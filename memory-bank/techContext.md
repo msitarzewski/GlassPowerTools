@@ -39,10 +39,10 @@ confirmed present.
   predate the current layout. Not an input to the merge, but not merely historical either: see the
   carried-forward findings below before Stage 2.
 
-Git state differs across the siblings: `glas.sh`, `glassdb`, `GlasSecretStore` and `GlassEditorKit`
-are Git checkouts; `glassDT` and `GlassConnectionKit` are not. This project is not a Git repository
-either, so per `AGENTS.md` substantial edits are staged and reviewed rather than committed, and Git
-is not initialised as an incidental task.
+Git state across the siblings after 2026-09-10: `glas.sh`, `glassdb`, `GlasSecretStore`,
+`GlassEditorKit` and `GlassConnectionKit` are Git checkouts; `glassDT` is not. This project is a Git
+repository on `main` since 2026-09-10. Commits still happen only on the user's instruction. The user
+notes glas.sh has an unmerged PR; local source is authoritative for this work.
 
 ## Sizes
 
@@ -136,13 +136,14 @@ records this as deliberate: "no publication or commit was made", 90 tests verifi
 glassdb pins "remain unchanged". `PROVENANCE.md` there names `9be45c9` as the base.
 
 Consequence: Glass Power Tools consumes `../GlasSecretStore` by local path, because that is the only
-copy with the RDP record Stage 4 needs and the only way to have one copy. Until that working tree is
-committed it is unrecoverable if lost. Committing it is a Git action in a sibling repository and
-happens only on the user's instruction.
+copy with the RDP record Stage 4 needs and the only way to have one copy. **Committed 2026-09-10 as
+`aa1b3f1` on `codex-completions` on the user's instruction; the tree is clean.** Upstream `main`
+still lacks it; glas.sh and glassdb still pin the older upstream revisions.
 
-**GlassConnectionKit has no version control at all.** It is the most-consumed package in the family
-(all three apps by local path since 2026-09-08, 38 tests) and is a plain directory. Same exposure,
-larger surface.
+**GlassConnectionKit is now under version control** — initialised 2026-09-10 on `main`, initial
+commit `d48a5ff`, 47 files, on the user's instruction. It is the most-consumed package in the
+family (all three apps by local path since 2026-09-08). `swift test` ran 21 tests in 3 suites on the
+macOS host on 2026-09-10; the package's own note says 38, and the difference was not investigated.
 
 **GlassEditorKit is clean.** glas.sh pins `5d8f003` = local `main` HEAD; glassdb pins `ae094a8`, an
 ancestor. Local path consumption is safe.
@@ -171,7 +172,15 @@ capability that owns the endpoint record arrives. That is exactly Stage 1's scop
 The *views* are already shared in `GlassConnectionUI` — `GlassNativeWindowFrame`,
 `GlassCanvasBackdrop(material:blurAmount:)`, `GlassWindowChrome.installTitlebarMaterial(in:)`,
 `GlassSettingSlider` — but the *state* feeding them is three different models with three different
-defaults. Stage 1 owns one model; the default is a visionOS-first design decision for the user.
+defaults. Stage 1 owns one model (`GlassLayers`, D2: transparent-first with frost on).
+
+**Migration limit found while building `GlassLayers`:** all three apps store those keys in their own
+`.standard` defaults domain (glas.sh `SettingsManager.swift:205`, glassdb `:142`, glassDT via
+`@AppStorage`), not in the App Group suite. A different bundle cannot read another app's
+`.standard` domain on iOS or visionOS at all, and on macOS only outside the sandbox. So the legacy
+migration is guaranteed only for keys already in the App Group suite or this app's own domain,
+best-effort on the Mac, and otherwise falls back to the D2 default. Do not promise that a user's
+current look carries over.
 
 ## Security posture to carry forward
 
