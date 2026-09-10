@@ -16,23 +16,49 @@ public enum GlassShellSettingsPage: String, CaseIterable, Hashable, Sendable {
     }
 }
 
-/// The one settings surface. Pages are the glassDT set; capabilities add
-/// sections to these pages in later stages rather than adding surfaces.
+/// A page in the one settings surface: the shell's own, or one a capability contributes.
+public enum GlassShellSettingsSelection: Hashable, Sendable {
+    case shell(GlassShellSettingsPage)
+    case capability(String)
+
+    /// The shell's pages first, then every registered capability's, in kind order.
+    public static func options(shell: [GlassShellSettingsPage] = GlassShellSettingsPage.allCases,
+                               capabilityPages: [GlassCapabilitySettingsPage]) -> [GlassShellSettingsSelection] {
+        shell.map(GlassShellSettingsSelection.shell) + capabilityPages.map { .capability($0.id) }
+    }
+}
+
+/// The one settings surface. Pages are the glassDT set plus whatever the registered
+/// capabilities contribute; nothing adds a second surface.
 public struct GlassShellSettingsView: View {
     private let model: GlassShellModel
-    @State private var page = GlassShellSettingsPage.general
+    @State private var page = GlassShellSettingsSelection.shell(.general)
 
     public init(model: GlassShellModel) { self.model = model }
 
+    private var capabilityPages: [GlassCapabilitySettingsPage] { model.registry.settingsPages }
+
+    private func title(_ selection: GlassShellSettingsSelection) -> String {
+        switch selection {
+        case .shell(let page): page.title
+        case .capability(let id): capabilityPages.first { $0.id == id }?.title ?? id
+        }
+    }
+
     public var body: some View {
-        GlassSettingsSections(selection: $page, options: GlassShellSettingsPage.allCases,
-                              title: \.title, pickerIdentifier: "settings-sections") { page in
+        GlassSettingsSections(selection: $page,
+                              options: GlassShellSettingsSelection.options(capabilityPages: capabilityPages),
+                              title: title, pickerIdentifier: "settings-sections") { selection in
             Form {
-                switch page {
-                case .general: general
-                case .appearance: GlassLayerControls()
-                case .privacy: privacy
-                case .about: about
+                switch selection {
+                case .shell(.general): general
+                case .shell(.appearance): GlassLayerControls()
+                case .shell(.privacy): privacy
+                case .shell(.about): about
+                case .capability(let id):
+                    if let page = capabilityPages.first(where: { $0.id == id }) {
+                        page.makeView().accessibilityIdentifier("settings-page-\(id)")
+                    }
                 }
             }
             .formStyle(.grouped)
@@ -48,6 +74,12 @@ public struct GlassShellSettingsView: View {
             LabeledContent("Sharing", value: model.hasSharedContainer ? "Shared with the Glass family" : "This app only")
             Text(model.hostLibraryStatus).font(.footnote).foregroundStyle(.secondary)
             LabeledContent("Hosts", value: model.hosts.count, format: .number)
+            if model.records.count != model.hosts.count {
+                // Diagnostics only: the family apps each published their own record per machine.
+                LabeledContent("Catalog records", value: model.records.count, format: .number)
+                Text("Records that describe the same machine are shown as one host. They are combined here, not rewritten in the shared library.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
             if let problem = model.preferencesProblem {
                 Text(problem).font(.footnote).foregroundStyle(.orange)
             }

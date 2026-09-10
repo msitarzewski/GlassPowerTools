@@ -13,9 +13,9 @@ public struct GlassShellLibraryView: View {
     @State private var scope = GlassLibraryScope.allConnections
     @State private var search = ""
     @State private var addingHost = false
-    @State private var editingHost: HostProfile?
-    @State private var addingServiceTo: HostProfile?
-    @State private var deleting: HostProfile?
+    @State private var editingHost: GlassShellHost?
+    @State private var addingServiceTo: GlassShellHost?
+    @State private var deleting: GlassShellHost?
     @State private var showSettings = false
     @Environment(\.scenePhase) private var scenePhase
 
@@ -33,6 +33,9 @@ public struct GlassShellLibraryView: View {
                 }
             } toolbarActions: {
                 HStack {
+                    ForEach(model.registry.registered, id: \.kind) { capability in
+                        capability.libraryToolbarItems()
+                    }
                     Button("Add Host", systemImage: "plus") { addingHost = true }
                         .keyboardShortcut("n", modifiers: .command)
                         .accessibilityIdentifier("connection-library-add-host")
@@ -67,10 +70,20 @@ public struct GlassShellLibraryView: View {
     private func row(_ item: GlassLibraryItem<HostID>) -> some View {
         GlassLibraryConnectionRow(name: item.name, subtitle: item.subtitle, isFavorite: item.isFavorite,
                                   lastConnected: item.lastConnected, nameAccessibilityIdentifier: "host-row-\(item.name)") {
+            // The spatial sidebar is narrow: an icon-only Connect (press and hold still opens the
+            // picker) and the service icons in one row, so nothing wraps. Wide rows keep the label.
+            #if os(visionOS)
+            HStack(spacing: 6) {
+                serviceIcons(for: item.id)
+                GlassShellConnectControl(model: model, hostID: item.id, compact: true)
+            }
+            .fixedSize(horizontal: true, vertical: false)
+            #else
             HStack(spacing: 8) {
                 serviceIcons(for: item.id)
                 GlassShellConnectControl(model: model, hostID: item.id)
             }
+            #endif
         }
         .contextMenu {
             Button("Connect") { model.connect(hostID: item.id) }
@@ -110,7 +123,7 @@ public struct GlassShellLibraryView: View {
         }
     }
 
-    private func detail(_ host: HostProfile) -> some View {
+    private func detail(_ host: GlassShellHost) -> some View {
         GlassLibraryDetail(title: host.displayName, content: {
             Section("Services") {
                 if host.services.isEmpty {
@@ -125,6 +138,9 @@ public struct GlassShellLibraryView: View {
                         Button("Connect") { model.connect(hostID: host.id, endpointID: service.endpointID) }
                             .buttonStyle(.bordered)
                             .accessibilityIdentifier("host-service-connect-\(service.kind.rawValue)")
+                        if let owner = host.member(owning: service.endpointID) {
+                            model.registry.serviceDetailActions(service: service, host: owner)
+                        }
                     }
                     .contextMenu {
                         Button("Remove Service", role: .destructive) {
@@ -187,11 +203,14 @@ public struct GlassShellConnectControl: View {
     private let model: GlassShellModel
     private let hostID: HostID
     private let prominent: Bool
+    /// Icon-only, single line, for narrow rows; the picker still opens on press-and-hold.
+    private let compact: Bool
 
-    public init(model: GlassShellModel, hostID: HostID, prominent: Bool = false) {
+    public init(model: GlassShellModel, hostID: HostID, prominent: Bool = false, compact: Bool = false) {
         self.model = model
         self.hostID = hostID
         self.prominent = prominent
+        self.compact = compact
     }
 
     private var services: [HostServiceLink] { model.services(for: hostID) }
@@ -218,11 +237,23 @@ public struct GlassShellConnectControl: View {
         }
     }
 
-    private var connectButton: some View {
-        Button("Connect", systemImage: "play.fill") { model.connect(hostID: hostID) }
-            .buttonStyle(.borderedProminent)
-            .controlSize(prominent ? .large : .small)
-            .accessibilityIdentifier("host-connect")
+    @ViewBuilder private var connectButton: some View {
+        if compact {
+            Button("Connect", systemImage: "play.fill") { model.connect(hostID: hostID) }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .fixedSize()
+                .accessibilityLabel("Connect")
+                .accessibilityIdentifier("host-connect")
+        } else {
+            Button("Connect", systemImage: "play.fill") { model.connect(hostID: hostID) }
+                .lineLimit(1)
+                .fixedSize()
+                .buttonStyle(.borderedProminent)
+                .controlSize(prominent ? .large : .small)
+                .accessibilityIdentifier("host-connect")
+        }
     }
 
     @ViewBuilder private var serviceButtons: some View {

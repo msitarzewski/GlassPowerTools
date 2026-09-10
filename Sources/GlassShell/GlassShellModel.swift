@@ -64,7 +64,11 @@ public final class GlassShellModel {
     public static let sharedContainerIdentifier = "group.sh.glas.shared"
     public static let catalogRelativePath = "GlassHostCatalog/hosts.json"
 
-    public private(set) var hosts: [HostProfile] = []
+    /// The library's hosts: catalog records that describe the same machine, consolidated
+    /// (see `GlassShellHostGrouping`). Never written back as one record before Stage 6.
+    public private(set) var hosts: [GlassShellHost] = []
+    /// The catalog as stored, one record per publishing app and endpoint. For diagnostics.
+    public private(set) var records: [HostProfile] = []
     public private(set) var isLoaded = false
     public var errorMessage: String?
     public private(set) var hasSharedContainer: Bool
@@ -162,7 +166,12 @@ public final class GlassShellModel {
     public func load() async {
         reloadPreferencesIfUnavailable()
         do {
-            hosts = try await catalog.snapshot()
+            #if DEBUG
+            try await seedForUITestingIfRequested()
+            #endif
+            records = try await catalog.snapshot()
+            hosts = GlassShellHostGrouping.group(records)
+            migratePreferencesToCanonicalHosts()
             isLoaded = true
             errorMessage = nil
         } catch {
@@ -197,7 +206,17 @@ public final class GlassShellModel {
         }
     }
 
-    public func host(_ id: HostID) -> HostProfile? { hosts.first { $0.id == id } }
+    /// The consolidated host for a canonical id — or for any member record's id, so a selection
+    /// or preference keyed on a record that later joined a group still resolves.
+    public func host(_ id: HostID) -> GlassShellHost? {
+        hosts.first { $0.id == id } ?? hosts.first { $0.contains(id) }
+    }
+
+    /// The stored record with this id, if any.
+    public func record(_ id: HostID) -> HostProfile? { records.first { $0.id == id } }
+
+    /// The canonical id for any host or member id.
+    public func canonicalID(for id: HostID) -> HostID { host(id)?.id ?? id }
 
     public func services(for id: HostID) -> [HostServiceLink] { host(id)?.services ?? [] }
 
@@ -206,11 +225,36 @@ public final class GlassShellModel {
         return HostServiceKind.allCases.filter(present.contains)
     }
 
-    public func isFavorite(_ id: HostID) -> Bool { preferences[host: id].isFavorite }
-    public func lastConnected(_ id: HostID) -> Date? { preferences[host: id].lastConnected }
+    public func isFavorite(_ id: HostID) -> Bool { preferences[host: canonicalID(for: id)].isFavorite }
+    public func lastConnected(_ id: HostID) -> Date? { preferences[host: canonicalID(for: id)].lastConnected }
     public func lastUsedService(for id: HostID) -> HostServiceLink? {
-        guard let endpointID = preferences[host: id].lastUsedEndpointID else { return nil }
+        guard let endpointID = preferences[host: canonicalID(for: id)].lastUsedEndpointID else { return nil }
         return services(for: id).first { $0.endpointID == endpointID }
+    }
+
+    /// Preferences written against a record that has since joined a group move to the group's
+    /// canonical id: favorite if any member was, the latest connection time, and the last-used
+    /// service of whichever member connected most recently. Idempotent; persisted only when the
+    /// file is writable and something actually moved.
+    private func migratePreferencesToCanonicalHosts() {
+        var moved = false
+        for host in hosts where host.isConsolidated {
+            var canonical = preferences.hosts[host.id] ?? .init()
+            for member in host.members.dropFirst() {
+                guard let stray = preferences.hosts.removeValue(forKey: member.id) else { continue }
+                moved = true
+                canonical.isFavorite = canonical.isFavorite || stray.isFavorite
+                if let strayDate = stray.lastConnected, strayDate > (canonical.lastConnected ?? .distantPast) {
+                    canonical.lastConnected = strayDate
+                    canonical.lastUsedEndpointID = stray.lastUsedEndpointID ?? canonical.lastUsedEndpointID
+                } else if canonical.lastUsedEndpointID == nil {
+                    canonical.lastUsedEndpointID = stray.lastUsedEndpointID
+                }
+            }
+            if moved { preferences.hosts[host.id] = canonical }
+        }
+        guard moved, !preferencesReadOnly else { return }
+        do { try persistPreferences() } catch { errorMessage = GlassShellError.message(for: error) }
     }
 
     // MARK: Mutations
@@ -224,52 +268,85 @@ public final class GlassShellModel {
         return profile
     }
 
+    /// Renames every member record (so the group stays together) and applies aliases and tags to
+    /// the canonical one. Each record is re-read right before writing so services another app
+    /// paired since our last load survive. (Interim until the kit offers an in-lock field edit.)
     public func updateHost(_ id: HostID, displayName: String, aliases: [String], tags: [String]) async throws {
-        guard let existing = host(id) else { throw GlassShellError.hostNotFound(id) }
+        guard let host = host(id) else { throw GlassShellError.hostNotFound(id) }
         let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw GlassShellError.invalidName }
-        // Re-read right before writing so services another app paired since our last load
-        // survive; only the fields the editor changed are applied. (Interim until the kit
-        // offers a field-level in-lock edit.)
-        let fresh = (try await catalog.snapshot()).first { $0.id == id } ?? existing
-        let updated = try HostProfile(id: fresh.id, displayName: trimmed, aliases: aliases,
-                                      services: fresh.services, tags: tags, createdAt: fresh.createdAt,
-                                      updatedAt: max(Date(), fresh.updatedAt), lastWriterID: preferences.writerID)
-        try await catalog.upsert(updated)
+        let snapshot = try await catalog.snapshot()
+        for member in host.members {
+            let fresh = snapshot.first { $0.id == member.id } ?? member
+            let isCanonical = member.id == host.id
+            let updated = try HostProfile(id: fresh.id, displayName: trimmed,
+                                          aliases: isCanonical ? aliases : fresh.aliases,
+                                          services: fresh.services,
+                                          tags: isCanonical ? tags : fresh.tags,
+                                          createdAt: fresh.createdAt,
+                                          updatedAt: max(Date(), fresh.updatedAt), lastWriterID: preferences.writerID)
+            try await catalog.upsert(updated)
+        }
         await load()
     }
 
+    /// Deletes every record that makes up the host.
     public func deleteHost(_ id: HostID) async throws {
-        try await catalog.delete(hostID: id)
-        preferences.hosts[id] = nil
+        guard let host = host(id) else { throw GlassShellError.hostNotFound(id) }
+        for member in host.members { try await catalog.delete(hostID: member.id) }
+        for member in host.members { preferences.hosts[member.id] = nil }
         try persistPreferences()
         await load()
     }
 
-    /// Creates a metadata-only service on the host. The capability that owns the
-    /// endpoint record fills it in later; nothing here can connect.
+    /// Creates a metadata-only service on the host's canonical record. The capability that
+    /// owns the endpoint record fills it in later; nothing here can connect.
     @discardableResult
     public func addService(kind: HostServiceKind, displayName: String, to id: HostID) async throws -> HostServiceLink {
         let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw GlassShellError.invalidName }
         let link = HostServiceLink(endpointID: EndpointID(), kind: kind, displayName: trimmed)
-        try await catalog.pair(link, with: id)
+        try await catalog.pair(link, with: canonicalID(for: id))
         await load()
         return link
     }
 
+    /// Removes the service from whichever member record owns it.
     public func removeService(_ endpointID: EndpointID, from id: HostID) async throws {
-        try await catalog.unpair(endpointID: endpointID, from: id)
-        if preferences[host: id].lastUsedEndpointID == endpointID {
-            preferences[host: id].lastUsedEndpointID = nil
+        guard let host = host(id) else { throw GlassShellError.hostNotFound(id) }
+        guard let owner = host.member(owning: endpointID) else { throw GlassShellError.serviceNotFound(endpointID) }
+        try await catalog.unpair(endpointID: endpointID, from: owner.id)
+        if preferences[host: host.id].lastUsedEndpointID == endpointID {
+            preferences[host: host.id].lastUsedEndpointID = nil
             try persistPreferences()
         }
         await load()
     }
 
     public func toggleFavorite(_ id: HostID) {
-        preferences[host: id].isFavorite.toggle()
+        preferences[host: canonicalID(for: id)].isFavorite.toggle()
         do { try persistPreferences() } catch { errorMessage = GlassShellError.message(for: error) }
+    }
+
+    /// Merges a consolidated host's member records into its canonical record **in the catalog**:
+    /// every service moves to the canonical record, aliases and tags are unioned, and the emptied
+    /// members are deleted. Written for Stage 6 and deliberately not reachable from the UI: the
+    /// three source applications still read `hosts.json` by their own record ids, and moving their
+    /// endpoints would strip those apps of their hosts until they are retired.
+    public func consolidateRecords(of id: HostID) async throws {
+        guard let host = host(id) else { throw GlassShellError.hostNotFound(id) }
+        guard host.isConsolidated else { return }
+        for member in host.members.dropFirst() {
+            for link in member.services { try await catalog.move(endpointID: link.endpointID, to: host.id) }
+            // `move` tombstones a record once its last service leaves; delete only what is left.
+            if member.services.isEmpty { try await catalog.delete(hostID: member.id) }
+        }
+        let fresh = (try await catalog.snapshot()).first { $0.id == host.id } ?? host.canonical
+        let merged = try HostProfile(id: fresh.id, displayName: fresh.displayName, aliases: host.aliases,
+                                     services: fresh.services, tags: host.tags, createdAt: fresh.createdAt,
+                                     updatedAt: max(Date(), fresh.updatedAt), lastWriterID: preferences.writerID)
+        try await catalog.upsert(merged)
+        await load()
     }
 
     // MARK: Connecting
@@ -287,21 +364,51 @@ public final class GlassShellModel {
 
     public func connect(hostID: HostID, endpointID: EndpointID) {
         guard let host = host(hostID) else { errorMessage = GlassShellError.hostNotFound(hostID).localizedDescription; return }
-        guard let service = host.services.first(where: { $0.endpointID == endpointID }) else {
+        guard let service = host.services.first(where: { $0.endpointID == endpointID }),
+              let owner = host.member(owning: endpointID) else {
             errorMessage = GlassShellError.serviceNotFound(endpointID).localizedDescription; return
         }
         // The user chose this service, so remember it either way; but "last connected" is only
         // true when a capability actually opens it. The placeholder connects nothing.
-        preferences[host: hostID].lastUsedEndpointID = endpointID
+        // The capability receives the record that owns the endpoint — its endpoint id is what
+        // the capability's own store is keyed by.
+        preferences[host: host.id].lastUsedEndpointID = endpointID
         if let capability = registry.capability(for: service.kind) {
-            preferences[host: hostID].lastConnected = Date()
+            preferences[host: host.id].lastConnected = Date()
             do { try persistPreferences() } catch { errorMessage = GlassShellError.message(for: error) }
-            capability.open(service: service, host: host)
+            capability.open(service: service, host: owner)
         } else {
             do { try persistPreferences() } catch { errorMessage = GlassShellError.message(for: error) }
-            placeholderRequest = GlassShellPlaceholderRequest(host: host, service: service)
+            placeholderRequest = GlassShellPlaceholderRequest(host: owner, service: service)
         }
     }
+
+    #if DEBUG
+    /// UI tests seed the isolated catalog through a launch argument, because the runner cannot
+    /// reach the app's container on iOS or visionOS:
+    /// `--ui-testing-seed-hosts "juliet:ssh|juliet:rdp|oscar:ssh+database"` creates one record
+    /// per `|` entry, named before the colon, with one service per `+`-separated kind. Only honoured
+    /// alongside `--ui-testing`, only into a catalog that is not under a real Group Container,
+    /// and only when that catalog is empty.
+    private func seedForUITestingIfRequested() async throws {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard arguments.contains("--ui-testing"),
+              let index = arguments.firstIndex(of: "--ui-testing-seed-hosts"), arguments.indices.contains(index + 1),
+              !catalogFileURL.path.contains("Group Containers"),
+              try await catalog.snapshot().isEmpty else { return }
+        for (offset, entry) in arguments[index + 1].split(separator: "|").enumerated() {
+            let parts = entry.split(separator: ":", maxSplits: 1)
+            guard let name = parts.first.map(String.init), !name.isEmpty else { continue }
+            let kinds = parts.count > 1 ? parts[1].split(separator: "+").compactMap { HostServiceKind(rawValue: String($0)) } : []
+            let services = kinds.map {
+                HostServiceLink(endpointID: EndpointID(), kind: $0, displayName: "\(GlassServicePresentation.displayName(for: $0)) on \(name)")
+            }
+            let created = Date(timeIntervalSince1970: 1_700_000_000 + Double(offset))
+            try await catalog.upsert(try HostProfile(displayName: name, aliases: [], services: services,
+                                                     createdAt: created, updatedAt: created, lastWriterID: writerID))
+        }
+    }
+    #endif
 
     private func switchToLocalCatalog(reason: String) {
         catalogFileURL = storageDirectory.appendingPathComponent(Self.catalogRelativePath)

@@ -5,7 +5,7 @@ import GlassConnectionKit
 /// those belong to the capability that owns each service.
 public struct GlassShellHostEditor: View {
     private let model: GlassShellModel
-    private let host: HostProfile?
+    private let host: GlassShellHost?
     private let onSave: (HostID) -> Void
     @State private var displayName: String
     @State private var aliases: String
@@ -14,7 +14,7 @@ public struct GlassShellHostEditor: View {
     @State private var saving = false
     @Environment(\.dismiss) private var dismiss
 
-    public init(model: GlassShellModel, host: HostProfile?, onSave: @escaping (HostID) -> Void) {
+    public init(model: GlassShellModel, host: GlassShellHost?, onSave: @escaping (HostID) -> Void) {
         self.model = model
         self.host = host
         self.onSave = onSave
@@ -72,14 +72,14 @@ public struct GlassShellHostEditor: View {
 /// created on the host and its capability fills in the endpoint later.
 public struct GlassShellServiceEditor: View {
     private let model: GlassShellModel
-    private let host: HostProfile
+    private let host: GlassShellHost
     @State private var kind = HostServiceKind.ssh
     @State private var displayName = ""
     @State private var error: String?
     @State private var saving = false
     @Environment(\.dismiss) private var dismiss
 
-    public init(model: GlassShellModel, host: HostProfile) {
+    public init(model: GlassShellModel, host: GlassShellHost) {
         self.model = model
         self.host = host
     }

@@ -39,9 +39,9 @@ final class GlassShellLibraryUITests: XCTestCase {
 
     // MARK: Helpers
 
-    private func launch() -> XCUIApplication {
+    private func launch(extraArguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments += ["--ui-testing", runID.uuidString]
+        app.launchArguments += ["--ui-testing", runID.uuidString] + extraArguments
         #if os(macOS)
         app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
         #endif
@@ -160,6 +160,13 @@ final class GlassShellLibraryUITests: XCTestCase {
                       "ssh service after adding the default service (detail Connect or row icon)")
         snap("03-host-with-ssh-service")
 
+        // SSH is a live capability since Stage 2, so Connect on it opens the terminal. The
+        // placeholder is the contract for kinds no capability owns yet: use a seeded database
+        // service for that assertion.
+        app.terminate()
+        runID = UUID()   // a fresh isolated store: the seeder only fills an empty catalog
+        app = launch(extraArguments: ["--ui-testing-seed-hosts", "dbhost:database"])
+        openDetail(of: "dbhost")
         tap("host-connect")
         let placeholder = element("placeholder-session")
         XCTAssertTrue(placeholder.waitForExistence(timeout: 10))
@@ -273,5 +280,24 @@ final class GlassShellLibraryUITests: XCTestCase {
         }
         tap("layers-reset")   // leave the app's own defaults at D2
         closeSettings()
+    }
+
+    /// Records from different family apps for the same machine are one row with one icon per
+    /// service. Seeded through `--ui-testing-seed-hosts` (DEBUG, isolated catalog only).
+    func testSameMachineRecordsAreOneRowWithAllServiceIcons() {
+        app.terminate()
+        runID = UUID()
+        app = launch(extraArguments: ["--ui-testing-seed-hosts", "juliet:ssh|juliet:rdp|oscar:rdp+ssh"])
+        enterAllConnections()
+        let rows = app.descendants(matching: .any).matching(identifier: "host-row-juliet")
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 15), "juliet row")
+        XCTAssertEqual(rows.count, 1, "one row per machine")
+        XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "host-row-oscar").count, 1)
+        // Icons for both kinds, on both hosts: two of each across the two rows.
+        XCTAssertTrue(element("host-service-ssh").waitForExistence(timeout: 5))
+        XCTAssertTrue(element("host-service-rdp").waitForExistence(timeout: 5))
+        XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "host-service-ssh").count, 2)
+        XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "host-service-rdp").count, 2)
+        snap("09-consolidated-hosts")
     }
 }
