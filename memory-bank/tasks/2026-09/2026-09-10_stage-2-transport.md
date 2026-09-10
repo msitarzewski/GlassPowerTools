@@ -107,6 +107,37 @@ SwiftTreeSitter 0.25.0, tree-sitter 0.25.10; W2 added SwiftTerm 1.15.0. Citadel 
 swift-crypto 4.5.1..<5.0.0 and swift-nio ≥ 2.101.3 — no conflict with GlassEditorKit (tree-sitter
 grammars only). One graph, one copy of each.
 
+## Addendum — SFTP server extensions and file times (coordinator request, after `6e5ffe6`)
+
+W2 found the SFTP browser taking the hardlink / posix-rename / fsync fallback paths
+unconditionally and having no way to set file times. Both were Citadel capabilities the engine had
+not surfaced (`SFTPClient.serverExtensions` / `supportsExtension` at `SFTPClient.swift:82-100`,
+`hardLink` `:587`, `posixRename` `:613`, `SFTPFile.synchronize` `SFTPFile.swift:322`;
+`SFTPFileAttributes.accessModificationTime` sets the `acmodtime` flag automatically,
+`SFTPFileFlags.swift:94-118`). Moved through, not reimplemented:
+
+- `public struct SFTPServerExtensions` — `raw: [String: String]`, `version(of:)`,
+  `supports(_:version:)`, `supportsPOSIXRename` / `supportsHardLink` / `supportsFSync` (exact
+  version "1", the OpenSSH contract), name constants `posixRename`, `hardLink`, `fsync`.
+- `SFTPSession` gained `var serverExtensions: SFTPServerExtensions { get async }`,
+  `posixRename(_:to:)`, `hardLink(_:to:)`, and `setAttributes(_ changes: SFTPAttributeChanges, at:)`
+  as the requirement; `setPermissions(_:at:)` is now a convenience over it, joined by
+  `setTimes(at:accessed:modified:)` (fills the missing side from the file, because SFTP v3 sends
+  the pair) and `replace(_:with:)` (posix-rename when advertised, else remove + rename — the
+  decision the browser made by hand).
+- `public struct SFTPAttributeChanges { permissions?, size?, accessed?, modified? }`; a lone time
+  is refused with `SFTPSessionError.partialTimes`.
+- `SFTPFileHandle` gained `synchronize()`.
+- Citadel's `SFTPError.unsupportedExtension(name)` maps to `SFTPSessionError.extensionUnsupported(name)`.
+
+Tests: `SFTPExtensionsAndTimesTests` (5) — name/version queries, flag derivation, `setTimes`
+fill-in and partial refusal, `setPermissions` convenience, consumer choice with and without the
+extensions (fake session records which path ran). The gated real-host test now also checks that
+OpenSSH advertises extensions, round-trips times and permissions, and exercises `replace` and
+`synchronize` where advertised. **Unit: 45 tests in 8 suites passed** (two consecutive runs);
+visionOS Simulator build succeeded, 0 warnings. Real host still blocked by the Local Network
+grant (same `errno 65`).
+
 ## Open items
 
 - Real-host results are pending the Local Network grant; nothing in the code path is untested

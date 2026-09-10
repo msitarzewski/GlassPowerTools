@@ -328,10 +328,11 @@ public actor SSHTransport {
         return channel
     }
 
-    /// Runs one command and returns its output (glas.sh `executeRemoteCommand`).
-    public func execute(_ command: String, maxResponseBytes: Int = .max) async throws -> String {
+    /// Runs one command and returns its output. Defaults match glas.sh `executeRemoteCommand`
+    /// (Models.swift:2470): unbounded response, one-hour timeout.
+    public func execute(_ command: String, maxResponseBytes: Int = .max, timeout: Duration = .seconds(3_600)) async throws -> String {
         guard let client, client.isConnected else { throw SSHTransportError.notConnected }
-        let buffer = try await client.executeCommand(command, maxResponseSize: maxResponseBytes)
+        let buffer = try await client.executeCommand(command, maxResponseSize: maxResponseBytes, executionTimeout: TimeAmount(timeout))
         return String(buffer: buffer)
     }
 

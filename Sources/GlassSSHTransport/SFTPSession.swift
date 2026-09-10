@@ -55,6 +55,56 @@ public struct SFTPEntry: Sendable, Hashable, Identifiable {
     }
 }
 
+/// The extensions the server advertised at SFTP init (name → version), with the three OpenSSH
+/// extensions consumers decide on. Pure data so consumers and tests can reason about it.
+public struct SFTPServerExtensions: Sendable, Hashable {
+    public static let posixRename = "posix-rename@openssh.com"
+    public static let hardLink = "hardlink@openssh.com"
+    public static let fsync = "fsync@openssh.com"
+
+    public let raw: [String: String]
+    public init(_ raw: [String: String] = [:]) { self.raw = raw }
+
+    public func version(of name: String) -> String? { raw[name] }
+    /// True when the server advertises `name`; with `version`, only that exact version.
+    public func supports(_ name: String, version: String? = nil) -> Bool {
+        guard let advertised = raw[name] else { return false }
+        guard let version else { return true }
+        return advertised == version
+    }
+    public var supportsPOSIXRename: Bool { supports(Self.posixRename, version: "1") }
+    public var supportsHardLink: Bool { supports(Self.hardLink, version: "1") }
+    public var supportsFSync: Bool { supports(Self.fsync, version: "1") }
+}
+
+/// Attributes to change with one SETSTAT. Only non-nil fields are sent. SFTP v3 carries access
+/// and modification time together (`acmodtime`), so both must be given to change either; use
+/// `setTimes(at:accessed:modified:)` to fill the other side from the file's current value.
+public struct SFTPAttributeChanges: Sendable, Hashable {
+    public var permissions: UInt32?
+    public var size: UInt64?
+    public var accessed: Date?
+    public var modified: Date?
+    public init(permissions: UInt32? = nil, size: UInt64? = nil, accessed: Date? = nil, modified: Date? = nil) {
+        self.permissions = permissions
+        self.size = size
+        self.accessed = accessed
+        self.modified = modified
+    }
+    public var isEmpty: Bool { permissions == nil && size == nil && accessed == nil && modified == nil }
+    public var hasPartialTimes: Bool { (accessed == nil) != (modified == nil) }
+
+    var citadelAttributes: SFTPFileAttributes {
+        var attributes = SFTPFileAttributes.none
+        attributes.permissions = permissions
+        attributes.size = size
+        if let accessed, let modified {
+            attributes.accessModificationTime = .init(accessTime: accessed, modificationTime: modified)
+        }
+        return attributes
+    }
+}
+
 public struct SFTPOpenMode: OptionSet, Sendable, Hashable {
     public let rawValue: UInt32
     public init(rawValue: UInt32) { self.rawValue = rawValue }
@@ -84,6 +134,9 @@ public protocol SFTPFileHandle: Sendable {
     func read(from offset: UInt64, length: UInt32) async throws -> Data
     func write(_ data: Data, at offset: UInt64) async throws
     func attributes() async throws -> SFTPAttributes
+    /// Flushes the file to stable storage (`fsync@openssh.com`); throws
+    /// `SFTPSessionError.extensionUnsupported` when the server lacks it.
+    func synchronize() async throws
     func close() async throws
 }
 
@@ -98,7 +151,13 @@ public protocol SFTPSession: Sendable {
     func removeFile(_ path: String) async throws
     func removeDirectory(_ path: String) async throws
     func rename(_ path: String, to newPath: String) async throws
-    func setPermissions(_ permissions: UInt32, at path: String) async throws
+    /// Atomic rename that replaces an existing destination (`posix-rename@openssh.com`).
+    func posixRename(_ path: String, to newPath: String) async throws
+    /// `hardlink@openssh.com`.
+    func hardLink(_ path: String, to newPath: String) async throws
+    func setAttributes(_ changes: SFTPAttributeChanges, at path: String) async throws
+    /// What the server advertised at init; decides which of the above are available.
+    var serverExtensions: SFTPServerExtensions { get async }
     var isActive: Bool { get async }
     func close() async throws
 }
@@ -113,6 +172,35 @@ public extension SFTPSession {
 
     func open(_ path: String, mode: SFTPOpenMode) async throws -> any SFTPFileHandle {
         try await open(path, mode: mode, permissions: nil)
+    }
+
+    func setPermissions(_ permissions: UInt32, at path: String) async throws {
+        try await setAttributes(SFTPAttributeChanges(permissions: permissions), at: path)
+    }
+
+    /// Sets either or both times. When only one is given, the other is read from the file first
+    /// because the protocol sends them as a pair.
+    func setTimes(at path: String, accessed: Date? = nil, modified: Date? = nil) async throws {
+        guard accessed != nil || modified != nil else { return }
+        var accessed = accessed, modified = modified
+        if accessed == nil || modified == nil {
+            let current = try await attributes(at: path, followSymlinks: true)
+            accessed = accessed ?? current.accessTime ?? current.modificationTime ?? Date()
+            modified = modified ?? current.modificationTime ?? current.accessTime ?? Date()
+        }
+        try await setAttributes(SFTPAttributeChanges(accessed: accessed, modified: modified), at: path)
+    }
+
+    /// Replaces `destination` with `path` atomically where the server supports it, otherwise by
+    /// removing the destination first and renaming — the choice every consumer used to make
+    /// by hand.
+    func replace(_ destination: String, with path: String) async throws {
+        if await serverExtensions.supportsPOSIXRename {
+            try await posixRename(path, to: destination)
+        } else {
+            try? await removeFile(destination)
+            try await rename(path, to: destination)
+        }
     }
 
     /// Reads a whole file in chunks, stopping at `maxBytes` and on cancellation.
@@ -163,6 +251,10 @@ public extension SFTPSession {
 public enum SFTPSessionError: Error, Sendable, Equatable {
     case fileTooLarge(limit: Int)
     case closed
+    /// The server did not advertise the named extension.
+    case extensionUnsupported(String)
+    /// `SFTPAttributeChanges` carried one time without the other.
+    case partialTimes
 }
 
 // MARK: - Citadel-backed implementation
@@ -237,15 +329,34 @@ final class CitadelSFTPSession: SFTPSession {
         try await client.rename(at: path, to: newPath)
     }
 
-    func setPermissions(_ permissions: UInt32, at path: String) async throws {
+    func posixRename(_ path: String, to newPath: String) async throws {
         try Task.checkCancellation()
-        var attributes = SFTPFileAttributes.none
-        attributes.permissions = permissions
-        try await client.setAttributes(at: path, to: attributes)
+        try await Self.mappingExtensionErrors { try await client.posixRename(at: path, to: newPath) }
+    }
+
+    func hardLink(_ path: String, to newPath: String) async throws {
+        try Task.checkCancellation()
+        try await Self.mappingExtensionErrors { try await client.hardLink(at: path, to: newPath) }
+    }
+
+    func setAttributes(_ changes: SFTPAttributeChanges, at path: String) async throws {
+        try Task.checkCancellation()
+        guard !changes.hasPartialTimes else { throw SFTPSessionError.partialTimes }
+        guard !changes.isEmpty else { return }
+        try await client.setAttributes(at: path, to: changes.citadelAttributes)
+    }
+
+    var serverExtensions: SFTPServerExtensions {
+        get async { SFTPServerExtensions(client.serverExtensions) }
     }
 
     func close() async throws {
         try await client.close()
+    }
+
+    static func mappingExtensionErrors<T>(_ body: () async throws -> T) async throws -> T {
+        do { return try await body() }
+        catch SFTPError.unsupportedExtension(let name) { throw SFTPSessionError.extensionUnsupported(name) }
     }
 }
 
@@ -270,6 +381,11 @@ final class CitadelSFTPFileHandle: SFTPFileHandle, @unchecked Sendable {
 
     func attributes() async throws -> SFTPAttributes {
         SFTPAttributes(try await file.readAttributes())
+    }
+
+    func synchronize() async throws {
+        try Task.checkCancellation()
+        try await CitadelSFTPSession.mappingExtensionErrors { try await file.synchronize() }
     }
 
     func close() async throws {

@@ -100,6 +100,26 @@ struct SSHTransportIntegrationTests {
         try await editor.saveDocument("round trip\n", to: file)
         #expect(try await editor.openDocument(at: file) == "round trip\n")
         #expect(try await sftp.list(directory).map(\.name) == ["roundtrip.txt"])
+
+        // Extensions and times on a real OpenSSH sftp-server.
+        let extensions = await sftp.serverExtensions
+        #expect(!extensions.raw.isEmpty, "OpenSSH advertises extensions at init")
+        let accessed = Date(timeIntervalSince1970: 1_600_000_000), modified = Date(timeIntervalSince1970: 1_600_000_100)
+        try await sftp.setTimes(at: file, accessed: accessed, modified: modified)
+        let stamped = try await sftp.attributes(at: file)
+        #expect(stamped.modificationTime == modified && stamped.accessTime == accessed)
+        try await sftp.setPermissions(0o600, at: file)
+        #expect(try await sftp.attributes(at: file).mode == 0o600)
+        if extensions.supportsPOSIXRename {
+            try await editor.saveDocument("replacement\n", to: file + ".tmp")
+            try await sftp.replace(file, with: file + ".tmp")
+            #expect(try await editor.openDocument(at: file) == "replacement\n")
+        }
+        if extensions.supportsFSync {
+            let handle = try await sftp.open(file, mode: [.write])
+            try await handle.synchronize()
+            try await handle.close()
+        }
         try await sftp.rename(file, to: file + ".renamed")
         #expect(try await sftp.list(directory).map(\.name) == ["roundtrip.txt.renamed"])
         try await sftp.removeFile(file + ".renamed")

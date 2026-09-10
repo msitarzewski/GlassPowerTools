@@ -37,6 +37,13 @@ actor FakeSFTPSession: SFTPSession {
     var files: [String: Data] = [:]
     var directories: Set<String> = ["/"]
     var closed = false
+    var permissions: [String: UInt32] = [:]
+    var times: [String: (accessed: Date, modified: Date)] = [:]
+    var extensions: SFTPServerExtensions
+    var posixRenames = 0
+    var hardLinks = 0
+
+    init(extensions: SFTPServerExtensions = SFTPServerExtensions()) { self.extensions = extensions }
 
     func list(_ path: String) async throws -> [SFTPEntry] {
         let base = path.hasSuffix("/") ? path : path + "/"
@@ -47,7 +54,8 @@ actor FakeSFTPSession: SFTPSession {
     func attributes(at path: String, followSymlinks: Bool) async throws -> SFTPAttributes {
         if directories.contains(path) { return SFTPAttributes(permissions: 0o040755) }
         guard let data = files[path] else { throw SFTPSessionError.closed }
-        return SFTPAttributes(size: UInt64(data.count), permissions: 0o100644)
+        return SFTPAttributes(size: UInt64(data.count), permissions: permissions[path] ?? 0o100644,
+                              accessTime: times[path]?.accessed, modificationTime: times[path]?.modified)
     }
     func realPath(_ path: String) async throws -> String { path }
     func open(_ path: String, mode: SFTPOpenMode, permissions: UInt32?) async throws -> any SFTPFileHandle {
@@ -59,8 +67,27 @@ actor FakeSFTPSession: SFTPSession {
     func createDirectory(_ path: String) async throws { directories.insert(path) }
     func removeFile(_ path: String) async throws { files.removeValue(forKey: path) }
     func removeDirectory(_ path: String) async throws { directories.remove(path) }
-    func rename(_ path: String, to newPath: String) async throws { files[newPath] = files.removeValue(forKey: path) }
-    func setPermissions(_ permissions: UInt32, at path: String) async throws {}
+    func rename(_ path: String, to newPath: String) async throws {
+        guard files[newPath] == nil else { throw SFTPSessionError.closed }   // plain rename refuses to overwrite
+        files[newPath] = files.removeValue(forKey: path)
+    }
+    func posixRename(_ path: String, to newPath: String) async throws {
+        guard extensions.supportsPOSIXRename else { throw SFTPSessionError.extensionUnsupported(SFTPServerExtensions.posixRename) }
+        posixRenames += 1
+        files[newPath] = files.removeValue(forKey: path)
+    }
+    func hardLink(_ path: String, to newPath: String) async throws {
+        guard extensions.supportsHardLink else { throw SFTPSessionError.extensionUnsupported(SFTPServerExtensions.hardLink) }
+        hardLinks += 1
+        files[newPath] = files[path]
+    }
+    func setAttributes(_ changes: SFTPAttributeChanges, at path: String) async throws {
+        guard !changes.hasPartialTimes else { throw SFTPSessionError.partialTimes }
+        guard files[path] != nil || directories.contains(path) else { throw SFTPSessionError.closed }
+        if let p = changes.permissions { permissions[path] = p }
+        if let a = changes.accessed, let m = changes.modified { times[path] = (a, m) }
+    }
+    var serverExtensions: SFTPServerExtensions { extensions }
     var isActive: Bool { !closed }
     func close() async throws { closed = true }
 
@@ -81,6 +108,9 @@ actor FakeSFTPSession: SFTPSession {
         func read(from offset: UInt64, length: UInt32) async throws -> Data { await session.read(path, offset: offset, length: length) }
         func write(_ data: Data, at offset: UInt64) async throws { await session.write(path, data: data, offset: offset) }
         func attributes() async throws -> SFTPAttributes { try await session.attributes(at: path, followSymlinks: true) }
+        func synchronize() async throws {
+            guard await session.serverExtensions.supportsFSync else { throw SFTPSessionError.extensionUnsupported(SFTPServerExtensions.fsync) }
+        }
         func close() async throws {}
     }
 }
