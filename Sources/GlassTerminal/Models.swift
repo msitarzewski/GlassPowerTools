@@ -1769,7 +1769,17 @@ struct WorkgroupSSHSubstitution: Codable, Equatable {
         let path = directory.trimmingCharacters(in: .whitespacesAndNewlines)
         let script = command.trimmingCharacters(in: .whitespacesAndNewlines)
         let quotedPath = "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
-        let startup = path.isEmpty ? script : "cd -- \(quotedPath)" + (script.isEmpty ? "" : " && {\n\(script)\n}")
+        // One line: startup commands travel through `TerminalStartupCommandTicket`, which rejects
+        // newlines because the PTY receives them as separate commands. A single-line group
+        // command keeps the script's exit status without a subshell.
+        let group: String
+        if script.isEmpty {
+            group = ""
+        } else {
+            let body = script.hasSuffix(";") || script.hasSuffix("&") ? script : script + ";"
+            group = " && { \(body) }"
+        }
+        let startup = path.isEmpty ? script : "cd -- \(quotedPath)" + group
         return .init(serverID: serverID, label: source.label, startupCommand: startup)
     }
 }

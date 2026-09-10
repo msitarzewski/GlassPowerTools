@@ -577,9 +577,25 @@ struct glas_shTests {
         #expect(preset.sessionIntents[0] == source)
         #expect(replacement.intent.kind == .ssh)
         #expect(replacement.intent.localShell == nil)
-        #expect(replacement.intent.startupCommand == "cd -- '/srv/it'\\''s a project' && {\npwd\n}")
+        // Single line: the ticket rejects newlines (the PTY would run them as separate commands).
+        #expect(replacement.intent.startupCommand == "cd -- '/srv/it'\\''s a project' && { pwd; }")
         preset.sessionIntents[0].label = "Changed recipe"
         #expect(settings.sshSubstitutions(for: preset).isEmpty)
+    }
+
+    @Test func sshSubstitutionStartupCommandIsAlwaysASingleLineTheTicketAccepts() {
+        let source = LayoutPreset.SessionIntent(kind: .local, label: "Build", startupCommand: "pwd")
+        let trailingSemicolon = WorkgroupSSHSubstitution(source: source, serverID: UUID(), directory: "/srv/app", command: "make;")
+        #expect(trailingSemicolon.intent.startupCommand == "cd -- '/srv/app' && { make; }")
+        let background = WorkgroupSSHSubstitution(source: source, serverID: UUID(), directory: "/srv/app", command: "tail -f log &")
+        #expect(background.intent.startupCommand == "cd -- '/srv/app' && { tail -f log & }")
+        let directoryOnly = WorkgroupSSHSubstitution(source: source, serverID: UUID(), directory: "/srv/app", command: "  ")
+        #expect(directoryOnly.intent.startupCommand == "cd -- '/srv/app'")
+        let commandOnly = WorkgroupSSHSubstitution(source: source, serverID: UUID(), directory: "", command: "pwd")
+        #expect(commandOnly.intent.startupCommand == "pwd")
+        for candidate in [trailingSemicolon, background, directoryOnly, commandOnly] {
+            #expect(TerminalStartupCommandTicket(command: candidate.intent.startupCommand) != nil)
+        }
     }
 
     @Test func codableColorResolvesExplicitSRGBComponents() {
