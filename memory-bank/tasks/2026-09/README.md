@@ -74,3 +74,7 @@
   ssh-keygen-fixture tests. 347 tests, one inherited failure now being root-caused by a narrow
   worker. Consolidation worker adding the hooks and the visionOS row fix; integration worker
   driving a real session.
+- 2026-09-10: The one failing moved test root-caused (`46e63e6`): glas.sh's unmerged PR builds a
+  multi-line workgroup startup command that its own committed ticket guard rejects. Fixed with a
+  single-line group command; 348 terminal tests all pass. The same fix applies to glas.sh's PR
+  branch — for the user to carry over.

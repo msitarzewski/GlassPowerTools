@@ -59,6 +59,25 @@ Presentation-level consolidation in the shell; **hosts.json is not rewritten** i
 button, now `.lineLimit(1).fixedSize()`. "Never"/last-connected is the kit row's trailing text and
 stays; it fits once the accessory is single-line.
 
+## Capability hooks (coordinator's addition for W3)
+
+`GlassCapability` gains three requirements with defaults: `settingsPages: [GlassCapabilitySettingsPage]`
+(`[]`), `libraryToolbarItems() -> AnyView` (empty), `serviceDetailActions(service:host:) -> AnyView`
+(empty; `host` is the catalog record that owns the service). `GlassCapabilitySettingsPage
+{ id, title, systemImage, makeView }`. `GlassCapabilityRegistry` adds `registered` (kind order),
+`settingsPages`, and `serviceDetailActions(service:host:)`, which asks only the owning kind.
+
+`GlassShellSettingsView` selects over `GlassShellSettingsSelection { .shell(page) | .capability(id) }`
+— the shell's four pages first, then every registered capability's pages in kind order; a
+capability page renders inside the same `GlassSettingsSections` picker (`settings-sections`
+identifier unchanged) with `settings-page-<id>` on its content. `GlassShellLibraryView` renders
+every registered capability's `libraryToolbarItems()` before Add Host in `toolbarActions`, and
+`serviceDetailActions` beside each service's Connect in the detail (identifiers unchanged).
+
+Tests (`GlassShell capability hooks`, 2): a registered capability's page joins the selection after
+the shell's pages in kind order; detail actions are requested from the owning capability only.
+Suite total: **29 tests, 5 suites, passed**.
+
 ## Why not merge on disk now (Stage 6 plan)
 
 glas.sh, glassdb and glassDT read `hosts.json` by their own record ids and by endpoint id. Moving
@@ -81,7 +100,7 @@ for every consolidated host once, then drop the grouping to a plain identity map
 | Check | Result |
 |---|---|
 | `swift build --build-system native` (whole package) | Build complete |
-| `swift test --build-system native --filter GlassShellTests` | **27 tests, 4 suites, passed** (9 new: same name different case; alias overlap; unrelated + loopback; already-single record untouched; preferences migrate; delete all members; add→canonical / remove→owner; picker + connect hands owning record; consolidateRecords) |
+| `swift test --build-system native --filter GlassShellTests` | **29 tests, 5 suites, passed** (9 consolidation + 2 hook tests new; consolidation: same name different case; alias overlap; unrelated + loopback; already-single record untouched; preferences migrate; delete all members; add→canonical / remove→owner; picker + connect hands owning record; consolidateRecords) |
 | visionOS Simulator (Vision Pro, OS 27.0), app seeded `juliet:ssh\|juliet:rdp\|oscar:rdp+ssh`, `simctl io screenshot` | `scratchpad/shots/vision-consolidated-row.png`: **two rows** (juliet, oscar), each "Desktop · Terminal" with two icons, an icon-only Connect and "Never" on one line; no wrapping |
 | iOS Simulator (iPhone 17 Pro Max, iOS 27.0) UI suite `GlassShellLibraryUITests` | **6/6 passed** across two runs on a verbatim copy of the tree excluding another worker's in-progress `UITests/GlassTerminalUITests.swift` (which does not compile at :291, main-actor key path — not mine): appearance, favorites, search, smoke and the new `testSameMachineRecordsAreOneRowWithAllServiceIcons` (one row each for `juliet` and `oscar`, two `host-service-ssh` and two `host-service-rdp` icons); `testAddHostAddServiceConnectPlaceholder` re-pointed and passing (below) |
 | Stage 2 side effect found | `testAddHostAddServiceConnectPlaceholder` expected the placeholder after Connect on an SSH service, but since `5f12575` the app registers `GlassTerminalCapability` for `.ssh`, so Connect opens the terminal's server form. The placeholder contract is for kinds no capability owns; the test now seeds a `database` service (`--ui-testing-seed-hosts "dbhost:database"`) into a fresh isolated store for that step. Seeded relaunches must use a new `runID`: the seeder fills only an empty catalog |
