@@ -20,9 +20,8 @@ Updated 2026-09-10.
 
 ## Not done
 
-Everything else. There is no Xcode project, no application target, no module, no test and no build in
-this repository. No source file has been moved from any of the three applications. The public
-repositories are untouched.
+Stages 2–5. Stage 2 (SSH engine and terminal) is in progress with two workers; no capability has
+reached parity yet. The public repositories are untouched.
 
 ## Known unverified assumptions
 

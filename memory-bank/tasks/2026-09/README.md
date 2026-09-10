@@ -52,3 +52,12 @@
   glas.sh with tunnel and SFTP APIs for every capability; `GlassDBKit`; RDP/VNC kits) are
   first-class shared modules; each app's UI/session layer is one capability module. Capabilities
   never depend on each other. Recorded in [decisions](../../decisions.md).
+- 2026-09-10: **Stage 1 verified and committed** (`fe20956`). 40 unit tests; three platforms
+  build; UI suites macOS 5/5, iOS 5/5, visionOS 4 + 1 reasoned skip (Appearance toggle press on
+  visionOS being adapted); 11 security findings fixed. macOS UI root cause: `tap()` does not drive
+  SwiftUI under Xcode 27 beta, `click()` does — no product change. Device installs and the 1.8
+  proof wait on the user's provisioning step. Notes: `2026-09-10_stage-1-{project,layers,
+  shell-module,integration,security-review,macos-uitests}.md`.
+- 2026-09-10: **Stage 2 started.** W1 extracts `GlassSSHTransport` (API surface first), W2 moves
+  glas.sh into `GlassTerminal`; real SSH test host recorded in technical context. Plan:
+  [Stage 2 note](2026-09-10_stage-2-ssh-terminal.md).
