@@ -149,6 +149,32 @@ briefly broke their builds.
    On this Mac the group container `group.sh.glas.shared` exists but holds no `hosts.json` — none of
    the three apps has written a catalog here — so 1.8 can only be shown on a device.
 
+## Stage 2 in progress; 1.8 proven — 2026-09-10 evening, commit `5f12575`
+
+**1.8 passed on the iPhone 17 Pro Max.** After the user enabled automatic signing in Xcode,
+per-App-ID managed profiles appeared (iOS/visionOS: 8 devices; macOS), the app installed on the
+iPhone and the Vision Pro, and the user's screenshot shows the existing hosts (`juliet`, `oscar`)
+from the shared catalog — no migration. macOS now signs with the real profile and no override.
+
+**Defect exposed by that screenshot (user requirement: "one line per host, multiple icons"):** each
+host appears once *per service* — the three source apps each published their own `HostProfile` for
+the same machine, and only pairing ever tied them. A shell worker is consolidating same-machine
+records into one row with every service icon, presentation-level only (the source apps still read
+`hosts.json` by their own IDs until Stage 6).
+
+**Stage 2 state:** `GlassSSHTransport` engine complete (61 unit tests, security review clean of
+High/Medium and all Low fixed, both July audit items confirmed resolved). glas.sh moved in as
+`GlassTerminal` (36,441 lines; 338 tests, one inherited failure; builds on all three platforms).
+Wave 2 running with exclusive ownership: **W3** (`Sources/GlassTerminal`: re-home the four features
+stranded in `ConnectionManagerView`, layering proof on the connection panel, settings merge,
+legacy-toggle warning), **integration** (`UITests/GlassTerminalUITests.swift`: real session against
+`192.0.2.6` through the shell on the Mac), **consolidation** (`Sources/GlassShell`,
+`UITests/GlassShellLibraryUITests.swift`).
+
+**Still needs the user:** Local Network grant for Ghostty (real-host CLI tests, errno 65); the app
+itself may show its own Local Network prompt on first connect — accept it; the Vision Pro
+launch (device asleep). `../docs` may be deleted; nothing in it is open.
+
 ## Next action
 
 Lay down the package skeleton, confirm the three local packages resolve in one graph, then fan out

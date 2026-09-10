@@ -61,3 +61,9 @@
 - 2026-09-10: **Stage 2 started.** W1 extracts `GlassSSHTransport` (API surface first), W2 moves
   glas.sh into `GlassTerminal`; real SSH test host recorded in technical context. Plan:
   [Stage 2 note](2026-09-10_stage-2-ssh-terminal.md).
+- 2026-09-10: **Stage 2 engine and move landed** (`6e5ffe6`…`5f12575`): `GlassSSHTransport` with
+  61 tests and a clean security review; glas.sh moved in as `GlassTerminal` with 338 tests.
+  **1.8 proven on the iPhone** after the user's Xcode signing step; macOS signs without override.
+  Defect found from the device screenshot: one row per service instead of per host — shell
+  consolidation in progress. Wave 2 (W3, integration, consolidation) running. Stage 3 and 4 notes
+  drafted.
