@@ -71,15 +71,14 @@ registered capability receives `open` instead of the placeholder; preferences ro
 `WriterID` stability; corrupt preferences reported; unavailable container gives the honest status
 and a local catalog; delete tombstones and clears preferences; name validation.
 
-`swift build` (macOS host) passes. iOS/visionOS simulator compiles: see the parent's record.
+`swift build` (macOS host) passes. `xcodebuild -scheme GlassShell` for `generic/platform=iOS Simulator` and `generic/platform=visionOS Simulator`: BUILD SUCCEEDED, re-run against the real GlassLayers.
 
-## Temporary file — must be deleted
+## GlassLayers integration — done
 
-`Sources/GlassShell/_TemporaryLayersStub.swift` mirrors the GlassLayers contract
-(`GlassLayerState`, `GlassLayerStore`, `EnvironmentValues.glassLayers`, `GlassLayeredWindow`,
-`GlassLayeredPanel`, `GlassLayerControls`). When the real module lands, delete it and add
-`import GlassLayers` to `GlassShellLibraryView.swift`, `GlassShellSettingsView.swift` and
-`GlassShellModel.swift`. The stub has no persistence and no visual effect.
+The real `GlassLayers` module landed mid-task. The temporary stub was deleted, the three views and
+the model import `GlassLayers`, and the build and all 10 tests pass against the real
+`GlassLayerStore`, `GlassLayeredWindow { }`, `GlassLayeredPanel { }` and `GlassLayerControls()`.
+About now shows `GlassLayerStore.migrationSource`.
 
 ## Integration notes for the app entry point
 
@@ -100,9 +99,6 @@ Capabilities register with `model.registry.register(_:)` and declare their own `
 
 ## Open items
 
-- Delete the layers stub when `GlassLayers` lands (above).
-- "About shows the layers migration source" was not implemented: the contract exposes no such
-  property. Add when `GlassLayerStore` defines it.
 - `GlassShellSettingsView.general` is minimal (library status, host count, preferences problem).
 - The visionOS `TabView` path of `GlassConnectionLibrary` renders the detail per tab; the
   `GlassLayeredPanel` wrap applies inside each. Verified by compile only.
