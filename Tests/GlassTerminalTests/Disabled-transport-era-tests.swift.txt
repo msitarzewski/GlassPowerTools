@@ -1,0 +1,432 @@
+// DISABLED — not compiled (the .txt suffix keeps SwiftPM from building this file).
+//
+// These glas.sh tests exercised transport internals that moved into the shared engine on
+// 2026-09-10 (GlassSSHTransport): SOCKS5 parsing/authentication/limits, SSHTransportIdentity and
+// SSHTransportOwnership, PTY terminal modes, legacy-algorithm retry, and Citadel's SFTP value
+// types behind the SFTP browser helpers. Their coverage now belongs in GlassSSHTransportTests
+// (W1) and, for the browser helpers, should be re-written against GlassTerminal's
+// SFTPCompatibility types. Kept verbatim here so nothing is lost; each function is listed in
+// memory-bank/tasks/2026-09/2026-09-10_stage-2-terminal.md.
+//
+
+    @Test func ptyTerminalModesDisableOnlyCarriageReturnTranslation() async throws {
+        let modes = SSHConnection.preferredPTYTerminalModes().modeMapping
+
+        #expect(modes[.OCRNL]?.rawValue == 0)
+        #expect(modes[.ONLCR] == nil)
+        #expect(modes[.ONLRET] == nil)
+    }
+
+    @Test @MainActor func keyExchangeNegotiationFailureDetection() {
+        let error = LegacyKEXFixture()
+
+        #expect(SSHConnection.isKeyExchangeNegotiationFailure(error))
+        #expect(!SSHConnection.shouldRetryWithLegacyAlgorithms(error, enabled: false))
+        #expect(SSHConnection.shouldRetryWithLegacyAlgorithms(error, enabled: true))
+    }
+
+    @Test func sftpOutlineIdentifiesDuplicateBasenamesByTheirFullPaths() {
+        let component = SFTPPathComponent(filename: "config", longname: "-rw------- config", attributes: .init())
+        let root = SFTPBrowserEntry(component: component, parentPath: "/", depth: 0)
+        let first = SFTPBrowserEntry(component: component, parentPath: "/one", depth: 1)
+        let second = SFTPBrowserEntry(component: component, parentPath: "/two", depth: 1)
+        #expect(root.id == "/config")
+        #expect(first.id == "/one/config")
+        #expect(second.id == "/two/config")
+        #expect(Set([root.id, first.id, second.id]).count == 3)
+        #expect(first.filename == "config")
+        #expect(first.parentPath == "/one")
+    }
+
+    @Test func sftpOutlineBatchOperationsDoNotProcessSelectedDescendantsTwice() {
+        func entry(_ name: String, in parent: String) -> SFTPBrowserEntry {
+            .init(component: .init(filename: name, longname: name, attributes: .init()), parentPath: parent, depth: 0)
+        }
+        let folder = entry("one", in: "/")
+        let child = entry("config", in: "/one")
+        let grandchild = entry("nested", in: "/one/subfolder")
+        let similarPrefix = entry("config", in: "/one-more")
+        #expect(SFTPBrowserEntry.topLevelSelection([child, folder, grandchild, similarPrefix]).map(\.id)
+            == ["/one", "/one-more/config"])
+        #expect(SFTPBrowserEntry.topLevelSelection([child, similarPrefix]).map(\.id)
+            == ["/one/config", "/one-more/config"])
+    }
+
+    @Test func sftpTableSortsEveryDataColumnAndKeepsDirectoriesFirst() {
+        func tableEntry(
+            _ name: String,
+            isDirectory: Bool = false,
+            size: UInt64? = nil,
+            modified: TimeInterval? = nil,
+            permissions: UInt32? = nil
+        ) -> SFTPBrowserTableEntry {
+            let accessModificationTime = modified.map {
+                SFTPFileAttributes.AccessModificationTime(
+                    accessTime: Date(timeIntervalSince1970: $0),
+                    modificationTime: Date(timeIntervalSince1970: $0)
+                )
+            }
+            var attributes = SFTPFileAttributes(
+                size: size,
+                accessModificationTime: accessModificationTime
+            )
+            attributes.permissions = permissions
+            return SFTPBrowserTableEntry(
+                entry: .init(
+                    filename: name,
+                    longname: isDirectory ? "drwx------ \(name)" : "-rw------- \(name)",
+                    attributes: attributes
+                ),
+                isDirectory: isDirectory
+            )
+        }
+
+        let nameRows = [
+            tableEntry("file10"),
+            tableEntry("folder-z", isDirectory: true),
+            tableEntry("file2"),
+            tableEntry("folder-a", isDirectory: true),
+        ]
+        #expect(
+            nameRows.sorted(using: [
+                SFTPBrowserTableSortComparator(column: .name)
+            ]).map(\.entry.filename)
+                == ["folder-a", "folder-z", "file2", "file10"]
+        )
+        #expect(
+            nameRows.sorted(using: [
+                SFTPBrowserTableSortComparator(column: .name, order: .reverse)
+            ]).map(\.entry.filename)
+                == ["folder-z", "folder-a", "file10", "file2"]
+        )
+
+        let sizeRows = [
+            tableEntry("unknown"),
+            tableEntry("large", size: 900),
+            tableEntry("folder", isDirectory: true),
+            tableEntry("small-b", size: 10),
+            tableEntry("small-a", size: 10),
+        ]
+        #expect(
+            sizeRows.sorted(using: [
+                SFTPBrowserTableSortComparator(column: .size)
+            ]).map(\.entry.filename)
+                == ["folder", "small-a", "small-b", "large", "unknown"]
+        )
+        #expect(
+            sizeRows.sorted(using: [
+                SFTPBrowserTableSortComparator(column: .size, order: .reverse)
+            ]).map(\.entry.filename)
+                == ["folder", "large", "small-a", "small-b", "unknown"]
+        )
+
+        let metadataRows = [
+            tableEntry("unknown"),
+            tableEntry("newer-private", modified: 200, permissions: 0o100600),
+            tableEntry("older-public", modified: 100, permissions: 0o100644),
+        ]
+        #expect(
+            metadataRows.sorted(using: [
+                SFTPBrowserTableSortComparator(column: .modified)
+            ]).map(\.entry.filename)
+                == ["older-public", "newer-private", "unknown"]
+        )
+        #expect(
+            metadataRows.sorted(using: [
+                SFTPBrowserTableSortComparator(column: .permissions, order: .reverse)
+            ]).map(\.entry.filename)
+                == ["older-public", "newer-private", "unknown"]
+        )
+    }
+
+    @Test func sftpDownloadReadBatchStopsBeforeEOFAndRejectsOversizedData() throws {
+        let requests = SFTPBrowserView.downloadReadWindow(
+            from: 0,
+            through: UInt64(SFTPBrowserView.downloadReadChunkSize) * 3
+        )
+        let eofDecision = try SFTPBrowserView.downloadReadBatchDecision(
+            requests: requests,
+            readableByteCounts: [Int(requests[0].length), 0, Int(requests[2].length)]
+        )
+        #expect(eofDecision.acceptedResponseCount == 1)
+        #expect(eofDecision.reachedEOF)
+
+        #expect(throws: SFTPError.self) {
+            try SFTPBrowserView.downloadReadBatchDecision(
+                requests: requests,
+                readableByteCounts: [Int(requests[0].length) + 1, 0, 0]
+            )
+        }
+    }
+
+    @Test func sftpV3RemoteStatNeverInventsNanoseconds() {
+        let attributes = SFTPFileAttributes(
+            size: 4_096,
+            accessModificationTime: .init(
+                accessTime: Date(timeIntervalSince1970: 1_700_000_000),
+                modificationTime: Date(timeIntervalSince1970: 1_700_000_123.875)
+            )
+        )
+
+        let stat = SFTPBrowserView.remoteStat(from: attributes)
+
+        #expect(stat.size == 4_096)
+        #expect(stat.modificationSeconds == 1_700_000_123)
+        #expect(stat.modificationNanoseconds == nil)
+    }
+
+    @Test @MainActor func socks5GreetingWaitsForAllMethodsAndRequiresUsernamePassword() {
+        var fragmented = ByteBuffer(bytes: [0x05, 0x02, 0x00])
+        #expect(PortForwardManager.parseSOCKS5Greeting(from: &fragmented) == .incomplete)
+        #expect(fragmented.readerIndex == 0)
+
+        fragmented.writeInteger(UInt8(0x02))
+        #expect(PortForwardManager.parseSOCKS5Greeting(from: &fragmented) == .selectUsernamePassword)
+        #expect(fragmented.readableBytes == 0)
+
+        var unsupported = ByteBuffer(bytes: [0x05, 0x01, 0x00])
+        #expect(PortForwardManager.parseSOCKS5Greeting(from: &unsupported) == .rejectAuthenticationMethods)
+    }
+
+    @Test @MainActor func socks5RFC1929ParserIsIncrementalBoundedAndPreservesCoalescedRequest() throws {
+        var authentication = ByteBuffer(bytes: [0x01, 0x04, 0x75, 0x73])
+        #expect(PortForwardManager.parseSOCKS5Authentication(from: &authentication) == .incomplete)
+        #expect(authentication.readerIndex == 0)
+
+        authentication.writeBytes([0x65, 0x72, 0x06])
+        authentication.writeBytes(Array("secret".utf8))
+        authentication.writeBytes([0x05, 0x01, 0x00, 0x01])
+        let parsed = PortForwardManager.parseSOCKS5Authentication(from: &authentication)
+        let presented: SOCKS5CredentialBytes
+        guard case .authenticate(let credentials) = parsed else {
+            Issue.record("Expected parsed RFC 1929 credentials")
+            return
+        }
+        presented = credentials
+        #expect(presented.username == Array("user".utf8))
+        #expect(presented.password == Array("secret".utf8))
+        #expect(authentication.getBytes(
+            at: authentication.readerIndex,
+            length: authentication.readableBytes
+        ) == [0x05, 0x01, 0x00, 0x01])
+
+        var emptyUsername = ByteBuffer(bytes: [0x01, 0x00])
+        #expect(PortForwardManager.parseSOCKS5Authentication(from: &emptyUsername) == .invalidCredentials)
+        var wrongVersion = ByteBuffer(bytes: [0x02, 0x01])
+        #expect(PortForwardManager.parseSOCKS5Authentication(from: &wrongVersion) == .invalidVersion)
+        #expect(PortForwardManager.maximumSOCKS5AuthenticationBytes == 513)
+
+        var boundedBuffer = ByteBuffer(bytes: Array(
+            repeating: UInt8(0),
+            count: PortForwardManager.maximumSOCKS5BufferedHandshakeBytes
+        ))
+        var excess = ByteBuffer(bytes: [0x00])
+        #expect(!PortForwardManager.appendSOCKS5HandshakeBytes(&excess, to: &boundedBuffer))
+    }
+
+    @Test @MainActor func socks5CredentialPolicyValidatesUTF8LengthsAndComparesBothFields() throws {
+        let expected = try #require(PortForwardManager.socks5Credentials(
+            username: "user",
+            password: "secret"
+        ))
+        #expect(PortForwardManager.socks5Credentials(username: "", password: "secret") == nil)
+        #expect(PortForwardManager.socks5Credentials(username: "user", password: "") == nil)
+        #expect(PortForwardManager.socks5Credentials(
+            username: String(repeating: "u", count: 256),
+            password: "secret"
+        ) == nil)
+
+        #expect(PortForwardManager.authenticateSOCKS5(presented: expected, expected: expected))
+        #expect(!PortForwardManager.authenticateSOCKS5(
+            presented: .init(username: Array("user".utf8), password: Array("secreu".utf8)),
+            expected: expected
+        ))
+        #expect(!PortForwardManager.authenticateSOCKS5(
+            presented: .init(username: Array("admin".utf8), password: Array("secret".utf8)),
+            expected: expected
+        ))
+        #expect(!PortForwardManager.constantTimeSOCKS5FieldEquals(
+            Array("user".utf8),
+            Array("user\0".utf8)
+        ))
+    }
+
+    @Test func socks5ConnectionLimiterRejectsExcessPreAuthenticationClients() async {
+        let limiter = SOCKS5ConnectionLimiter(maximumConnections: 2)
+
+        #expect(await limiter.acquire())
+        #expect(await limiter.acquire())
+        #expect(!(await limiter.acquire()))
+        await limiter.release()
+        #expect(await limiter.acquire())
+        #expect(PortForwardManager.maximumConcurrentSOCKS5Connections == 64)
+        #expect(PortForwardManager.socks5HandshakeTimeout == .seconds(15))
+    }
+
+    @Test func socks5HandshakePermitReleasesItsSlotExactlyOnce() async {
+        let limiter = SOCKS5ConnectionLimiter(maximumConnections: 1)
+        #expect(await limiter.acquire())
+        let permit = SOCKS5ConnectionPermit(limiter: limiter)
+
+        await permit.release()
+        await permit.release()
+
+        #expect(await limiter.acquire())
+        #expect(!(await limiter.acquire()))
+    }
+
+    @Test @MainActor func socks5ConnectParserPreservesCoalescedPayload() {
+        let domain = Array("example.com".utf8)
+        var bytes: [UInt8] = [0x05, 0x01, 0x00, 0x03, UInt8(domain.count)]
+        bytes.append(contentsOf: domain)
+        bytes.append(contentsOf: [0x01, 0xBB])
+        bytes.append(contentsOf: Array("GET /".utf8))
+        var buffer = ByteBuffer(bytes: bytes)
+
+        #expect(
+            PortForwardManager.parseSOCKS5ConnectRequest(from: &buffer)
+                == .connect(SOCKS5Target(host: "example.com", port: 443))
+        )
+        #expect(buffer.readString(length: buffer.readableBytes) == "GET /")
+    }
+
+    @Test @MainActor func socks5ConnectParserHandlesFragmentedIPv4AndValidatesHeader() {
+        var fragmented = ByteBuffer(bytes: [0x05, 0x01, 0x00, 0x01, 127])
+        #expect(PortForwardManager.parseSOCKS5ConnectRequest(from: &fragmented) == .incomplete)
+        #expect(fragmented.readerIndex == 0)
+
+        fragmented.writeBytes([0, 0, 1, 0x1F, 0x90])
+        #expect(
+            PortForwardManager.parseSOCKS5ConnectRequest(from: &fragmented)
+                == .connect(SOCKS5Target(host: "127.0.0.1", port: 8080))
+        )
+
+        var badReserved = ByteBuffer(bytes: [0x05, 0x01, 0x01, 0x01])
+        #expect(PortForwardManager.parseSOCKS5ConnectRequest(from: &badReserved) == .invalidReservedByte)
+
+        var unsupportedCommand = ByteBuffer(bytes: [0x05, 0x02, 0x00, 0x01])
+        #expect(PortForwardManager.parseSOCKS5ConnectRequest(from: &unsupportedCommand) == .unsupportedCommand)
+    }
+
+    @Test @MainActor
+    func sharedSSHTransportClosesOnlyAfterFinalSurface() {
+        let terminal = UUID(), browser = UUID(), secondTerminal = UUID()
+        var ownership = SSHTransportOwnership()
+        func acquire(_ id: UUID) -> Bool { ownership.acquire(id) }
+        func release(_ id: UUID) -> Bool { ownership.release(id) }
+        #expect(acquire(terminal))
+        #expect(acquire(browser))
+        #expect(!release(terminal))
+        #expect(!ownership.isClosing)
+        #expect(acquire(secondTerminal))
+        #expect(!release(browser))
+        #expect(!release(browser))
+        #expect(release(secondTerminal))
+        #expect(ownership.isClosing)
+        #expect(!release(secondTerminal))
+        #expect(!acquire(UUID()))
+    }
+
+    @Test @MainActor
+    func sharedSSHIdentityIgnoresPresentationButSeparatesEndpointsAndRoutes() {
+        let server = ServerConfiguration(name: "Original", host: "example.test", username: "alice")
+        let original = SSHTransportIdentity(server: server, jumpHosts: [])
+        var changed = server
+        changed.name = "Renamed"
+        changed.lastConnected = Date()
+        changed.colorTag = .red
+        changed.isFavorite = true
+        changed.terminalType = "xterm"
+        #expect(SSHTransportIdentity(server: changed, jumpHosts: []) == original)
+        changed.username = "bob"
+        #expect(SSHTransportIdentity(server: changed, jumpHosts: []) != original)
+        changed = server
+        changed.host = "different.test"
+        #expect(SSHTransportIdentity(server: changed, jumpHosts: []) != original)
+        changed = server
+        changed.allowLegacyAlgorithms = true
+        #expect(SSHTransportIdentity(server: changed, jumpHosts: []) != original)
+        let hop = ServerConfiguration(name: "Jump", host: "jump.test", username: "alice")
+        #expect(SSHTransportIdentity(server: server, jumpHosts: [hop]) != original)
+        var otherHop = hop
+        otherHop.port = 2222
+        #expect(SSHTransportIdentity(server: server, jumpHosts: [hop]) != SSHTransportIdentity(server: server, jumpHosts: [otherHop]))
+    }
+
+// ---- from macOS/MacWorkspaceTests.swift (host-key trust validator internals, now the engine's) ----
+
+    @Test func hostKeyValidatorRunsOnNIOEventLoopWithoutActorIsolationTrap() async throws {
+        let hostKey = try NIOSSHPublicKey(openSSHPublicKey: Self.hostKeyValidationFixture)
+        var wireBuffer = ByteBufferAllocator().buffer(capacity: 128)
+        _ = hostKey.write(to: &wireBuffer)
+        let trustedKeyBase64 = Data(wireBuffer.readableBytesView).base64EncodedString()
+        let eventLoop = MultiThreadedEventLoopGroup.singleton.next()
+
+        let trustedBox = HostKeyChallengeBox()
+        let trustedValidator = PromptingHostKeyValidator(
+            host: "trusted.example.com",
+            port: 22,
+            trustedKeyBase64Set: [trustedKeyBase64],
+            verificationMode: .ask,
+            challengeBox: trustedBox
+        )
+        let trustedPromise = eventLoop.makePromise(of: Void.self)
+        eventLoop.execute {
+            trustedValidator.validateHostKey(
+                hostKey: hostKey,
+                validationCompletePromise: trustedPromise
+            )
+        }
+        try await trustedPromise.futureResult.get()
+        #expect(trustedBox.take() == nil)
+
+        let unknownBox = HostKeyChallengeBox()
+        let unknownValidator = PromptingHostKeyValidator(
+            host: "unknown.example.com",
+            port: 2222,
+            trustedKeyBase64Set: [],
+            verificationMode: .ask,
+            challengeBox: unknownBox
+        )
+        let unknownPromise = eventLoop.makePromise(of: Void.self)
+        eventLoop.execute {
+            unknownValidator.validateHostKey(
+                hostKey: hostKey,
+                validationCompletePromise: unknownPromise
+            )
+        }
+        do {
+            try await unknownPromise.futureResult.get()
+            Issue.record("An unknown host key must require an explicit trust decision")
+        } catch let error as HostKeyTrustRequiredError {
+            #expect(error.challenge.host == "unknown.example.com")
+            #expect(error.challenge.port == 2222)
+            #expect(error.challenge.algorithm == "ssh-ed25519")
+            #expect(error.challenge.reason == .unknown)
+        }
+        #expect(unknownBox.take()?.reason == .unknown)
+
+        let changedBox = HostKeyChallengeBox()
+        let changedValidator = PromptingHostKeyValidator(
+            host: "changed.example.com",
+            port: 22,
+            trustedKeyBase64Set: ["different-key"],
+            verificationMode: .strict,
+            challengeBox: changedBox
+        )
+        let changedPromise = eventLoop.makePromise(of: Void.self)
+        eventLoop.execute {
+            changedValidator.validateHostKey(
+                hostKey: hostKey,
+                validationCompletePromise: changedPromise
+            )
+        }
+        do {
+            try await changedPromise.futureResult.get()
+            Issue.record("A changed host key must fail strict verification")
+        } catch let error as HostKeyTrustRequiredError {
+            #expect(error.challenge.reason == .changed)
+            #expect(error.challenge.keyDataBase64 == trustedKeyBase64)
+        }
+        #expect(changedBox.take()?.reason == .changed)
+    }

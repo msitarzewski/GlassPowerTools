@@ -4,13 +4,5 @@
 <dict>
 	<key>GlasKeychainAccessGroup</key>
 	<string>$(AppIdentifierPrefix)sh.glas.shared</string>
-	<key>NSFaceIDUsageDescription</key>
-	<string>Authenticate to use a hardware-protected SSH key.</string>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>Glass Power Tools uses your local network to connect to servers you choose.</string>
-	<key>NSHumanReadableCopyright</key>
-	<string>Copyright © 2026 Michael Sitarzewski.</string>
-	<key>LSApplicationCategoryType</key>
-	<string>public.app-category.developer-tools</string>
 </dict>
 </plist>

@@ -10,11 +10,16 @@
 import SwiftUI
 import GlassShell
 import GlassLayers
+import GlassTerminal
 
 @main
 struct GlassPowerToolsApp: App {
     @State private var layers: GlassLayerStore
     @State private var model: GlassShellModel
+    @State private var terminal: GlassTerminalRuntime
+    #if os(macOS)
+    @NSApplicationDelegateAdaptor(MacTerminalAppDelegate.self) private var appDelegate
+    #endif
 
     init() {
         let layers = GlassLayerStore()
@@ -39,8 +44,13 @@ struct GlassPowerToolsApp: App {
             accessGroup: isolatedDirectory == nil ? accessGroup : nil,
             layers: layers
         )
+        // Stage 2: the SSH capability. glas.sh's managers live for the process in the runtime; the
+        // shell routes Connect for `.ssh` services through the capability.
+        let terminal = GlassTerminalRuntime()
+        model.registry.register(GlassTerminalCapability(runtime: terminal))
         _layers = State(initialValue: layers)
         _model = State(initialValue: model)
+        _terminal = State(initialValue: terminal)
     }
 
     #if DEBUG
@@ -60,9 +70,15 @@ struct GlassPowerToolsApp: App {
 
     var body: some Scene {
         WindowGroup("Connections", id: "main") {
-            GlassShellLibraryView(model: model)
-                .glassLayers(layers)
+            GlassTerminalBootstrap(runtime: terminal) {
+                GlassShellLibraryView(model: model)
+            }
+            .glassLayers(layers)
+            #if os(macOS)
+            .onAppear { terminal.attach(to: appDelegate) }
+            #endif
         }
+        GlassTerminalScenes(runtime: terminal)
         #if os(macOS)
         Settings {
             GlassShellSettingsView(model: model)

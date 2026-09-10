@@ -7,9 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		6A000000000000000000AB41 /* Mac Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6A000000000000000000AB40 /* Mac Assets.xcassets */; platformFilter = macos; };
+		6A000000000000000000AB41 /* Mac Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6A000000000000000000AB40 /* Mac Assets.xcassets */; };
 		6A000000000000000000AB63 /* GlassShell in Frameworks */ = {isa = PBXBuildFile; productRef = 6A000000000000000000AB61 /* GlassShell */; };
 		6A000000000000000000AB64 /* GlassLayers in Frameworks */ = {isa = PBXBuildFile; productRef = 6A000000000000000000AB62 /* GlassLayers */; };
+		6A000000000000000000AC0D /* GlassPowerToolsWidgets.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 6A000000000000000000AC0E /* GlassPowerToolsWidgets.appex */; platformFilters = (ios, xros, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -20,31 +21,58 @@
 			remoteGlobalIDString = 6A000000000000000000AB10;
 			remoteInfo = GlassPowerTools;
 		};
+		6A000000000000000000AC00 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6A000000000000000000AB01 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6A000000000000000000AC03;
+			remoteInfo = GlassPowerToolsWidgets;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		6A000000000000000000AC10 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				6A000000000000000000AC0D /* GlassPowerToolsWidgets.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		6A000000000000000000AB17 /* GlassPowerTools.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GlassPowerTools.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		6A000000000000000000AB40 /* Mac Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = "Mac Assets.xcassets"; path = Platforms/macOS/Assets.xcassets; sourceTree = SOURCE_ROOT; };
 		6A000000000000000000AB57 /* GlassPowerToolsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GlassPowerToolsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		6A000000000000000000AC0E /* GlassPowerToolsWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = GlassPowerToolsWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
 		6A000000000000000000AB31 /* Exceptions for "App" folder in "GlassPowerTools" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				GlassPowerTools.entitlements,
 				Info.plist,
 			);
 			target = 6A000000000000000000AB10 /* GlassPowerTools */;
 		};
-		6A000000000000000000AB33 /* Exceptions for "macOS" folder in "GlassPowerTools" target */ = {
+		6A000000000000000000AB33 /* Exceptions for "Platforms/macOS" folder in "GlassPowerTools" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Assets.xcassets,
 				Info.plist,
-				macOS.entitlements,
 			);
 			target = 6A000000000000000000AB10 /* GlassPowerTools */;
+		};
+		6A000000000000000000AC0F /* Exceptions for "Widgets" folder in "GlassPowerToolsWidgets" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 6A000000000000000000AC03 /* GlassPowerToolsWidgets */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -57,10 +85,10 @@
 			path = App;
 			sourceTree = "<group>";
 		};
-		6A000000000000000000AB32 /* macOS */ = {
+		6A000000000000000000AB32 /* Platforms/macOS */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				6A000000000000000000AB33 /* Exceptions for "macOS" folder in "GlassPowerTools" target */,
+				6A000000000000000000AB33 /* Exceptions for "Platforms/macOS" folder in "GlassPowerTools" target */,
 			);
 			path = Platforms/macOS;
 			sourceTree = "<group>";
@@ -68,6 +96,14 @@
 		6A000000000000000000AB34 /* UITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = UITests;
+			sourceTree = "<group>";
+		};
+		6A000000000000000000AC02 /* Widgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				6A000000000000000000AC0F /* Exceptions for "Widgets" folder in "GlassPowerToolsWidgets" target */,
+			);
+			path = Widgets;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -89,6 +125,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		6A000000000000000000AC05 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -96,9 +139,10 @@
 			isa = PBXGroup;
 			children = (
 				6A000000000000000000AB30 /* App */,
-				6A000000000000000000AB32 /* macOS */,
+				6A000000000000000000AB32 /* Platforms/macOS */,
 				6A000000000000000000AB40 /* Mac Assets.xcassets */,
 				6A000000000000000000AB34 /* UITests */,
+				6A000000000000000000AC02 /* Widgets */,
 				6A000000000000000000AB03 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -108,6 +152,7 @@
 			children = (
 				6A000000000000000000AB17 /* GlassPowerTools.app */,
 				6A000000000000000000AB57 /* GlassPowerToolsUITests.xctest */,
+				6A000000000000000000AC0E /* GlassPowerToolsWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -122,19 +167,22 @@
 				6A000000000000000000AB14 /* Sources */,
 				6A000000000000000000AB15 /* Frameworks */,
 				6A000000000000000000AB16 /* Resources */,
+				6A000000000000000000AC10 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				6A000000000000000000AC11 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				6A000000000000000000AB30 /* App */,
-				6A000000000000000000AB32 /* macOS */,
+				6A000000000000000000AB32 /* Platforms/macOS */,
 			);
 			name = GlassPowerTools;
 			packageProductDependencies = (
 				6A000000000000000000AB61 /* GlassShell */,
 				6A000000000000000000AB62 /* GlassLayers */,
+				6A000000000000000000AB65 /* GlassTerminal */,
 			);
 			productName = GlassPowerTools;
 			productReference = 6A000000000000000000AB17 /* GlassPowerTools.app */;
@@ -163,6 +211,28 @@
 			productReference = 6A000000000000000000AB57 /* GlassPowerToolsUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		6A000000000000000000AC03 /* GlassPowerToolsWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6A000000000000000000AC09 /* Build configuration list for PBXNativeTarget "GlassPowerToolsWidgets" */;
+			buildPhases = (
+				6A000000000000000000AC04 /* Sources */,
+				6A000000000000000000AC05 /* Frameworks */,
+				6A000000000000000000AC06 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				6A000000000000000000AC02 /* Widgets */,
+			);
+			name = GlassPowerToolsWidgets;
+			packageProductDependencies = (
+			);
+			productName = GlassPowerToolsWidgets;
+			productReference = 6A000000000000000000AC0E /* GlassPowerToolsWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -174,6 +244,9 @@
 				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					6A000000000000000000AB10 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					6A000000000000000000AC03 = {
 						CreatedOnToolsVersion = 27.0;
 					};
 					6A000000000000000000AB50 = {
@@ -200,6 +273,7 @@
 			projectRoot = "";
 			targets = (
 				6A000000000000000000AB10 /* GlassPowerTools */,
+				6A000000000000000000AC03 /* GlassPowerToolsWidgets */,
 				6A000000000000000000AB50 /* GlassPowerToolsUITests */,
 			);
 		};
@@ -215,6 +289,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		6A000000000000000000AB56 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6A000000000000000000AC06 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -238,6 +319,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		6A000000000000000000AC04 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -245,6 +333,15 @@
 			isa = PBXTargetDependency;
 			target = 6A000000000000000000AB10 /* GlassPowerTools */;
 			targetProxy = 6A000000000000000000AB58 /* PBXContainerItemProxy */;
+		};
+		6A000000000000000000AC11 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilters = (
+				ios,
+				xros,
+			);
+			target = 6A000000000000000000AC03 /* GlassPowerToolsWidgets */;
+			targetProxy = 6A000000000000000000AC00 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -265,6 +362,10 @@
 				INFOPLIST_FILE = App/Info.plist;
 				"INFOPLIST_FILE[sdk=macosx*]" = Platforms/macOS/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Glass Power Tools";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Authenticate to use a hardware-protected SSH key.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Michael Sitarzewski.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Glass Power Tools uses your local network to connect to servers you choose.";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -313,6 +414,10 @@
 				INFOPLIST_FILE = App/Info.plist;
 				"INFOPLIST_FILE[sdk=macosx*]" = Platforms/macOS/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Glass Power Tools";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Authenticate to use a hardware-protected SSH key.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Michael Sitarzewski.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Glass Power Tools uses your local network to connect to servers you choose.";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -517,6 +622,74 @@
 			};
 			name = Release;
 		};
+		6A000000000000000000AC07 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_ENTITLEMENTS = Widgets/glasWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7JQGQ7CRH8;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Widgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Glass Power Tools Widgets";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.glasspowertools.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				"TARGETED_DEVICE_FAMILY[sdk=iphoneos*]" = "1,2";
+				"TARGETED_DEVICE_FAMILY[sdk=iphonesimulator*]" = "1,2";
+				"TARGETED_DEVICE_FAMILY[sdk=xros*]" = 7;
+				"TARGETED_DEVICE_FAMILY[sdk=xrsimulator*]" = 7;
+				XROS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		6A000000000000000000AC08 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_ENTITLEMENTS = Widgets/glasWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7JQGQ7CRH8;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Widgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Glass Power Tools Widgets";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.glasspowertools.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				"TARGETED_DEVICE_FAMILY[sdk=iphoneos*]" = "1,2";
+				"TARGETED_DEVICE_FAMILY[sdk=iphonesimulator*]" = "1,2";
+				"TARGETED_DEVICE_FAMILY[sdk=xros*]" = 7;
+				"TARGETED_DEVICE_FAMILY[sdk=xrsimulator*]" = 7;
+				XROS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -547,6 +720,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		6A000000000000000000AC09 /* Build configuration list for PBXNativeTarget "GlassPowerToolsWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6A000000000000000000AC07 /* Debug */,
+				6A000000000000000000AC08 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
@@ -564,6 +746,10 @@
 		6A000000000000000000AB62 /* GlassLayers */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = GlassLayers;
+		};
+		6A000000000000000000AB65 /* GlassTerminal */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = GlassTerminal;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

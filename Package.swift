@@ -110,6 +110,12 @@ let package = Package(
                 .product(name: "Citadel", package: "Citadel"),
                 .product(name: "NIOSSH", package: "swift-nio-ssh"),
                 .product(name: "NIOCore", package: "swift-nio"),
+            ],
+            swiftSettings: [
+                .defaultIsolation(MainActor.self),
+                .enableUpcomingFeature("InferIsolatedConformances"),
+                .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
+                .enableUpcomingFeature("MemberImportVisibility"),
             ]
         ),
         .testTarget(

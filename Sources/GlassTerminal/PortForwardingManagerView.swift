@@ -1,0 +1,399 @@
+//
+//  PortForwardingManagerView.swift
+//  glas.sh
+//
+//  Manage SSH port forwarding
+//
+
+import SwiftUI
+
+struct PortForwardingManagerView: View {
+    @Environment(SessionManager.self) private var sessionManager
+
+    private var portForwardManager: PortForwardManager {
+        sessionManager.portForwardManager
+    }
+    
+    @State private var selectedSession: TerminalSession?
+    @State private var showingAddForward = false
+    
+    var body: some View {
+        NavigationSplitView {
+            // Session list
+            List(sessionManager.sessions) { session in
+                Button {
+                    selectedSession = session
+                } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(session.server.name)
+                            .font(.headline)
+                        
+                        Text("\(session.server.username)@\(session.server.host)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        
+                        HStack(spacing: 4) {
+                            Image(systemName: session.state.icon)
+                                .font(.caption2)
+                            Text(session.state.displayName)
+                                .font(.caption2)
+                        }
+                        .foregroundStyle(session.state.color)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+            .navigationTitle("Sessions")
+        } detail: {
+            if let session = selectedSession {
+                forwardsList(for: session)
+            } else {
+                emptyState
+            }
+        }
+    }
+    
+    // MARK: - Forwards List
+    
+    private func forwardsList(for session: TerminalSession) -> some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Port Forwards")
+                        .font(.title2)
+                        .fontWeight(.bold)
+
+                    Text("Manage port forwarding for \(session.server.name)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                
+                Spacer()
+                
+                Button {
+                    showingAddForward = true
+                } label: {
+                    Label("Add Forward", systemImage: "plus.circle.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityLabel("Add port forward")
+            }
+            .padding()
+            
+            Divider()
+            
+            // Forwards list
+            if portForwardManager.forwards(for: session.id).isEmpty {
+                ContentUnavailableView {
+                    Label("No Port Forwards", systemImage: "arrow.forward.square")
+                } description: {
+                    Text("Create a port forward to access remote services")
+                } actions: {
+                    Button {
+                        showingAddForward = true
+                    } label: {
+                        Text("Add Port Forward")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            } else {
+                List {
+                    ForEach(portForwardManager.forwards(for: session.id)) { forward in
+                        PortForwardRow(
+                            forward: forward,
+                            onToggle: {
+                                portForwardManager.toggleForward(forward, in: session.id, session: session)
+                            },
+                            onDelete: {
+                                portForwardManager.removeForward(forward, from: session.id)
+                            }
+                        )
+                    }
+                }
+                .listStyle(.plain)
+            }
+        }
+        .sheet(isPresented: $showingAddForward) {
+            AddPortForwardView(
+                sessionID: session.id,
+                portForwardManager: portForwardManager
+            )
+        }
+    }
+    
+    private var emptyState: some View {
+        ContentUnavailableView {
+            Label("No Session Selected", systemImage: "arrow.left")
+        } description: {
+            Text("Select a session to manage port forwards")
+        }
+    }
+}
+
+// MARK: - Port Forward Row
+
+struct PortForwardRow: View {
+    let forward: PortForward
+    let onToggle: () -> Void
+    let onDelete: () -> Void
+
+    private var statusColor: Color {
+        switch forward.status {
+        case .active: return .green
+        case .starting: return .orange
+        case .error: return .red
+        case .stopping: return .yellow
+        case .inactive: return .gray
+        }
+    }
+
+    private var statusLabel: String {
+        switch forward.status {
+        case .active: return "Active"
+        case .starting: return "Starting"
+        case .error: return "Error"
+        case .stopping: return "Stopping"
+        case .inactive: return "Inactive"
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 16) {
+                // Type indicator
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(forward.type.displayName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Text(forward.displayString)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                HStack(spacing: 12) {
+                    HStack(spacing: 6) {
+                        if forward.status == .starting {
+                            ProgressView()
+                                .controlSize(.mini)
+                        } else {
+                            Circle()
+                                .fill(statusColor)
+                                .frame(width: 8, height: 8)
+                        }
+
+                        Text(statusLabel)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Status: \(statusLabel)")
+
+                    Toggle("", isOn: Binding(
+                        get: { forward.isActive },
+                        set: { _ in onToggle() }
+                    ))
+                    .labelsHidden()
+                    .accessibilityLabel("Toggle \(forward.type.displayName) forward")
+
+                    Button(role: .destructive, action: onDelete) {
+                        Image(systemName: "trash")
+                            .foregroundStyle(.red)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(forward.isActive)
+                    .accessibilityLabel("Delete forward")
+                }
+            }
+
+            // Error message display
+            if forward.status == .error, let errorMessage = forward.errorMessage {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption2)
+                    Text(errorMessage)
+                        .font(.caption)
+                }
+                .foregroundStyle(.red)
+            }
+        }
+    }
+}
+
+// MARK: - Add Port Forward View
+
+struct AddPortForwardView: View {
+    let sessionID: UUID
+    @Bindable var portForwardManager: PortForwardManager
+    @Environment(\.dismiss) private var dismiss
+    
+    @State private var forwardType: PortForward.ForwardType = .local
+    @State private var localPort: String = ""
+    @State private var remoteHost: String = "localhost"
+    @State private var remotePort: String = ""
+    @State private var socks5Username: String = ""
+    @State private var socks5Password: String = ""
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Forward Type") {
+                    Picker("Type", selection: $forwardType) {
+                        ForEach([PortForward.ForwardType.local, .remote, .dynamic], id: \.self) { type in
+                            VStack(alignment: .leading) {
+                                Text(type.displayName)
+                                    .font(.headline)
+                                Text(type.description)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .tag(type)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                }
+                
+                Section("Configuration") {
+                    TextField("Local Port", text: $localPort)
+                        .terminalNumericInput()
+                    
+                    if forwardType != .dynamic {
+                        TextField("Remote Host", text: $remoteHost)
+                            .terminalTextInputDefaults()
+                        
+                        TextField("Remote Port", text: $remotePort)
+                            .terminalNumericInput()
+                    }
+                }
+
+                if forwardType == .dynamic {
+                    Section("SOCKS5 Authentication") {
+                        TextField("Username", text: $socks5Username)
+                            .terminalTextInputDefaults()
+                        SecureField("Password", text: $socks5Password)
+
+                        Text("Required for every local SOCKS5 client. These credentials stay only in app memory for this session and are never saved with the forward.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                
+                Section {
+                    Text(previewString)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } header: {
+                    Text("Preview")
+                }
+
+                if forwardType == .remote {
+                    Section("Remote Bind Safety") {
+                        Text("This release limits remote listeners to loopback addresses so a tunnel cannot unexpectedly expose a local service to the server's network.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .navigationTitle("Add Port Forward")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") {
+                        addForward()
+                    }
+                    .disabled(!isValid)
+                }
+            }
+        }
+    }
+    
+    private var previewString: String {
+        guard let local = Int(localPort) else {
+            return "Enter valid port numbers"
+        }
+        
+        switch forwardType {
+        case .local:
+            guard let remote = Int(remotePort) else {
+                return "Enter valid port numbers"
+            }
+            return "localhost:\(local) → \(remoteHost):\(remote)"
+            
+        case .remote:
+            guard let remote = Int(remotePort) else {
+                return "Enter valid port numbers"
+            }
+            return "\(remoteHost):\(remote) → localhost:\(local)"
+            
+        case .dynamic:
+            return "SOCKS proxy on localhost:\(local)"
+        }
+    }
+    
+    private var isValid: Bool {
+        guard let local = Int(localPort), local > 0 && local <= 65535 else {
+            return false
+        }
+        
+        if forwardType != .dynamic {
+            guard let remote = Int(remotePort), remote > 0 && remote <= 65535 else {
+                return false
+            }
+        }
+
+        if forwardType == .remote {
+            let normalizedHost = remoteHost.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard ["localhost", "127.0.0.1", "::1"].contains(normalizedHost) else {
+                return false
+            }
+        }
+
+        if forwardType == .dynamic {
+            guard PortForwardManager.socks5Credentials(
+                username: socks5Username,
+                password: socks5Password
+            ) != nil else {
+                return false
+            }
+        }
+        
+        return true
+    }
+    
+    private func addForward() {
+        let forward = PortForward(
+            type: forwardType,
+            localPort: Int(localPort)!,
+            remoteHost: forwardType == .dynamic ? "localhost" : remoteHost,
+            remotePort: forwardType == .dynamic ? 0 : Int(remotePort)!
+        )
+        
+        if forwardType == .dynamic {
+            guard portForwardManager.addForward(
+                forward,
+                to: sessionID,
+                socks5Username: socks5Username,
+                socks5Password: socks5Password
+            ) else {
+                return
+            }
+        } else {
+            portForwardManager.addForward(forward, to: sessionID)
+        }
+        dismiss()
+    }
+}
+
+#Preview {
+    PortForwardingManagerView()
+        .environment(SessionManager())
+}

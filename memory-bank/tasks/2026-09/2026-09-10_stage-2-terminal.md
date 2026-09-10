@@ -67,7 +67,7 @@ answers `.reject`, so glas.sh's flow (surface challenge → user pins → reconn
 | Site | Change |
 |---|---|
 | `shareTransport(from:)` (SessionManager:397, :432) | Now `async` — the engine's ownership is actor-isolated. Both callers were already in async functions; `await` added. |
-| `executeRemoteCommand(_:maxResponseBytes:executionTimeout:)` | The engine's `execute` has no timeout parameter; `executionTimeout` is accepted and ignored. **Open item for W1**: expose a timeout. |
+| `executeRemoteCommand(_:maxResponseBytes:executionTimeout:)` | Timeout passed through as a `Duration` (W1 added it); `maxResponseBytes` passed through, so callers that relied on `.max` are unbounded as before. |
 | `runRemotePortForward` | Same contract (runs until the forward closes, `onOpen(boundPort)`), now `remoteForward` + `boundPort()` + `waitUntilClosed()`. |
 | `resetKeepAliveCounter()` | Keep-alive is the engine's; retained as a no-op for callers. |
 | `hasReusableTransport` / `canShareTransport` | Backed by an `isTransportConnected` flag driven by engine events instead of `client.isConnected`. |
@@ -75,11 +75,17 @@ answers `.reject`, so glas.sh's flow (surface challenge → user pins → reconn
 | SFTP browser | `openSFTPClient()` returns a **terminal-internal, Citadel-shaped shim** (`SFTPCompatibility.swift`: `SFTPClient`, `SFTPFile`, `SFTPPathComponent`, `SFTPFileAttributes`, `SFTPFileType`, `SFTPError`, `SFTPOpenFileFlags` = engine `SFTPOpenMode`) over `SFTPSession` / `SFTPFileHandle`. The 5,813-line browser is byte-identical except the dropped `import Citadel` and an added `import GlassSSHTransport`. After W1's extension (`serverExtensions`, `posixRename`, `hardLink`, `setAttributes` with times, `synchronize`) the shim routes those honestly; `serverExtensions` is read once at client creation because the browser asks synchronously. Pipelined reads (`read(_ requests:)`) are issued concurrently in a task group and returned in order. |
 
 Engine dependencies still imported by `GlassTerminal`: `NIOCore` (`Channel`, `TimeAmount`,
-`ByteBuffer` in the browser and shim), `NIOSSH` in `SSHConnection.swift` (for
-`NIOSSHError` in the verbatim `isKeyExchangeNegotiationFailure`) and in **`SettingsManager.swift`**
-together with Citadel (`NIOSSHPrivateKey`/`Insecure.RSA` to derive public keys for display/export —
-key management, not transport). **Seam for W1**: a `publicKey(for: SSHKeyMaterial)` utility would
-let `SettingsManager` drop Citadel.
+`ByteBuffer` in the browser and shim) and `NIOSSH` in `SSHConnection.swift` only (for
+`NIOSSHError` in the verbatim `isKeyExchangeNegotiationFailure`). **Citadel is no longer imported
+anywhere in the capability.** After W1 added `SSHPublicKeys` (2a13b54), `SettingsManager`'s
+`openSSHPublicKey(for:)` is `SSHPublicKeys.openSSHLine(for:comment:)`; the import form's key-type
+check is the engine's header-only probe `SSHPublicKeys.declaredKeyType(inOpenSSHPrivateKey:)`
+(W1 added it after a terminal-side copy proved the need; that copy is deleted) so `addSSHKey`
+keeps its detect-then-catalog order — fully deriving the key through the engine broke two
+catalog-rollback tests whose fixtures are header-valid only. Catalog descriptions stay
+`SSHDeclaredKeyType.displayName` = "RSA" / "ED25519" / "ECDSA P-256".
+`executeRemoteCommand`'s `executionTimeout` now passes through to `execute(_:maxResponseBytes:timeout:)`
+(engine default response bound is 8 MiB; the browser's callers pass their own bound).
 
 ## Shell integration
 
@@ -113,6 +119,18 @@ terminal features still live only there and need a home: **workgroup-preset laun
 (`openVisionWorkgroup`, `LayoutRestorationPlan`, substitution review), **Tailscale network mode
 and quick connect**, and the Mac **local terminal** entry. Server **edit/delete** actions also
 still live there (a per-service detail hook in the shell would surface them).
+
+## Audit item carried in (coordinator, from the Stage 2 security review)
+
+glas.sh's model has a per-server `allowLegacyAlgorithms` flag but **no editor for it** — the
+form never exposed it, so the July audit's "persistent warning next to the toggle" had no toggle
+to sit beside. `ServerFormView`'s Connection section now has the toggle ("Allow Legacy SSH
+Algorithms", identifier `<prefix>-legacy-algorithms`) and an always-visible warning label
+(`<prefix>-legacy-algorithms-warning`, orange when enabled) stating it weakens cryptography for
+that host, is only for old servers, and that every connection will ask to confirm — which the
+existing `TerminalConnectFlow` legacy-algorithm alert already does. Saved on both add and edit
+paths. The engine applies it per hop (`SSHConnectionOptions.allowLegacyAlgorithms`: group-14 KEX
+and AES-128-CTR for that connection only).
 
 ## Layering proof (Stage 2)
 
@@ -155,7 +173,13 @@ Settings scene; glas.sh's settings pages are not yet shown anywhere in the merge
 - Adapted, not disabled: three `MainBootstrapView.sameDeepLinkSecurityIdentity` calls →
   `MainBootstrapView<EmptyView>`; the macOS test file's `import RealityKitContent`.
 
-## Builds (actual)
+## Builds (actual, final tree)
+
+Re-run after the `SSHPublicKeys` / timeout / legacy-toggle changes: identical results to the table
+below; `swift test --build-system native --filter GlassTerminalTests` → 338 tests, 337 passed, the
+one inherited failure. Not run: the UI test target, any real-host session, any device.
+
+## Builds (before those changes)
 
 | Target | macOS | iOS Simulator (iPhone 17 Pro Max, 27.0) | visionOS Simulator (Vision Pro, 27.0) |
 |---|---|---|---|
@@ -173,7 +197,7 @@ Not run: the UI test target (per brief), any real-host session, any device.
 2. Wrap the SSH connection panel and terminal window in `GlassLayers` (Stage 2 layering proof).
 3. Re-home workgroup presets, Tailscale network mode, local terminal, server edit/delete (above).
 4. W3: settings pages, iCloud sync, window recovery into the shell.
-5. W1 backlog: `execute` timeout; public-key derivation utility so `SettingsManager` drops Citadel.
+5. ~~W1 backlog: `execute` timeout; public-key derivation utility~~ — both landed (2a13b54) and adopted.
 6. Rewrite the four browser-helper tests against the shim; move the transport-internal tests'
    intent to `GlassSSHTransportTests` if not already covered.
 7. Not mine, noticed in the tree: `Platforms/macOS/Info.plist` shows modified and

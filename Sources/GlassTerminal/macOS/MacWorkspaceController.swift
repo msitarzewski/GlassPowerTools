@@ -1,0 +1,1053 @@
+#if os(macOS)
+#if os(macOS)
+import Foundation
+import Observation
+import GlassTerminalEmulator
+import os
+
+@MainActor
+@Observable
+final class MacWorkspaceController {
+    private static let maximumEncodedBytes = 128 * 1024
+
+    private(set) var state: MacWorkspaceRestorationState
+    private(set) var sessionsByPaneID: [UUID: TerminalSession] = [:]
+    private(set) var loadingPaneIDs: Set<UUID> = []
+    private(set) var errorsByPaneID: [UUID: String] = [:]
+    private(set) var pendingCredentialErrorsByPaneID: [UUID: SessionOpenError] = [:]
+    private(set) var explicitStartupCommandsByPaneID: [UUID: String] = [:]
+    private var retainedStartupTicketsByPaneID: [UUID: TerminalStartupCommandTicket] = [:]
+    private(set) var localRuntimesByPaneID: [UUID: SwiftTermLocalProcessRuntime] = [:]
+    private(set) var localProcessStatusesByPaneID: [UUID: String] = [:]
+    private(set) var recordersByPaneID: [UUID: SessionRecorder] = [:]
+    private(set) var findTargetPaneID: UUID?
+    private(set) var findRequestNonce: UInt64 = 0
+    private(set) var isClosed = false
+    var pendingSSHAxis: MacWorkspaceSplitAxis?
+
+    private let defaults: UserDefaults
+    private let startupCommandBroker: MacStartupCommandBroker
+    private let liveSessionBroker: MacLiveSessionBroker
+    private var startupTicketIDsByPaneID: [UUID: UUID] = [:]
+    private var lifecycleGeneration: UInt64 = 0
+
+    let workgroupID: UUID?
+    let workgroupName: String?
+    let workgroupColor: ServerColorTag?
+    let tabLabel: String?
+
+    init(
+        workspaceID: UUID,
+        startsEmptyIfUnrestored: Bool = false,
+        defaults: UserDefaults = .standard
+    ) {
+        self.defaults = defaults
+        self.startupCommandBroker = .shared
+        self.liveSessionBroker = .shared
+        self.workgroupID = nil
+        self.workgroupName = nil
+        self.workgroupColor = nil
+        self.tabLabel = nil
+        self.state = Self.load(
+            workspaceID: workspaceID,
+            startsEmptyIfUnrestored: startsEmptyIfUnrestored,
+            initialPaneIntent: nil,
+            defaults: defaults
+        ).state
+    }
+
+    convenience init(
+        request: MacWorkspaceLaunchRequest,
+        startupCommandBroker: MacStartupCommandBroker = .shared,
+        liveSessionBroker: MacLiveSessionBroker = .shared,
+        defaults: UserDefaults = .standard
+    ) {
+        self.init(
+            request: request.tabs[0],
+            startupCommandBroker: startupCommandBroker,
+            liveSessionBroker: liveSessionBroker,
+            defaults: defaults
+        )
+    }
+
+    init(
+        request: MacWorkspaceTabRequest,
+        startupCommandBroker: MacStartupCommandBroker = .shared,
+        liveSessionBroker: MacLiveSessionBroker = .shared,
+        defaults: UserDefaults = .standard
+    ) {
+        self.defaults = defaults
+        self.startupCommandBroker = startupCommandBroker
+        self.liveSessionBroker = liveSessionBroker
+        self.workgroupID = request.workgroupID
+        self.workgroupName = request.workgroupName
+        self.workgroupColor = request.workgroupColor
+        self.tabLabel = request.tabLabel
+        let loaded = Self.load(
+            workspaceID: request.workspaceID,
+            startsEmptyIfUnrestored: request.startsEmpty,
+            initialPaneIntent: request.initialPaneIntent,
+            defaults: defaults
+        )
+        self.state = loaded.state
+        var acceptedInitialLayout = false
+        if !loaded.hadRestorationData, let initial = request.initialState,
+           let validated = try? initial.validated(for: request.workspaceID) {
+            self.state = validated
+            acceptedInitialLayout = true
+            startupTicketIDsByPaneID = request.paneStartupTicketIDs ?? [:]
+        } else {
+            for id in request.paneStartupTicketIDs?.values ?? Dictionary<UUID, UUID>().values {
+                startupCommandBroker.discard(id)
+            }
+        }
+        if !loaded.hadRestorationData,
+           let paneID = loaded.state.focusedPaneID,
+           let ticketID = request.startupTicketID {
+            startupTicketIDsByPaneID[paneID] = ticketID
+        } else if let ticketID = request.startupTicketID {
+            startupCommandBroker.discard(ticketID)
+        }
+        if !loaded.hadRestorationData,
+           let paneID = loaded.state.focusedPaneID,
+           let pane = loaded.state.root?.pane(id: paneID),
+           let ticketID = request.liveSessionTicketID {
+            if let ticket = liveSessionBroker.claim(ticketID) {
+                if pane.intent.kind == .ssh,
+                   pane.intent.serverID == ticket.session.server.id {
+                    sessionsByPaneID[paneID] = ticket.session
+                } else {
+                    ticket.discard()
+                    errorsByPaneID[paneID] = "The prepared terminal session did not match its launch request."
+                }
+            } else {
+                errorsByPaneID[paneID] = "The prepared terminal session expired before its window opened."
+            }
+        } else if let ticketID = request.liveSessionTicketID {
+            liveSessionBroker.discard(ticketID)
+        }
+        for (paneID, ticketID) in startupTicketIDsByPaneID {
+            guard state.root?.pane(id: paneID) != nil else {
+                startupCommandBroker.discard(ticketID)
+                continue
+            }
+            if let ticket = startupCommandBroker.claim(ticketID) {
+                retainedStartupTicketsByPaneID[paneID] = ticket
+                explicitStartupCommandsByPaneID[paneID] = ticket.command
+            }
+        }
+        startupTicketIDsByPaneID.removeAll()
+        // Unselected tabs may never receive a focus or layout event. Save their
+        // fresh trees now so window descriptors can restore every tab later.
+        // Existing malformed restoration data is deliberately left untouched.
+        if !loaded.hadRestorationData && (request.initialState == nil || acceptedInitialLayout) {
+            persist()
+        }
+    }
+
+    var workspaceID: UUID { state.id }
+    var restorationDescriptor: MacWorkspaceTabDescriptor {
+        MacWorkspaceTabDescriptor(
+            MacWorkspaceTabRequest(
+                workspaceID: workspaceID,
+                workgroupID: workgroupID,
+                workgroupName: workgroupName,
+                workgroupColor: workgroupColor,
+                tabLabel: tabLabel
+            )
+        )
+    }
+    var focusedPaneID: UUID? { state.focusedPaneID }
+    var focusedPane: MacWorkspacePane? {
+        guard let focusedPaneID else { return nil }
+        return state.root?.pane(id: focusedPaneID)
+    }
+
+    var isEmpty: Bool { state.root == nil }
+    var windowTitle: String {
+        switch (workgroupName, tabLabel) {
+        case let (.some(workgroup), .some(tab)): "\(workgroup) · \(tab)"
+        case let (.some(workgroup), .none): workgroup
+        case let (.none, .some(tab)): tab
+        case (.none, .none): "Terminal"
+        }
+    }
+    var canAddPane: Bool {
+        (state.root?.paneIDs.count ?? 0) < MacWorkspaceRestorationState.maximumPaneCount
+    }
+
+    func windowIdentity(
+        servers: [ServerConfiguration],
+        localUsername: String = NSUserName()
+    ) -> MacWorkspaceWindowIdentity {
+        guard let focusedPane else {
+            return MacWorkspaceWindowIdentity(
+                title: windowTitle == "Terminal" ? "New Terminal" : windowTitle,
+                subtitle: nil
+            )
+        }
+
+        switch focusedPane.intent.kind {
+        case .local:
+            return MacWorkspaceWindowIdentity(
+                title: tabLabel ?? focusedPane.intent.label ?? workgroupName ?? "Local",
+                subtitle: "\(localUsername)@localhost" + (localProcessStatusesByPaneID[focusedPane.id].map { " — \($0)" } ?? "")
+            )
+        case .ssh:
+            let server = session(for: focusedPane.id)?.server
+                ?? servers.first(where: { $0.id == focusedPane.intent.serverID })
+            guard let server else {
+                return MacWorkspaceWindowIdentity(
+                    title: tabLabel ?? workgroupName ?? "SSH Terminal",
+                    subtitle: nil
+                )
+            }
+            return MacWorkspaceWindowIdentity(
+                title: tabLabel ?? focusedPane.intent.label ?? server.name,
+                subtitle: Self.connectionSubtitle(
+                    "\(server.username)@\(server.host):\(server.port)",
+                    state: session(for: focusedPane.id)?.state
+                )
+            )
+        }
+    }
+
+    func focusedSessionState() -> SessionState? {
+        guard let focusedPaneID else { return nil }
+        return session(for: focusedPaneID)?.state
+    }
+
+    func updateLocalProcessStatus(_ status: String?, for paneID: UUID) {
+        guard !isClosed, state.root?.pane(id: paneID)?.intent.kind == .local else { return }
+        localProcessStatusesByPaneID[paneID] = status
+    }
+
+    static func connectionSubtitle(_ connection: String, state: SessionState?) -> String {
+        let status: String
+        switch state {
+        case .connected, nil: return connection
+        case .connecting: status = "Connecting…"
+        case .reconnecting: status = "Reconnecting…"
+        case .disconnected: status = "Disconnected"
+        case .error: status = "Connection failed"
+        }
+        return "\(connection) — \(status)"
+    }
+
+    func session(for paneID: UUID) -> TerminalSession? {
+        sessionsByPaneID[paneID]
+    }
+
+    func localRuntime(for paneID: UUID) -> SwiftTermLocalProcessRuntime? {
+        guard !isClosed,
+              state.root?.pane(id: paneID)?.intent.kind == .local else { return nil }
+        if let runtime = localRuntimesByPaneID[paneID] {
+            return runtime
+        }
+        let runtime = SwiftTermLocalProcessRuntime()
+        localRuntimesByPaneID[paneID] = runtime
+        return runtime
+    }
+
+    func recorder(for paneID: UUID) -> SessionRecorder? {
+        guard !isClosed,
+              state.root?.pane(id: paneID) != nil else { return nil }
+        if let recorder = recordersByPaneID[paneID] {
+            return recorder
+        }
+        let recorder = SessionRecorder()
+        recordersByPaneID[paneID] = recorder
+        return recorder
+    }
+
+    /// Start every local pane independently of SwiftUI's lazy tab presentation.
+    func startLocalPanes(sessionManager: SessionManager, settingsManager: SettingsManager, onEmpty: @escaping () -> Void) {
+        for pane in state.root?.panes ?? [] where pane.intent.kind == .local {
+            guard let runtime = localRuntime(for: pane.id), !runtime.hasEngine,
+                  let recorder = recorder(for: pane.id) else { continue }
+            runtime.start(
+                configuration: MacLocalTerminalConfiguration.resolve(
+                    shell: pane.intent.localShell ?? settingsManager.localShell,
+                    directory: pane.intent.localDirectory ?? settingsManager.localWorkingDirectory
+                ),
+                theme: settingsManager.currentTheme.swiftTermTheme,
+                runtimeSettings: SwiftTermRuntimeSettings(
+                    cursorStyle: settingsManager.cursorStyle,
+                    blinkingCursor: settingsManager.blinkingCursor,
+                    scrollbackLines: settingsManager.saveScrollback ? settingsManager.maxScrollbackLines : 0
+                ),
+                onOutputData: { recorder.recordOutput($0) },
+                onInputData: { recorder.recordInput($0) },
+                onResize: { recorder.recordResize(width: $0, height: $1) },
+                onProcessReady: { [weak self, weak runtime] in
+                    guard let ticket = self?.claimStartupCommand(for: pane.id) else { return }
+                    _ = runtime?.processState.sendCommand(ticket.command)
+                },
+                onProcessTerminated: { [weak self] exitCode in
+                    if recorder.isRecording { _ = recorder.stop() }
+                    guard let self, !isClosed,
+                          MacLocalTerminalExitPolicy.shouldClose(exitCode: exitCode) else { return }
+                    removePane(pane.id, sessionManager: sessionManager)
+                    if state.root == nil { onEmpty() }
+                }
+            )
+        }
+    }
+
+    func error(for paneID: UUID) -> String? {
+        errorsByPaneID[paneID]
+    }
+
+    func isLoading(_ paneID: UUID) -> Bool {
+        loadingPaneIDs.contains(paneID)
+    }
+
+    var closeWarning: String? {
+        if recordersByPaneID.values.contains(where: \.isRecording)
+            || sessionsByPaneID.values.contains(where: { $0.recorder?.isRecording == true }) {
+            return "This tab is recording. Closing it will stop the recording and disconnect its terminals."
+        }
+        if !loadingPaneIDs.isEmpty {
+            return "This tab is still starting a connection. Closing it will cancel that connection."
+        }
+        if sessionsByPaneID.values.contains(where: {
+            $0.state == .connected || $0.state == .connecting || $0.pendingHostKeyChallenge != nil
+        }) {
+            return "This tab has an SSH session. Remote command activity cannot be verified; closing it will disconnect the session."
+        }
+        if localRuntimesByPaneID.values.contains(where: {
+            $0.processState.isRunning && $0.hasActiveChildProcesses != false
+        }) {
+            return "This tab has running commands, or its activity could not be verified. Closing it will stop those commands."
+        }
+        return nil
+    }
+
+    func focus(_ paneID: UUID) {
+        guard state.root?.pane(id: paneID) != nil else { return }
+        state.focusedPaneID = paneID
+        persist()
+    }
+
+    func focusNextPane() {
+        let paneIDs = state.root?.paneIDs ?? []
+        guard !paneIDs.isEmpty else { return }
+        guard let focusedPaneID,
+              let index = paneIDs.firstIndex(of: focusedPaneID) else {
+            focus(paneIDs[0])
+            return
+        }
+        focus(paneIDs[(index + 1) % paneIDs.count])
+    }
+
+    func addPane(
+        intent: MacWorkspacePaneIntent,
+        axis: MacWorkspaceSplitAxis
+    ) {
+        guard canAddPane else { return }
+        let newPane = MacWorkspacePane(intent: intent)
+        guard let root = state.root else {
+            state.root = .pane(newPane)
+            state.focusedPaneID = newPane.id
+            persist()
+            return
+        }
+        let targetID = state.focusedPaneID ?? root.paneIDs.first
+        guard let targetID else { return }
+        state.root = root.splittingPane(id: targetID, axis: axis, newPane: newPane)
+        state.focusedPaneID = newPane.id
+        persist()
+    }
+
+    func requestSSHPane(axis: MacWorkspaceSplitAxis) {
+        pendingSSHAxis = axis
+    }
+
+    func addSSHPane(serverID: UUID) {
+        let axis = pendingSSHAxis ?? .horizontal
+        pendingSSHAxis = nil
+        addPane(intent: .ssh(serverID: serverID), axis: axis)
+    }
+
+    func cancelSSHPaneRequest() {
+        pendingSSHAxis = nil
+    }
+
+    func removeFocusedPane(sessionManager: SessionManager) {
+        guard let paneID = state.focusedPaneID else { return }
+        removePane(paneID, sessionManager: sessionManager)
+    }
+
+    func removePane(_ paneID: UUID, sessionManager: SessionManager) {
+        guard !isClosed, let root = state.root, root.pane(id: paneID) != nil else { return }
+        if let session = sessionsByPaneID.removeValue(forKey: paneID) {
+            sessionManager.closeSession(session)
+        }
+        loadingPaneIDs.remove(paneID)
+        errorsByPaneID.removeValue(forKey: paneID)
+        localRuntimesByPaneID.removeValue(forKey: paneID)?.terminate()
+        localProcessStatusesByPaneID.removeValue(forKey: paneID)
+        recordersByPaneID.removeValue(forKey: paneID)?.finalize()
+        discardStartupCommand(for: paneID)
+        state.root = root.removingPane(id: paneID)
+        state.focusedPaneID = state.root?.paneIDs.first
+        persist()
+    }
+
+    func updateSplitFraction(_ splitID: UUID, fraction: Double) {
+        guard let root = state.root, fraction.isFinite else { return }
+        state.root = root.updatingSplitFraction(id: splitID, fraction: fraction)
+        persist()
+    }
+
+    func retryPane(_ paneID: UUID) {
+        guard !isClosed else { return }
+        errorsByPaneID.removeValue(forKey: paneID)
+        pendingCredentialErrorsByPaneID.removeValue(forKey: paneID)
+    }
+
+    func disconnectSSHPane(_ paneID: UUID, sessionManager: SessionManager) {
+        guard !isClosed,
+              state.root?.pane(id: paneID)?.intent.kind == .ssh else { return }
+        if let session = sessionsByPaneID.removeValue(forKey: paneID) {
+            sessionManager.closeSession(session)
+        }
+        loadingPaneIDs.remove(paneID)
+        errorsByPaneID[paneID] = "The SSH session ended. Retry to reconnect."
+    }
+
+    @discardableResult
+    func completeCleanSSHExit(_ paneID: UUID, sessionManager: SessionManager) -> Bool {
+        guard !isClosed,
+              state.root?.pane(id: paneID)?.intent.kind == .ssh else { return false }
+        let closesWorkspace = state.root?.panes.count == 1
+        removePane(paneID, sessionManager: sessionManager)
+        return closesWorkspace
+    }
+
+    func requestFindInFocusedPane() {
+        guard let focusedPaneID else { return }
+        findTargetPaneID = focusedPaneID
+        findRequestNonce &+= 1
+    }
+
+    private func prepareOffscreenRenderer(for session: TerminalSession, settingsManager: SettingsManager) {
+        let model = session.terminalHostModel
+        SwiftTermHostView(model: model,
+            theme: settingsManager.currentTheme.swiftTermTheme,
+            runtimeSettings: SwiftTermRuntimeSettings(
+                cursorStyle: settingsManager.cursorStyle,
+                blinkingCursor: settingsManager.blinkingCursor,
+                scrollbackLines: settingsManager.saveScrollback ? settingsManager.maxScrollbackLines : 0),
+            allowsFocusOwnership: false,
+            onSendData: { [weak session] data in session?.sendTerminalData(data) },
+            onResize: { [weak session, weak model] columns, rows in
+                // Offscreen geometry is the configured fallback, not a measured window.
+                guard model?.rendererDiagnostics.isWindowAttached == true else { return }
+                session?.updateTerminalGeometry(rows: rows, columns: columns)
+            }
+        ).prepareOffscreen(columns: session.currentTerminalGeometry.columns,
+                           rows: session.currentTerminalGeometry.rows)
+    }
+
+    func prepareSSHPaneIfNeeded(
+        _ pane: MacWorkspacePane,
+        sessionManager: SessionManager,
+        settingsManager: SettingsManager
+    ) async {
+        guard !isClosed,
+              pane.intent.kind == .ssh,
+              let serverID = pane.intent.serverID,
+              sessionsByPaneID[pane.id] == nil,
+              !loadingPaneIDs.contains(pane.id),
+              errorsByPaneID[pane.id] == nil else { return }
+
+        let generation = lifecycleGeneration
+        loadingPaneIDs.insert(pane.id)
+        defer { loadingPaneIDs.remove(pane.id) }
+
+        let startupTicket = retainedStartupTicketsByPaneID.removeValue(forKey: pane.id) ?? claimStartupCommand(for: pane.id)
+        let startupCommand = startupTicket?.command
+        do {
+            let launch = try await sessionManager.createAuthorizedSessionByServerID(
+                serverID,
+                settingsManager: settingsManager,
+                startupCommand: startupCommand,
+                initialTerminalPresentation: { [weak self] pendingSession in
+                    guard let self,
+                          !isClosed,
+                          generation == lifecycleGeneration,
+                          state.root?.pane(id: pane.id)?.intent == pane.intent else { return }
+                    sessionsByPaneID[pane.id] = pendingSession
+                    prepareOffscreenRenderer(for: pendingSession, settingsManager: settingsManager)
+                }
+            )
+            guard !isClosed,
+                  generation == lifecycleGeneration,
+                  state.root?.pane(id: pane.id)?.intent == pane.intent else {
+                sessionManager.closeSession(launch.session)
+                return
+            }
+            if launch.session.state == .connected || launch.session.pendingHostKeyChallenge != nil {
+                sessionsByPaneID[pane.id] = launch.session
+            } else {
+                if case .error(let message) = launch.session.state {
+                    errorsByPaneID[pane.id] = message
+                } else {
+                    errorsByPaneID[pane.id] = "The SSH session ended before the pane opened."
+                }
+                if launch.session.hasPendingStartupCommand {
+                    retainedStartupTicketsByPaneID[pane.id] = startupTicket
+                }
+                sessionsByPaneID.removeValue(forKey: pane.id)
+                sessionManager.closeSession(launch.session)
+            }
+        } catch {
+            guard !isClosed,
+                  generation == lifecycleGeneration,
+                  state.root?.pane(id: pane.id)?.intent == pane.intent else { return }
+            errorsByPaneID[pane.id] = error.localizedDescription
+            let pendingSession = sessionsByPaneID.removeValue(forKey: pane.id)
+            if pendingSession == nil || pendingSession?.hasPendingStartupCommand == true {
+                retainedStartupTicketsByPaneID[pane.id] = startupTicket
+            }
+            if let pendingSession { sessionManager.closeSession(pendingSession) }
+            if let credentialError = error as? SessionOpenError {
+                pendingCredentialErrorsByPaneID[pane.id] = credentialError
+            }
+        }
+    }
+
+    func closeAllSessions(sessionManager: SessionManager) {
+        isClosed = true
+        lifecycleGeneration &+= 1
+        let sessions = Array(sessionsByPaneID.values)
+        sessionsByPaneID.removeAll()
+        let localRuntimes = Array(localRuntimesByPaneID.values)
+        localRuntimesByPaneID.removeAll()
+        let recorders = Array(recordersByPaneID.values)
+        recordersByPaneID.removeAll()
+        loadingPaneIDs.removeAll()
+        for ticketID in startupTicketIDsByPaneID.values {
+            startupCommandBroker.discard(ticketID)
+        }
+        startupTicketIDsByPaneID.removeAll()
+        retainedStartupTicketsByPaneID.removeAll()
+        explicitStartupCommandsByPaneID.removeAll()
+        pendingCredentialErrorsByPaneID.removeAll()
+        for session in sessions {
+            sessionManager.closeSession(session)
+        }
+        for runtime in localRuntimes {
+            runtime.terminate()
+        }
+        for recorder in recorders {
+            recorder.finalize()
+        }
+    }
+
+    func claimStartupCommand(for paneID: UUID) -> TerminalStartupCommandTicket? {
+        guard !isClosed, state.root?.pane(id: paneID) != nil else { return nil }
+        if let ticket = retainedStartupTicketsByPaneID.removeValue(forKey: paneID) { return ticket }
+        guard !isClosed,
+              state.root?.pane(id: paneID) != nil,
+              let ticketID = startupTicketIDsByPaneID.removeValue(forKey: paneID) else {
+            return nil
+        }
+        let ticket = startupCommandBroker.claim(ticketID)
+        explicitStartupCommandsByPaneID[paneID] = ticket?.command
+        return ticket
+    }
+
+    private func discardStartupCommand(for paneID: UUID) {
+        retainedStartupTicketsByPaneID.removeValue(forKey: paneID)
+        explicitStartupCommandsByPaneID.removeValue(forKey: paneID)
+        pendingCredentialErrorsByPaneID.removeValue(forKey: paneID)
+        guard let ticketID = startupTicketIDsByPaneID.removeValue(forKey: paneID) else { return }
+        startupCommandBroker.discard(ticketID)
+    }
+
+    private func persist() {
+        do {
+            _ = try state.validated(for: state.id)
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys]
+            let data = try encoder.encode(state)
+            guard data.count <= Self.maximumEncodedBytes else {
+                throw MacWorkspaceStateError.encodedStateTooLarge
+            }
+            defaults.set(data, forKey: Self.defaultsKey(for: state.id))
+        } catch {
+            Logger.settings.error(
+                "Refusing to persist invalid workspace state: \(error.localizedDescription, privacy: .public)"
+            )
+            assertionFailure("Refusing to persist invalid workspace state: \(error)")
+        }
+    }
+
+    private struct LoadResult {
+        let state: MacWorkspaceRestorationState
+        let hadRestorationData: Bool
+    }
+
+    private static func load(
+        workspaceID: UUID,
+        startsEmptyIfUnrestored: Bool,
+        initialPaneIntent: MacWorkspacePaneIntent?,
+        defaults: UserDefaults
+    ) -> LoadResult {
+        let key = defaultsKey(for: workspaceID)
+        guard let data = defaults.data(forKey: key) else {
+            let state: MacWorkspaceRestorationState
+            if startsEmptyIfUnrestored {
+                state = .empty(id: workspaceID)
+            } else {
+                state = MacWorkspaceRestorationState(
+                    id: workspaceID,
+                    initialIntent: initialPaneIntent ?? .local
+                )
+            }
+            return LoadResult(state: state, hadRestorationData: false)
+        }
+        guard data.count <= maximumEncodedBytes else {
+            return LoadResult(
+                state: .empty(id: workspaceID),
+                hadRestorationData: true
+            )
+        }
+        do {
+            let state = try JSONDecoder()
+                .decode(MacWorkspaceRestorationState.self, from: data)
+                .validated(for: workspaceID)
+            return LoadResult(state: state, hadRestorationData: true)
+        } catch {
+            // Keep malformed or future-version data untouched for diagnosis,
+            // but never execute a launch request that failed validation.
+            return LoadResult(
+                state: .empty(id: workspaceID),
+                hadRestorationData: true
+            )
+        }
+    }
+
+    private static func defaultsKey(for workspaceID: UUID) -> String {
+        "\(UserDefaultsKeys.macWorkspaceRestoration).\(workspaceID.uuidString.lowercased())"
+    }
+}
+
+struct MacWorkspaceWindowIdentity: Equatable {
+    let title: String
+    let subtitle: String?
+
+    init(title: String, subtitle: String?) {
+        self.title = MacWorkspaceChromeText.sanitize(
+            title,
+            maximumLength: 160
+        ) ?? "Terminal"
+        self.subtitle = subtitle.flatMap {
+            MacWorkspaceChromeText.sanitize($0, maximumLength: 240)
+        }
+    }
+}
+
+@MainActor
+final class MacWorkspaceTransferBroker {
+    static let shared = MacWorkspaceTransferBroker()
+    static let defaultCapacity = 16
+    static let defaultExpiration: Duration = .seconds(30)
+
+    private struct Entry {
+        let controller: MacWorkspaceController
+        let expirationTask: Task<Void, Never>
+        let commit: @MainActor (UUID) -> Bool
+        let invalidate: @MainActor (UUID) -> Void
+    }
+
+    private let capacity: Int
+    private let expiration: Duration
+    private var entries: [UUID: Entry] = [:]
+    private var order: [UUID] = []
+
+    init(
+        capacity: Int = defaultCapacity,
+        expiration: Duration = defaultExpiration
+    ) {
+        self.capacity = max(1, capacity)
+        self.expiration = expiration
+    }
+
+    var pendingCount: Int { entries.count }
+
+    func issue(
+        controller: MacWorkspaceController,
+        commit: @escaping @MainActor (UUID) -> Bool,
+        invalidate: @escaping @MainActor (UUID) -> Void
+    ) -> UUID {
+        while entries.count >= capacity, let oldest = order.first {
+            self.invalidate(oldest)
+        }
+        let id = UUID()
+        let expirationTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(for: self.expiration)
+            guard !Task.isCancelled else { return }
+            self.invalidate(id)
+        }
+        entries[id] = Entry(
+            controller: controller,
+            expirationTask: expirationTask,
+            commit: commit,
+            invalidate: invalidate
+        )
+        order.append(id)
+        return id
+    }
+
+    func claim(_ id: UUID) -> MacWorkspaceController? {
+        guard let entry = entries.removeValue(forKey: id) else { return nil }
+        order.removeAll { $0 == id }
+        entry.expirationTask.cancel()
+        guard !entry.controller.isClosed, entry.commit(id) else {
+            entry.invalidate(id)
+            return nil
+        }
+        return entry.controller
+    }
+
+    func discard(_ id: UUID) {
+        invalidate(id)
+    }
+
+    private func invalidate(_ id: UUID) {
+        guard let entry = entries.removeValue(forKey: id) else { return }
+        order.removeAll { $0 == id }
+        entry.expirationTask.cancel()
+        entry.invalidate(id)
+    }
+}
+
+@MainActor
+@Observable
+final class MacWorkspaceWindowController {
+    private static let maximumEncodedBytes = 64 * 1024
+
+    let windowID: UUID
+    private(set) var tabs: [MacWorkspaceController]
+    private(set) var selectedTabID: UUID
+
+    private let defaults: UserDefaults
+    private let startupCommandBroker: MacStartupCommandBroker
+    private let liveSessionBroker: MacLiveSessionBroker
+    private let transferBroker: MacWorkspaceTransferBroker
+    private var pendingTransferTicketsByWorkspaceID: [UUID: UUID] = [:]
+
+    init(
+        request: MacWorkspaceLaunchRequest,
+        startupCommandBroker: MacStartupCommandBroker = .shared,
+        liveSessionBroker: MacLiveSessionBroker = .shared,
+        transferBroker: MacWorkspaceTransferBroker = .shared,
+        defaults: UserDefaults = .standard
+    ) {
+        windowID = request.windowID
+        self.defaults = defaults
+        self.startupCommandBroker = startupCommandBroker
+        self.liveSessionBroker = liveSessionBroker
+        self.transferBroker = transferBroker
+
+        let resolvedTabs: [MacWorkspaceController]
+        let resolvedSelectedTabID: UUID
+        if let ticketID = request.transferredTabTicketID {
+            if let transferred = transferBroker.claim(ticketID) {
+                resolvedTabs = [transferred]
+                resolvedSelectedTabID = transferred.workspaceID
+            } else {
+                let fallback = MacWorkspaceController(
+                    request: MacWorkspaceTabRequest(
+                        workspaceID: UUID(),
+                        startsEmpty: true
+                    ),
+                    startupCommandBroker: startupCommandBroker,
+                    liveSessionBroker: liveSessionBroker,
+                    defaults: defaults
+                )
+                resolvedTabs = [fallback]
+                resolvedSelectedTabID = fallback.workspaceID
+            }
+        } else if let restored = Self.load(windowID: request.windowID, defaults: defaults) {
+            resolvedTabs = restored.tabs.map {
+                MacWorkspaceController(
+                    request: $0.request,
+                    startupCommandBroker: startupCommandBroker,
+                    liveSessionBroker: liveSessionBroker,
+                    defaults: defaults
+                )
+            }
+            resolvedSelectedTabID = restored.selectedTabID
+        } else if defaults.object(
+            forKey: Self.defaultsKey(for: request.windowID)
+        ) != nil {
+            let fallback = MacWorkspaceController(
+                request: MacWorkspaceTabRequest(
+                    workspaceID: UUID(),
+                    startsEmpty: true
+                ),
+                startupCommandBroker: startupCommandBroker,
+                liveSessionBroker: liveSessionBroker,
+                defaults: defaults
+            )
+            resolvedTabs = [fallback]
+            resolvedSelectedTabID = fallback.workspaceID
+        } else {
+            resolvedTabs = request.tabs.map {
+                MacWorkspaceController(
+                    request: $0,
+                    startupCommandBroker: startupCommandBroker,
+                    liveSessionBroker: liveSessionBroker,
+                    defaults: defaults
+                )
+            }
+            resolvedSelectedTabID = request.initialSelectedTabID.flatMap { requested in
+                resolvedTabs.first(where: { $0.workspaceID == requested })?.workspaceID
+            } ?? resolvedTabs[0].workspaceID
+        }
+        tabs = resolvedTabs
+        selectedTabID = resolvedSelectedTabID
+        persist()
+    }
+
+    var selectedTab: MacWorkspaceController {
+        tabs.first(where: { $0.workspaceID == selectedTabID }) ?? tabs[0]
+    }
+
+    func capturePreset(
+        name: String,
+        servers: [ServerConfiguration],
+        defaultLocalShell: String? = nil,
+        defaultLocalDirectory: String? = nil,
+        sourcePresets: [LayoutPreset] = []
+    ) throws -> LayoutPreset {
+        var intents: [LayoutPreset.SessionIntent] = []
+        var savedTabs: [LayoutPreset.WorkspaceLayout.Tab] = []
+        var selectedIndex = 0
+        for tab in tabs {
+            guard let root = tab.state.root else { continue }
+            var indices: [UUID: Int] = [:]
+            func convert(_ node: MacWorkspaceNode) throws -> LayoutPreset.WorkspaceLayout.Node {
+                switch node {
+                case .pane(let pane):
+                    guard intents.count < LayoutPreset.maximumSessionCount else { throw MacWorkspaceStateError.tooManyPanes }
+                    let index = intents.count
+                    indices[pane.id] = index
+                    let intent = pane.intent
+                    let sourcePreset = sourcePresets.first { $0.id == tab.workgroupID }
+                    let sourceIntent = intent.sourceSessionIndex.flatMap { sourceIndex in
+                        sourcePreset?.sessionIntents.indices.contains(sourceIndex) == true
+                            ? sourcePreset?.sessionIntents[sourceIndex] : nil
+                    }
+                    let sourceCommand = sourceIntent.flatMap { source in
+                        source.kind.rawValue == intent.kind.rawValue && source.serverID == intent.serverID
+                            ? source.startupCommand : nil
+                    }
+                    if intent.kind == .ssh,
+                       !servers.contains(where: { $0.id == intent.serverID }) {
+                        throw MacWorkspaceStateError.invalidPaneIntent
+                    }
+                    intents.append(.init(kind: intent.kind == .local ? .local : .ssh,
+                                         serverID: intent.serverID,
+                                         label: intent.label,
+                                         startupCommand: tab.explicitStartupCommandsByPaneID[pane.id] ?? sourceCommand,
+                                         localShell: intent.kind == .local
+                                            ? (tab.localRuntimesByPaneID[pane.id]?.launchedShell ?? intent.localShell ?? defaultLocalShell) : nil,
+                                         localDirectory: intent.kind == .local
+                                            ? (tab.localRuntimesByPaneID[pane.id]?.currentWorkingDirectory ?? intent.localDirectory ?? defaultLocalDirectory)
+                                            : nil))
+                    return .session(index)
+                case .split(let split):
+                    return .split(axis: split.axis == .horizontal ? .horizontal : .vertical,
+                                  fraction: split.fraction, first: try convert(split.first), second: try convert(split.second))
+                }
+            }
+            let savedRoot = try convert(root)
+            if tab.workspaceID == selectedTabID { selectedIndex = savedTabs.count }
+            savedTabs.append(.init(label: tab.tabLabel, root: savedRoot,
+                                   focusedSessionIndex: tab.focusedPaneID.flatMap { indices[$0] } ?? indices[root.paneIDs[0]]!))
+        }
+        let preset = LayoutPreset(name: name, colorTag: selectedTab.workgroupColor ?? .blue,
+                                  sessionIntents: intents,
+                                  workspaceLayout: .init(tabs: savedTabs, selectedTabIndex: selectedIndex))
+        guard preset.isValidForPersistence else { throw MacWorkspaceStateError.invalidPaneIntent }
+        return preset
+    }
+
+    var isEmpty: Bool {
+        tabs.allSatisfy(\.isEmpty)
+    }
+    var canAddTab: Bool {
+        tabs.count < MacWorkspaceWindowRestorationState.maximumTabCount
+    }
+    var canTransferSelectedTab: Bool {
+        tabs.count > 1
+            && pendingTransferTicketsByWorkspaceID[selectedTabID] == nil
+    }
+
+    func select(_ workspaceID: UUID) {
+        guard tabs.contains(where: { $0.workspaceID == workspaceID }) else { return }
+        selectedTabID = workspaceID
+        persist()
+    }
+
+    @discardableResult
+    func addTab(_ request: MacWorkspaceTabRequest = MacWorkspaceTabRequest(startsEmpty: true))
+        -> MacWorkspaceController?
+    {
+        guard canAddTab else { return nil }
+        let controller = MacWorkspaceController(
+            request: request,
+            startupCommandBroker: startupCommandBroker,
+            liveSessionBroker: liveSessionBroker,
+            defaults: defaults
+        )
+        tabs.append(controller)
+        selectedTabID = controller.workspaceID
+        persist()
+        return controller
+    }
+
+    @discardableResult
+    func removeTab(
+        _ workspaceID: UUID,
+        sessionManager: SessionManager,
+        closeSessions: Bool = true
+    ) -> Bool {
+        guard let index = tabs.firstIndex(where: { $0.workspaceID == workspaceID }) else {
+            return false
+        }
+        if tabs.count == 1 {
+            cancelPendingTransfer(for: workspaceID)
+            if closeSessions {
+                tabs[0].closeAllSessions(sessionManager: sessionManager)
+            }
+            defaults.removeObject(forKey: Self.defaultsKey(for: windowID))
+            return true
+        }
+        cancelPendingTransfer(for: workspaceID)
+        let controller = tabs.remove(at: index)
+        if closeSessions {
+            controller.closeAllSessions(sessionManager: sessionManager)
+        }
+        guard !tabs.isEmpty else {
+            defaults.removeObject(forKey: Self.defaultsKey(for: windowID))
+            return true
+        }
+        if selectedTabID == workspaceID {
+            selectedTabID = tabs[min(index, tabs.count - 1)].workspaceID
+        }
+        persist()
+        return false
+    }
+
+    func transferSelectedTab() -> MacWorkspaceLaunchRequest? {
+        guard canTransferSelectedTab else { return nil }
+        let controller = selectedTab
+        let ticketID = transferBroker.issue(
+            controller: controller,
+            commit: { [weak self] ticketID in
+                self?.commitTransfer(
+                    controller.workspaceID,
+                    ticketID: ticketID
+                ) ?? false
+            },
+            invalidate: { [weak self] ticketID in
+                self?.invalidateTransfer(
+                    controller.workspaceID,
+                    ticketID: ticketID
+                )
+            }
+        )
+        pendingTransferTicketsByWorkspaceID[controller.workspaceID] = ticketID
+        return MacWorkspaceLaunchRequest(
+            windowID: UUID(),
+            tabs: [controller.restorationDescriptor.request],
+            transferredTabTicketID: ticketID
+        )
+    }
+
+    func closeAllSessions(sessionManager: SessionManager) {
+        let pendingTickets = Array(pendingTransferTicketsByWorkspaceID.values)
+        for ticketID in pendingTickets {
+            transferBroker.discard(ticketID)
+        }
+        pendingTransferTicketsByWorkspaceID.removeAll()
+        for tab in tabs {
+            tab.closeAllSessions(sessionManager: sessionManager)
+        }
+    }
+
+    private func commitTransfer(_ workspaceID: UUID, ticketID: UUID) -> Bool {
+        guard pendingTransferTicketsByWorkspaceID[workspaceID] == ticketID else {
+            return false
+        }
+        guard let index = tabs.firstIndex(where: { $0.workspaceID == workspaceID }),
+              tabs.count > 1 else {
+            pendingTransferTicketsByWorkspaceID.removeValue(forKey: workspaceID)
+            return false
+        }
+        pendingTransferTicketsByWorkspaceID.removeValue(forKey: workspaceID)
+        tabs.remove(at: index)
+        if selectedTabID == workspaceID {
+            selectedTabID = tabs[min(index, tabs.count - 1)].workspaceID
+        }
+        persist()
+        return true
+    }
+
+    private func invalidateTransfer(_ workspaceID: UUID, ticketID: UUID) {
+        guard pendingTransferTicketsByWorkspaceID[workspaceID] == ticketID else {
+            return
+        }
+        pendingTransferTicketsByWorkspaceID.removeValue(forKey: workspaceID)
+    }
+
+    private func cancelPendingTransfer(for workspaceID: UUID) {
+        guard let ticketID = pendingTransferTicketsByWorkspaceID[workspaceID] else {
+            return
+        }
+        transferBroker.discard(ticketID)
+    }
+
+    private func persist() {
+        let state = MacWorkspaceWindowRestorationState(
+            tabs: tabs.map(\.restorationDescriptor),
+            selectedTabID: selectedTabID
+        )
+        guard state.validated() != nil,
+              let data = try? JSONEncoder().encode(state),
+              data.count <= Self.maximumEncodedBytes else {
+            assertionFailure("Refusing to persist invalid macOS window tabs")
+            return
+        }
+        defaults.set(data, forKey: Self.defaultsKey(for: windowID))
+    }
+
+    private static func load(
+        windowID: UUID,
+        defaults: UserDefaults
+    ) -> MacWorkspaceWindowRestorationState? {
+        guard let data = defaults.data(forKey: defaultsKey(for: windowID)),
+              data.count <= maximumEncodedBytes,
+              let state = try? JSONDecoder().decode(
+                MacWorkspaceWindowRestorationState.self,
+                from: data
+              ) else {
+            return nil
+        }
+        return state.validated()
+    }
+
+    private static func defaultsKey(for windowID: UUID) -> String {
+        "\(UserDefaultsKeys.macWorkspaceRestoration).window.\(windowID.uuidString.lowercased())"
+    }
+}
+#endif
+
+#endif

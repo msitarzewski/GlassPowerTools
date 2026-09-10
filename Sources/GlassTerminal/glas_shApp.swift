@@ -1,0 +1,625 @@
+//
+//  glas_shApp.swift
+//  glas.sh
+//
+//  Created by Michael Sitarzewski on 9/10/25.
+//
+
+import SwiftUI
+import GlassConnectionKit
+import os
+#if os(macOS)
+import AppKit
+
+@MainActor
+public final class MacTerminalAppDelegate: NSObject, NSApplicationDelegate {
+    public override init() { super.init() }
+    var sessionManager: SessionManager?
+    var settingsManager: SettingsManager?
+    private var terminationInProgress = false
+
+    public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard !terminationInProgress else { return .terminateLater }
+        let windows = MacTerminalWindowReader.Coordinator.active.allObjects
+        let sessions = sessionManager?.sessions ?? []
+        let needsConfirmation = windows.contains { $0.requiresCloseConfirmation }
+            || (settingsManager?.confirmBeforeClosing == true && !sessions.isEmpty)
+        if needsConfirmation {
+            let alert = NSAlert()
+            alert.messageText = "Quit glas.sh?"
+            alert.informativeText = "Running terminal sessions will be disconnected."
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "Quit")
+            alert.addButton(withTitle: "Cancel")
+            guard alert.runModal() == .alertFirstButtonReturn else { return .terminateCancel }
+        }
+        terminationInProgress = true
+        // Keep the windows and their saved layouts intact for restoration while
+        // finalizing recordings and stopping their local and remote processes.
+        for window in windows { window.finishSessions() }
+        sessionManager?.closeAllSessions()
+        Task { @MainActor in
+            for session in sessions { await session.awaitLifecycleCleanup() }
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
+    }
+}
+#endif
+
+@MainActor
+struct PlatformNewTerminalAction {
+    let title: String
+    private let action: () -> Void
+
+    init(title: String, action: @escaping () -> Void) {
+        self.title = title
+        self.action = action
+    }
+
+    func callAsFunction() {
+        action()
+    }
+}
+
+private struct PlatformNewTerminalActionKey: FocusedValueKey {
+    typealias Value = PlatformNewTerminalAction
+}
+
+extension FocusedValues {
+    var platformNewTerminalAction: PlatformNewTerminalAction? {
+        get { self[PlatformNewTerminalActionKey.self] }
+        set { self[PlatformNewTerminalActionKey.self] = newValue }
+    }
+}
+
+struct PlatformTerminalCommands: Commands {
+    @FocusedValue(\.platformNewTerminalAction) private var newTerminalAction
+
+    var body: some Commands {
+        CommandGroup(replacing: .newItem) {
+            Button(newTerminalAction?.title ?? "New Terminal") {
+                newTerminalAction?()
+            }
+            .keyboardShortcut("t", modifiers: .command)
+            .disabled(newTerminalAction == nil)
+        }
+    }
+}
+
+
+#if os(iOS)
+@MainActor
+@Observable
+final class IOSAppRouter {
+    var terminalWorkgroupID: UUID?
+    private(set) var mostRecentTerminalWorkgroupID: UUID?
+    var showsSettings = false
+    var sftpContext: SFTPBrowserContext?
+    var pendingDeepLinkURL: URL?
+
+    func showTerminal(workgroupID: UUID) {
+        sftpContext = nil
+        mostRecentTerminalWorkgroupID = workgroupID
+        terminalWorkgroupID = workgroupID
+    }
+
+    func showConnections() {
+        sftpContext = nil
+        terminalWorkgroupID = nil
+    }
+
+    func liveWorkgroups(in sessionManager: SessionManager) -> [TerminalWorkgroup] {
+        sessionManager.workgroups.filter { workgroup in
+            workgroup.sessionIDs.contains { sessionManager.session(for: $0) != nil }
+        }
+    }
+
+    func resumableWorkgroupID(in sessionManager: SessionManager) -> UUID? {
+        let liveWorkgroups = liveWorkgroups(in: sessionManager)
+        if let mostRecentTerminalWorkgroupID,
+           liveWorkgroups.contains(where: { $0.id == mostRecentTerminalWorkgroupID }) {
+            return mostRecentTerminalWorkgroupID
+        }
+        return liveWorkgroups.last?.id
+    }
+
+    @discardableResult
+    func resumeTerminal(
+        workgroupID: UUID,
+        in sessionManager: SessionManager
+    ) -> Bool {
+        guard liveWorkgroups(in: sessionManager).contains(where: { $0.id == workgroupID }) else {
+            return false
+        }
+        showTerminal(workgroupID: workgroupID)
+        return true
+    }
+
+    @discardableResult
+    func resumeMostRecentTerminal(in sessionManager: SessionManager) -> Bool {
+        guard let workgroupID = resumableWorkgroupID(in: sessionManager) else {
+            return false
+        }
+        showTerminal(workgroupID: workgroupID)
+        return true
+    }
+
+    func showSettings() {
+        showsSettings = true
+    }
+
+    func showSFTP(sessionID: UUID) {
+        sftpContext = SFTPBrowserContext(sessionID: sessionID)
+    }
+}
+
+#endif
+
+struct MainBootstrapView<Content: View>: View {
+    let content: Content
+    @Environment(SessionManager.self) private var sessionManager
+    @Environment(SettingsManager.self) private var settingsManager
+    @Environment(\.openWindow) private var openWindow
+    #if os(iOS)
+    @Environment(IOSAppRouter.self) private var iOSRouter
+    #endif
+    @State private var didBootstrap = false
+    @State private var pendingDeepLinkServer: ServerConfiguration?
+    @State private var pendingDeepLinkJumpRoute: [ServerConfiguration] = []
+    @State private var pendingDeepLinkTrustSession: TerminalSession?
+    @State private var pendingDeepLinkTrustChallenge: HostKeyTrustChallenge?
+    @State private var deepLinkFailureMessage: String?
+    #if DEBUG
+    @State private var uiTestCredentialCleanupComplete = false
+    #endif
+
+    init(@ViewBuilder content: () -> Content) { self.content = content() }
+
+    var body: some View {
+        content
+        #if DEBUG
+        .overlay(alignment: .topLeading) {
+            if uiTestCredentialCleanupComplete {
+                Text("UI test credential cleanup complete")
+                    .font(.caption2)
+                    .foregroundStyle(.clear)
+                    .frame(width: 1, height: 1)
+                    .allowsHitTesting(false)
+                    .accessibilityIdentifier("ui-test-credential-cleanup-complete")
+            }
+        }
+        #endif
+        .task {
+            guard !didBootstrap else { return }
+            didBootstrap = true
+            loadPersistentState()
+            #if DEBUG
+            purgeUITestCredentialsIfRequested()
+            #endif
+            #if os(iOS)
+            consumePendingDeepLinkIfNeeded()
+            #endif
+        }
+        // NOTE: We intentionally do NOT close sessions on scenePhase == .background.
+        // On visionOS, closing the Connections window (or glancing away) backgrounds
+        // this scene — which would kill every live terminal and orphan its window into
+        // "Session not found". Sessions are ephemeral and the OS tears down sockets on
+        // actual app termination; TerminalSession.deinit cancels outstanding tasks.
+        .onOpenURL { url in
+            #if os(iOS)
+            iOSRouter.pendingDeepLinkURL = url
+            #else
+            handleDeepLink(url)
+            #endif
+        }
+        #if os(iOS)
+        .onChange(of: iOSRouter.pendingDeepLinkURL) { _, _ in
+            consumePendingDeepLinkIfNeeded()
+        }
+        #endif
+        .alert(
+            "Connect to Server?",
+            isPresented: deepLinkConfirmationBinding,
+            presenting: pendingDeepLinkServer
+        ) { server in
+            Button(
+                server.legacyAlgorithmsEnabled ? "Connect with Legacy Algorithms" : "Connect",
+                role: server.legacyAlgorithmsEnabled ? .destructive : nil
+            ) {
+                connectToDeepLinkServer(server)
+            }
+            Button("Cancel", role: .cancel) {
+                pendingDeepLinkServer = nil
+                pendingDeepLinkJumpRoute = []
+            }
+        } message: { server in
+            if server.legacyAlgorithmsEnabled {
+                Text("An external link requested a connection to \(server.username)@\(server.host):\(server.port). This server permits obsolete SSH algorithms with weaker protection.")
+            } else {
+                Text("An external link requested a connection to \(server.username)@\(server.host):\(server.port).")
+            }
+        }
+        .alert(
+            pendingDeepLinkTrustChallenge?.reason == .changed
+                ? "SSH Host Key Changed"
+                : "Trust SSH Host Key?",
+            isPresented: deepLinkTrustBinding,
+            presenting: pendingDeepLinkTrustChallenge
+        ) { challenge in
+            Button(
+                challenge.reason == .changed ? "Trust Changed Key & Connect" : "Trust & Connect",
+                role: challenge.reason == .changed ? .destructive : nil
+            ) {
+                trustDeepLinkHostKeyAndReconnect(challenge)
+            }
+            Button("Cancel", role: .cancel) {
+                closePendingDeepLinkTrustSession()
+            }
+        } message: { challenge in
+            Text(deepLinkTrustMessage(for: challenge))
+        }
+        .alert("Connection Failed", isPresented: deepLinkFailureBinding) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(deepLinkFailureMessage ?? "Unable to connect.")
+        }
+    }
+
+    private func loadPersistentState() {
+        SharedDefaults.migrateIfNeeded()
+        sessionManager.preloadPersistentStateIfNeeded()
+        settingsManager.loadPersistentStateIfNeeded()
+    }
+
+    #if DEBUG
+    private func purgeUITestCredentialsIfRequested() {
+        guard ProcessInfo.processInfo.environment[
+            "GLAS_UI_TEST_CREDENTIAL_CLEANUP"
+        ] == "1" else { return }
+        do {
+            try sessionManager.serverManager.purgeConnectionLibraryUITestFixtures()
+            uiTestCredentialCleanupComplete = true
+        } catch {
+            Logger.keychain.error(
+                "UI test credential cleanup failed: \(error.localizedDescription)"
+            )
+        }
+    }
+    #endif
+
+    #if os(iOS)
+    private func consumePendingDeepLinkIfNeeded() {
+        guard let url = iOSRouter.pendingDeepLinkURL else { return }
+        iOSRouter.pendingDeepLinkURL = nil
+        handleDeepLink(url)
+    }
+    #endif
+
+    private func handleDeepLink(_ url: URL) {
+        loadPersistentState()
+
+        guard case .ssh(let serverID) = GlassConnectionLink(url: url) else {
+            deepLinkFailureMessage = "The connection link is invalid."
+            return
+        }
+
+        guard let server = sessionManager.server(for: serverID) else {
+            deepLinkFailureMessage = "The requested server was not found."
+            return
+        }
+
+        guard let route = resolvedDeepLinkJumpRoute(for: server) else {
+            deepLinkFailureMessage = "A jump host required by the requested server is no longer available."
+            return
+        }
+        pendingDeepLinkJumpRoute = route
+        pendingDeepLinkServer = server
+    }
+
+    private var deepLinkConfirmationBinding: Binding<Bool> {
+        Binding(
+            get: { pendingDeepLinkServer != nil },
+            set: { isPresented in
+                if !isPresented {
+                    pendingDeepLinkServer = nil
+                    pendingDeepLinkJumpRoute = []
+                }
+            }
+        )
+    }
+
+    private var deepLinkFailureBinding: Binding<Bool> {
+        Binding(
+            get: { deepLinkFailureMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    deepLinkFailureMessage = nil
+                }
+            }
+        )
+    }
+
+    private var deepLinkTrustBinding: Binding<Bool> {
+        Binding(
+            get: { pendingDeepLinkTrustChallenge != nil },
+            set: { isPresented in
+                if !isPresented {
+                    closePendingDeepLinkTrustSession()
+                }
+            }
+        )
+    }
+
+    private func deepLinkTrustMessage(for challenge: HostKeyTrustChallenge) -> String {
+        let context = challenge.reason == .changed
+            ? "The presented key no longer matches the saved key. Verify this change before continuing."
+            : "No trusted key is saved for this endpoint."
+        return "\(context)\n\nEndpoint: \(challenge.host):\(challenge.port)\nAlgorithm: \(challenge.algorithm)\nFingerprint (SHA-256): \(challenge.fingerprintSHA256)"
+    }
+
+    private func trustDeepLinkHostKeyAndReconnect(_ challenge: HostKeyTrustChallenge) {
+        guard let session = pendingDeepLinkTrustSession else {
+            pendingDeepLinkTrustChallenge = nil
+            return
+        }
+        do {
+            try sessionManager.trustHostKey(challenge, for: session)
+        } catch {
+            deepLinkFailureMessage = error.localizedDescription
+            closePendingDeepLinkTrustSession()
+            return
+        }
+        session.pendingHostKeyChallenge = nil
+        pendingDeepLinkTrustSession = nil
+        pendingDeepLinkTrustChallenge = nil
+        Task { @MainActor in
+            do {
+                try await sessionManager.reconnect(session, settingsManager: settingsManager)
+            } catch {
+                deepLinkFailureMessage = error.localizedDescription
+                sessionManager.closePendingHostTrustSession(session)
+                return
+            }
+            if session.state == .connected {
+                presentTerminalWorkgroup(for: session)
+            } else {
+                if case .error(let message) = session.state {
+                    deepLinkFailureMessage = message
+                }
+                sessionManager.closePendingHostTrustSession(session)
+            }
+        }
+    }
+
+    private func closePendingDeepLinkTrustSession() {
+        if let session = pendingDeepLinkTrustSession {
+            sessionManager.closePendingHostTrustSession(session)
+        }
+        pendingDeepLinkTrustSession = nil
+        pendingDeepLinkTrustChallenge = nil
+    }
+
+    private func connectToDeepLinkServer(_ server: ServerConfiguration) {
+        pendingDeepLinkServer = nil
+        Task { @MainActor in
+            guard let currentServer = sessionManager.server(for: server.id) else {
+                deepLinkFailureMessage = "The requested server is no longer available."
+                return
+            }
+            guard let currentRoute = resolvedDeepLinkJumpRoute(for: currentServer) else {
+                pendingDeepLinkJumpRoute = []
+                deepLinkFailureMessage = "A jump host required by the requested server is no longer available."
+                return
+            }
+            let routeIsUnchanged = currentRoute.count == pendingDeepLinkJumpRoute.count
+                && zip(currentRoute, pendingDeepLinkJumpRoute).allSatisfy {
+                    Self.sameDeepLinkSecurityIdentity($0.0, $0.1)
+                }
+            guard Self.sameDeepLinkSecurityIdentity(currentServer, server), routeIsUnchanged else {
+                // The connection target or its authentication/routing policy
+                // changed after the prompt was presented. Show the new identity
+                // and require a fresh decision.
+                pendingDeepLinkJumpRoute = currentRoute
+                pendingDeepLinkServer = currentServer
+                return
+            }
+            pendingDeepLinkJumpRoute = []
+            do {
+                let launch = try await sessionManager.createAuthorizedSession(
+                    for: currentServer,
+                    settingsManager: settingsManager,
+                    initialTerminalPresentation: { pendingSession in
+                        presentTerminalWorkgroup(for: pendingSession)
+                    }
+                )
+                if launch.session.state == .connected {
+                    if !launch.session.didRequestInitialTerminalPresentation {
+                        presentTerminalWorkgroup(for: launch.session)
+                    }
+                } else if let challenge = launch.session.pendingHostKeyChallenge {
+                    pendingDeepLinkTrustSession = launch.session
+                    pendingDeepLinkTrustChallenge = challenge
+                } else if case .error(let message) = launch.session.state {
+                    guard !launch.session.didRequestInitialTerminalPresentation else { return }
+                    deepLinkFailureMessage = message
+                    sessionManager.closeSession(launch.session)
+                }
+            } catch {
+                deepLinkFailureMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func presentTerminalWorkgroup(for session: TerminalSession) {
+        #if os(macOS)
+        openWindow(
+            id: "workspace",
+            value: MacLiveSessionWorkspaceRouter.launchRequest(
+                for: session,
+                sessionManager: sessionManager
+            )
+        )
+        #else
+        let workgroupID = sessionManager.createWorkgroup(
+            name: session.server.name,
+            colorTag: session.server.colorTag
+        )
+        guard sessionManager.appendSession(session, toWorkgroup: workgroupID) else {
+            sessionManager.discardWorkgroupIfEmpty(workgroupID)
+            sessionManager.closeSession(session)
+            deepLinkFailureMessage = "The terminal could not be added to its workgroup."
+            return
+        }
+        #if os(visionOS)
+        openWindow(id: "terminal", value: workgroupID)
+        #elseif os(iOS)
+        iOSRouter.showTerminal(workgroupID: workgroupID)
+        #endif
+        #endif
+    }
+
+    static func sameDeepLinkSecurityIdentity(
+        _ lhs: ServerConfiguration,
+        _ rhs: ServerConfiguration
+    ) -> Bool {
+        lhs.host == rhs.host
+            && lhs.port == rhs.port
+            && lhs.username == rhs.username
+            && lhs.authMethod == rhs.authMethod
+            && lhs.sshKeyPath == rhs.sshKeyPath
+            && lhs.sshKeyID == rhs.sshKeyID
+            && lhs.resolvedJumpHostIDs == rhs.resolvedJumpHostIDs
+            && lhs.forwardAgent == rhs.forwardAgent
+            && lhs.legacyAlgorithmsEnabled == rhs.legacyAlgorithmsEnabled
+    }
+
+    private func resolvedDeepLinkJumpRoute(
+        for server: ServerConfiguration
+    ) -> [ServerConfiguration]? {
+        var route: [ServerConfiguration] = []
+        var visited: Set<UUID> = [server.id]
+        for id in server.resolvedJumpHostIDs {
+            guard visited.insert(id).inserted,
+                  let hop = sessionManager.server(for: id) else { return nil }
+            route.append(hop)
+        }
+        return route
+    }
+}
+
+private struct WindowPresenceTrackingModifier: ViewModifier {
+    let key: String
+    let recovery: WindowRecoveryManager
+    @Environment(\.openWindow) private var openWindow
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear {
+                recovery.setOpenWindowAction(openWindow)
+                recovery.markWindowVisible(key)
+            }
+            .onDisappear {
+                recovery.markWindowHidden(key)
+            }
+    }
+}
+
+extension View {
+    func trackWindowPresence(key: String, recovery: WindowRecoveryManager) -> some View {
+        modifier(WindowPresenceTrackingModifier(key: key, recovery: recovery))
+    }
+}
+
+/// Slowly spinning terminal icon shown when Connections is closed as the last window.
+/// Tapping it restores the full Connections window and dismisses this proxy.
+struct MinimizedConnectionsView: View {
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
+
+    var body: some View {
+        Button {
+            openWindow(id: "main")
+            dismissWindow(id: "minimized")
+        } label: {
+            Image(systemName: "terminal")
+                .font(.system(size: 56))
+                .foregroundStyle(.secondary)
+                .symbolEffect(.rotate, options: .repeat(.continuous))
+                .padding(28)
+                .background(.regularMaterial, in: .circle)
+        }
+        .buttonStyle(.plain)
+        .terminalHoverHighlight()
+        .help("Open Connections")
+        .accessibilityLabel("Open Connections")
+    }
+}
+
+struct SFTPBrowserNotFoundView: View {
+    let context: SFTPBrowserContext?
+    @Environment(\.dismissWindow) private var dismissWindow
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "folder.fill.badge.questionmark")
+                .font(.system(size: 44))
+                .foregroundStyle(.secondary)
+
+            Text("SFTP browser unavailable")
+                .font(.title3)
+                .fontWeight(.semibold)
+
+            Text("This SFTP window's source session is no longer active.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 460)
+
+            Button("Close Window") {
+                if let context {
+                    dismissWindow(id: "sftp", value: context)
+                } else {
+                    dismissWindow(id: "sftp")
+                }
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(32)
+    }
+}
+
+#if DEBUG
+struct HTMLPreviewNotFoundView: View {
+    let context: HTMLPreviewContext?
+    @Environment(\.dismissWindow) private var dismissWindow
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "doc.text.magnifyingglass")
+                .font(.system(size: 44))
+                .foregroundStyle(.secondary)
+
+            Text("Preview unavailable")
+                .font(.title3)
+                .fontWeight(.semibold)
+
+            Text("This preview window's source session is no longer active.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 460)
+
+            Button("Close Window") {
+                if let context {
+                    dismissWindow(id: "html-preview", value: context)
+                } else {
+                    dismissWindow(id: "html-preview")
+                }
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(32)
+    }
+}
+#endif
