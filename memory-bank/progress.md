@@ -18,7 +18,22 @@ Updated 2026-09-10.
   [task note](tasks/2026-09/2026-09-10_stage-1-shell.md). Its pre-steps and six decisions are
   listed there for the user.
 
+- **Stage 2 at unit-level parity on 2026-09-10** (`6e5ffe6`…`410d0fc`): `GlassSSHTransport`
+  engine (61 tests, security review clean, SFTP extensions/times, key-header probe); glas.sh moved
+  in as `GlassTerminal` (348 tests, all pass after the inherited-PR fix); `ConnectionManagerView`
+  deleted after re-homing; layering proven on the connection panel and visionOS terminal chrome;
+  settings merged through three shell hooks; window recovery and settings sync moved to the
+  shell; "choose a key file" delivered; one row per host with all service icons. **Whole package:
+  461 tests in 23 suites pass.** Builds on macOS (real profile), iOS Simulator, visionOS Simulator.
+
 ## Not done
+
+- **Stage 2 still open:** real-host session through the shell (integration worker; the CLI suite
+  waits on the Local Network grant for Ghostty), UI suites on the final tree (blocked until the
+  integration worker's `GlassTerminalUITests.swift` compiles), the macOS accessibility-recursion
+  crash under XCUITest (analysis in progress), device re-installs of the Stage 2 build, widget
+  verified on a device, iCloud settings sync verified live.
+
 
 Stages 2–5. Stage 2 (SSH engine and terminal) is in progress with two workers; no capability has
 reached parity yet. The public repositories are untouched.
