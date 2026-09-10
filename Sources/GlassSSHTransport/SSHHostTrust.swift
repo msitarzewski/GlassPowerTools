@@ -84,7 +84,7 @@ public struct SecretStoreHostTrustStore: SSHHostTrustStore {
     }
 
     public func pin(_ challenge: SSHHostTrustChallenge) throws {
-        guard let keyData = challenge.keyData else { throw SSHTransportError.invalidHost(challenge.host) }
+        guard let keyData = challenge.keyData else { throw SSHTransportError.invalidHostKey }
         let pinned = PinnedSSHHostKey(host: challenge.host, port: challenge.port, algorithm: challenge.algorithm, publicKeyData: keyData)
         switch challenge.reason {
         case .unknown:

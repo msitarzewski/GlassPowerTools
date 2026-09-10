@@ -138,6 +138,40 @@ OpenSSH advertises extensions, round-trips times and permissions, and exercises 
 visionOS Simulator build succeeded, 0 warnings. Real host still blocked by the Local Network
 grant (same `errno 65`).
 
+## Addendum 2 — W2 backlog items and the engine security review (after the SFTP commit)
+
+**W2 backlog (both taken).** `SSHTransport.execute(_:maxResponseBytes:timeout:)` gained the
+one-hour timeout glas.sh had (`executeRemoteCommand`, Models.swift:2470) via Citadel's timed
+overload. `SSHPublicKeys` (new file) moves `SettingsManager.openSSHPublicKey(for:)`
+(SettingsManager.swift:807-846) into the engine: `openSSHLine(for:comment:)`, `algorithm(for:)`,
+`sha256Fingerprint(for:)` over `SSHKeyMaterial`, so the capability drops its Citadel/NIOSSH
+imports. Tests use three throwaway `ssh-keygen` fixtures and assert equality with what ssh-keygen
+wrote to the `.pub` files (Ed25519, RSA-2048, passphrase-protected Ed25519), a legacy-wrapped P256
+payload, the OpenSSH fingerprint format, and refusal of garbage without echoing it.
+
+**Security review (`2026-09-10_stage-2-security-review.md`): no High/Medium; five Low and the
+cheap Info items fixed, one Info documented.**
+
+| # | Fix | Test |
+|---|---|---|
+| S1 | `execute` defaults to `SSHTransport.defaultMaximumResponseBytes` = 8 MiB; larger limits are explicit | bound asserted |
+| S2 | Pool records the fresh transport in the map before any suspension and treats a connecting (not closing) transport as reusable; a closing one is replaced | 16 concurrent first requests → 1 construction, 16 owners; closing transport replaced |
+| S3 | `connect()` keeps the in-flight attempt as a `Task` and later callers await it | 3 concurrent connects to a refusing port: none gets `connectionFailed` |
+| S4 | `SSHEngineAlgorithms.registerHostKeyAlgorithmsOnce` registers RSA host keys (`rsa-sha2-512` signatures, `RSA.swift:143`) at engine load; the per-hop legacy option now uses `SSHEngineAlgorithms.legacy` = SHA-1/SHA-256 group-14 KEX + AES-128-CTR only, per connection, no registry side effects | legacy set registers no public-key algorithms; option off by default |
+| S5 | `SFTPEntry.hasSafeName` / `SFTPEntry.isSafeName(_:)` — non-empty, not `.`/`..`, no `/`, no NUL; documented consumer obligation before local writes or path joins | seven name cases |
+| S8 | `recordMissedKeepAlive` and `lostConnection` guard on `isClosing`; `lostConnection` only tears down when `forceClose()` flips | double `close()` yields exactly `[.closed]` |
+| S9 | Transport tracks its `SSHRemoteForward`s and closes them in `teardown`; forwards report closure once via `onClosed`; `remoteForwardCount` for diagnostics | forward closes once, reports once |
+| S10 | `SSHTransportError.invalidHostKey`; `SecretStoreHostTrustStore.pin` throws it for an undecodable blob | asserted, with its description |
+| S7 | **Not taken.** Citadel's `SSHClientSettings.authenticationMethod` is a synchronous, non-throwing closure, so Keychain resolution (async, throwing, may prompt) cannot move inside it without changing Citadel. NIOSSH sends nothing before KEX and host-key validation succeed, so there is no leak; only prompt ordering | — |
+| S6 | **Recorded limit:** resolved passwords and private keys become Swift `String`s for Citadel's `SSHAuthenticationMethod`; those copies are not zeroed and live as long as the method. `SecureBytes` protects the store→builder hop only. Inherent to Citadel's API | — |
+
+W2/W3 note from the review, not mine: glas.sh's per-server legacy toggle has no warning text; add
+the persistent warning the July audit asked for.
+
+**Verification after these changes:** unit **60 tests in 10 suites passed** (two consecutive runs);
+visionOS Simulator build **succeeded, 0 warnings**; scaffold sweep clean. Real host unchanged
+(Local Network grant still absent).
+
 ## Open items
 
 - Real-host results are pending the Local Network grant; nothing in the code path is untested

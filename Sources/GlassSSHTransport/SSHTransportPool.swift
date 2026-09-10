@@ -19,12 +19,15 @@ public actor SSHTransportPool {
     /// one when it can still take owners. The caller connects it if needed.
     public func transport(for route: SSHRoute, owner: UUID) async -> SSHTransport {
         let identity = route.identity
-        if let existing = transports[identity], await existing.isConnected, await existing.acquire(owner: owner) {
-            return existing
+        // A transport that is still connecting is reusable; only a closing one is not (S2).
+        if let existing = transports[identity] {
+            if await existing.acquire(owner: owner) { return existing }
+            if transports[identity] === existing { transports.removeValue(forKey: identity) }
         }
+        // Record before any suspension so a concurrent caller finds this one, not a second.
         let fresh = makeTransport(route)
-        _ = await fresh.acquire(owner: owner)
         transports[identity] = fresh
+        _ = await fresh.acquire(owner: owner)
         return fresh
     }
 

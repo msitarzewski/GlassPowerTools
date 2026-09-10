@@ -16,6 +16,8 @@ public enum SSHTransportError: Error, Sendable, Equatable {
     case invalidPrivateKey(String)
     case hostTrustRequired(SSHHostTrustChallenge)
     case hostTrustRejected(SSHHostTrustChallenge)
+    /// A host-key blob that could not be decoded (S10).
+    case invalidHostKey
     case channelClosed
     case cancelled
     case tunnelBindFailed(port: Int, reason: String)
@@ -37,6 +39,7 @@ extension SSHTransportError: LocalizedError {
         case .invalidPrivateKey(let message): return "Invalid SSH key: \(message)"
         case .hostTrustRequired(let challenge): return challenge.summary
         case .hostTrustRejected(let challenge): return "The host key for \(challenge.host):\(challenge.port) was not trusted."
+        case .invalidHostKey: return "The server's host key could not be decoded"
         case .channelClosed: return "The SSH channel was closed"
         case .cancelled: return "The SSH operation was cancelled"
         case .tunnelBindFailed(let port, let reason): return "Failed to bind port \(port): \(reason)"
@@ -71,6 +74,7 @@ public extension SSHTransportError {
                 case .changed: return "Warning: the host key changed for \(address). This may indicate a security risk."
                 }
             case .hostTrustRejected: return "The host key for \(address) was not trusted, so the connection was not made."
+            case .invalidHostKey: return "The host key presented by \(address) could not be decoded."
             case .channelClosed: return "The SSH channel to \(address) was closed."
             case .cancelled: return "The connection to \(address) was cancelled."
             case .tunnelBindFailed(let port, let reason): return "Could not open local port \(port): \(reason)"

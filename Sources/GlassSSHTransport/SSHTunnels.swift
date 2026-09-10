@@ -350,6 +350,7 @@ enum SSHTunnelFactory {
 /// A remote (`-R`) forward: the server listens and sends connections back through the tunnel.
 /// `boundPort` resolves once the server confirms the listener; `close()` cancels it.
 public final class SSHRemoteForward: Sendable {
+    public let id = UUID()
     public let remoteHost: String
     public let requestedRemotePort: Int
     public let localHost: String
@@ -357,6 +358,14 @@ public final class SSHRemoteForward: Sendable {
     private let task: Task<Void, Error>
     private let bound: AsyncStream<Int>
     private let boundValue = OSAllocatedUnfairLock<Int?>(initialState: nil)
+    private let closedState = OSAllocatedUnfairLock<(closed: Bool, onClosed: (@Sendable (UUID) -> Void)?)>(initialState: (false, nil))
+
+    /// Called once when the forward ends, however it ends. Set by the owning transport.
+    var onClosed: (@Sendable (UUID) -> Void)? {
+        get { closedState.withLock { $0.onClosed } }
+        set { closedState.withLock { $0.onClosed = newValue } }
+    }
+    public var isClosed: Bool { closedState.withLock { $0.closed } }
 
     init(remoteHost: String, requestedRemotePort: Int, localHost: String, localPort: Int, run: @escaping @Sendable (_ onOpen: @escaping @Sendable (Int) -> Void) async throws -> Void) {
         self.remoteHost = remoteHost
@@ -366,8 +375,18 @@ public final class SSHRemoteForward: Sendable {
         let (stream, continuation) = AsyncStream<Int>.makeStream()
         bound = stream
         let boundValue = self.boundValue
+        let closedState = self.closedState
+        let id = self.id
         task = Task {
-            defer { continuation.finish() }
+            defer {
+                continuation.finish()
+                let callback: (@Sendable (UUID) -> Void)? = closedState.withLock { state in
+                    guard !state.closed else { return nil }
+                    state.closed = true
+                    return state.onClosed
+                }
+                callback?(id)
+            }
             try await run { port in
                 boundValue.withLock { $0 = port }
                 continuation.yield(port)

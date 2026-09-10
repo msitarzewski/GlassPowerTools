@@ -47,6 +47,17 @@ public struct SFTPEntry: Sendable, Hashable, Identifiable {
     public var attributes: SFTPAttributes
     public var id: String { path }
 
+    /// Server-supplied names are untrusted (security review S5). A name is safe to use as a
+    /// local file name or to join onto a directory only when it is a single path component:
+    /// non-empty, not `.` or `..`, and free of `/` and NUL. Consumers must check this before
+    /// writing locally or building paths from `name`; `path` is computed regardless so the
+    /// entry can still be shown and deleted.
+    public var hasSafeName: Bool { SFTPEntry.isSafeName(name) }
+
+    public static func isSafeName(_ name: String) -> Bool {
+        !name.isEmpty && name != "." && name != ".." && !name.contains("/") && !name.contains("\0")
+    }
+
     public init(name: String, path: String, longName: String = "", attributes: SFTPAttributes) {
         self.name = name
         self.path = path

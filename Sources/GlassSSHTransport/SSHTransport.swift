@@ -3,7 +3,32 @@ import Citadel
 import NIOCore
 import NIOSSH
 import GlasSecretStore
+import Crypto
+import _CryptoExtras
 import os
+
+/// Algorithm policy for the whole engine (security review S4). RSA host keys are registered
+/// once, deliberately, at engine load — NIOSSH's registry is process-wide, and glas.sh's
+/// legacy fallback used to register them as a side effect of one connection, so which host-key
+/// algorithms were accepted depended on connection history. The per-hop legacy option now
+/// enables only the per-connection parts: SHA-1 group-14 key exchange and AES-128-CTR.
+public enum SSHEngineAlgorithms {
+    /// Idempotent; NIOSSH ignores repeat registrations of the same type.
+    public static let registerHostKeyAlgorithmsOnce: Void = {
+        NIOSSHAlgorithms.register(publicKey: Insecure.RSA.PublicKey.self, signature: Insecure.RSA.Signature.self)
+    }()
+
+    /// What `allowLegacyAlgorithms` turns on for one connection. No public-key registration.
+    static let legacy: SSHAlgorithms = {
+        var algorithms = SSHAlgorithms()
+        algorithms.transportProtectionSchemes = .add([AES128CTR.self])
+        algorithms.keyExchangeAlgorithms = .add([DiffieHellmanGroup14Sha1.self, DiffieHellmanGroup14Sha256.self])
+        return algorithms
+    }()
+
+    /// True when the legacy set registers no host-key algorithms (the property S4 requires).
+    public static var legacySetRegistersNoPublicKeyAlgorithms: Bool { legacy.publicKeyAlgorihtms == nil }
+}
 
 /// Where a connection attempt is. glas.sh drove its progress UI from the same stages
 /// (`ConnectionProgressStage`, Models.swift:1155).
@@ -46,7 +71,10 @@ public actor SSHTransport {
 
     private var client: SSHClient?
     private var jumpClients: [SSHClient] = []
-    private var connecting = false
+    /// The in-flight connect, so concurrent callers join it instead of failing (S3).
+    private var connectTask: Task<Void, Error>?
+    /// Remote forwards opened on this transport, cancelled at teardown (S9).
+    private var remoteForwards: [UUID: SSHRemoteForward] = [:]
     private(set) public var ownership = SSHTransportOwnership()
     private var keepAliveTask: Task<Void, Never>?
     private var missedKeepAlives = 0
@@ -67,6 +95,7 @@ public actor SSHTransport {
         let (stream, continuation) = AsyncStream<SSHTransportEvent>.makeStream()
         events = stream
         eventContinuation = continuation
+        _ = SSHEngineAlgorithms.registerHostKeyAlgorithmsOnce
     }
 
     /// The GlasSecretStore-backed configuration: credentials and pinned host keys from the
@@ -107,6 +136,9 @@ public actor SSHTransport {
     private func teardown(reason: SSHTransportEvent) async {
         keepAliveTask?.cancel()
         keepAliveTask = nil
+        let forwards = Array(remoteForwards.values)
+        remoteForwards.removeAll()
+        for forward in forwards { await forward.close() }
         let closing = [client].compactMap { $0 } + jumpClients.reversed()
         client = nil
         jumpClients.removeAll()
@@ -126,10 +158,17 @@ public actor SSHTransport {
     public func connect() async throws {
         if isConnected { return }
         guard !ownership.isClosing else { throw SSHTransportError.notConnected }
-        guard !connecting else { throw SSHTransportError.connectionFailed }
-        connecting = true
-        defer { connecting = false }
+        if let inFlight = connectTask {
+            try await inFlight.value
+            return
+        }
+        let task = Task { [self] in try await connectLoop() }
+        connectTask = task
+        defer { connectTask = nil }
+        try await task.value
+    }
 
+    private func connectLoop() async throws {
         while true {
             do {
                 try await connectOnce()
@@ -263,7 +302,7 @@ public actor SSHTransport {
                     authenticationMethod: authentication,
                     hostKeyValidator: validator,
                     reconnect: .never,
-                    algorithms: .all
+                    algorithms: SSHEngineAlgorithms.legacy
                 )
             } catch {
                 if let challenge = challengeBox.take() { throw SSHHostTrustRequiredError(challenge: challenge) }
@@ -306,13 +345,14 @@ public actor SSHTransport {
     func resetKeepAliveCounter() { missedKeepAlives = 0 }
 
     private func recordMissedKeepAlive(maximum: Int) -> Int {
+        guard !ownership.isClosing else { return 0 }
         missedKeepAlives += 1
         emit(.keepAliveMissed(count: missedKeepAlives, maximum: maximum))
         return missedKeepAlives
     }
 
     private func lostConnection(reason: String) async {
-        _ = ownership.forceClose()
+        guard ownership.forceClose() else { return }
         await teardown(reason: .lost(reason))
     }
 
@@ -328,9 +368,12 @@ public actor SSHTransport {
         return channel
     }
 
-    /// Runs one command and returns its output. Defaults match glas.sh `executeRemoteCommand`
-    /// (Models.swift:2470): unbounded response, one-hour timeout.
-    public func execute(_ command: String, maxResponseBytes: Int = .max, timeout: Duration = .seconds(3_600)) async throws -> String {
+    /// Runs one command and returns its output. The one-hour timeout matches glas.sh
+    /// `executeRemoteCommand` (Models.swift:2470); the response bound is new.
+    /// Bound on `execute` output unless the caller raises it explicitly (S1).
+    public static let defaultMaximumResponseBytes = 8 * 1024 * 1024
+
+    public func execute(_ command: String, maxResponseBytes: Int = SSHTransport.defaultMaximumResponseBytes, timeout: Duration = .seconds(3_600)) async throws -> String {
         guard let client, client.isConnected else { throw SSHTransportError.notConnected }
         let buffer = try await client.executeCommand(command, maxResponseSize: maxResponseBytes, executionTimeout: TimeAmount(timeout))
         return String(buffer: buffer)
@@ -370,12 +413,20 @@ public actor SSHTransport {
     /// connections back to `localHost:localPort` here.
     public func remoteForward(remoteHost: String, remotePort: Int, toLocalHost localHost: String = "127.0.0.1", localPort: Int) async throws -> SSHRemoteForward {
         guard let client, client.isConnected else { throw SSHTransportError.notConnected }
-        return SSHRemoteForward(remoteHost: remoteHost, requestedRemotePort: remotePort, localHost: localHost, localPort: localPort) { onOpen in
+        let forward = SSHRemoteForward(remoteHost: remoteHost, requestedRemotePort: remotePort, localHost: localHost, localPort: localPort) { onOpen in
             try await client.runRemotePortForward(host: remoteHost, port: remotePort, forwardingTo: localHost, port: localPort) { forward in
                 onOpen(forward.boundPort)
             }
         }
+        remoteForwards[forward.id] = forward
+        forward.onClosed = { [weak self] id in Task { await self?.forgetRemoteForward(id) } }
+        return forward
     }
+
+    private func forgetRemoteForward(_ id: UUID) { remoteForwards.removeValue(forKey: id) }
+
+    /// Remote forwards currently tracked (for tests and diagnostics).
+    public var remoteForwardCount: Int { remoteForwards.count }
 
     private struct DirectChannelProvider: SSHDirectChannelProvider {
         let transport: SSHTransport
