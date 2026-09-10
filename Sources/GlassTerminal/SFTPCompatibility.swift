@@ -111,6 +111,9 @@ nonisolated struct SFTPPathComponent: Sendable, Hashable {
         longname = entry.longName
         attributes = SFTPFileAttributes(entry.attributes)
     }
+    init(filename: String, longname: String, attributes: SFTPFileAttributes) {
+        self.filename = filename; self.longname = longname; self.attributes = attributes
+    }
 }
 
 /// One listing, as Citadel returned it: the browser flattens `.components`.

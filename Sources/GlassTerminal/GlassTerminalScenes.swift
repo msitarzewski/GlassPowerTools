@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import GlassLayers
 
 public struct GlassTerminalScenes: Scene {
     private let runtime: GlassTerminalRuntime
@@ -17,12 +18,38 @@ public struct GlassTerminalScenes: Scene {
     public init(runtime: GlassTerminalRuntime) { self.runtime = runtime }
 
     public var body: some Scene {
+        #if os(macOS) || os(visionOS)
+        Window("Workgroups", id: "terminal-workgroups") {
+            GlassLayeredWindow {
+                TerminalWorkgroupsView()
+                    .environment(runtime)
+                    .environment(sessionManager)
+                    .environment(settingsManager)
+                .glassLayers(runtime.layers)
+            }
+            .glassLayers(runtime.layers)
+        }
+        .defaultSize(width: 900, height: 600)
+        .commands { TerminalLibraryCommands(runtime: runtime) }
+        Window("Tailscale", id: "terminal-tailscale") {
+            GlassLayeredWindow {
+                TerminalTailscaleView()
+                    .environment(runtime)
+                    .environment(sessionManager)
+                    .environment(settingsManager)
+                .glassLayers(runtime.layers)
+            }
+            .glassLayers(runtime.layers)
+        }
+        .defaultSize(width: 900, height: 600)
+        #endif
         #if os(macOS)
         WindowGroup("Terminal", id: "workspace", for: MacWorkspaceLaunchRequest.self) { $request in
             MacWorkspaceSceneRoot(request: request)
                 .environment(runtime)
                 .environment(sessionManager)
                 .environment(settingsManager)
+                .glassLayers(runtime.layers)
         }
         .defaultSize(width: 1180, height: 760)
         .defaultLaunchBehavior(.suppressed)
@@ -32,6 +59,7 @@ public struct GlassTerminalScenes: Scene {
                 SFTPBrowserView(sessionID: context.sessionID)
                     .environment(sessionManager)
                     .environment(settingsManager)
+                .glassLayers(runtime.layers)
             } else {
                 SFTPBrowserNotFoundView(context: context)
             }
@@ -40,6 +68,7 @@ public struct GlassTerminalScenes: Scene {
         Window("Port Forwarding", id: "port-forwarding") {
             PortForwardingManagerView()
                 .environment(sessionManager)
+                .glassLayers(runtime.layers)
         }
         .defaultSize(width: 700, height: 560)
         #if DEBUG
@@ -60,6 +89,7 @@ public struct GlassTerminalScenes: Scene {
                     .environment(runtime)
                     .environment(sessionManager)
                     .environment(settingsManager)
+                .glassLayers(runtime.layers)
                     .trackWindowPresence(key: "terminal-workgroup-\(workgroupID.uuidString)", recovery: windowRecoveryManager)
             } else {
                 ContentUnavailableView(
@@ -101,6 +131,7 @@ public struct GlassTerminalScenes: Scene {
                 SFTPBrowserView(sessionID: context.sessionID)
                     .environment(sessionManager)
                     .environment(settingsManager)
+                .glassLayers(runtime.layers)
                     .trackWindowPresence(key: "sftp-\(context.sessionID.uuidString)", recovery: windowRecoveryManager)
             } else {
                 SFTPBrowserNotFoundView(context: context)
@@ -113,6 +144,7 @@ public struct GlassTerminalScenes: Scene {
         Window("Port Forwarding", id: "port-forwarding") {
             PortForwardingManagerView()
                 .environment(sessionManager)
+                .glassLayers(runtime.layers)
                 .trackWindowPresence(key: "port-forwarding", recovery: windowRecoveryManager)
         }
         .windowStyle(.plain)

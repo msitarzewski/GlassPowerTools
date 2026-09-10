@@ -95,6 +95,8 @@ final class IOSAppRouter {
     var terminalWorkgroupID: UUID?
     private(set) var mostRecentTerminalWorkgroupID: UUID?
     var showsSettings = false
+    var showsWorkgroups = false
+    var showsTailscale = false
     var sftpContext: SFTPBrowserContext?
     var pendingDeepLinkURL: URL?
 

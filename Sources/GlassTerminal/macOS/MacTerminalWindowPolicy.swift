@@ -2,6 +2,7 @@
 #if os(macOS)
 import AppKit
 import SwiftUI
+import GlassLayers
 import GlassConnectionUI
 
 enum MacTerminalToolbarItemID {
@@ -9,6 +10,8 @@ enum MacTerminalToolbarItemID {
 }
 
 struct MacTerminalWindowReader: NSViewRepresentable {
+    @Environment(\.glassLayers) private var layers
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     let tabbingIdentifier: String
     var onWindow: (NSWindow) -> Void
     var onClose: () -> Void
@@ -55,7 +58,8 @@ struct MacTerminalWindowReader: NSViewRepresentable {
 
     private func configure(_ window: NSWindow?, coordinator: Coordinator) {
         guard let window else { return }
-        MacTerminalWindowPolicy.apply(window, tabbingIdentifier: tabbingIdentifier, overviewPresented: overviewPresented)
+        let state = GlassLayerResolution.resolve(layers.state, reduceTransparency: reduceTransparency)
+        MacTerminalWindowPolicy.apply(window, tabbingIdentifier: tabbingIdentifier, overviewPresented: overviewPresented, layers: state)
         coordinator.observeWindowClose(window, action: onClose)
         coordinator.interceptWindowClose(window, shouldConfirm: shouldConfirmClose)
         coordinator.configureInitialSidebar(in: window, enabled: opensSidebarInitially, overviewPresented: overviewPresented)
@@ -246,16 +250,14 @@ typealias MacTerminalTitlebarMaterialView = GlassTitlebarMaterialView
 
 @MainActor
 enum MacTerminalWindowPolicy {
-    static func apply(_ window: NSWindow, tabbingIdentifier: String, overviewPresented: Bool = false) {
-        // Canvas opacity reveals the desktop, not an opaque window backing.
-        // Never change alphaValue: terminal text and controls stay opaque.
-        window.isOpaque = false
-        window.backgroundColor = .clear
-        // Let the passive titlebar material provide the backing; leave
-        // toolbar placement, full-size content, and movement policy alone.
-        window.titlebarAppearsTransparent = true
-        GlassWindowChrome.installTitlebarMaterial(in: window,
-            materialStyle: overviewPresented ? .underWindowBackground : .sidebar)
+    static func apply(_ window: NSWindow, tabbingIdentifier: String, overviewPresented: Bool = false,
+                      layers: GlassLayerState = .default) {
+        // The family's titlebar sequence (clear backing, transparent titlebar, passive material
+        // whose alpha follows frost) lives in GlassLayers; the overview swaps the material style.
+        GlassWindowLayerPolicy.apply(window, state: layers)
+        if overviewPresented {
+            GlassWindowChrome.installTitlebarMaterial(in: window, materialStyle: .underWindowBackground)
+        }
         // Leave toolbar layout and dragging to SwiftUI/AppKit.
         // The added titlebar material is passive.
         // SwiftUI's navigation sidebar owns terminal tabs inside this

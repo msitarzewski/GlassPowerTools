@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import GlassSSHTransport
+import UniformTypeIdentifiers
 import GlasSecretStore
 #if os(macOS)
 import UniformTypeIdentifiers
@@ -15,71 +17,6 @@ import UIKit
 #elseif canImport(AppKit)
 import AppKit
 #endif
-
-struct SettingsView: View {
-    @Environment(SettingsManager.self) private var settingsManager
-
-    var body: some View {
-        #if os(iOS)
-        List {
-            NavigationLink {
-                GeneralSettingsView().navigationTitle("General")
-            } label: {
-                Label("General", systemImage: "gear")
-            }
-            NavigationLink {
-                TerminalSettingsView().navigationTitle("Terminal")
-            } label: {
-                Label("Terminal", systemImage: "terminal")
-            }
-            if UIDevice.current.userInterfaceIdiom == .pad {
-                NavigationLink {
-                    AppearanceSettingsView().navigationTitle("Appearance")
-                } label: {
-                    Label("Appearance", systemImage: "paintbrush")
-                }
-            }
-            NavigationLink {
-                SnippetsSettingsView().navigationTitle("Snippets")
-            } label: {
-                Label("Snippets", systemImage: "text.badge.star")
-            }
-        }
-        .navigationTitle("Settings")
-        .navigationBarTitleDisplayMode(.inline)
-        #else
-        TabView {
-            GeneralSettingsView()
-                .environment(settingsManager)
-                .tabItem {
-                    Label("General", systemImage: "gear")
-                }
-            
-            TerminalSettingsView()
-                .environment(settingsManager)
-                .tabItem {
-                    Label("Terminal", systemImage: "terminal")
-                }
-            
-            AppearanceSettingsView()
-                .environment(settingsManager)
-                .tabItem {
-                    Label("Appearance", systemImage: "paintbrush")
-                }
-            
-            SnippetsSettingsView()
-                .environment(settingsManager)
-                .tabItem {
-                    Label("Snippets", systemImage: "text.badge.star")
-                }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        #if os(visionOS)
-        .glassBackgroundEffect(in: .rect(cornerRadius: 28))
-        #endif
-        #endif
-    }
-}
 
 // MARK: - General Settings
 
@@ -621,6 +558,21 @@ struct TerminalSettingsView: View {
                 }
             }
             
+            Section("Canvas") {
+                #if os(visionOS)
+                Toggle("Interactive glass", isOn: $settings.interactiveGlass)
+                    .onChange(of: settings.interactiveGlass) { _, _ in
+                        settings.saveSettings()
+                    }
+                #endif
+                GlassTintPicker(value: $settings.glassTint)
+                    .onChange(of: settings.glassTint) { _, _ in
+                        settings.saveSettings()
+                    }
+                Text("Opacity, frost and material are shared with every Glass window: change them in Appearance. Tint applies only to the terminal canvas.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Section("Font") {
                 Picker("Font Family", selection: fontFamilyBinding) {
                     Text("SF Mono").tag("SF Mono")
@@ -719,81 +671,6 @@ struct TerminalSettingsView: View {
                 settingsManager.saveTheme(theme)
             }
         )
-    }
-}
-
-// MARK: - Appearance Settings
-
-struct AppearanceSettingsView: View {
-    @Environment(SettingsManager.self) private var settingsManager
-    
-    var body: some View {
-        @Bindable var settings = settingsManager
-        
-        Form {
-            Section("Glass") {
-                #if os(visionOS)
-                Picker("Frost", selection: $settings.glassFrost) {
-                    Text("Light").tag("ultraThin")
-                    Text("Medium").tag("thin")
-                    Text("Heavy").tag("regular")
-                    Text("Max").tag("thick")
-                }
-                .onChange(of: settings.glassFrost) { _, _ in
-                    settings.saveSettings()
-                }
-                #endif
-
-                Slider(value: $settings.windowOpacity, in: 0.0...1.0) {
-                    Text("Opacity")
-                } minimumValueLabel: {
-                    Text("Transparent")
-                } maximumValueLabel: {
-                    Text("Opaque")
-                }
-                .onChange(of: settings.windowOpacity) { _, _ in
-                    settings.saveSettings()
-                }
-
-                Slider(value: $settings.blurBackground, in: 0.0...1.0) {
-                    Text("Blur")
-                } minimumValueLabel: {
-                    Text("None")
-                } maximumValueLabel: {
-                    Text("Maximum")
-                }
-                .onChange(of: settings.blurBackground) { _, _ in
-                    settings.saveSettings()
-                }
-
-                #if os(visionOS)
-                Toggle("Interactive glass", isOn: $settings.interactiveGlass)
-                    .onChange(of: settings.interactiveGlass) { _, _ in
-                        settings.saveSettings()
-                    }
-                #endif
-
-                #if os(visionOS)
-                Text("Opacity paints the theme color; Blur controls passthrough frosting independently. Set both to zero for a completely transparent terminal. Interactive glass changes how the selected frost responds to gaze without disabling either slider.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                #else
-                Text("Tint, opacity, and blur apply only to the terminal canvas. Set opacity and blur to zero for a completely transparent typing surface; window chrome keeps the system Liquid Glass appearance.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                #endif
-
-                GlassTintPicker(value: $settings.glassTint)
-                    .onChange(of: settings.glassTint) { _, _ in
-                        settings.saveSettings()
-                    }
-            }
-            
-        }
-        .formStyle(.grouped)
-        #if !os(iOS)
-        .padding()
-        #endif
     }
 }
 
@@ -1723,7 +1600,10 @@ struct AddSSHKeyView: View {
     @State private var privateKey: String = ""
     @State private var passphrase: String = ""
     @State private var errorMessage: String?
+    @State private var inspection: SSHPrivateKeyInspection?
+    @State private var showingFileImporter = false
     @FocusState private var isNameFocused: Bool
+    @FocusState private var isPassphraseFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -1731,7 +1611,8 @@ struct AddSSHKeyView: View {
                 Section("Key Details") {
                     TextField("Key name", text: $name)
                         .focused($isNameFocused)
-                    SecureField("Passphrase (optional)", text: $passphrase)
+                    SecureField(inspection?.isPassphraseProtected == true ? "Passphrase (required for this key)" : "Passphrase (optional)", text: $passphrase)
+                        .focused($isPassphraseFocused)
                     Text("RSA and ED25519 private keys are supported.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -1741,6 +1622,19 @@ struct AddSSHKeyView: View {
                     TextEditor(text: $privateKey)
                         .font(.system(.body, design: .monospaced))
                         .frame(minHeight: 220)
+                        .accessibilityIdentifier("ssh-key-private-key")
+                    Button("Choose File…", systemImage: "doc") { chooseKeyFile() }
+                        .accessibilityIdentifier("ssh-key-choose-file")
+                    if let inspection {
+                        Label {
+                            Text(inspectionSummary(inspection))
+                        } icon: {
+                            Image(systemName: inspection.isPassphraseProtected ? "lock.fill" : "checkmark.seal")
+                        }
+                        .font(.footnote)
+                        .foregroundStyle(inspection.isPassphraseProtected ? .orange : .secondary)
+                        .accessibilityIdentifier("ssh-key-detected")
+                    }
                 }
 
                 if let errorMessage {
@@ -1753,6 +1647,18 @@ struct AddSSHKeyView: View {
             }
             .navigationTitle("Add SSH Key")
             .onAppear { isNameFocused = true }
+            .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [.item, .data], allowsMultipleSelection: false) { result in
+                switch result {
+                case .success(let urls):
+                    if let url = urls.first { importKeyFile(at: url) }
+                case .failure(let error):
+                    errorMessage = error.localizedDescription
+                }
+            }
+            .onChange(of: privateKey) { _, text in
+                // Pasted text is classified the same way as a chosen file; nothing is stored.
+                inspection = try? SSHPrivateKeyImport.inspect(text)
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -1778,6 +1684,54 @@ struct AddSSHKeyView: View {
             }
         }
     }
+
+    private func chooseKeyFile() {
+        #if os(macOS)
+        // As the theme importer does (NSOpenPanel), starting in the real ~/.ssh so keys with no
+        // extension are one click away; hidden files shown because the directory itself is hidden.
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.showsHiddenFiles = true
+        panel.allowedContentTypes = [.item, .data]
+        if let home = getpwuid(getuid())?.pointee.pw_dir.map({ String(cString: $0) }) {
+            let ssh = URL(fileURLWithPath: home).appendingPathComponent(".ssh", isDirectory: true)
+            panel.directoryURL = FileManager.default.fileExists(atPath: ssh.path) ? ssh : URL(fileURLWithPath: home)
+        }
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            importKeyFile(at: url)
+        }
+        #else
+        showingFileImporter = true
+        #endif
+    }
+
+    private func importKeyFile(at url: URL) {
+        do {
+            let (text, inspection) = try SSHPrivateKeyImport.read(from: url)
+            privateKey = text
+            self.inspection = inspection
+            errorMessage = nil
+            if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                name = SSHPrivateKeyImport.suggestedName(comment: inspection.comment, fileURL: url)
+            }
+            if inspection.isPassphraseProtected { isPassphraseFocused = true }
+        } catch {
+            errorMessage = error.localizedDescription
+            inspection = nil
+        }
+    }
+
+    private func inspectionSummary(_ inspection: SSHPrivateKeyInspection) -> String {
+        var parts = ["\(inspection.keyType.displayName) key"]
+        if let comment = inspection.comment, !comment.isEmpty { parts.append("comment “\(comment)”") }
+        if inspection.isPassphraseProtected { parts.append("passphrase required") }
+        if !inspection.keyType.isSupportedForAuthentication { parts.append("not supported for authentication") }
+        return parts.joined(separator: " · ")
+    }
+
 }
 
 struct GenerateSecureEnclaveSSHKeyView: View {
@@ -1874,7 +1828,7 @@ private let relativeDateFormatter: RelativeDateTimeFormatter = {
 }()
 
 #Preview {
-    SettingsView()
+    TerminalSettingsView()
         .environment(SettingsManager())
         .environment(SessionManager(loadImmediately: false))
 }

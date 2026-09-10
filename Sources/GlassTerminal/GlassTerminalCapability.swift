@@ -10,6 +10,7 @@
 import SwiftUI
 import GlassConnectionKit
 import GlassShell
+import GlassLayers
 
 /// What the shell asked the terminal to open.
 public enum GlassTerminalOpenPurpose: Sendable { case terminal, sftp }
@@ -21,32 +22,89 @@ public final class GlassTerminalRuntime {
     let settingsManager: SettingsManager
     let windowRecoveryManager: WindowRecoveryManager
 
-    struct ConnectRequest { let serverID: UUID; let purpose: TerminalSession.Purpose }
+    /// Everything the library, the command palette, the workgroup and Tailscale surfaces and the
+    /// shell can ask the terminal to do. One queue, consumed by `TerminalConnectFlow`, so the
+    /// legacy-algorithm confirmation, trust prompt and password fallback exist exactly once.
+    enum Request {
+        case connect(serverID: UUID, purpose: TerminalSession.Purpose)
+        case quickConnect(ServerConfiguration, password: String)
+        case openWorkgroup(LayoutPreset)
+        case addServer(draft: ServerConfiguration?)
+        case editServer(ServerConfiguration)
+        case serverInfo(ServerConfiguration)
+        case deleteServer(ServerConfiguration)
+        case localTerminal
+        case showWorkgroups
+        case showTailscale
+    }
     struct SetupRequest: Identifiable {
         let host: HostProfile
         let service: HostServiceLink
         var id: EndpointID { service.endpointID }
     }
 
-    private(set) var connectRequestSerial = 0
-    private var pendingConnect: ConnectRequest?
+    private(set) var requestSerial = 0
+    private var pendingRequests: [Request] = []
     var setupRequest: SetupRequest?
 
-    public init() {
+    /// The one layering state; the terminal's canvas appearance reads and writes it through
+    /// `SettingsManager` so no second material system exists.
+    public let layers: GlassLayerStore
+
+    public init(layers: GlassLayerStore? = nil) {
+        let layers = layers ?? GlassLayerStore()
+        self.layers = layers
         sessionManager = SessionManager(loadImmediately: false)
-        settingsManager = SettingsManager(loadImmediately: false)
+        settingsManager = SettingsManager(loadImmediately: false, layers: layers)
         windowRecoveryManager = WindowRecoveryManager()
     }
 
     /// Connect to the saved server whose id is the shell's endpoint id. Consumed by the bootstrap.
     public func requestConnect(serverID: UUID, purpose: GlassTerminalOpenPurpose = .terminal) {
-        pendingConnect = ConnectRequest(serverID: serverID, purpose: purpose == .sftp ? .sftp : .terminal)
-        connectRequestSerial &+= 1
+        enqueue(.connect(serverID: serverID, purpose: purpose == .sftp ? .sftp : .terminal))
+    }
+    /// Open a saved workgroup preset (all of its terminals) through the launch plan.
+    public func requestOpenWorkgroup(_ presetID: UUID) {
+        guard let preset = settingsManager.layoutPresets.first(where: { $0.id == presetID }) else { return }
+        enqueue(.openWorkgroup(preset))
+    }
+    /// glas.sh's server form, empty or pre-filled (Tailscale import, shell service link).
+    public func requestAddServer() { enqueue(.addServer(draft: nil)) }
+    public func requestEditServer(id: UUID) {
+        guard let server = sessionManager.serverManager.server(for: id) else { return }
+        enqueue(.editServer(server))
+    }
+    public func requestServerInfo(id: UUID) {
+        guard let server = sessionManager.serverManager.server(for: id) else { return }
+        enqueue(.serverInfo(server))
+    }
+    public func requestDeleteServer(id: UUID) {
+        guard let server = sessionManager.serverManager.server(for: id) else { return }
+        enqueue(.deleteServer(server))
+    }
+    /// macOS: a new workspace window with a local shell. Elsewhere this is a no-op.
+    public func requestLocalTerminal() { enqueue(.localTerminal) }
+    public func requestShowWorkgroups() { enqueue(.showWorkgroups) }
+    public func requestShowTailscale() { enqueue(.showTailscale) }
+
+    func enqueue(_ request: Request) {
+        pendingRequests.append(request)
+        requestSerial &+= 1
     }
 
-    func takeConnectRequest() -> ConnectRequest? {
-        defer { pendingConnect = nil }
-        return pendingConnect
+    func takeRequests() -> [Request] {
+        defer { pendingRequests.removeAll() }
+        return pendingRequests
+    }
+
+    /// Saved servers the shell can surface (command palette, service actions).
+    public var savedServerIDs: [UUID] { sessionManager.serverManager.servers.map(\.id) }
+    public func savedServerName(id: UUID) -> String? { sessionManager.serverManager.server(for: id)?.name }
+    /// Whether the user has configured Tailscale credentials (decides whether the entry shows).
+    public var tailscaleIsConfigured: Bool { tailscaleConfigured }
+    var tailscaleConfigured = false
+    public func refreshTailscaleConfiguration() async {
+        tailscaleConfigured = await TailscaleClient.storedCredentialPresence() == .configured
     }
 
     /// True when a saved SSH server exists for this endpoint id.
@@ -105,15 +163,33 @@ public struct GlassTerminalBootstrap<Content: View>: View {
         platformRoot
             .modifier(TerminalConnectFlow())
             .sheet(item: $runtime.setupRequest) { request in
-                AddServerView(
-                    serverManager: runtime.sessionManager.serverManager,
-                    draft: ServerConfiguration(
-                        id: request.service.endpointID.rawValue,
-                        name: request.host.displayName,
-                        host: request.host.aliases.first ?? "",
-                        username: ""
+                // The SSH connection panel: the Stage 2 layering proof on a real capability surface.
+                GlassLayeredPanel(cornerRadius: 0) {
+                    AddServerView(
+                        serverManager: runtime.sessionManager.serverManager,
+                        draft: ServerConfiguration(
+                            id: request.service.endpointID.rawValue,
+                            name: request.host.displayName,
+                            host: request.host.aliases.first ?? "",
+                            username: ""
+                        )
                     )
-                )
+                }
+            }
+            #if os(iOS)
+            .sheet(isPresented: Binding(get: { router.showsWorkgroups }, set: { router.showsWorkgroups = $0 })) {
+                TerminalWorkgroupsView()
+            }
+            .sheet(isPresented: Binding(get: { router.showsTailscale }, set: { router.showsTailscale = $0 })) {
+                TerminalTailscaleView()
+            }
+            #endif
+            #if os(macOS)
+            .focusedSceneValue(\.macCommandCenterEntries, GlassTerminalCommandCenter.entries(runtime: runtime))
+            #endif
+            .task { await runtime.refreshTailscaleConfiguration() }
+            .onReceive(NotificationCenter.default.publisher(for: .tailscaleCredentialsDidChange)) { _ in
+                Task { await runtime.refreshTailscaleConfiguration() }
             }
             .environment(runtime)
             .environment(runtime.sessionManager)

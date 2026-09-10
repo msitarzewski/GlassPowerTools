@@ -6,7 +6,9 @@
 //
 
 import Foundation
+import CoreGraphics
 import GlassConnectionKit
+import GlassConnectionUI
 
 enum ConnectionLibraryMode: String, CaseIterable, Identifiable, Hashable, Sendable {
     case library
@@ -145,3 +147,16 @@ struct ConnectionLibraryProjection {
         }
     }
 }
+
+#if os(macOS)
+/// Column defaults for the Mac library, kept with the projection (moved from ConnectionManagerView).
+enum ConnectionLibraryMacColumnLayout {
+    static let navigationMinimum: CGFloat = GlassLibraryColumnLayout.navigationMinimum
+    static let navigationIdeal: CGFloat = GlassLibraryColumnLayout.navigationIdeal
+    static let navigationMaximum: CGFloat = GlassLibraryColumnLayout.navigationMaximum
+    static let resultsMinimum: CGFloat = GlassLibraryColumnLayout.resultsMinimum
+    static let resultsIdeal: CGFloat = GlassLibraryColumnLayout.resultsIdeal
+    static let resultsMaximum: CGFloat = GlassLibraryColumnLayout.resultsMaximum
+    static let autosaveName = "sh.glas.connection-library.columns"
+}
+#endif

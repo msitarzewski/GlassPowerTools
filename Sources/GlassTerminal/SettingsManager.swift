@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Foundation
+import GlassLayers
 import Observation
 import os
 import Security
@@ -161,11 +162,28 @@ class SettingsManager {
     private(set) var sshKeyDeletionRecoveryError: String?
     var cursorStyle: String = "Block"
     var blinkingCursor: Bool = true
-    var glassFrost: String = "ultraThin"
+    /// The one layering state (Stage 1's `GlassLayerStore`). glas.sh's three appearance settings
+    /// are views over it so the terminal canvas, the shell's windows and Settings → Appearance all
+    /// read and write the same values; nothing here persists a second copy.
+    let layers: GlassLayerStore
+    var glassFrost: String {
+        get { layers.state.material.rawValue }
+        set { layers.state.material = GlassLayerMaterial(rawValue: newValue) ?? .ultraThin }
+    }
     /// Theme-color coverage. Zero leaves the terminal canvas fully transparent.
-    var windowOpacity: Double = 0.0
+    var windowOpacity: Double {
+        get { layers.state.effectiveOpacity }
+        set {
+            let value = Self.unitValue(newValue)
+            layers.state.opacity = value
+            layers.state.paintsTheme = value > 0
+        }
+    }
     /// Strength of the independently composited system blur layer.
-    var blurBackground: Double = 1.0
+    var blurBackground: Double {
+        get { layers.state.frost }
+        set { layers.state.frost = Self.unitValue(newValue) }
+    }
     var interactiveGlass: Bool = true
     var glassTint: String = "None"
     /// Compatibility alias for the short-lived glass redesign schema.
@@ -197,9 +215,14 @@ class SettingsManager {
         sshKeyDefaults: UserDefaults? = nil,
         sshKeyLifecycleStore: SSHKeyLifecycleStore? = nil,
         sshKeyCatalogWriter: ((Data) -> Void)? = nil,
-        iCloudSettingsSyncService: ICloudSettingsSyncService? = nil
+        iCloudSettingsSyncService: ICloudSettingsSyncService? = nil,
+        layers: GlassLayerStore? = nil
     ) {
-        self.settingsDefaults = settingsDefaults ?? .standard
+        let resolvedSettingsDefaults = settingsDefaults ?? .standard
+        self.settingsDefaults = resolvedSettingsDefaults
+        // Without an injected store (tests, previews) the layer state lives in the same suite as
+        // the rest of the settings; glas.sh's own keys are migrated on load, below.
+        self.layers = layers ?? GlassLayerStore(defaults: resolvedSettingsDefaults, legacyDefaults: [])
         let resolvedSSHKeyDefaults = sshKeyDefaults ?? SharedDefaults.defaults
         self.sshKeyDefaults = resolvedSSHKeyDefaults
         self.sshKeyLifecycleStore = sshKeyLifecycleStore ?? .live
@@ -223,6 +246,34 @@ class SettingsManager {
         if loadImmediately {
             loadPersistentStateIfNeeded()
         }
+    }
+
+    /// glas.sh's own appearance keys → the shared layer state, once. The keys are consumed so the
+    /// migration cannot repeat over a state the user has since changed in Appearance. When the
+    /// injected store already migrated (the app's store reads this domain itself), only consume.
+    private func migrateLegacyAppearanceIfNeeded() {
+        let legacyKeys = [UserDefaultsKeys.windowOpacity, UserDefaultsKeys.blurBackground, UserDefaultsKeys.glassFrost,
+                          UserDefaultsKeys.backgroundFill, UserDefaultsKeys.glassMaterialStyle]
+        let present = legacyKeys.filter { settingsDefaults.object(forKey: $0) != nil }
+        guard !present.isEmpty else { return }
+        defer { present.forEach { settingsDefaults.removeObject(forKey: $0) } }
+        guard layers.migrationSource == .none else { return }
+        var state = layers.state
+        if let frost = settingsDefaults.string(forKey: UserDefaultsKeys.glassFrost)
+            ?? settingsDefaults.string(forKey: UserDefaultsKeys.glassMaterialStyle) {
+            state.material = GlassLayerMaterial(rawValue: frost) ?? .ultraThin
+        }
+        let canonicalOpacity = settingsDefaults.object(forKey: UserDefaultsKeys.windowOpacity)
+        let legacyOpacity = settingsDefaults.object(forKey: UserDefaultsKeys.backgroundFill)
+        if canonicalOpacity != nil || legacyOpacity != nil {
+            let opacity = Self.resolvedWindowOpacity(canonical: canonicalOpacity, legacy: legacyOpacity)
+            state.opacity = opacity
+            state.paintsTheme = opacity > 0
+        }
+        if let blur = settingsDefaults.object(forKey: UserDefaultsKeys.blurBackground) {
+            state.frost = Self.resolvedBlurBackground(blur)
+        }
+        layers.state = state
     }
 
     func loadPersistentStateIfNeeded() {
@@ -270,25 +321,7 @@ class SettingsManager {
         if settingsDefaults.object(forKey: UserDefaultsKeys.blinkingCursor) != nil {
             blinkingCursor = settingsDefaults.bool(forKey: UserDefaultsKeys.blinkingCursor)
         }
-        // Keep opacity and blur as separate persisted dimensions. The
-        // short-lived backgroundFill key maps only to opacity; it must never
-        // erase a user's blur preference during migration.
-        if let v = settingsDefaults.string(forKey: UserDefaultsKeys.glassFrost) {
-            glassFrost = v
-        } else if let old = settingsDefaults.string(forKey: UserDefaultsKeys.glassMaterialStyle) {
-            glassFrost = old
-        }
-        let canonicalOpacity = settingsDefaults.object(forKey: UserDefaultsKeys.windowOpacity)
-        let legacyOpacity = settingsDefaults.object(forKey: UserDefaultsKeys.backgroundFill)
-        if canonicalOpacity != nil || legacyOpacity != nil {
-            windowOpacity = Self.resolvedWindowOpacity(
-                canonical: canonicalOpacity,
-                legacy: legacyOpacity
-            )
-        }
-        if let savedBlur = settingsDefaults.object(forKey: UserDefaultsKeys.blurBackground) {
-            blurBackground = Self.resolvedBlurBackground(savedBlur)
-        }
+        migrateLegacyAppearanceIfNeeded()
         if settingsDefaults.object(forKey: UserDefaultsKeys.interactiveGlass) != nil {
             interactiveGlass = settingsDefaults.bool(forKey: UserDefaultsKeys.interactiveGlass)
         } else if settingsDefaults.object(forKey: UserDefaultsKeys.interactiveGlassEffects) != nil {
@@ -340,8 +373,6 @@ class SettingsManager {
         )
         initialTerminalColumns = initialGeometry.columns
         initialTerminalRows = initialGeometry.rows
-        windowOpacity = Self.unitValue(windowOpacity)
-        blurBackground = Self.unitValue(blurBackground)
         sessionOverrides = sessionOverrides.reduce(into: [:]) { result, element in
             var override = element.value
             override.canonicalizeAppearance()
@@ -362,9 +393,6 @@ class SettingsManager {
         settingsDefaults.set(hostKeyVerificationMode, forKey: UserDefaultsKeys.hostKeyVerificationMode)
         settingsDefaults.set(cursorStyle, forKey: UserDefaultsKeys.cursorStyle)
         settingsDefaults.set(blinkingCursor, forKey: UserDefaultsKeys.blinkingCursor)
-        settingsDefaults.set(glassFrost, forKey: UserDefaultsKeys.glassFrost)
-        settingsDefaults.set(windowOpacity, forKey: UserDefaultsKeys.windowOpacity)
-        settingsDefaults.set(blurBackground, forKey: UserDefaultsKeys.blurBackground)
         settingsDefaults.set(interactiveGlass, forKey: UserDefaultsKeys.interactiveGlass)
         settingsDefaults.set(glassTint, forKey: UserDefaultsKeys.glassTint)
         settingsDefaults.set(tailscaleTailnet, forKey: UserDefaultsKeys.tailscaleTailnet)

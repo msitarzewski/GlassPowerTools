@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import GlassLayers
 import GlassConnectionUI
 #if canImport(UIKit)
 import UIKit
@@ -285,7 +286,10 @@ struct TerminalWindowView: View {
     @ViewBuilder
     private var terminalSurface: some View {
         #if os(visionOS)
-        GlassNativeWindowFrame(
+        // Stage 2 layering proof: the window chrome and its backdrop come from the one layering
+        // state. The canvas keeps its own theme painting; a per-session override adds its own
+        // backdrop on top, otherwise the shared window backdrop is the only frost.
+        GlassLayeredWindow(
             showTitle: isTerminalActive && showsConnectionOrnament,
             showControls: isTerminalActive
         ) {
@@ -296,7 +300,7 @@ struct TerminalWindowView: View {
             .modifier(GlassWindowBackground(
                 interactive: effectiveInteractiveGlass,
                 material: resolvedMaterial,
-                blurAmount: effectiveBlurBackground,
+                blurAmount: sessionOverrideBlur,
                 appearance: settingsManager.currentTheme.resolvedAppearance
             ))
         } title: {
@@ -891,6 +895,12 @@ struct TerminalWindowView: View {
 
     private var effectiveBlurBackground: Double {
         effectiveGlassAppearance.blur
+    }
+
+    /// Blur painted by the canvas itself. On visionOS the shared window backdrop already frosts
+    /// at the global level, so the canvas only adds frost when this session overrides it.
+    private var sessionOverrideBlur: Double {
+        settingsManager.sessionOverride(for: session.id)?.blurBackground ?? 0
     }
 
     private var effectiveInteractiveGlass: Bool {

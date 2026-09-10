@@ -8,6 +8,7 @@
 import Testing
 import Foundation
 @testable import GlassTerminal
+import GlassLayers
 import GlasSecretStore
 import GlassConnectionUI
 import NIOCore
@@ -4458,7 +4459,7 @@ struct glas_shTests {
             rawTags: ["tag:production", "tag:tailscale"]
         ))
 
-        let draft = try #require(ConnectionManagerView.tailscaleImportDraft(for: device))
+        let draft = try #require(TerminalTailscaleImport.draft(for: device))
 
         #expect(draft.name == "build-host")
         #expect(draft.host == "100.64.1.9")
@@ -7152,8 +7153,11 @@ struct glas_shTests {
         }
         settings.saveSettings()
 
-        #expect(defaults.double(forKey: UserDefaultsKeys.windowOpacity) == 0.37)
-        #expect(defaults.double(forKey: UserDefaultsKeys.blurBackground) == 0.64)
+        // Opacity and blur are the shared GlassLayers state now; nothing writes the legacy keys.
+        let stored = GlassLayerStore(defaults: defaults, legacyDefaults: []).state
+        #expect(stored.effectiveOpacity == 0.37)
+        #expect(stored.frost == 0.64)
+        #expect(defaults.object(forKey: UserDefaultsKeys.windowOpacity) == nil)
         #expect(defaults.object(forKey: UserDefaultsKeys.backgroundFill) == nil)
 
         let reloaded = SettingsManager(
@@ -7565,45 +7569,45 @@ struct glas_shTests {
             server: requested,
             location: .target
         )
-        #expect(ConnectionManagerView.targetPasswordPromptServer(
+        #expect(TerminalConnectFlow.targetPasswordPromptServer(
             for: targetError,
             requestedServerID: requested.id
         )?.id == requested.id)
 
-        #expect(ConnectionManagerView.targetPasswordPromptServer(
+        #expect(TerminalConnectFlow.targetPasswordPromptServer(
             for: targetError,
             requestedServerID: other.id
         ) == nil)
-        #expect(ConnectionManagerView.targetPasswordPromptServer(
+        #expect(TerminalConnectFlow.targetPasswordPromptServer(
             for: SessionOpenError.missingPassword(server: other, location: .jumpHost(1)),
             requestedServerID: requested.id
         ) == nil)
-        #expect(ConnectionManagerView.targetPasswordPromptServer(
+        #expect(TerminalConnectFlow.targetPasswordPromptServer(
             for: SessionOpenError.credentialUnavailable(server: requested, location: .target),
             requestedServerID: requested.id
         ) == nil)
     }
 
     @Test @MainActor func connectionManagerIdentifiesLocalNetworkSSHHosts() {
-        #expect(ConnectionManagerView.isLikelyLocalNetworkHost("localhost"))
-        #expect(ConnectionManagerView.isLikelyLocalNetworkHost("pip.local"))
-        #expect(ConnectionManagerView.isLikelyLocalNetworkHost("10.20.30.40"))
-        #expect(ConnectionManagerView.isLikelyLocalNetworkHost("172.16.0.1"))
-        #expect(ConnectionManagerView.isLikelyLocalNetworkHost("172.31.255.255"))
-        #expect(ConnectionManagerView.isLikelyLocalNetworkHost("192.168.1.20"))
-        #expect(ConnectionManagerView.isLikelyLocalNetworkHost("169.254.1.2"))
-        #expect(ConnectionManagerView.isLikelyLocalNetworkHost("127.0.0.1"))
-        #expect(ConnectionManagerView.isLikelyLocalNetworkHost("[fe80::1]"))
-        #expect(ConnectionManagerView.isLikelyLocalNetworkHost("fd12::20"))
+        #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("localhost"))
+        #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("pip.local"))
+        #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("10.20.30.40"))
+        #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("172.16.0.1"))
+        #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("172.31.255.255"))
+        #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("192.168.1.20"))
+        #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("169.254.1.2"))
+        #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("127.0.0.1"))
+        #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("[fe80::1]"))
+        #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("fd12::20"))
 
-        #expect(!ConnectionManagerView.isLikelyLocalNetworkHost("example.com"))
-        #expect(!ConnectionManagerView.isLikelyLocalNetworkHost("172.32.0.1"))
-        #expect(!ConnectionManagerView.isLikelyLocalNetworkHost("192.167.1.20"))
-        #expect(!ConnectionManagerView.isLikelyLocalNetworkHost("not-an-address"))
+        #expect(!TerminalConnectFlow.isLikelyLocalNetworkHost("example.com"))
+        #expect(!TerminalConnectFlow.isLikelyLocalNetworkHost("172.32.0.1"))
+        #expect(!TerminalConnectFlow.isLikelyLocalNetworkHost("192.167.1.20"))
+        #expect(!TerminalConnectFlow.isLikelyLocalNetworkHost("not-an-address"))
     }
 
     @Test @MainActor func localConnectionFailureAddsActionablePermissionGuidance() {
-        let localMessage = ConnectionManagerView.connectionFailureMessage(
+        let localMessage = TerminalConnectFlow.connectionFailureMessage(
             base: "Could not reach pip.local:22.",
             diagnostics: "Connection timed out.",
             host: "pip.local"
@@ -7612,7 +7616,7 @@ struct glas_shTests {
         #expect(localMessage.contains("Privacy & Security > Local Network"))
         #expect(localMessage.contains("allow glas.sh"))
 
-        let remoteMessage = ConnectionManagerView.connectionFailureMessage(
+        let remoteMessage = TerminalConnectFlow.connectionFailureMessage(
             base: "Could not reach example.com:22.",
             diagnostics: nil,
             host: "example.com"
