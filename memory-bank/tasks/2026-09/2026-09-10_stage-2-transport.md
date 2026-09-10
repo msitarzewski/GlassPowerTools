@@ -1,0 +1,121 @@
+# Stage 2 — W1: GlassSSHTransport engine
+
+Worker `stage2-transport`. 2026-09-10. **Status: built, unit-verified on macOS, builds for iOS and
+visionOS simulators; real-host suite written and gated, blocked from running in this session by
+macOS Local Network privacy (evidence below). Not committed (coordinator commits).**
+
+## What moved, from where
+
+| Engine file | From glas.sh | Notes |
+|---|---|---|
+| `SSHEndpoint.swift` — `SSHEndpoint`, `SSHConnectionOptions`, `SSHHop`, `SSHRoute`, `SSHTransportIdentity`, `SSHTransportOwnership` | `Models.swift:1852-1907` (`SSHTransportIdentity`, `SSHTransportOwnership`), `normalizedHost` at `:2727` | Identity now hashes the hop values instead of reading `ServerConfiguration`; ownership verbatim plus `forceClose()` |
+| `SSHCredentials.swift` — `SSHCredentialReference`, `SSHResolvedCredential`, `SSHCredentialResolver`, `SecretStoreCredentialResolver`, `SSHAuthenticationBuilder` | `Models.swift:2010-2075` (`resolveAuthMethod`, both Secure Enclave encodings, RSA/Ed25519 detection); `KeychainManager.swift:523,606` | Credentials are references resolved inside the engine; no raw strings in the API. glassdb's `SSHTunnelConfig` (raw password/key strings) deliberately not ported |
+| `SSHHostTrust.swift` — `SSHHostTrustPolicy`, `SSHHostTrustChallenge`, `SSHHostTrustRequiredError`, `SSHHostTrustDecision`, `SSHHostTrustDecider`, `SSHHostTrustStore`, `SecretStoreHostTrustStore`, `InMemoryHostTrustStore`, `SSHHostTrustEvaluator`, internal `SSHHostKeyChallengeBox`, `SSHPromptingHostKeyValidator` | `Models.swift:26-31` (`HostKeyVerificationMode`), `:243-268` (challenge, reason, required error), `:270-368` (challenge box, validator) | One challenge type for the app; trust arithmetic separated from NIO into `SSHHostTrustEvaluator` so it is unit-testable; pinning through `SSHHostTrustKeychainStore.save`/`replace` |
+| `SSHTransportError.swift` | `Models.swift:2781-2830` (`SSHError`), `:2615-2700` (`userFacingMessage`), `:2735-2760` (kex-failure, legacy-retry, channel-closed helpers), `PortForwardManager.swift:1165` (bind error text) | Renamed `SSHTransportError`; adds `hostTrustRequired/Rejected`, `credentialUnavailable`, `tunnelBindFailed`, `cancelled`, `sftpUnavailable` |
+| `SSHTransport.swift` — `actor SSHTransport`, `SSHConnectionStage`, `SSHTransportEvent` | `Models.swift:1909-1935` (`SharedSSHTransport`), `:1937-2320` (connection half of `SSHConnection`: direct + jump-chain connect, legacy-algorithm retry, keep-alive at `:2570`, `executeRemoteCommand`, `openSFTPClient`, `createDirectTCPIPChannel`, `runRemotePortForward`, `disconnect`) | Progress lines and `TerminalSession` calls became `events`; trust challenge → decider loop inside `connect()`; `UserDefaults` reads became `SSHRoute.trustPolicy` / `SSHConnectionOptions` |
+| `SSHShellChannel.swift` — `SSHPTYRequest`, `SSHShellOutput`, `SSHShellExit`, `actor SSHShellChannel` | `Models.swift:2320-2420` (`runInteractiveTTY`, PTY request, env merge, TTY-ready continuation, clean-exit classification), `:2425-2460` (`sendInput`/`sendBytes`), `:2600` (`resizeTerminal`) | Output is an `AsyncStream`; exit reason recorded once; keep-alive counter reset on every chunk as before |
+| `SFTPSession.swift` — `SFTPAttributes`, `SFTPEntry`, `SFTPOpenMode`, `SFTPFileHandle`, `SFTPSession` (+ `readFile`/`writeFile`), internal `CitadelSFTPSession`, `CitadelSFTPFileHandle` | The `SFTPClient` calls inline in `SFTPBrowserView.swift` (`listDirectory` ×8, `openFile` ×5, `remove` ×5, `rename` ×4, `createDirectory` ×3, `setAttributes`, `getAttributes`, 262 144-byte chunking at `:3939`) and `openSFTPClient` at `Models.swift:2463` | Consumers see no Citadel types; the browser's operations map one-to-one |
+| `SOCKS5.swift` | `PortForwardManager.swift:16-80` (types, limiter, permit), `:775-960` (credential policy, constant-time compare, three parsers, reply) | Verbatim, namespaced under `SOCKS5Protocol`; public for tests and for the port-forwarding UI |
+| `SSHTunnels.swift` — `SSHDirectChannelProvider`, `SSHTunnel`, `SSHRemoteForward`, internal `SSHTunnelChildRegistry`, `SSHTunnelFactory` | `PortForwardManager.swift:86-160` (child registry), `:330-445` (local listener), `:445-500` (pipe), `:505-560` (remote forward), `:600-700` (SOCKS5 listener), `:965-1080` (SOCKS5 handler), `:1083-1160` (stop/wait) | Per-forward `Task`/listener/registry bookkeeping became one `SSHTunnel` object per forward; the `PortForward` rows, statuses and per-session dictionaries stay with the terminal UI (W2) |
+| `SSHTransportPool.swift` | The transport-sharing behaviour of `SSHConnection.shareTransport`/`canShareTransport` (`Models.swift:1960-1975`) | A pool keyed by identity with owner counting |
+
+`Packages/Citadel` and `Packages/swift-nio-ssh` copied verbatim from `../glas.sh/Packages/`
+(`Sources`, `Tests`, `Package.swift`, `Package.resolved`, docs; excluded `build`, `.build`,
+`.swiftpm/xcode/xcuserdata`, `Examples`). `diff -rq` on `Sources/`: 0 differences each.
+
+**Not moved (terminal-owned, W2):** `TerminalSession`, `SessionState`, `ConnectionProgressStage`
+→ UI mapping of `SSHTransportEvent`, auto-reconnect policy, recording, `PortForward` rows and
+`PortForwardManager`'s per-session state, the SFTP browser and its transfer bookkeeping, agent
+forwarding UI (the engine reports `.agent` as unavailable exactly as glas.sh did).
+
+## One fix made while moving
+
+`NIOAsyncChannel(wrappingChannelSynchronously:)` must run on the channel's event loop
+(`NIOCore/AsyncChannel.swift:110` precondition). glas.sh's `handleLocalConnection` and
+`handleSOCKS5Connection` wrap the SSH channel from an arbitrary task; under the vendored
+swift-nio 2.102 that trapped in the unit tests. `SSHTunnelFactory.wrap` hops to the loop with
+`eventLoop.submit`. W2 should expect the same trap if any moved terminal code wraps channels
+off-loop.
+
+## Renames (collision avoidance and prefixing)
+
+| glas.sh | Engine |
+|---|---|
+| `HostKeyVerificationMode` | `SSHHostTrustPolicy` |
+| `HostKeyTrustChallenge` / `HostKeyChallengeReason` / `HostKeyTrustRequiredError` | `SSHHostTrustChallenge` / `SSHHostTrustReason` / `SSHHostTrustRequiredError` |
+| `HostKeyChallengeBox` / `PromptingHostKeyValidator` | `SSHHostKeyChallengeBox` / `SSHPromptingHostKeyValidator` (internal) |
+| `SSHError` | `SSHTransportError` |
+| `SharedSSHTransport` + `SSHConnection` | `SSHTransport` |
+| `PortForwardChildChannelRegistry` | `SSHTunnelChildRegistry` (internal) |
+| `PortForwardManager.parseSOCKS5*` etc. | `SOCKS5Protocol.*` |
+| `SessionAuthenticationMaterial` / `PreparedServerAuthentication` / `SessionConnectionPreparation` | `SSHResolvedCredential` + `SSHCredentialResolver` (preparation is the resolver's job) |
+
+## Public API as implemented
+
+48 public types, ~2,250 lines. Signatures as messaged to the coordinator ("API surface landed"):
+`SSHEndpoint(host:port:username:)`, `SSHConnectionOptions(allowLegacyAlgorithms:forwardAgent:keepAliveInterval:keepAliveMaxMissed:terminalType:environment:)`,
+`SSHHop(recordID:displayName:endpoint:credential:options:)`, `SSHRoute(target:jumps:trustPolicy:)`,
+`SSHCredentialReference {.password(profileID:), .privateKey(keyID:), .agent, .custom(String)}`,
+`SecretStoreCredentialResolver(configuration:passwordLocations:)`,
+`SSHTransport(route:secrets:trustDecider:)` / `(route:credentials:trustStore:trustDecider:)` with
+`events`, `connect()`, `acquire(owner:)`, `release(owner:)`, `close()`, `openShell(pty:)`,
+`execute(_:maxResponseBytes:)`, `openSFTP()`, `openDirectChannel(toHost:port:)`,
+`forward(localPort:toHost:port:)`, `socks5(localPort:credentials:)`,
+`remoteForward(remoteHost:remotePort:toLocalHost:localPort:)`; `SSHShellChannel` (`output`,
+`exit`, `write`, `sendCommand`, `resize`, `close`); `SFTPSession` protocol + `readFile`/`writeFile`;
+`SSHTunnel`, `SSHRemoteForward`, `SOCKS5Credentials`, `SSHTransportPool`. No SwiftUI, no
+`GlassShell`/`GlassLayers` import; `GlassConnectionKit` only for `CredentialID` bridging.
+
+## Verification
+
+| Check | Result |
+|---|---|
+| `swift build --target GlassSSHTransport` | Build complete, **0 warnings** in the target, no `notImplemented`/`TODO`/`fatalError`/`try!`/`as!` |
+| `xcodebuild -scheme GlassSSHTransport`, iOS Simulator (iPhone 17 Pro Max, iOS 27.0) | **BUILD SUCCEEDED**, 0 warnings in the target |
+| `xcodebuild -scheme GlassSSHTransport`, visionOS Simulator (Apple Vision Pro, OS 27.0) | **BUILD SUCCEEDED**, 0 warnings in the target |
+| Unit tests, macOS host: SOCKS5 protocol 7, ownership/identity 6, host trust 7, credentials 5, tunnels 6, first-class consumers 4, gated suite 5 (not-run paths) | **40 tests in 7 suites passed**, three consecutive runs |
+| Real-host suite (`GPT_SSH_TEST_HOST=192.0.2.6`, user `michael`, key `~/.ssh/scratch_vm`) | **Not run — blocked by macOS Local Network privacy in this session.** All five tests fail at TCP connect with `errno 65 No route to host`. Evidence: `nc -z 192.0.2.6 22` succeeds and `ssh … 'echo ok; uname -sr'` returns `ok` / `Linux 7.0.0-29-generic` from the same shell (Apple-signed tools are exempt), while an ad-hoc-signed Swift binary doing a plain BSD `connect()` to `192.0.2.6:22` gets `errno 65` and the same binary reaches `127.0.0.1:22` and reads `SSH-2.0-OpenSSH_`. The VM is on `bridge100` (a local network); no TCC prompt can be answered from this session. |
+
+**How the package tests were run.** `swift test` at the repository root cannot run yet: SwiftPM
+links every test target into one bundle and W2's `GlassTerminal` is mid-move (its own
+compile errors, e.g. `ServerManager.familyDeletionOutbox`); additionally SwiftPM's default
+swiftbuild backend fails on SwiftTerm's `Shaders.metal` via the stub `metal`, which
+`--build-system native` avoids. I ran the engine's tests from a throwaway runner package in the
+session scratchpad (`transport-runner/Package.swift` depending on the `GlassSSHTransport` product
+by path with `Tests` symlinked to `Tests/GlassSSHTransportTests`). Once `GlassTerminal` compiles,
+`swift test --build-system native --filter GlassSSHTransportTests` at the root is the command.
+
+**To run the real-host suite** (from a terminal whose app has the Local Network grant, e.g. after
+System Settings → Privacy & Security → Local Network for the terminal, or Terminal.app):
+`GPT_SSH_TEST_HOST=192.0.2.6 GPT_SSH_TEST_USER=michael GPT_SSH_TEST_KEY_PATH=$HOME/.ssh/scratch_vm swift test --build-system native --filter SSHTransportIntegrationTests`.
+The suite is read-only apart from a `/tmp/glasspowertools-transport-<uuid>` directory it creates
+and removes; it trusts the host key for the run only and records nothing.
+
+## First-class proof
+
+`Tests/GlassSSHTransportTests/FirstClassConsumerTests.swift` defines `DatabaseTunnelConsumer`
+(uses `forward`) and `EditorSFTPConsumer` (uses `SFTPSession` read/write) without importing
+`GlassTerminal`. They pass against a TCP provider and an in-memory SFTP session; the gated suite
+runs the same two consumers against the real transport (`tunnelReachesTheHostsOwnSSHPort`,
+`sftpListsAndRoundTripsInATemporaryDirectory`).
+
+## Resolved dependency versions (root `Package.resolved`, after adding the engine)
+
+swift-nio 2.102.0, swift-crypto 4.5.2, swift-log 1.15.1, BigInt 6.0.1, swift-atomics 1.3.1,
+swift-collections 1.6.0, swift-system 1.8.1, swift-asn1 1.7.2; unchanged from GlassEditorKit:
+SwiftTreeSitter 0.25.0, tree-sitter 0.25.10; W2 added SwiftTerm 1.15.0. Citadel requires
+swift-crypto 4.5.1..<5.0.0 and swift-nio ≥ 2.101.3 — no conflict with GlassEditorKit (tree-sitter
+grammars only). One graph, one copy of each.
+
+## Open items
+
+- Real-host results are pending the Local Network grant; nothing in the code path is untested
+  except the Citadel-backed implementations themselves (`connect`, PTY, SFTP, direct-tcpip,
+  remote forward), which the gated suite covers.
+- `SSHConnectionOptions.forwardAgent` is carried for identity only; agent auth and forwarding
+  remain unavailable, as in glas.sh.
+- `Packages/Citadel/Package.resolved` may be rewritten by builds; the copied `Sources` are what
+  matters and are verbatim.
+- W2: map `SSHTransportEvent` to `ConnectionProgressStage`, keep auto-reconnect and recording in
+  the terminal, pass glas.sh's password location list through `SecretStoreCredentialResolver`,
+  and expect the on-loop `NIOAsyncChannel` requirement noted above.
