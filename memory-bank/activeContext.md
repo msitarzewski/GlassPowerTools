@@ -151,7 +151,7 @@ briefly broke their builds.
 
 ## Stage 2 in progress; 1.8 proven — 2026-09-10 evening, commit `5f12575`
 
-**1.8 passed on the iPhone 17 Pro Max.** After the user enabled automatic signing in Xcode,
+**1.8 passed on the iPhone 17 Pro Max and on the Vision Pro** (user screenshots of both; visionOS shows `Michael`, `juliet`, `oscar`; the Vision Pro's catalog already holds `oscar` as one host with two services while the iPhone's holds two records — real data has both shapes). **visionOS defect:** the sidebar row's Connect label wraps vertically; routed to the shell worker. After the user enabled automatic signing in Xcode,
 per-App-ID managed profiles appeared (iOS/visionOS: 8 devices; macOS), the app installed on the
 iPhone and the Vision Pro, and the user's screenshot shows the existing hosts (`juliet`, `oscar`)
 from the shared catalog — no migration. macOS now signs with the real profile and no override.
