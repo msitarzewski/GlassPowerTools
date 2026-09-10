@@ -102,6 +102,28 @@ AchkG92DPg9/h94Hlidb8Dl6fz0aV2/rQzwgI=
         #expect(!fingerprint.hasSuffix("="))
     }
 
+    @Test func declaredTypeReadsOnlyTheHeader() throws {
+        #expect(try SSHPublicKeys.declaredKeyType(inOpenSSHPrivateKey: Self.ed25519PrivateKey) == .ed25519)
+        #expect(try SSHPublicKeys.declaredKeyType(inOpenSSHPrivateKey: Self.rsaPrivateKey) == .rsa)
+        #expect(try SSHPublicKeys.declaredKeyType(in: material(Self.passphrasePrivateKey)) == .ed25519,
+                "a passphrase-protected key is classified without its passphrase")
+
+        // Header valid, body unparseable: the header probe still answers; full derivation does not.
+        let lines = Self.ed25519PrivateKey.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        var corrupted = lines
+        if corrupted.count > 3 { corrupted[corrupted.count - 3] = String(corrupted[corrupted.count - 3].reversed()) }
+        let corruptedKey = corrupted.joined(separator: "\n")
+        #expect(try SSHPublicKeys.declaredKeyType(inOpenSSHPrivateKey: corruptedKey) == .ed25519)
+        #expect(throws: SSHTransportError.invalidPrivateKey("The stored key material could not be decoded.")) {
+            _ = try SSHPublicKeys.openSSHLine(for: material(corruptedKey))
+        }
+
+        #expect(throws: SSHKeyHeaderError.notAnOpenSSHPrivateKey) { _ = try SSHPublicKeys.declaredKeyType(inOpenSSHPrivateKey: "not a key") }
+        #expect(throws: SSHKeyHeaderError.notAnOpenSSHPrivateKey) { _ = try SSHPublicKeys.declaredKeyType(inOpenSSHPrivateKey: Self.ed25519PublicLine) }
+        #expect(SSHDeclaredKeyType.ecdsaP384.isSupportedForAuthentication == false)
+        #expect(SSHDeclaredKeyType.ed25519.displayName == "ED25519")
+    }
+
     @Test func garbageIsRefusedWithoutEchoingIt() {
         #expect(throws: SSHTransportError.invalidPrivateKey("The stored key material could not be decoded.")) {
             _ = try SSHPublicKeys.openSSHLine(for: material("not a key at all"))

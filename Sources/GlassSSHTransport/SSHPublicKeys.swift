@@ -9,7 +9,73 @@ import GlasSecretStore
 /// need Citadel or NIOSSH themselves. Moved from glas.sh `SettingsManager.openSSHPublicKey(for:)`
 /// (SettingsManager.swift:807-846); accepts the same three private-key encodings the
 /// authentication builder does.
+/// The key algorithm an OpenSSH private-key file declares in its header, before any decoding.
+/// Consumers use it for import-form checks; full derivation is `SSHPublicKeys.algorithm(for:)`.
+public enum SSHDeclaredKeyType: String, Sendable, Hashable, CaseIterable {
+    case rsa = "ssh-rsa"
+    case ed25519 = "ssh-ed25519"
+    case ecdsaP256 = "ecdsa-sha2-nistp256"
+    case ecdsaP384 = "ecdsa-sha2-nistp384"
+    case ecdsaP521 = "ecdsa-sha2-nistp521"
+
+    public var displayName: String {
+        switch self {
+        case .rsa: "RSA"
+        case .ed25519: "ED25519"
+        case .ecdsaP256: "ECDSA P-256"
+        case .ecdsaP384: "ECDSA P-384"
+        case .ecdsaP521: "ECDSA P-521"
+        }
+    }
+
+    /// Whether the engine can authenticate with this type (`SSHAuthenticationBuilder`).
+    public var isSupportedForAuthentication: Bool {
+        switch self {
+        case .rsa, .ed25519, .ecdsaP256: true
+        case .ecdsaP384, .ecdsaP521: false
+        }
+    }
+
+    init?(_ citadel: SSHKeyType) { self.init(rawValue: citadel.rawValue) }
+}
+
+/// Why a private-key header could not be read (`SSHPublicKeys.declaredKeyType(inOpenSSHPrivateKey:)`).
+public enum SSHKeyHeaderError: Error, Sendable, Equatable {
+    /// Not an OpenSSH private key (missing or wrong PEM armour).
+    case notAnOpenSSHPrivateKey
+    /// Armour present but the header block does not parse.
+    case malformedHeader
+    /// The header names a type the engine does not model.
+    case unsupportedKeyType(String)
+}
+
 public enum SSHPublicKeys {
+    /// Reads only the OpenSSH private-key header (armour, magic, key type) — no key material is
+    /// decoded and no passphrase is needed — so import forms can classify a key before deciding
+    /// what to do with it. Wraps Citadel's `SSHKeyDetection.detectPrivateKeyType`.
+    public static func declaredKeyType(inOpenSSHPrivateKey text: String) throws -> SSHDeclaredKeyType {
+        let detected: SSHKeyType
+        do {
+            detected = try SSHKeyDetection.detectPrivateKeyType(from: text)
+        } catch let error as SSHKeyDetectionError {
+            switch error {
+            case .invalidPrivateKeyFormat, .invalidKeyFormat: throw SSHKeyHeaderError.notAnOpenSSHPrivateKey
+            case .unsupportedKeyType(let type): throw SSHKeyHeaderError.unsupportedKeyType(type ?? "unknown")
+            case .malformedKey, .encryptedPrivateKey, .passphraseRequired, .incorrectPassphrase: throw SSHKeyHeaderError.malformedHeader
+            }
+        }
+        guard let type = SSHDeclaredKeyType(detected) else {
+            throw SSHKeyHeaderError.unsupportedKeyType(detected.rawValue)
+        }
+        return type
+    }
+
+    /// Same, over stored material (decodes only the UTF-8 text, never the key).
+    public static func declaredKeyType(in material: SSHKeyMaterial) throws -> SSHDeclaredKeyType {
+        guard let text = material.privateKey.toUTF8String() else { throw SSHTransportError.invalidCredentialEncoding }
+        return try declaredKeyType(inOpenSSHPrivateKey: text)
+    }
+
     /// The `authorized_keys` line for `material`, e.g. `ssh-ed25519 AAAA… comment`.
     public static func openSSHLine(for material: SSHKeyMaterial, comment: String? = nil) throws -> String {
         let key = try publicKey(for: material)

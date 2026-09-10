@@ -172,6 +172,8 @@ the persistent warning the July audit asked for.
 visionOS Simulator build **succeeded, 0 warnings**; scaffold sweep clean. Real host unchanged
 (Local Network grant still absent).
 
+**Header-only key classification (W2 request, after the above).** `SSHPublicKeys.declaredKeyType(inOpenSSHPrivateKey:)` and `declaredKeyType(in: SSHKeyMaterial)` return an engine `SSHDeclaredKeyType` (rsa, ed25519, ecdsaP256/384/521 with `displayName` and `isSupportedForAuthentication`) by reading only the OpenSSH header through Citadel's `SSHKeyDetection.detectPrivateKeyType`; errors are `SSHKeyHeaderError`. Import forms classify a key — including a passphrase-protected or body-corrupted one — without decoding it, which is what full derivation (`algorithm(for:)`) cannot do. Test: header-valid/body-corrupted fixture classifies as ed25519 while `openSSHLine` refuses it. Unit total now **61 tests in 10 suites**.
+
 ## Open items
 
 - Real-host results are pending the Local Network grant; nothing in the code path is untested
