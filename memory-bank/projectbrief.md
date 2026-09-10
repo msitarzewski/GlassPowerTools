@@ -1,0 +1,62 @@
+# Project brief
+
+## What this is
+
+Glass Power Tools is one native Apple application for every machine a user owns and every service on
+it: terminal and file transfer over SSH, databases, and remote desktops over RDP and VNC, with text
+editing available as a further capability. Bundle identifier `com.glasspowertools`. MIT licensed.
+
+It replaces three separate applications that were converging on the same shell: glas.sh, glassdb and
+glassDT.
+
+## Where this came from
+
+The journey began with building a world-class SSH tool **for visionOS**, one that uses what visionOS
+actually offers rather than shipping a phone app into a headset. Databases followed for the same
+reason, then remote desktops. Glass Power Tools is the same intent at full scope.
+
+This is the reason for the 26.0 floor. It is **not** housekeeping or a preference for recent APIs. It
+is the version that reaches the visionOS capabilities the product is built on, and everything else
+inherits that floor rather than the other way round.
+
+It follows that **visionOS leads the design**, and Mac, iPad and iPhone adapt from it. A surface
+designed for the Mac and then fitted into a headset arrives having already given up the things worth
+having. The reverse adapts cleanly. Where the three source applications did this backwards, the merge
+is the moment to correct it, not to preserve it.
+
+## Why it exists
+
+The shared host catalog already models a host that owns several services of kind `ssh`, `database`
+or `rdp`. The three applications were each a partial view of that one model, and a large amount of
+code existed only to keep three processes agreeing about it. Merging deletes that code rather than
+moving it.
+
+The differentiator is not any single protocol client, all of which have mature competitors. It is the
+combination: every host, every service, one credential store, one settings surface, and on Vision Pro
+a spatial workspace where a host's terminal, database and desktop can sit side by side. Three
+separate applications cannot compose that way.
+
+## Scope
+
+- Native Mac, iPad, iPhone and Vision Pro. Apple TV and watchOS are excluded.
+- Capabilities in build order: SSH terminal with SFTP and port forwarding; databases; RDP and VNC
+  remote desktops; then the editor interface. GlassEditorKit comes in as a library from the start.
+- Apple Silicon only, 26.0 floor on every platform.
+- The Glass layering system, including window and title bar transparency, is foundational rather than
+  a later polish pass.
+- One library, one settings surface, one credential store, one window and navigation model.
+
+## Non-goals
+
+- Matching competitors feature for feature inside any single capability. Depth is chosen for what a
+  user needs while already looking at that host.
+- Shipping to an App Store at this stage. None of the three source apps is published, which is why
+  merging carries no product-identity cost.
+
+## Constraints carried in
+
+- Follow protocol specifications precisely and advertise only implemented capabilities.
+- Validate untrusted protocol data before use.
+- Keep credential storage in GlasSecretStore, with its existing eligibility and mobility rules.
+- Preserve the familiar library navigation. Users must not relearn the app.
+- Never present a stub, a compile, or a dependency declaration as a working feature.
