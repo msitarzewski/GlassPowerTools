@@ -58,7 +58,7 @@ public struct GlassShellHostEditor: View {
                     onSave(created.id)
                 }
                 dismiss()
-            } catch { self.error = error.localizedDescription }
+            } catch { self.error = GlassShellError.message(for: error) }
         }
     }
 
@@ -122,7 +122,7 @@ public struct GlassShellServiceEditor: View {
                 let name = displayName.trimmingCharacters(in: .whitespaces).isEmpty ? defaultName : displayName
                 try await model.addService(kind: kind, displayName: name, to: host.id)
                 dismiss()
-            } catch { self.error = error.localizedDescription }
+            } catch { self.error = GlassShellError.message(for: error) }
         }
     }
 }

@@ -168,3 +168,20 @@ struct GlassLayerMigrationTests {
         #expect(GlassLayerLegacy.numericUnit(-2.0) == 0)
     }
 }
+
+@Suite("GlassLayer corrupt state (F7)", .serialized)
+@MainActor
+struct GlassLayerCorruptStateTests {
+    @Test("Corrupt stored state → default, source none, legacy migration not re-run")
+    func corruptStoredStateDoesNotRemigrate() {
+        let own = DefaultsFixture(), legacy = DefaultsFixture()
+        own.defaults.set(Data("not json".utf8), forKey: GlassLayerStore.stateKey)
+        own.defaults.set(GlassLayerMigrationSource.glasSH.rawValue, forKey: GlassLayerStore.migrationKey)
+        legacy.defaults.set(0.4, forKey: "windowOpacity")    // would migrate if consulted
+        let store = GlassLayerStore(defaults: own.defaults, legacyDefaults: [legacy.defaults])
+        #expect(store.state == .default)
+        #expect(store.migrationSource == .none)
+        let persisted = own.defaults.data(forKey: GlassLayerStore.stateKey).flatMap { try? JSONDecoder().decode(GlassLayerState.self, from: $0) }
+        #expect(persisted == .default, "the corrupt value is replaced by the default, once")
+    }
+}

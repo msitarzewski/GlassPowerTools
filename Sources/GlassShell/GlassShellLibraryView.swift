@@ -97,8 +97,14 @@ public struct GlassShellLibraryView: View {
         ContentUnavailableView {
             Label(model.hosts.isEmpty ? "Your Hosts" : "Select a Host", systemImage: "server.rack")
         } description: {
-            Text(model.hosts.isEmpty ? "Every machine you own, and every service on it, in one library."
-                 : "Choose a host to see its services.")
+            VStack(spacing: 8) {
+                Text(model.hosts.isEmpty ? "Every machine you own, and every service on it, in one library."
+                     : "Choose a host to see its services.")
+                if !model.hasSharedContainer {
+                    Text(model.hostLibraryStatus).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("connection-library-status")
+                }
+            }
         } actions: {
             Button("Add Host") { addingHost = true }.accessibilityIdentifier("connection-library-add-host-empty")
         }
@@ -171,7 +177,7 @@ public struct GlassShellLibraryView: View {
     }
 
     private func run(_ body: () async throws -> Void) async {
-        do { try await body() } catch { model.errorMessage = error.localizedDescription }
+        do { try await body() } catch { model.errorMessage = GlassShellError.message(for: error) }
     }
 }
 

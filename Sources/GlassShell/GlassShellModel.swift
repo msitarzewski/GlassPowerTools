@@ -9,12 +9,47 @@ public enum GlassShellError: LocalizedError, Equatable {
     case hostNotFound(HostID)
     case serviceNotFound(EndpointID)
     case invalidName
+    case preferencesReadOnly
 
     public var errorDescription: String? {
         switch self {
         case .hostNotFound: "That host is no longer in the library."
         case .serviceNotFound: "That service is no longer on the host."
         case .invalidName: "Enter a name."
+        case .preferencesReadOnly: "Favorites and recent services are read-only until the preferences file can be read or is reset in Settings."
+        }
+    }
+
+    /// User-facing text for any error the shell surfaces. The kit's validation and catalog errors
+    /// carry no `LocalizedError` text of their own, so they are mapped here; everything else
+    /// keeps its own description.
+    public static func message(for error: Error) -> String {
+        switch error {
+        case let error as GlassShellError:
+            return error.localizedDescription
+        case let error as HostProfileError:
+            switch error {
+            case .invalidName: return "The name is empty or longer than 1,024 bytes."
+            case .invalidAlias: return "An alias is empty or longer than 1,024 bytes."
+            case .invalidTag: return "A collection name is empty or longer than 1,024 bytes."
+            case .tooManyEntries: return "Too many entries: a host allows up to 64 aliases, 64 collections and 128 services."
+            case .duplicateService: return "That service is already on this host."
+            case .invalidTimestamp: return "The host record has an invalid timestamp."
+            case .unsupportedVersion(let v): return "The host record uses schema version \(v), which this build does not understand."
+            }
+        case let error as HostCatalogError:
+            switch error {
+            case .unsupportedVersion(let v): return "The host library uses schema version \(v), which this build does not understand. Update the app; nothing was changed."
+            case .tooLarge: return "The host library is too large to load safely (more than 8 MB or 10,000 hosts). Nothing was changed."
+            case .duplicateHost: return "A host with that identity already exists."
+            case .endpointAlreadyPaired: return "That service is already attached to a host."
+            case .endpointNotFound: return "That service is no longer on the host."
+            case .hostNotFound: return "That host is no longer in the library."
+            case .hostDeleted: return "That host was deleted; restore it before editing."
+            case .fileLockFailed(let code): return "The host library is busy in another app (lock error \(code)). Try again in a moment."
+            }
+        default:
+            return error.localizedDescription
         }
     }
 }
@@ -35,12 +70,15 @@ public final class GlassShellModel {
     public private(set) var hasSharedContainer: Bool
     public private(set) var hostLibraryStatus: String
     public private(set) var preferencesProblem: String?
+    /// True while the preferences file exists but cannot be trusted or read; nothing is written
+    /// over it until `resetPreferences()` or a later successful read.
+    public private(set) var preferencesReadOnly = false
     public var placeholderRequest: GlassShellPlaceholderRequest?
 
     public let storageDirectory: URL
-    public let catalog: HostCatalogStore
-    /// Fixed at init; mirrored here so views and tests need not hop to the actor.
-    public let catalogFileURL: URL
+    public private(set) var catalog: HostCatalogStore
+    /// Mirrored here so views and tests need not hop to the actor.
+    public private(set) var catalogFileURL: URL
     public let writerID: WriterID
     public let layers: GlassLayerStore
     public let registry: GlassCapabilityRegistry
@@ -66,37 +104,80 @@ public final class GlassShellModel {
         let loaded = GlassShellPreferencesStore(fileURL: directory.appendingPathComponent("shell-preferences.json")).load()
         let writerID = loaded.preferences.writerID
         self.preferences = loaded.preferences
-        self.preferencesProblem = loaded.problem
+        self.preferencesProblem = loaded.outcome.problem
+        self.preferencesReadOnly = !loaded.outcome.isWritable
+        self.preferencesUnavailable = { if case .unavailable = loaded.outcome { true } else { false } }()
 
         let shared = sharedContainerURL ?? (resolveSharedContainer
             ? FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: Self.sharedContainerIdentifier) : nil)
         self.writerID = writerID
         if let shared {
-            catalogFileURL = shared.appendingPathComponent(Self.catalogRelativePath)
-            catalog = HostCatalogStore(fileURL: catalogFileURL, writerID: writerID)
+            let fileURL = shared.appendingPathComponent(Self.catalogRelativePath)
+            catalogFileURL = fileURL
+            catalog = HostCatalogStore(fileURL: fileURL, writerID: writerID)
             hasSharedContainer = true
             hostLibraryStatus = "Host library is shared with glas.sh, glassdb and glassDT on this device."
         } else {
-            catalogFileURL = directory.appendingPathComponent(Self.catalogRelativePath)
-            catalog = HostCatalogStore(fileURL: catalogFileURL, writerID: writerID)
+            let fileURL = directory.appendingPathComponent(Self.catalogRelativePath)
+            catalogFileURL = fileURL
+            catalog = HostCatalogStore(fileURL: fileURL, writerID: writerID)
             hasSharedContainer = false
             hostLibraryStatus = "The shared App Group is unavailable, so hosts are kept in this app only. Check the group.sh.glas.shared entitlement and signing."
         }
         secretConfiguration = SecretStoreConfiguration(serviceNamePrefix: "sh.glas", accessGroup: accessGroup,
                                                        useDataProtectionKeychain: true, mobilityPolicy: .deviceOnly)
-        if loaded.problem != nil { try? preferencesStore.save(loaded.preferences) }
+    }
+
+    /// Set when the file was unreadable for availability reasons (protected before first
+    /// unlock); `load()` retries it, and a successful read lifts read-only.
+    private var preferencesUnavailable = false
+
+    /// Retries an unavailable preferences file. Never overwrites; only adopts a successful read.
+    public func reloadPreferencesIfUnavailable() {
+        guard preferencesReadOnly, preferencesUnavailable else { return }
+        let loaded = preferencesStore.load()
+        guard loaded.outcome.isWritable else {
+            preferencesProblem = loaded.outcome.problem
+            preferencesUnavailable = { if case .unavailable = loaded.outcome { true } else { false } }()
+            return
+        }
+        preferences = loaded.preferences
+        preferencesProblem = nil
+        preferencesReadOnly = false
+        preferencesUnavailable = false
+    }
+
+    /// The user's explicit choice to start fresh: the unreadable file is moved aside, not deleted.
+    public func resetPreferences() throws {
+        try preferencesStore.setAside()
+        preferences = GlassShellPreferences()
+        preferencesProblem = nil
+        preferencesReadOnly = false
+        preferencesUnavailable = false
+        try preferencesStore.save(preferences)
     }
 
     // MARK: Loading
 
     public func load() async {
+        reloadPreferencesIfUnavailable()
         do {
             hosts = try await catalog.snapshot()
             isLoaded = true
             errorMessage = nil
         } catch {
             isLoaded = true
-            errorMessage = "The host library could not be read: \(error.localizedDescription)"
+            if hasSharedContainer, Self.isPermissionDenied(error) {
+                // The container resolves but the sandbox refuses it: the App Group entitlement is
+                // not granted by this build's provisioning profile. Degrade to the private
+                // catalog and say so where the user will see it, instead of alerting every launch.
+                switchToLocalCatalog(reason: "This build is not allowed to use the shared host library "
+                    + "(the App Group entitlement is not granted by its provisioning profile), so hosts are "
+                    + "kept in this app only until it is signed with the group.")
+                await load()
+                return
+            }
+            errorMessage = "The host library could not be read: \(GlassShellError.message(for: error))"
         }
     }
 
@@ -147,9 +228,13 @@ public final class GlassShellModel {
         guard let existing = host(id) else { throw GlassShellError.hostNotFound(id) }
         let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw GlassShellError.invalidName }
-        let updated = try HostProfile(id: existing.id, displayName: trimmed, aliases: aliases,
-                                      services: existing.services, tags: tags, createdAt: existing.createdAt,
-                                      updatedAt: max(Date(), existing.updatedAt), lastWriterID: preferences.writerID)
+        // Re-read right before writing so services another app paired since our last load
+        // survive; only the fields the editor changed are applied. (Interim until the kit
+        // offers a field-level in-lock edit.)
+        let fresh = (try await catalog.snapshot()).first { $0.id == id } ?? existing
+        let updated = try HostProfile(id: fresh.id, displayName: trimmed, aliases: aliases,
+                                      services: fresh.services, tags: tags, createdAt: fresh.createdAt,
+                                      updatedAt: max(Date(), fresh.updatedAt), lastWriterID: preferences.writerID)
         try await catalog.upsert(updated)
         await load()
     }
@@ -184,7 +269,7 @@ public final class GlassShellModel {
 
     public func toggleFavorite(_ id: HostID) {
         preferences[host: id].isFavorite.toggle()
-        do { try persistPreferences() } catch { errorMessage = error.localizedDescription }
+        do { try persistPreferences() } catch { errorMessage = GlassShellError.message(for: error) }
     }
 
     // MARK: Connecting
@@ -205,15 +290,40 @@ public final class GlassShellModel {
         guard let service = host.services.first(where: { $0.endpointID == endpointID }) else {
             errorMessage = GlassShellError.serviceNotFound(endpointID).localizedDescription; return
         }
+        // The user chose this service, so remember it either way; but "last connected" is only
+        // true when a capability actually opens it. The placeholder connects nothing.
         preferences[host: hostID].lastUsedEndpointID = endpointID
-        preferences[host: hostID].lastConnected = Date()
-        do { try persistPreferences() } catch { errorMessage = error.localizedDescription }
         if let capability = registry.capability(for: service.kind) {
+            preferences[host: hostID].lastConnected = Date()
+            do { try persistPreferences() } catch { errorMessage = GlassShellError.message(for: error) }
             capability.open(service: service, host: host)
         } else {
+            do { try persistPreferences() } catch { errorMessage = GlassShellError.message(for: error) }
             placeholderRequest = GlassShellPlaceholderRequest(host: host, service: service)
         }
     }
 
-    private func persistPreferences() throws { try preferencesStore.save(preferences) }
+    private func switchToLocalCatalog(reason: String) {
+        catalogFileURL = storageDirectory.appendingPathComponent(Self.catalogRelativePath)
+        catalog = HostCatalogStore(fileURL: catalogFileURL, writerID: writerID)
+        hasSharedContainer = false
+        hostLibraryStatus = reason
+        errorMessage = nil
+    }
+
+    /// EACCES/EPERM from the kit's lock, or Cocoa's no-permission codes from directory creation.
+    static func isPermissionDenied(_ error: Error) -> Bool {
+        if case HostCatalogError.fileLockFailed(let code) = error { return code == EACCES || code == EPERM }
+        let ns = error as NSError
+        if ns.domain == NSCocoaErrorDomain {
+            return [NSFileWriteNoPermissionError, NSFileReadNoPermissionError].contains(ns.code)
+                || (ns.underlyingErrors.first.map(isPermissionDenied) ?? false)
+        }
+        return ns.domain == NSPOSIXErrorDomain && (ns.code == Int(EACCES) || ns.code == Int(EPERM))
+    }
+
+    private func persistPreferences() throws {
+        guard !preferencesReadOnly else { throw GlassShellError.preferencesReadOnly }
+        try preferencesStore.save(preferences)
+    }
 }

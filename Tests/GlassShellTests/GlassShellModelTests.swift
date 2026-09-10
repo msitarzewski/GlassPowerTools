@@ -94,7 +94,7 @@ struct GlassShellModelTests {
         try await model.removeService(db.endpointID, from: host.id)
         #expect(model.lastUsedService(for: host.id) == nil)
         #expect(model.connect(hostID: host.id)?.endpointID == ssh.endpointID, "falls back to first")
-        #expect(model.lastConnected(host.id) != nil)
+        #expect(model.lastConnected(host.id) == nil, "F3: the placeholder connects nothing, so no connection time")
     }
 
     @Test("A registered capability receives the open call instead of the placeholder")

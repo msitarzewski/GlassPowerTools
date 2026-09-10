@@ -28,11 +28,18 @@ public final class GlassLayerStore {
     ///   - legacyDefaults: suites searched, in order, when no stored state exists yet.
     public init(defaults: UserDefaults = .standard, legacyDefaults: [UserDefaults] = GlassLayerStore.defaultLegacySuites) {
         self.defaults = defaults
-        if let data = defaults.data(forKey: Self.stateKey),
-           let stored = try? JSONDecoder().decode(GlassLayerState.self, from: data) {
-            storage = stored
-            migrationSource = defaults.string(forKey: Self.migrationKey)
-                .flatMap(GlassLayerMigrationSource.init(rawValue:)) ?? .none
+        if let data = defaults.data(forKey: Self.stateKey) {
+            if let stored = try? JSONDecoder().decode(GlassLayerState.self, from: data) {
+                storage = stored
+                migrationSource = defaults.string(forKey: Self.migrationKey)
+                    .flatMap(GlassLayerMigrationSource.init(rawValue:)) ?? .none
+            } else {
+                // A stored value exists but is unreadable: the user had a state of their own, so
+                // do not re-run the legacy migration over it. Start from the default.
+                storage = .default
+                migrationSource = .none
+                persist()
+            }
         } else {
             let (migrated, source) = GlassLayerLegacy.migrate(from: legacyDefaults)
             storage = migrated
@@ -47,8 +54,12 @@ public final class GlassLayerStore {
         var suites: [UserDefaults] = [.standard]
         if let group = UserDefaults(suiteName: GlassLayerLegacy.appGroupSuite) { suites.append(group) }
         #if os(macOS)
-        for identifier in GlassLayerLegacy.legacyBundleIdentifiers {
-            if let domain = UserDefaults(suiteName: identifier) { suites.append(domain) }
+        // Under App Sandbox these domains are unreadable and each attempt logs a violation, so
+        // only look when the process is not sandboxed.
+        if ProcessInfo.processInfo.environment["APP_SANDBOX_CONTAINER_ID"] == nil {
+            for identifier in GlassLayerLegacy.legacyBundleIdentifiers {
+                if let domain = UserDefaults(suiteName: identifier) { suites.append(domain) }
+            }
         }
         #endif
         return suites

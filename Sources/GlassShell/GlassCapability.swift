@@ -70,11 +70,16 @@ public struct GlassShellPlaceholderSession: View {
                 Label(request.service.displayName, systemImage: GlassServicePresentation.symbolName(for: request.service.kind))
             } description: {
                 Text("\(GlassServicePresentation.displayName(for: request.service.kind)) is not part of this build yet. \(request.host.displayName) and this service are saved; nothing was connected.")
-            } actions: {
-                Button("Done") { dismiss() }.accessibilityIdentifier("placeholder-done")
             }
             .navigationTitle(request.host.displayName)
             .accessibilityIdentifier("placeholder-session")
+            // Toolbar, not the unavailable view's actions slot: on visionOS the identified
+            // container is exposed as one element and swallows buttons inside it.
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }.accessibilityIdentifier("placeholder-done")
+                }
+            }
         }
         #if os(visionOS) || os(macOS)
         .frame(minWidth: 420, minHeight: 320)
