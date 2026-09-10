@@ -78,3 +78,7 @@
   multi-line workgroup startup command that its own committed ticket guard rejects. Fixed with a
   single-line group command; 348 terminal tests all pass. The same fix applies to glas.sh's PR
   branch — for the user to carry over.
+- 2026-09-10: **One row per host** (`7ebe746`): same-machine catalog records grouped in the shell
+  with every service icon; visionOS row fixed; three capability hooks added; 29 shell tests. W3
+  wiring the terminal's pages/toolbar/actions and moving shell services; integration driving a
+  real session.

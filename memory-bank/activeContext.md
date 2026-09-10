@@ -162,6 +162,13 @@ the same machine, and only pairing ever tied them. A shell worker is consolidati
 records into one row with every service icon, presentation-level only (the source apps still read
 `hosts.json` by their own IDs until Stage 6).
 
+**Consolidation landed (`7ebe746`):** one row per host with every service icon, on all platforms;
+visionOS row fixed (simulator screenshot judged by eye: `juliet` / `oscar`, "Desktop · Terminal",
+two icons, icon-only Connect). Root cause recorded: the catalog matches only by endpoint id and
+each app publishes its own record per saved endpoint. `hosts.json` is not rewritten; the on-disk
+merge is written, tested and unwired until Stage 6. Three `GlassCapability` hooks are in the shell
+(settings pages, library toolbar items, per-service detail actions).
+
 **Stage 2 state:** `GlassSSHTransport` engine complete (61 unit tests, security review clean of
 High/Medium and all Low fixed, both July audit items confirmed resolved). glas.sh moved in as
 `GlassTerminal` (36,441 lines; 338 tests, one inherited failure; builds on all three platforms).
