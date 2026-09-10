@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import GlassShell
 import Foundation
 import GlassLayers
 import Observation

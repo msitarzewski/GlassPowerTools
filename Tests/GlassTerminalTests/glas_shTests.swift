@@ -17,6 +17,7 @@ import Citadel
 import GlassEditorCore
 import GlassTerminalEmulator
 import SwiftUI
+import GlassShell
 import UniformTypeIdentifiers
 #if canImport(UIKit)
 import Combine

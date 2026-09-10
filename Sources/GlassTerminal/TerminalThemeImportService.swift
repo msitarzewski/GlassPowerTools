@@ -34,7 +34,7 @@ enum TerminalThemeImportError: LocalizedError {
 @MainActor
 enum TerminalThemeImportService {
     static let maximumImportBytes = 1_048_576
-    static let maximumNameLength = TerminalTheme.maximumNameLength
+    nonisolated static let maximumNameLength = TerminalTheme.maximumNameLength
 
     private static let colorFields: [(String, WritableKeyPath<TerminalTheme, CodableColor>)] = [
         ("TextColor", \.foreground),

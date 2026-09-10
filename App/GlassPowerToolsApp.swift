@@ -17,6 +17,7 @@ struct GlassPowerToolsApp: App {
     @State private var layers: GlassLayerStore
     @State private var model: GlassShellModel
     @State private var terminal: GlassTerminalRuntime
+    @State private var windowRecovery: GlassWindowRecoveryManager
     #if os(macOS)
     @NSApplicationDelegateAdaptor(MacTerminalAppDelegate.self) private var appDelegate
     #endif
@@ -46,11 +47,13 @@ struct GlassPowerToolsApp: App {
         )
         // Stage 2: the SSH capability. glas.sh's managers live for the process in the runtime; the
         // shell routes Connect for `.ssh` services through the capability.
-        let terminal = GlassTerminalRuntime()
+        let windowRecovery = GlassWindowRecoveryManager()
+        let terminal = GlassTerminalRuntime(layers: layers, windowRecovery: windowRecovery)
         model.registry.register(GlassTerminalCapability(runtime: terminal))
         _layers = State(initialValue: layers)
         _model = State(initialValue: model)
         _terminal = State(initialValue: terminal)
+        _windowRecovery = State(initialValue: windowRecovery)
     }
 
     #if DEBUG
@@ -74,6 +77,7 @@ struct GlassPowerToolsApp: App {
                 GlassShellLibraryView(model: model)
             }
             .glassLayers(layers)
+            .trackWindowPresence(key: "main", recovery: windowRecovery)
             #if os(macOS)
             .onAppear { terminal.attach(to: appDelegate) }
             #endif

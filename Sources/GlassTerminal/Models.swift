@@ -1263,11 +1263,11 @@ enum TerminalThemeAppearance: String, Codable, CaseIterable, Equatable, Sendable
 }
 
 struct TerminalTheme: Identifiable, Codable, Equatable {
-    static let defaultID = UUID(uuidString: "B16B00B5-7E4D-4A51-9A9E-474C41535348")!
-    static let maximumNameLength = 128
-    static let maximumFontNameLength = 128
-    static let minimumFontSize: CGFloat = 10
-    static let maximumFontSize: CGFloat = 24
+    nonisolated static let defaultID = UUID(uuidString: "B16B00B5-7E4D-4A51-9A9E-474C41535348")!
+    nonisolated static let maximumNameLength = 128
+    nonisolated static let maximumFontNameLength = 128
+    nonisolated static let minimumFontSize: CGFloat = 10
+    nonisolated static let maximumFontSize: CGFloat = 24
     let id: UUID
     var name: String
     var background: CodableColor
@@ -1525,7 +1525,7 @@ struct TerminalThemeRecord: Identifiable, Codable, Equatable {
 
 struct TerminalThemeLibrary: Codable, Equatable {
     static let currentSchemaVersion = 1
-    static let maximumThemeCount = 64
+    nonisolated static let maximumThemeCount = 64
     static let maximumRecordCount = 128
 
     var schemaVersion: Int
@@ -1790,7 +1790,7 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
         var title: String { rawValue.capitalized }
     }
     static let currentSchemaVersion = 4
-    static let maximumNameLength = 80
+    nonisolated static let maximumNameLength = 80
     static let maximumSessionCount = 32
 
     struct SessionIntent: Codable, Hashable {

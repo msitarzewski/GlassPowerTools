@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import GlassShell
 import GlassConnectionKit
 import os
 #if os(macOS)
@@ -510,28 +511,6 @@ struct MainBootstrapView<Content: View>: View {
     }
 }
 
-private struct WindowPresenceTrackingModifier: ViewModifier {
-    let key: String
-    let recovery: WindowRecoveryManager
-    @Environment(\.openWindow) private var openWindow
-
-    func body(content: Content) -> some View {
-        content
-            .onAppear {
-                recovery.setOpenWindowAction(openWindow)
-                recovery.markWindowVisible(key)
-            }
-            .onDisappear {
-                recovery.markWindowHidden(key)
-            }
-    }
-}
-
-extension View {
-    func trackWindowPresence(key: String, recovery: WindowRecoveryManager) -> some View {
-        modifier(WindowPresenceTrackingModifier(key: key, recovery: recovery))
-    }
-}
 
 /// Slowly spinning terminal icon shown when Connections is closed as the last window.
 /// Tapping it restores the full Connections window and dismisses this proxy.

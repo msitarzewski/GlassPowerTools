@@ -291,7 +291,8 @@ struct TerminalWindowView: View {
         // backdrop on top, otherwise the shared window backdrop is the only frost.
         GlassLayeredWindow(
             showTitle: isTerminalActive && showsConnectionOrnament,
-            showControls: isTerminalActive
+            showControls: isTerminalActive,
+            paintsTheme: false
         ) {
             VStack(spacing: 0) {
                 terminalContent

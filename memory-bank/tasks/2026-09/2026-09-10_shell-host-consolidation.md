@@ -105,3 +105,20 @@ for every consolidated host once, then drop the grouping to a plain identity map
 | iOS Simulator (iPhone 17 Pro Max, iOS 27.0) UI suite `GlassShellLibraryUITests` | **6/6 passed** across two runs on a verbatim copy of the tree excluding another worker's in-progress `UITests/GlassTerminalUITests.swift` (which does not compile at :291, main-actor key path — not mine): appearance, favorites, search, smoke and the new `testSameMachineRecordsAreOneRowWithAllServiceIcons` (one row each for `juliet` and `oscar`, two `host-service-ssh` and two `host-service-rdp` icons); `testAddHostAddServiceConnectPlaceholder` re-pointed and passing (below) |
 | Stage 2 side effect found | `testAddHostAddServiceConnectPlaceholder` expected the placeholder after Connect on an SSH service, but since `5f12575` the app registers `GlassTerminalCapability` for `.ssh`, so Connect opens the terminal's server form. The placeholder contract is for kinds no capability owns; the test now seeds a `database` service (`--ui-testing-seed-hosts "dbhost:database"`) into a fresh isolated store for that step. Seeded relaunches must use a new `runID`: the seeder fills only an empty catalog |
 | macOS / iOS device rows | not run |
+
+## Final iOS run and an observation outside my scope
+
+- Final `GlassShellLibraryUITests` run after the hooks (fresh copy, iOS 27.0): add-host/placeholder,
+  appearance, favorites and the consolidation case **passed**; `testSearchFiltersRows` was
+  interrupted mid-run by the test runner restarting ("Restarting after unexpected exit, crash, or
+  test timeout" while waiting for `host-editor-save`, no assertion, no app crash report for the
+  simulator) and **passed on an immediate solo re-run (32.5 s)**. Treated as runner flakiness; the
+  test is unchanged from the version that passed every earlier run.
+- **Not mine, for the coordinator:** five `GlassPowerTools` crash reports between 18:04 and 18:22
+  (`~/Library/Logs/DiagnosticReports`, some under `Retired/`) are all the **macOS** app —
+  `EXC_BAD_ACCESS` in `CoreFoundation ___CFBasicHashFindBucket_Linear ← CFDictionaryGetValue ←
+  AppKit _accessibilityFindRoleFromProtocol ← SwiftUI AccessibilityNode.resolvedRole` — while an
+  accessibility client walks the tree, with no frame from GlassShell/GlassLayers/GlassTerminal in
+  the faulting thread. I ran no macOS builds or tests; these coincide with another worker's macOS
+  UI-test runs. Same signature five times, so it is reproducible there and worth a look by whoever
+  owns the macOS runs (possibly an AX role lookup on a SwiftUI element from the terminal move).

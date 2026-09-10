@@ -51,12 +51,12 @@ public final class GlassTerminalRuntime {
     /// `SettingsManager` so no second material system exists.
     public let layers: GlassLayerStore
 
-    public init(layers: GlassLayerStore? = nil) {
+    public init(layers: GlassLayerStore? = nil, windowRecovery: GlassWindowRecoveryManager? = nil) {
         let layers = layers ?? GlassLayerStore()
         self.layers = layers
         sessionManager = SessionManager(loadImmediately: false)
         settingsManager = SettingsManager(loadImmediately: false, layers: layers)
-        windowRecoveryManager = WindowRecoveryManager()
+        windowRecoveryManager = windowRecovery ?? GlassWindowRecoveryManager()
     }
 
     /// Connect to the saved server whose id is the shell's endpoint id. Consumed by the bootstrap.
@@ -140,6 +140,25 @@ public final class GlassTerminalCapability: GlassCapability {
         } else {
             runtime.setupRequest = .init(host: host, service: service)
         }
+    }
+
+    // MARK: Shell hooks
+
+    public var settingsPages: [GlassCapabilitySettingsPage] {
+        let runtime = self.runtime
+        return GlassTerminalSettingsPages.all.map { page in
+            GlassCapabilitySettingsPage(id: page.id, title: page.title, systemImage: page.systemImage) {
+                page.view(runtime: runtime)
+            }
+        }
+    }
+
+    public func libraryToolbarItems() -> AnyView {
+        AnyView(GlassTerminalLibraryToolbar(runtime: runtime))
+    }
+
+    public func serviceDetailActions(service: HostServiceLink, host: HostProfile) -> AnyView {
+        AnyView(GlassTerminalServiceActions(runtime: runtime, service: service, host: host))
     }
 }
 

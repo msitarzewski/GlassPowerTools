@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import GlassShell
 import GlassLayers
 
 public struct GlassTerminalScenes: Scene {

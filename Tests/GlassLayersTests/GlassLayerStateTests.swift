@@ -64,6 +64,16 @@ struct GlassLayerStateTests {
         #expect(GlassLayerResolution.resolve(clear, reduceTransparency: false) == clear)
     }
 
+    @Test("A self-painting surface skips the theme layer unless Reduce Transparency is on")
+    func paintsThemeOptOut() {
+        let themed = GlassLayerState(opacity: 0.6, frost: 0.4, material: .thin, paintsTheme: true)
+        let optedOut = GlassLayerResolution.resolve(themed, reduceTransparency: false, paintsTheme: false)
+        #expect(optedOut.effectiveOpacity == 0)
+        #expect(optedOut.frost == 0.4 && optedOut.material == .thin)
+        #expect(GlassLayerResolution.resolve(themed, reduceTransparency: false, paintsTheme: true) == themed)
+        #expect(GlassLayerResolution.resolve(themed, reduceTransparency: true, paintsTheme: false).effectiveOpacity == 1)
+    }
+
     @Test("Material raw values are the strings glas.sh persists")
     func materialRawValues() {
         #expect(GlassLayerMaterial.allCases.map(\.rawValue) == ["ultraThin", "thin", "regular", "thick"])

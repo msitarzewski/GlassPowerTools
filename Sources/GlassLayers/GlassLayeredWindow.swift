@@ -12,19 +12,24 @@ public struct GlassLayeredWindow<Content: View, Title: View, Controls: View>: Vi
 
     private let showTitle: Bool
     private let showControls: Bool
+    private let paintsTheme: Bool
     private let content: Content
     private let title: Title
     private let controls: Controls
 
+    /// - Parameter paintsTheme: false when the content paints its own theme colour (a terminal
+    ///   canvas); the window then supplies only chrome and frost, never a second theme layer.
     public init(
         showTitle: Bool = true,
         showControls: Bool = true,
+        paintsTheme: Bool = true,
         @ViewBuilder content: () -> Content,
         @ViewBuilder title: () -> Title,
         @ViewBuilder controls: () -> Controls
     ) {
         self.showTitle = showTitle
         self.showControls = showControls
+        self.paintsTheme = paintsTheme
         self.content = content()
         self.title = title()
         self.controls = controls()
@@ -47,7 +52,7 @@ public struct GlassLayeredWindow<Content: View, Title: View, Controls: View>: Vi
     }
 
     private var resolved: GlassLayerState {
-        GlassLayerResolution.resolve(layers.state, reduceTransparency: reduceTransparency)
+        GlassLayerResolution.resolve(layers.state, reduceTransparency: reduceTransparency, paintsTheme: paintsTheme)
     }
 
     private var layered: some View {
@@ -60,8 +65,8 @@ public struct GlassLayeredWindow<Content: View, Title: View, Controls: View>: Vi
 }
 
 public extension GlassLayeredWindow where Title == EmptyView, Controls == EmptyView {
-    init(@ViewBuilder content: () -> Content) {
-        self.init(showTitle: false, showControls: false, content: content, title: { EmptyView() }, controls: { EmptyView() })
+    init(paintsTheme: Bool = true, @ViewBuilder content: () -> Content) {
+        self.init(showTitle: false, showControls: false, paintsTheme: paintsTheme, content: content, title: { EmptyView() }, controls: { EmptyView() })
     }
 }
 
@@ -110,7 +115,18 @@ struct GlassLayerBackground: View {
 /// as glassDT already does for its desktop canvas.
 public enum GlassLayerResolution {
     public static func resolve(_ state: GlassLayerState, reduceTransparency: Bool) -> GlassLayerState {
-        guard reduceTransparency else { return state }
-        return GlassLayerState(opacity: 1, frost: 1, material: state.material, paintsTheme: true)
+        resolve(state, reduceTransparency: reduceTransparency, paintsTheme: true)
+    }
+
+    /// A surface that paints its own theme opts out of the layer's theme paint; Reduce
+    /// Transparency still wins, because an opaque window is an accessibility promise.
+    public static func resolve(_ state: GlassLayerState, reduceTransparency: Bool, paintsTheme: Bool) -> GlassLayerState {
+        if reduceTransparency {
+            return GlassLayerState(opacity: 1, frost: 1, material: state.material, paintsTheme: true)
+        }
+        guard paintsTheme else {
+            return GlassLayerState(opacity: state.opacity, frost: state.frost, material: state.material, paintsTheme: false)
+        }
+        return state
     }
 }
