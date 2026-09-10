@@ -114,8 +114,11 @@ draws the shell boundary; it is what glassDT already is (`GlassDesktopCore` + `G
 | Citadel, swift-nio-ssh | vendored copy | vendored copy | — |
 
 One graph resolves each of these once. swift-crypto 3 → 4 is a major bump for glassdb's SSH tunnel
-and database drivers; whether mysql-nio (a fork) and postgres-nio 1.33 build against swift-crypto 4
-and swift-nio 2.102 is **the first thing Stage 3 must check**, before any file moves.
+and database drivers. **Checked 2026-09-10 with a throwaway package in the session scratchpad:**
+`mysql-nio` at `6948987` and `postgres-nio` (resolved 1.33.1) resolve and build on the macOS host
+together with swift-crypto 4.5.2 and swift-nio 2.102.0 (plus nio-ssl 2.37.4, transport-services
+1.28.0). Stage 3 is not blocked on dependency resolution; device-platform builds are checked when
+`GlassDBKit` moves in.
 
 **The two vendored SSH stacks are not the same code.** `Packages/Citadel` differs in 45 entries
 between glas.sh and glassdb and `Packages/swift-nio-ssh` in 52, including source files
