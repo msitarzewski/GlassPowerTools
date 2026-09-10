@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4C1FEBDB30535A73008A7EA7 /* GlassTerminal in Frameworks */ = {isa = PBXBuildFile; productRef = 6A000000000000000000AB65 /* GlassTerminal */; };
 		6A000000000000000000AB41 /* Mac Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6A000000000000000000AB40 /* Mac Assets.xcassets */; };
 		6A000000000000000000AB63 /* GlassShell in Frameworks */ = {isa = PBXBuildFile; productRef = 6A000000000000000000AB61 /* GlassShell */; };
 		6A000000000000000000AB64 /* GlassLayers in Frameworks */ = {isa = PBXBuildFile; productRef = 6A000000000000000000AB62 /* GlassLayers */; };
@@ -113,6 +114,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4C1FEBDB30535A73008A7EA7 /* GlassTerminal in Frameworks */,
 				6A000000000000000000AB63 /* GlassShell in Frameworks */,
 				6A000000000000000000AB64 /* GlassLayers in Frameworks */,
 			);
@@ -246,12 +248,12 @@
 					6A000000000000000000AB10 = {
 						CreatedOnToolsVersion = 27.0;
 					};
-					6A000000000000000000AC03 = {
-						CreatedOnToolsVersion = 27.0;
-					};
 					6A000000000000000000AB50 = {
 						CreatedOnToolsVersion = 27.0;
 						TestTargetID = 6A000000000000000000AB10;
+					};
+					6A000000000000000000AC03 = {
+						CreatedOnToolsVersion = 27.0;
 					};
 				};
 			};
