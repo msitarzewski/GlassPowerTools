@@ -44,3 +44,11 @@
   one Swift 6.4 graph. Stage 1 fanned out to three workers with exclusive ownership: project file
   (`GlassPowerTools.xcodeproj`, `App/`, `Platforms/macOS/`, `UITests/`), `Sources/GlassLayers`,
   `Sources/GlassShell`. Each writes its own task note here. D1 Git actions still await the user.
+- 2026-09-10: On the user's instruction: GlasSecretStore's uncommitted RDP credential work
+  committed (`aa1b3f1`), GlassConnectionKit put under version control (`d48a5ff`), this project
+  initialised on `main`. The one-module-per-capability carve for Stages 2 and 3 approved; see
+  [groundwork](2026-09-10_stage-2-3-groundwork.md) and [decisions](../../decisions.md).
+- 2026-09-10: Carve refined on the user's instruction: engines (`GlassSSHTransport` extracted from
+  glas.sh with tunnel and SFTP APIs for every capability; `GlassDBKit`; RDP/VNC kits) are
+  first-class shared modules; each app's UI/session layer is one capability module. Capabilities
+  never depend on each other. Recorded in [decisions](../../decisions.md).

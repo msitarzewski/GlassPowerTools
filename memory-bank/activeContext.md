@@ -105,9 +105,10 @@ The user approved the Stage 1 plan and authorized building **Stages 1 through 5 
 function, unit, UI-automation and security testing, using parallel agents, then a sweep for TODOs
 and stubs. Decisions D2–D6 are taken at their proposals (transparent-first layers with frost and
 legacy-key migration; reuse glas.sh's iCloud KVS identifier; drop the three URL schemes; display
-name "Glass Power Tools"; `GlassEditorUI` waits for Stage 5). **D1's Git actions in sibling
-repositories remain unauthorized until the user says so explicitly**; P3 (sibling test suites) is
-running. The user notes glas.sh has an unmerged PR; local source is authoritative for this work.
+name "Glass Power Tools"; `GlassEditorUI` waits for Stage 5). **D1 executed on the user's explicit
+instruction**: GlasSecretStore committed (`aa1b3f1`), GlassConnectionKit initialised (`d48a5ff`),
+this project initialised on `main`. P3 passed: GlasSecretStore 90 tests, GlassConnectionKit 21.
+The one-module-per-capability carve is approved. The user notes glas.sh has an unmerged PR; local source is authoritative for this work.
 
 Toolchain observed: Xcode 27.0 (27A5252f), Swift 6.4. Simulators: iPhone 17 family on iOS 27.0,
 Apple Vision Pro on visionOS 26.4 / 26.5 / 27.0. Physical: iPhone 17 Pro Max (iOS 27.0), Vision
@@ -115,6 +116,14 @@ Pro (visionOS 27.0), Mac (macOS 27.0). One Apple Development signing identity.
 
 Coordinator `/root` owns this file, progress, toc, decisions and the monthly README. Workers own
 the directories named in their briefs and write their own task notes under `tasks/2026-09/`.
+
+## Stage 1 modules landed — 2026-09-10
+
+All three workers reported and their output is committed (`7f4d521` shell, `cb8a84b` layers,
+`GlassPowerTools.xcodeproj` after). GlassShell 10 tests, GlassLayers 21 tests, iOS and visionOS
+simulator builds green, iOS launch smoke UI test green. **macOS is blocked on signing only:** the
+iCloud KVS entitlement (D3) needs the iCloud capability enabled once on App ID
+`com.glasspowertools` — user action. App Group and Keychain group sign fine on macOS.
 
 ## Next action
 

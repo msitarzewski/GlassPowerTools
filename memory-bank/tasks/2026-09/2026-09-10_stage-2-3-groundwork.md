@@ -72,7 +72,16 @@ Plus `Platforms/macOS/` (5,663 lines: `MacWorkspace*`, `MacTerminalOverview`,
 4. `SettingsView`/`SettingsManager` in each app merge into the shell's one settings surface as
    capability pages; the *models* behind them move with the capability.
 
-## Proposed carve — one module per capability, not three
+## Carve — engines first-class, one capability module per app (refined by the user 2026-09-10)
+
+**The user's requirement:** the other capabilities must be able to use the SSH transport, SFTP and
+tunnelling as first-class integrations. Therefore the transport is extracted as a shared engine
+module in Stage 2 — `GlassSSHTransport` — with a public API built for the terminal, the database
+tunnel, the desktop tunnel and the editor's SFTP at once. The single-module simplification below
+applies to the capability (UI and session) layer only. Full decision in
+[decisions](../../decisions.md).
+
+### The original single-module reasoning, kept for the capability layer
 
 The Stage 1 note said "carve glas.sh into terminal, SFTP, port forwarding, workgroups, SSH
 transport". The maps argue for something simpler and safer:
@@ -124,3 +133,51 @@ Stage 1 lands first. Then, with the user's nod on the one-module carve: Stage 2 
 `Sources/GlassTerminal` and moving glas.sh's files in verbatim, adding `Packages/Citadel` and
 `Packages/swift-nio-ssh` from glas.sh, then making the scene and capability types public and
 compiling until green — no behaviour edits until it builds.
+
+## The SSH transport surface, located (read 2026-09-10)
+
+Only four glas.sh files import Citadel or NIO: `Models.swift`, `PortForwardManager.swift`,
+`SFTPBrowserView.swift`, `SettingsManager.swift`. Citadel API used, by count: `SSHClient` 17,
+`SFTPClient` 16, `SFTPPathComponent` 10, `SFTPFile`/`SFTPFileAttributes` 6 each,
+`SSHHostKeyValidator` 4, `NIOSSHPrivateKey` 4, `createDirectTCPIPChannel` 4,
+`SSHAuthenticationMethod` 3, `withPTY`/`TTYStdinWriter`/`openSFTP`/`executeCommand` 1 each.
+
+**glas.sh already has a transport abstraction**, in `Models.swift`:
+`SSHTransportIdentity` (:1852), `SSHTransportOwnership` (:1890), `SharedSSHTransport` (:1909),
+`SSHConnection` (:1937), `SSHError` (:2781) — roughly lines 1852–2842 — plus the trust and auth
+model above it: `HostKeyVerificationMode` (:26), `TrustedHostKeyEntry` (:31),
+`AuthenticationMethod` (:43), `HostKeyTrustChallenge` (:248), `HostKeyTrustRequiredError` (:266),
+`SessionAuthenticationMaterial` (:370), `PreparedServerAuthentication` (:375),
+`SessionConnectionPreparation` (:380), `PortForward` / `ForwardType` (:1224), `TunnelStatus`
+(:1216). `TerminalSession` (:418–1117) is a consumer of it. `PortForwardManager.swift` (1,176
+lines) is the tunnel engine: direct-TCP/IP channels and a full SOCKS5 proxy with a connection
+limiter. `SFTPBrowserView.swift` drives `SFTPClient` inline from a 5,813-line view; the SFTP
+*service* the editor needs is extracted from there.
+
+**glassdb's consumer contract today** (`GlassDBKit/SSHTunnelManager.swift`, 539 lines):
+`SSHTunnelConfig { sshHost, sshPort, sshUsername, sshPassword?, sshPrivateKey?, sshKeyPassphrase?,
+remoteHost, remotePort, trustedHostKeys: Set<Data>, algorithmPolicy }` →
+`SSHTunnelManager().establish(config) async throws -> SSHTunnel` with `.localPort` and `.close()`,
+called from `DatabaseSessionManager.swift:135-186, 307-310`. It carries its own
+`SSHHostKeyChallenge` / `SSHHostKeyTrustRequiredError`, duplicating glas.sh's
+`HostKeyTrustChallenge`. **It passes raw passwords and private keys as `String`s.**
+
+### `GlassSSHTransport` public API — drawn from those consumers (proposal for the Stage 2 brief)
+
+- `SSHEndpoint { host, port, username, jump: [SSHEndpoint] }` and `SSHCredentialReference`
+  (a `CredentialID` resolved through GlasSecretStore at connect time — **no raw secret strings
+  cross the API**, fixing glassdb's contract).
+- `SSHHostTrust` — one challenge type for the whole app, backed by `SSHHostTrustKeychainStore`;
+  the caller supplies a `HostTrustDecider` (UI prompt) and never a raw `trustedHostKeys` set.
+- `actor SSHTransport` (from `SharedSSHTransport`): `connect()`, shared per host identity,
+  reference-counted ownership as today.
+- `openShell(pty:) -> SSHShellChannel` (terminal), `openSFTP() -> SFTPSession` (editor and SFTP
+  browser: list/stat/read/write/rename/remove with streaming and cancellation),
+  `forward(local: port?, to remoteHost:remotePort) -> SSHTunnel { localPort, close() }` (database
+  and desktop), remote forwarding and SOCKS5 as today (`PortForwardManager` moves in whole).
+- Tests: state machine and trust decisions as unit tests; a real-server integration suite gated on
+  an environment variable naming a host the user owns, recorded as not run when absent.
+
+`GlassTerminal` keeps `TerminalSession`, recording, workgroups and every view; it imports
+`GlassSSHTransport`. `GlassDatabase` replaces `SSHTunnelManager` with `forward`. The desktop
+capability's VNC-over-SSH in Stage 5 is the same call.

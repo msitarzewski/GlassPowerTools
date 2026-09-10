@@ -112,3 +112,52 @@ never edits `project.pbxproj`. XcodeGen is not used.
 
 **Supersedes** the merge plan's original wording "an application target per platform", which was
 inherited from glassDT without a decision having been taken.
+
+## Approved — engines are first-class shared modules; one capability module per app (2026-09-10)
+
+**Status: Approved by the user on 2026-09-10 and refined the same day on the user's instruction
+("first-class integrations, not hacks"). Not implemented.**
+
+Two layers, and the rule that capabilities never depend on each other holds between them:
+
+**Engines** — shared modules with public APIs, no UI, no dependency on the shell:
+- `GlassSSHTransport`, extracted from glas.sh in Stage 2: connection, host trust through
+  GlasSecretStore, authentication, PTY channel, **SFTP client**, **local and remote port
+  forwarding with a tunnel API**. Designed from the first commit for four consumers: the terminal
+  (shell channel), the database capability (tunnel), the desktop capability (tunnel for VNC and
+  RDP), and the editor (SFTP file operations). The dependency map locates it: the SSH types in
+  `Models.swift`, `SessionManager`, `PortForwardManager` and `ServerManager`.
+- `GlassDBKit`, already a package. Its `SSHTunnelManager` over glassdb's older vendored Citadel is
+  replaced by `GlassSSHTransport`'s tunnel API; there is one SSH stack.
+- `RDPKit`, `VNCKit`, `GlassRDPTransport`, `GlassVNCTransport`, already packages.
+
+**Capabilities** — one module per source application, every file's `internal` access kept, only
+capability registration, scene views and settings pages made `public`: `GlassTerminal` (glas.sh
+minus the transport), `GlassDatabase` (glassdb minus the tunnel), `GlassDesktopCore` and
+`GlassDesktopUI` (already this shape), the editor interface in Stage 5. Each depends on the shell
+and on engines; none on another capability.
+
+This is what makes the Stage 5 integrations real rather than bolted on: VNC over SSH is the desktop
+capability calling `GlassSSHTransport.forward`; the editor over SFTP is the editor calling the same
+module's SFTP client; the spatial workspace composes capabilities through the shell.
+
+Evidence in the [Stage 2/3 groundwork](tasks/2026-09/2026-09-10_stage-2-3-groundwork.md). The
+earlier five-way UI split of glas.sh (terminal, SFTP browser, port-forwarding UI, workgroups) stays
+deferred: those are presentation layers over one engine and can be separated later inside a
+building app.
+
+**Supersedes** the Stage 2 wording "carve glas.sh into terminal, SFTP, port forwarding, workgroups,
+SSH transport" in the merge plan and the Stage 1 note.
+
+## Approved and done — version control for the inputs and this project (2026-09-10)
+
+**Status: Executed on the user's explicit instruction, 2026-09-10.**
+
+- `../GlasSecretStore`: the 12 uncommitted files (RDP credential store, synchronizable-Keychain
+  lifecycle, provenance and notes) committed on `codex-completions` as `aa1b3f1`. Tree clean.
+- `../GlassConnectionKit`: initialised on `main`, 47 files, initial commit `d48a5ff`.
+- This project: initialised on `main` with the guide, Memory Bank, session log and package
+  skeleton. Worker output is committed as it lands.
+
+Commit messages carry co-author attribution and no session URLs, per the user's global rules.
+
