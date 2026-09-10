@@ -46,6 +46,13 @@ separate applications cannot compose that way.
   a later polish pass.
 - One library, one settings surface, one credential store, one window and navigation model.
 
+## Requirements added during the build
+
+- **2026-09-10 — choose a key file, not only paste.** SSH private-key import (settings SSH-keys page
+  and the server form) must offer a file picker in addition to the pasted-text box, reading the
+  chosen file through the same import path; the file's path and contents are never persisted
+  outside the credential store. Owner: Stage 2 W3.
+
 ## Non-goals
 
 - Matching competitors feature for feature inside any single capability. Depth is chosen for what a

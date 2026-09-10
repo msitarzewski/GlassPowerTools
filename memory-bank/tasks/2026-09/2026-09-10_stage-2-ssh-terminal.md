@@ -85,6 +85,13 @@ public protocol SFTPSession { list/stat/read(stream)/write(stream)/rename/remove
 Sequencing: W1 and W2 start together; W2 moves files and fixes everything except transport calls
 first, then switches to W1's API. W3, security and integration follow.
 
+## Requirement added 2026-09-10
+
+Choose an SSH key **file** instead of pasting (user). Evidence of the current state:
+`Sources/GlassTerminal/SettingsView.swift:1741` (`TextEditor` paste) → `SettingsManager.swift:708`
+`addSSHKey`; existing family pickers to reuse: `NSOpenPanel` at `SettingsView.swift:1665`,
+`.fileImporter` at `SFTPBrowserView.swift:586`. Assigned to W3; added to the parity checklist.
+
 ## Parity checklist (what "done" means)
 
 Connect to a real host over password and key auth with host-trust prompt; terminal I/O, resize,
