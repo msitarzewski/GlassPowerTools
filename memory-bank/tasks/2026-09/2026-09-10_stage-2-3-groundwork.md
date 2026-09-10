@@ -162,6 +162,18 @@ called from `DatabaseSessionManager.swift:135-186, 307-310`. It carries its own
 `SSHHostKeyChallenge` / `SSHHostKeyTrustRequiredError`, duplicating glas.sh's
 `HostKeyTrustChallenge`. **It passes raw passwords and private keys as `String`s.**
 
+**Consumer matrix — each row is a first-class dependency on the engine's public API, never on
+another capability (user's instruction, 2026-09-10):**
+
+| Engine service | Terminal | Database | Desktop (RDP/VNC) | Editor |
+|---|---|---|---|---|
+| Shell channel (PTY) | uses | — | — | — |
+| **SFTP session** | SFTP browser | — | — | **open / save remote files** |
+| **Port forwarding / tunnel** | port-forward UI, SOCKS5 | **DB over SSH tunnel** | **VNC and RDP over SSH tunnel** | — |
+| Host trust + credential resolution | uses | uses | uses | uses |
+| `GlassDBKit` (database engine) | — | uses | — | SQL documents in Stage 5 |
+| `RDPKit` / `VNCKit` | — | — | uses | — |
+
 ### `GlassSSHTransport` public API — drawn from those consumers (proposal for the Stage 2 brief)
 
 - `SSHEndpoint { host, port, username, jump: [SSHEndpoint] }` and `SSHCredentialReference`

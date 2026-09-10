@@ -137,6 +137,18 @@ minus the transport), `GlassDatabase` (glassdb minus the tunnel), `GlassDesktopC
 `GlassDesktopUI` (already this shape), the editor interface in Stage 5. Each depends on the shell
 and on engines; none on another capability.
 
+**Consumer matrix — each row is a first-class dependency on the engine's public API, never on
+another capability (user's instruction, 2026-09-10):**
+
+| Engine service | Terminal | Database | Desktop (RDP/VNC) | Editor |
+|---|---|---|---|---|
+| Shell channel (PTY) | uses | — | — | — |
+| **SFTP session** | SFTP browser | — | — | **open / save remote files** |
+| **Port forwarding / tunnel** | port-forward UI, SOCKS5 | **DB over SSH tunnel** | **VNC and RDP over SSH tunnel** | — |
+| Host trust + credential resolution | uses | uses | uses | uses |
+| `GlassDBKit` (database engine) | — | uses | — | SQL documents in Stage 5 |
+| `RDPKit` / `VNCKit` | — | — | uses | — |
+
 This is what makes the Stage 5 integrations real rather than bolted on: VNC over SSH is the desktop
 capability calling `GlassSSHTransport.forward`; the editor over SFTP is the editor calling the same
 module's SFTP client; the spatial workspace composes capabilities through the shell.
