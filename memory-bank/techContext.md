@@ -182,6 +182,15 @@ migration is guaranteed only for keys already in the App Group suite or this app
 best-effort on the Mac, and otherwise falls back to the D2 default. Do not promise that a user's
 current look carries over.
 
+## Test hosts (user-provided, 2026-09-10)
+
+| Purpose | Host | User | Auth | Verified |
+|---|---|---|---|---|
+| SSH / SFTP / tunnel integration tests | `192.0.2.6` (Parallels scratch VM, Linux 7.0.0-29-generic) | `michael` | ED25519 key at `~/.ssh/scratch_vm` | `echo ok` over BatchMode SSH; `Subsystem sftp /usr/lib/openssh/sftp-server`; no `AllowTcpForwarding` restriction |
+
+Environment for the gated tests: `GPT_SSH_TEST_HOST=192.0.2.6 GPT_SSH_TEST_USER=michael
+GPT_SSH_TEST_KEY_PATH=$HOME/.ssh/scratch_vm`. Never record key material or passwords here.
+
 ## Security posture to carry forward
 
 - RDP pins the server certificate; the flow is implemented and tested.

@@ -212,6 +212,18 @@ Not run means not run. A simulator build is not a device result.
 | The shell grows capability assumptions because there is no capability to push back | Keep 1.5–1.7 honest: placeholders say so, nothing simulates a session |
 | The three legacy layer key sets are migrated wrongly and a user's look changes | Migration tests per key set, with the three defaults as fixtures |
 
+## Follow-ups found while testing (not Stage 1 blockers)
+
+- **visionOS search is not reachable by accessibility.** `GlassConnectionUI`'s `.searchable` on
+  the visionOS `TabView` navigation exposes no search-field element, so `testSearchFiltersRows` is
+  skipped there with a stated reason (verified on iOS and macOS). This is a kit-level VoiceOver gap
+  on the platform that leads the design; fix in `../GlassConnectionKit` when the kit is next opened
+  for changes, and un-skip the test.
+- **visionOS in-test screenshots are 1×1** (XCUIScreen on the visionOS simulator). Visual evidence
+  on visionOS is taken with `simctl io screenshot` outside the test.
+- **Slider drags cannot be synthesized** on the visionOS simulator or macOS; the Appearance
+  persistence test uses the theme toggle everywhere and the slider on iOS only.
+
 ## Exit criteria
 
 1. Builds and runs on Mac, iPhone and Vision Pro from one target.

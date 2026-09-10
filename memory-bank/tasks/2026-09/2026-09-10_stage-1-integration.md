@@ -2,7 +2,7 @@
 
 Worker: integration worker (fork of `/root`), 2026-09-10. Owned `App/`, `UITests/`; edited
 `Sources/GlassShell` and `Sources/GlassLayers` only for the security-review fixes. No Git changes.
-**Status: integrated; simulators and Mac verified; physical devices blocked on provisioning.**
+**Status: integrated and unit-verified; UI results superseded by coordinator runs on `17e79be`; physical devices and the Mac's shared container blocked on provisioning.**
 
 ## 1. App entry point — done
 
@@ -24,7 +24,7 @@ only asserts the process reaches the foreground and the main window exists.
 | visionOS Simulator, Apple Vision Pro (OS 27.0) | **BUILD SUCCEEDED** |
 | macOS, with the build-time `noKVS.xcconfig` override (project untouched; the iCloud KVS entitlement waits for the capability on the App ID) | **BUILD SUCCEEDED**, signed Apple Development, team 7JQGQ7CRH8 |
 | `swift test`, whole package, before fixes | GlassShellTests **10 passed**, GlassLayersTests **21 passed** |
-| `swift test`, whole package, after fixes (§7) | GlassShellTests **15 passed** (1 suite + the new "security fixes" suite), GlassLayersTests **22 passed** (3 suites) — **37 total, 0 failed** |
+| `swift test`, whole package, after fixes (§7, §8) | GlassShellTests **18 passed** (3 suites), GlassLayersTests **22 passed** (3 suites) — **40 total, 0 failed** |
 
 ## 4. Running — simulators and Mac
 
@@ -32,7 +32,7 @@ only asserts the process reaches the foreground and the main window exists.
 |---|---|---|
 | iOS Simulator | Yes; library renders the family scopes (All / Favorites / Recent, `+`, gear) | `scratchpad/shots/ios-library-empty.png` |
 | visionOS Simulator | Yes; glass window with the scope ornament, "No Connections" sidebar, "Your Hosts" empty state with Add Host | `scratchpad/shots/vision-library-empty.png` |
-| macOS | Yes, process runs from `dd-mac/Build/Products/Debug/GlassPowerTools.app`. **Sandboxed** (`com.apple.security.app-sandbox = true` in the signed entitlements), so the layers legacy bundle-domain suites are correctly skipped (F5). `screencapture` from the CLI was refused ("could not create image from display": no Screen Recording grant for the shell), so Mac screenshots come from the UI test runner (`mac-*.png`) instead | see §6 |
+| macOS | Yes, process runs from `dd-mac/Build/Products/Debug/GlassPowerTools.app`, idle at 0% CPU. **Sandboxed** (`com.apple.security.app-sandbox = true` in the signed entitlements), so the layers legacy bundle-domain suites are correctly skipped (F5). `screencapture` from the CLI was refused (no Screen Recording grant for the shell), so Mac screenshots come from the UI test runner (`mac-*.png`) | see §6 and §8 |
 
 Only simulator log noise was observed (a GameController kext dlopen on iOS, RealityKit
 profiling lines on visionOS); nothing from our process.
@@ -43,7 +43,7 @@ profiling lines on visionOS); nothing from our process.
 |---|---|
 | iPhone 17 Pro Max (iOS 27.0) | **Build failed at provisioning**, not code: "No Accounts" from the CLI; the automatic "iOS Team Provisioning Profile: *" lacks App Groups, the `group.sh.glas.shared` group, iCloud, and this device. Stopped, per brief. |
 | Vision Pro (visionOS 27.0) | Same provisioning failure, same profile. Stopped. |
-| Mac | Runs. **The 1.8 check cannot be proven on this Mac**: `~/Library/Group Containers/group.sh.glas.shared/` exists but is **empty** — no `GlassHostCatalog/hosts.json` anywhere under `~/Library`, even though glas.sh (2026-09-05), glassdb (2026-09-04) and glassDT (2026-09-10) are installed with the App Group. None of the three has written a catalog on this machine. So the merged app correctly shows an empty library here, and "existing hosts appear" can only be demonstrated on the iPhone or Vision Pro once provisioning exists. The real container was read-only observed; nothing was written to it. |
+| Mac | Runs, but **the 1.8 check is unproven here, and the reason is provisioning, not code.** Probed through the sandboxed app itself against the real container (a throwaway UI test, since deleted; nothing written): it alerts *"The host library could not be read: You don't have permission to save the file "GlassHostCatalog" in the folder "group.sh.glas.shared"."* and shows 0 hosts. The build is signed with the wildcard "Mac Team Provisioning Profile: *", which grants no App Group; `/Applications/glas.sh.app` carries "Mac Team Provisioning Profile: sh.glas.app" whose profile *does* grant `group.sh.glas.shared`, and `/Applications/glassDT.app` carries the same wildcard profile as ours — so glassDT on this Mac cannot reach the shared catalog either (family-level finding). My earlier observation that the container was "empty" was my shell being denied by TCC (`ls` → "Operation not permitted"), not the container's contents; retracted. |
 
 **What unblocks devices (user action):** register `com.glasspowertools` with App Groups
 (`group.sh.glas.shared`) and iCloud in Xcode's Signing & Capabilities with the account signed in,
@@ -62,7 +62,30 @@ than ten minutes at the next isolated launch, because the runner cannot reach th
 Search targets `app.searchFields.firstMatch` — the kit owns `.searchable` and its prompt, so
 `connection-library-search` was not added anywhere (no kit edit).
 
-UI_RESULTS_PLACEHOLDER
+**Results actually observed by this worker** (all runs against commit-in-progress sources; the
+coordinator's runs on `17e79be` supersede these):
+
+| Platform | Run | Outcome |
+|---|---|---|
+| iOS Simulator | Concurrent rerun, before the §8 test fixes | `testAppearanceOpacityPersistsAcrossRelaunch`, `testFavoriteAppearsInFavoritesScope`, `testSearchFiltersRows` **passed**; `testAddHostAddServiceConnectPlaceholder` failed at the row-icon assertion (iPhone stays on the detail; fixed by accepting the detail's Connect); smoke failed because it still asserted the removed placeholder (rewritten). Screenshots `ios-01,02,05,06,07,08`. |
+| visionOS Simulator | Concurrent rerun, before the §8 test fixes | All four library tests failed at platform differences (placeholder Done unreachable, slider not synthesizable, scopes are tab titles, no search-field element); smoke failed for the same placeholder reason. Screenshots `vision-01..05` show add host, detail, service icon, placeholder and favorite rendering correctly. |
+| macOS | Alone, on the code with the F1–F7 fixes but before `press()`/`click()` | Smoke **passed**; the four library tests failed because `tap()` does not drive SwiftUI buttons on macOS (probe: `click()` opens the sheet in under 1 s) and ⌘N opened a second window (fixed in the app). |
+| macOS, iOS, visionOS | Final rerun with every §8 fix | **Not observed**: the macOS leg failed to start (my script passed `-xcconfig` as one quoted token), and the simulator legs were stopped on the coordinator's stand-down before finishing. Superseded by coordinator runs. |
+
+## 8. Defects found by running, and their fixes
+
+| Defect | Evidence | Fix |
+|---|---|---|
+| Sandbox-refused shared container alerted on every launch instead of degrading | Mac probe alert above; unit-reproducible with a read-only parent directory | `GlassShellModel.load()` recognises a permission denial from the kit (`fileLockFailed(EACCES/EPERM)` or Cocoa no-permission) on the *shared* path, switches to the private catalog, sets `hasSharedContainer = false` and a `hostLibraryStatus` naming the missing entitlement grant; no alert. Test: read-only group dir → no `errorMessage`, status says "not allowed", hosts land locally, nothing created in the group dir |
+| First run on an empty or absent shared container | Suspected, then disproved | Two tests added (empty existing container → 0 hosts, no error; absent container → created on first write). Both pass; the kit creates the directory inside its lock |
+| macOS UI tests could not open any sheet | `XCUIElement.tap()` compiles on macOS but does not drive SwiftUI buttons; a probe with `click()` opened the sheet within 1 s | Test helper `press(_:)` uses `click()` on macOS |
+| ⌘N opened a **second library window** on macOS | Probe: `windows=2` after ⌘N | App uses `Window("Connections", id: "main")` on macOS and visionOS as glas.sh does (iOS keeps `WindowGroup`), and replaces the `.newItem` command group as glas.sh does (`glas_shApp.swift:79`) so ⌘N is Add Host |
+| Placeholder's Done button unreachable on visionOS | `placeholder-session` found, `placeholder-done` not; an identified `ContentUnavailableView` is one element there | Done moved to the sheet toolbar (`confirmationAction`), the pattern the host editor already uses successfully on visionOS |
+| Slider drags cannot be synthesized on the visionOS simulator or macOS | "Failed to synthesize event" | Appearance test uses the theme toggle as the persisted change everywhere and the slider on iOS only |
+| visionOS scopes are tab titles, not `glass-library-scope-*` | Kit's `visionNavigation` is a `TabView` over All/Favorites/Recent/Collections | Test selects scopes by tab title on visionOS |
+| iPhone stays on the detail after adding a service, where the row icon is off screen | iOS failure at the `host-service-ssh` assertion | Test accepts the detail's `host-service-connect-ssh` as evidence |
+| `simctl diagnose` after failures made both simulator runs look hung (7–8 min at 0% CPU) | `ps` showed `simctl diagnose --timeout=600` children | Runs were killed and repeated; note it, do not wait on it |
+| UI test case with `@MainActor` and synchronous `setUp`/`tearDown` | Swift 6 "sending 'self' risks causing data races" on all platforms | Async overrides with `MainActor.run` |
 
 ## 7. Security-review fixes applied (`2026-09-10_stage-1-security-review.md`)
 

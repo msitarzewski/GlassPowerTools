@@ -125,6 +125,30 @@ simulator builds green, iOS launch smoke UI test green. **macOS is blocked on si
 iCloud KVS entitlement (D3) needs the iCloud capability enabled once on App ID
 `com.glasspowertools` — user action. App Group and Keychain group sign fine on macOS.
 
+## Stage 1 integration state — 2026-09-10, commit `17e79be`
+
+Integration, security review and fixes are committed. Verified: whole package `swift test` 37
+passed; iOS, visionOS and macOS (build-time KVS override) all build; iOS smoke UI test passes;
+macOS smoke passes when run alone. Simulator screenshots of the library, host detail, service icon,
+placeholder connect, favorites, search and Appearance are in the session scratchpad and judged by
+eye; visionOS in-test screenshots come out 1×1 (XCUIScreen limitation on the visionOS simulator),
+so visionOS visual evidence is the `simctl` shot.
+
+**Open on macOS:** the four `GlassShellLibraryUITests` interaction tests fail because synthesized
+clicks do not take effect (keystrokes do; app idles at 0 % CPU; no overlay in our composition; main
+window marked Disabled in the AX tree). A worker is finding the root cause — window activation,
+beta click synthesis, or a real product defect — with the rule that product code changes only for
+a proven defect. iOS and visionOS library suites are re-running after that worker's macOS-only probe
+briefly broke their builds.
+
+**Needs the user (both are Apple-account actions the CLI cannot do):**
+1. Enable the iCloud capability on App ID `com.glasspowertools` so macOS signs with the KVS
+   entitlement as designed (D3); until then macOS builds use `noKVS.xcconfig` at build time.
+2. Open the project in Xcode signed in, so automatic provisioning registers App Groups, iCloud and
+   the iPhone/Vision Pro devices; device installs and the 1.8 host-inheritance check wait on this.
+   On this Mac the group container `group.sh.glas.shared` exists but holds no `hosts.json` — none of
+   the three apps has written a catalog here — so 1.8 can only be shown on a device.
+
 ## Next action
 
 Lay down the package skeleton, confirm the three local packages resolve in one graph, then fan out

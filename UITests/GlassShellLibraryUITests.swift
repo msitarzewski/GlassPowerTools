@@ -60,10 +60,19 @@ final class GlassShellLibraryUITests: XCTestCase {
         app.descendants(matching: .any).matching(identifier: identifier).firstMatch
     }
 
+    /// `tap()` compiles on macOS but does not drive SwiftUI buttons there; `click()` does.
+    private func press(_ e: XCUIElement) {
+        #if os(macOS)
+        e.click()
+        #else
+        e.tap()
+        #endif
+    }
+
     private func tap(_ identifier: String, timeout: TimeInterval = 15, file: StaticString = #filePath, line: UInt = #line) {
         let e = element(identifier)
         XCTAssertTrue(e.waitForExistence(timeout: timeout), "missing \(identifier)", file: file, line: line)
-        e.tap()
+        press(e)
     }
 
     private func snap(_ name: String) {
@@ -91,15 +100,15 @@ final class GlassShellLibraryUITests: XCTestCase {
     /// iPhone shows scopes first; everything else shows results beside them.
     private func enterAllConnections() {
         let scope = scopeElement("all-connections", title: "All")
-        if scope.waitForExistence(timeout: 5) { scope.tap() }
+        if scope.waitForExistence(timeout: 5) { press(scope) }
     }
 
     private func addHost(named name: String) {
         let empty = element("connection-library-add-host-empty")
-        if empty.waitForExistence(timeout: 3) { empty.tap() } else { tap("connection-library-add-host") }
+        if empty.waitForExistence(timeout: 3) { press(empty) } else { tap("connection-library-add-host") }
         let field = element("host-editor-name")
         XCTAssertTrue(field.waitForExistence(timeout: 10))
-        field.tap(); field.typeText(name)
+        press(field); field.typeText(name)
         tap("host-editor-save")
     }
 
@@ -132,7 +141,7 @@ final class GlassShellLibraryUITests: XCTestCase {
         let picker = element("settings-sections")
         let button = picker.buttons[title].exists ? picker.buttons[title] : picker.radioButtons[title]
         XCTAssertTrue(button.waitForExistence(timeout: 5), "settings page \(title)")
-        button.tap()
+        press(button)
     }
 
     // MARK: Tests
@@ -154,7 +163,8 @@ final class GlassShellLibraryUITests: XCTestCase {
         tap("host-connect")
         let placeholder = element("placeholder-session")
         XCTAssertTrue(placeholder.waitForExistence(timeout: 10))
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'not part of this build'")).firstMatch.exists,
+        // macOS exposes static text as `value`, touch platforms as `label`.
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'not part of this build' OR value CONTAINS 'not part of this build'")).firstMatch.exists,
                       "placeholder must say the capability is absent")
         snap("04-connect-placeholder")
         tap("placeholder-done")
@@ -169,12 +179,12 @@ final class GlassShellLibraryUITests: XCTestCase {
         snap("05-favorited")
 
         #if os(iOS)
-        app.navigationBars.buttons.element(boundBy: 0).tap()   // back to results
-        app.navigationBars.buttons.element(boundBy: 0).tap()   // back to scopes
+        press(app.navigationBars.buttons.element(boundBy: 0))   // back to results
+        press(app.navigationBars.buttons.element(boundBy: 0))   // back to scopes
         #endif
         let favorites = scopeElement("favorites", title: "Favorites")
         XCTAssertTrue(favorites.waitForExistence(timeout: 10), "favorites scope")
-        favorites.tap()
+        press(favorites)
         XCTAssertTrue(element("host-row-Fav Host").waitForExistence(timeout: 10))
         snap("06-favorites-scope")
     }
@@ -183,7 +193,7 @@ final class GlassShellLibraryUITests: XCTestCase {
         addHost(named: "Searchable Host")
         #if os(iOS)
         if element("host-add-service").waitForExistence(timeout: 5) {
-            app.navigationBars.buttons.element(boundBy: 0).tap()   // detail → results
+            press(app.navigationBars.buttons.element(boundBy: 0))   // detail → results
         }
         #endif
         enterAllConnections()
@@ -200,13 +210,13 @@ final class GlassShellLibraryUITests: XCTestCase {
         }
         #endif
         XCTAssertTrue(search.waitForExistence(timeout: 10), "kit search field")
-        search.tap(); search.typeText("zzz-no-match")
+        press(search); search.typeText("zzz-no-match")
         XCTAssertFalse(element("host-row-Searchable Host").waitForExistence(timeout: 3))
         snap("07-search-no-match")
         #if os(macOS)
         search.typeKey("a", modifierFlags: .command); search.typeText(XCUIKeyboardKey.delete.rawValue)
         #else
-        if app.buttons["Clear text"].exists { app.buttons["Clear text"].tap() } else { search.doubleTap(); search.typeText(XCUIKeyboardKey.delete.rawValue) }
+        if app.buttons["Clear text"].exists { press(app.buttons["Clear text"]) } else { search.doubleTap(); search.typeText(XCUIKeyboardKey.delete.rawValue) }
         #endif
         XCTAssertTrue(element("host-row-Searchable Host").waitForExistence(timeout: 10))
     }
@@ -214,16 +224,30 @@ final class GlassShellLibraryUITests: XCTestCase {
     func testAppearanceOpacityPersistsAcrossRelaunch() {
         openSettings()
         selectSettingsPage("Appearance")
-        let paints = element("layers-paints-theme")
-        XCTAssertTrue(paints.waitForExistence(timeout: 10))
+        // Toggle is a Switch on touch platforms and a CheckBox on macOS; `.any` can match the
+        // enclosing row, so prefer the control itself.
+        let anyPaints = element("layers-paints-theme")
+        XCTAssertTrue(anyPaints.waitForExistence(timeout: 10))
+        let control = app.switches.matching(identifier: "layers-paints-theme").firstMatch
+        let box = app.checkBoxes.matching(identifier: "layers-paints-theme").firstMatch
+        let paints = control.exists ? control : (box.exists ? box : anyPaints)
         let paintsBefore = "\(paints.value ?? "")"
-        paints.tap()                                   // D2 default is off, so this turns it on
+        // D2 default is off, so this turns it on. On touch platforms the Switch element spans the
+        // whole Form row and only the trailing knob toggles, so press near the trailing edge.
+        #if os(macOS)
+        press(paints)
+        #else
+        paints.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        #endif
+        // The value updates asynchronously after the gesture; never read it synchronously.
+        let changed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in "\(paints.value ?? "")" != paintsBefore }, object: nil)
+        XCTAssertEqual(XCTWaiter().wait(for: [changed], timeout: 5), .completed, "theme toggle value changed")
         let paintsAfter = "\(paints.value ?? "")"
         XCTAssertNotEqual(paintsBefore, paintsAfter, "theme toggle changed")
         var sliderValue: String?
-        #if !os(visionOS)
-        // Slider drags cannot be synthesized on the visionOS simulator; the toggle is the
-        // persisted change there.
+        #if os(iOS)
+        // Slider drags synthesize on iOS only (visionOS simulator and macOS refuse); the toggle
+        // is the persisted change elsewhere.
         let slider = element("layers-opacity")
         XCTAssertTrue(slider.waitForExistence(timeout: 5))
         slider.adjust(toNormalizedSliderPosition: 0.6)
