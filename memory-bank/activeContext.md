@@ -169,6 +169,9 @@ each app publishes its own record per saved endpoint. `hosts.json` is not rewrit
 merge is written, tested and unwired until Stage 6. Three `GlassCapability` hooks are in the shell
 (settings pages, library toolbar items, per-service detail actions).
 
+**Stage 2 build (`410d0fc`) installed on the iPhone (launched) and the Vision Pro (installed;
+launch unconfirmed, device asleep) on 2026-09-10; the Stage 1 sibling worktree is removed.**
+
 **Stage 2 state:** `GlassSSHTransport` engine complete (61 unit tests, security review clean of
 High/Medium and all Low fixed, both July audit items confirmed resolved). glas.sh moved in as
 `GlassTerminal` (36,441 lines; 338 tests, one inherited failure; builds on all three platforms).
