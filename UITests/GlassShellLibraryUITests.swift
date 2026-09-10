@@ -235,9 +235,11 @@ final class GlassShellLibraryUITests: XCTestCase {
         // D2 default is off, so this turns it on. On touch platforms the Switch element spans the
         // whole Form row and only the trailing knob toggles, so press near the trailing edge.
         #if os(macOS)
-        press(paints)
+        press(paints)                                   // CheckBox: centre click
+        #elseif os(iOS)
+        paints.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()   // row-wide Switch: knob is trailing
         #else
-        paints.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        paints.tap()                                    // visionOS: the centre tap toggles; edge taps miss
         #endif
         // The value updates asynchronously after the gesture; never read it synchronously.
         let changed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in "\(paints.value ?? "")" != paintsBefore }, object: nil)
