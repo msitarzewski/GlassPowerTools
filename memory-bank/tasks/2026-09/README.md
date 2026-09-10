@@ -67,3 +67,10 @@
   Defect found from the device screenshot: one row per service instead of per host — shell
   consolidation in progress. Wave 2 (W3, integration, consolidation) running. Stage 3 and 4 notes
   drafted.
+- 2026-09-10: **Stage 2 W3 landed** (`ded6ad2`): `ConnectionManagerView` (3,697 lines) deleted
+  after re-homing workgroups, Tailscale, server actions and local terminal; layering proven on
+  the connection panel sheets and visionOS terminal chrome; settings merged (pending three shell
+  hooks); user requirement "choose a key file" delivered with `SSHPrivateKeyImport` and
+  ssh-keygen-fixture tests. 347 tests, one inherited failure now being root-caused by a narrow
+  worker. Consolidation worker adding the hooks and the visionOS row fix; integration worker
+  driving a real session.

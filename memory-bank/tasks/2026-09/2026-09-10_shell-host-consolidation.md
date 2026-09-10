@@ -1,7 +1,7 @@
 # Shell: one row per host, every service's icon — and the visionOS row fix
 
-Worker: shell-host-consolidation. 2026-09-10. **Status: built, unit-tested, visionOS row proven
-on the simulator; iOS UI run in progress at report time (see Results). Not committed.**
+Worker: shell-host-consolidation. 2026-09-10. **Status: built, unit-tested, visionOS row proven on the
+simulator, iOS UI suite green on a copy of the tree. Not committed.**
 
 ## Root cause (evidence)
 
@@ -83,5 +83,6 @@ for every consolidated host once, then drop the grouping to a plain identity map
 | `swift build --build-system native` (whole package) | Build complete |
 | `swift test --build-system native --filter GlassShellTests` | **27 tests, 4 suites, passed** (9 new: same name different case; alias overlap; unrelated + loopback; already-single record untouched; preferences migrate; delete all members; add→canonical / remove→owner; picker + connect hands owning record; consolidateRecords) |
 | visionOS Simulator (Vision Pro, OS 27.0), app seeded `juliet:ssh\|juliet:rdp\|oscar:rdp+ssh`, `simctl io screenshot` | `scratchpad/shots/vision-consolidated-row.png`: **two rows** (juliet, oscar), each "Desktop · Terminal" with two icons, an icon-only Connect and "Never" on one line; no wrapping |
-| iOS Simulator UI suite `GlassShellLibraryUITests` (incl. the new case) | The UI test target in the working tree does not compile because of another worker's in-progress `UITests/GlassTerminalUITests.swift:291` (main-actor key path). Run from a verbatim copy of the tree without that file — result recorded in the report |
+| iOS Simulator (iPhone 17 Pro Max, iOS 27.0) UI suite `GlassShellLibraryUITests` | **6/6 passed** across two runs on a verbatim copy of the tree excluding another worker's in-progress `UITests/GlassTerminalUITests.swift` (which does not compile at :291, main-actor key path — not mine): appearance, favorites, search, smoke and the new `testSameMachineRecordsAreOneRowWithAllServiceIcons` (one row each for `juliet` and `oscar`, two `host-service-ssh` and two `host-service-rdp` icons); `testAddHostAddServiceConnectPlaceholder` re-pointed and passing (below) |
+| Stage 2 side effect found | `testAddHostAddServiceConnectPlaceholder` expected the placeholder after Connect on an SSH service, but since `5f12575` the app registers `GlassTerminalCapability` for `.ssh`, so Connect opens the terminal's server form. The placeholder contract is for kinds no capability owns; the test now seeds a `database` service (`--ui-testing-seed-hosts "dbhost:database"`) into a fresh isolated store for that step. Seeded relaunches must use a new `runID`: the seeder fills only an empty catalog |
 | macOS / iOS device rows | not run |
