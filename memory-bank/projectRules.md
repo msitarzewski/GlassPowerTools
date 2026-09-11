@@ -19,3 +19,12 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
 9. **Public repositories are not touched** without explicit instruction, including archiving,
    redirecting or renaming.
 10. **No Git initialisation or commits** as an incidental part of any task.
+11. **UI tests capture elements, never the screen.** `XCUIScreen.main.screenshot()` on a
+    multi-display Mac captures other applications' windows. Use `element.screenshot()`; on the
+    visionOS simulator, where in-test captures are 1×1, use `simctl io screenshot` outside the test.
+    (Found 2026-09-10; the offending captures were deleted.)
+12. **Never present a sheet on a sheet on macOS.** `AddSSHKeyView` presented from the server-form
+    sheet deterministically crashes AppKit's accessibility role resolution under Xcode 27 / macOS 27
+    (`_accessibilityFindRoleFromProtocol` recursion). Use `openWindow` or a popover for nested
+    presentation on macOS.
+

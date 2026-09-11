@@ -190,6 +190,16 @@ current look carries over.
 Environment for the gated tests: `GPT_SSH_TEST_HOST=192.0.2.6 GPT_SSH_TEST_USER=michael
 GPT_SSH_TEST_KEY_PATH=$HOME/.ssh/scratch_vm`. Never record key material or passwords here.
 
+## macOS accessibility crash under XCUITest (root-caused 2026-09-10)
+
+Six identical `EXC_BAD_ACCESS` reports in AppKit `_accessibilityFindRoleFromProtocol` ←
+SwiftUI `AccessibilityNode.resolvedRole`, no app frames, are triggered deterministically by
+presenting `AddSSHKeyView` as a sheet from the server-form sheet (`ServerFormViews.swift:427`),
+whenever the accessibility tree is then resolved (the runner's snapshot ~45 s after the click).
+The view is byte-identical to glas.sh; the form alone is fine. Rule 12 in project rules; fix owned
+by W3. The engine reached the test VM from the iOS simulator through key exchange to the host-trust
+prompt, so the simulator is not subject to the Mac's Local Network gate.
+
 ## Security posture to carry forward
 
 - RDP pins the server certificate; the flow is implemented and tested.
