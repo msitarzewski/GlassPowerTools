@@ -46,3 +46,8 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     with a title header, a grouped `Form`, and the standard bottom bar with Cancel and the primary
     action bottom-trailing — the "Add Terminal to <host>" sheet is the reference. No custom
     title-bar buttons, no columns-style forms in windows for what is a save/cancel editor.
+
+16. **Verify the version after every install.** A failed build leaves the previous product in
+    derived data, so installing on a stale bundle looks successful. Stamp device and Mac builds with
+    `CURRENT_PROJECT_VERSION`/`MARKETING_VERSION` from the commit count and read
+    `CFBundleShortVersionString` back from the installed app before reporting it.

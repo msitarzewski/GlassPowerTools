@@ -439,3 +439,10 @@ Real defects found while finishing the runs, all fixed:
 "Failed to received invalid scene ID (nil) from Accessibility" when pressing Add SSH Key inside
 the host sheet — a simulator accessibility fault on a nested sheet, not an app assertion. The same
 test passed on visionOS before the nested-sheet change and passes on macOS and iPhone now.
+
+**Builds from `8fb17f9` (2026-09-11 midday):** Mac `/Applications` 0.2.45 (launched), iPhone 0.2.43
+(launched), Vision Pro 0.2.43 (installed). Version numbers now come from the commit count; the Mac's
+45 was stamped by hand from the same commit. One trap recorded: a failed Release build leaves the
+previous app in derived data, so an install step gated only on the log's exit line can silently
+ship the old binary — check `CFBundleShortVersionString` after every install (this happened once,
+caused by `navigationBarTitleDisplayMode` being iOS-only in the kit's new compact settings list).
