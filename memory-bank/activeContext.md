@@ -172,6 +172,12 @@ merge is written, tested and unwired until Stage 6. Three `GlassCapability` hook
 **Stage 2 build (`410d0fc`) installed on the iPhone (launched) and the Vision Pro (installed;
 launch unconfirmed, device asleep) on 2026-09-10; the Stage 1 sibling worktree is removed.**
 
+**Stage 2 UI suites on `410d0fc`:** iOS 6 passed / 1 skipped (real-host, no env), visionOS
+5 passed / 2 skipped (search, real-host), **macOS 4 failed** — detail controls not hittable after
+the Stage 2 library additions (capability toolbar items, per-service actions, layered panel wraps,
+`Window` scene); no crash reports during the run. Assigned to W3 with the trace. Whole package unit
+suite 461/461.
+
 **Stage 2 state:** `GlassSSHTransport` engine complete (61 unit tests, security review clean of
 High/Medium and all Low fixed, both July audit items confirmed resolved). glas.sh moved in as
 `GlassTerminal` (36,441 lines; 338 tests, one inherited failure; builds on all three platforms).
