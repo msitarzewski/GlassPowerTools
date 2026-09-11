@@ -34,8 +34,13 @@ private final class RecordingCapability: GlassCapability {
     var displayName: String { "Recorder" }
     var symbolName: String { "circle" }
     var opened: [(HostServiceLink, HostProfile)] = []
+    /// The shell's outcome callback for the latest `open`; tests deliver it explicitly.
+    var pendingReport: ((GlassCapabilityOutcome) -> Void)?
     init(kind: HostServiceKind) { self.kind = kind }
-    func open(service: HostServiceLink, host: HostProfile) { opened.append((service, host)) }
+    func open(service: HostServiceLink, host: HostProfile, report: @escaping @MainActor (GlassCapabilityOutcome) -> Void) {
+        opened.append((service, host))
+        pendingReport = report
+    }
 }
 
 @Suite("GlassShell host consolidation", .serialized)
@@ -182,7 +187,38 @@ struct GlassShellConsolidationTests {
         #expect(desktop.opened.count == 1)
         #expect(desktop.opened.first?.1.id == newer.id, "the record that owns the endpoint")
         #expect(model.lastUsedService(for: host.id)?.endpointID == newer.services[0].endpointID)
-        #expect(model.lastConnected(host.id) != nil)
+        #expect(model.lastConnected(host.id) == nil, "opened is not connected: the capability has not reported yet")
+        desktop.pendingReport?(.connected)
+        #expect(model.lastConnected(host.id) != nil, "stamped when the capability reports a live session")
+    }
+
+    @Test("A failed or dismissed attempt never stamps last connected; the chosen service is still remembered")
+    func failedAttemptDoesNotStampLastConnected() async throws {
+        let (model, root, sibling) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let record = try record("juliet", kinds: [.ssh], createdAt: t0)
+        try await sibling.upsert(record)
+        let terminal = RecordingCapability(kind: .ssh)
+        model.registry.register(terminal)
+        await model.load()
+        let host = try #require(model.hosts.first)
+
+        model.connect(hostID: host.id)
+        terminal.pendingReport?(.failed("authentication failed"))
+        #expect(model.lastConnected(host.id) == nil)
+        #expect(model.lastUsedService(for: host.id)?.endpointID == record.services[0].endpointID)
+
+        model.connect(hostID: host.id)
+        terminal.pendingReport?(.dismissed)
+        #expect(model.lastConnected(host.id) == nil)
+        #expect(terminal.opened.count == 2)
+
+        // The stamp survives a reload only once a connection was reported.
+        model.connect(hostID: host.id)
+        terminal.pendingReport?(.connected)
+        let stamped = try #require(model.lastConnected(host.id))
+        await model.load()
+        #expect(model.lastConnected(host.id) == stamped)
     }
 
     @Test("consolidateRecords merges members into the canonical record in the catalog (Stage 6 operation)")
@@ -210,7 +246,7 @@ private final class ContributingCapability: GlassCapability {
     var symbolName: String { "circle" }
     var detailActionRequests: [HostServiceKind] = []
     init(kind: HostServiceKind) { self.kind = kind }
-    func open(service: HostServiceLink, host: HostProfile) {}
+    func open(service: HostServiceLink, host: HostProfile, report: @escaping @MainActor (GlassCapabilityOutcome) -> Void) {}
     var settingsPages: [GlassCapabilitySettingsPage] {
         [GlassCapabilitySettingsPage(id: "\(kind.rawValue)-page", title: "\(kind.rawValue.capitalized) Settings", systemImage: symbolName) { AnyView(Text("page")) }]
     }

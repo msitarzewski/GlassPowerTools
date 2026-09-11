@@ -47,6 +47,11 @@ enum SSHPrivateKeyImport {
     static func read(from url: URL) throws -> (text: String, inspection: SSHPrivateKeyInspection) {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        // Refuse by size before loading anything: a mischosen multi-gigabyte file must not be
+        // read into memory just to be rejected.
+        let size: Int
+        do { size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0 } catch { throw SSHPrivateKeyImportError.unreadable }
+        guard size <= maximumFileSize else { throw SSHPrivateKeyImportError.tooLarge(size) }
         let data: Data
         do { data = try Data(contentsOf: url, options: [.uncached]) } catch { throw SSHPrivateKeyImportError.unreadable }
         guard data.count <= maximumFileSize else { throw SSHPrivateKeyImportError.tooLarge(data.count) }

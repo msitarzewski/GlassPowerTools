@@ -70,26 +70,56 @@ public extension GlassLayeredWindow where Title == EmptyView, Controls == EmptyV
     }
 }
 
-/// A panel or detail surface drawing from the same state, with the family's rounded frost.
+/// How a `GlassLayeredPanel` relates to the surface around it.
+public enum GlassLayeredPanelRole: Sendable {
+    /// Its own presentation: a sheet, popover or secondary window. It paints theme and frost on
+    /// every platform, because nothing else paints that surface.
+    case presented
+    /// A column or region inside a `GlassLayeredWindow`, which already paints edge to edge.
+    case embedded
+}
+
+/// A panel or detail surface drawing from the same state.
+///
+/// visionOS leads: a panel is a floating surface with the family's rounded frost, so there it
+/// always paints its own theme and frost inside `cornerRadius`. On the Mac, iPad and iPhone a
+/// `.presented` panel paints the same way, while an `.embedded` panel is the content itself:
+/// painting a second rounded card inside an already layered window doubled the theme paint,
+/// clipped the detail's bottom action bar into a lighter band and let the window corner show
+/// through (observed on the Mac, 2026-09-10).
 public struct GlassLayeredPanel<Content: View>: View {
     @Environment(\.glassLayers) private var layers
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private let cornerRadius: CGFloat
+    private let role: GlassLayeredPanelRole
     private let content: Content
 
-    public init(cornerRadius: CGFloat = 24, @ViewBuilder content: () -> Content) {
+    public init(cornerRadius: CGFloat = 24, role: GlassLayeredPanelRole = .presented, @ViewBuilder content: () -> Content) {
         self.cornerRadius = cornerRadius
+        self.role = role
         self.content = content()
     }
 
+    private var paintsOwnSurface: Bool {
+        #if os(visionOS)
+        true
+        #else
+        role == .presented
+        #endif
+    }
+
     public var body: some View {
-        let state = GlassLayerResolution.resolve(layers.state, reduceTransparency: reduceTransparency)
-        content
-            .background {
-                GlassLayerBackground(state: state, cornerRadius: cornerRadius)
-            }
-            .clipShape(.rect(cornerRadius: cornerRadius))
+        if paintsOwnSurface {
+            let state = GlassLayerResolution.resolve(layers.state, reduceTransparency: reduceTransparency)
+            content
+                .background {
+                    GlassLayerBackground(state: state, cornerRadius: cornerRadius)
+                }
+                .clipShape(.rect(cornerRadius: cornerRadius))
+        } else {
+            content
+        }
     }
 }
 

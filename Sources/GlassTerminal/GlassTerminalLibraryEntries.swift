@@ -67,7 +67,7 @@ public struct GlassTerminalServiceActions: View {
             Button("SFTP", systemImage: "folder") { runtime.requestConnect(serverID: serverID, purpose: .sftp) }
                 .help("Connect and browse remote files using SFTP")
                 .accessibilityIdentifier("connection-library-sftp-server-\(serverID.uuidString.lowercased())")
-            Button("Edit", systemImage: "pencil") { runtime.requestEditServer(id: serverID) }
+            Button("Edit", systemImage: "pencil") { runtime.requestEditServer(id: serverID, host: host) }
                 .accessibilityIdentifier("connection-library-edit-server-\(serverID.uuidString.lowercased())")
             Button("Details", systemImage: "info.circle") { runtime.requestServerInfo(id: serverID) }
                 .accessibilityIdentifier("connection-library-details-server-\(serverID.uuidString.lowercased())")

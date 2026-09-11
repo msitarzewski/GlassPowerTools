@@ -28,7 +28,9 @@ public struct GlassShellLibraryView: View {
                                    onActivate: { model.connect(hostID: $0) }) { item in
                 row(item)
             } detail: { id in
-                GlassLayeredPanel {
+                // Embedded in the layered window's own column: paints only on visionOS (rounded
+                // panel); on macOS and iOS the column is flat and the window paints once.
+                GlassLayeredPanel(role: .embedded) {
                     if let id, let host = model.host(id) { detail(host) } else { emptyDetail }
                 }
             } toolbarActions: {
@@ -36,10 +38,10 @@ public struct GlassShellLibraryView: View {
                     ForEach(model.registry.registered, id: \.kind) { capability in
                         capability.libraryToolbarItems()
                     }
-                    Button("Add Host", systemImage: "plus") { addingHost = true }
-                        .keyboardShortcut("n", modifiers: .command)
-                        .accessibilityIdentifier("connection-library-add-host")
+                    // On the Mac "Add Host" belongs to the sidebar column (left of the sidebar
+                    // toggle); compact stacks and the visionOS tab bar have no sidebar region.
                     #if !os(macOS)
+                    addHostButton
                     Button("Settings", systemImage: "gearshape") { showSettings = true }
                         .accessibilityIdentifier("connection-library-settings")
                     #endif
@@ -47,6 +49,9 @@ public struct GlassShellLibraryView: View {
             } presentationAnchor: {
                 alertAnchor
             }
+            #if os(macOS)
+            .sidebarActions { addHostButton }
+            #endif
         }
         .sheet(isPresented: $addingHost) { GlassShellHostEditor(model: model, host: nil) { selection = $0 } }
         .sheet(item: $editingHost) { GlassShellHostEditor(model: model, host: $0) { _ in } }
@@ -63,6 +68,17 @@ public struct GlassShellLibraryView: View {
         }
         .task { if !model.isLoaded { await model.load() } }
         .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await model.load() } } }
+        #if os(macOS)
+        // glas.sh's Connections window minimum; with the scene's default size this keeps the
+        // detail's controls inside the window instead of below its bottom edge.
+        .frame(minWidth: 900, minHeight: 560)
+        #endif
+    }
+
+    private var addHostButton: some View {
+        Button("Add Host", systemImage: "plus") { addingHost = true }
+            .keyboardShortcut("n", modifiers: .command)
+            .accessibilityIdentifier("connection-library-add-host")
     }
 
     // MARK: Row
@@ -85,6 +101,12 @@ public struct GlassShellLibraryView: View {
             }
             #endif
         }
+        // The kit row combines its children into one element. macOS joins the children's
+        // identifiers into that element's identifier (`host-row-x-host-service-ssh-…`), so the
+        // row is named here explicitly; its label still lists every service icon's name.
+        #if os(macOS)
+        .accessibilityIdentifier("host-row-\(item.name)")
+        #endif
         .contextMenu {
             Button("Connect") { model.connect(hostID: item.id) }
             Button("Edit") { editingHost = model.host(item.id) }
@@ -131,32 +153,35 @@ public struct GlassShellLibraryView: View {
                         .foregroundStyle(.secondary)
                 }
                 ForEach(host.services) { service in
-                    HStack {
-                        Label(service.displayName, systemImage: GlassServicePresentation.symbolName(for: service.kind))
-                        Spacer()
-                        Text(GlassServicePresentation.displayName(for: service.kind)).foregroundStyle(.secondary)
-                        Button("Connect") { model.connect(hostID: host.id, endpointID: service.endpointID) }
-                            .buttonStyle(.bordered)
-                            .accessibilityIdentifier("host-service-connect-\(service.kind.rawValue)")
-                        if let owner = host.member(owning: service.endpointID) {
-                            model.registry.serviceDetailActions(service: service, host: owner)
+                    serviceRow(service, host: host)
+                        .contextMenu {
+                            Button("Remove Service", role: .destructive) {
+                                Task { await run { try await model.removeService(service.endpointID, from: host.id) } }
+                            }
                         }
-                    }
-                    .contextMenu {
-                        Button("Remove Service", role: .destructive) {
-                            Task { await run { try await model.removeService(service.endpointID, from: host.id) } }
-                        }
-                    }
                 }
                 Button("Add a service…", systemImage: "plus.circle") { addingServiceTo = host }
                     .accessibilityIdentifier("host-add-service")
             }
             Section("Host") {
+                if host.addresses.count > 1 {
+                    LabeledContent("Address", value: host.addresses.joined(separator: " · "))
+                        .accessibilityIdentifier("host-detail-address")
+                    Text("The records that make up this host disagree on the address. Edit the host to settle it.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                } else if let address = host.address {
+                    LabeledContent("Address", value: address).accessibilityIdentifier("host-detail-address")
+                } else {
+                    LabeledContent("Address") { Text("Not set").foregroundStyle(.secondary) }
+                        .accessibilityIdentifier("host-detail-address")
+                }
                 if !host.aliases.isEmpty { LabeledContent("Also known as", value: host.aliases.joined(separator: ", ")) }
                 if !host.tags.isEmpty { LabeledContent("Collections", value: host.tags.joined(separator: ", ")) }
                 if let last = model.lastConnected(host.id) { LabeledContent("Last connected") { Text(last, style: .relative) } }
                 else { LabeledContent("Last connected", value: "Never") }
-                if let used = model.lastUsedService(for: host.id) { LabeledContent("Connect opens", value: used.displayName) }
+                if let used = model.lastUsedService(for: host.id) {
+                    LabeledContent("Connect opens", value: Self.connectOpensText(used, host: host))
+                }
                 Button(model.isFavorite(host.id) ? "Remove Favorite" : "Add Favorite",
                        systemImage: model.isFavorite(host.id) ? "star.fill" : "star") { model.toggleFavorite(host.id) }
                     .accessibilityIdentifier("host-favorite")
@@ -171,6 +196,56 @@ public struct GlassShellLibraryView: View {
                 Button("Delete", role: .destructive) { deleting = host }.accessibilityIdentifier("host-delete")
             }.buttonStyle(.bordered).controlSize(.large)
         })
+    }
+
+    /// One service: its name and kind at the leading edge, Connect and the capability's actions
+    /// at the trailing edge. The actions keep their size and the name truncates first; when the
+    /// column is too narrow for one line the actions drop under the name.
+    private func serviceRow(_ service: HostServiceLink, host: GlassShellHost) -> some View {
+        let identity = HStack(spacing: 10) {
+            Image(systemName: GlassServicePresentation.symbolName(for: service.kind))
+                .foregroundStyle(.secondary)
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(service.displayName).lineLimit(1).truncationMode(.tail)
+                Text(GlassServicePresentation.displayName(for: service.kind))
+                    .font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+            }
+        }
+        let actions = HStack(spacing: 8) {
+            Button("Connect") { model.connect(hostID: host.id, endpointID: service.endpointID) }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("host-service-connect-\(service.kind.rawValue)")
+            if let owner = host.member(owning: service.endpointID) {
+                model.registry.serviceDetailActions(service: service, host: owner)
+            }
+        }
+        .fixedSize()
+        .layoutPriority(1)
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                identity
+                Spacer(minLength: 8)
+                actions
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                identity
+                HStack { Spacer(minLength: 0); actions }
+            }
+        }
+    }
+
+    /// "Desktop · What is this?" — the kind first, because the endpoint's own name came from
+    /// whichever app saved it and may say nothing about the service; the kind alone when the
+    /// name adds nothing (it equals the host's name or the shell's default "Kind on Host").
+    static func connectOpensText(_ service: HostServiceLink, host: GlassShellHost) -> String {
+        let kind = GlassServicePresentation.displayName(for: service.kind)
+        let name = service.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let redundant = name.isEmpty
+            || name.caseInsensitiveCompare(host.displayName) == .orderedSame
+            || name.caseInsensitiveCompare(kind) == .orderedSame
+            || name.caseInsensitiveCompare("\(kind) on \(host.displayName)") == .orderedSame
+        return redundant ? kind : "\(kind) · \(name)"
     }
 
     // MARK: Alerts

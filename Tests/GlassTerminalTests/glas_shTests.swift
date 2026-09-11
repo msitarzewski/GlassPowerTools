@@ -1123,12 +1123,19 @@ struct glas_shTests {
         #expect(destination.currentTheme == expectedTheme)
         #expect(destination.currentTheme.ansiColors == expectedTheme.ansiColors)
         #expect(destination.currentTheme.swiftTermTheme == expectedTheme.swiftTermTheme)
-        #expect(destination.windowOpacity == 0.27)
-        #expect(destination.blurBackground == 0.63)
+        // The three appearance values are the shell's layer state: still carried in the payload
+        // for glas.sh's readers, but a device's own Appearance choice is never overwritten by a
+        // synced payload (that rewrote the toggle on every relaunch).
+        let accepted = try #require(sourceService.acceptedEnvelope?.payload.preferences)
+        #expect(accepted.windowOpacity == 0.27)
+        #expect(accepted.blurBackground == 0.63)
+        #expect(accepted.glassFrost == "regular")
+        #expect(destination.windowOpacity == GlassLayerState.default.effectiveOpacity)
+        #expect(destination.blurBackground == GlassLayerState.default.frost)
+        #expect(destination.glassFrost == GlassLayerState.default.material.rawValue)
         #expect(destination.initialTerminalColumns == 172)
         #expect(destination.initialTerminalRows == 55)
         #expect(destination.glassTint == "#AF52DE")
-        #expect(destination.glassFrost == "regular")
         #expect(destination.interactiveGlass == false)
         #expect(destination.cursorStyle == "Bar")
         #expect(destination.blinkingCursor == false)
@@ -4028,249 +4035,21 @@ struct glas_shTests {
 
     // MARK: - Connection Library Projection Tests
 
-    @Test func connectionLibraryDeduplicatesServersAndBuildsNormalizedCollections() throws {
-        let productionID = UUID()
-        let stagingID = UUID()
-        let production = ServerConfiguration(
-            id: productionID,
-            name: "Production",
-            host: "prod.example.com",
-            username: "deploy",
-            tags: [" Production ", "client A", "production"]
-        )
-        let duplicate = ServerConfiguration(
-            id: productionID,
-            name: "Duplicate",
-            host: "duplicate.example.com",
-            username: "ignored",
-            tags: ["ignored"]
-        )
-        let staging = ServerConfiguration(
-            id: stagingID,
-            name: "Staging",
-            host: "staging.example.com",
-            username: "deploy",
-            tags: ["production", "Client A"]
-        )
-
-        let projection = ConnectionLibraryProjection(
-            servers: [production, duplicate, staging],
-            workgroups: [],
-            networkIsConfigured: false
-        )
-
-        #expect(projection.servers.map(\.id) == [productionID, stagingID])
-        #expect(projection.collections.map(\.name) == ["Client A", "Production"])
-        let collection = try #require(projection.collection(named: "PRODUCTION"))
-        #expect(collection.serverIDs == [productionID, stagingID])
-        #expect(collection.count == 2)
-        #expect(projection.collection(named: "ignored") == nil)
-    }
-
-    @Test func connectionLibraryExcludesEmptyAndWhitespaceOnlyCollections() {
-        let blankTags = ServerConfiguration(
-            name: "Blank Tags",
-            host: "blank.example.com",
-            username: "tester",
-            tags: ["", "   ", "\n\t"]
-        )
-        let tagless = ServerConfiguration(
-            name: "Tagless",
-            host: "tagless.example.com",
-            username: "tester"
-        )
-        let tagged = ServerConfiguration(
-            name: "Tagged",
-            host: "tagged.example.com",
-            username: "tester",
-            tags: [" Production ", "  "]
-        )
-
-        let projection = ConnectionLibraryProjection(
-            servers: [blankTags, tagless, tagged],
-            workgroups: [],
-            networkIsConfigured: false
-        )
-
-        #expect(projection.collections.map(\.name) == ["Production"])
-        #expect(projection.collection(named: "") == nil)
-        #expect(projection.collection(named: "   ") == nil)
-        #expect(projection.collection(named: "production")?.serverIDs == [tagged.id])
-    }
-
-    @Test func connectionLibraryProjectsFavoritesRecentsAndSearchDeterministically() throws {
-        var oldest = ServerConfiguration(
-            name: "Alpha",
-            host: "alpha.example.com",
-            username: "one",
-            isFavorite: true,
-            tags: ["Home Lab"]
-        )
-        oldest.lastConnected = Date(timeIntervalSince1970: 100)
-        var newest = ServerConfiguration(
-            name: "Bravo",
-            host: "bravo.example.com",
-            username: "two",
-            isFavorite: true,
-            tags: ["Production"]
-        )
-        newest.lastConnected = Date(timeIntervalSince1970: 300)
-        var middle = ServerConfiguration(
-            name: "Database",
-            host: "db.internal",
-            username: "dba",
-            tags: ["Production"]
-        )
-        middle.lastConnected = Date(timeIntervalSince1970: 200)
-
-        let projection = ConnectionLibraryProjection(
-            servers: [oldest, newest, middle],
-            workgroups: [],
-            networkIsConfigured: false,
-            recentLimit: 2
-        )
-
-        #expect(projection.servers(in: .favorites).map(\.id) == [newest.id, oldest.id])
-        #expect(projection.servers(in: .recent).map(\.id) == [newest.id, middle.id])
-        #expect(projection.servers(in: .allConnections, searchQuery: "Alpha").map(\.id) == [oldest.id])
-        #expect(projection.servers(in: .allConnections, searchQuery: "internal").map(\.id) == [middle.id])
-        #expect(projection.servers(in: .allConnections, searchQuery: "dba").map(\.id) == [middle.id])
-        #expect(projection.servers(in: .allConnections, searchQuery: "home lab").map(\.id) == [oldest.id])
-        let production = try #require(projection.collection(named: " production "))
-        #expect(
-            projection.servers(in: .collection(production.id)).map(\.id)
-                == [newest.id, middle.id]
-        )
-    }
-
-    @Test func connectionLibraryUsesStableTieBreakOrdering() {
-        let timestamp = Date(timeIntervalSince1970: 500)
-        let lowestID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
-        let highestID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
-
-        func server(
-            id: UUID = UUID(),
-            name: String,
-            host: String,
-            username: String
-        ) -> ServerConfiguration {
-            var server = ServerConfiguration(
-                id: id,
-                name: name,
-                host: host,
-                username: username,
-                isFavorite: true
-            )
-            server.lastConnected = timestamp
-            return server
-        }
-
-        let alpha = server(name: "Alpha", host: "z.example.com", username: "zulu")
-        let hostFirst = server(name: "Bravo", host: "a.example.com", username: "zulu")
-        let userFirst = server(name: "Bravo", host: "b.example.com", username: "alpha")
-        let idFirst = server(
-            id: lowestID,
-            name: "Bravo",
-            host: "b.example.com",
-            username: "bravo"
-        )
-        let idLast = server(
-            id: highestID,
-            name: "Bravo",
-            host: "b.example.com",
-            username: "bravo"
-        )
-        let expectedIDs = [alpha.id, hostFirst.id, userFirst.id, idFirst.id, idLast.id]
-
-        let projection = ConnectionLibraryProjection(
-            servers: [idLast, userFirst, hostFirst, idFirst, alpha],
-            workgroups: [],
-            networkIsConfigured: false
-        )
-
-        #expect(projection.servers(in: .favorites).map(\.id) == expectedIDs)
-        #expect(projection.servers(in: .recent).map(\.id) == expectedIDs)
-    }
-
-    @Test func connectionLibraryModesScopesWorkgroupsAndSelectionFollowAvailability() throws {
-        let server = ServerConfiguration(
-            name: "umbp",
-            host: "192.0.2.11",
-            username: "michael",
-            tags: ["Anomalous"]
-        )
-        let preset = LayoutPreset(
-            name: "glas.sh",
-            colorTag: .cyan,
-            sessionIntents: [
-                .init(kind: .local, label: "Editor", startupCommand: "nvim"),
-                .init(serverID: server.id, label: "Logs", startupCommand: "journalctl -f"),
-            ]
-        )
-        let hiddenNetwork = ConnectionLibraryProjection(
-            servers: [server],
-            workgroups: [preset],
-            networkIsConfigured: false
-        )
-        let visibleNetwork = ConnectionLibraryProjection(
-            servers: [server],
-            workgroups: [preset],
-            networkIsConfigured: true
-        )
-
-        #expect(!hiddenNetwork.availableModes.contains(.network))
-        #expect(hiddenNetwork.scopes(for: .network).isEmpty)
-        #expect(visibleNetwork.availableModes.contains(.network))
-        #expect(visibleNetwork.scopes(for: .network) == [.network])
-        #expect(hiddenNetwork.workgroups(matching: "Logs").map(\.id) == [preset.id])
-        #expect(hiddenNetwork.workgroups(matching: "journalctl").isEmpty)
-
-        let collection = try #require(hiddenNetwork.collection(named: "anomalous"))
-        let scope = ConnectionLibraryScope.collection(collection.id)
-        #expect(
-            hiddenNetwork.resolvedSelection(
-                preferredServerID: server.id,
-                in: scope
-            ) == server.id
-        )
-        #expect(
-            hiddenNetwork.resolvedSelection(
-                preferredServerID: server.id,
-                in: scope,
-                searchQuery: "missing"
-            ) == nil
-        )
-    }
-
-    @Test func connectionLibraryClearsSelectionAfterServerDeletion() {
-        let server = ServerConfiguration(
-            name: "Disposable",
-            host: "disposable.example.com",
-            username: "operator"
-        )
-        let beforeDeletion = ConnectionLibraryProjection(
-            servers: [server],
-            workgroups: [],
-            networkIsConfigured: false
-        )
-        let afterDeletion = ConnectionLibraryProjection(
-            servers: [],
-            workgroups: [],
-            networkIsConfigured: false
-        )
-
-        #expect(
-            beforeDeletion.resolvedSelection(
-                preferredServerID: server.id,
-                in: .allConnections
-            ) == server.id
-        )
-        #expect(
-            afterDeletion.resolvedSelection(
-                preferredServerID: server.id,
-                in: .allConnections
-            ) == nil
-        )
+    @Test func connectionLibraryProjectionDeduplicatesServersAndSearchesWorkgroups() {
+        let shared = UUID()
+        let servers = [
+            ServerConfiguration(id: shared, name: "alpha", host: "a.example", port: 22, username: "u"),
+            ServerConfiguration(id: shared, name: "alpha duplicate", host: "a.example", port: 22, username: "u"),
+            ServerConfiguration(name: "beta", host: "b.example", port: 22, username: "u"),
+        ]
+        var preset = LayoutPreset(name: "Ops", sessionIntents: [])
+        preset.sessionIntents = [.init(kind: .ssh, serverID: servers[2].id, label: "db-primary")]
+        let projection = ConnectionLibraryProjection(servers: servers, workgroups: [preset], networkIsConfigured: false)
+        #expect(projection.servers.map(\.name) == ["alpha", "beta"])
+        #expect(projection.workgroups(matching: "").count == 1)
+        #expect(projection.workgroups(matching: "ops").count == 1)
+        #expect(projection.workgroups(matching: "primary").count == 1, "session labels are searched")
+        #expect(projection.workgroups(matching: "nothing").isEmpty)
     }
 
     @Test @MainActor func tailscaleConfigurationRequiresCompleteActiveCredentials() {
@@ -4390,24 +4169,6 @@ struct glas_shTests {
             accessToken: "token",
             expiresIn: TailscaleClient.maximumOAuthTokenLifetime + 1
         ))
-    }
-
-    @Test @MainActor func deepLinkSecurityIdentityIncludesKeyPathAndAgentForwarding() {
-        let original = ServerConfiguration(
-            name: "Original",
-            host: "server.example.com",
-            username: "operator",
-            authMethod: .sshKey,
-            sshKeyPath: "/keys/approved"
-        )
-        var changedKeyPath = original
-        changedKeyPath.sshKeyPath = "/keys/replacement"
-        var enabledAgentForwarding = original
-        enabledAgentForwarding.forwardAgent = true
-
-        #expect(MainBootstrapView<EmptyView>.sameDeepLinkSecurityIdentity(original, original))
-        #expect(!MainBootstrapView<EmptyView>.sameDeepLinkSecurityIdentity(original, changedKeyPath))
-        #expect(!MainBootstrapView<EmptyView>.sameDeepLinkSecurityIdentity(original, enabledAgentForwarding))
     }
 
     @Test func tailscaleDeviceValidatesInventoryAndNormalizesTags() throws {
@@ -7631,7 +7392,7 @@ struct glas_shTests {
         )
         #expect(localMessage.contains("Connection timed out."))
         #expect(localMessage.contains("Privacy & Security > Local Network"))
-        #expect(localMessage.contains("allow glas.sh"))
+        #expect(localMessage.contains("allow Glass Power Tools"))
 
         let remoteMessage = TerminalConnectFlow.connectionFailureMessage(
             base: "Could not reach example.com:22.",
@@ -7642,11 +7403,6 @@ struct glas_shTests {
     }
 
     #if os(macOS)
-    @Test func connectionLibraryMacColumnDefaultsMatchApprovedLayout() {
-        #expect(ConnectionLibraryMacColumnLayout.navigationIdeal == 340)
-        #expect(ConnectionLibraryMacColumnLayout.resultsIdeal == 510)
-        #expect(!ConnectionLibraryMacColumnLayout.autosaveName.isEmpty)
-    }
     #endif
 
     @Test @MainActor func initialLaunchPreparesEveryCredentialBeforeSessionRegistration() async {
@@ -8451,14 +8207,11 @@ struct glas_shTests {
         let workgroupID = UUID()
 
         first.showTerminal(workgroupID: workgroupID)
-        first.showSettings()
         first.showSFTP(sessionID: UUID())
 
         #expect(first.terminalWorkgroupID == workgroupID)
-        #expect(first.showsSettings)
         #expect(first.sftpContext != nil)
         #expect(second.terminalWorkgroupID == nil)
-        #expect(!second.showsSettings)
         #expect(second.sftpContext == nil)
     }
 

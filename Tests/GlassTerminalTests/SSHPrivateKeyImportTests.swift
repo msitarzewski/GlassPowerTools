@@ -44,6 +44,21 @@ import GlasSecretStore
         #expect(SSHPrivateKeyImport.suggestedName(comment: nil, fileURL: url) == "id_ed25519")
     }
 
+    @Test func oversizedFilesAreRefusedBeforeBeingRead() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("gpt-key-import-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("huge")
+        // One byte over the limit, plausible key text so only the size check can reject it.
+        let oversized = "-----BEGIN OPENSSH PRIVATE KEY-----\n" + String(repeating: "A", count: SSHPrivateKeyImport.maximumFileSize)
+        try Data(oversized.utf8).write(to: url)
+        #expect(throws: SSHPrivateKeyImportError.self) { _ = try SSHPrivateKeyImport.read(from: url) }
+        do { _ = try SSHPrivateKeyImport.read(from: url) } catch let error as SSHPrivateKeyImportError {
+            guard case .tooLarge(let reported) = error else { Issue.record("expected tooLarge, got \(error)"); return }
+            #expect(reported > SSHPrivateKeyImport.maximumFileSize)
+        }
+    }
+
     @Test func nonKeyFilesAreRejectedHonestly() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("gpt-key-import-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

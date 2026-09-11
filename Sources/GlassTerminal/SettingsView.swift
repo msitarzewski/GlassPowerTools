@@ -1611,6 +1611,7 @@ struct AddSSHKeyView: View {
                 Section("Key Details") {
                     TextField("Key name", text: $name)
                         .focused($isNameFocused)
+                        .accessibilityIdentifier("ssh-key-name")
                     SecureField(inspection?.isPassphraseProtected == true ? "Passphrase (required for this key)" : "Passphrase (optional)", text: $passphrase)
                         .focused($isPassphraseFocused)
                     Text("RSA and ED25519 private keys are supported.")
@@ -1647,6 +1648,8 @@ struct AddSSHKeyView: View {
             }
             .navigationTitle("Add SSH Key")
             .onAppear { isNameFocused = true }
+            #if !os(macOS)
+            // macOS chooses through NSOpenPanel (below); the importer modifier is touch-only.
             .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [.item, .data], allowsMultipleSelection: false) { result in
                 switch result {
                 case .success(let urls):
@@ -1655,6 +1658,7 @@ struct AddSSHKeyView: View {
                     errorMessage = error.localizedDescription
                 }
             }
+            #endif
             .onChange(of: privateKey) { _, text in
                 // Pasted text is classified the same way as a chosen file; nothing is stored.
                 inspection = try? SSHPrivateKeyImport.inspect(text)

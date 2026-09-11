@@ -12,6 +12,12 @@ public struct GlassShellHost: Identifiable, Hashable, Sendable {
     /// selection key on it.
     public let id: HostID
     public let displayName: String
+    /// The machine's address as the library shows it: the canonical member's, else the first
+    /// member that has one. Services inherit it; the host editor is where it is typed.
+    public let address: String?
+    /// Every distinct address across the members. More than one means the records disagree; the
+    /// detail surfaces that rather than hiding it.
+    public let addresses: [String]
     public let aliases: [String]
     public let tags: [String]
     /// Union of every member's services, canonical member first, deduplicated by endpoint.
@@ -43,6 +49,9 @@ public struct GlassShellHost: Identifiable, Hashable, Sendable {
         }
         id = canonical.id
         displayName = canonical.displayName
+        let addresses = Self.union(ordered.compactMap(\.address).map { [$0] })
+        self.addresses = addresses
+        address = addresses.first
         aliases = Self.union(ordered.map(\.aliases))
         tags = Self.union(ordered.map(\.tags))
         self.services = services
@@ -58,8 +67,9 @@ public struct GlassShellHost: Identifiable, Hashable, Sendable {
 }
 
 /// The grouping rule. Two records are the same machine when their normalised display names are
-/// equal, or when they share an alias (the apps publish the address as the alias). Loopback
-/// addresses never group: many distinct local services legitimately carry them.
+/// equal, when they share an alias (the source apps published the address as the alias), or when
+/// they carry the same address. Loopback addresses never group: many distinct local services
+/// legitimately carry them.
 public enum GlassShellHostGrouping {
     public static func normalizedName(_ name: String) -> String {
         var value = name.trimmingCharacters(in: .whitespacesAndNewlines).precomposedStringWithCanonicalMapping.lowercased()
@@ -95,7 +105,7 @@ public enum GlassShellHostGrouping {
             if !name.isEmpty {
                 if let first = byName[name] { join(first, index) } else { byName[name] = index }
             }
-            for alias in record.aliases.compactMap(normalizedAlias) {
+            for alias in (record.aliases + [record.address].compactMap { $0 }).compactMap(normalizedAlias) {
                 if let first = byAlias[alias] { join(first, index) } else { byAlias[alias] = index }
             }
         }

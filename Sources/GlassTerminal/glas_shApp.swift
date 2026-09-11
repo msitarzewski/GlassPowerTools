@@ -95,11 +95,9 @@ struct PlatformTerminalCommands: Commands {
 final class IOSAppRouter {
     var terminalWorkgroupID: UUID?
     private(set) var mostRecentTerminalWorkgroupID: UUID?
-    var showsSettings = false
     var showsWorkgroups = false
     var showsTailscale = false
     var sftpContext: SFTPBrowserContext?
-    var pendingDeepLinkURL: URL?
 
     func showTerminal(workgroupID: UUID) {
         sftpContext = nil
@@ -148,10 +146,6 @@ final class IOSAppRouter {
         return true
     }
 
-    func showSettings() {
-        showsSettings = true
-    }
-
     func showSFTP(sessionID: UUID) {
         sftpContext = SFTPBrowserContext(sessionID: sessionID)
     }
@@ -163,16 +157,7 @@ struct MainBootstrapView<Content: View>: View {
     let content: Content
     @Environment(SessionManager.self) private var sessionManager
     @Environment(SettingsManager.self) private var settingsManager
-    @Environment(\.openWindow) private var openWindow
-    #if os(iOS)
-    @Environment(IOSAppRouter.self) private var iOSRouter
-    #endif
     @State private var didBootstrap = false
-    @State private var pendingDeepLinkServer: ServerConfiguration?
-    @State private var pendingDeepLinkJumpRoute: [ServerConfiguration] = []
-    @State private var pendingDeepLinkTrustSession: TerminalSession?
-    @State private var pendingDeepLinkTrustChallenge: HostKeyTrustChallenge?
-    @State private var deepLinkFailureMessage: String?
     #if DEBUG
     @State private var uiTestCredentialCleanupComplete = false
     #endif
@@ -200,73 +185,12 @@ struct MainBootstrapView<Content: View>: View {
             #if DEBUG
             purgeUITestCredentialsIfRequested()
             #endif
-            #if os(iOS)
-            consumePendingDeepLinkIfNeeded()
-            #endif
         }
         // NOTE: We intentionally do NOT close sessions on scenePhase == .background.
         // On visionOS, closing the Connections window (or glancing away) backgrounds
         // this scene — which would kill every live terminal and orphan its window into
         // "Session not found". Sessions are ephemeral and the OS tears down sockets on
         // actual app termination; TerminalSession.deinit cancels outstanding tasks.
-        .onOpenURL { url in
-            #if os(iOS)
-            iOSRouter.pendingDeepLinkURL = url
-            #else
-            handleDeepLink(url)
-            #endif
-        }
-        #if os(iOS)
-        .onChange(of: iOSRouter.pendingDeepLinkURL) { _, _ in
-            consumePendingDeepLinkIfNeeded()
-        }
-        #endif
-        .alert(
-            "Connect to Server?",
-            isPresented: deepLinkConfirmationBinding,
-            presenting: pendingDeepLinkServer
-        ) { server in
-            Button(
-                server.legacyAlgorithmsEnabled ? "Connect with Legacy Algorithms" : "Connect",
-                role: server.legacyAlgorithmsEnabled ? .destructive : nil
-            ) {
-                connectToDeepLinkServer(server)
-            }
-            Button("Cancel", role: .cancel) {
-                pendingDeepLinkServer = nil
-                pendingDeepLinkJumpRoute = []
-            }
-        } message: { server in
-            if server.legacyAlgorithmsEnabled {
-                Text("An external link requested a connection to \(server.username)@\(server.host):\(server.port). This server permits obsolete SSH algorithms with weaker protection.")
-            } else {
-                Text("An external link requested a connection to \(server.username)@\(server.host):\(server.port).")
-            }
-        }
-        .alert(
-            pendingDeepLinkTrustChallenge?.reason == .changed
-                ? "SSH Host Key Changed"
-                : "Trust SSH Host Key?",
-            isPresented: deepLinkTrustBinding,
-            presenting: pendingDeepLinkTrustChallenge
-        ) { challenge in
-            Button(
-                challenge.reason == .changed ? "Trust Changed Key & Connect" : "Trust & Connect",
-                role: challenge.reason == .changed ? .destructive : nil
-            ) {
-                trustDeepLinkHostKeyAndReconnect(challenge)
-            }
-            Button("Cancel", role: .cancel) {
-                closePendingDeepLinkTrustSession()
-            }
-        } message: { challenge in
-            Text(deepLinkTrustMessage(for: challenge))
-        }
-        .alert("Connection Failed", isPresented: deepLinkFailureBinding) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(deepLinkFailureMessage ?? "Unable to connect.")
-        }
     }
 
     private func loadPersistentState() {
@@ -291,224 +215,6 @@ struct MainBootstrapView<Content: View>: View {
     }
     #endif
 
-    #if os(iOS)
-    private func consumePendingDeepLinkIfNeeded() {
-        guard let url = iOSRouter.pendingDeepLinkURL else { return }
-        iOSRouter.pendingDeepLinkURL = nil
-        handleDeepLink(url)
-    }
-    #endif
-
-    private func handleDeepLink(_ url: URL) {
-        loadPersistentState()
-
-        guard case .ssh(let serverID) = GlassConnectionLink(url: url) else {
-            deepLinkFailureMessage = "The connection link is invalid."
-            return
-        }
-
-        guard let server = sessionManager.server(for: serverID) else {
-            deepLinkFailureMessage = "The requested server was not found."
-            return
-        }
-
-        guard let route = resolvedDeepLinkJumpRoute(for: server) else {
-            deepLinkFailureMessage = "A jump host required by the requested server is no longer available."
-            return
-        }
-        pendingDeepLinkJumpRoute = route
-        pendingDeepLinkServer = server
-    }
-
-    private var deepLinkConfirmationBinding: Binding<Bool> {
-        Binding(
-            get: { pendingDeepLinkServer != nil },
-            set: { isPresented in
-                if !isPresented {
-                    pendingDeepLinkServer = nil
-                    pendingDeepLinkJumpRoute = []
-                }
-            }
-        )
-    }
-
-    private var deepLinkFailureBinding: Binding<Bool> {
-        Binding(
-            get: { deepLinkFailureMessage != nil },
-            set: { isPresented in
-                if !isPresented {
-                    deepLinkFailureMessage = nil
-                }
-            }
-        )
-    }
-
-    private var deepLinkTrustBinding: Binding<Bool> {
-        Binding(
-            get: { pendingDeepLinkTrustChallenge != nil },
-            set: { isPresented in
-                if !isPresented {
-                    closePendingDeepLinkTrustSession()
-                }
-            }
-        )
-    }
-
-    private func deepLinkTrustMessage(for challenge: HostKeyTrustChallenge) -> String {
-        let context = challenge.reason == .changed
-            ? "The presented key no longer matches the saved key. Verify this change before continuing."
-            : "No trusted key is saved for this endpoint."
-        return "\(context)\n\nEndpoint: \(challenge.host):\(challenge.port)\nAlgorithm: \(challenge.algorithm)\nFingerprint (SHA-256): \(challenge.fingerprintSHA256)"
-    }
-
-    private func trustDeepLinkHostKeyAndReconnect(_ challenge: HostKeyTrustChallenge) {
-        guard let session = pendingDeepLinkTrustSession else {
-            pendingDeepLinkTrustChallenge = nil
-            return
-        }
-        do {
-            try sessionManager.trustHostKey(challenge, for: session)
-        } catch {
-            deepLinkFailureMessage = error.localizedDescription
-            closePendingDeepLinkTrustSession()
-            return
-        }
-        session.pendingHostKeyChallenge = nil
-        pendingDeepLinkTrustSession = nil
-        pendingDeepLinkTrustChallenge = nil
-        Task { @MainActor in
-            do {
-                try await sessionManager.reconnect(session, settingsManager: settingsManager)
-            } catch {
-                deepLinkFailureMessage = error.localizedDescription
-                sessionManager.closePendingHostTrustSession(session)
-                return
-            }
-            if session.state == .connected {
-                presentTerminalWorkgroup(for: session)
-            } else {
-                if case .error(let message) = session.state {
-                    deepLinkFailureMessage = message
-                }
-                sessionManager.closePendingHostTrustSession(session)
-            }
-        }
-    }
-
-    private func closePendingDeepLinkTrustSession() {
-        if let session = pendingDeepLinkTrustSession {
-            sessionManager.closePendingHostTrustSession(session)
-        }
-        pendingDeepLinkTrustSession = nil
-        pendingDeepLinkTrustChallenge = nil
-    }
-
-    private func connectToDeepLinkServer(_ server: ServerConfiguration) {
-        pendingDeepLinkServer = nil
-        Task { @MainActor in
-            guard let currentServer = sessionManager.server(for: server.id) else {
-                deepLinkFailureMessage = "The requested server is no longer available."
-                return
-            }
-            guard let currentRoute = resolvedDeepLinkJumpRoute(for: currentServer) else {
-                pendingDeepLinkJumpRoute = []
-                deepLinkFailureMessage = "A jump host required by the requested server is no longer available."
-                return
-            }
-            let routeIsUnchanged = currentRoute.count == pendingDeepLinkJumpRoute.count
-                && zip(currentRoute, pendingDeepLinkJumpRoute).allSatisfy {
-                    Self.sameDeepLinkSecurityIdentity($0.0, $0.1)
-                }
-            guard Self.sameDeepLinkSecurityIdentity(currentServer, server), routeIsUnchanged else {
-                // The connection target or its authentication/routing policy
-                // changed after the prompt was presented. Show the new identity
-                // and require a fresh decision.
-                pendingDeepLinkJumpRoute = currentRoute
-                pendingDeepLinkServer = currentServer
-                return
-            }
-            pendingDeepLinkJumpRoute = []
-            do {
-                let launch = try await sessionManager.createAuthorizedSession(
-                    for: currentServer,
-                    settingsManager: settingsManager,
-                    initialTerminalPresentation: { pendingSession in
-                        presentTerminalWorkgroup(for: pendingSession)
-                    }
-                )
-                if launch.session.state == .connected {
-                    if !launch.session.didRequestInitialTerminalPresentation {
-                        presentTerminalWorkgroup(for: launch.session)
-                    }
-                } else if let challenge = launch.session.pendingHostKeyChallenge {
-                    pendingDeepLinkTrustSession = launch.session
-                    pendingDeepLinkTrustChallenge = challenge
-                } else if case .error(let message) = launch.session.state {
-                    guard !launch.session.didRequestInitialTerminalPresentation else { return }
-                    deepLinkFailureMessage = message
-                    sessionManager.closeSession(launch.session)
-                }
-            } catch {
-                deepLinkFailureMessage = error.localizedDescription
-            }
-        }
-    }
-
-    private func presentTerminalWorkgroup(for session: TerminalSession) {
-        #if os(macOS)
-        openWindow(
-            id: "workspace",
-            value: MacLiveSessionWorkspaceRouter.launchRequest(
-                for: session,
-                sessionManager: sessionManager
-            )
-        )
-        #else
-        let workgroupID = sessionManager.createWorkgroup(
-            name: session.server.name,
-            colorTag: session.server.colorTag
-        )
-        guard sessionManager.appendSession(session, toWorkgroup: workgroupID) else {
-            sessionManager.discardWorkgroupIfEmpty(workgroupID)
-            sessionManager.closeSession(session)
-            deepLinkFailureMessage = "The terminal could not be added to its workgroup."
-            return
-        }
-        #if os(visionOS)
-        openWindow(id: "terminal", value: workgroupID)
-        #elseif os(iOS)
-        iOSRouter.showTerminal(workgroupID: workgroupID)
-        #endif
-        #endif
-    }
-
-    static func sameDeepLinkSecurityIdentity(
-        _ lhs: ServerConfiguration,
-        _ rhs: ServerConfiguration
-    ) -> Bool {
-        lhs.host == rhs.host
-            && lhs.port == rhs.port
-            && lhs.username == rhs.username
-            && lhs.authMethod == rhs.authMethod
-            && lhs.sshKeyPath == rhs.sshKeyPath
-            && lhs.sshKeyID == rhs.sshKeyID
-            && lhs.resolvedJumpHostIDs == rhs.resolvedJumpHostIDs
-            && lhs.forwardAgent == rhs.forwardAgent
-            && lhs.legacyAlgorithmsEnabled == rhs.legacyAlgorithmsEnabled
-    }
-
-    private func resolvedDeepLinkJumpRoute(
-        for server: ServerConfiguration
-    ) -> [ServerConfiguration]? {
-        var route: [ServerConfiguration] = []
-        var visited: Set<UUID> = [server.id]
-        for id in server.resolvedJumpHostIDs {
-            guard visited.insert(id).inserted,
-                  let hop = sessionManager.server(for: id) else { return nil }
-            route.append(hop)
-        }
-        return route
-    }
 }
 
 

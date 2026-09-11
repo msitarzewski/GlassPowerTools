@@ -8,12 +8,16 @@
 //
 
 import SwiftUI
+import OSLog
 import GlassConnectionKit
 import GlassShell
 import GlassLayers
 
 /// What the shell asked the terminal to open.
 public enum GlassTerminalOpenPurpose: Sendable { case terminal, sftp }
+
+/// The shell's outcome callback for one connect attempt (see `GlassCapabilityOutcome`).
+public typealias GlassCapabilityReport = @MainActor (GlassCapabilityOutcome) -> Void
 
 /// Owns glas.sh's managers for the process. One per app, created in the composition root.
 @MainActor @Observable
@@ -26,11 +30,14 @@ public final class GlassTerminalRuntime {
     /// shell can ask the terminal to do. One queue, consumed by `TerminalConnectFlow`, so the
     /// legacy-algorithm confirmation, trust prompt and password fallback exist exactly once.
     enum Request {
-        case connect(serverID: UUID, purpose: TerminalSession.Purpose)
+        /// `report` is the shell's outcome callback (nil for the terminal's own callers).
+        case connect(serverID: UUID, purpose: TerminalSession.Purpose, report: GlassCapabilityReport?)
         case quickConnect(ServerConfiguration, password: String)
         case openWorkgroup(LayoutPreset)
         case addServer(draft: ServerConfiguration?)
-        case editServer(ServerConfiguration)
+        /// `hostContext` when the edit comes from the shell's host detail: the form then shows the
+        /// host's address read-only instead of a second Host field.
+        case editServer(ServerConfiguration, hostContext: ServerFormHostContext?)
         case serverInfo(ServerConfiguration)
         case deleteServer(ServerConfiguration)
         case localTerminal
@@ -40,7 +47,18 @@ public final class GlassTerminalRuntime {
     struct SetupRequest: Identifiable {
         let host: HostProfile
         let service: HostServiceLink
+        /// The shell's host access, so an address typed into the setup form is written back to
+        /// the host (nil when the request came from the terminal's own "Set Up…" action, which
+        /// still has the host record and its address).
+        var hostAccess: GlassCapabilityHostAccess?
         var id: EndpointID { service.endpointID }
+
+        /// What the server form needs to know about the shell's host.
+        var formContext: ServerFormHostContext {
+            ServerFormHostContext(hostName: host.displayName,
+                                  address: hostAccess?.address ?? host.address,
+                                  setAddress: hostAccess?.setAddress)
+        }
     }
 
     private(set) var requestSerial = 0
@@ -60,8 +78,11 @@ public final class GlassTerminalRuntime {
     }
 
     /// Connect to the saved server whose id is the shell's endpoint id. Consumed by the bootstrap.
-    public func requestConnect(serverID: UUID, purpose: GlassTerminalOpenPurpose = .terminal) {
-        enqueue(.connect(serverID: serverID, purpose: purpose == .sftp ? .sftp : .terminal))
+    /// `report`, when given, receives the attempt's terminal state (the shell stamps "last
+    /// connected" only on `.connected`).
+    public func requestConnect(serverID: UUID, purpose: GlassTerminalOpenPurpose = .terminal,
+                               report: GlassCapabilityReport? = nil) {
+        enqueue(.connect(serverID: serverID, purpose: purpose == .sftp ? .sftp : .terminal, report: report))
     }
     /// Open a saved workgroup preset (all of its terminals) through the launch plan.
     public func requestOpenWorkgroup(_ presetID: UUID) {
@@ -72,7 +93,19 @@ public final class GlassTerminalRuntime {
     public func requestAddServer() { enqueue(.addServer(draft: nil)) }
     public func requestEditServer(id: UUID) {
         guard let server = sessionManager.serverManager.server(for: id) else { return }
-        enqueue(.editServer(server))
+        enqueue(.editServer(server, hostContext: nil))
+    }
+    /// Edit from the shell's host detail: the host's address is shown read-only.
+    public func requestEditServer(id: UUID, host: HostProfile) {
+        guard let server = sessionManager.serverManager.server(for: id) else { return }
+        enqueue(.editServer(server, hostContext: ServerFormHostContext(hostName: host.displayName, address: host.address, setAddress: nil)))
+    }
+
+    /// The host's address changed in the shell: every saved server that is a service of that
+    /// host record follows it, so the machine's identity is edited once. Returns the ids updated.
+    @discardableResult
+    func applyHostAddress(_ address: String?, to host: HostProfile) -> [UUID] {
+        GlassTerminalHostAddressSync.apply(address, to: host, in: sessionManager.serverManager)
     }
     public func requestServerInfo(id: UUID) {
         guard let server = sessionManager.serverManager.server(for: id) else { return }
@@ -133,13 +166,25 @@ public final class GlassTerminalCapability: GlassCapability {
 
     public init(runtime: GlassTerminalRuntime) { self.runtime = runtime }
 
-    public func open(service: HostServiceLink, host: HostProfile) {
+    public func open(service: HostServiceLink, host: HostProfile, report: @escaping GlassCapabilityReport) {
+        open(service: service, host: host, hostAccess: GlassCapabilityHostAccess(address: host.address) { _ in }, report: report)
+    }
+
+    public func open(service: HostServiceLink, host: HostProfile, hostAccess: GlassCapabilityHostAccess,
+                     report: @escaping GlassCapabilityReport) {
         let serverID = service.endpointID.rawValue
         if runtime.hasServer(id: serverID) {
-            runtime.requestConnect(serverID: serverID)
+            runtime.requestConnect(serverID: serverID, report: report)
         } else {
-            runtime.setupRequest = .init(host: host, service: service)
+            // The setup form only creates the saved server; the user connects afterwards, and
+            // that attempt reports on its own. Nothing was connected by this call.
+            runtime.setupRequest = .init(host: host, service: service, hostAccess: hostAccess)
+            report(.dismissed)
         }
+    }
+
+    public func hostAddressDidChange(host: HostProfile, address: String?) {
+        runtime.applyHostAddress(address, to: host)
     }
 
     // MARK: Shell hooks
@@ -184,14 +229,17 @@ public struct GlassTerminalBootstrap<Content: View>: View {
             .sheet(item: $runtime.setupRequest) { request in
                 // The SSH connection panel: the Stage 2 layering proof on a real capability surface.
                 GlassLayeredPanel(cornerRadius: 0) {
+                    // The host's address is the machine's, entered once on the host; the form
+                    // shows it read-only and asks only for what is the terminal's: port, user, auth.
                     AddServerView(
                         serverManager: runtime.sessionManager.serverManager,
                         draft: ServerConfiguration(
                             id: request.service.endpointID.rawValue,
                             name: request.host.displayName,
-                            host: request.host.aliases.first ?? "",
+                            host: request.formContext.address ?? "",
                             username: ""
-                        )
+                        ),
+                        hostContext: request.formContext
                     )
                 }
             }
@@ -244,5 +292,38 @@ public struct GlassTerminalBootstrap<Content: View>: View {
         #else
         MainBootstrapView { content }
         #endif
+    }
+}
+
+/// Which saved servers follow a host's address, and to what. Pure so it is testable without a
+/// keychain: a server follows when it is one of the host record's SSH services and its address
+/// differs from the host's.
+enum GlassTerminalHostAddressSync {
+    /// Persists the change for every following server; a server whose update fails is logged and
+    /// skipped so one bad record does not stop the rest. Returns the ids updated. A cleared
+    /// address (nil) leaves the servers as they are: they still need something to connect to.
+    @MainActor @discardableResult
+    static func apply(_ address: String?, to host: HostProfile, in manager: ServerManager) -> [UUID] {
+        guard let address else { return [] }
+        var applied: [UUID] = []
+        for server in servers(manager.servers, following: host, address: address) {
+            do {
+                try manager.updateServerOrThrow(server)
+                applied.append(server.id)
+            } catch {
+                Logger.servers.error("Host address sync skipped \(server.id.uuidString, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            }
+        }
+        return applied
+    }
+
+    static func servers(_ servers: [ServerConfiguration], following host: HostProfile, address: String) -> [ServerConfiguration] {
+        let owned = Set(host.services.filter { $0.kind == .ssh }.map(\.endpointID.rawValue))
+        return servers.compactMap { server in
+            guard owned.contains(server.id), server.host != address else { return nil }
+            var updated = server
+            updated.host = address
+            return updated
+        }
     }
 }

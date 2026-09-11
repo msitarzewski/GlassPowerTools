@@ -1,5 +1,5 @@
 //
-//  WindowRecoveryManager.swift
+//  TerminalSessionOverride.swift
 //  Glass Power Tools — GlassTerminal
 //
 //  The recovery manager is the shell's (GlassWindowRecoveryManager) since 2026-09-10; the

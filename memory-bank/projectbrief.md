@@ -67,3 +67,12 @@ separate applications cannot compose that way.
 - Keep credential storage in GlasSecretStore, with its existing eligibility and mobility rules.
 - Preserve the familiar library navigation. Users must not relearn the app.
 - Never present a stub, a compile, or a dependency declaration as a working feature.
+
+**Added 2026-09-10 (user):** system-wide tags are essential — labels, groups, clients — and
+comma-separated text entry is a non-starter. Host aliases and collections are edited with a shared
+token/tag field whose suggestions come from one system-wide vocabulary. Assumption in force: one
+flat vocabulary; labels/groups/clients are uses of tags, not tag types.
+
+**Added 2026-09-10 (user):** the machine identity (IP or DNS name) belongs to the host, entered
+once; services inherit it and never ask for it again. "Connection > Terminal > IP address" is wrong.
+Port and username remain per service.

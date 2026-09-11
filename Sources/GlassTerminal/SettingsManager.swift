@@ -222,8 +222,9 @@ class SettingsManager {
         let resolvedSettingsDefaults = settingsDefaults ?? .standard
         self.settingsDefaults = resolvedSettingsDefaults
         // Without an injected store (tests, previews) the layer state lives in the same suite as
-        // the rest of the settings; glas.sh's own keys are migrated on load, below.
-        self.layers = layers ?? GlassLayerStore(defaults: resolvedSettingsDefaults, legacyDefaults: [])
+        // the rest of the settings, and the store performs glas.sh's one-time key migration from
+        // that suite; `migrateLegacyAppearanceIfNeeded` only consumes the keys afterwards.
+        self.layers = layers ?? GlassLayerStore(defaults: resolvedSettingsDefaults, legacyDefaults: [resolvedSettingsDefaults])
         let resolvedSSHKeyDefaults = sshKeyDefaults ?? SharedDefaults.defaults
         self.sshKeyDefaults = resolvedSSHKeyDefaults
         self.sshKeyLifecycleStore = sshKeyLifecycleStore ?? .live
@@ -249,32 +250,17 @@ class SettingsManager {
         }
     }
 
-    /// glas.sh's own appearance keys → the shared layer state, once. The keys are consumed so the
-    /// migration cannot repeat over a state the user has since changed in Appearance. When the
-    /// injected store already migrated (the app's store reads this domain itself), only consume.
+    /// Consumes glas.sh's own appearance keys. The one-time migration of their values into the
+    /// shared layer state is `GlassLayerStore`'s (the app's store reads this domain among its
+    /// legacy suites; the fallback store above is given it explicitly), so this never writes
+    /// the state: a second writer here re-applied stale keys over a state the user had since
+    /// changed in Appearance. Removing the keys keeps the migration from ever repeating.
     private func migrateLegacyAppearanceIfNeeded() {
         let legacyKeys = [UserDefaultsKeys.windowOpacity, UserDefaultsKeys.blurBackground, UserDefaultsKeys.glassFrost,
                           UserDefaultsKeys.backgroundFill, UserDefaultsKeys.glassMaterialStyle]
-        let present = legacyKeys.filter { settingsDefaults.object(forKey: $0) != nil }
-        guard !present.isEmpty else { return }
-        defer { present.forEach { settingsDefaults.removeObject(forKey: $0) } }
-        guard layers.migrationSource == .none else { return }
-        var state = layers.state
-        if let frost = settingsDefaults.string(forKey: UserDefaultsKeys.glassFrost)
-            ?? settingsDefaults.string(forKey: UserDefaultsKeys.glassMaterialStyle) {
-            state.material = GlassLayerMaterial(rawValue: frost) ?? .ultraThin
+        for key in legacyKeys where settingsDefaults.object(forKey: key) != nil {
+            settingsDefaults.removeObject(forKey: key)
         }
-        let canonicalOpacity = settingsDefaults.object(forKey: UserDefaultsKeys.windowOpacity)
-        let legacyOpacity = settingsDefaults.object(forKey: UserDefaultsKeys.backgroundFill)
-        if canonicalOpacity != nil || legacyOpacity != nil {
-            let opacity = Self.resolvedWindowOpacity(canonical: canonicalOpacity, legacy: legacyOpacity)
-            state.opacity = opacity
-            state.paintsTheme = opacity > 0
-        }
-        if let blur = settingsDefaults.object(forKey: UserDefaultsKeys.blurBackground) {
-            state.frost = Self.resolvedBlurBackground(blur)
-        }
-        layers.state = state
     }
 
     func loadPersistentStateIfNeeded() {
@@ -1372,9 +1358,10 @@ class SettingsManager {
         visualBell = preferences.visualBell
         cursorStyle = preferences.cursorStyle
         blinkingCursor = preferences.blinkingCursor
-        glassFrost = preferences.glassFrost
-        windowOpacity = Self.unitValue(preferences.windowOpacity)
-        blurBackground = Self.unitValue(preferences.blurBackground)
+        // `glassFrost`, `windowOpacity` and `blurBackground` are the shell's layer state
+        // (Settings → Appearance), still carried in the payload for glas.sh's readers but not
+        // applied here: the store is shared with glas.sh (D3) and applying its payload at launch
+        // overwrote the user's local Appearance choice on every relaunch.
         interactiveGlass = preferences.interactiveGlass
         glassTint = preferences.glassTint
 

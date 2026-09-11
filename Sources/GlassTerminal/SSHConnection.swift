@@ -3,7 +3,7 @@
 //  Glass Power Tools — GlassTerminal
 //
 //  glas.sh's SSHConnection, re-based on the shared engine. Every call site in TerminalSession,
-//  SessionManager, the SFTP browser and the port-forwarding manager keeps the method surface it
+//  SessionManager and the SFTP browser keeps the method surface it
 //  had; underneath, the Citadel clients, jump chain, PTY, keep-alive and host-key validation now
 //  live in GlassSSHTransport (SSHTransport / SSHShellChannel / SSHTransportPool). The terminal keeps
 //  its own concerns: mapping transport events to connection progress and terminal lines, the
@@ -421,8 +421,6 @@ class SSHConnection {
         }
         try await forward.waitUntilClosed()
     }
-
-    func resetKeepAliveCounter() { /* keep-alive is the engine's; retained for callers */ }
 
     func disconnect() async {
         eventTask?.cancel(); eventTask = nil

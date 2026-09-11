@@ -126,7 +126,7 @@ struct TerminalTailscaleView: View {
                 HStack {
                     if let savedServer {
                         Button("Edit", systemImage: "pencil") {
-                            runtime.enqueue(.editServer(savedServer))
+                            runtime.enqueue(.editServer(savedServer, hostContext: nil))
                         }
                         Spacer()
                         Button("Connect", systemImage: "terminal") {

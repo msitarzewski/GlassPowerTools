@@ -35,6 +35,7 @@ public enum GlassShellError: LocalizedError, Equatable {
             case .tooManyEntries: return "Too many entries: a host allows up to 64 aliases, 64 collections and 128 services."
             case .duplicateService: return "That service is already on this host."
             case .invalidTimestamp: return "The host record has an invalid timestamp."
+            case .invalidAddress: return "The address must be a hostname or an IP address, with no user, port or spaces."
             case .unsupportedVersion(let v): return "The host record uses schema version \(v), which this build does not understand."
             }
         case let error as HostCatalogError:
@@ -196,8 +197,7 @@ public final class GlassShellModel {
         hosts.map { host in
             let record = preferences[host: host.id]
             let kinds = HostServiceKind.allCases.filter { kind in host.services.contains { $0.kind == kind } }
-            let subtitle = kinds.isEmpty ? "No services yet"
-                : kinds.map(GlassServicePresentation.displayName(for:)).joined(separator: " · ")
+            let subtitle = Self.subtitle(for: kinds)
             return GlassLibraryItem(id: host.id, name: host.displayName, subtitle: subtitle,
                                     searchTerms: host.aliases + host.services.map(\.displayName),
                                     tags: host.tags, isFavorite: record.isFavorite,
@@ -208,6 +208,17 @@ public final class GlassShellModel {
 
     /// The consolidated host for a canonical id — or for any member record's id, so a selection
     /// or preference keyed on a record that later joined a group still resolves.
+    /// The row's second line. Up to two kinds are named; three or more are counted, because the
+    /// shared row middle-truncates a long subtitle ("Desk…abase") and the icons beside the row
+    /// already say which kinds they are.
+    static func subtitle(for kinds: [HostServiceKind]) -> String {
+        switch kinds.count {
+        case 0: "No services yet"
+        case 1, 2: kinds.map(GlassServicePresentation.displayName(for:)).joined(separator: " · ")
+        default: "\(kinds.count) services"
+        }
+    }
+
     public func host(_ id: HostID) -> GlassShellHost? {
         hosts.first { $0.id == id } ?? hosts.first { $0.contains(id) }
     }
@@ -259,35 +270,74 @@ public final class GlassShellModel {
 
     // MARK: Mutations
 
-    public func addHost(displayName: String, aliases: [String] = [], tags: [String] = []) async throws -> HostProfile {
+    public func addHost(displayName: String, address: String? = nil, aliases: [String] = [], tags: [String] = []) async throws -> HostProfile {
         let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw GlassShellError.invalidName }
-        let profile = try HostProfile(displayName: trimmed, aliases: aliases, tags: tags, lastWriterID: preferences.writerID)
+        let profile = try HostProfile(displayName: trimmed, address: Self.blankToNil(address), aliases: aliases, tags: tags,
+                                      lastWriterID: preferences.writerID)
         try await catalog.upsert(profile)
         await load()
         return profile
     }
 
+    /// Blank means "no address", never an empty string that the kit would reject.
+    static func blankToNil(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
     /// Renames every member record (so the group stays together) and applies aliases and tags to
     /// the canonical one. Each record is re-read right before writing so services another app
     /// paired since our last load survive. (Interim until the kit offers an in-lock field edit.)
-    public func updateHost(_ id: HostID, displayName: String, aliases: [String], tags: [String]) async throws {
+    public func updateHost(_ id: HostID, displayName: String, address: String? = nil, aliases: [String], tags: [String]) async throws {
         guard let host = host(id) else { throw GlassShellError.hostNotFound(id) }
         let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw GlassShellError.invalidName }
+        let newAddress = try Self.blankToNil(address).map(HostProfile.normalizedAddress)
         let snapshot = try await catalog.snapshot()
+        var updatedMembers: [HostProfile] = []
         for member in host.members {
             let fresh = snapshot.first { $0.id == member.id } ?? member
             let isCanonical = member.id == host.id
-            let updated = try HostProfile(id: fresh.id, displayName: trimmed,
+            // The address is the machine's, so every member record carries the same one.
+            let updated = try HostProfile(id: fresh.id, displayName: trimmed, address: newAddress,
                                           aliases: isCanonical ? aliases : fresh.aliases,
                                           services: fresh.services,
                                           tags: isCanonical ? tags : fresh.tags,
                                           createdAt: fresh.createdAt,
                                           updatedAt: max(Date(), fresh.updatedAt), lastWriterID: preferences.writerID)
             try await catalog.upsert(updated)
+            updatedMembers.append(updated)
         }
         await load()
+        if newAddress != host.address { notifyAddressChange(members: updatedMembers, address: newAddress) }
+    }
+
+    /// Sets only the address, leaving name, aliases and tags as they are. Used by capabilities
+    /// (through `GlassCapabilityHostAccess`) when a setup form learns the address of a host that
+    /// had none, so the machine's identity is typed once.
+    public func setHostAddress(_ address: String?, for id: HostID) async throws {
+        guard let host = host(id) else { throw GlassShellError.hostNotFound(id) }
+        try await updateHost(host.id, displayName: host.displayName, address: address, aliases: host.aliases, tags: host.tags)
+    }
+
+    /// Every capability hears about each member record: a capability keys its services by the
+    /// endpoint ids inside those records.
+    private func notifyAddressChange(members: [HostProfile], address: String?) {
+        for capability in registry.registered {
+            for member in members where member.services.contains(where: { $0.kind == capability.kind }) {
+                capability.hostAddressDidChange(host: member, address: address)
+            }
+        }
+    }
+
+    /// What a capability may do to a host while it sets a service up.
+    func hostAccess(for id: HostID) -> GlassCapabilityHostAccess {
+        GlassCapabilityHostAccess(address: host(id)?.address) { [weak self] address in
+            guard let self else { return }
+            try await self.setHostAddress(address, for: id)
+        }
     }
 
     /// Deletes every record that makes up the host.
@@ -342,7 +392,7 @@ public final class GlassShellModel {
             if member.services.isEmpty { try await catalog.delete(hostID: member.id) }
         }
         let fresh = (try await catalog.snapshot()).first { $0.id == host.id } ?? host.canonical
-        let merged = try HostProfile(id: fresh.id, displayName: fresh.displayName, aliases: host.aliases,
+        let merged = try HostProfile(id: fresh.id, displayName: fresh.displayName, address: host.address, aliases: host.aliases,
                                      services: fresh.services, tags: host.tags, createdAt: fresh.createdAt,
                                      updatedAt: max(Date(), fresh.updatedAt), lastWriterID: preferences.writerID)
         try await catalog.upsert(merged)
@@ -369,16 +419,20 @@ public final class GlassShellModel {
             errorMessage = GlassShellError.serviceNotFound(endpointID).localizedDescription; return
         }
         // The user chose this service, so remember it either way; but "last connected" is only
-        // true when a capability actually opens it. The placeholder connects nothing.
+        // true when a capability reports a live session. A failed attempt, a cancelled prompt and
+        // the placeholder connect nothing.
         // The capability receives the record that owns the endpoint — its endpoint id is what
         // the capability's own store is keyed by.
         preferences[host: host.id].lastUsedEndpointID = endpointID
+        do { try persistPreferences() } catch { errorMessage = GlassShellError.message(for: error) }
         if let capability = registry.capability(for: service.kind) {
-            preferences[host: host.id].lastConnected = Date()
-            do { try persistPreferences() } catch { errorMessage = GlassShellError.message(for: error) }
-            capability.open(service: service, host: owner)
+            let hostID = host.id
+            capability.open(service: service, host: owner, hostAccess: hostAccess(for: hostID)) { [weak self] outcome in
+                guard let self, case .connected = outcome else { return }
+                self.preferences[host: hostID].lastConnected = Date()
+                do { try self.persistPreferences() } catch { self.errorMessage = GlassShellError.message(for: error) }
+            }
         } else {
-            do { try persistPreferences() } catch { errorMessage = GlassShellError.message(for: error) }
             placeholderRequest = GlassShellPlaceholderRequest(host: owner, service: service)
         }
     }
@@ -387,9 +441,10 @@ public final class GlassShellModel {
     /// UI tests seed the isolated catalog through a launch argument, because the runner cannot
     /// reach the app's container on iOS or visionOS:
     /// `--ui-testing-seed-hosts "juliet:ssh|juliet:rdp|oscar:ssh+database"` creates one record
-    /// per `|` entry, named before the colon, with one service per `+`-separated kind. Only honoured
-    /// alongside `--ui-testing`, only into a catalog that is not under a real Group Container,
-    /// and only when that catalog is empty.
+    /// per `|` entry, named before the colon, with one service per `+`-separated kind; a name may
+    /// carry the host's address after `@` (`scratch@192.0.2.6:ssh`). Only honoured alongside
+    /// `--ui-testing`, only into a catalog that is not under a real Group Container, and only when
+    /// that catalog is empty.
     private func seedForUITestingIfRequested() async throws {
         let arguments = ProcessInfo.processInfo.arguments
         guard arguments.contains("--ui-testing"),
@@ -398,13 +453,17 @@ public final class GlassShellModel {
               try await catalog.snapshot().isEmpty else { return }
         for (offset, entry) in arguments[index + 1].split(separator: "|").enumerated() {
             let parts = entry.split(separator: ":", maxSplits: 1)
-            guard let name = parts.first.map(String.init), !name.isEmpty else { continue }
+            guard let nameAndAddress = parts.first.map(String.init), !nameAndAddress.isEmpty else { continue }
+            let nameParts = nameAndAddress.split(separator: "@", maxSplits: 1).map(String.init)
+            let name = nameParts[0]
+            let address = nameParts.count > 1 ? nameParts[1] : nil
+            guard !name.isEmpty else { continue }
             let kinds = parts.count > 1 ? parts[1].split(separator: "+").compactMap { HostServiceKind(rawValue: String($0)) } : []
             let services = kinds.map {
                 HostServiceLink(endpointID: EndpointID(), kind: $0, displayName: "\(GlassServicePresentation.displayName(for: $0)) on \(name)")
             }
             let created = Date(timeIntervalSince1970: 1_700_000_000 + Double(offset))
-            try await catalog.upsert(try HostProfile(displayName: name, aliases: [], services: services,
+            try await catalog.upsert(try HostProfile(displayName: name, address: address, aliases: [], services: services,
                                                      createdAt: created, updatedAt: created, lastWriterID: writerID))
         }
     }

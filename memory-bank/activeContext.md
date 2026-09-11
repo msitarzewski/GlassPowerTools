@@ -259,3 +259,95 @@ Then the TODO/stub sweep the user asked for across all created code, with the sa
 On resume: read this file, the Stage 2 note, the W3, integration and consolidation notes; commit
 any interim W3 note; launch one worker for defects 1–5 with the ownership above and one read-only
 reviewer for the Stage 2 close-out; run the verification list; then Stage 3.
+
+## Resumed — 2026-09-11T00:27Z, tree clean at `13fed7f`
+
+Recovery matched the handoff; no discrepancy. **Local Network is no longer blocked:** an
+ad-hoc-signed TCP probe built in the session scratchpad reaches `192.0.2.6:22` and reads the
+OpenSSH banner, so the engine's gated CLI suite (`SSHTransportIntegrationTests`) is running in a
+separate scratch build path. Two agents launched: **W4** (owns `Sources/GlassShell`,
+`Sources/GlassTerminal`, `UITests/`, `App/GlassPowerToolsApp.swift`; task note
+`tasks/2026-09/2026-09-10_stage-2-w4.md`) for the three macOS causes and integration defects 1–4
+plus the settings-page check; and a **read-only Stage 2 close-out reviewer** (parity checklist,
+TODO/stub scan, security spot-check, dead code). Coordinator `/root` still owns this file.
+
+## User feedback on the first /Applications build — 2026-09-10 evening
+
+Release build from W4's in-flight tree installed at `/Applications/GlassPowerTools.app` (0.1.0,
+signed, launches). The user's five macOS crash reports were all the sheet-on-sheet accessibility
+recursion (defect 1, fixed in W4's tree). New user requests, all in flight:
+
+1. **"+" left of the sidebar toggle** (library window and terminal window). Kit change made by
+   the coordinator in `../GlassConnectionKit` (uncommitted): `GlassConnectionLibrary.sidebarActions`.
+   Shell/terminal wiring assigned to W4 (phase 3).
+2. **Settings modal tabs**: no "Settings Section" label; vertical tabs on compact iPhone; leading
+   ornament on visionOS. Done in the kit's `GlassSettingsSections` (uncommitted); kit builds on all
+   three platforms, 48 kit tests pass. UI-test adjustments, if any, assigned to W4.
+3. **macOS App Sandbox removed** from `Platforms/macOS/macOS.entitlements` (matches glas.sh; the
+   sandbox broke the Mac local terminal). Recorded in techContext.
+
+Next: when W4 reports green, rebuild Release and reinstall to /Applications; then commit (the
+user authorized commits for this project's work) and note the kit's uncommitted diff for the user.
+
+**W5 launched (2026-09-10 evening):** system-wide tag field. Owns the new kit file
+`GlassConnectionUI/GlassTagField.swift` (+ kit tests), `Sources/GlassShell/GlassShellEditors.swift`,
+new `GlassShellTagVocabulary.swift` (+ test), and only the tag-typing lines of
+`UITests/GlassShellLibraryUITests.swift`. W4 notified. Task note: `tasks/2026-09/2026-09-10_shell-tags.md`.
+
+**W5 done (2026-09-10 evening, uncommitted):** `GlassTagField` in the kit (chips, Remove, Return/comma
+commit, Backspace removes last, suggestions from one system-wide vocabulary; flow layout), 3 kit
+tests (kit 51/51); `GlassShellTagVocabulary` + `GlassShellModel.tagVocabulary` (2 tests); host editor
+uses the field for aliases and collections; new `UITests/GlassShellTagFieldUITests.swift`. Whole
+package 461 tests / 25 suites pass in W5's scratch build; macOS library 5/5 + tag test 1/1; iPhone
+5/5 + 1/1; visionOS builds, no UI run. Mac screenshots judged by eye: chips as tinted capsules with
+×, suggestions "+ Clients / + Lab" under the input. Note: `tasks/2026-09/2026-09-10_shell-tags.md`.
+Real defect found and fixed: AppKit's field editor consumes Backspace before `onKeyPress`, so the
+field uses a local NSEvent monitor only while focused and empty.
+
+## Late evening 2026-09-10 — W4 lost to the session rate limit; W6 launched
+
+W4 (macOS regression + defects + cleanup + phase 3) was terminated by the API session limit before
+its final report. **All four phase-3 edits are present in the tree** (sidebar "+" placements, 3 pt
+canvas margin with `TerminalCanvasMetrics`, `GlassLayeredPanel(role: .embedded)`, window sizing);
+its note's verification table is current only up to the phase-2 queue. W4's last visionOS run found
+the kit's hand-built settings `.ornament` absent from the accessibility hierarchy; the coordinator
+replaced it with a native `TabView` (visionOS renders tabs as the leading ornament; kit builds).
+Open from W4: the macOS accessibility crash after the connection-failure alert (only under XCTest
+diagnostics), and the macOS real-host UI test blocked on the app's own Local Network prompt.
+
+**W6 launched** for the host-level address requirement (see projectbrief): owns
+`HostProfile.swift` (+ kit tests), `Sources/GlassShell/**`, the terminal capability/connect
+flow/server form, tests and UITests; note `tasks/2026-09/2026-09-10_host-address.md`.
+
+**Still Stage 2.** Everything since the resume is Stage 2 close-out plus shell fixes the Stage 2
+build exposed on real use (sandbox, panel role, tags, address, "+", settings tabs, margin). Stage 3
+starts when the Stage 2 verification list is green and the tree is committed.
+
+**Second /Applications build (late 2026-09-10):** Release from the tree with W4's phase 3 + W5's
+tags + the sandbox removal; installed, launches, no crash. Verified by eye from own-window captures
+(`scratchpad/mac-library-now.png`, `mac-detail-now4.png`): "+" sits left of the sidebar toggle;
+the detail is a flat column with the standard action bar, no card, no white corner (panel role fix
+confirmed). Found and queued to W6: Services rows overflow at the 900-pt minimum width; "Connect
+opens" shows a bare endpoint name. Scripted System Events clicks register as double-clicks (they
+opened the connect sheet); a real single click selects — not a defect. The terminal cannot read
+the App Group container (TCC), so catalog contents are only inspectable through the app.
+
+## W6 done — 2026-09-11 early (uncommitted → committed in the next checkpoint)
+
+Host-level address landed: `HostProfile.address: String?` in the kit (schema stays 1; absent on the
+wire when nil; lenient decode; catalog publication preserves it; 53 kit tests), shell `Address`
+field under Name, detail row, same-address grouping (loopback excluded), capability hooks
+`GlassCapabilityHostAccess` / `hostAddressDidChange`, terminal server form shows the address
+read-only ("From the host …") when the host has one and writes an entered value back when it has
+none, `GlassTerminalHostAddressSync` propagates edits. Seed syntax `name@address:kind`. Detail
+Services rows restructured (name/kind stacked, actions trailing, `ViewThatFits`); "Connect opens"
+shows the kind first. Results: whole package **469 tests / 28 suites** (twice); iOS/visionOS/macOS
+builds; iPhone UI 7/8 — the real-host test ran the full address flow (screenshot judged by eye:
+"192.0.2.6 / From the host scratch", no Host field) and then failed only because **the VM is
+down** (`nc` times out from the Mac too). **macOS XCUITest is blocked** on this machine: every
+launch fails "Timed out while enabling automation mode" (four attempts by W6); the coordinator is
+re-checking with the smoke test. Third /Applications build installed and launched.
+
+**Needs the user:** bring the VM at 192.0.2.6 back; if the macOS smoke test still times out,
+run `sudo launchctl kickstart -k system/com.apple.testmanagerd` or re-grant Automation /
+Accessibility to the Xcode test runner in System Settings.

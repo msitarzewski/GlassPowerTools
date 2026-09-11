@@ -20,6 +20,13 @@ struct SFTPExtensionsAndTimesTests {
         #expect(SFTPServerExtensions(["posix-rename@openssh.com": "2"]).supportsPOSIXRename == false, "only version 1 is the OpenSSH contract")
     }
 
+    @Test func selfAndParentReferencesAreNeverEntriesAndNeverSafeNames() {
+        #expect(SFTPEntry.isSelfOrParent(".") && SFTPEntry.isSelfOrParent(".."))
+        #expect(!SFTPEntry.isSelfOrParent(".hidden") && !SFTPEntry.isSelfOrParent("..."))
+        #expect(!SFTPEntry.isSafeName(".") && !SFTPEntry.isSafeName(".."))
+        #expect(SFTPEntry.isSafeName(".hidden") && SFTPEntry.isSafeName("..."))
+    }
+
     @Test func attributeChangesSendOnlyWhatIsSetAndRefusePartialTimes() {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let both = SFTPAttributeChanges(permissions: 0o644, accessed: now, modified: now)

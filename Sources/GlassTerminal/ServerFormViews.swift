@@ -103,26 +103,41 @@ private struct TerminalInitialSizeEditor: View {
 
 // MARK: - Server Form Entry Points
 
+/// The shell's host, as the server form sees it. The address is the machine's and lives on the
+/// host: when the host has one the form shows it read-only and asks only for the terminal's own
+/// fields; when it has none the form's Host field is the one place it is typed, and `setAddress`
+/// hands it back to the host so no service asks again.
+struct ServerFormHostContext {
+    let hostName: String
+    let address: String?
+    let setAddress: (@MainActor @Sendable (String) async throws -> Void)?
+
+    var showsReadOnlyAddress: Bool { address != nil }
+}
+
 struct AddServerView: View {
     @Bindable var serverManager: ServerManager
     private let draft: ServerConfiguration?
+    private let hostContext: ServerFormHostContext?
 
-    init(serverManager: ServerManager, draft: ServerConfiguration? = nil) {
+    init(serverManager: ServerManager, draft: ServerConfiguration? = nil, hostContext: ServerFormHostContext? = nil) {
         self.serverManager = serverManager
         self.draft = draft
+        self.hostContext = hostContext
     }
 
     var body: some View {
-        ServerFormView(mode: .add(draft), serverManager: serverManager)
+        ServerFormView(mode: .add(draft), serverManager: serverManager, hostContext: hostContext)
     }
 }
 
 struct EditServerView: View {
     let server: ServerConfiguration
     @Bindable var serverManager: ServerManager
+    var hostContext: ServerFormHostContext? = nil
 
     var body: some View {
-        ServerFormView(mode: .edit(server), serverManager: serverManager)
+        ServerFormView(mode: .edit(server), serverManager: serverManager, hostContext: hostContext)
     }
 }
 
@@ -287,19 +302,27 @@ struct ServerFormView: View {
     @State private var touchedFields: Set<FormField> = []
     @State private var showingAddSSHKey = false
     @State private var showingJumpHostPicker = false
+    #if os(macOS)
+    @Environment(\.openWindow) private var openWindow
+    #endif
     @State private var saveError: String?
     @State private var requiresPasswordUpgrade = false
     @State private var didLoadStoredPassword = false
 
     @FocusState private var focusedField: FormField?
 
-    init(mode: Mode, serverManager: ServerManager) {
+    /// Present when the form was opened from the shell's host; see `ServerFormHostContext`.
+    private let hostContext: ServerFormHostContext?
+
+    init(mode: Mode, serverManager: ServerManager, hostContext: ServerFormHostContext? = nil) {
         self.mode = mode
         self.serverManager = serverManager
+        self.hostContext = hostContext
 
         let source = mode.sourceConfiguration
         _name = State(initialValue: source?.name ?? "")
-        _host = State(initialValue: source?.host ?? "")
+        // The host's address wins over whatever the saved server carried: the host is the source.
+        _host = State(initialValue: hostContext?.address ?? source?.host ?? "")
         _port = State(initialValue: source.map { String($0.port) } ?? "22")
         _username = State(initialValue: source?.username ?? "")
         _authMethod = State(initialValue: source?.authMethod == .sshKey ? .sshKey : .password)
@@ -319,6 +342,13 @@ struct ServerFormView: View {
         _initialTerminalRows = State(
             initialValue: source?.initialTerminalRows ?? TerminalGeometry.default.rows
         )
+    }
+
+    /// From the shell's host the form adds a terminal *to that host*; "Import" is the Tailscale
+    /// draft's word and "Add Server" the terminal's own.
+    private var navigationTitle: String {
+        if let hostContext, !mode.isEditing { return "Add Terminal to \(hostContext.hostName)" }
+        return mode.navigationTitle
     }
 
     private var validationInput: ValidationInput {
@@ -374,7 +404,13 @@ struct ServerFormView: View {
                 markTouched(authMethod == .sshKey ? .sshKey : .password)
                 normalizeSelectedSSHKey()
             }
-            .onChange(of: settingsManager.sshKeys.map(\.id)) { _, _ in
+            .onChange(of: settingsManager.sshKeys.map(\.id)) { previous, current in
+                // A key the user just added from this form is the one they mean: select it
+                // rather than the catalog's first key (on a Mac that shares glas.sh's catalog
+                // the first key is usually an older one whose material this build may not hold).
+                if authMethod == .sshKey, let added = current.first(where: { !previous.contains($0) }) {
+                    sshKeyID = added
+                }
                 normalizeSelectedSSHKey()
             }
             .onChange(of: usesAppDefaultTerminalSize) { _, usesDefault in
@@ -407,7 +443,7 @@ struct ServerFormView: View {
     private var editor: some View {
         NavigationStack {
             platformForm
-                .navigationTitle(mode.navigationTitle)
+                .navigationTitle(navigationTitle)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Cancel") {
@@ -424,10 +460,12 @@ struct ServerFormView: View {
                         #endif
                     }
                 }
+                #if !os(macOS)
                 .sheet(isPresented: $showingAddSSHKey) {
                     AddSSHKeyView()
                         .environment(settingsManager)
                 }
+                #endif
                 .sheet(isPresented: $showingJumpHostPicker) {
                     JumpHostPickerView(
                         servers: availableJumpHosts,
@@ -467,13 +505,34 @@ struct ServerFormView: View {
                 identifier: "\(identifierPrefix)-display-name",
                 isRequired: true
             )
-            formTextField(
-                "Host",
-                text: $host,
-                field: .host,
-                identifier: "\(identifierPrefix)-host",
-                isRequired: true
-            )
+            if let hostContext, hostContext.showsReadOnlyAddress {
+                // The machine's identity is the host's, entered once in the host editor.
+                LabeledContent("Address") {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(host)
+                            .textSelection(.enabled)
+                            .accessibilityIdentifier("\(identifierPrefix)-host")
+                            .accessibilityValue(host)
+                        Text("From the host \(hostContext.hostName)")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .accessibilityElement(children: .contain)
+            } else {
+                formTextField(
+                    "Host",
+                    text: $host,
+                    field: .host,
+                    identifier: "\(identifierPrefix)-host",
+                    isRequired: true
+                )
+                if let hostContext {
+                    Text("\(hostContext.hostName) has no address yet. This one is saved on the host and shared by its services.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
             portField
             formTextField(
                 "Username",
@@ -632,11 +691,23 @@ struct ServerFormView: View {
     @ViewBuilder
     private var sshKeyEditor: some View {
         #if os(macOS)
+        // The label is plain text on purpose. `requiredFieldLabel` folds its two texts into one
+        // accessibility element with an explicit label; on a `LabeledContent` whose content is
+        // not a single control (this text-and-button stack) that makes SwiftUI's label
+        // resolution on macOS 27 recurse until the stack overflows — SIGSEGV in
+        // `AccessibilityNode.accessibilityLabel` on any full accessibility snapshot of the form,
+        // reproduced with the SSH Key method selected and no other window open. The Password and
+        // Host rows keep the combined label because their content is one text field.
         LabeledContent {
             sshKeyEditorContent
                 .serverFormControlPresentation()
         } label: {
-            requiredFieldLabel("SSH Key", isRequired: true)
+            HStack(spacing: 6) {
+                Text("SSH Key")
+                Text("Required")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
         }
         #else
         VStack(alignment: .leading, spacing: 8) {
@@ -663,7 +734,13 @@ struct ServerFormView: View {
             }
             validationMessage(for: .sshKey)
             Button("Add SSH Key", systemImage: "plus.circle") {
+                #if os(macOS)
+                // This form is itself a sheet; a sheet on a sheet crashes AppKit's accessibility
+                // resolution on macOS 27 (project rule 12). The key form gets its own window.
+                openWindow(id: "terminal-add-ssh-key")
+                #else
                 showingAddSSHKey = true
+                #endif
             }
             .buttonStyle(.bordered)
         }
@@ -792,6 +869,17 @@ struct ServerFormView: View {
         return issues.isEmpty
     }
 
+    /// The host had no address and the user typed one here: hand it to the host so every other
+    /// service inherits it. Failure to record it is logged, never fatal — the server is saved.
+    private func recordAddressOnHostIfNew(_ address: String) {
+        guard let hostContext, !hostContext.showsReadOnlyAddress, let setAddress = hostContext.setAddress else { return }
+        Task { @MainActor in
+            do { try await setAddress(address) } catch {
+                Logger.servers.error("Could not record the address on the host: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
+
     private func save() {
         guard validateForSave(), let parsedPort = Int(port) else { return }
         commitPendingTag()
@@ -826,6 +914,7 @@ struct ServerFormView: View {
                     server,
                     password: authMethod == .password ? password : nil
                 )
+                recordAddressOnHostIfNew(normalizedHost)
             case .edit(let original):
                 var updatedServer = original
                 updatedServer.name = normalizedName

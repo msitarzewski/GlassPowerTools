@@ -11,6 +11,7 @@
 
 import SwiftUI
 import GlassLayers
+import GlassShell
 
 /// Attached once by `GlassTerminalBootstrap`; runs connect requests posted to the runtime.
 struct TerminalConnectFlow: ViewModifier {
@@ -27,11 +28,14 @@ struct TerminalConnectFlow: ViewModifier {
     @State private var pendingTrustChallenge: HostKeyTrustChallenge?
     @State private var connectionFailureMessage: String?
     @State private var connectingServerIDs: Set<UUID> = []
+    /// The shell's outcome callbacks for attempts still in flight (trust prompt, password
+    /// prompt, legacy-algorithm confirmation), keyed by server id. Each is called once.
+    @State private var outcomeReports: [UUID: GlassCapabilityReport] = [:]
     @State private var pendingLegacyAlgorithmServer: ServerConfiguration?
     @State private var passwordPromptServer: ServerConfiguration?
     @State private var pendingConnectionPurpose: TerminalSession.Purpose = .terminal
     @State private var addServerDraft: AddServerRequest?
-    @State private var editingServer: ServerConfiguration?
+    @State private var editingServer: EditServerRequest?
     @State private var viewingServer: ServerConfiguration?
     @State private var serverPendingDeletion: ServerConfiguration?
     #if os(visionOS) || os(iOS)
@@ -44,6 +48,11 @@ struct TerminalConnectFlow: ViewModifier {
 
     /// `Identifiable` wrapper so an empty draft (plain "Add Server") can drive a `.sheet(item:)`.
     struct AddServerRequest: Identifiable { let id = UUID(); let draft: ServerConfiguration? }
+    struct EditServerRequest: Identifiable {
+        let server: ServerConfiguration
+        let hostContext: ServerFormHostContext?
+        var id: UUID { server.id }
+    }
 
     func body(content: Content) -> some View {
         content
@@ -66,6 +75,7 @@ struct TerminalConnectFlow: ViewModifier {
                     retryPendingConnection()
                 } catch {
                     connectionFailureMessage = error.localizedDescription
+                    report(.failed(error.localizedDescription), for: session.server.id)
                     sessionManager.closePendingHostTrustSession(session)
                     clearPendingTrustPrompt()
                 }
@@ -91,10 +101,18 @@ struct TerminalConnectFlow: ViewModifier {
                 connectToServer(server, purpose: pendingConnectionPurpose, legacyAlgorithmsConfirmed: true)
             }
             Button("Cancel", role: .cancel) {
+                report(.dismissed, for: server.id)
                 pendingLegacyAlgorithmServer = nil
             }
         } message: { server in
             Text("\(server.name) permits obsolete SSH algorithms. They provide weaker protection and should only be used for a server you control when upgrading it is not currently possible.")
+        }
+        .onChange(of: passwordPromptServer?.id) { previous, current in
+            // The prompt closed without a submitted password: the attempt is over. A submitted
+            // password has already started `connectToServer`, which reports on its own.
+            if let previous, current == nil, !connectingServerIDs.contains(previous) {
+                report(.dismissed, for: previous)
+            }
         }
         .sheet(item: $passwordPromptServer, onDismiss: {
             #if os(visionOS) || os(iOS)
@@ -129,9 +147,9 @@ struct TerminalConnectFlow: ViewModifier {
                 AddServerView(serverManager: serverManager, draft: request.draft)
             }
         }
-        .sheet(item: $editingServer) { server in
+        .sheet(item: $editingServer) { request in
             GlassLayeredPanel(cornerRadius: 0) {
-                EditServerView(server: server, serverManager: serverManager)
+                EditServerView(server: request.server, serverManager: serverManager, hostContext: request.hostContext)
             }
         }
         .sheet(item: $viewingServer) { server in
@@ -198,8 +216,17 @@ struct TerminalConnectFlow: ViewModifier {
 
     private func handle(_ request: GlassTerminalRuntime.Request) {
         switch request {
-        case .connect(let serverID, let purpose):
-            guard let server = serverManager.server(for: serverID) else { return }
+        case .connect(let serverID, let purpose, let report):
+            guard let server = serverManager.server(for: serverID) else {
+                report?(.failed(SessionOpenError.savedServerNotFound.localizedDescription))
+                return
+            }
+            if let report {
+                // A second Connect while one is pending replaces the callback; the shell only
+                // cares about the latest attempt.
+                if let superseded = outcomeReports[serverID] { superseded(.dismissed) }
+                outcomeReports[serverID] = report
+            }
             connectToServer(server, purpose: purpose)
         case .quickConnect(let config, let password):
             Task { @MainActor in
@@ -211,8 +238,8 @@ struct TerminalConnectFlow: ViewModifier {
             openWorkgroup(preset)
         case .addServer(let draft):
             addServerDraft = AddServerRequest(draft: draft)
-        case .editServer(let server):
-            editingServer = server
+        case .editServer(let server, let hostContext):
+            editingServer = EditServerRequest(server: server, hostContext: hostContext)
         case .serverInfo(let server):
             viewingServer = server
         case .deleteServer(let server):
@@ -442,11 +469,13 @@ struct TerminalConnectFlow: ViewModifier {
                     pendingConnectionPurpose = purpose
                     passwordPromptServer = promptServer
                 } else {
-                    connectionFailureMessage = Self.connectionFailureMessage(
+                    let message = Self.connectionFailureMessage(
                         base: error.localizedDescription,
                         diagnostics: nil,
                         host: server.host
                     )
+                    connectionFailureMessage = message
+                    report(.failed(message), for: server.id)
                 }
                 return
             }
@@ -463,20 +492,28 @@ struct TerminalConnectFlow: ViewModifier {
                 if !session.didRequestInitialTerminalPresentation {
                     presentConnectionSurface(for: session)
                 }
+                report(.connected, for: server.id)
                 return
             }
 
             if case .error(let message) = session.state {
                 if session.didRequestInitialTerminalPresentation {
+                    report(.failed(message), for: server.id)
                     return
                 }
-                connectionFailureMessage = Self.connectionFailureMessage(
+                let failure = Self.connectionFailureMessage(
                     base: message,
                     diagnostics: session.lastConnectionDiagnostics,
                     host: server.host
                 )
+                connectionFailureMessage = failure
+                report(.failed(failure), for: server.id)
                 sessionManager.closeSession(session)
+                return
             }
+            // A strict-mode host-key rejection leaves the session neither connected nor errored;
+            // the flow has already told the user. The attempt is over either way.
+            report(.dismissed, for: server.id)
         }
     }
 
@@ -549,8 +586,10 @@ struct TerminalConnectFlow: ViewModifier {
         let reason = challenge.reason == .changed
             ? "the presented key does not match the saved key"
             : "the presented key has not been saved"
-        connectionFailureMessage =
+        let message =
             "Strict host-key verification blocked the connection to \(challenge.host):\(challenge.port) because \(reason). No trust decision was recorded."
+        connectionFailureMessage = message
+        report(.failed(message), for: session.server.id)
         session.pendingHostKeyChallenge = nil
         sessionManager.closeSession(session)
         clearPendingTrustPrompt()
@@ -571,11 +610,21 @@ struct TerminalConnectFlow: ViewModifier {
         Binding(
             get: { pendingLegacyAlgorithmServer != nil },
             set: { isPresented in
-                if !isPresented {
+                if !isPresented, let server = pendingLegacyAlgorithmServer {
+                    report(.dismissed, for: server.id)
                     pendingLegacyAlgorithmServer = nil
                 }
             }
         )
+    }
+
+    // MARK: - Outcome reports (the shell's `GlassCapability.open` callback)
+
+    /// Delivers the shell's outcome for a server's attempt, once; later calls for the same
+    /// attempt are no-ops. Attempts the terminal started itself have no report.
+    private func report(_ outcome: GlassCapabilityOutcome, for serverID: UUID) {
+        guard let pending = outcomeReports.removeValue(forKey: serverID) else { return }
+        pending(outcome)
     }
 
     static func targetPasswordPromptServer(
@@ -602,7 +651,7 @@ struct TerminalConnectFlow: ViewModifier {
         }
         if isLikelyLocalNetworkHost(host) {
             sections.append(
-                "Local Network access may be required for this host. In System Settings, open Privacy & Security > Local Network, allow glas.sh, then try again."
+                "Local Network access may be required for this host. In System Settings, open Privacy & Security > Local Network, allow Glass Power Tools, then try again."
             )
         }
         return sections.joined(separator: "\n\n")
@@ -703,11 +752,33 @@ struct TerminalConnectFlow: ViewModifier {
         }
     }
 
+    /// Reconnects the session whose host key the user just trusted.
+    ///
+    /// The session is taken out of the prompt state *before* the reconnect task starts. The
+    /// alert's Confirm action runs first, then SwiftUI sets the alert's `isPresented` binding to
+    /// false, whose setter performs the Cancel cleanup (close and unregister the pending
+    /// session). With the session still pending at that point, the cleanup closed it before the
+    /// task ran `reconnect`, which then threw `sessionNotRegistered` — the post-trust failure
+    /// seen against the real host. Clearing synchronously leaves the dismissal nothing to close.
     private func retryPendingConnection() {
-        guard let session = pendingTrustSession else { return }
+        guard let session = Self.takePendingTrustSession(&pendingTrustSession, challenge: &pendingTrustChallenge) else { return }
+        reconnectTrustedSession(session)
+    }
 
+    /// Clears the prompt state and hands back the session it held, so the prompt's dismissal
+    /// cannot close the session a retry is about to reconnect. Nonisolated for unit testing.
+    nonisolated static func takePendingTrustSession(
+        _ session: inout TerminalSession?,
+        challenge: inout HostKeyTrustChallenge?
+    ) -> TerminalSession? {
+        defer { session = nil; challenge = nil }
+        return session
+    }
+
+    private func reconnectTrustedSession(_ session: TerminalSession) {
+        let serverID = session.server.id
         Task { @MainActor in
-            if let updatedServer = serverManager.server(for: session.server.id) {
+            if let updatedServer = serverManager.server(for: serverID) {
                 session.server = updatedServer
             }
             session.pendingHostKeyChallenge = nil
@@ -715,27 +786,30 @@ struct TerminalConnectFlow: ViewModifier {
                 try await sessionManager.reconnect(session, settingsManager: settingsManager)
             } catch {
                 connectionFailureMessage = error.localizedDescription
+                report(.failed(error.localizedDescription), for: serverID)
                 sessionManager.closePendingHostTrustSession(session)
-                clearPendingTrustPrompt()
                 return
             }
             if session.state == .connected {
                 if !session.didRequestInitialTerminalPresentation {
                     presentConnectionSurface(for: session)
                 }
-                clearPendingTrustPrompt()
+                report(.connected, for: serverID)
             } else {
                 if case .error(let message) = session.state {
                     connectionFailureMessage = message
+                    report(.failed(message), for: serverID)
+                } else {
+                    report(.dismissed, for: serverID)
                 }
                 sessionManager.closePendingHostTrustSession(session)
-                clearPendingTrustPrompt()
             }
         }
     }
 
     private func closePendingTrustSessionAndClearPrompt() {
         if let session = pendingTrustSession {
+            report(.dismissed, for: session.server.id)
             sessionManager.closePendingHostTrustSession(session)
         }
         clearPendingTrustPrompt()

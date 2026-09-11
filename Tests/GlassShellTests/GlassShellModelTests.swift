@@ -2,6 +2,7 @@ import GlassLayers
 import Foundation
 import Testing
 import GlassConnectionKit
+import GlassConnectionUI
 import GlassHostCatalog
 @testable import GlassShell
 
@@ -22,8 +23,13 @@ private final class RecordingCapability: GlassCapability {
     var displayName: String { "Recorder" }
     var symbolName: String { "circle" }
     var opened: [(HostServiceLink, HostProfile)] = []
+    /// The shell's outcome callback for the latest `open`; tests deliver it explicitly.
+    var pendingReport: ((GlassCapabilityOutcome) -> Void)?
     init(kind: HostServiceKind) { self.kind = kind }
-    func open(service: HostServiceLink, host: HostProfile) { opened.append((service, host)) }
+    func open(service: HostServiceLink, host: HostProfile, report: @escaping @MainActor (GlassCapabilityOutcome) -> Void) {
+        opened.append((service, host))
+        pendingReport = report
+    }
 }
 
 @Suite("GlassShellModel", .serialized)
@@ -178,6 +184,6 @@ struct GlassShellModelTests {
         await #expect(throws: GlassShellError.invalidName) { _ = try await model.addHost(displayName: "   ") }
         let host = try await model.addHost(displayName: "Ok")
         await #expect(throws: GlassShellError.invalidName) { _ = try await model.addService(kind: .ssh, displayName: " ", to: host.id) }
-        #expect(GlassShellHostEditor.split(" a, b ,,c ") == ["a", "b", "c"])
+        #expect(GlassTagList.adding(" a, b ,,c ", to: []) == ["a", "b", "c"], "the editor commits tokens through the kit tag list")
     }
 }

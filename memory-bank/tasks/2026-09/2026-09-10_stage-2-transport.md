@@ -186,3 +186,16 @@ visionOS Simulator build **succeeded, 0 warnings**; scaffold sweep clean. Real h
 - W2: map `SSHTransportEvent` to `ConnectionProgressStage`, keep auto-reconnect and recording in
   the terminal, pass glas.sh's password location list through `SecretStoreCredentialResolver`,
   and expect the on-loop `NIOAsyncChannel` requirement noted above.
+
+## Real-host suite run — 2026-09-11 (coordinator)
+
+After the terminal restart the Local Network grant is in place: an ad-hoc-signed BSD `connect()`
+probe reaches `192.0.2.6:22` and reads `SSH-2.0-OpenSSH_10.2p1 Ubuntu-2ubuntu3.6`.
+
+| Run | Result |
+|---|---|
+| `SSHTransportIntegrationTests` (gated, real host, first run) | **4 passed, 1 failed:** `sftpListsAndRoundTripsInATemporaryDirectory` — `list(directory)` returned `.` and `..` alongside the file (OpenSSH's `sftp-server` lists them like `ls -a`; the terminal browser filtered them at four call sites, the editor consumer and the test did not). |
+| Fix | `CitadelSFTPSession.list` drops `.`/`..` at the engine boundary (`Sources/GlassSSHTransport/SFTPSession.swift`, `SFTPEntry.isSelfOrParent`, reused by `isSafeName`); protocol doc updated; unit test `selfAndParentReferencesAreNeverEntriesAndNeverSafeNames` added. |
+| `GlassSSHTransportTests` whole module incl. real host, after fix | **62 tests in 10 suites passed**; real-host suite 5/5 (command exec, interactive shell round trip, SFTP round trip with extensions/times/posix-rename/fsync, tunnel to the host's own port, pool sharing). |
+
+Provenance: real server, OpenSSH 10.2p1 on Ubuntu, over the Parallels bridge; not a simulation.

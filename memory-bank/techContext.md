@@ -210,3 +210,13 @@ prompt, so the simulator is not subject to the Mac's Local Network gate.
   are memory-safe Swift, but zlib, VideoToolbox, CommonCrypto, tree-sitter and a small number of
   deliberate unsafe blocks are not. If real containment is wanted later, move an engine into an XPC
   service; that is one piece of infrastructure here, and would have been three.
+
+
+**Local Network (updated 2026-09-11):** the grant for the terminal app is now in place; ad-hoc-signed binaries reach `192.0.2.6:22`. The engine's real-host suite passes 5/5 (see the Stage 2 transport note).
+
+**macOS App Sandbox (found 2026-09-10 evening, fixed):** the Stage 1 project's
+`Platforms/macOS/macOS.entitlements` carried `com.apple.security.app-sandbox`, `network.client`
+and `files.user-selected.read-only`, which glas.sh's macOS entitlements never had. The sandbox broke
+the Mac local terminal (`zsh: can't set tty pgrp: operation not permitted`) and would have blocked
+the SSH agent socket, `~/.ssh` reads and file-promise drags. The file is now byte-identical to
+glas.sh's: App Group, Keychain group, iCloud KVS, hardened runtime on, no sandbox.

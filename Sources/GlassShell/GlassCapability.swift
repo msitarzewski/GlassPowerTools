@@ -1,6 +1,35 @@
 import SwiftUI
 import GlassConnectionKit
 
+/// How a capability's `open` ended, reported back to the shell once, at the first terminal
+/// state. Only `.connected` counts as a connection: the shell stamps "last connected" on it and
+/// on nothing else, so a failed or cancelled attempt never shows as a recent connection.
+public enum GlassCapabilityOutcome: Sendable, Equatable {
+    /// A live session was established.
+    case connected
+    /// The attempt ended with an error the capability has already shown the user.
+    case failed(String)
+    /// The user backed out (cancelled a prompt, closed a setup form) or nothing was attempted.
+    case dismissed
+}
+
+/// What a capability may do to the host record on the shell's behalf while it sets a service
+/// up. The host's address is the one thing every service shares, so a capability that learns it
+/// (the user typed it into a setup form because the host had none) hands it back here and it is
+/// entered once; the capability never writes the catalog itself.
+public struct GlassCapabilityHostAccess: Sendable {
+    /// The host's current address, if it has one. A capability pre-fills from it and shows it
+    /// read-only rather than asking again.
+    public let address: String?
+    /// Records an address on the host. Throws `GlassShellError` / `HostProfileError.invalidAddress`.
+    public let setAddress: @MainActor @Sendable (String) async throws -> Void
+
+    public init(address: String?, setAddress: @escaping @MainActor @Sendable (String) async throws -> Void) {
+        self.address = address
+        self.setAddress = setAddress
+    }
+}
+
 /// A capability owns one service kind. The shell routes `connect` through it;
 /// the capability declares its own scenes statically in the app target.
 @MainActor
@@ -8,7 +37,17 @@ public protocol GlassCapability: AnyObject {
     var kind: HostServiceKind { get }
     var displayName: String { get }
     var symbolName: String { get }
-    func open(service: HostServiceLink, host: HostProfile)
+    /// Open the service. `report` is called exactly once, on the main actor, when the attempt
+    /// reaches a terminal state; it may run long after `open` returns (trust prompt, password).
+    func open(service: HostServiceLink, host: HostProfile, report: @escaping @MainActor (GlassCapabilityOutcome) -> Void)
+    /// `open` with access to the host record. The shell calls this one; the default forwards to
+    /// `open(service:host:report:)` for capabilities that never need the host's address.
+    func open(service: HostServiceLink, host: HostProfile, hostAccess: GlassCapabilityHostAccess,
+              report: @escaping @MainActor (GlassCapabilityOutcome) -> Void)
+    /// The host's address changed in the shell (or was set for the first time). A capability
+    /// that stores an address per service updates every service of `host` it owns, so the user
+    /// edits the machine's identity once. `address` is nil when it was cleared. Default: nothing.
+    func hostAddressDidChange(host: HostProfile, address: String?)
 
     /// Settings pages the capability contributes to the one settings surface, appended after the
     /// shell's own pages. Default: none.
@@ -21,6 +60,11 @@ public protocol GlassCapability: AnyObject {
 }
 
 public extension GlassCapability {
+    func open(service: HostServiceLink, host: HostProfile, hostAccess: GlassCapabilityHostAccess,
+              report: @escaping @MainActor (GlassCapabilityOutcome) -> Void) {
+        open(service: service, host: host, report: report)
+    }
+    func hostAddressDidChange(host: HostProfile, address: String?) {}
     var settingsPages: [GlassCapabilitySettingsPage] { [] }
     func libraryToolbarItems() -> AnyView { AnyView(EmptyView()) }
     func serviceDetailActions(service: HostServiceLink, host: HostProfile) -> AnyView { AnyView(EmptyView()) }

@@ -631,6 +631,11 @@ struct TerminalWindowView: View {
             .padding(.vertical, terminalCanvasPadding)
         }
         .clipShape(RoundedRectangle(cornerRadius: terminalCanvasCornerRadius, style: .continuous))
+        #if os(macOS)
+        // The rounded canvas floats inside a small margin of window glass instead of sitting
+        // flush against the sidebar divider and the window edges; the top stays under the toolbar.
+        .padding([.leading, .bottom, .trailing], TerminalCanvasMetrics.macOuterMargin)
+        #endif
         .contentShape(.rect)
         .onTapGesture {
             if terminalCanOwnFocus {
@@ -813,7 +818,7 @@ struct TerminalWindowView: View {
 
     private var terminalCanvasCornerRadius: CGFloat {
         #if os(macOS)
-        showsMacPaneChrome ? 18 : 0
+        showsMacPaneChrome ? TerminalCanvasMetrics.macCornerRadius : 0
         #elseif os(iOS)
         UIDevice.current.userInterfaceIdiom == .phone ? 0 : 18
         #else
@@ -2481,4 +2486,13 @@ extension Color {
     return TerminalWindowView(session: session)
         .environment(SessionManager())
         .environment(SettingsManager())
+}
+
+/// Shared canvas geometry for the Mac terminal surfaces (session canvas and local pane).
+enum TerminalCanvasMetrics {
+    /// The rounded canvas's corner radius when it shows its Mac pane chrome.
+    static let macCornerRadius: CGFloat = 18
+    /// Margin of window glass on the leading, bottom and trailing edges of the canvas, so the
+    /// theme colour never sits flush against the sidebar divider or the window edges.
+    static let macOuterMargin: CGFloat = 3
 }

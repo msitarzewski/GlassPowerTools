@@ -55,7 +55,14 @@ public struct SFTPEntry: Sendable, Hashable, Identifiable {
     public var hasSafeName: Bool { SFTPEntry.isSafeName(name) }
 
     public static func isSafeName(_ name: String) -> Bool {
-        !name.isEmpty && name != "." && name != ".." && !name.contains("/") && !name.contains("\0")
+        !name.isEmpty && !isSelfOrParent(name) && !name.contains("/") && !name.contains("\0")
+    }
+
+    /// OpenSSH's `sftp-server` lists `.` and `..` like `ls -a`; they are never entries a consumer
+    /// wants (verified against OpenSSH 10.2 on 2026-09-11), so `list` omits them at the engine
+    /// boundary rather than in every browser and editor.
+    public static func isSelfOrParent(_ name: String) -> Bool {
+        name == "." || name == ".."
     }
 
     public init(name: String, path: String, longName: String = "", attributes: SFTPAttributes) {
@@ -154,6 +161,7 @@ public protocol SFTPFileHandle: Sendable {
 /// The SFTP surface every consumer uses: glas.sh's browser today, the editor in Stage 5.
 /// All operations honour task cancellation.
 public protocol SFTPSession: Sendable {
+    /// The directory's entries without the server's `.` and `..` references.
     func list(_ path: String) async throws -> [SFTPEntry]
     func attributes(at path: String, followSymlinks: Bool) async throws -> SFTPAttributes
     func realPath(_ path: String) async throws -> String
@@ -289,7 +297,9 @@ final class CitadelSFTPSession: SFTPSession {
         try Task.checkCancellation()
         let names = try await client.listDirectory(atPath: path)
         let base = path.hasSuffix("/") ? path : path + "/"
-        return names.flatMap(\.components).map { component in
+        return names.flatMap(\.components)
+            .filter { !SFTPEntry.isSelfOrParent($0.filename) }
+            .map { component in
             SFTPEntry(
                 name: component.filename,
                 path: base + component.filename,

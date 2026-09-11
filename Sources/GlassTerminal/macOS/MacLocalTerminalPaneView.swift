@@ -93,6 +93,10 @@ struct MacLocalTerminalPaneView: View {
                     appearance: settingsManager.currentTheme.resolvedAppearance
                 )
             }
+            // A framed canvas: the background is clipped to the session canvas's corner radius
+            // and floats inside a margin of window glass (top stays flush under the toolbar).
+            .clipShape(RoundedRectangle(cornerRadius: TerminalCanvasMetrics.macCornerRadius, style: .continuous))
+            .padding([.leading, .bottom, .trailing], TerminalCanvasMetrics.macOuterMargin)
             .overlay {
                 if let launchError = processState.launchError {
                     ContentUnavailableView(

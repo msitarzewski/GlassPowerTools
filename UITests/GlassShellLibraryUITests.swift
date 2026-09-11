@@ -7,14 +7,6 @@ final class GlassShellLibraryUITests: XCTestCase {
     private var app: XCUIApplication!
     private var runID = UUID()
 
-    #if os(iOS)
-    private let platform = "ios"
-    #elseif os(visionOS)
-    private let platform = "vision"
-    #else
-    private let platform = "mac"
-    #endif
-
     // XCTest calls the synchronous setUp/tearDown off the main actor; the async forms let a
     // @MainActor test case hop over explicitly instead of sending `self` across.
     override func setUp() async throws {
@@ -75,15 +67,11 @@ final class GlassShellLibraryUITests: XCTestCase {
         press(e)
     }
 
+    /// Our own window only (project rule 11); see `UITestCapture.swift`.
     private func snap(_ name: String) {
-        guard let dir = ProcessInfo.processInfo.environment["GPT_SHOTS_DIR"] else { return }
-        let data = XCUIScreen.main.screenshot().pngRepresentation
-        let url = URL(fileURLWithPath: dir).appendingPathComponent("\(platform)-\(name).png")
-        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? data.write(to: url)
-        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        attachment.name = "\(platform)-\(name)"; attachment.lifetime = .keepAlways
-        add(attachment)
+        let sheet = app.sheets.firstMatch
+        let subject = sheet.exists ? sheet : app.windows.firstMatch
+        captureOwnWindow(subject, app: app, name: name)
     }
 
     /// The kit's sidebar list carries `glass-library-scope-<id>`; on visionOS the library is a
@@ -294,10 +282,20 @@ final class GlassShellLibraryUITests: XCTestCase {
         XCTAssertEqual(rows.count, 1, "one row per machine")
         XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "host-row-oscar").count, 1)
         // Icons for both kinds, on both hosts: two of each across the two rows.
+        #if os(macOS)
+        // The kit row combines its children into one element and macOS folds the icons'
+        // identifiers into the row's; the icons are evidenced by their labels in the row's label.
+        for name in ["juliet", "oscar"] {
+            let label = element("host-row-\(name)").label
+            XCTAssertTrue(label.contains("Terminal"), "\(name) row lists the terminal icon: \(label)")
+            XCTAssertTrue(label.contains("Desktop"), "\(name) row lists the desktop icon: \(label)")
+        }
+        #else
         XCTAssertTrue(element("host-service-ssh").waitForExistence(timeout: 5))
         XCTAssertTrue(element("host-service-rdp").waitForExistence(timeout: 5))
         XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "host-service-ssh").count, 2)
         XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "host-service-rdp").count, 2)
+        #endif
         snap("09-consolidated-hosts")
     }
 }

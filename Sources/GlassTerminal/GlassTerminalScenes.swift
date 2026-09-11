@@ -66,12 +66,17 @@ public struct GlassTerminalScenes: Scene {
             }
         }
         .defaultSize(width: 820, height: 620)
-        Window("Port Forwarding", id: "port-forwarding") {
-            PortForwardingManagerView()
-                .environment(sessionManager)
-                .glassLayers(runtime.layers)
+        // The server form's "Add SSH Key" (the form is a sheet, so the key form cannot be one).
+        // `dismiss` from the root view closes the window.
+        Window("Add SSH Key", id: "terminal-add-ssh-key") {
+            GlassLayeredWindow {
+                AddSSHKeyView()
+                    .environment(settingsManager)
+                    .glassLayers(runtime.layers)
+            }
+            .glassLayers(runtime.layers)
         }
-        .defaultSize(width: 700, height: 560)
+        .defaultSize(width: 560, height: 640)
         #if DEBUG
         WindowGroup(id: "html-preview", for: HTMLPreviewContext.self) { $context in
             if let context {
@@ -142,14 +147,6 @@ public struct GlassTerminalScenes: Scene {
         .windowStyle(.plain)
         .defaultSize(width: 700, height: 500)
         .restorationBehavior(.disabled)
-        Window("Port Forwarding", id: "port-forwarding") {
-            PortForwardingManagerView()
-                .environment(sessionManager)
-                .glassLayers(runtime.layers)
-                .trackWindowPresence(key: "port-forwarding", recovery: windowRecoveryManager)
-        }
-        .windowStyle(.plain)
-        .defaultSize(width: 600, height: 500)
         ImmersiveSpace(id: "focus-environment") {
             FocusEnvironmentView()
         }

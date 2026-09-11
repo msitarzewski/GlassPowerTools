@@ -56,6 +56,29 @@ struct GlassPowerToolsApp: App {
         _windowRecovery = State(initialValue: windowRecovery)
     }
 
+    /// The library window. On macOS it carries glas.sh's Connections window sizing
+    /// (`../glas.sh/glas.sh/glas_shApp.swift:99-113`): without a default size the window opened
+    /// at the sidebar's ideal height and clipped the detail.
+    private var mainScene: some Scene {
+        let group = WindowGroup("Connections", id: "main") {
+            GlassTerminalBootstrap(runtime: terminal) {
+                GlassShellLibraryView(model: model)
+            }
+            .glassLayers(layers)
+            .trackWindowPresence(key: "main", recovery: windowRecovery)
+            #if os(macOS)
+            .onAppear { terminal.attach(to: appDelegate) }
+            #endif
+        }
+        #if os(macOS)
+        return group
+            .defaultSize(width: 1180, height: 720)
+            .windowResizability(.contentMinSize)
+        #else
+        return group
+        #endif
+    }
+
     #if DEBUG
     /// The UI test runner cannot reach this sandbox from iOS or visionOS, so each isolated run
     /// removes earlier runs' directories older than ten minutes (a run in progress is never
@@ -72,16 +95,7 @@ struct GlassPowerToolsApp: App {
     #endif
 
     var body: some Scene {
-        WindowGroup("Connections", id: "main") {
-            GlassTerminalBootstrap(runtime: terminal) {
-                GlassShellLibraryView(model: model)
-            }
-            .glassLayers(layers)
-            .trackWindowPresence(key: "main", recovery: windowRecovery)
-            #if os(macOS)
-            .onAppear { terminal.attach(to: appDelegate) }
-            #endif
-        }
+        mainScene
         GlassTerminalScenes(runtime: terminal)
         #if os(macOS)
         Settings {

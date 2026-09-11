@@ -28,3 +28,10 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     (`_accessibilityFindRoleFromProtocol` recursion). Use `openWindow` or a popover for nested
     presentation on macOS.
 
+
+13. **Layered panels declare their role.** `GlassLayeredPanel(role:)` is `.presented` for a sheet,
+    popover or secondary window (paints theme + frost on every platform) and `.embedded` for a
+    column or region inside a `GlassLayeredWindow` (paints only on visionOS, where panels float;
+    pass-through on Mac, iPad and iPhone, whose window already paints edge to edge). Never nest a
+    painting panel inside a layered window on the Mac: it double-paints the theme, clips the
+    detail's action bar into a lighter band and exposes the window corner (observed 2026-09-10).

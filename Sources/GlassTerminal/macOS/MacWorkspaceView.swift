@@ -93,7 +93,10 @@ struct MacWorkspaceView: View {
                 .listStyle(.sidebar)
                 .navigationSplitViewColumnWidth(min: 180, ideal: 240, max: 360)
                 .toolbar {
-                    ToolbarItem(id: "new-terminal-tab", placement: .navigation) {
+                    // `.automatic` on the sidebar list's own toolbar keeps it in the sidebar
+                    // column, left of the sidebar toggle; `.navigation` pushed it into the content
+                    // region to the toggle's right.
+                    ToolbarItem(id: "new-terminal-tab", placement: .automatic) {
                         Button("New Terminal Tab", systemImage: "plus", action: addTab)
                             .help("New Terminal Tab")
                             .disabled(!windowController.canAddTab)

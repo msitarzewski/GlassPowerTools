@@ -53,3 +53,16 @@ reached parity yet. The public repositories are untouched.
 - Whether the RDP Detail scale setting sharpens text on the user's Ubuntu host or merely shrinks the
   interface, which decides whether Automatic stays the default.
 - A session indicator for encrypted versus unencrypted connections, and an SSH tunnel for VNC.
+
+## 2026-09-11 checkpoint — Stage 2 close-out in progress
+
+Verified: whole package 469 tests / 28 suites (W6, twice); engine real-host suite 5/5 (coordinator,
+before the VM went down); kit 53/53; macOS, iOS Simulator and visionOS Simulator builds; iPhone UI
+suites 7/8 (real-host test blocked by the VM being down); Mac library window, "+" placement, flat
+detail column and no-sandbox local terminal judged by eye on the installed Release build.
+Landed since the last checkpoint: macOS regression (three causes) and integration defects 1–5
+(W4), close-out cleanup, system-wide tag field (W5), host-level address (W6), settings tabs per
+platform, 3 pt canvas margin, panel roles, sandbox removal.
+Open: macOS XCUITest automation mode blocked on this Mac; macOS accessibility recursion after the
+connection-failure alert under XCTest diagnostics; widget on device and live iCloud sync unproven;
+visionOS UI suite not re-run since the TabView change; kit changes uncommitted in the sibling repo.
