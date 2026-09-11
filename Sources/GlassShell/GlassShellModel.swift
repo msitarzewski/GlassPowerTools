@@ -78,10 +78,6 @@ public final class GlassShellModel {
     /// True while the preferences file exists but cannot be trusted or read; nothing is written
     /// over it until `resetPreferences()` or a later successful read.
     public private(set) var preferencesReadOnly = false
-    public var placeholderRequest: GlassShellPlaceholderRequest?
-    /// The shell needs the host's address before it can go on (a service setup is about to open,
-    /// or the user asked to set it). Presented by the library as `GlassShellAddressPrompt`.
-    public var addressRequest: GlassShellAddressRequest?
 
     public let storageDirectory: URL
     public private(set) var catalog: HostCatalogStore
@@ -385,28 +381,36 @@ public final class GlassShellModel {
         await load()
     }
 
-    /// Creates a metadata-only service on the host's canonical record. The capability that
-    /// owns the endpoint record fills it in later; nothing here can connect.
+    /// Links a service to the host's canonical record. `endpointID` is the key the owning
+    /// capability stored the service's configuration under: the setup sheet commits the
+    /// capability's draft first, then records the link, so a service never exists half-made.
     @discardableResult
-    public func addService(kind: HostServiceKind, displayName: String, to id: HostID) async throws -> HostServiceLink {
+    public func addService(kind: HostServiceKind, displayName: String, endpointID: EndpointID = EndpointID(),
+                           to id: HostID) async throws -> HostServiceLink {
         let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw GlassShellError.invalidName }
-        let link = HostServiceLink(endpointID: EndpointID(), kind: kind, displayName: trimmed)
+        let link = HostServiceLink(endpointID: endpointID, kind: kind, displayName: trimmed)
         try await catalog.pair(link, with: canonicalID(for: id))
         await load()
         return link
     }
 
-    /// Removes the service from whichever member record owns it.
+    /// Removes the service from whichever member record owns it, then lets the owning
+    /// capability delete what it stored for it. The link goes first: a stray configuration is
+    /// harmless, a link to nothing is not.
     public func removeService(_ endpointID: EndpointID, from id: HostID) async throws {
         guard let host = host(id) else { throw GlassShellError.hostNotFound(id) }
-        guard let owner = host.member(owning: endpointID) else { throw GlassShellError.serviceNotFound(endpointID) }
+        guard let owner = host.member(owning: endpointID),
+              let service = owner.services.first(where: { $0.endpointID == endpointID }) else {
+            throw GlassShellError.serviceNotFound(endpointID)
+        }
         try await catalog.unpair(endpointID: endpointID, from: owner.id)
         if preferences[host: host.id].lastUsedEndpointID == endpointID {
             preferences[host: host.id].lastUsedEndpointID = nil
             try persistPreferences()
         }
         await load()
+        try await registry.capability(for: service.kind)?.removeService(service, host: owner)
     }
 
     public func toggleFavorite(_ id: HostID) {
@@ -455,39 +459,27 @@ public final class GlassShellModel {
             errorMessage = GlassShellError.serviceNotFound(endpointID).localizedDescription; return
         }
         // The user chose this service, so remember it either way; but "last connected" is only
-        // true when a capability reports a live session. A failed attempt, a cancelled prompt and
-        // the placeholder connect nothing.
-        // The capability receives the record that owns the endpoint — its endpoint id is what
-        // the capability's own store is keyed by.
+        // true when a capability reports a live session. A failed attempt and a cancelled prompt
+        // connect nothing. The capability receives the record that owns the endpoint — its
+        // endpoint id is what the capability's own store is keyed by.
         preferences[host: host.id].lastUsedEndpointID = endpointID
         do { try persistPreferences() } catch { errorMessage = GlassShellError.message(for: error) }
-        if let capability = registry.capability(for: service.kind) {
-            let hostID = host.id
-            // The machine's address is defined at the host. A setup form never asks for it: when
-            // the host has none, adopt what a capability already stores, else ask on the host
-            // first and come back here once it is set.
-            if host.address == nil, capability.needsSetup(service: service, host: owner) {
-                if let known = knownAddress(for: host) {
-                    Task { [weak self] in
-                        guard let self else { return }
-                        do {
-                            try await self.setHostAddress(known, for: hostID)
-                            self.connect(hostID: hostID, endpointID: endpointID)
-                        } catch { self.errorMessage = GlassShellError.message(for: error) }
-                    }
-                } else {
-                    addressRequest = GlassShellAddressRequest(host: host, endpointID: endpointID)
-                }
-                return
-            }
-            capability.open(service: service, host: owner, hostAccess: hostAccess(for: hostID)) { [weak self] outcome in
-                guard let self, case .connected = outcome else { return }
-                self.preferences[host: hostID].lastConnected = Date()
-                do { try self.persistPreferences() } catch { self.errorMessage = GlassShellError.message(for: error) }
-            }
-        } else {
-            placeholderRequest = GlassShellPlaceholderRequest(host: owner, service: service)
+        // A kind no capability in this build owns cannot be connected: say so and connect nothing.
+        guard let capability = registry.capability(for: service.kind) else {
+            errorMessage = Self.unavailableMessage(for: service.kind)
+            return
         }
+        let hostID = host.id
+        capability.open(service: service, host: owner, hostAccess: hostAccess(for: hostID)) { [weak self] outcome in
+            guard let self, case .connected = outcome else { return }
+            self.preferences[host: hostID].lastConnected = Date()
+            do { try self.persistPreferences() } catch { self.errorMessage = GlassShellError.message(for: error) }
+        }
+    }
+
+    /// What the shell says about a kind this build has no capability for.
+    public static func unavailableMessage(for kind: HostServiceKind) -> String {
+        "\(GlassServicePresentation.displayName(for: kind)) is not part of this build yet. Nothing was connected."
     }
 
     #if DEBUG

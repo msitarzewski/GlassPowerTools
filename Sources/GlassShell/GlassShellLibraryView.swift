@@ -12,9 +12,7 @@ public struct GlassShellLibraryView: View {
     @State private var selection: HostID?
     @State private var scope = GlassLibraryScope.allConnections
     @State private var search = ""
-    @State private var addingHost = false
-    @State private var editingHost: GlassShellHost?
-    @State private var addingServiceTo: GlassShellHost?
+    @State private var setupMode: GlassShellSetupMode?
     @State private var deleting: GlassShellHost?
     @State private var showSettings = false
     @Environment(\.scenePhase) private var scenePhase
@@ -53,11 +51,10 @@ public struct GlassShellLibraryView: View {
             .sidebarActions { addHostButton }
             #endif
         }
-        .sheet(isPresented: $addingHost) { GlassShellHostEditor(model: model, host: nil) { selection = $0 } }
-        .sheet(item: $editingHost) { GlassShellHostEditor(model: model, host: $0) { _ in } }
-        .sheet(item: $addingServiceTo) { GlassShellServiceEditor(model: model, host: $0) }
-        .sheet(item: $model.placeholderRequest) { GlassShellPlaceholderSession(request: $0) }
-        .sheet(item: $model.addressRequest) { GlassShellAddressPrompt(model: model, request: $0) }
+        // One sheet for Add Host, Add a service, Edit service and Edit Host (rule 15).
+        .sheet(item: $setupMode) { mode in
+            GlassShellHostSetupSheet(model: model, mode: mode) { selection = $0 }
+        }
         .sheet(isPresented: $showSettings) {
             NavigationStack {
                 GlassShellSettingsView(model: model)
@@ -77,7 +74,7 @@ public struct GlassShellLibraryView: View {
     }
 
     private var addHostButton: some View {
-        Button("Add Host", systemImage: "plus") { addingHost = true }
+        Button("Add Host", systemImage: "plus") { setupMode = .addHost }
             .keyboardShortcut("n", modifiers: .command)
             .accessibilityIdentifier("connection-library-add-host")
     }
@@ -110,7 +107,7 @@ public struct GlassShellLibraryView: View {
         #endif
         .contextMenu {
             Button("Connect") { model.connect(hostID: item.id) }
-            Button("Edit") { editingHost = model.host(item.id) }
+            Button("Edit") { if let host = model.host(item.id) { setupMode = .editHost(host) } }
             Button(item.isFavorite ? "Remove Favorite" : "Add Favorite") { model.toggleFavorite(item.id) }
             Button("Delete", role: .destructive) { deleting = model.host(item.id) }
         }
@@ -142,7 +139,7 @@ public struct GlassShellLibraryView: View {
                 }
             }
         } actions: {
-            Button("Add Host") { addingHost = true }.accessibilityIdentifier("connection-library-add-host-empty")
+            Button("Add Host") { setupMode = .addHost }.accessibilityIdentifier("connection-library-add-host-empty")
         }
     }
 
@@ -161,7 +158,7 @@ public struct GlassShellLibraryView: View {
                             }
                         }
                 }
-                Button("Add a service…", systemImage: "plus.circle") { addingServiceTo = host }
+                Button("Add a service…", systemImage: "plus.circle") { setupMode = .addService(host, .ssh) }
                     .accessibilityIdentifier("host-add-service")
             }
             Section("Host") {
@@ -170,15 +167,10 @@ public struct GlassShellLibraryView: View {
                         .accessibilityIdentifier("host-detail-address")
                     Text("The records that make up this host disagree on the address. Edit the host to settle it.")
                         .font(.footnote).foregroundStyle(.secondary)
-                } else if let address = host.address {
-                    LabeledContent("Address", value: address).accessibilityIdentifier("host-detail-address")
                 } else {
-                    // The button carries the row's identity: an identifier on the LabeledContent
-                    // would hide the button from the accessibility tree on macOS.
-                    LabeledContent("Address") {
-                        Button("Set Address…") { model.addressRequest = GlassShellAddressRequest(host: host, endpointID: nil) }
-                            .accessibilityIdentifier("host-detail-set-address")
-                    }
+                    // A record another family app wrote without an address shows "Not set";
+                    // Edit on the host, or adding a service, collects it.
+                    LabeledContent("Address", value: host.address ?? "Not set").accessibilityIdentifier("host-detail-address")
                 }
                 if !host.aliases.isEmpty { LabeledContent("Also known as", value: host.aliases.joined(separator: ", ")) }
                 if !host.tags.isEmpty { LabeledContent("Collections", value: host.tags.joined(separator: ", ")) }
@@ -197,7 +189,7 @@ public struct GlassShellLibraryView: View {
         }, actions: {
             HStack {
                 GlassShellConnectControl(model: model, hostID: host.id, prominent: true)
-                Button("Edit") { editingHost = host }.accessibilityIdentifier("host-edit")
+                Button("Edit") { setupMode = .editHost(host) }.accessibilityIdentifier("host-edit")
                 Button("Delete", role: .destructive) { deleting = host }.accessibilityIdentifier("host-delete")
             }.buttonStyle(.bordered).controlSize(.large)
         })
@@ -222,6 +214,10 @@ public struct GlassShellLibraryView: View {
         let connect = Button("Connect") { model.connect(hostID: host.id, endpointID: service.endpointID) }
             .buttonStyle(.bordered)
             .accessibilityIdentifier("host-service-connect-\(service.kind.rawValue)")
+        // Edit is the shell's: it opens the one host sheet on this service's tab.
+        let edit = Button("Edit", systemImage: "pencil") { setupMode = .editService(host, service) }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("host-service-edit-\(service.kind.rawValue)")
         let owner = host.member(owning: service.endpointID)
         return ViewThatFits(in: .horizontal) {
             HStack(spacing: 12) {
@@ -229,6 +225,7 @@ public struct GlassShellLibraryView: View {
                 Spacer(minLength: 8)
                 HStack(spacing: 8) {
                     connect
+                    edit
                     if let owner { model.registry.serviceDetailActions(service: service, host: owner) }
                 }
                 .fixedSize()
@@ -239,6 +236,7 @@ public struct GlassShellLibraryView: View {
                 Spacer(minLength: 8)
                 HStack(spacing: 8) {
                     connect
+                    edit
                     if let owner {
                         Menu {
                             model.registry.serviceDetailActions(service: service, host: owner)

@@ -91,13 +91,72 @@ final class GlassShellLibraryUITests: XCTestCase {
         if scope.waitForExistence(timeout: 5) { press(scope) }
     }
 
-    private func addHost(named name: String) {
+    /// Adds a host through the one setup sheet: name and address are the machine's, entered
+    /// once. With `terminalUser` the Terminal tab is enabled and its required fields filled, so
+    /// the host and its terminal are created together (password auth; nothing connects).
+    private func addHost(named name: String, address: String = "10.9.8.7", terminalUser: String? = nil) {
         let empty = element("connection-library-add-host-empty")
         if empty.waitForExistence(timeout: 3) { press(empty) } else { tap("connection-library-add-host") }
         let field = element("host-editor-name")
         XCTAssertTrue(field.waitForExistence(timeout: 10))
         press(field); field.typeText(name)
+        let addressField = element("host-editor-address")
+        XCTAssertTrue(addressField.waitForExistence(timeout: 5), "the sheet asks for the machine's address")
+        press(addressField); addressField.typeText(address)
+        if let terminalUser {
+            enableTerminalTab()
+            let user = element("add-server-username")
+            XCTAssertTrue(user.waitForExistence(timeout: 10), "the Terminal tab's required fields appear once enabled")
+            press(user); user.typeText(terminalUser)
+            let password = reveal("add-server-password")
+            XCTAssertTrue(password.exists, "password is the default method's required field")
+            press(password); password.typeText("not-a-real-password")
+        }
         tap("host-editor-save")
+        dismissSystemPasswordPrompt()
+        XCTAssertTrue(element("host-editor-save").waitForNonExistence(timeout: 15), "the sheet closes after Save")
+    }
+
+    /// visionOS offers to save a typed password in iCloud Keychain after the sheet commits; the
+    /// alert covers the app and every later assertion fails. The app keeps credentials in its own
+    /// store, so the answer is always "Not Now" (observed on the visionOS simulator, 2026-09-11).
+    private func dismissSystemPasswordPrompt() {
+        var targets = [XCUIApplication(bundleIdentifier: "com.apple.springboard")]
+        if let app { targets.append(app) }
+        for target in targets {
+            let notNow = target.buttons["Not Now"].firstMatch
+            if notNow.waitForExistence(timeout: 1) { notNow.tap(); return }
+        }
+    }
+
+    /// SwiftUI builds list rows lazily: a row below the fold is absent from the accessibility
+    /// tree, not merely off-screen. The visionOS sheet is short enough for that to hide the
+    /// authentication fields, so scroll the surface until the row exists (2026-09-11).
+    @discardableResult
+    private func reveal(_ identifier: String, timeout: TimeInterval = 10) -> XCUIElement {
+        let target = element(identifier)
+        if target.waitForExistence(timeout: 2) { return target }
+        let surfaces = [app.scrollViews.firstMatch, app.collectionViews.firstMatch, app.tables.firstMatch]
+        guard let surface = surfaces.first(where: { $0.exists }) else {
+            _ = target.waitForExistence(timeout: timeout)
+            return target
+        }
+        for _ in 0..<8 where !target.exists { surface.swipeUp() }
+        _ = target.waitForExistence(timeout: timeout)
+        return target
+    }
+
+    /// The Terminal tab is selected by default; its toggle turns the service on.
+    private func enableTerminalTab() {
+        let toggle = element("setup-enable-ssh")
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10), "Terminal tab toggle")
+        #if os(macOS)
+        press(toggle)
+        #elseif os(iOS)
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        #else
+        toggle.tap()
+        #endif
     }
 
     /// After saving, the shell selects the new host; on iPhone that pushes to detail directly.
@@ -147,36 +206,45 @@ final class GlassShellLibraryUITests: XCTestCase {
 
     // MARK: Tests
 
-    func testAddHostAddServiceConnectPlaceholder() {
+    /// One sheet: the host and its terminal are created together, complete; Connect then goes
+    /// straight to the terminal (a failed attempt is fine — no setup form may appear). A kind
+    /// no capability owns is a disabled tab, never a saved-but-empty service.
+    func testAddHostWithTerminalInOneSheetThenConnect() {
         snap("01-empty-library")
-        addHost(named: "Probe Host")
+        let empty = element("connection-library-add-host-empty")
+        if empty.waitForExistence(timeout: 3) { press(empty) } else { tap("connection-library-add-host") }
+        XCTAssertTrue(element("host-editor-name").waitForExistence(timeout: 10))
+        XCTAssertTrue(element("setup-sections").waitForExistence(timeout: 5), "service tabs under the machine fields")
+        let databaseToggle = element("setup-enable-database")
+        // The Database tab exists but is disabled: nothing arrives before Stage 3.
+        let sections = element("setup-sections")
+        let databaseTab = sections.buttons["Database"].exists ? sections.buttons["Database"] : sections.radioButtons["Database"]
+        if databaseTab.waitForExistence(timeout: 3) {
+            press(databaseTab)
+            XCTAssertTrue(databaseToggle.waitForExistence(timeout: 5))
+            XCTAssertFalse(databaseToggle.isEnabled, "no capability: the tab's toggle is disabled")
+            snap("02-database-tab-disabled")
+            let terminalTab = sections.buttons["Terminal"].exists ? sections.buttons["Terminal"] : sections.radioButtons["Terminal"]
+            press(terminalTab)
+        }
+        tap("host-editor-cancel")
+        XCTAssertTrue(element("host-editor-name").waitForNonExistence(timeout: 10))
+
+        addHost(named: "Probe Host", terminalUser: "probe")
         openDetail(of: "Probe Host")
-        snap("02-host-detail-no-services")
+        let detailConnect = reveal("host-service-connect-ssh")
+        XCTAssertTrue(detailConnect.exists || element("host-service-ssh").exists,
+                      "the terminal exists on the host right after the one save")
+        XCTAssertFalse(app.buttons["Set Up…"].exists, "no pending state anywhere")
+        snap("03-host-with-terminal")
 
-        tap("host-add-service")
-        XCTAssertTrue(element("service-editor-save").waitForExistence(timeout: 10))
-        tap("service-editor-save")
-        let rowIcon = element("host-service-ssh"), detailConnect = element("host-service-connect-ssh")
-        XCTAssertTrue(detailConnect.waitForExistence(timeout: 10) || rowIcon.waitForExistence(timeout: 5),
-                      "ssh service after adding the default service (detail Connect or row icon)")
-        snap("03-host-with-ssh-service")
-
-        // SSH is a live capability since Stage 2, so Connect on it opens the terminal. The
-        // placeholder is the contract for kinds no capability owns yet: use a seeded database
-        // service for that assertion.
-        app.terminate()
-        runID = UUID()   // a fresh isolated store: the seeder only fills an empty catalog
-        app = launch(extraArguments: ["--ui-testing-seed-hosts", "dbhost:database"])
-        openDetail(of: "dbhost")
-        tap("host-connect")
-        let placeholder = element("placeholder-session")
-        XCTAssertTrue(placeholder.waitForExistence(timeout: 10))
-        // macOS exposes static text as `value`, touch platforms as `label`.
-        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'not part of this build' OR value CONTAINS 'not part of this build'")).firstMatch.exists,
-                      "placeholder must say the capability is absent")
-        snap("04-connect-placeholder")
-        tap("placeholder-done")
-        XCTAssertFalse(placeholder.waitForExistence(timeout: 3))
+        // Connect: the saved terminal connects (and fails, there is no such machine); what must
+        // not happen is any setup form.
+        tap("host-service-connect-ssh")
+        XCTAssertFalse(element("add-server-username").waitForExistence(timeout: 5), "Connect never opens a setup form")
+        let failure = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] 'Connection Failed' OR value CONTAINS[c] 'Connection Failed' OR label CONTAINS[c] 'Connecting' OR value CONTAINS[c] 'Connecting'")).firstMatch
+        _ = failure.waitForExistence(timeout: 20)
+        snap("04-connect-attempt")
     }
 
     func testFavoriteAppearsInFavoritesScope() {

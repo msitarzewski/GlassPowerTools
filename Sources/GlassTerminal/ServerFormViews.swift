@@ -7,6 +7,8 @@
 
 import SwiftUI
 import GlasSecretStore
+import GlassConnectionKit
+import GlassShell
 import os
 
 extension View {
@@ -101,91 +103,23 @@ private struct TerminalInitialSizeEditor: View {
     }
 }
 
-// MARK: - Server Form Entry Points
+// MARK: - The terminal's service draft
 
-/// The shell's host, as the server form sees it. The address is the machine's and lives on the
-/// host: the form shows it read-only and asks only for the terminal's own fields (port, user,
-/// authentication). The shell collects the address before any setup opens, so a form launched
-/// from the shell never carries an address field.
+/// The shell's host, as the standalone server form sees it (a Tailscale import that already
+/// knows the machine). The address is the machine's and lives on the host.
 struct ServerFormHostContext {
     let hostName: String
     let address: String
 }
 
-struct AddServerView: View {
-    @Bindable var serverManager: ServerManager
-    private let draft: ServerConfiguration?
-    private let hostContext: ServerFormHostContext?
-
-    init(serverManager: ServerManager, draft: ServerConfiguration? = nil, hostContext: ServerFormHostContext? = nil) {
-        self.serverManager = serverManager
-        self.draft = draft
-        self.hostContext = hostContext
-    }
-
-    var body: some View {
-        ServerFormView(mode: .add(draft), serverManager: serverManager, hostContext: hostContext)
-    }
-}
-
-struct EditServerView: View {
-    let server: ServerConfiguration
-    @Bindable var serverManager: ServerManager
-    var hostContext: ServerFormHostContext? = nil
-
-    var body: some View {
-        ServerFormView(mode: .edit(server), serverManager: serverManager, hostContext: hostContext)
-    }
-}
-
-// MARK: - Shared Server Form
-
-struct ServerFormView: View {
-    enum Mode {
-        case add(ServerConfiguration?)
-        case edit(ServerConfiguration)
-
-        var sourceConfiguration: ServerConfiguration? {
-            switch self {
-            case .add(let draft): draft
-            case .edit(let server): server
-            }
-        }
-
-        var editingServer: ServerConfiguration? {
-            guard case .edit(let server) = self else { return nil }
-            return server
-        }
-
-        var isEditing: Bool {
-            editingServer != nil
-        }
-
-        var isImporting: Bool {
-            guard case .add(.some) = self else { return false }
-            return true
-        }
-
-        var navigationTitle: String {
-            if isEditing { return "Edit Connection" }
-            return isImporting ? "Import Connection" : "Add Server"
-        }
-
-        var confirmationTitle: String {
-            if isEditing { return "Save Changes" }
-            return isImporting ? "Save Connection" : "Add Server"
-        }
-    }
-
-    enum FormField: Hashable {
-        case name
-        case host
-        case port
-        case username
-        case authentication
-        case password
-        case sshKey
-        case terminalSize
+/// Everything the terminal needs to create or update one saved server, and nothing the host
+/// owns: no address, ever — the shell passes it in at commit time. The same draft backs the
+/// shell's host sheet (required fields + Advanced) and glas.sh's standalone form, so the fields,
+/// validation and persistence exist once.
+@MainActor @Observable
+final class TerminalServiceDraft: GlassServiceDraft {
+    enum Field: String, Hashable, Sendable {
+        case name, host, port, username, authentication, password, sshKey, terminalSize
     }
 
     struct ValidationInput {
@@ -202,27 +136,79 @@ struct ServerFormView: View {
         let initialTerminalRows: Int
     }
 
-    static let orderedFormFields: [FormField] = [
-        .name,
-        .host,
-        .port,
-        .username,
-        .authentication,
-        .password,
-        .sshKey,
-        .terminalSize
-    ]
+    static let orderedFields: [Field] = [.name, .host, .port, .username, .authentication, .password, .sshKey, .terminalSize]
 
-    static func normalizedEndpointValue(_ value: String) -> String {
-        value
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .precomposedStringWithCanonicalMapping
+    let kind: HostServiceKind = .ssh
+    /// The saved server being edited; nil for a new one.
+    let editing: ServerConfiguration?
+    /// Where an imported draft came from (Tailscale), carried through to the saved server.
+    let provenance: ServerConnectionProvenance?
+    let serverManager: ServerManager
+    let settingsManager: SettingsManager
+
+    /// Optional from the shell (a default is derived from the host); required standalone.
+    var name: String
+    /// Standalone form only. From the shell the host's address replaces it at commit.
+    var host: String
+    var port: String
+    var username: String
+    var authMethod: AuthenticationMethod
+    var password = ""
+    var sshKeyID: UUID?
+    var colorTag: ServerColorTag
+    var tags: [String]
+    var isFavorite: Bool
+    var allowLegacyAlgorithms: Bool
+    var jumpHostIDs: [UUID]
+    var usesAppDefaultTerminalSize: Bool
+    var initialTerminalColumns: Int
+    var initialTerminalRows: Int
+
+    var attemptedSave = false
+    var touchedFields: Set<Field> = []
+    var requiresPasswordUpgrade = false
+    var saveError: String?
+    /// Set by `focusFirstIssue`; the field views move focus and clear it.
+    var focusRequest: Field?
+    private var didLoadStoredPassword = false
+
+    init(editing: ServerConfiguration? = nil, imported: ServerConfiguration? = nil,
+         serverManager: ServerManager, settingsManager: SettingsManager) {
+        self.editing = editing
+        self.serverManager = serverManager
+        self.settingsManager = settingsManager
+        let source = editing ?? imported
+        provenance = source?.provenance
+        name = source?.name ?? ""
+        host = source?.host ?? ""
+        port = source.map { String($0.port) } ?? "22"
+        username = source?.username ?? ""
+        authMethod = source?.authMethod == .sshKey ? .sshKey : .password
+        sshKeyID = source?.sshKeyID
+        colorTag = source?.colorTag ?? .blue
+        tags = source?.tags ?? []
+        isFavorite = source?.isFavorite ?? false
+        allowLegacyAlgorithms = source?.legacyAlgorithmsEnabled ?? false
+        jumpHostIDs = source?.resolvedJumpHostIDs ?? []
+        let hasTerminalSize = source?.initialTerminalColumns != nil && source?.initialTerminalRows != nil
+        usesAppDefaultTerminalSize = !hasTerminalSize
+        initialTerminalColumns = source?.initialTerminalColumns ?? TerminalGeometry.default.columns
+        initialTerminalRows = source?.initialTerminalRows ?? TerminalGeometry.default.rows
+        normalizeSelectedSSHKey()
+        loadStoredPasswordIfNeeded()
     }
 
-    static func validationIssues(for input: ValidationInput) -> [FormField: String] {
-        var issues: [FormField: String] = [:]
+    var isEditing: Bool { editing != nil }
 
-        if normalizedEndpointValue(input.name).isEmpty {
+    // MARK: Validation
+
+    static func normalizedEndpointValue(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines).precomposedStringWithCanonicalMapping
+    }
+
+    static func validationIssues(for input: ValidationInput, nameRequired: Bool = true) -> [Field: String] {
+        var issues: [Field: String] = [:]
+        if nameRequired, normalizedEndpointValue(input.name).isEmpty {
             issues[.name] = "Enter a name for this connection."
         }
         if normalizedEndpointValue(input.host).isEmpty {
@@ -234,338 +220,249 @@ struct ServerFormView: View {
         if Int(input.port).map({ (1...65_535).contains($0) }) != true {
             issues[.port] = "Enter a port from 1 through 65535."
         }
-
         switch input.authMethod {
         case .password:
-            if input.password.isEmpty {
-                issues[.password] = "Enter the SSH password."
-            }
+            if input.password.isEmpty { issues[.password] = "Enter the SSH password." }
         case .sshKey:
-            guard let sshKeyID = input.sshKeyID,
-                  input.availableSSHKeyIDs.contains(sshKeyID) else {
-                issues[.sshKey] = "Choose an SSH key that is available to glas.sh."
-                break
-            }
+            if let sshKeyID = input.sshKeyID, input.availableSSHKeyIDs.contains(sshKeyID) { break }
+            issues[.sshKey] = "Choose an SSH key that is available to Glass Power Tools."
         case .agent:
             issues[.authentication] = "Choose Password or SSH Key."
         }
-
         if !input.usesAppDefaultTerminalSize,
-           !TerminalGeometry.contains(
-               rows: input.initialTerminalRows,
-               columns: input.initialTerminalColumns
-           ) {
+           !TerminalGeometry.contains(rows: input.initialTerminalRows, columns: input.initialTerminalColumns) {
             issues[.terminalSize] = "Choose terminal dimensions within 20 through 500 columns and 8 through 300 rows."
         }
-
         return issues
     }
 
-    static func nextField(after field: FormField, in authMethod: AuthenticationMethod) -> FormField? {
+    static func nextField(after field: Field, in authMethod: AuthenticationMethod) -> Field? {
         switch field {
         case .name: .host
         case .host: .port
         case .port: .username
-        case .username:
-            authMethod == .sshKey ? .sshKey : .password
-        case .authentication, .password, .sshKey, .terminalSize:
-            nil
+        case .username: authMethod == .sshKey ? .sshKey : .password
+        case .authentication, .password, .sshKey, .terminalSize: nil
         }
     }
 
-    private let mode: Mode
-    @Bindable private var serverManager: ServerManager
-    @Environment(SettingsManager.self) private var settingsManager
-    @Environment(\.dismiss) private var dismiss
+    /// Issues for the standalone form (its own Host field and a required Name).
+    var standaloneIssues: [Field: String] { issues(address: host, nameRequired: true) }
 
-    @State private var name: String
-    @State private var host: String
-    @State private var port: String
-    @State private var username: String
-    @State private var authMethod: AuthenticationMethod
-    @State private var password: String = ""
-    @State private var sshKeyID: UUID?
-    @State private var colorTag: ServerColorTag
-    @State private var tags: [String]
-    @State private var newTag: String = ""
-    @State private var isFavorite: Bool
-    @State private var allowLegacyAlgorithms: Bool
-    @State private var jumpHostIDs: [UUID]
-    @State private var usesAppDefaultTerminalSize: Bool
-    @State private var initialTerminalColumns: Int
-    @State private var initialTerminalRows: Int
-
-    @State private var attemptedSave = false
-    @State private var touchedFields: Set<FormField> = []
-    @State private var showingAddSSHKey = false
-    @State private var showingJumpHostPicker = false
-    #if os(macOS)
-    #endif
-    @State private var saveError: String?
-    @State private var requiresPasswordUpgrade = false
-    @State private var didLoadStoredPassword = false
-
-    @FocusState private var focusedField: FormField?
-
-    /// Present when the form was opened from the shell's host; see `ServerFormHostContext`.
-    private let hostContext: ServerFormHostContext?
-
-    init(mode: Mode, serverManager: ServerManager, hostContext: ServerFormHostContext? = nil) {
-        self.mode = mode
-        self.serverManager = serverManager
-        self.hostContext = hostContext
-
-        let source = mode.sourceConfiguration
-        _name = State(initialValue: source?.name ?? "")
-        // The host's address wins over whatever the saved server carried: the host is the source.
-        _host = State(initialValue: hostContext?.address ?? source?.host ?? "")
-        _port = State(initialValue: source.map { String($0.port) } ?? "22")
-        _username = State(initialValue: source?.username ?? "")
-        _authMethod = State(initialValue: source?.authMethod == .sshKey ? .sshKey : .password)
-        _sshKeyID = State(initialValue: source?.sshKeyID)
-        _colorTag = State(initialValue: source?.colorTag ?? .blue)
-        _tags = State(initialValue: source?.tags ?? [])
-        _isFavorite = State(initialValue: source?.isFavorite ?? false)
-        _allowLegacyAlgorithms = State(initialValue: source?.legacyAlgorithmsEnabled ?? false)
-        _jumpHostIDs = State(initialValue: source?.resolvedJumpHostIDs ?? [])
-
-        let hasTerminalSize = source?.initialTerminalColumns != nil
-            && source?.initialTerminalRows != nil
-        _usesAppDefaultTerminalSize = State(initialValue: !hasTerminalSize)
-        _initialTerminalColumns = State(
-            initialValue: source?.initialTerminalColumns ?? TerminalGeometry.default.columns
-        )
-        _initialTerminalRows = State(
-            initialValue: source?.initialTerminalRows ?? TerminalGeometry.default.rows
-        )
-    }
-
-    /// From the shell's host the form adds a terminal *to that host*; "Import" is the Tailscale
-    /// draft's word and "Add Server" the terminal's own.
-    private var navigationTitle: String {
-        if let hostContext {
-            return mode.isEditing ? "Edit Terminal on \(hostContext.hostName)" : "Add Terminal to \(hostContext.hostName)"
-        }
-        return mode.navigationTitle
-    }
-
-    private var validationInput: ValidationInput {
-        ValidationInput(
-            name: name,
-            host: host,
-            port: port,
-            username: username,
-            authMethod: authMethod,
-            password: password,
-            sshKeyID: sshKeyID,
-            availableSSHKeyIDs: Set(settingsManager.sshKeys.map(\.id)),
+    /// Issues as the shell sees them: the address is the host's, the name is optional.
+    func issues(address: String, nameRequired: Bool) -> [Field: String] {
+        Self.validationIssues(for: ValidationInput(
+            name: name, host: address, port: port, username: username, authMethod: authMethod,
+            password: password, sshKeyID: sshKeyID, availableSSHKeyIDs: Set(settingsManager.sshKeys.map(\.id)),
             usesAppDefaultTerminalSize: usesAppDefaultTerminalSize,
-            initialTerminalColumns: initialTerminalColumns,
-            initialTerminalRows: initialTerminalRows
-        )
+            initialTerminalColumns: initialTerminalColumns, initialTerminalRows: initialTerminalRows), nameRequired: nameRequired)
     }
 
-    private var validationIssues: [FormField: String] {
-        Self.validationIssues(for: validationInput)
+    /// The message a view shows for a field: only once the field was touched or a save tried.
+    func message(for field: Field, in issues: [Field: String]) -> String? {
+        guard attemptedSave || touchedFields.contains(field) else { return nil }
+        return issues[field]
     }
 
-    private var isFormValid: Bool {
-        validationIssues.isEmpty
-    }
+    func markTouched(_ field: Field) { touchedFields.insert(field) }
 
-    private var identifierPrefix: String {
-        mode.isEditing ? "edit-server" : "add-server"
-    }
-
-    private var availableJumpHosts: [ServerConfiguration] {
-        guard let editingID = mode.editingServer?.id else {
-            return serverManager.servers
+    func revealIssuesAndFocus(_ issues: [Field: String]) {
+        attemptedSave = true
+        touchedFields.formUnion(issues.keys)
+        guard let first = Self.orderedFields.first(where: { issues[$0] != nil }) else { return }
+        switch first {
+        case .name, .host, .port, .username, .password: focusRequest = first
+        case .authentication, .sshKey, .terminalSize: focusRequest = nil
         }
+    }
+
+    // MARK: GlassServiceDraft
+
+    func serviceDisplayName(hostName: String) -> String {
+        let trimmed = Self.normalizedEndpointValue(name)
+        return trimmed.isEmpty ? "Terminal on \(hostName)" : trimmed
+    }
+
+    func requiredFields() -> AnyView { AnyView(TerminalRequiredFields(draft: self)) }
+
+    func advancedFields() -> AnyView { AnyView(TerminalAdvancedFields(draft: self, showsName: true)) }
+
+    func validate(address: String) -> [GlassSetupIssue] {
+        let issues = self.issues(address: address, nameRequired: false)
+        return Self.orderedFields.compactMap { field in
+            issues[field].map { GlassSetupIssue(field: field.rawValue, message: $0) }
+        }
+    }
+
+    func focusFirstIssue(_ issues: [GlassSetupIssue]) {
+        var byField: [Field: String] = [:]
+        for issue in issues { if let field = Field(rawValue: issue.field) { byField[field] = issue.message } }
+        revealIssuesAndFocus(byField)
+    }
+
+    func commit(endpointID: EndpointID, host: HostProfile, address: String) async throws {
+        let issues = self.issues(address: address, nameRequired: false)
+        guard issues.isEmpty else {
+            revealIssuesAndFocus(issues)
+            throw TerminalServiceDraftError.invalid(issues.values.sorted().joined(separator: " "))
+        }
+        try persist(id: endpointID.rawValue, address: address, name: serviceDisplayName(hostName: host.displayName))
+    }
+
+    func rollback(endpointID: EndpointID) async {
+        guard let server = serverManager.server(for: endpointID.rawValue) else { return }
+        do { try serverManager.deleteServer(server) } catch {
+            Logger.servers.error("Rollback of \(endpointID.rawValue.uuidString, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    // MARK: Persistence (shared by the shell's sheet and the standalone form)
+
+    /// Saves the standalone form: its own Host field and required Name. Returns false with
+    /// `saveError` set when the server could not be saved.
+    func saveStandalone() -> Bool {
+        let issues = standaloneIssues
+        guard issues.isEmpty else { revealIssuesAndFocus(issues); return false }
+        do {
+            try persist(id: editing?.id ?? UUID(), address: Self.normalizedEndpointValue(host), name: Self.normalizedEndpointValue(name))
+            return true
+        } catch {
+            Logger.servers.error("Failed to save server transactionally: \(error.localizedDescription)")
+            saveError = isEditing ? "The server changes were not saved: \(error.localizedDescription)"
+                                  : "The server was not added: \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    /// Writes the server and its password through `ServerManager`'s transactional paths.
+    private func persist(id: UUID, address: String, name: String) throws {
+        guard let parsedPort = Int(port) else { throw TerminalServiceDraftError.invalid("Enter a port from 1 through 65535.") }
+        let normalizedUsername = Self.normalizedEndpointValue(username)
+        if let original = editing {
+            var updated = original
+            updated.name = name
+            updated.host = address
+            updated.port = parsedPort
+            updated.username = normalizedUsername
+            updated.authMethod = authMethod
+            updated.sshKeyID = authMethod == .sshKey ? sshKeyID : nil
+            updated.sshKeyPath = nil
+            updated.colorTag = colorTag
+            updated.tags = tags
+            updated.isFavorite = isFavorite
+            updated.allowLegacyAlgorithms = allowLegacyAlgorithms
+            updated.jumpHostID = jumpHostIDs.first
+            updated.jumpHostIDs = jumpHostIDs.isEmpty ? nil : jumpHostIDs
+            updated.initialTerminalColumns = usesAppDefaultTerminalSize ? nil : initialTerminalColumns
+            updated.initialTerminalRows = usesAppDefaultTerminalSize ? nil : initialTerminalRows
+            try serverManager.updateServerOrThrow(updated, password: authMethod == .password ? password : nil)
+            requiresPasswordUpgrade = false
+        } else {
+            var server = ServerConfiguration(
+                id: id,   // the shell's endpoint id when created from the host sheet
+                name: name,
+                host: address,
+                port: parsedPort,
+                username: normalizedUsername,
+                authMethod: authMethod,
+                sshKeyPath: nil,
+                sshKeyID: authMethod == .sshKey ? sshKeyID : nil,
+                isFavorite: isFavorite,
+                colorTag: colorTag,
+                tags: tags,
+                provenance: provenance,
+                jumpHostID: jumpHostIDs.first,
+                jumpHostIDs: jumpHostIDs.isEmpty ? nil : jumpHostIDs,
+                initialTerminalColumns: usesAppDefaultTerminalSize ? nil : initialTerminalColumns,
+                initialTerminalRows: usesAppDefaultTerminalSize ? nil : initialTerminalRows
+            )
+            server.allowLegacyAlgorithms = allowLegacyAlgorithms
+            try serverManager.addServerOrThrow(server, password: authMethod == .password ? password : nil)
+        }
+    }
+
+    /// The configuration this draft would save (for tests: draft → configuration → draft).
+    func configuration(id: UUID, address: String, name: String) -> ServerConfiguration? {
+        guard let parsedPort = Int(port) else { return nil }
+        var server = ServerConfiguration(id: id, name: name, host: address, port: parsedPort,
+                                         username: Self.normalizedEndpointValue(username), authMethod: authMethod,
+                                         sshKeyPath: nil, sshKeyID: authMethod == .sshKey ? sshKeyID : nil,
+                                         isFavorite: isFavorite, colorTag: colorTag, tags: tags, provenance: provenance,
+                                         jumpHostID: jumpHostIDs.first, jumpHostIDs: jumpHostIDs.isEmpty ? nil : jumpHostIDs,
+                                         initialTerminalColumns: usesAppDefaultTerminalSize ? nil : initialTerminalColumns,
+                                         initialTerminalRows: usesAppDefaultTerminalSize ? nil : initialTerminalRows)
+        server.allowLegacyAlgorithms = allowLegacyAlgorithms
+        return server
+    }
+
+    func loadStoredPasswordIfNeeded() {
+        guard !didLoadStoredPassword, authMethod == .password, let server = editing else { return }
+        didLoadStoredPassword = true
+        do {
+            password = try serverManager.password(for: server)
+            requiresPasswordUpgrade = false
+        } catch SecretStoreError.notFound {
+            requiresPasswordUpgrade = true
+        } catch {
+            saveError = "The saved password could not be read: \(error.localizedDescription)"
+        }
+    }
+
+    func normalizeSelectedSSHKey() {
+        guard authMethod == .sshKey else { return }
+        let availableIDs = Set(settingsManager.sshKeys.map(\.id))
+        if let selected = sshKeyID, availableIDs.contains(selected) { return }
+        sshKeyID = settingsManager.sshKeys.first?.id
+    }
+
+    var availableJumpHosts: [ServerConfiguration] {
+        guard let editingID = editing?.id else { return serverManager.servers }
         return serverManager.servers.filter { $0.id != editingID }
     }
+}
+
+enum TerminalServiceDraftError: LocalizedError {
+    case invalid(String)
+    var errorDescription: String? {
+        switch self { case .invalid(let message): message }
+    }
+}
+
+// MARK: - Field views (shared by the shell's host sheet and the standalone form)
+
+/// What a terminal cannot be created without: the user and how to authenticate. Rows for a
+/// grouped `Form` section; the caller provides the section.
+struct TerminalRequiredFields: View {
+    @Bindable var draft: TerminalServiceDraft
+    @FocusState private var focusedField: TerminalServiceDraft.Field?
+    @State private var showingAddSSHKey = false
+
+    private var issues: [TerminalServiceDraft.Field: String] { draft.issues(address: "-", nameRequired: false) }
+    private var identifierPrefix: String { draft.isEditing ? "edit-server" : "add-server" }
 
     var body: some View {
-        platformEditor
-            .onAppear {
-                normalizeSelectedSSHKey()
-                focusedField = mode.isImporting ? .username : .name
-                loadStoredPasswordIfNeeded()
+        Group {
+            TerminalFormTextField(label: "Username", text: $draft.username, field: .username,
+                                  identifier: "\(identifierPrefix)-username", isRequired: true,
+                                  message: draft.message(for: .username, in: issues), focus: $focusedField) {
+                focusedField = TerminalServiceDraft.nextField(after: .username, in: draft.authMethod)
             }
-            .onChange(of: name) { _, _ in markTouched(.name) }
-            .onChange(of: host) { _, _ in markTouched(.host) }
-            .onChange(of: port) { _, _ in markTouched(.port) }
-            .onChange(of: username) { _, _ in markTouched(.username) }
-            .onChange(of: password) { _, _ in markTouched(.password) }
-            .onChange(of: sshKeyID) { _, _ in markTouched(.sshKey) }
-            .onChange(of: authMethod) { _, _ in
-                markTouched(.authentication)
-                markTouched(authMethod == .sshKey ? .sshKey : .password)
-                normalizeSelectedSSHKey()
-            }
-            .onChange(of: settingsManager.sshKeys.map(\.id)) { previous, current in
-                // A key the user just added from this form is the one they mean: select it
-                // rather than the catalog's first key (on a Mac that shares glas.sh's catalog
-                // the first key is usually an older one whose material this build may not hold).
-                if authMethod == .sshKey, let added = current.first(where: { !previous.contains($0) }) {
-                    sshKeyID = added
-                }
-                normalizeSelectedSSHKey()
-            }
-            .onChange(of: usesAppDefaultTerminalSize) { _, usesDefault in
-                markTouched(.terminalSize)
-                guard !usesDefault else { return }
-                initialTerminalColumns = settingsManager.initialTerminalColumns
-                initialTerminalRows = settingsManager.initialTerminalRows
-            }
-            .onChange(of: initialTerminalColumns) { _, _ in markTouched(.terminalSize) }
-            .onChange(of: initialTerminalRows) { _, _ in markTouched(.terminalSize) }
-    }
-
-    @ViewBuilder
-    private var platformEditor: some View {
-        #if os(macOS)
-        editor
-            .frame(
-                minWidth: 600,
-                idealWidth: 640,
-                maxWidth: 680,
-                minHeight: 620,
-                idealHeight: 720,
-                maxHeight: 820
-            )
-        #else
-        editor
-        #endif
-    }
-
-    private var editor: some View {
-        NavigationStack {
-            platformForm
-                .navigationTitle(navigationTitle)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") {
-                            dismiss()
-                        }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button(mode.confirmationTitle) {
-                            save()
-                        }
-                        .disabled(!isFormValid)
-                        #if os(macOS)
-                        .keyboardShortcut(.defaultAction)
-                        #endif
+            observing(serverFormLabeledContent("Method") {
+                Picker("Method", selection: $draft.authMethod) {
+                    ForEach(supportedAuthenticationMethods, id: \.self) { method in
+                        Text(method.displayName).tag(method)
                     }
                 }
-                .sheet(isPresented: $showingAddSSHKey) {
-                    AddSSHKeyView()
-                        .environment(settingsManager)
-                }
-                .sheet(isPresented: $showingJumpHostPicker) {
-                    JumpHostPickerView(
-                        servers: availableJumpHosts,
-                        excludedIDs: Set(jumpHostIDs)
-                    ) { selectedID in
-                        jumpHostIDs.append(selectedID)
-                    }
-                }
-                .alert("Save Failed", isPresented: Binding(
-                    get: { saveError != nil },
-                    set: { if !$0 { saveError = nil } }
-                )) {
-                    Button("OK", role: .cancel) {}
-                } message: {
-                    Text(saveError ?? "The server could not be saved.")
-                }
-        }
-    }
-
-    @ViewBuilder
-    private var platformForm: some View {
-        #if os(macOS)
-        Form { formSections }
-            .formStyle(.grouped)
-        #else
-        Form { formSections }
-        #endif
-    }
-
-    @ViewBuilder
-    private var formSections: some View {
-        Section("Connection") {
-            formTextField(
-                "Name",
-                text: $name,
-                field: .name,
-                identifier: "\(identifierPrefix)-display-name",
-                isRequired: true
-            )
-            if let hostContext {
-                // The machine's identity is the host's, entered once on the host; never a field here.
-                LabeledContent("Address") {
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text(hostContext.address)
-                            .textSelection(.enabled)
-                            .accessibilityIdentifier("\(identifierPrefix)-host")
-                            .accessibilityValue(hostContext.address)
-                        Text("From the host \(hostContext.hostName)")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-                .accessibilityElement(children: .contain)
-            } else {
-                // glas.sh's standalone form (no shell host): the Host field stays.
-                formTextField(
-                    "Host",
-                    text: $host,
-                    field: .host,
-                    identifier: "\(identifierPrefix)-host",
-                    isRequired: true
-                )
-            }
-            portField
-            formTextField(
-                "Username",
-                text: $username,
-                field: .username,
-                identifier: "\(identifierPrefix)-username",
-                isRequired: true
-            )
-            Toggle("Allow Legacy SSH Algorithms", isOn: $allowLegacyAlgorithms)
-                .accessibilityIdentifier("\(identifierPrefix)-legacy-algorithms")
-            // Persistent, not conditional: the July 2026 audit asked that this option never look
-            // like a plain compatibility switch. It enables group-14 KEX and AES-128-CTR for this
-            // host only (SSHConnectionOptions.allowLegacyAlgorithms); host-key policy is unaffected.
-            Label {
-                Text("Weakens the cryptography used to reach this host. Only for old servers that reject modern algorithms; every connection will ask you to confirm.")
-            } icon: {
-                Image(systemName: "exclamationmark.triangle.fill")
-            }
-            .font(.footnote)
-            .foregroundStyle(allowLegacyAlgorithms ? .orange : .secondary)
-            .accessibilityIdentifier("\(identifierPrefix)-legacy-algorithms-warning")
-        }
-
-        Section("Authentication") {
-            serverFormLabeledContent("Method") {
-                VStack(alignment: .leading, spacing: 4) {
-                    Picker("Method", selection: $authMethod) {
-                        ForEach(supportedAuthenticationMethods, id: \.self) { method in
-                            Text(method.displayName).tag(method)
-                        }
-                    }
-                    .serverFormControlPresentation()
-                    validationMessage(for: .authentication)
-                }
-            }
-
-            if authMethod == .password {
+                .serverFormControlPresentation()
+                .accessibilityIdentifier("\(identifierPrefix)-auth-method")
+            })
+            TerminalValidationMessage(message: draft.message(for: .authentication, in: issues),
+                                      identifier: "\(identifierPrefix)-authentication-validation")
+            if draft.authMethod == .password {
                 passwordField
-                if requiresPasswordUpgrade {
+                if draft.requiresPasswordUpgrade {
                     Label {
-                        Text("Re-enter this password once to upgrade it. Earlier releases used an address-based Keychain account shared with glassdb; glas.sh will not import that ambiguous credential.")
+                        Text("Re-enter this password once to upgrade it. Earlier releases used an address-based Keychain account shared with glassdb; the ambiguous credential is not imported.")
                     } icon: {
                         Image(systemName: "key.horizontal")
                     }
@@ -573,123 +470,62 @@ struct ServerFormView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 }
-            } else if authMethod == .sshKey {
+            } else if draft.authMethod == .sshKey {
                 sshKeyEditor
             }
         }
+    }
 
-        Section("Routing") {
-            #if os(macOS)
-            serverFormLabeledContent("Route") {
-                routingEditor.serverFormControlPresentation()
+    /// Modifiers that must exist once: on the Method row, never on the `Group` (a modifier on a
+    /// `Group` is applied to every row, which presented the key sheet from several places at once
+    /// on iOS and never showed it).
+    private func observing<V: View>(_ view: V) -> some View {
+        view
+            .onChange(of: draft.username) { _, _ in draft.markTouched(.username) }
+            .onChange(of: draft.password) { _, _ in draft.markTouched(.password) }
+            .onChange(of: draft.sshKeyID) { _, _ in draft.markTouched(.sshKey) }
+            .onChange(of: draft.authMethod) { _, _ in
+                draft.markTouched(.authentication)
+                draft.markTouched(draft.authMethod == .sshKey ? .sshKey : .password)
+                draft.normalizeSelectedSSHKey()
             }
-            #else
-            routingEditor
-            #endif
-        }
-
-        Section("Terminal") {
-            TerminalInitialSizeEditor(
-                usesAppDefault: $usesAppDefaultTerminalSize,
-                columns: $initialTerminalColumns,
-                rows: $initialTerminalRows,
-                appDefault: TerminalGeometry(
-                    rows: settingsManager.initialTerminalRows,
-                    columns: settingsManager.initialTerminalColumns
-                )
-            )
-            validationMessage(for: .terminalSize)
-        }
-
-        Section("Appearance") {
-            #if os(macOS)
-            serverFormLabeledContent("Color tag") {
-                colorTagPicker.serverFormControlPresentation()
+            .onChange(of: draft.settingsManager.sshKeys.map(\.id)) { previous, current in
+                // A key the user just added from this form is the one they mean: select it rather
+                // than the catalog's first key.
+                if draft.authMethod == .sshKey, let added = current.first(where: { !previous.contains($0) }) {
+                    draft.sshKeyID = added
+                }
+                draft.normalizeSelectedSSHKey()
             }
-            serverFormLabeledContent("Collections") {
-                collectionEditor.serverFormControlPresentation()
+            .onChange(of: draft.focusRequest) { _, request in
+                guard let request, [.username, .password].contains(request) else { return }
+                focusedField = request
+                draft.focusRequest = nil
             }
-            #else
-            colorTagPicker
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Tags")
-                    .font(.headline)
-                collectionEditor
-            }
-            #endif
-        }
-
-        Section("Preferences") {
-            Toggle("Favorite", systemImage: "heart.fill", isOn: $isFavorite)
-                .accessibilityIdentifier("\(identifierPrefix)-favorite")
-        }
     }
 
     @ViewBuilder
-    private func formTextField(
-        _ label: String,
-        text: Binding<String>,
-        field: FormField,
-        identifier: String,
-        isRequired: Bool
-    ) -> some View {
-        LabeledContent {
-            VStack(alignment: .leading, spacing: 4) {
-                TextField(label, text: text)
-                    .terminalTextInputDefaults()
-                    .focused($focusedField, equals: field)
-                    .serverFormTextFieldPresentation()
-                    .accessibilityIdentifier(identifier)
-                    .onSubmit { advanceFocus(after: field) }
-                validationMessage(for: field)
-            }
-        } label: {
-            requiredFieldLabel(label, isRequired: isRequired)
-        }
-    }
-
-    private var portField: some View {
-        LabeledContent {
-            VStack(alignment: .leading, spacing: 4) {
-                TextField("Port", text: $port)
-                    .terminalNumericInput()
-                    .focused($focusedField, equals: .port)
-                    .serverFormTextFieldPresentation()
-                    .accessibilityIdentifier("\(identifierPrefix)-port")
-                    .onSubmit { advanceFocus(after: .port) }
-                validationMessage(for: .port)
-            }
-        } label: {
-            requiredFieldLabel("Port", isRequired: false)
-        }
-    }
-
     private var passwordField: some View {
         LabeledContent {
-            VStack(alignment: .leading, spacing: 4) {
-                SecureField("Password", text: $password)
-                    .textContentType(.init(rawValue: ""))
-                    .focused($focusedField, equals: .password)
-                    .serverFormTextFieldPresentation()
-                    .accessibilityIdentifier("\(identifierPrefix)-password")
-                    .onSubmit { advanceFocus(after: .password) }
-                validationMessage(for: .password)
-            }
+            SecureField("Password", text: $draft.password)
+                .textContentType(.init(rawValue: ""))
+                .focused($focusedField, equals: .password)
+                .serverFormTextFieldPresentation()
+                .accessibilityIdentifier("\(identifierPrefix)-password")
         } label: {
-            requiredFieldLabel("Password", isRequired: true)
+            TerminalRequiredFieldLabel(title: "Password", isRequired: true)
         }
+        TerminalValidationMessage(message: draft.message(for: .password, in: issues),
+                                  identifier: "\(identifierPrefix)-password-validation")
     }
 
     @ViewBuilder
     private var sshKeyEditor: some View {
         #if os(macOS)
-        // The label is plain text on purpose. `requiredFieldLabel` folds its two texts into one
-        // accessibility element with an explicit label; on a `LabeledContent` whose content is
-        // not a single control (this text-and-button stack) that makes SwiftUI's label
-        // resolution on macOS 27 recurse until the stack overflows — SIGSEGV in
-        // `AccessibilityNode.accessibilityLabel` on any full accessibility snapshot of the form,
-        // reproduced with the SSH Key method selected and no other window open. The Password and
-        // Host rows keep the combined label because their content is one text field.
+        // The label is plain text on purpose. `TerminalRequiredFieldLabel` folds its two texts
+        // into one accessibility element with an explicit label; on a `LabeledContent` whose
+        // content is not a single control (this text-and-button stack) that makes SwiftUI's
+        // label resolution on macOS 27 recurse until the stack overflows (W4, 2026-09-10).
         LabeledContent {
             sshKeyEditorContent
                 .serverFormControlPresentation()
@@ -703,7 +539,7 @@ struct ServerFormView: View {
         }
         #else
         VStack(alignment: .leading, spacing: 8) {
-            requiredFieldLabel("SSH Key", isRequired: true)
+            TerminalRequiredFieldLabel(title: "SSH Key", isRequired: true)
             sshKeyEditorContent
         }
         #endif
@@ -711,42 +547,132 @@ struct ServerFormView: View {
 
     private var sshKeyEditorContent: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if settingsManager.sshKeys.isEmpty {
+            if draft.settingsManager.sshKeys.isEmpty {
                 Text("No SSH keys available. Add one to continue.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else {
-                Picker("SSH Key", selection: $sshKeyID) {
+                Picker("SSH Key", selection: $draft.sshKeyID) {
                     Text("Select a key").tag(nil as UUID?)
-                    ForEach(settingsManager.sshKeys) { key in
+                    ForEach(draft.settingsManager.sshKeys) { key in
                         Text("\(key.name) (\(key.keyTypeBadge))").tag(key.id as UUID?)
                     }
                 }
                 .serverFormControlPresentation()
+                .accessibilityIdentifier("\(identifierPrefix)-ssh-key")
             }
-            validationMessage(for: .sshKey)
-            Button("Add SSH Key", systemImage: "plus.circle") {
-                // A sheet over this sheet on every platform: the macOS crash once blamed on
-                // nesting was the SSH Key row's accessibility label (W4, 2026-09-10).
-                showingAddSSHKey = true
-            }
-            .buttonStyle(.bordered)
+            TerminalValidationMessage(message: draft.message(for: .sshKey, in: issues),
+                                      identifier: "\(identifierPrefix)-sshKey-validation")
+            Button("Add SSH Key", systemImage: "plus.circle") { showingAddSSHKey = true }
+                .buttonStyle(.bordered)
+                .sheet(isPresented: $showingAddSSHKey) {
+                    // A sheet over this sheet on every platform: the macOS crash once blamed on
+                    // nesting was the SSH Key row's accessibility label (W4, 2026-09-10).
+                    AddSSHKeyView()
+                        .environment(draft.settingsManager)
+                }
         }
+    }
+}
+
+/// Everything optional: the shell's "Advanced" disclosure and the standalone form's sections.
+struct TerminalAdvancedFields: View {
+    @Bindable var draft: TerminalServiceDraft
+    /// The shell's sheet offers the service name here (optional, defaulted from the host); the
+    /// standalone form has it up top as a required field.
+    var showsName = true
+    @FocusState private var focusedField: TerminalServiceDraft.Field?
+    @State private var showingJumpHostPicker = false
+
+    private var issues: [TerminalServiceDraft.Field: String] { draft.issues(address: "-", nameRequired: false) }
+    private var identifierPrefix: String { draft.isEditing ? "edit-server" : "add-server" }
+
+    var body: some View {
+        Group {
+            if showsName {
+                TerminalFormTextField(label: "Name", text: $draft.name, field: .name,
+                                      identifier: "\(identifierPrefix)-display-name", isRequired: false,
+                                      message: nil, focus: $focusedField, prompt: "Terminal on this host") {}
+            }
+            observing(LabeledContent("Port") {
+                TextField("Port", text: $draft.port)
+                    .terminalNumericInput()
+                    .focused($focusedField, equals: .port)
+                    .serverFormTextFieldPresentation()
+                    .accessibilityIdentifier("\(identifierPrefix)-port")
+            })
+            TerminalValidationMessage(message: draft.message(for: .port, in: issues),
+                                      identifier: "\(identifierPrefix)-port-validation")
+            Toggle("Allow Legacy SSH Algorithms", isOn: $draft.allowLegacyAlgorithms)
+                .accessibilityIdentifier("\(identifierPrefix)-legacy-algorithms")
+            // Persistent, not conditional: the July 2026 audit asked that this option never look
+            // like a plain compatibility switch. It enables group-14 KEX and AES-128-CTR for this
+            // host only (SSHConnectionOptions.allowLegacyAlgorithms); host-key policy is unaffected.
+            Label {
+                Text("Weakens the cryptography used to reach this host. Only for old servers that reject modern algorithms; every connection will ask you to confirm.")
+            } icon: {
+                Image(systemName: "exclamationmark.triangle.fill")
+            }
+            .font(.footnote)
+            .foregroundStyle(draft.allowLegacyAlgorithms ? .orange : .secondary)
+            .accessibilityIdentifier("\(identifierPrefix)-legacy-algorithms-warning")
+
+            #if os(macOS)
+            serverFormLabeledContent("Route") { routingEditor.serverFormControlPresentation() }
+            #else
+            routingEditor
+            #endif
+
+            TerminalInitialSizeEditor(
+                usesAppDefault: $draft.usesAppDefaultTerminalSize,
+                columns: $draft.initialTerminalColumns,
+                rows: $draft.initialTerminalRows,
+                appDefault: TerminalGeometry(rows: draft.settingsManager.initialTerminalRows,
+                                             columns: draft.settingsManager.initialTerminalColumns)
+            )
+            TerminalValidationMessage(message: draft.message(for: .terminalSize, in: issues),
+                                      identifier: "\(identifierPrefix)-terminalSize-validation")
+
+            #if os(macOS)
+            serverFormLabeledContent("Color tag") { colorTagPicker.serverFormControlPresentation() }
+            #else
+            colorTagPicker
+            #endif
+        }
+    }
+
+    /// Once, on the Port row (see `TerminalRequiredFields.observing`).
+    private func observing<V: View>(_ view: V) -> some View {
+        view
+            .onChange(of: draft.name) { _, _ in draft.markTouched(.name) }
+            .onChange(of: draft.port) { _, _ in draft.markTouched(.port) }
+            .onChange(of: draft.usesAppDefaultTerminalSize) { _, usesDefault in
+                draft.markTouched(.terminalSize)
+                guard !usesDefault else { return }
+                draft.initialTerminalColumns = draft.settingsManager.initialTerminalColumns
+                draft.initialTerminalRows = draft.settingsManager.initialTerminalRows
+            }
+            .onChange(of: draft.initialTerminalColumns) { _, _ in draft.markTouched(.terminalSize) }
+            .onChange(of: draft.initialTerminalRows) { _, _ in draft.markTouched(.terminalSize) }
+            .onChange(of: draft.focusRequest) { _, request in
+                guard let request, [.name, .port].contains(request) else { return }
+                focusedField = request
+                draft.focusRequest = nil
+            }
     }
 
     private var routingEditor: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if jumpHostIDs.isEmpty {
-                Text("Direct connection")
-                    .foregroundStyle(.secondary)
+            if draft.jumpHostIDs.isEmpty {
+                Text("Direct connection").foregroundStyle(.secondary)
             } else {
-                ForEach(Array(jumpHostIDs.enumerated()), id: \.offset) { index, hopID in
-                    if let hop = serverManager.servers.first(where: { $0.id == hopID }) {
+                ForEach(Array(draft.jumpHostIDs.enumerated()), id: \.offset) { index, hopID in
+                    if let hop = draft.serverManager.servers.first(where: { $0.id == hopID }) {
                         HStack {
                             Label("Hop \(index + 1): \(hop.name)", systemImage: "\(index + 1).circle.fill")
                             Spacer()
                             Button("Remove hop \(index + 1)", systemImage: "minus.circle.fill") {
-                                jumpHostIDs.remove(at: index)
+                                draft.jumpHostIDs.remove(at: index)
                             }
                             .labelStyle(.iconOnly)
                             .buttonStyle(.plain)
@@ -754,19 +680,19 @@ struct ServerFormView: View {
                         }
                     }
                 }
-                .onMove { from, to in
-                    jumpHostIDs.move(fromOffsets: from, toOffset: to)
+                .onMove { from, to in draft.jumpHostIDs.move(fromOffsets: from, toOffset: to) }
+            }
+            Button("Add Jump Host", systemImage: "plus.circle") { showingJumpHostPicker = true }
+                .sheet(isPresented: $showingJumpHostPicker) {
+                    JumpHostPickerView(servers: draft.availableJumpHosts, excludedIDs: Set(draft.jumpHostIDs)) { selectedID in
+                        draft.jumpHostIDs.append(selectedID)
+                    }
                 }
-            }
-
-            Button("Add Jump Host", systemImage: "plus.circle") {
-                showingJumpHostPicker = true
-            }
         }
     }
 
     private var colorTagPicker: some View {
-        Picker("Color tag", selection: $colorTag) {
+        Picker("Color tag", selection: $draft.colorTag) {
             ForEach(ServerColorTag.allCases, id: \.self) { tag in
                 Label(tag.rawValue.capitalized, systemImage: "circle.fill")
                     .foregroundStyle(tag.color)
@@ -774,29 +700,299 @@ struct ServerFormView: View {
             }
         }
     }
+}
+
+/// One labelled text row with its validation message.
+struct TerminalFormTextField: View {
+    let label: String
+    @Binding var text: String
+    let field: TerminalServiceDraft.Field
+    let identifier: String
+    let isRequired: Bool
+    let message: String?
+    var focus: FocusState<TerminalServiceDraft.Field?>.Binding
+    var prompt: String? = nil
+    let onSubmit: () -> Void
+
+    @ViewBuilder
+    var body: some View {
+        LabeledContent {
+            TextField(label, text: $text, prompt: prompt.map(Text.init))
+                .terminalTextInputDefaults()
+                .focused(focus, equals: field)
+                .serverFormTextFieldPresentation()
+                .accessibilityIdentifier(identifier)
+                .onSubmit(onSubmit)
+        } label: {
+            TerminalRequiredFieldLabel(title: label, isRequired: isRequired)
+        }
+        TerminalValidationMessage(message: message, identifier: "\(identifier)-validation")
+    }
+}
+
+/// Plain text on purpose: folding the two texts into one accessibility element with an explicit
+/// label made SwiftUI's label resolution recurse on macOS 27 whenever the row's content was more
+/// than one control (W4, 2026-09-10; seen again on 2026-09-11 in the host sheet).
+struct TerminalRequiredFieldLabel: View {
+    let title: String
+    let isRequired: Bool
+
+    var body: some View {
+        if isRequired {
+            HStack(spacing: 6) {
+                Text(title)
+                Text("Required")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+        } else {
+            Text(title)
+        }
+    }
+}
+
+struct TerminalValidationMessage: View {
+    let message: String?
+    let identifier: String
+
+    var body: some View {
+        if let message {
+            Label(message, systemImage: "exclamationmark.circle.fill")
+                .font(.caption)
+                .foregroundStyle(.red)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier(identifier)
+                .accessibilityLabel("Error: \(message)")
+        }
+    }
+}
+
+// MARK: - Standalone form (glas.sh's own Add/Edit Server: Tailscale import, command palette)
+
+struct AddServerView: View {
+    @Bindable var serverManager: ServerManager
+    private let draft: ServerConfiguration?
+
+    init(serverManager: ServerManager, draft: ServerConfiguration? = nil) {
+        self.serverManager = serverManager
+        self.draft = draft
+    }
+
+    var body: some View {
+        ServerFormView(mode: .add(draft), serverManager: serverManager)
+    }
+}
+
+struct EditServerView: View {
+    let server: ServerConfiguration
+    @Bindable var serverManager: ServerManager
+    var hostContext: ServerFormHostContext? = nil
+
+    var body: some View {
+        ServerFormView(mode: .edit(server), serverManager: serverManager, hostContext: hostContext)
+    }
+}
+
+/// glas.sh's standalone server form, built from the same field views as the shell's host sheet.
+/// It keeps its own Host field because nothing else defines the machine here.
+struct ServerFormView: View {
+    enum Mode {
+        case add(ServerConfiguration?)
+        case edit(ServerConfiguration)
+
+        var isEditing: Bool { if case .edit = self { true } else { false } }
+        var isImporting: Bool { if case .add(.some) = self { true } else { false } }
+        var navigationTitle: String {
+            if isEditing { return "Edit Connection" }
+            return isImporting ? "Import Connection" : "Add Server"
+        }
+        var confirmationTitle: String {
+            if isEditing { return "Save Changes" }
+            return isImporting ? "Save Connection" : "Add Server"
+        }
+    }
+
+    private let mode: Mode
+    private let hostContext: ServerFormHostContext?
+    private let serverManager: ServerManager
+    @Environment(SettingsManager.self) private var settingsManager
+    /// Built on first appearance from the environment's settings (the key catalog).
+    @State private var draft: TerminalServiceDraft?
+    @FocusState private var focusedField: TerminalServiceDraft.Field?
+    @State private var newTag = ""
+    @Environment(\.dismiss) private var dismiss
+
+    init(mode: Mode, serverManager: ServerManager, hostContext: ServerFormHostContext? = nil) {
+        self.mode = mode
+        self.hostContext = hostContext
+        self.serverManager = serverManager
+    }
+
+    private func makeDraft() -> TerminalServiceDraft {
+        switch mode {
+        case .add(let imported):
+            TerminalServiceDraft(imported: imported, serverManager: serverManager, settingsManager: settingsManager)
+        case .edit(let server):
+            TerminalServiceDraft(editing: server, serverManager: serverManager, settingsManager: settingsManager)
+        }
+    }
+
+    private var identifierPrefix: String { mode.isEditing ? "edit-server" : "add-server" }
+
+    var body: some View {
+        platformEditor
+            .onAppear {
+                if draft == nil { draft = makeDraft() }
+                focusedField = mode.isImporting ? .username : .name
+            }
+    }
+
+    @ViewBuilder
+    private var platformEditor: some View {
+        #if os(macOS)
+        editor.frame(minWidth: 600, idealWidth: 640, maxWidth: 680, minHeight: 620, idealHeight: 720, maxHeight: 820)
+        #else
+        editor
+        #endif
+    }
+
+    @ViewBuilder
+    private var editor: some View {
+        if let draft {
+            ServerFormContent(mode: mode, hostContext: hostContext, draft: draft, focusedField: $focusedField,
+                              newTag: $newTag, save: save)
+        } else {
+            ProgressView()
+        }
+    }
+
+    private func save() {
+        guard let draft else { return }
+        commitPendingTag()
+        if let hostContext { draft.host = hostContext.address }
+        if draft.saveStandalone() { dismiss() }
+    }
+
+    private func commitPendingTag() {
+        guard let draft else { return }
+        let trimmed = newTag.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { newTag = ""; return }
+        if !draft.tags.contains(trimmed) { draft.tags.append(trimmed) }
+        newTag = ""
+    }
+}
+
+/// The standalone form's body, once the draft exists.
+private struct ServerFormContent: View {
+    let mode: ServerFormView.Mode
+    let hostContext: ServerFormHostContext?
+    @Bindable var draft: TerminalServiceDraft
+    var focusedField: FocusState<TerminalServiceDraft.Field?>.Binding
+    @Binding var newTag: String
+    let save: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    private var identifierPrefix: String { mode.isEditing ? "edit-server" : "add-server" }
+    private var issues: [TerminalServiceDraft.Field: String] { draft.standaloneIssues }
+
+    private var navigationTitle: String {
+        if let hostContext {
+            return mode.isEditing ? "Edit Terminal on \(hostContext.hostName)" : "Add Terminal to \(hostContext.hostName)"
+        }
+        return mode.navigationTitle
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Connection") {
+                    TerminalFormTextField(label: "Name", text: $draft.name, field: .name,
+                                          identifier: "\(identifierPrefix)-display-name", isRequired: true,
+                                          message: draft.message(for: .name, in: issues), focus: focusedField) {
+                        focusedField.wrappedValue = .host
+                    }
+                    if let hostContext {
+                        LabeledContent("Address") {
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text(hostContext.address).textSelection(.enabled)
+                                    .accessibilityIdentifier("\(identifierPrefix)-host")
+                                    .accessibilityValue(hostContext.address)
+                                Text("From the host \(hostContext.hostName)").font(.caption2).foregroundStyle(.tertiary)
+                            }
+                        }
+                        .accessibilityElement(children: .contain)
+                    } else {
+                        TerminalFormTextField(label: "Host", text: $draft.host, field: .host,
+                                              identifier: "\(identifierPrefix)-host", isRequired: true,
+                                              message: draft.message(for: .host, in: issues), focus: focusedField) {
+                            focusedField.wrappedValue = .port
+                        }
+                    }
+                    TerminalRequiredFields(draft: draft)
+                }
+                Section("Advanced") {
+                    TerminalAdvancedFields(draft: draft, showsName: false)
+                }
+                Section("Preferences") {
+                    #if os(macOS)
+                    serverFormLabeledContent("Collections") { collectionEditor.serverFormControlPresentation() }
+                    #else
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Tags").font(.headline)
+                        collectionEditor
+                    }
+                    #endif
+                    Toggle("Favorite", systemImage: "heart.fill", isOn: $draft.isFavorite)
+                        .accessibilityIdentifier("\(identifierPrefix)-favorite")
+                }
+            }
+            .formStyle(.grouped)
+            .navigationTitle(navigationTitle)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(mode.confirmationTitle) { save() }
+                        .disabled(!issues.isEmpty)
+                        #if os(macOS)
+                        .keyboardShortcut(.defaultAction)
+                        #endif
+                }
+            }
+            .alert("Save Failed", isPresented: Binding(
+                get: { draft.saveError != nil },
+                set: { if !$0 { draft.saveError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(draft.saveError ?? "The server could not be saved.")
+            }
+            .onChange(of: draft.host) { _, _ in draft.markTouched(.host) }
+            .onChange(of: draft.focusRequest) { _, request in
+                guard let request, request == .host else { return }
+                focusedField.wrappedValue = .host
+                draft.focusRequest = nil
+            }
+        }
+    }
 
     private var collectionEditor: some View {
         FlowLayout(spacing: 8) {
-            ForEach(tags, id: \.self) { tag in
-                TagChip(tag: tag) {
-                    tags.removeAll { $0 == tag }
-                }
+            ForEach(draft.tags, id: \.self) { tag in
+                TagChip(tag: tag) { draft.tags.removeAll { $0 == tag } }
             }
-
             HStack(spacing: 4) {
                 TextField("Add collection", text: $newTag)
                     .textFieldStyle(.plain)
                     .frame(width: 110)
                     .accessibilityIdentifier("\(identifierPrefix)-tag")
                     .onSubmit { commitPendingTag() }
-
                 if !newTag.isEmpty {
-                    Button("Add collection", systemImage: "plus.circle.fill") {
-                        commitPendingTag()
-                    }
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Add collection")
+                    Button("Add collection", systemImage: "plus.circle.fill") { commitPendingTag() }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Add collection")
                 }
             }
             .padding(.horizontal, 12)
@@ -805,163 +1001,11 @@ struct ServerFormView: View {
         }
     }
 
-    @ViewBuilder
-    private func requiredFieldLabel(_ title: String, isRequired: Bool) -> some View {
-        if isRequired {
-            HStack(spacing: 6) {
-                Text(title)
-                Text("Required")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(title), required")
-        } else {
-            Text(title)
-        }
-    }
-
-    @ViewBuilder
-    private func validationMessage(for field: FormField) -> some View {
-        if (attemptedSave || touchedFields.contains(field)),
-           let message = validationIssues[field] {
-            Label(message, systemImage: "exclamationmark.circle.fill")
-                .font(.caption)
-                .foregroundStyle(.red)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("\(identifierPrefix)-\(field)-validation")
-                .accessibilityLabel("Error: \(message)")
-        }
-    }
-
-    private func markTouched(_ field: FormField) {
-        touchedFields.insert(field)
-    }
-
-    private func advanceFocus(after field: FormField) {
-        focusedField = Self.nextField(after: field, in: authMethod)
-    }
-
-    private func validateForSave() -> Bool {
-        attemptedSave = true
-        let issues = validationIssues
-        touchedFields.formUnion(issues.keys)
-        if let firstInvalidField = Self.orderedFormFields.first(where: { issues[$0] != nil }) {
-            switch firstInvalidField {
-            case .name, .host, .port, .username, .password:
-                focusedField = firstInvalidField
-            case .authentication, .sshKey, .terminalSize:
-                focusedField = nil
-            }
-        }
-        return issues.isEmpty
-    }
-
-    private func save() {
-        guard validateForSave(), let parsedPort = Int(port) else { return }
-        commitPendingTag()
-
-        let normalizedName = Self.normalizedEndpointValue(name)
-        let normalizedHost = Self.normalizedEndpointValue(host)
-        let normalizedUsername = Self.normalizedEndpointValue(username)
-
-        do {
-            switch mode {
-            case .add(let draft):
-                var server = ServerConfiguration(
-                    id: draft?.id ?? UUID(),   // Glass Power Tools: the shell's HostServiceLink endpoint id
-                    name: normalizedName,
-                    host: normalizedHost,
-                    port: parsedPort,
-                    username: normalizedUsername,
-                    authMethod: authMethod,
-                    sshKeyPath: nil,
-                    sshKeyID: authMethod == .sshKey ? sshKeyID : nil,
-                    isFavorite: isFavorite,
-                    colorTag: colorTag,
-                    tags: tags,
-                    provenance: draft?.provenance,
-                    jumpHostID: jumpHostIDs.first,
-                    jumpHostIDs: jumpHostIDs.isEmpty ? nil : jumpHostIDs,
-                    initialTerminalColumns: usesAppDefaultTerminalSize ? nil : initialTerminalColumns,
-                    initialTerminalRows: usesAppDefaultTerminalSize ? nil : initialTerminalRows
-                )
-                server.allowLegacyAlgorithms = allowLegacyAlgorithms
-                try serverManager.addServerOrThrow(
-                    server,
-                    password: authMethod == .password ? password : nil
-                )
-            case .edit(let original):
-                var updatedServer = original
-                updatedServer.name = normalizedName
-                updatedServer.host = normalizedHost
-                updatedServer.port = parsedPort
-                updatedServer.username = normalizedUsername
-                updatedServer.authMethod = authMethod
-                updatedServer.sshKeyID = authMethod == .sshKey ? sshKeyID : nil
-                updatedServer.sshKeyPath = nil
-                updatedServer.colorTag = colorTag
-                updatedServer.tags = tags
-                updatedServer.isFavorite = isFavorite
-                updatedServer.allowLegacyAlgorithms = allowLegacyAlgorithms
-                updatedServer.jumpHostID = jumpHostIDs.first
-                updatedServer.jumpHostIDs = jumpHostIDs.isEmpty ? nil : jumpHostIDs
-                updatedServer.initialTerminalColumns = usesAppDefaultTerminalSize ? nil : initialTerminalColumns
-                updatedServer.initialTerminalRows = usesAppDefaultTerminalSize ? nil : initialTerminalRows
-                try serverManager.updateServerOrThrow(
-                    updatedServer,
-                    password: authMethod == .password ? password : nil
-                )
-                requiresPasswordUpgrade = false
-            }
-        } catch {
-            Logger.servers.error("Failed to save server transactionally: \(error.localizedDescription)")
-            if mode.isEditing {
-                saveError = "The server changes were not saved: \(error.localizedDescription)"
-            } else {
-                saveError = "The server was not added: \(error.localizedDescription)"
-            }
-            return
-        }
-
-        dismiss()
-    }
-
-    private func loadStoredPasswordIfNeeded() {
-        guard !didLoadStoredPassword,
-              authMethod == .password,
-              let server = mode.editingServer else { return }
-        didLoadStoredPassword = true
-
-        do {
-            password = try serverManager.password(for: server)
-            requiresPasswordUpgrade = false
-        } catch SecretStoreError.notFound {
-            requiresPasswordUpgrade = true
-        } catch {
-            saveError = "The saved password could not be read: \(error.localizedDescription)"
-        }
-    }
-
     private func commitPendingTag() {
         let trimmed = newTag.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            newTag = ""
-            return
-        }
-        if !tags.contains(trimmed) {
-            tags.append(trimmed)
-        }
+        guard !trimmed.isEmpty else { newTag = ""; return }
+        if !draft.tags.contains(trimmed) { draft.tags.append(trimmed) }
         newTag = ""
-    }
-
-    private func normalizeSelectedSSHKey() {
-        guard authMethod == .sshKey else { return }
-        let availableIDs = Set(settingsManager.sshKeys.map(\.id))
-        if let selected = sshKeyID, availableIDs.contains(selected) {
-            return
-        }
-        sshKeyID = settingsManager.sshKeys.first?.id
     }
 }
 

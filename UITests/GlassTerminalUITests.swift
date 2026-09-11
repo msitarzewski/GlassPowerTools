@@ -56,9 +56,9 @@ final class GlassTerminalUITests: XCTestCase {
 
     // MARK: - Helpers (same conventions as GlassShellLibraryUITests)
 
-    private func launch() -> XCUIApplication {
+    private func launch(extraArguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments += ["--ui-testing", runID.uuidString]
+        app.launchArguments += ["--ui-testing", runID.uuidString] + extraArguments
         #if os(macOS)
         app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
         #endif
@@ -117,6 +117,16 @@ final class GlassTerminalUITests: XCTestCase {
 
     /// Attaches the accessibility tree so a failure can be diagnosed from the result bundle.
     private func dumpTree(_ name: String) {
+        #if !os(macOS)
+        // iOS and visionOS print a real subtree. Enumerating `app.buttons` there raises
+        // "Automation type mismatch: computed Button ... vs PopUpButton" on a SwiftUI Picker
+        // (iOS 27) and fails the test from inside the diagnostic, so never do that off macOS.
+        let subtree = XCTAttachment(string: app.debugDescription)
+        subtree.name = "terminal-tree-\(name)"
+        subtree.lifetime = .keepAlways
+        add(subtree)
+        return
+        #else
         // On macOS `debugDescription` of the application only prints its query chain, so
         // inventory the interesting element classes explicitly.
         var lines: [String] = []
@@ -131,6 +141,7 @@ final class GlassTerminalUITests: XCTestCase {
         attachment.name = "terminal-tree-\(name)"
         attachment.lifetime = .keepAlways
         add(attachment)
+        #endif
     }
 
     private func enterAllConnections() {
@@ -140,14 +151,34 @@ final class GlassTerminalUITests: XCTestCase {
 
     // MARK: - Steps
 
-    /// The machine's address is typed once, on the host; every service inherits it. With no
-    /// address the host is created bare, and the shell asks for the address before any setup.
-    private func addHost(named name: String, address: String? = nil) {
+    /// Adds a host through the one setup sheet. The address is the machine's, typed once here;
+    /// with `terminal` the Terminal tab is enabled and filled (username, SSH key added through
+    /// the nested key sheet), so the host and its terminal are created together.
+    private func addHost(named name: String, address: String, terminal fixture: HostFixture? = nil) throws {
         let empty = element("connection-library-add-host-empty")
         if empty.waitForExistence(timeout: 3) { press(empty) } else { press("connection-library-add-host") }
         type(name, into: "host-editor-name")
-        if let address { type(address, into: "host-editor-address") }
+        type(address, into: "host-editor-address")
+        if let fixture {
+            enableTerminalTab()
+            try fillTerminalTab(fixture)
+        }
+        snap(fixture == nil ? "02-add-host" : "04-add-host-terminal-filled")
         press("host-editor-save")
+        XCTAssertTrue(element("host-editor-save").waitForNonExistence(timeout: 20), "the sheet closes after Save")
+    }
+
+    private func enableTerminalTab() {
+        let toggle = element("setup-enable-ssh")
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10), "Terminal tab toggle")
+        #if os(macOS)
+        press(toggle)
+        #elseif os(iOS)
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        #else
+        toggle.tap()
+        #endif
+        XCTAssertTrue(element("add-server-username").waitForExistence(timeout: 10), "required fields appear once enabled")
     }
 
     private func openDetail(of name: String) {
@@ -157,25 +188,6 @@ final class GlassTerminalUITests: XCTestCase {
         XCTAssertTrue(element("host-add-service").waitForExistence(timeout: 10))
     }
 
-    private func addSSHService() {
-        press("host-add-service")
-        XCTAssertTrue(element("service-editor-save").waitForExistence(timeout: 10))
-        // Default kind is ssh; the picker is left alone unless the ssh icon does not appear.
-        // A press that lands while the sheet is still animating in is dropped on iOS 27; press
-        // once more if the sheet is still up.
-        press("service-editor-save")
-        if !element("service-editor-save").waitForNonExistence(timeout: 3) {
-            press("service-editor-save")
-            XCTAssertTrue(element("service-editor-save").waitForNonExistence(timeout: 5), "service editor dismissed")
-        }
-        // The row combines its children into one element on macOS, so the icon's own identifier
-        // is not addressable there; the detail's per-service Connect is the evidence.
-        let added = firstExisting([element("host-service-connect-ssh"), element("host-service-ssh")], timeout: 10)
-        XCTAssertNotNil(added, "ssh service present after adding the service")
-    }
-
-    /// The shell's Connect hands off to the terminal capability; with no saved server yet the
-    /// capability presents glas.sh's AddServerView pre-filled from the host.
     private func connectFromDetail() {
         let candidates = [element("host-service-connect-ssh"), element("host-connect")]
         guard let connect = firstExisting(candidates, timeout: 10) else {
@@ -184,28 +196,26 @@ final class GlassTerminalUITests: XCTestCase {
         press(connect)
     }
 
-    private func fillServerForm(_ fixture: HostFixture) throws {
-        XCTAssertTrue(element("add-server-host").waitForExistence(timeout: 15), "glas.sh server form")
-        snap("02-server-form")
-
-        // The address came from the host and is read-only here: the form must show it, not ask
-        // for it again. The port defaults to 22; only type into a field whose value is wrong
-        // (select-all is macOS-only, so typing appends).
-        let addressRow = element("add-server-host")
-        XCTAssertEqual(addressRow.value as? String ?? addressRow.label, fixture.host, "the host's address is shown, not typed")
-        XCTAssertFalse(app.textFields["add-server-host"].exists, "no editable Host field when the host has an address")
+    /// The Terminal tab's required fields: username and an SSH key added through the nested key
+    /// sheet. Port lives under Advanced and defaults to 22; it is set only when the fixture's differs.
+    private func fillTerminalTab(_ fixture: HostFixture) throws {
+        XCTAssertFalse(app.textFields["add-server-host"].exists, "a service never has an address field")
         setField("add-server-username", to: fixture.user)
-        if element("add-server-port").exists { setField("add-server-port", to: fixture.port) }
-
-        // Authentication → SSH Key.
+        if fixture.port != "22" {
+            let advanced = element("setup-advanced-ssh")
+            if advanced.waitForExistence(timeout: 3) { expandDisclosure(advanced) }
+            if element("add-server-port").waitForExistence(timeout: 3) { setField("add-server-port", to: fixture.port) }
+        }
         chooseSSHKeyMethod()
 
-        // Add the key through the form's own "Add SSH Key": a sheet over the form on every
-        // platform.
         let addKey = app.buttons["Add SSH Key"].firstMatch
         XCTAssertTrue(addKey.waitForExistence(timeout: 10), "Add SSH Key button")
+        #if !os(macOS)
+        // The host sheet scrolls on a phone; bring the button into view before pressing it.
+        var scrolls = 0
+        while !addKey.isHittable, scrolls < 4 { app.swipeUp(); scrolls += 1 }
+        #endif
         press(addKey)
-        // By identifier: on macOS the placeholder is neither the field's label nor its identifier.
         let keyName = element("ssh-key-name")
         let keyFormShown = keyName.waitForExistence(timeout: 10)
         if !keyFormShown {
@@ -220,8 +230,6 @@ final class GlassTerminalUITests: XCTestCase {
         XCTAssertTrue(saveKey.waitForExistence(timeout: 5))
         press(saveKey)
         XCTAssertTrue(keyName.waitForNonExistence(timeout: 10), "Add SSH Key form closes after Save")
-        // The key just added is the selected one, even when the catalog already holds others
-        // (the Mac shares glas.sh's key catalog).
         #if os(macOS)
         let keyPicker = app.popUpButtons.matching(NSPredicate(format: "value CONTAINS[c] 'scratch-vm-key'")).firstMatch
         #else
@@ -229,21 +237,65 @@ final class GlassTerminalUITests: XCTestCase {
         #endif
         if !keyPicker.waitForExistence(timeout: 5) { dumpTree("key-not-selected") }
         XCTAssertTrue(keyPicker.exists, "the newly added key is selected in the SSH Key picker")
+    }
 
-        // Confirm the server. The confirmation title is mode-dependent; find the toolbar's
-        // non-Cancel button by the titles glas.sh uses.
-        let confirm = firstExisting([app.buttons["Save Connection"].firstMatch,
-                                     app.buttons["Add Server"].firstMatch,
-                                     app.buttons["Add Connection"].firstMatch,
-                                     app.buttons["Import"].firstMatch,
-                                     app.buttons["Add"].firstMatch,
-                                     app.buttons["Save"].firstMatch], timeout: 10)
-        XCTAssertNotNil(confirm, "server form confirmation button")
-        snap("04-server-form-filled")
-        if let confirm {
-            XCTAssertTrue(confirm.isEnabled, "server form must validate before saving")
-            press(confirm)
+    /// Expands one of the sheet's disclosure rows (a plain button row, see `GlassFormDisclosureStyle`).
+    private func expandDisclosure(_ row: XCUIElement) {
+        if "\(row.value ?? "")" == "expanded" { return }
+        press(row)
+        let done = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in "\(row.value ?? "")" == "expanded" }, object: nil)
+        _ = XCTWaiter().wait(for: [done], timeout: 3)
+    }
+
+    /// A sheet's title: a static text on the Mac, the navigation bar on touch platforms.
+    /// The detail's Address row is one `LabeledContent`: macOS exposes its value as a child
+    /// static text, iOS folds it into the element's own value. Ask for either.
+    private func detailShowsAddress(_ value: String, timeout: TimeInterval = 10) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if app.staticTexts[value].firstMatch.exists { return true }
+            let row = element("host-detail-address")
+            if row.exists, (row.label + " " + ((row.value as? String) ?? "")).contains(value) { return true }
+            _ = row.waitForExistence(timeout: 0.5)
+        } while Date() < deadline
+        return false
+    }
+
+    /// visionOS offers to save a typed password in iCloud Keychain once the sheet commits; the
+    /// alert covers the app. The app keeps credentials in its own store, so answer "Not Now".
+    private func dismissSystemPasswordPrompt() {
+        var targets = [XCUIApplication(bundleIdentifier: "com.apple.springboard")]
+        if let app { targets.append(app) }
+        for target in targets {
+            let notNow = target.buttons["Not Now"].firstMatch
+            if notNow.waitForExistence(timeout: 1) { notNow.tap(); return }
         }
+    }
+
+    /// SwiftUI builds list rows lazily: a row below the fold is absent from the accessibility
+    /// tree, not merely off-screen. The visionOS sheet is short enough for that to hide the
+    /// authentication fields, so scroll the surface until the row exists (2026-09-11).
+    @discardableResult
+    private func reveal(_ identifier: String, timeout: TimeInterval = 10) -> XCUIElement {
+        let target = element(identifier)
+        if target.waitForExistence(timeout: 2) { return target }
+        let surfaces = [app.scrollViews.firstMatch, app.collectionViews.firstMatch, app.tables.firstMatch]
+        guard let surface = surfaces.first(where: { $0.exists }) else {
+            _ = target.waitForExistence(timeout: timeout)
+            return target
+        }
+        for _ in 0..<8 where !target.exists { surface.swipeUp() }
+        _ = target.waitForExistence(timeout: timeout)
+        return target
+    }
+
+    private func sheetTitle(_ title: String) -> XCUIElement {
+        #if os(macOS)
+        return app.staticTexts[title].firstMatch
+        #else
+        let bar = app.navigationBars[title].firstMatch
+        return bar.exists ? bar : app.staticTexts[title].firstMatch
+        #endif
     }
 
     private func setField(_ identifier: String, to value: String) {
@@ -395,9 +447,8 @@ final class GlassTerminalUITests: XCTestCase {
     /// window (framed canvas with its 3 pt glass margin, "New Terminal Tab" in the sidebar).
     func testMacLibraryAndTerminalWindowChrome() throws {
         app = launch()
-        addHost(named: "chrome", address: "chrome.example")
+        try addHost(named: "chrome", address: "chrome.example")
         openDetail(of: "chrome")
-        addSSHService()
         // Toolbar order: the sidebar's "+" must precede the sidebar toggle from the left.
         let addHost = element("connection-library-add-host")
         XCTAssertTrue(addHost.waitForExistence(timeout: 5), "Add Host in the sidebar toolbar")
@@ -433,35 +484,82 @@ final class GlassTerminalUITests: XCTestCase {
     }
     #endif
 
-    /// A host created without an address: Connect on its terminal service asks for the address
-    /// on the host (the shell's prompt), never in the terminal's form, which then shows it
-    /// read-only. No real connection is made.
-    func testAddressIsCollectedOnTheHostBeforeTerminalSetup() throws {
-        app = launch()
-        addHost(named: "bare")
+    /// Add a service to a host that has no address (a record another family app wrote): the one
+    /// sheet collects the address on the host and the terminal's fields together; no service
+    /// setup ever shows an address field of its own. No real connection is made.
+    func testAddServiceCollectsTheAddressOnTheHost() throws {
+        app = launch(extraArguments: ["--ui-testing-seed-hosts", "bare"])
         openDetail(of: "bare")
-        XCTAssertTrue(element("host-detail-set-address").waitForExistence(timeout: 10), "detail offers Set Address… when unset")
-        addSSHService()
-        connectFromDetail()
-
-        let field = element("host-address-prompt-field")
-        XCTAssertTrue(field.waitForExistence(timeout: 10), "the shell asks for the host's address first")
-        XCTAssertFalse(element("add-server-host").exists, "no terminal form before the address is set")
-        snap("20-address-prompt")
-        press(field); field.typeText("10.9.8.7")
-        press("host-address-prompt-continue")
-
-        XCTAssertTrue(element("add-server-host").waitForExistence(timeout: 15), "terminal setup opens once the host has an address")
-        let addressRow = element("add-server-host")
-        XCTAssertEqual(addressRow.value as? String ?? addressRow.label, "10.9.8.7", "the address just saved on the host, read-only")
-        XCTAssertFalse(app.textFields["add-server-host"].exists, "the terminal form never has an address field")
-        XCTAssertTrue(app.staticTexts["Add Terminal to bare"].waitForExistence(timeout: 5), "form titled for the host, never Import Connection")
-        snap("21-server-form-after-address")
-        let cancel = app.buttons["Cancel"].firstMatch
-        if cancel.waitForExistence(timeout: 5) { press(cancel) }
-        XCTAssertTrue(element("add-server-host").waitForNonExistence(timeout: 10))
         XCTAssertTrue(element("host-detail-address").waitForExistence(timeout: 10))
-        XCTAssertFalse(element("host-detail-set-address").exists, "the detail now shows the address")
+        // The row is one `LabeledContent`: macOS exposes its value as a child static text, iOS as
+        // the element's own value. Query for either rather than assuming one shape.
+        XCTAssertTrue(detailShowsAddress("Not set", timeout: 5), "no address yet")
+        press("host-add-service")
+        XCTAssertTrue(sheetTitle("Add Terminal to bare").waitForExistence(timeout: 10), "titled for the host")
+        let addressField = element("host-editor-address")
+        XCTAssertTrue(addressField.waitForExistence(timeout: 10), "the address is asked for on the host, in the same sheet")
+        XCTAssertTrue(element("add-server-username").waitForExistence(timeout: 5), "the terminal's required fields are already there")
+        XCTAssertFalse(app.textFields["add-server-host"].exists, "the terminal never has an address field")
+        snap("20-add-service-collects-address")
+        press("host-editor-save")
+        XCTAssertTrue(element("host-editor-address-validation").waitForExistence(timeout: 5) || element("host-editor-save").exists,
+                      "Save refuses without the address")
+        press(addressField); addressField.typeText("10.9.8.7")
+        setField("add-server-username", to: "probe")
+        let password = reveal("add-server-password")
+        XCTAssertTrue(password.exists)
+        press(password); password.typeText("not-a-real-password")
+        press("host-editor-save")
+        dismissSystemPasswordPrompt()
+        XCTAssertTrue(element("host-editor-save").waitForNonExistence(timeout: 15))
+        // Read the value as a static text: macOS keeps the row's earlier text in the accessibility
+        // tree for a while, so the identifier's first match can lag behind what is on screen.
+        let shown = detailShowsAddress("10.9.8.7")
+        if !shown { dumpTree("detail-address") }
+        snap("21-detail-after-add-service")
+        XCTAssertTrue(shown, "the detail shows the address saved on the host")
+        XCTAssertTrue(element("host-service-connect-ssh").waitForExistence(timeout: 10), "the terminal exists, complete")
+        snap("21-detail-after-add-service")
+    }
+
+    /// Edit opens the same sheet on the service's tab with the saved fields loaded; Advanced holds
+    /// the optional settings. Password auth, nothing connects.
+    func testEditTerminalOpensTheSheetWithAdvanced() throws {
+        app = launch()
+        try addHost(named: "editable", address: "editable.example")
+        openDetail(of: "editable")
+        press("host-add-service")
+        XCTAssertTrue(element("add-server-username").waitForExistence(timeout: 10), "Add a service opens on the Terminal tab, enabled")
+        setField("add-server-username", to: "probe")
+        let password = reveal("add-server-password")
+        XCTAssertTrue(password.exists)
+        press(password); password.typeText("not-a-real-password")
+        press("host-editor-save")
+        dismissSystemPasswordPrompt()
+        XCTAssertTrue(element("host-editor-save").waitForNonExistence(timeout: 15))
+
+        // A sheet presented while the previous one is still animating away is swallowed on iOS,
+        // so wait for the detail to settle and press again if the first press did not take.
+        let editButton = reveal("host-service-edit-ssh")
+        XCTAssertTrue(editButton.exists, "Edit on the service row")
+        press(editButton)
+        if !sheetTitle("Edit Terminal on editable").waitForExistence(timeout: 6), editButton.exists {
+            press(editButton)
+        }
+        if !sheetTitle("Edit Terminal on editable").waitForExistence(timeout: 10) { dumpTree("after-edit-press") }
+        XCTAssertTrue(sheetTitle("Edit Terminal on editable").exists, "edit sheet titled for the host")
+        let user = element("edit-server-username")
+        XCTAssertTrue(user.waitForExistence(timeout: 10))
+        XCTAssertEqual(user.value as? String, "probe", "the saved terminal's fields are loaded")
+        XCTAssertFalse(element("setup-enable-ssh").exists, "the service being edited has no toggle")
+        let advanced = element("setup-advanced-ssh")
+        XCTAssertTrue(advanced.waitForExistence(timeout: 5), "Advanced disclosure")
+        expandDisclosure(advanced)
+        if !element("edit-server-port").waitForExistence(timeout: 5) { dumpTree("advanced-not-expanded") }
+        XCTAssertTrue(element("edit-server-port").exists, "port lives under Advanced")
+        snap("22-edit-terminal-advanced")
+        press("host-editor-cancel")
+        XCTAssertTrue(element("edit-server-username").waitForNonExistence(timeout: 10))
     }
 
     func testConnectsToRealHostThroughTheShell() throws {
@@ -469,17 +567,10 @@ final class GlassTerminalUITests: XCTestCase {
         app = launch()
         snap("01-library")
 
-        addHost(named: "scratch", address: fixture.host)
+        // Host and terminal in one sheet: name, address, then the Terminal tab's fields.
+        try addHost(named: "scratch", address: fixture.host, terminal: fixture)
         openDetail(of: "scratch")
-        addSSHService()
-        connectFromDetail()
-        try fillServerForm(fixture)
-
-        // With the server saved, Connect goes straight to the connect flow.
-        if !element("add-server-host").waitForNonExistence(timeout: 10) {
-            dumpTree("form-still-open")
-            XCTFail("server form did not dismiss after saving")
-        }
+        XCTAssertTrue(element("host-service-connect-ssh").waitForExistence(timeout: 10), "the terminal exists after the one save")
         connectFromDetail()
         acceptTrustPromptIfShown()
 

@@ -2827,7 +2827,7 @@ struct glas_shTests {
     }
 
     @Test @MainActor func serverFormAcceptsAValidPasswordConnection() {
-        let input = ServerFormView.ValidationInput(
+        let input = TerminalServiceDraft.ValidationInput(
             name: "Production",
             host: "example.com",
             port: "22",
@@ -2841,11 +2841,11 @@ struct glas_shTests {
             initialTerminalRows: 0
         )
 
-        #expect(ServerFormView.validationIssues(for: input).isEmpty)
+        #expect(TerminalServiceDraft.validationIssues(for: input).isEmpty)
     }
 
     @Test @MainActor func serverFormReportsFieldSpecificConnectionAndTerminalIssues() {
-        let input = ServerFormView.ValidationInput(
+        let input = TerminalServiceDraft.ValidationInput(
             name: " \n ",
             host: "\t",
             port: "65536",
@@ -2859,7 +2859,7 @@ struct glas_shTests {
             initialTerminalRows: 7
         )
 
-        let issues = ServerFormView.validationIssues(for: input)
+        let issues = TerminalServiceDraft.validationIssues(for: input)
 
         #expect(Set(issues.keys) == Set([
             .name,
@@ -2876,7 +2876,7 @@ struct glas_shTests {
     @Test @MainActor func serverFormRequiresAnAvailableSSHKey() {
         let availableKeyID = UUID()
         let missingKeyID = UUID()
-        let base = ServerFormView.ValidationInput(
+        let base = TerminalServiceDraft.ValidationInput(
             name: "Production",
             host: "example.com",
             port: "22",
@@ -2890,9 +2890,9 @@ struct glas_shTests {
             initialTerminalRows: 0
         )
 
-        #expect(ServerFormView.validationIssues(for: base)[.sshKey] != nil)
+        #expect(TerminalServiceDraft.validationIssues(for: base)[.sshKey] != nil)
 
-        let available = ServerFormView.ValidationInput(
+        let available = TerminalServiceDraft.ValidationInput(
             name: base.name,
             host: base.host,
             port: base.port,
@@ -2905,11 +2905,11 @@ struct glas_shTests {
             initialTerminalColumns: base.initialTerminalColumns,
             initialTerminalRows: base.initialTerminalRows
         )
-        #expect(ServerFormView.validationIssues(for: available).isEmpty)
+        #expect(TerminalServiceDraft.validationIssues(for: available).isEmpty)
     }
 
     @Test @MainActor func serverFormRejectsLegacyAgentAuthentication() {
-        let input = ServerFormView.ValidationInput(
+        let input = TerminalServiceDraft.ValidationInput(
             name: "Production",
             host: "example.com",
             port: "22",
@@ -2923,23 +2923,23 @@ struct glas_shTests {
             initialTerminalRows: 0
         )
 
-        #expect(ServerFormView.validationIssues(for: input) == [
+        #expect(TerminalServiceDraft.validationIssues(for: input) == [
             .authentication: "Choose Password or SSH Key."
         ])
     }
 
     @Test @MainActor func serverFormNormalizesEndpointValuesButNotCredentials() {
-        #expect(ServerFormView.normalizedEndpointValue("  cafe\u{301}.example.com \n") == "caf\u{E9}.example.com")
+        #expect(TerminalServiceDraft.normalizedEndpointValue("  cafe\u{301}.example.com \n") == "caf\u{E9}.example.com")
     }
 
     @Test @MainActor func serverFormReturnKeyFollowsTheVisibleCredentialPath() {
-        #expect(ServerFormView.nextField(after: .name, in: .password) == .host)
-        #expect(ServerFormView.nextField(after: .host, in: .password) == .port)
-        #expect(ServerFormView.nextField(after: .port, in: .password) == .username)
-        #expect(ServerFormView.nextField(after: .username, in: .password) == .password)
-        #expect(ServerFormView.nextField(after: .username, in: .sshKey) == .sshKey)
-        #expect(ServerFormView.nextField(after: .password, in: .password) == nil)
-        #expect(ServerFormView.nextField(after: .sshKey, in: .sshKey) == nil)
+        #expect(TerminalServiceDraft.nextField(after: .name, in: .password) == .host)
+        #expect(TerminalServiceDraft.nextField(after: .host, in: .password) == .port)
+        #expect(TerminalServiceDraft.nextField(after: .port, in: .password) == .username)
+        #expect(TerminalServiceDraft.nextField(after: .username, in: .password) == .password)
+        #expect(TerminalServiceDraft.nextField(after: .username, in: .sshKey) == .sshKey)
+        #expect(TerminalServiceDraft.nextField(after: .password, in: .password) == nil)
+        #expect(TerminalServiceDraft.nextField(after: .sshKey, in: .sshKey) == nil)
     }
 
     @Test func invalidPerConnectionTerminalGeometryFailsClosed() throws {

@@ -66,6 +66,10 @@ final class GlassShellTagFieldUITests: XCTestCase {
         let field = element("host-editor-name")
         XCTAssertTrue(field.waitForExistence(timeout: 10))
         press(field); field.typeText(name)
+        // The machine's address is required to save a host.
+        let address = element("host-editor-address")
+        XCTAssertTrue(address.waitForExistence(timeout: 5))
+        press(address); address.typeText("\(name).example")
     }
 
     /// Types a token and commits it with Return.
@@ -76,9 +80,31 @@ final class GlassShellTagFieldUITests: XCTestCase {
         input.typeText(tag + "\n")
     }
 
+    /// Aliases and collections sit under "Also known as & Collections", collapsed by default.
+    private func expandOrganize() {
+        if element("host-editor-tags.input").waitForExistence(timeout: 2) { return }
+        let triangle = element("host-editor-organize")
+        XCTAssertTrue(triangle.waitForExistence(timeout: 5), "organise disclosure")
+        expandDisclosure(triangle)
+        if !element("host-editor-tags.input").waitForExistence(timeout: 5) {
+            let tree = XCTAttachment(string: app.debugDescription)
+            tree.name = "tree-organize"; tree.lifetime = .keepAlways; add(tree)
+            XCTFail("could not expand Also known as & Collections")
+        }
+    }
+
+    /// Expands one of the sheet's disclosure rows (a plain button row, see `GlassFormDisclosureStyle`).
+    private func expandDisclosure(_ row: XCUIElement) {
+        if "\(row.value ?? "")" == "expanded" { return }
+        press(row)
+        let done = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in "\(row.value ?? "")" == "expanded" }, object: nil)
+        _ = XCTWaiter().wait(for: [done], timeout: 3)
+    }
+
     func testCollectionsAreChipsAndFeedTheSystemWideVocabulary() throws {
         // First host: two collections typed as tokens.
         openHostEditor(named: "alpha")
+        expandOrganize()
         addTag("Clients", to: "host-editor-tags")
         addTag("Lab", to: "host-editor-tags")
         XCTAssertTrue(element("host-editor-tags.tag.0").waitForExistence(timeout: 5), "first chip")
@@ -104,6 +130,7 @@ final class GlassShellTagFieldUITests: XCTestCase {
 
         // Second host: the vocabulary offers the first host's collections before anything is typed.
         openHostEditor(named: "beta")
+        expandOrganize()
         let input2 = element("host-editor-tags.input")
         XCTAssertTrue(input2.waitForExistence(timeout: 10))
         press(input2)

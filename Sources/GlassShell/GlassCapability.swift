@@ -17,14 +17,52 @@ public enum GlassCapabilityOutcome: Sendable, Equatable {
 /// host's address is the one thing every service shares: the shell collects it on the host, before
 /// any setup form opens, so a capability only ever reads it. Capabilities never write the catalog.
 public struct GlassCapabilityHostAccess: Sendable {
-    /// The host's address (DNS name or IP). Present whenever the shell opens a setup; nil only
-    /// for a connect on a legacy host record that has no address and whose service already
-    /// exists on the capability's side.
+    /// The host's address (DNS name or IP). Nil only for a record another family app wrote
+    /// without one; a service created in this app always has a host with an address.
     public let address: String?
 
     public init(address: String?) {
         self.address = address
     }
+}
+
+/// One problem that blocks saving a service draft: which field, and what to tell the user.
+public struct GlassSetupIssue: Identifiable, Hashable, Sendable {
+    /// A stable key for the field (also the suffix of its accessibility identifier).
+    public let field: String
+    public let message: String
+    public var id: String { field }
+
+    public init(field: String, message: String) {
+        self.field = field
+        self.message = message
+    }
+}
+
+/// A service being set up or edited in the shell's host sheet. The capability owns the draft
+/// (its fields, validation and persistence); the shell owns the sheet, the host's identity and
+/// the order of operations. A draft never carries the host's address: the shell passes it in at
+/// commit time, because the address is defined once, on the host.
+@MainActor
+public protocol GlassServiceDraft: AnyObject {
+    var kind: HostServiceKind { get }
+    /// The name the shell records on the service link. The capability derives a sensible
+    /// default from the host so the user never has to type one.
+    func serviceDisplayName(hostName: String) -> String
+    /// The fields a service cannot be created without, as rows of a grouped `Form` section.
+    func requiredFields() -> AnyView
+    /// Everything optional, shown under the sheet's "Advanced" disclosure.
+    func advancedFields() -> AnyView
+    /// Problems that block Save. Called with the host's address so a draft can validate what
+    /// it will commit; empty means the draft can be committed.
+    func validate(address: String) -> [GlassSetupIssue]
+    /// Reveal every validation message and move focus to the first invalid field.
+    func focusFirstIssue(_ issues: [GlassSetupIssue])
+    /// Create or update the service's configuration and credentials, keyed by `endpointID`,
+    /// which is the link the shell records on the host.
+    func commit(endpointID: EndpointID, host: HostProfile, address: String) async throws
+    /// Undo a `commit` that created a new service, when a later step of the same save failed.
+    func rollback(endpointID: EndpointID) async
 }
 
 /// A capability owns one service kind. The shell routes `connect` through it;
@@ -45,14 +83,21 @@ public protocol GlassCapability: AnyObject {
     /// that stores an address per service updates every service of `host` it owns, so the user
     /// edits the machine's identity once. `address` is nil when it was cleared. Default: nothing.
     func hostAddressDidChange(host: HostProfile, address: String?)
-    /// True when opening `service` would present a setup form (the capability holds nothing for
-    /// it yet). The shell then makes sure the host has an address first, so no setup form ever
-    /// asks for one. Default: false.
-    func needsSetup(service: HostServiceLink, host: HostProfile) -> Bool
     /// The address the capability already stores for `service`, if any — a record saved by the
     /// source app before hosts carried an address. The shell adopts it onto the host so the
     /// machine's identity is defined once, at the host. Default: nil.
     func knownAddress(service: HostServiceLink, host: HostProfile) -> String?
+
+    /// A draft for a new service of this kind, composed into the shell's host sheet. A service
+    /// is created complete — configuration and credentials with it — so no capability may
+    /// answer nil here: the shell shows a kind without a capability as a disabled tab instead.
+    func makeSetupDraft() -> any GlassServiceDraft
+    /// A draft loaded from an existing service, for the sheet's edit mode; nil when the
+    /// capability holds nothing for it (the link is broken and the user is told so).
+    func setupDraft(for service: HostServiceLink, host: HostProfile) -> (any GlassServiceDraft)?
+    /// The shell removed `service` from `host`: delete whatever the capability stored for it
+    /// (configuration, credentials). Default: nothing.
+    func removeService(_ service: HostServiceLink, host: HostProfile) async throws
 
     /// Settings pages the capability contributes to the one settings surface, appended after the
     /// shell's own pages. Default: none.
@@ -70,11 +115,42 @@ public extension GlassCapability {
         open(service: service, host: host, report: report)
     }
     func hostAddressDidChange(host: HostProfile, address: String?) {}
-    func needsSetup(service: HostServiceLink, host: HostProfile) -> Bool { false }
     func knownAddress(service: HostServiceLink, host: HostProfile) -> String? { nil }
+    /// A capability that has not adopted the setup contract yet: the sheet shows why and Save
+    /// refuses, so no half-made service can be created through it.
+    func makeSetupDraft() -> any GlassServiceDraft { GlassUnavailableServiceDraft(kind: kind, capabilityName: displayName) }
+    func setupDraft(for service: HostServiceLink, host: HostProfile) -> (any GlassServiceDraft)? { nil }
+    func removeService(_ service: HostServiceLink, host: HostProfile) async throws {}
     var settingsPages: [GlassCapabilitySettingsPage] { [] }
     func libraryToolbarItems() -> AnyView { AnyView(EmptyView()) }
     func serviceDetailActions(service: HostServiceLink, host: HostProfile) -> AnyView { AnyView(EmptyView()) }
+}
+
+/// The draft of a capability that offers no setup. Honest, not a stub: it says so in the
+/// sheet and blocks Save.
+@MainActor
+public final class GlassUnavailableServiceDraft: GlassServiceDraft {
+    public let kind: HostServiceKind
+    private let capabilityName: String
+
+    public init(kind: HostServiceKind, capabilityName: String) {
+        self.kind = kind
+        self.capabilityName = capabilityName
+    }
+
+    public func serviceDisplayName(hostName: String) -> String { "\(capabilityName) on \(hostName)" }
+    public func requiredFields() -> AnyView {
+        AnyView(Text("\(capabilityName) cannot be set up from here yet.").foregroundStyle(.secondary))
+    }
+    public func advancedFields() -> AnyView { AnyView(EmptyView()) }
+    public func validate(address: String) -> [GlassSetupIssue] {
+        [GlassSetupIssue(field: "setup", message: "\(capabilityName) cannot be set up from here yet.")]
+    }
+    public func focusFirstIssue(_ issues: [GlassSetupIssue]) {}
+    public func commit(endpointID: EndpointID, host: HostProfile, address: String) async throws {
+        throw GlassShellError.invalidName
+    }
+    public func rollback(endpointID: EndpointID) async {}
 }
 
 /// One settings page owned by a capability. `id` must be stable and unique across capabilities;
@@ -145,56 +221,5 @@ public final class GlassCapabilityRegistry {
     /// its kind. Only that capability is asked.
     public func serviceDetailActions(service: HostServiceLink, host: HostProfile) -> AnyView {
         capability(for: service.kind)?.serviceDetailActions(service: service, host: host) ?? AnyView(EmptyView())
-    }
-}
-
-/// What the shell shows when a service's capability is not in this build.
-/// Deliberately not a session: it says exactly what is missing.
-/// The shell must collect the host's address before it can continue. `endpointID` is the service
-/// whose connect was interrupted (resumed once the address is saved), nil when the user simply
-/// asked to set the address from the host detail.
-public struct GlassShellAddressRequest: Identifiable, Sendable {
-    public let host: GlassShellHost
-    public let endpointID: EndpointID?
-    public var id: HostID { host.id }
-
-    public init(host: GlassShellHost, endpointID: EndpointID?) {
-        self.host = host
-        self.endpointID = endpointID
-    }
-}
-
-public struct GlassShellPlaceholderRequest: Identifiable, Hashable, Sendable {
-    public let host: HostProfile
-    public let service: HostServiceLink
-    public var id: EndpointID { service.endpointID }
-}
-
-public struct GlassShellPlaceholderSession: View {
-    let request: GlassShellPlaceholderRequest
-    @Environment(\.dismiss) private var dismiss
-
-    public init(request: GlassShellPlaceholderRequest) { self.request = request }
-
-    public var body: some View {
-        NavigationStack {
-            ContentUnavailableView {
-                Label(request.service.displayName, systemImage: GlassServicePresentation.symbolName(for: request.service.kind))
-            } description: {
-                Text("\(GlassServicePresentation.displayName(for: request.service.kind)) is not part of this build yet. \(request.host.displayName) and this service are saved; nothing was connected.")
-            }
-            .navigationTitle(request.host.displayName)
-            .accessibilityIdentifier("placeholder-session")
-            // Toolbar, not the unavailable view's actions slot: on visionOS the identified
-            // container is exposed as one element and swallows buttons inside it.
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }.accessibilityIdentifier("placeholder-done")
-                }
-            }
-        }
-        #if os(visionOS) || os(macOS)
-        .frame(minWidth: 420, minHeight: 320)
-        #endif
     }
 }

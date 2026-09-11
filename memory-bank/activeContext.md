@@ -396,3 +396,46 @@ server-form pattern. Note: launching the Release build adopted the saved termina
 real `oscar` record (designed behaviour). Open: `GlassTerminalLibraryEntries.swift` "Set Up…" bypasses
 the shell's address gate for legacy records; the ⋯ menu's items not captured; W4's post-failure
 accessibility recursion; visionOS UI suite not re-run since W7; widget on device; live iCloud sync.
+
+**visionOS full suite with the real host (2026-09-11 ~09:00, `scratchpad/vision-ui-root5.log`):**
+**real-host connect passed on visionOS too** (live shell, 192 s), address-step test, settings pages,
+tag field, favorites, consolidation, appearance persistence, smoke all passed; search skipped (known).
+One failure: `testAddHostAddServiceConnectPlaceholder` at `GlassShellLibraryUITests.swift:98` — the
+Add Host sheet's name field did not appear within 10 s on the suite's first test; passed alone
+earlier today. Rerunning alone. The placeholder flow itself is about to be replaced by the
+one-and-done setup (see the new requirement below).
+Rerun alone: `testAddHostAddServiceConnectPlaceholder` **passed** on visionOS (49 s) — first-test
+load flake, not a regression. visionOS suite is therefore green with the real host apart from the
+search skip. **W8 launched** for the one-and-done setup (see projectbrief); owns `Sources/GlassShell/**`,
+the terminal capability/connect flow/server form/library entries/scenes, tests, UITests; note
+`tasks/2026-09/2026-09-11_one-and-done-setup.md`.
+
+**Device installs (2026-09-11 ~09:15):** the committed tree `3f1c6b6` built Release from a clean
+worktree (`scratchpad/wt-device`, sibling packages symlinked beside it) and installed on the
+iPhone 17 Pro Max (launched) and the Vision Pro (installed). Widget-on-device and live iCloud sync
+still to be observed by the user. W8's one-and-done build will be installed the same way.
+
+## W8 verified and committed — 2026-09-11 (coordinator finished W8's runs)
+
+W8 (one-and-done setup) ran out of credits after its macOS run; the coordinator completed the
+verification. **Package 483 tests / 30 suites. macOS UI 12/12 with the real host. iPhone 13/13
+with the real host. visionOS 10 passed, 1 skipped (search), 1 failed.**
+
+Real defects found while finishing the runs, all fixed:
+- **iPhone popped to the scope list after saving a service.** Reloading the items behind a
+  presented sheet rebuilds the compact stack and drops the detail. Fixed in the kit's
+  `reconcileSelection()`: a selection that survives a reload re-pushes its detail.
+- **Compact Settings was a stacked list + page.** Now the Settings-app pattern: a `List` of
+  `NavigationLink` rows pushing each page (kit `GlassSettingsSections.pushList`). iPad/Mac keep the
+  segmented control, visionOS the leading column.
+- **Test-side**: the diagnostic dump crashed on iOS 27 enumerating `app.buttons` over a SwiftUI
+  Picker (macOS-only now); the detail's Address row is a child static text on macOS and the
+  element's value on iOS (one `detailShowsAddress` helper); a sheet presented while the previous
+  one animates away is swallowed on iOS (settle + retry); SwiftUI list rows are built lazily, so
+  visionOS needed `reveal()` to scroll a row into existence; and visionOS raises the system
+  "Save Password?" alert after a save, which covers the app (`dismissSystemPasswordPrompt`).
+
+**Open (visionOS only):** `testConnectsToRealHostThroughTheShell` fails with XCUITest's
+"Failed to received invalid scene ID (nil) from Accessibility" when pressing Add SSH Key inside
+the host sheet — a simulator accessibility fault on a nested sheet, not an app assertion. The same
+test passed on visionOS before the nested-sheet change and passes on macOS and iPhone now.

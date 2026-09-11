@@ -240,6 +240,8 @@ struct TerminalConnectFlow: ViewModifier {
             addServerDraft = AddServerRequest(draft: draft)
         case .editServer(let server, let hostContext):
             editingServer = EditServerRequest(server: server, hostContext: hostContext)
+        case .showFailure(let message):
+            connectionFailureMessage = message
         case .serverInfo(let server):
             viewingServer = server
         case .deleteServer(let server):

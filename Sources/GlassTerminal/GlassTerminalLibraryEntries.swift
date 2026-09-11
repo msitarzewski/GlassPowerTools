@@ -47,9 +47,9 @@ public struct GlassTerminalLibraryToolbar: View {
     }
 }
 
-/// Per-service actions for an SSH service in the shell's host detail. A service whose endpoint
-/// has no saved server yet offers only "Set Up…", which opens glas.sh's server form pre-filled
-/// with the host and linked by the endpoint id.
+/// Per-service actions for an SSH service in the shell's host detail, beside the shell's own
+/// Connect and Edit: SFTP and the server's details. Removal is the shell's ("Remove Service"),
+/// which asks the capability to delete the saved server.
 public struct GlassTerminalServiceActions: View {
     private let runtime: GlassTerminalRuntime
     private let service: HostServiceLink
@@ -67,17 +67,8 @@ public struct GlassTerminalServiceActions: View {
             Button("SFTP", systemImage: "folder") { runtime.requestConnect(serverID: serverID, purpose: .sftp) }
                 .help("Connect and browse remote files using SFTP")
                 .accessibilityIdentifier("connection-library-sftp-server-\(serverID.uuidString.lowercased())")
-            Button("Edit", systemImage: "pencil") { runtime.requestEditServer(id: serverID, host: host) }
-                .accessibilityIdentifier("connection-library-edit-server-\(serverID.uuidString.lowercased())")
             Button("Details", systemImage: "info.circle") { runtime.requestServerInfo(id: serverID) }
                 .accessibilityIdentifier("connection-library-details-server-\(serverID.uuidString.lowercased())")
-            Button("Delete", systemImage: "trash", role: .destructive) { runtime.requestDeleteServer(id: serverID) }
-                .accessibilityIdentifier("connection-library-delete-server-\(serverID.uuidString.lowercased())")
-        } else {
-            Button("Set Up…", systemImage: "terminal") {
-                runtime.setupRequest = .init(host: host, service: service)
-            }
-            .accessibilityIdentifier("connection-library-setup-server-\(serverID.uuidString.lowercased())")
         }
     }
 }

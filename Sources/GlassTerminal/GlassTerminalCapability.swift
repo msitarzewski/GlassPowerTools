@@ -43,27 +43,11 @@ public final class GlassTerminalRuntime {
         case localTerminal
         case showWorkgroups
         case showTailscale
+        /// Show the connect flow's failure alert with this message (a link with nothing behind it).
+        case showFailure(String)
     }
-    struct SetupRequest: Identifiable {
-        let host: HostProfile
-        let service: HostServiceLink
-        /// What the shell knows about the host (nil when the request came from the terminal's own
-        /// "Set Up…" action, which still has the host record and its address).
-        var hostAccess: GlassCapabilityHostAccess?
-        var id: EndpointID { service.endpointID }
-
-        /// The address the form shows read-only. Nil only when neither the shell nor the record
-        /// carries one — the shell collects it before opening a setup, so that is the "Set Up…"
-        /// path on a host that predates addresses; the sheet then asks for the host, not a form.
-        var address: String? { hostAccess?.address ?? host.address }
-        var formContext: ServerFormHostContext? {
-            address.map { ServerFormHostContext(hostName: host.displayName, address: $0) }
-        }
-    }
-
     private(set) var requestSerial = 0
     private var pendingRequests: [Request] = []
-    var setupRequest: SetupRequest?
 
     /// The one layering state; the terminal's canvas appearance reads and writes it through
     /// `SettingsManager` so no second material system exists.
@@ -94,12 +78,6 @@ public final class GlassTerminalRuntime {
     public func requestEditServer(id: UUID) {
         guard let server = sessionManager.serverManager.server(for: id) else { return }
         enqueue(.editServer(server, hostContext: nil))
-    }
-    /// Edit from the shell's host detail: the host's address is shown read-only. A host record
-    /// that predates addresses shows the saved server's own, which the shell adopts on load.
-    public func requestEditServer(id: UUID, host: HostProfile) {
-        guard let server = sessionManager.serverManager.server(for: id) else { return }
-        enqueue(.editServer(server, hostContext: ServerFormHostContext(hostName: host.displayName, address: host.address ?? server.host)))
     }
 
     /// The host's address changed in the shell: every saved server that is a service of that
@@ -155,9 +133,9 @@ public final class GlassTerminalRuntime {
     #endif
 }
 
-/// The shell's SSH capability. `open` connects when a saved server exists for the service's
-/// endpoint id; otherwise it asks the bootstrap to present glas.sh's server form so the user
-/// creates one — the new server takes the shell's endpoint id, which is the link.
+/// The shell's SSH capability. A service is created complete through the shell's host sheet:
+/// the terminal's draft commits the saved server under the shell's endpoint id, which is the
+/// link. `open` connects to that server; a link with no server behind it is reported as such.
 @MainActor
 public final class GlassTerminalCapability: GlassCapability {
     public let kind: HostServiceKind = .ssh
@@ -171,10 +149,21 @@ public final class GlassTerminalCapability: GlassCapability {
         open(service: service, host: host, hostAccess: GlassCapabilityHostAccess(address: host.address), report: report)
     }
 
-    /// A service with no saved server yet opens the setup form; the shell collects the host's
-    /// address first, so the form never asks for it.
-    public func needsSetup(service: HostServiceLink, host: HostProfile) -> Bool {
-        !runtime.hasServer(id: service.endpointID.rawValue)
+    // MARK: Setup (the shell's host sheet)
+
+    public func makeSetupDraft() -> any GlassServiceDraft {
+        TerminalServiceDraft(serverManager: runtime.sessionManager.serverManager, settingsManager: runtime.settingsManager)
+    }
+
+    public func setupDraft(for service: HostServiceLink, host: HostProfile) -> (any GlassServiceDraft)? {
+        guard let server = runtime.sessionManager.serverManager.server(for: service.endpointID.rawValue) else { return nil }
+        return TerminalServiceDraft(editing: server, serverManager: runtime.sessionManager.serverManager,
+                                    settingsManager: runtime.settingsManager)
+    }
+
+    public func removeService(_ service: HostServiceLink, host: HostProfile) async throws {
+        guard let server = runtime.sessionManager.serverManager.server(for: service.endpointID.rawValue) else { return }
+        try runtime.sessionManager.serverManager.deleteServer(server)
     }
 
     /// The saved server's address, for hosts that predate addresses on the host record.
@@ -190,10 +179,11 @@ public final class GlassTerminalCapability: GlassCapability {
         if runtime.hasServer(id: serverID) {
             runtime.requestConnect(serverID: serverID, report: report)
         } else {
-            // The setup form only creates the saved server; the user connects afterwards, and
-            // that attempt reports on its own. Nothing was connected by this call.
-            runtime.setupRequest = .init(host: host, service: service, hostAccess: hostAccess)
-            report(.dismissed)
+            // A link another family app recorded without a saved server behind it. Nothing to
+            // connect; the shell shows the message and the user can edit or remove the service.
+            let message = "\(service.displayName) has no saved terminal configuration. Edit the service to set it up, or remove it."
+            runtime.enqueue(.showFailure(message))
+            report(.failed(message))
         }
     }
 
@@ -237,30 +227,8 @@ public struct GlassTerminalBootstrap<Content: View>: View {
     }
 
     public var body: some View {
-        @Bindable var runtime = runtime
         platformRoot
             .modifier(TerminalConnectFlow())
-            .sheet(item: $runtime.setupRequest) { request in
-                // The SSH connection panel: the Stage 2 layering proof on a real capability surface.
-                GlassLayeredPanel(cornerRadius: 0) {
-                    // The host's address is the machine's, entered once on the host; the form
-                    // shows it read-only and asks only for what is the terminal's: port, user, auth.
-                    if let context = request.formContext {
-                        AddServerView(
-                            serverManager: runtime.sessionManager.serverManager,
-                            draft: ServerConfiguration(
-                                id: request.service.endpointID.rawValue,
-                                name: request.host.displayName,
-                                host: context.address,
-                                username: ""
-                            ),
-                            hostContext: context
-                        )
-                    } else {
-                        GlassTerminalSetupNeedsAddressView(hostName: request.host.displayName)
-                    }
-                }
-            }
             #if os(iOS)
             .sheet(isPresented: Binding(get: { router.showsWorkgroups }, set: { router.showsWorkgroups = $0 })) {
                 TerminalWorkgroupsView()
@@ -343,28 +311,5 @@ enum GlassTerminalHostAddressSync {
             updated.host = address
             return updated
         }
-    }
-}
-
-
-/// Shown instead of the server form when a setup was requested for a host record that carries
-/// no address (the terminal's own "Set Up…" on a host that predates addresses). The address is
-/// the host's to define: the shell's Connect collects it and opens the form with it read-only.
-struct GlassTerminalSetupNeedsAddressView: View {
-    let hostName: String
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ContentUnavailableView {
-                Label("\(hostName) has no address", systemImage: "network.slash")
-            } description: {
-                Text("Set the address on the host first (Edit the host, or Connect from its detail), then set the terminal up. Every service shares it.")
-            }
-            .navigationTitle("Add Terminal to \(hostName)")
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
-            .frame(minWidth: 380, minHeight: 220)
-        }
-        .accessibilityIdentifier("terminal-setup-needs-address")
     }
 }

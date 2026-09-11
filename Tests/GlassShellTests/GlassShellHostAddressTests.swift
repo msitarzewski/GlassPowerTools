@@ -34,7 +34,6 @@ private final class AddressAwareCapability: GlassCapability {
         report(.dismissed)
     }
     func hostAddressDidChange(host: HostProfile, address: String?) { addressChanges.append((host.id, address)) }
-    func needsSetup(service: HostServiceLink, host: HostProfile) -> Bool { savedAddresses[service.endpointID] == nil }
     func knownAddress(service: HostServiceLink, host: HostProfile) -> String? { savedAddresses[service.endpointID] }
 }
 
@@ -84,31 +83,8 @@ struct GlassShellHostAddressTests {
         #expect(model.host(host.id)?.address == nil)
     }
 
-    @Test("A setup on a host without an address asks for it on the host first, then resumes the connect")
-    func setupWaitsForTheHostAddress() async throws {
-        let (model, root) = try makeModel()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let ssh = AddressAwareCapability(kind: .ssh)
-        model.registry.register(ssh)
-        let host = try await model.addHost(displayName: "fresh")
-        let link = try await model.addService(kind: .ssh, displayName: "Terminal", to: host.id)
-
-        model.connect(hostID: host.id, endpointID: link.endpointID)
-        #expect(ssh.openedWith.isEmpty, "no setup form opens before the host has an address")
-        let request = try #require(model.addressRequest)
-        #expect(request.host.id == host.id && request.endpointID == link.endpointID)
-
-        // The prompt saves on the host and resumes the interrupted connect.
-        try await model.setHostAddress("192.0.2.6", for: host.id)
-        model.addressRequest = nil
-        model.connect(hostID: host.id, endpointID: link.endpointID)
-        #expect(ssh.openedWith.map(\.address) == ["192.0.2.6"], "the setup receives the host's address, read-only")
-        #expect(model.host(host.id)?.displayName == "fresh" && model.services(for: host.id) == [link], "only the address changed")
-        #expect(ssh.addressChanges.map(\.1) == ["192.0.2.6"])
-    }
-
-    @Test("A host with an address goes straight to the setup; a saved service connects without a prompt")
-    func setupWithAddressIsImmediate() async throws {
+    @Test("Connect hands the capability the host's address, read-only; a record without one is opened as is")
+    func connectPassesTheHostAddress() async throws {
         let (model, root) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
         let ssh = AddressAwareCapability(kind: .ssh)
@@ -116,20 +92,19 @@ struct GlassShellHostAddressTests {
         let host = try await model.addHost(displayName: "ready", address: "ready.example")
         let link = try await model.addService(kind: .ssh, displayName: "Terminal", to: host.id)
         model.connect(hostID: host.id, endpointID: link.endpointID)
-        #expect(model.addressRequest == nil)
         #expect(ssh.openedWith.map(\.address) == ["ready.example"])
 
-        // A legacy host (no address) whose service is already saved on the capability: no
-        // setup, so no prompt either; the capability opens with what it has.
-        let legacy = try await model.addHost(displayName: "legacy")
-        let saved = try await model.addService(kind: .ssh, displayName: "Terminal", to: legacy.id)
+        // A record another family app wrote without an address: the capability still opens with
+        // what it has; nothing in this app prompts for a setup on connect.
+        let foreign = try await model.addHost(displayName: "foreign")
+        let saved = try await model.addService(kind: .ssh, displayName: "Terminal", to: foreign.id)
         ssh.savedAddresses[saved.endpointID] = "10.0.0.5"
-        model.connect(hostID: legacy.id, endpointID: saved.endpointID)
-        #expect(model.addressRequest == nil)
+        model.connect(hostID: foreign.id, endpointID: saved.endpointID)
         #expect(ssh.openedWith.count == 2)
+        #expect(model.errorMessage == nil)
     }
 
-    @Test("A host that predates addresses adopts the one its capability already stores, on load and on connect")
+    @Test("A record another app saved with an address lends it to the host, on load")
     func knownAddressIsAdopted() async throws {
         let (model, root) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -144,9 +119,8 @@ struct GlassShellHostAddressTests {
         await model.load()
         #expect(model.host(host.id)?.address == "10.0.0.7", "adopted from the saved record on load")
 
-        // Connecting the pending service needs a setup; the address is already there, so no prompt.
+        // Connecting the other service hands the capability the adopted address.
         model.connect(hostID: host.id, endpointID: pending.endpointID)
-        #expect(model.addressRequest == nil)
         #expect(ssh.openedWith.map(\.address) == ["10.0.0.7"])
 
         // Disagreeing records are not guessed at.
@@ -157,16 +131,6 @@ struct GlassShellHostAddressTests {
         await model.load()
         #expect(model.host(torn.id)?.address == nil, "two different saved addresses: left for the user")
         #expect(model.knownAddress(for: try #require(model.host(torn.id))) == nil)
-    }
-
-    @Test("The address can be requested from the detail without a pending connect")
-    func addressRequestWithoutConnect() async throws {
-        let (model, root) = try makeModel()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let host = try await model.addHost(displayName: "bare")
-        let shellHost = try #require(model.host(host.id))
-        model.addressRequest = GlassShellAddressRequest(host: shellHost, endpointID: nil)
-        #expect(model.addressRequest?.endpointID == nil && model.addressRequest?.id == host.id)
     }
 
     @Test("Records that carry the same address are one host; a disagreement is surfaced, then settled by one edit")

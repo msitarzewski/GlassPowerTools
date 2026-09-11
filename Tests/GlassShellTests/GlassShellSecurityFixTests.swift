@@ -131,7 +131,7 @@ struct GlassShellSecurityFixTests {
         let host = try await model.addHost(displayName: "Alpha")
         let link = try await model.addService(kind: .ssh, displayName: "shell", to: host.id)
         model.connect(hostID: host.id)
-        #expect(model.placeholderRequest != nil)
+        #expect(model.errorMessage == GlassShellModel.unavailableMessage(for: .ssh))
         #expect(model.lastUsedService(for: host.id)?.endpointID == link.endpointID)
         #expect(model.lastConnected(host.id) == nil)
         #expect(model.items[0].lastConnected == nil)

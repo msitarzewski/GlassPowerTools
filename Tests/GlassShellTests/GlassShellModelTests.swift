@@ -91,7 +91,7 @@ struct GlassShellModelTests {
         #expect(model.connect(hostID: host.id) == nil)
         let ssh = try await model.addService(kind: .ssh, displayName: "ssh", to: host.id)
         #expect(model.connect(hostID: host.id)?.endpointID == ssh.endpointID)
-        #expect(model.placeholderRequest?.service.endpointID == ssh.endpointID, "no capability → honest placeholder")
+        #expect(model.errorMessage == GlassShellModel.unavailableMessage(for: .ssh), "no capability → says so, connects nothing")
         let db = try await model.addService(kind: .database, displayName: "db", to: host.id)
         #expect(model.connect(hostID: host.id)?.endpointID == ssh.endpointID, "last-used wins over first")
         model.connect(hostID: host.id, endpointID: db.endpointID)
@@ -100,10 +100,10 @@ struct GlassShellModelTests {
         try await model.removeService(db.endpointID, from: host.id)
         #expect(model.lastUsedService(for: host.id) == nil)
         #expect(model.connect(hostID: host.id)?.endpointID == ssh.endpointID, "falls back to first")
-        #expect(model.lastConnected(host.id) == nil, "F3: the placeholder connects nothing, so no connection time")
+        #expect(model.lastConnected(host.id) == nil, "F3: an unavailable kind connects nothing, so no connection time")
     }
 
-    @Test("A registered capability receives the open call instead of the placeholder")
+    @Test("A registered capability receives the open call")
     func capabilityRouting() async throws {
         let (model, root) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -111,11 +111,11 @@ struct GlassShellModelTests {
         model.registry.register(recorder)
         let host = try await model.addHost(displayName: "Win")
         let rdp = try await model.addService(kind: .rdp, displayName: "desktop", to: host.id)
-        model.placeholderRequest = nil
+        model.errorMessage = nil
         model.connect(hostID: host.id)
         #expect(recorder.opened.count == 1)
         #expect(recorder.opened.first?.0.endpointID == rdp.endpointID)
-        #expect(model.placeholderRequest == nil)
+        #expect(model.errorMessage == nil)
         #expect(model.registry.registeredKinds == [.rdp])
     }
 

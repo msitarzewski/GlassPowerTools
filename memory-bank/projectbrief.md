@@ -81,3 +81,13 @@ Port and username remain per service.
 desktop) never shows a host/address field, not even as a fallback. The address is defined at the
 machine level and inherited; if a host has no address yet, the shell collects it on the host
 before any service setup opens. The Add SSH Key window needs a proper layout.
+
+**Added 2026-09-11 (user): one-and-done setup.** Adding a host offers its services right then; a
+service is created complete, with its required configuration, in the same sheet — no "Set Up…"
+or pending state anywhere, and no legacy path ("there is no legacy; plan for a day 1 experience").
+Layout: machine fields (Name, Address) on top, then tabs `[ Terminal | Database | Desktop ]`; a tab
+shows an "Add <kind> to this host" toggle and, once on, only that kind's required fields with the
+optional ones under an Advanced disclosure; the tab label marks enabled services. Save is all or
+nothing. The same sheet serves Add Host, Add a service (tab preselected, host fields read-only)
+and Edit service. Aliases and collections sit under a disclosure. Apple HIG patterns throughout
+(rule 15).
