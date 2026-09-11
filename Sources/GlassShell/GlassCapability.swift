@@ -108,6 +108,29 @@ public protocol GlassCapability: AnyObject {
     /// Actions shown beside a service's Connect in the host detail, asked only for the
     /// capability's own kind. `host` is the catalog record that owns the service. Default: none.
     func serviceDetailActions(service: HostServiceLink, host: HostProfile) -> AnyView
+
+    /// Peer rows the capability contributes to the host detail below its services: tools that a
+    /// configured service makes available rather than services of their own. The terminal offers
+    /// Files (SFTP) when the server supports it; Stage 5's editor joins here.
+    func serviceTools(service: HostServiceLink, host: HostProfile) -> [GlassServiceTool]
+}
+
+/// A tool a service makes available: its own row in the host detail, with the service it rides.
+public struct GlassServiceTool: Identifiable, Sendable {
+    public let id: String
+    public let title: String
+    public let symbolName: String
+    public let subtitle: String?
+    public let open: @MainActor @Sendable () -> Void
+
+    public init(id: String, title: String, symbolName: String, subtitle: String? = nil,
+                open: @escaping @MainActor @Sendable () -> Void) {
+        self.id = id
+        self.title = title
+        self.symbolName = symbolName
+        self.subtitle = subtitle
+        self.open = open
+    }
 }
 
 public extension GlassCapability {
@@ -125,6 +148,7 @@ public extension GlassCapability {
     var settingsPages: [GlassCapabilitySettingsPage] { [] }
     func libraryToolbarItems() -> AnyView { AnyView(EmptyView()) }
     func serviceDetailActions(service: HostServiceLink, host: HostProfile) -> AnyView { AnyView(EmptyView()) }
+    func serviceTools(service: HostServiceLink, host: HostProfile) -> [GlassServiceTool] { [] }
 }
 
 /// The draft of a capability that offers no setup. Honest, not a stub: it says so in the
@@ -222,6 +246,10 @@ public final class GlassCapabilityRegistry {
 
     /// The owning capability's detail actions for a service, or nothing if no capability owns
     /// its kind. Only that capability is asked.
+    public func serviceTools(service: HostServiceLink, host: HostProfile) -> [GlassServiceTool] {
+        capability(for: service.kind)?.serviceTools(service: service, host: host) ?? []
+    }
+
     public func serviceDetailActions(service: HostServiceLink, host: HostProfile) -> AnyView {
         capability(for: service.kind)?.serviceDetailActions(service: service, host: host) ?? AnyView(EmptyView())
     }

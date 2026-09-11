@@ -90,22 +90,27 @@ struct MacTerminalWindowPolicyTests {
             window.contentView?.layoutSubtreeIfNeeded()
             try await Task.sleep(for: .milliseconds(25))
         }
+        // The app supplies its own toggle ("sidebar-toggle"): AppKit's drifts to the window's
+        // trailing edge with a "Show Sidebar" label once this toolbar is crowded, and the two
+        // windows then disagree. Either identifier counts, and there must still be exactly one.
         let sidebarIndices = toolbar.items.indices.filter {
-            toolbar.items[$0].itemIdentifier.rawValue.contains("toggleSidebar")
+            let id = toolbar.items[$0].itemIdentifier.rawValue
+            return id.contains("toggleSidebar") || id == "sidebar-toggle"
         }
         #expect(sidebarIndices.count == 1)
         let sidebarIndex = try #require(sidebarIndices.first)
         let newTabIndex = try #require(toolbar.items.firstIndex {
             $0.itemIdentifier.rawValue == "new-terminal-tab"
         })
+        #expect(newTabIndex < sidebarIndex, "New Tab sits left of the sidebar toggle, as in the library")
         let save = try #require(toolbar.items.first {
             $0.itemIdentifier.rawValue == "save-workspace"
         })
         let separatorIndex = try #require(toolbar.items.firstIndex { $0 is NSTrackingSeparatorToolbarItem })
         #expect(sidebarIndex < separatorIndex)
         #expect(newTabIndex < separatorIndex)
-        // The native toggle and add button are the only sidebar controls;
-        // redeclaring the native toggle can leave an empty glass slot.
+        // The toggle and add button are the only sidebar controls; redeclaring the native
+        // toggle without removing it leaves an empty glass slot.
         let sidebarControls = toolbar.items.prefix(separatorIndex).filter {
             $0.itemIdentifier != .flexibleSpace && $0.itemIdentifier != .space
         }
@@ -118,7 +123,8 @@ struct MacTerminalWindowPolicyTests {
             window.setContentSize(NSSize(width: width, height: 760))
             window.contentView?.layoutSubtreeIfNeeded()
             #expect(toolbar.visibleItems?.contains {
-                $0.itemIdentifier.rawValue.contains("toggleSidebar") && !$0.isHidden
+                let id = $0.itemIdentifier.rawValue
+                return (id.contains("toggleSidebar") || id == "sidebar-toggle") && !$0.isHidden
             } == true)
             #expect(toolbar.visibleItems?.contains {
                 $0.itemIdentifier.rawValue == "new-terminal-tab" && !$0.isHidden
@@ -141,7 +147,8 @@ struct MacTerminalWindowPolicyTests {
             #expect(sidebarEdge > 0)
             #expect(abs(material.frame.minX - sidebarEdge) < 1)
             #expect(toolbar.visibleItems?.contains {
-                $0.itemIdentifier.rawValue.contains("toggleSidebar") && !$0.isHidden
+                let id = $0.itemIdentifier.rawValue
+                return (id.contains("toggleSidebar") || id == "sidebar-toggle") && !$0.isHidden
             } == true)
         }
         split.toggleSidebar(nil)

@@ -209,6 +209,24 @@ public final class GlassTerminalCapability: GlassCapability {
     public func serviceDetailActions(service: HostServiceLink, host: HostProfile) -> AnyView {
         AnyView(GlassTerminalServiceActions(runtime: runtime, service: service, host: host))
     }
+
+    /// Files is SFTP, offered as its own row because it is a separate tool, not a separate
+    /// service: it rides this terminal's endpoint, credentials and host trust. Every SSH server
+    /// this app can reach runs the SFTP subsystem, so the row appears whenever the service has a
+    /// saved server; the session reports it honestly if the subsystem is refused.
+    public func serviceTools(service: HostServiceLink, host: HostProfile) -> [GlassServiceTool] {
+        let serverID = service.endpointID.rawValue
+        guard runtime.hasServer(id: serverID) else { return [] }
+        let runtime = self.runtime
+        return [
+            GlassServiceTool(id: "files-\(serverID.uuidString.lowercased())",
+                             title: "Files",
+                             symbolName: "folder",
+                             subtitle: "Browse this machine's files over \(GlassServicePresentation.displayName(for: service.kind))") {
+                runtime.requestConnect(serverID: serverID, purpose: .sftp)
+            }
+        ]
+    }
 }
 
 /// Wraps the shell's library window content with glas.sh's bootstrap (persistent state load,

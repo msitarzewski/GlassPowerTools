@@ -162,6 +162,15 @@ public struct GlassShellLibraryView: View {
                             }
                         }
                 }
+                // Tools a configured service makes available, as peer rows: Files (SFTP) today,
+                // the editor in Stage 5. They are not services and are never configured here.
+                ForEach(host.services) { service in
+                    if let owner = host.member(owning: service.endpointID) {
+                        ForEach(model.registry.serviceTools(service: service, host: owner)) { tool in
+                            toolRow(tool)
+                        }
+                    }
+                }
                 Button("Add a service…", systemImage: "plus.circle") { setupMode = .addService(host, .ssh) }
                     .accessibilityIdentifier("host-add-service")
             }
@@ -200,6 +209,27 @@ public struct GlassShellLibraryView: View {
         })
     }
 
+    private func toolRow(_ tool: GlassServiceTool) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: tool.symbolName)
+                .foregroundStyle(.secondary)
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(tool.title).lineLimit(1)
+                if let subtitle = tool.subtitle {
+                    Text(subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
+            Spacer(minLength: 8)
+            Button("Open", systemImage: "play.fill") { tool.open() }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.bordered)
+                .help("Open \(tool.title)")
+                .accessibilityIdentifier("host-tool-open-\(tool.id)")
+        }
+        .accessibilityIdentifier("host-tool-\(tool.id)")
+    }
+
     /// One service: its name and kind at the leading edge, Connect and the capability's actions
     /// at the trailing edge. The name truncates first. When the column cannot fit the actions
     /// inline they collapse into one overflow menu beside Connect, so nothing ever clips at the
@@ -216,12 +246,18 @@ public struct GlassShellLibraryView: View {
             }
         }
         .layoutPriority(0)
-        let connect = Button("Connect") { model.connect(hostID: host.id, endpointID: service.endpointID) }
+        // Wordless, like the library row: the glyph carries the meaning and the label stays for
+        // assistive technology and the tooltip.
+        let connect = Button("Connect", systemImage: "play.fill") { model.connect(hostID: host.id, endpointID: service.endpointID) }
+            .labelStyle(.iconOnly)
             .buttonStyle(.bordered)
+            .help("Connect")
             .accessibilityIdentifier("host-service-connect-\(service.kind.rawValue)")
         // Edit is the shell's: it opens the one host sheet on this service's tab.
         let edit = Button("Edit", systemImage: "pencil") { setupMode = .editService(host, service) }
+            .labelStyle(.iconOnly)
             .buttonStyle(.bordered)
+            .help("Edit")
             .accessibilityIdentifier("host-service-edit-\(service.kind.rawValue)")
         let owner = host.member(owning: service.endpointID)
         return ViewThatFits(in: .horizontal) {

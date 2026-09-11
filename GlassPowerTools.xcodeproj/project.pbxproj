@@ -351,8 +351,7 @@
 		6A000000000000000000AB12 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=macosx*]" = MacAppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = GlassPowerTools;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = App/GlassPowerTools.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = Platforms/macOS/macOS.entitlements;
@@ -379,6 +378,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 0.1.0;
+				ASSETCATALOG_COMPILER_APPICON_NAME = GlassPowerTools;
 				PRODUCT_BUNDLE_IDENTIFIER = com.glasspowertools;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;
@@ -402,8 +402,7 @@
 		6A000000000000000000AB13 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=macosx*]" = MacAppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = GlassPowerTools;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = App/GlassPowerTools.entitlements;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = Platforms/macOS/macOS.entitlements;
@@ -431,6 +430,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 0.1.0;
+				ASSETCATALOG_COMPILER_APPICON_NAME = GlassPowerTools;
 				PRODUCT_BUNDLE_IDENTIFIER = com.glasspowertools;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = auto;

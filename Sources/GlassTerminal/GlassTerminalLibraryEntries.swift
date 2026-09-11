@@ -62,14 +62,10 @@ public struct GlassTerminalServiceActions: View {
     }
 
     public var body: some View {
-        let serverID = service.endpointID.rawValue
-        if runtime.hasServer(id: serverID) {
-            Button("SFTP", systemImage: "folder") { runtime.requestConnect(serverID: serverID, purpose: .sftp) }
-                .help("Connect and browse remote files using SFTP")
-                .accessibilityIdentifier("connection-library-sftp-server-\(serverID.uuidString.lowercased())")
-            Button("Details", systemImage: "info.circle") { runtime.requestServerInfo(id: serverID) }
-                .accessibilityIdentifier("connection-library-details-server-\(serverID.uuidString.lowercased())")
-        }
+        // Files (SFTP) is its own peer row in the host detail, not an action on the terminal, and
+        // the server's own facts are already on the host detail — glas.sh's "Details" sheet was a
+        // holdover from the separate app and showed nothing the pane does not.
+        EmptyView()
     }
 }
 

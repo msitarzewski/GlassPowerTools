@@ -119,8 +119,6 @@ struct TerminalWindowView: View {
     @State private var notificationManager = NotificationManager()
     @State private var isImmersiveFocusActive = false
     @State private var showingRecordings = false
-    @State private var openingSFTP = false
-    @State private var sftpOpenError: String?
     @State private var recordings: [SessionRecording] = []
     @State private var recordingPendingDeletion: SessionRecording?
     @State private var recordingDeletionError: String?
@@ -350,7 +348,6 @@ struct TerminalWindowView: View {
         .onAppear { updateKeyboardTools() }
         .onDisappear { terminalHostModel.clearKeyboardTools() }
         .onChange(of: session.state) { _, _ in updateKeyboardTools() }
-        .onChange(of: openingSFTP) { _, _ in updateKeyboardTools() }
         .onChange(of: session.recorder?.isRecording) { _, _ in updateKeyboardTools() }
         .onChange(of: settingsManager.snippets.isEmpty) { _, _ in updateKeyboardTools() }
         .onChange(of: aiAssistant.isAvailable) { _, _ in updateKeyboardTools() }
@@ -1150,24 +1147,6 @@ struct TerminalWindowView: View {
         #endif
     }
 
-    private func showSFTPBrowser() {
-        guard !openingSFTP else { return }
-        openingSFTP = true
-        Task { @MainActor in
-            defer { openingSFTP = false }
-            do {
-                let browserSession = try await sessionManager.createSFTPSession(sharing: session)
-                #if os(iOS)
-                iOSRouter.showSFTP(sessionID: browserSession.id)
-                #else
-                let context = SFTPBrowserContext(sessionID: browserSession.id)
-                openWindow(id: "sftp", value: context)
-                #endif
-            } catch {
-                sftpOpenError = error.localizedDescription
-            }
-        }
-    }
 
     private var newTerminalAccessibilityLabel: String {
         onNewTerminalTab == nil
@@ -1289,26 +1268,9 @@ struct TerminalWindowView: View {
                 .help("AI Assistant")
             }
 
-            Button {
-                showSFTPBrowser()
-            } label: {
-                toolLabel("Files", image: "folder.fill", inMenu: inMenu)
-            }
-#if !os(macOS)
-            .buttonStyle(.borderless)
-#endif
-            .disabled(session.state != .connected)
-            .accessibilityLabel("SFTP Browser")
-            .help("SFTP Browser")
-            .disabled(openingSFTP)
-            .alert("Could Not Open SFTP", isPresented: Binding(
-                get: { sftpOpenError != nil },
-                set: { if !$0 { sftpOpenError = nil } }
-            )) {
-                Button("OK", role: .cancel) { sftpOpenError = nil }
-            } message: {
-                Text(sftpOpenError ?? "")
-            }
+            // Files left this toolbar when it became a peer row on the host detail: it is a
+            // separate tool, reached from the machine, not a control of one terminal session.
+            // The command palette still opens it per saved connection (`connection.sftp.*`).
 
             #if os(visionOS)
             Button {
