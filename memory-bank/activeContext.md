@@ -481,3 +481,6 @@ view now carries its own Done on compact iOS).
 
 **Run trap:** macOS UI runs must reuse `scratchpad/dd-uitest` — a fresh derived-data path produces a
 binary without the Local Network grant, and the real-host test then fails as if the VM were down.
+
+**0.2.47 deployed (2026-09-11):** Mac `/Applications`, iPhone and Vision Pro all on 0.2.47 from
+`98a6094`, each version read back from the installed bundle.
