@@ -104,15 +104,12 @@ private struct TerminalInitialSizeEditor: View {
 // MARK: - Server Form Entry Points
 
 /// The shell's host, as the server form sees it. The address is the machine's and lives on the
-/// host: when the host has one the form shows it read-only and asks only for the terminal's own
-/// fields; when it has none the form's Host field is the one place it is typed, and `setAddress`
-/// hands it back to the host so no service asks again.
+/// host: the form shows it read-only and asks only for the terminal's own fields (port, user,
+/// authentication). The shell collects the address before any setup opens, so a form launched
+/// from the shell never carries an address field.
 struct ServerFormHostContext {
     let hostName: String
-    let address: String?
-    let setAddress: (@MainActor @Sendable (String) async throws -> Void)?
-
-    var showsReadOnlyAddress: Bool { address != nil }
+    let address: String
 }
 
 struct AddServerView: View {
@@ -303,7 +300,6 @@ struct ServerFormView: View {
     @State private var showingAddSSHKey = false
     @State private var showingJumpHostPicker = false
     #if os(macOS)
-    @Environment(\.openWindow) private var openWindow
     #endif
     @State private var saveError: String?
     @State private var requiresPasswordUpgrade = false
@@ -347,7 +343,9 @@ struct ServerFormView: View {
     /// From the shell's host the form adds a terminal *to that host*; "Import" is the Tailscale
     /// draft's word and "Add Server" the terminal's own.
     private var navigationTitle: String {
-        if let hostContext, !mode.isEditing { return "Add Terminal to \(hostContext.hostName)" }
+        if let hostContext {
+            return mode.isEditing ? "Edit Terminal on \(hostContext.hostName)" : "Add Terminal to \(hostContext.hostName)"
+        }
         return mode.navigationTitle
     }
 
@@ -460,12 +458,10 @@ struct ServerFormView: View {
                         #endif
                     }
                 }
-                #if !os(macOS)
                 .sheet(isPresented: $showingAddSSHKey) {
                     AddSSHKeyView()
                         .environment(settingsManager)
                 }
-                #endif
                 .sheet(isPresented: $showingJumpHostPicker) {
                     JumpHostPickerView(
                         servers: availableJumpHosts,
@@ -505,14 +501,14 @@ struct ServerFormView: View {
                 identifier: "\(identifierPrefix)-display-name",
                 isRequired: true
             )
-            if let hostContext, hostContext.showsReadOnlyAddress {
-                // The machine's identity is the host's, entered once in the host editor.
+            if let hostContext {
+                // The machine's identity is the host's, entered once on the host; never a field here.
                 LabeledContent("Address") {
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text(host)
+                        Text(hostContext.address)
                             .textSelection(.enabled)
                             .accessibilityIdentifier("\(identifierPrefix)-host")
-                            .accessibilityValue(host)
+                            .accessibilityValue(hostContext.address)
                         Text("From the host \(hostContext.hostName)")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
@@ -520,6 +516,7 @@ struct ServerFormView: View {
                 }
                 .accessibilityElement(children: .contain)
             } else {
+                // glas.sh's standalone form (no shell host): the Host field stays.
                 formTextField(
                     "Host",
                     text: $host,
@@ -527,11 +524,6 @@ struct ServerFormView: View {
                     identifier: "\(identifierPrefix)-host",
                     isRequired: true
                 )
-                if let hostContext {
-                    Text("\(hostContext.hostName) has no address yet. This one is saved on the host and shared by its services.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
             }
             portField
             formTextField(
@@ -734,13 +726,9 @@ struct ServerFormView: View {
             }
             validationMessage(for: .sshKey)
             Button("Add SSH Key", systemImage: "plus.circle") {
-                #if os(macOS)
-                // This form is itself a sheet; a sheet on a sheet crashes AppKit's accessibility
-                // resolution on macOS 27 (project rule 12). The key form gets its own window.
-                openWindow(id: "terminal-add-ssh-key")
-                #else
+                // A sheet over this sheet on every platform: the macOS crash once blamed on
+                // nesting was the SSH Key row's accessibility label (W4, 2026-09-10).
                 showingAddSSHKey = true
-                #endif
             }
             .buttonStyle(.bordered)
         }
@@ -869,17 +857,6 @@ struct ServerFormView: View {
         return issues.isEmpty
     }
 
-    /// The host had no address and the user typed one here: hand it to the host so every other
-    /// service inherits it. Failure to record it is logged, never fatal — the server is saved.
-    private func recordAddressOnHostIfNew(_ address: String) {
-        guard let hostContext, !hostContext.showsReadOnlyAddress, let setAddress = hostContext.setAddress else { return }
-        Task { @MainActor in
-            do { try await setAddress(address) } catch {
-                Logger.servers.error("Could not record the address on the host: \(error.localizedDescription, privacy: .public)")
-            }
-        }
-    }
-
     private func save() {
         guard validateForSave(), let parsedPort = Int(port) else { return }
         commitPendingTag()
@@ -914,7 +891,6 @@ struct ServerFormView: View {
                     server,
                     password: authMethod == .password ? password : nil
                 )
-                recordAddressOnHostIfNew(normalizedHost)
             case .edit(let original):
                 var updatedServer = original
                 updatedServer.name = normalizedName

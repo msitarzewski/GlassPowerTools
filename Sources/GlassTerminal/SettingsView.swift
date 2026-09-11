@@ -1608,24 +1608,28 @@ struct AddSSHKeyView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Key Details") {
-                    TextField("Key name", text: $name)
+                Section("Key") {
+                    TextField("Key name", text: $name, prompt: Text("Key name"))
                         .focused($isNameFocused)
                         .accessibilityIdentifier("ssh-key-name")
-                    SecureField(inspection?.isPassphraseProtected == true ? "Passphrase (required for this key)" : "Passphrase (optional)", text: $passphrase)
+                    SecureField(inspection?.isPassphraseProtected == true ? "Passphrase (required for this key)" : "Passphrase (optional)",
+                                text: $passphrase)
                         .focused($isPassphraseFocused)
-                    Text("RSA and ED25519 private keys are supported.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
 
-                Section("Private Key") {
-                    TextEditor(text: $privateKey)
-                        .font(.system(.body, design: .monospaced))
-                        .frame(minHeight: 220)
-                        .accessibilityIdentifier("ssh-key-private-key")
+                Section {
+                    // Choosing a file is the primary path; pasting is the fallback. The editor is
+                    // bounded to a few lines and scrolls, so the form keeps its shape.
                     Button("Choose File…", systemImage: "doc") { chooseKeyFile() }
+                        .buttonStyle(.borderedProminent)
                         .accessibilityIdentifier("ssh-key-choose-file")
+                    TextEditor(text: $privateKey)
+                        .font(.system(.footnote, design: .monospaced))
+                        .frame(minHeight: 132, maxHeight: 176)
+                        .scrollContentBackground(.hidden)
+                        .padding(4)
+                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(.quaternary.opacity(0.35)))
+                        .accessibilityIdentifier("ssh-key-private-key")
                     if let inspection {
                         Label {
                             Text(inspectionSummary(inspection))
@@ -1636,6 +1640,10 @@ struct AddSSHKeyView: View {
                         .foregroundStyle(inspection.isPassphraseProtected ? .orange : .secondary)
                         .accessibilityIdentifier("ssh-key-detected")
                     }
+                } header: {
+                    Text("Private Key")
+                } footer: {
+                    Text("Choose the key file or paste its contents. RSA and ED25519 private keys are supported.")
                 }
 
                 if let errorMessage {
@@ -1646,6 +1654,12 @@ struct AddSSHKeyView: View {
                     }
                 }
             }
+            .formStyle(.grouped)
+            #if os(macOS)
+            // A sheet on every platform (also over the server form: W4 traced the earlier crash
+            // to an accessibility label, not to sheet nesting). Sized like the server form.
+            .frame(minWidth: 460, idealWidth: 520, maxWidth: 560, minHeight: 440, idealHeight: 500, maxHeight: 600)
+            #endif
             .navigationTitle("Add SSH Key")
             .onAppear { isNameFocused = true }
             #if !os(macOS)
@@ -1684,6 +1698,9 @@ struct AddSSHKeyView: View {
                         name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                             || privateKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     )
+                    #if os(macOS)
+                    .keyboardShortcut(.defaultAction)
+                    #endif
                 }
             }
         }

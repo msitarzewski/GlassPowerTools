@@ -109,13 +109,10 @@ final class GlassTerminalUITests: XCTestCase {
         return nil
     }
 
-    /// Our own window only (project rule 11); see `UITestCapture.swift`. Prefers the Add SSH
-    /// Key window, then a sheet, then the main window.
+    /// Our own window only (project rule 11); see `UITestCapture.swift`. The main window,
+    /// which carries any sheet (the key form is a sheet over the server form on every platform).
     private func snap(_ name: String) {
-        let sheet = app.sheets.firstMatch
-        let keyWindow = app.windows["Add SSH Key"].firstMatch
-        let subject = keyWindow.exists ? keyWindow : (sheet.exists ? sheet : app.windows.firstMatch)
-        captureOwnWindow(subject, app: app, name: "terminal-\(name)")
+        captureOwnWindow(app.windows.firstMatch, app: app, name: "terminal-\(name)")
     }
 
     /// Attaches the accessibility tree so a failure can be diagnosed from the result bundle.
@@ -143,12 +140,13 @@ final class GlassTerminalUITests: XCTestCase {
 
     // MARK: - Steps
 
-    /// The machine's address is typed once, on the host; every service inherits it.
-    private func addHost(named name: String, address: String) {
+    /// The machine's address is typed once, on the host; every service inherits it. With no
+    /// address the host is created bare, and the shell asks for the address before any setup.
+    private func addHost(named name: String, address: String? = nil) {
         let empty = element("connection-library-add-host-empty")
         if empty.waitForExistence(timeout: 3) { press(empty) } else { press("connection-library-add-host") }
         type(name, into: "host-editor-name")
-        type(address, into: "host-editor-address")
+        if let address { type(address, into: "host-editor-address") }
         press("host-editor-save")
     }
 
@@ -202,8 +200,8 @@ final class GlassTerminalUITests: XCTestCase {
         // Authentication → SSH Key.
         chooseSSHKeyMethod()
 
-        // Add the key through the form's own "Add SSH Key": a sheet on iOS and visionOS, its own
-        // window on macOS (the form is already a sheet; project rule 12).
+        // Add the key through the form's own "Add SSH Key": a sheet over the form on every
+        // platform.
         let addKey = app.buttons["Add SSH Key"].firstMatch
         XCTAssertTrue(addKey.waitForExistence(timeout: 10), "Add SSH Key button")
         press(addKey)
@@ -434,6 +432,37 @@ final class GlassTerminalUITests: XCTestCase {
         if terminalWindow.exists { app.typeKey("w", modifierFlags: [.command, .shift]) }
     }
     #endif
+
+    /// A host created without an address: Connect on its terminal service asks for the address
+    /// on the host (the shell's prompt), never in the terminal's form, which then shows it
+    /// read-only. No real connection is made.
+    func testAddressIsCollectedOnTheHostBeforeTerminalSetup() throws {
+        app = launch()
+        addHost(named: "bare")
+        openDetail(of: "bare")
+        XCTAssertTrue(element("host-detail-set-address").waitForExistence(timeout: 10), "detail offers Set Address… when unset")
+        addSSHService()
+        connectFromDetail()
+
+        let field = element("host-address-prompt-field")
+        XCTAssertTrue(field.waitForExistence(timeout: 10), "the shell asks for the host's address first")
+        XCTAssertFalse(element("add-server-host").exists, "no terminal form before the address is set")
+        snap("20-address-prompt")
+        press(field); field.typeText("10.9.8.7")
+        press("host-address-prompt-continue")
+
+        XCTAssertTrue(element("add-server-host").waitForExistence(timeout: 15), "terminal setup opens once the host has an address")
+        let addressRow = element("add-server-host")
+        XCTAssertEqual(addressRow.value as? String ?? addressRow.label, "10.9.8.7", "the address just saved on the host, read-only")
+        XCTAssertFalse(app.textFields["add-server-host"].exists, "the terminal form never has an address field")
+        XCTAssertTrue(app.staticTexts["Add Terminal to bare"].waitForExistence(timeout: 5), "form titled for the host, never Import Connection")
+        snap("21-server-form-after-address")
+        let cancel = app.buttons["Cancel"].firstMatch
+        if cancel.waitForExistence(timeout: 5) { press(cancel) }
+        XCTAssertTrue(element("add-server-host").waitForNonExistence(timeout: 10))
+        XCTAssertTrue(element("host-detail-address").waitForExistence(timeout: 10))
+        XCTAssertFalse(element("host-detail-set-address").exists, "the detail now shows the address")
+    }
 
     func testConnectsToRealHostThroughTheShell() throws {
         let fixture = try fixture()

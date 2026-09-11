@@ -47,17 +47,17 @@ public final class GlassTerminalRuntime {
     struct SetupRequest: Identifiable {
         let host: HostProfile
         let service: HostServiceLink
-        /// The shell's host access, so an address typed into the setup form is written back to
-        /// the host (nil when the request came from the terminal's own "Set Up…" action, which
-        /// still has the host record and its address).
+        /// What the shell knows about the host (nil when the request came from the terminal's own
+        /// "Set Up…" action, which still has the host record and its address).
         var hostAccess: GlassCapabilityHostAccess?
         var id: EndpointID { service.endpointID }
 
-        /// What the server form needs to know about the shell's host.
-        var formContext: ServerFormHostContext {
-            ServerFormHostContext(hostName: host.displayName,
-                                  address: hostAccess?.address ?? host.address,
-                                  setAddress: hostAccess?.setAddress)
+        /// The address the form shows read-only. Nil only when neither the shell nor the record
+        /// carries one — the shell collects it before opening a setup, so that is the "Set Up…"
+        /// path on a host that predates addresses; the sheet then asks for the host, not a form.
+        var address: String? { hostAccess?.address ?? host.address }
+        var formContext: ServerFormHostContext? {
+            address.map { ServerFormHostContext(hostName: host.displayName, address: $0) }
         }
     }
 
@@ -95,10 +95,11 @@ public final class GlassTerminalRuntime {
         guard let server = sessionManager.serverManager.server(for: id) else { return }
         enqueue(.editServer(server, hostContext: nil))
     }
-    /// Edit from the shell's host detail: the host's address is shown read-only.
+    /// Edit from the shell's host detail: the host's address is shown read-only. A host record
+    /// that predates addresses shows the saved server's own, which the shell adopts on load.
     public func requestEditServer(id: UUID, host: HostProfile) {
         guard let server = sessionManager.serverManager.server(for: id) else { return }
-        enqueue(.editServer(server, hostContext: ServerFormHostContext(hostName: host.displayName, address: host.address, setAddress: nil)))
+        enqueue(.editServer(server, hostContext: ServerFormHostContext(hostName: host.displayName, address: host.address ?? server.host)))
     }
 
     /// The host's address changed in the shell: every saved server that is a service of that
@@ -167,7 +168,20 @@ public final class GlassTerminalCapability: GlassCapability {
     public init(runtime: GlassTerminalRuntime) { self.runtime = runtime }
 
     public func open(service: HostServiceLink, host: HostProfile, report: @escaping GlassCapabilityReport) {
-        open(service: service, host: host, hostAccess: GlassCapabilityHostAccess(address: host.address) { _ in }, report: report)
+        open(service: service, host: host, hostAccess: GlassCapabilityHostAccess(address: host.address), report: report)
+    }
+
+    /// A service with no saved server yet opens the setup form; the shell collects the host's
+    /// address first, so the form never asks for it.
+    public func needsSetup(service: HostServiceLink, host: HostProfile) -> Bool {
+        !runtime.hasServer(id: service.endpointID.rawValue)
+    }
+
+    /// The saved server's address, for hosts that predate addresses on the host record.
+    public func knownAddress(service: HostServiceLink, host: HostProfile) -> String? {
+        guard let server = runtime.sessionManager.serverManager.server(for: service.endpointID.rawValue) else { return nil }
+        let address = server.host.trimmingCharacters(in: .whitespacesAndNewlines)
+        return address.isEmpty ? nil : address
     }
 
     public func open(service: HostServiceLink, host: HostProfile, hostAccess: GlassCapabilityHostAccess,
@@ -231,16 +245,20 @@ public struct GlassTerminalBootstrap<Content: View>: View {
                 GlassLayeredPanel(cornerRadius: 0) {
                     // The host's address is the machine's, entered once on the host; the form
                     // shows it read-only and asks only for what is the terminal's: port, user, auth.
-                    AddServerView(
-                        serverManager: runtime.sessionManager.serverManager,
-                        draft: ServerConfiguration(
-                            id: request.service.endpointID.rawValue,
-                            name: request.host.displayName,
-                            host: request.formContext.address ?? "",
-                            username: ""
-                        ),
-                        hostContext: request.formContext
-                    )
+                    if let context = request.formContext {
+                        AddServerView(
+                            serverManager: runtime.sessionManager.serverManager,
+                            draft: ServerConfiguration(
+                                id: request.service.endpointID.rawValue,
+                                name: request.host.displayName,
+                                host: context.address,
+                                username: ""
+                            ),
+                            hostContext: context
+                        )
+                    } else {
+                        GlassTerminalSetupNeedsAddressView(hostName: request.host.displayName)
+                    }
                 }
             }
             #if os(iOS)
@@ -325,5 +343,28 @@ enum GlassTerminalHostAddressSync {
             updated.host = address
             return updated
         }
+    }
+}
+
+
+/// Shown instead of the server form when a setup was requested for a host record that carries
+/// no address (the terminal's own "Set Up…" on a host that predates addresses). The address is
+/// the host's to define: the shell's Connect collects it and opens the form with it read-only.
+struct GlassTerminalSetupNeedsAddressView: View {
+    let hostName: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ContentUnavailableView {
+                Label("\(hostName) has no address", systemImage: "network.slash")
+            } description: {
+                Text("Set the address on the host first (Edit the host, or Connect from its detail), then set the terminal up. Every service shares it.")
+            }
+            .navigationTitle("Add Terminal to \(hostName)")
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
+            .frame(minWidth: 380, minHeight: 220)
+        }
+        .accessibilityIdentifier("terminal-setup-needs-address")
     }
 }

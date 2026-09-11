@@ -23,11 +23,10 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     multi-display Mac captures other applications' windows. Use `element.screenshot()`; on the
     visionOS simulator, where in-test captures are 1×1, use `simctl io screenshot` outside the test.
     (Found 2026-09-10; the offending captures were deleted.)
-12. **Never present a sheet on a sheet on macOS.** `AddSSHKeyView` presented from the server-form
-    sheet deterministically crashes AppKit's accessibility role resolution under Xcode 27 / macOS 27
-    (`_accessibilityFindRoleFromProtocol` recursion). Use `openWindow` or a popover for nested
-    presentation on macOS.
-
+12. **Superseded 2026-09-11.** The "never sheet-on-sheet on macOS" rule came from a crash that W4
+    bisected to the SSH Key row's accessibility label (an `.accessibilityElement(children: .ignore)`
+    label over a text-and-button stack), not to nested sheets. Nested sheets are allowed; modal
+    editors follow rule 15.
 
 13. **Layered panels declare their role.** `GlassLayeredPanel(role:)` is `.presented` for a sheet,
     popover or secondary window (paints theme + frost on every platform) and `.embedded` for a
@@ -41,3 +40,9 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     (element trees captured 2026-09-11 show only the page content; no tab bar in any window).
     Section pickers and similar controls presented in a sheet live inside the surface — the
     settings sections use a leading column of vertical tabs there.
+
+15. **Apple HIG patterns by default.** Unless the user explicitly asks otherwise, every surface uses
+    the platform's native pattern. Modal editors (server form, SSH key, host, service) are sheets
+    with a title header, a grouped `Form`, and the standard bottom bar with Cancel and the primary
+    action bottom-trailing — the "Add Terminal to <host>" sheet is the reference. No custom
+    title-bar buttons, no columns-style forms in windows for what is a save/cancel editor.

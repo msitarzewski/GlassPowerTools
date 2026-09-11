@@ -149,3 +149,74 @@ public struct GlassShellServiceEditor: View {
         }
     }
 }
+
+
+/// "Address for <host>": the one place the machine's address is collected when a host has none
+/// and something needs it (a service setup is about to open, or the user asked from the detail).
+/// Saves to the host through the same validation as the host editor, then resumes the connect
+/// that was interrupted. No service form ever asks for an address.
+public struct GlassShellAddressPrompt: View {
+    private let model: GlassShellModel
+    private let request: GlassShellAddressRequest
+    @State private var address = ""
+    @State private var error: String?
+    @State private var saving = false
+    @FocusState private var focused: Bool
+    @Environment(\.dismiss) private var dismiss
+
+    public init(model: GlassShellModel, request: GlassShellAddressRequest) {
+        self.model = model
+        self.request = request
+    }
+
+    public var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Address", text: $address, prompt: Text("Hostname or IP"))
+                        .focused($focused)
+                        #if !os(macOS)
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.URL)
+                        #endif
+                        .autocorrectionDisabled()
+                        .onSubmit { if canContinue { save() } }
+                        .accessibilityIdentifier("host-address-prompt-field")
+                } footer: {
+                    Text("\(request.host.displayName) has no address yet. It is saved on the host and shared by every service: terminal, database and desktop.")
+                }
+                if let error { Text(error).foregroundStyle(.red) }
+            }
+            .formStyle(.grouped)
+            .navigationTitle("Address for \(request.host.displayName)")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }.accessibilityIdentifier("host-address-prompt-cancel")
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(request.endpointID == nil ? "Save" : "Continue") { save() }
+                        .disabled(!canContinue)
+                        .accessibilityIdentifier("host-address-prompt-continue")
+                }
+            }
+            .frame(minWidth: 320, idealWidth: 440, minHeight: 160)
+            .onAppear { focused = true }
+        }
+    }
+
+    private var canContinue: Bool { !saving && !address.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    private func save() {
+        saving = true
+        Task {
+            defer { saving = false }
+            do {
+                try await model.setHostAddress(address, for: request.host.id)
+                dismiss()
+                if let endpointID = request.endpointID {
+                    model.connect(hostID: request.host.id, endpointID: endpointID)
+                }
+            } catch { self.error = GlassShellError.message(for: error) }
+        }
+    }
+}

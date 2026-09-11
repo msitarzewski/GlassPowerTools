@@ -76,3 +76,8 @@ flat vocabulary; labels/groups/clients are uses of tags, not tag types.
 **Added 2026-09-10 (user):** the machine identity (IP or DNS name) belongs to the host, entered
 once; services inherit it and never ask for it again. "Connection > Terminal > IP address" is wrong.
 Port and username remain per service.
+
+**Refined 2026-09-11 (user):** a service setup form (terminal/SSH, and later database and
+desktop) never shows a host/address field, not even as a fallback. The address is defined at the
+machine level and inherited; if a host has no address yet, the shell collects it on the host
+before any service setup opens. The Add SSH Key window needs a proper layout.

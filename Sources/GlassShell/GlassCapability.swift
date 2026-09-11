@@ -13,20 +13,17 @@ public enum GlassCapabilityOutcome: Sendable, Equatable {
     case dismissed
 }
 
-/// What a capability may do to the host record on the shell's behalf while it sets a service
-/// up. The host's address is the one thing every service shares, so a capability that learns it
-/// (the user typed it into a setup form because the host had none) hands it back here and it is
-/// entered once; the capability never writes the catalog itself.
+/// What the shell knows about the host while a capability sets a service up or connects. The
+/// host's address is the one thing every service shares: the shell collects it on the host, before
+/// any setup form opens, so a capability only ever reads it. Capabilities never write the catalog.
 public struct GlassCapabilityHostAccess: Sendable {
-    /// The host's current address, if it has one. A capability pre-fills from it and shows it
-    /// read-only rather than asking again.
+    /// The host's address (DNS name or IP). Present whenever the shell opens a setup; nil only
+    /// for a connect on a legacy host record that has no address and whose service already
+    /// exists on the capability's side.
     public let address: String?
-    /// Records an address on the host. Throws `GlassShellError` / `HostProfileError.invalidAddress`.
-    public let setAddress: @MainActor @Sendable (String) async throws -> Void
 
-    public init(address: String?, setAddress: @escaping @MainActor @Sendable (String) async throws -> Void) {
+    public init(address: String?) {
         self.address = address
-        self.setAddress = setAddress
     }
 }
 
@@ -48,6 +45,14 @@ public protocol GlassCapability: AnyObject {
     /// that stores an address per service updates every service of `host` it owns, so the user
     /// edits the machine's identity once. `address` is nil when it was cleared. Default: nothing.
     func hostAddressDidChange(host: HostProfile, address: String?)
+    /// True when opening `service` would present a setup form (the capability holds nothing for
+    /// it yet). The shell then makes sure the host has an address first, so no setup form ever
+    /// asks for one. Default: false.
+    func needsSetup(service: HostServiceLink, host: HostProfile) -> Bool
+    /// The address the capability already stores for `service`, if any — a record saved by the
+    /// source app before hosts carried an address. The shell adopts it onto the host so the
+    /// machine's identity is defined once, at the host. Default: nil.
+    func knownAddress(service: HostServiceLink, host: HostProfile) -> String?
 
     /// Settings pages the capability contributes to the one settings surface, appended after the
     /// shell's own pages. Default: none.
@@ -65,6 +70,8 @@ public extension GlassCapability {
         open(service: service, host: host, report: report)
     }
     func hostAddressDidChange(host: HostProfile, address: String?) {}
+    func needsSetup(service: HostServiceLink, host: HostProfile) -> Bool { false }
+    func knownAddress(service: HostServiceLink, host: HostProfile) -> String? { nil }
     var settingsPages: [GlassCapabilitySettingsPage] { [] }
     func libraryToolbarItems() -> AnyView { AnyView(EmptyView()) }
     func serviceDetailActions(service: HostServiceLink, host: HostProfile) -> AnyView { AnyView(EmptyView()) }
@@ -143,6 +150,20 @@ public final class GlassCapabilityRegistry {
 
 /// What the shell shows when a service's capability is not in this build.
 /// Deliberately not a session: it says exactly what is missing.
+/// The shell must collect the host's address before it can continue. `endpointID` is the service
+/// whose connect was interrupted (resumed once the address is saved), nil when the user simply
+/// asked to set the address from the host detail.
+public struct GlassShellAddressRequest: Identifiable, Sendable {
+    public let host: GlassShellHost
+    public let endpointID: EndpointID?
+    public var id: HostID { host.id }
+
+    public init(host: GlassShellHost, endpointID: EndpointID?) {
+        self.host = host
+        self.endpointID = endpointID
+    }
+}
+
 public struct GlassShellPlaceholderRequest: Identifiable, Hashable, Sendable {
     public let host: HostProfile
     public let service: HostServiceLink

@@ -66,3 +66,11 @@ platform, 3 pt canvas margin, panel roles, sandbox removal.
 Open: macOS XCUITest automation mode blocked on this Mac; macOS accessibility recursion after the
 connection-failure alert under XCTest diagnostics; widget on device and live iCloud sync unproven;
 visionOS UI suite not re-run since the TabView change; kit changes uncommitted in the sibling repo.
+
+## 2026-09-11 morning — Stage 2 functionally verified on Mac and iPhone against the real host
+
+macOS: all UI suites green with the real host (library, tag field, smoke, terminal chrome, settings
+pages, real-host connect to a live shell). iPhone: all suites green with the real host. Package
+472 tests / 28 suites. Engine real-host suite 5/5. Fourth /Applications build pending install.
+Remaining for Stage 2 close-out: visionOS UI re-run, widget on a device, live iCloud sync,
+W4's post-failure accessibility recursion, the "Set Up…" bypass of the address gate.

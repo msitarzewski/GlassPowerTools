@@ -361,3 +361,38 @@ check of the visionOS column still owed (in-test shots are 1×1; simulator shut 
 Rule 14 added. UI-test helpers attach the accessibility tree on a settings-page miss.
 **macOS XCUITest remains blocked** ("Timed out while enabling automation mode", coordinator
 confirmed twice after clearing stale processes) — user action: kickstart `testmanagerd`.
+
+**2026-09-11 ~01:20 — VM back; real-host runs:** engine suite 5/5 again; **iPhone terminal suite
+2/2 with the real host** — `testConnectsToRealHostThroughTheShell` passed end to end (host address
+entered once, terminal form read-only, key auth, live shell), settings pages pass. macOS automation
+mode recovered on its own (smoke passed); full macOS UI run with the real host in progress.
+
+**2026-09-11 ~01:45 — full macOS UI run with the real host (automation mode recovered on its own):
+10 passed / 1 failed.** Library 5/5, tag field 1/1, smoke 1/1, terminal chrome 1/1, settings pages
+1/1. `testConnectsToRealHostThroughTheShell` failed: after `host-service-connect-ssh` was clicked
+no terminal window opened within 45 s (element tree at failure: windows=1, no sheet/alert, no
+trust prompt) — consistent with W4's earlier observation that the test build hits the app's own
+**Local Network prompt** (a system dialog outside the app's tree) and the attempt fails while it is
+pending. Needs the user to click Allow once for Glass Power Tools (from the /Applications build:
+connect to 192.0.2.6, accept the prompt), then rerun the macOS terminal suite. Open polish item
+from the capture (`scratchpad/att-mac-full/B1C16699….png`): the detail's Services row actions
+(Connect / SFTP / Edit / Details / Delete) still overflow at the 900-pt minimum width — W6's
+`ViewThatFits` did not wrap; the trash button clips at the trailing edge.
+
+## W7 done — 2026-09-11 ~08:30
+
+No address field in any service setup: the shell gates a capability's setup on the host's address
+(`GlassShellAddressRequest`, "Address for <host>" prompt with Cancel/Continue; a saved service's
+address is adopted when exactly one is known; disagreements are left to the user), the terminal form
+always shows the address read-only from the shell, write-back removed. Add SSH Key is a sheet on
+every platform using the server form's pattern (Key / Private Key sections, Choose File… first,
+bounded paste area, detection footer; the separate macOS window and rule 12 are gone). Services row
+collapses capability actions into a ⋯ menu when narrow. Results: package **472 tests / 28 suites**
+(twice); **macOS UI all suites with the real host green, including the real-host connect (the
+Local Network grant is in place)**; iPhone all suites green after a rerun of two tests W7's own
+`pkill` had disturbed; new address-step test passed alone twice, flaked once under load in the full
+suite (recorded, not masked). Screenshots judged by eye: key sheet and address prompt match the
+server-form pattern. Note: launching the Release build adopted the saved terminal address onto the
+real `oscar` record (designed behaviour). Open: `GlassTerminalLibraryEntries.swift` "Set Up…" bypasses
+the shell's address gate for legacy records; the ⋯ menu's items not captured; W4's post-failure
+accessibility recursion; visionOS UI suite not re-run since W7; widget on device; live iCloud sync.

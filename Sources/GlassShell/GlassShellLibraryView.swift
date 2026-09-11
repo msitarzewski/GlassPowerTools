@@ -57,6 +57,7 @@ public struct GlassShellLibraryView: View {
         .sheet(item: $editingHost) { GlassShellHostEditor(model: model, host: $0) { _ in } }
         .sheet(item: $addingServiceTo) { GlassShellServiceEditor(model: model, host: $0) }
         .sheet(item: $model.placeholderRequest) { GlassShellPlaceholderSession(request: $0) }
+        .sheet(item: $model.addressRequest) { GlassShellAddressPrompt(model: model, request: $0) }
         .sheet(isPresented: $showSettings) {
             NavigationStack {
                 GlassShellSettingsView(model: model)
@@ -172,8 +173,12 @@ public struct GlassShellLibraryView: View {
                 } else if let address = host.address {
                     LabeledContent("Address", value: address).accessibilityIdentifier("host-detail-address")
                 } else {
-                    LabeledContent("Address") { Text("Not set").foregroundStyle(.secondary) }
-                        .accessibilityIdentifier("host-detail-address")
+                    // The button carries the row's identity: an identifier on the LabeledContent
+                    // would hide the button from the accessibility tree on macOS.
+                    LabeledContent("Address") {
+                        Button("Set Address…") { model.addressRequest = GlassShellAddressRequest(host: host, endpointID: nil) }
+                            .accessibilityIdentifier("host-detail-set-address")
+                    }
                 }
                 if !host.aliases.isEmpty { LabeledContent("Also known as", value: host.aliases.joined(separator: ", ")) }
                 if !host.tags.isEmpty { LabeledContent("Collections", value: host.tags.joined(separator: ", ")) }
@@ -199,8 +204,9 @@ public struct GlassShellLibraryView: View {
     }
 
     /// One service: its name and kind at the leading edge, Connect and the capability's actions
-    /// at the trailing edge. The actions keep their size and the name truncates first; when the
-    /// column is too narrow for one line the actions drop under the name.
+    /// at the trailing edge. The name truncates first. When the column cannot fit the actions
+    /// inline they collapse into one overflow menu beside Connect, so nothing ever clips at the
+    /// trailing edge (the 900-pt minimum window showed the trash button cut off, 2026-09-11).
     private func serviceRow(_ service: HostServiceLink, host: GlassShellHost) -> some View {
         let identity = HStack(spacing: 10) {
             Image(systemName: GlassServicePresentation.symbolName(for: service.kind))
@@ -212,25 +218,41 @@ public struct GlassShellLibraryView: View {
                     .font(.footnote).foregroundStyle(.secondary).lineLimit(1)
             }
         }
-        let actions = HStack(spacing: 8) {
-            Button("Connect") { model.connect(hostID: host.id, endpointID: service.endpointID) }
-                .buttonStyle(.bordered)
-                .accessibilityIdentifier("host-service-connect-\(service.kind.rawValue)")
-            if let owner = host.member(owning: service.endpointID) {
-                model.registry.serviceDetailActions(service: service, host: owner)
-            }
-        }
-        .fixedSize()
-        .layoutPriority(1)
+        .layoutPriority(0)
+        let connect = Button("Connect") { model.connect(hostID: host.id, endpointID: service.endpointID) }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("host-service-connect-\(service.kind.rawValue)")
+        let owner = host.member(owning: service.endpointID)
         return ViewThatFits(in: .horizontal) {
             HStack(spacing: 12) {
                 identity
                 Spacer(minLength: 8)
-                actions
+                HStack(spacing: 8) {
+                    connect
+                    if let owner { model.registry.serviceDetailActions(service: service, host: owner) }
+                }
+                .fixedSize()
+                .layoutPriority(1)
             }
-            VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
                 identity
-                HStack { Spacer(minLength: 0); actions }
+                Spacer(minLength: 8)
+                HStack(spacing: 8) {
+                    connect
+                    if let owner {
+                        Menu {
+                            model.registry.serviceDetailActions(service: service, host: owner)
+                        } label: {
+                            Label("More", systemImage: "ellipsis.circle")
+                        }
+                        .labelStyle(.iconOnly)
+                        .menuIndicator(.hidden)
+                        .fixedSize()
+                        .accessibilityIdentifier("host-service-more-\(service.kind.rawValue)")
+                    }
+                }
+                .fixedSize()
+                .layoutPriority(1)
             }
         }
     }

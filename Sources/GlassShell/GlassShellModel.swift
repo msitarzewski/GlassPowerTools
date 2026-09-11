@@ -79,6 +79,9 @@ public final class GlassShellModel {
     /// over it until `resetPreferences()` or a later successful read.
     public private(set) var preferencesReadOnly = false
     public var placeholderRequest: GlassShellPlaceholderRequest?
+    /// The shell needs the host's address before it can go on (a service setup is about to open,
+    /// or the user asked to set it). Presented by the library as `GlassShellAddressPrompt`.
+    public var addressRequest: GlassShellAddressRequest?
 
     public let storageDirectory: URL
     public private(set) var catalog: HostCatalogStore
@@ -175,6 +178,7 @@ public final class GlassShellModel {
             migratePreferencesToCanonicalHosts()
             isLoaded = true
             errorMessage = nil
+            await adoptKnownAddresses()
         } catch {
             isLoaded = true
             if hasSharedContainer, Self.isPermissionDenied(error) {
@@ -314,9 +318,9 @@ public final class GlassShellModel {
         if newAddress != host.address { notifyAddressChange(members: updatedMembers, address: newAddress) }
     }
 
-    /// Sets only the address, leaving name, aliases and tags as they are. Used by capabilities
-    /// (through `GlassCapabilityHostAccess`) when a setup form learns the address of a host that
-    /// had none, so the machine's identity is typed once.
+    /// Sets only the address, leaving name, aliases and tags as they are. Used by the address
+    /// prompt and by adoption from a capability's saved record, so the machine's identity is
+    /// defined once, at the host.
     public func setHostAddress(_ address: String?, for id: HostID) async throws {
         guard let host = host(id) else { throw GlassShellError.hostNotFound(id) }
         try await updateHost(host.id, displayName: host.displayName, address: address, aliases: host.aliases, tags: host.tags)
@@ -332,11 +336,43 @@ public final class GlassShellModel {
         }
     }
 
-    /// What a capability may do to a host while it sets a service up.
+    /// What a capability may read about a host while it sets a service up or connects.
     func hostAccess(for id: HostID) -> GlassCapabilityHostAccess {
-        GlassCapabilityHostAccess(address: host(id)?.address) { [weak self] address in
-            guard let self else { return }
-            try await self.setHostAddress(address, for: id)
+        GlassCapabilityHostAccess(address: host(id)?.address)
+    }
+
+    /// An address one of the host's capabilities already stores for a service of the host — a
+    /// record saved by the source app before hosts carried an address. Nil when none, or when
+    /// the capabilities disagree (that is for the user to settle, not for the shell to guess).
+    func knownAddress(for host: GlassShellHost) -> String? {
+        var found = Set<String>()
+        for member in host.members {
+            for service in member.services {
+                guard let capability = registry.capability(for: service.kind),
+                      let address = capability.knownAddress(service: service, host: member)?
+                        .trimmingCharacters(in: .whitespacesAndNewlines), !address.isEmpty else { continue }
+                found.insert(address.lowercased())
+            }
+        }
+        return found.count == 1 ? found.first : nil
+    }
+
+    /// Hosts that predate the address gain it from the services already saved on their
+    /// capabilities, once, so the detail never says "Not set" for a machine the terminal knows.
+    /// Runs after each load; a host whose capabilities disagree is left for the user.
+    private var isAdoptingAddresses = false
+    private func adoptKnownAddresses() async {
+        guard !isAdoptingAddresses else { return }
+        isAdoptingAddresses = true
+        defer { isAdoptingAddresses = false }
+        let candidates = hosts.filter { $0.address == nil }.compactMap { host in
+            knownAddress(for: host).map { (host.id, $0) }
+        }
+        for (id, address) in candidates {
+            do { try await setHostAddress(address, for: id) } catch {
+                // Not fatal: the host simply keeps "Not set" until the user enters it.
+                continue
+            }
         }
     }
 
@@ -427,6 +463,23 @@ public final class GlassShellModel {
         do { try persistPreferences() } catch { errorMessage = GlassShellError.message(for: error) }
         if let capability = registry.capability(for: service.kind) {
             let hostID = host.id
+            // The machine's address is defined at the host. A setup form never asks for it: when
+            // the host has none, adopt what a capability already stores, else ask on the host
+            // first and come back here once it is set.
+            if host.address == nil, capability.needsSetup(service: service, host: owner) {
+                if let known = knownAddress(for: host) {
+                    Task { [weak self] in
+                        guard let self else { return }
+                        do {
+                            try await self.setHostAddress(known, for: hostID)
+                            self.connect(hostID: hostID, endpointID: endpointID)
+                        } catch { self.errorMessage = GlassShellError.message(for: error) }
+                    }
+                } else {
+                    addressRequest = GlassShellAddressRequest(host: host, endpointID: endpointID)
+                }
+                return
+            }
             capability.open(service: service, host: owner, hostAccess: hostAccess(for: hostID)) { [weak self] outcome in
                 guard let self, case .connected = outcome else { return }
                 self.preferences[host: hostID].lastConnected = Date()

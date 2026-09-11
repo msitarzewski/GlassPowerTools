@@ -66,17 +66,6 @@ public struct GlassTerminalScenes: Scene {
             }
         }
         .defaultSize(width: 820, height: 620)
-        // The server form's "Add SSH Key" (the form is a sheet, so the key form cannot be one).
-        // `dismiss` from the root view closes the window.
-        Window("Add SSH Key", id: "terminal-add-ssh-key") {
-            GlassLayeredWindow {
-                AddSSHKeyView()
-                    .environment(settingsManager)
-                    .glassLayers(runtime.layers)
-            }
-            .glassLayers(runtime.layers)
-        }
-        .defaultSize(width: 560, height: 640)
         #if DEBUG
         WindowGroup(id: "html-preview", for: HTMLPreviewContext.self) { $context in
             if let context {
