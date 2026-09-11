@@ -82,3 +82,6 @@
   with every service icon; visionOS row fixed; three capability hooks added; 29 shell tests. W3
   wiring the terminal's pages/toolbar/actions and moving shell services; integration driving a
   real session.
+- 2026-09-11: Session paused for a terminal restart at `bf88fc9` (tree clean). Stage 2 built and
+  unit-verified (461 tests); UI green on iOS/visionOS, four macOS failures and four integration
+  defects open — listed in the active context with owners. Local Network grant still needed.

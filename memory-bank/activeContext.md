@@ -191,7 +191,71 @@ legacy-toggle warning), **integration** (`UITests/GlassTerminalUITests.swift`: r
 itself may show its own Local Network prompt on first connect — accept it; the Vision Pro
 launch (device asleep). `../docs` may be deleted; nothing in it is open.
 
+## Session handoff — 2026-09-11T00:18:24Z (terminal restart)
+
+**Tree clean at `bf88fc9`.** If `memory-bank/tasks/2026-09/2026-09-10_stage-2-w3.md` shows an
+uncommitted "Phase 3 (interrupted)" section on resume, it is W3's interim note written after this
+handoff — read it, commit it. All agents end with the session; resume work as fresh workers from
+the notes, not by resuming agents.
+
+### Where things stand
+
+- **Stage 1: complete and verified** on simulators and on the user's iPhone and Vision Pro (1.8
+  proven: existing hosts appear from the shared catalog). Exit criteria met except app icons
+  (placeholders) and the visionOS search accessibility gap (kit follow-up).
+- **Stage 2: built, unit-verified, integration partly verified.** Engine `GlassSSHTransport` (61
+  tests, security review clean). glas.sh moved in as `GlassTerminal` (348 tests). Whole package
+  **461 tests / 23 suites pass**. Builds on macOS (real profile, no override), iOS Simulator,
+  visionOS Simulator; Stage 2 build installed on both devices. UI suites on `410d0fc`: iOS 6/7,
+  visionOS 5/7 (reasoned skips), **macOS 4 failures (detail controls not hittable)**.
+  Real-host session from the iOS simulator reaches the VM through key exchange to the host-trust
+  prompt, then fails on reconnect (defect below).
+
+### Open defects, all assigned to a W3-type worker on resume (owns `Sources/GlassShell`,
+`Sources/GlassTerminal`, `UITests/`)
+
+1. **macOS UI regression:** after the Stage 2 library additions (capability toolbar items ahead
+   of Add Host, per-service actions beside Connect, `GlassLayeredPanel` wraps, `Window` scene),
+   the detail's buttons are "Not hittable" and rows aren't found under XCUITest on macOS only.
+   Trace: `scratchpad` is gone with the session — reproduce with the macOS UI suite; capture the AX
+   tree via `xcresulttool export attachments`.
+2. **macOS crash, deterministic:** `ServerFormViews.swift:427` presents `AddSSHKeyView` as a sheet
+   on the server-form sheet → AppKit accessibility recursion segfault. Present via `openWindow` or
+   popover on macOS (project rule 12); then let `UITests/GlassTerminalUITests.swift` run past the
+   key sheet on macOS.
+3. **Post-trust reconnect fails:** `TerminalConnectFlow.swift:706` → `SessionManager.reconnect` →
+   `origin(for:)` (:343-352) throws `sessionNotRegistered` (:885) because the connect-failure path
+   (:587-599) unregisters the session on the trust-challenge error; glas.sh kept it. Unit test.
+4. **`lastConnected` stamped on open, not success** (`GlassShellModel.swift:377`): add a result
+   path from `GlassCapability.open` and stamp only on connected.
+5. **Verify capability settings pages appear** (Connections/Terminal/Snippets) on the current
+   tree; they were missing at `9f58a61`, before the wiring commit `410d0fc`.
+
+### Then, to close Stage 2
+
+Run: whole package tests; UI suites on iOS, visionOS, macOS; the terminal UI test with
+`TEST_RUNNER_GPT_SSH_TEST_HOST=192.0.2.6 …_USER=michael …_KEY_PATH=$HOME/.ssh/scratch_vm` on the
+iOS simulator (reaches the VM) and macOS; the engine's gated CLI suite
+(`GPT_SSH_TEST_*`, `swift test --build-system native --filter SSHTransportIntegrationTests`) —
+**blocked until the user grants Local Network to the terminal app (was Ghostty)**; then the parity
+checklist in the Stage 2 note (SFTP, forwards, workgroups, widget on device, iCloud sync live),
+device re-install, progress/README, and commit.
+
+### Still needs the user
+
+- Local Network grant for the terminal app driving the session (System Settings → Privacy &
+  Security → Local Network). Verified blocked by `errno 65` from ad-hoc-signed binaries.
+- Report what the Stage 2 build shows on the iPhone (one row per host, two icons) and Vision Pro.
+- `../docs` may be deleted; every July finding is closed.
+
+### After Stage 2
+
+Stage 3 (database) and Stage 4 (desktop) notes are drafted and indexed; Stage 3's dependency gate
+already passes. Stage 5 (editor interface, spatial workspace, VNC-over-SSH, VNC kind) follows.
+Then the TODO/stub sweep the user asked for across all created code, with the same testing.
+
 ## Next action
 
-Lay down the package skeleton, confirm the three local packages resolve in one graph, then fan out
-Stage 1 work: project file, `GlassLayers`, `GlassShell`, app target, security review.
+On resume: read this file, the Stage 2 note, the W3, integration and consolidation notes; commit
+any interim W3 note; launch one worker for defects 1–5 with the ownership above and one read-only
+reviewer for the Stage 2 close-out; run the verification list; then Stage 3.
