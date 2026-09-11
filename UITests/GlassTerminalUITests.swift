@@ -364,12 +364,24 @@ final class GlassTerminalUITests: XCTestCase {
         #endif
         let picker = element("settings-sections")
         XCTAssertTrue(picker.waitForExistence(timeout: 10), "settings picker")
-        for title in ["Connections", "Terminal", "Snippets"] {
-            let entry = picker.buttons[title].exists ? picker.buttons[title] : picker.radioButtons[title]
-            XCTAssertTrue(entry.waitForExistence(timeout: 5), "settings page \(title) listed")
+        // visionOS renders the sections TabView as the leading ornament, exposed as a tab bar.
+        func page(_ title: String) -> XCUIElement {
+            #if os(visionOS)
+            if app.tabBars.buttons[title].waitForExistence(timeout: 2) { return app.tabBars.buttons[title] }
+            if app.buttons[title].firstMatch.waitForExistence(timeout: 2) { return app.buttons[title].firstMatch }
+            #endif
+            return picker.buttons[title].exists ? picker.buttons[title] : picker.radioButtons[title]
         }
-        let terminal = picker.buttons["Terminal"].exists ? picker.buttons["Terminal"] : picker.radioButtons["Terminal"]
-        press(terminal)
+        for title in ["Connections", "Terminal", "Snippets"] {
+            if !page(title).waitForExistence(timeout: 5) {
+                let tree = XCTAttachment(string: app.debugDescription)
+                tree.name = "accessibility-tree-settings-\(title)"
+                tree.lifetime = .keepAlways
+                add(tree)
+            }
+            XCTAssertTrue(page(title).exists, "settings page \(title) listed")
+        }
+        press(page("Terminal"))
         XCTAssertTrue(element("settings-page-terminal.terminal").waitForExistence(timeout: 10), "Terminal page renders")
         snap("00-settings-terminal-page")
         #if os(macOS)

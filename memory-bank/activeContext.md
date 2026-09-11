@@ -351,3 +351,13 @@ re-checking with the smoke test. Third /Applications build installed and launche
 **Needs the user:** bring the VM at 192.0.2.6 back; if the macOS smoke test still times out,
 run `sudo launchctl kickstart -k system/com.apple.testmanagerd` or re-grant Automation /
 Accessibility to the Xcode test runner in System Settings.
+
+**visionOS settings sections (2026-09-11 01:00):** the TabView-as-ornament attempt was invisible to
+XCUITest inside the settings sheet (tree captured, no tab bar anywhere); the kit now renders a
+leading column of vertical tabs on visionOS. Both affected visionOS tests pass
+(`testAppearanceOpacityPersistsAcrossRelaunch`, `testTerminalSettingsPagesAppearInTheShellSettings`);
+visionOS suite otherwise green apart from the reasoned skips (search; real host, VM down). Visual
+check of the visionOS column still owed (in-test shots are 1×1; simulator shut down after the run).
+Rule 14 added. UI-test helpers attach the accessibility tree on a settings-page miss.
+**macOS XCUITest remains blocked** ("Timed out while enabling automation mode", coordinator
+confirmed twice after clearing stale processes) — user action: kickstart `testmanagerd`.

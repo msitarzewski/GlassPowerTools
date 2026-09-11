@@ -35,3 +35,9 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     pass-through on Mac, iPad and iPhone, whose window already paints edge to edge). Never nest a
     painting panel inside a layered window on the Mac: it double-paints the theme, clips the
     detail's action bar into a lighter band and exposes the window corner (observed 2026-09-10).
+
+14. **No ornaments for controls inside visionOS sheets.** A `TabView`'s ornament and a hand-built
+    `.ornament` both vanish from the accessibility hierarchy when their host is a sheet on visionOS
+    (element trees captured 2026-09-11 show only the page content; no tab bar in any window).
+    Section pickers and similar controls presented in a sheet live inside the surface — the
+    settings sections use a leading column of vertical tabs there.

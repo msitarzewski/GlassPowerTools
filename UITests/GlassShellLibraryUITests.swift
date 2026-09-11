@@ -127,8 +127,21 @@ final class GlassShellLibraryUITests: XCTestCase {
 
     private func selectSettingsPage(_ title: String) {
         let picker = element("settings-sections")
+        #if os(visionOS)
+        // The sections are a TabView there; visionOS renders its tabs as the leading ornament,
+        // which XCUITest exposes as a tab bar rather than as children of the TabView element.
+        let candidates = [app.tabBars.buttons[title], picker.buttons[title], app.buttons[title].firstMatch]
+        let button = candidates.first(where: { $0.waitForExistence(timeout: 2) }) ?? candidates[0]
+        #else
         let button = picker.buttons[title].exists ? picker.buttons[title] : picker.radioButtons[title]
-        XCTAssertTrue(button.waitForExistence(timeout: 5), "settings page \(title)")
+        #endif
+        if !button.waitForExistence(timeout: 5) {
+            let tree = XCTAttachment(string: app.debugDescription)
+            tree.name = "accessibility-tree-settings-\(title)"
+            tree.lifetime = .keepAlways
+            add(tree)
+        }
+        XCTAssertTrue(button.exists, "settings page \(title)")
         press(button)
     }
 
