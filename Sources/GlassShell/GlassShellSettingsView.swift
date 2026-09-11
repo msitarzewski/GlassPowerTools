@@ -33,6 +33,10 @@ public enum GlassShellSettingsSelection: Hashable, Sendable {
 public struct GlassShellSettingsView: View {
     private let model: GlassShellModel
     @State private var page = GlassShellSettingsSelection.shell(.general)
+    @Environment(\.dismiss) private var dismiss
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
 
     public init(model: GlassShellModel) { self.model = model }
 
@@ -62,6 +66,18 @@ public struct GlassShellSettingsView: View {
                 }
             }
             .formStyle(.grouped)
+            #if os(iOS)
+            // A compact iPhone pushes each page onto the sheet's stack, and the presenter's Done
+            // button stays behind on the root. A modal must be dismissable from wherever the user
+            // is, so every pushed page carries its own Done beside the back button.
+            .toolbar {
+                if horizontalSizeClass == .compact {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { dismiss() }.accessibilityIdentifier("settings-done")
+                    }
+                }
+            }
+            #endif
         }
         .navigationTitle("Settings")
         #if os(macOS)

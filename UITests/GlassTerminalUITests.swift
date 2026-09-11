@@ -264,7 +264,12 @@ final class GlassTerminalUITests: XCTestCase {
     /// visionOS offers to save a typed password in iCloud Keychain once the sheet commits; the
     /// alert covers the app. The app keeps credentials in its own store, so answer "Not Now".
     private func dismissSystemPasswordPrompt() {
+        // Springboard only exists on the touch platforms; asking for it on macOS fails the test.
+        #if os(macOS)
+        var targets: [XCUIApplication] = []
+        #else
         var targets = [XCUIApplication(bundleIdentifier: "com.apple.springboard")]
+        #endif
         if let app { targets.append(app) }
         for target in targets {
             let notNow = target.buttons["Not Now"].firstMatch

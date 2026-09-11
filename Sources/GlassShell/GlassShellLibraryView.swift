@@ -81,9 +81,12 @@ public struct GlassShellLibraryView: View {
 
     // MARK: Row
 
+    /// The row is the host's name and its service icons: no subtitle naming or counting the
+    /// services the icons already show, and no "last connected" (that lives in the detail's Host
+    /// section). Removed family-wide 2026-09-11 at the user's direction.
     private func row(_ item: GlassLibraryItem<HostID>) -> some View {
-        GlassLibraryConnectionRow(name: item.name, subtitle: item.subtitle, isFavorite: item.isFavorite,
-                                  lastConnected: item.lastConnected, nameAccessibilityIdentifier: "host-row-\(item.name)") {
+        GlassLibraryConnectionRow(name: item.name, isFavorite: item.isFavorite,
+                                  nameAccessibilityIdentifier: "host-row-\(item.name)") {
             // The spatial sidebar is narrow: an icon-only Connect (press and hold still opens the
             // picker) and the service icons in one row, so nothing wraps. Wide rows keep the label.
             #if os(visionOS)
@@ -110,13 +113,14 @@ public struct GlassShellLibraryView: View {
             Button("Edit") { if let host = model.host(item.id) { setupMode = .editHost(host) } }
             Button(item.isFavorite ? "Remove Favorite" : "Add Favorite") { model.toggleFavorite(item.id) }
             Button("Delete", role: .destructive) { deleting = model.host(item.id) }
+                .accessibilityIdentifier("host-delete")
         }
     }
 
     private func serviceIcons(for id: HostID) -> some View {
         HStack(spacing: 4) {
             ForEach(model.serviceKinds(for: id), id: \.self) { kind in
-                Image(systemName: GlassServicePresentation.symbolName(for: kind))
+                GlassServiceIcon(GlassServicePresentation.symbol(for: kind))
                     .foregroundStyle(.secondary)
                     .accessibilityLabel(GlassServicePresentation.displayName(for: kind))
                     .accessibilityIdentifier("host-service-\(kind.rawValue)")
@@ -187,10 +191,11 @@ public struct GlassShellLibraryView: View {
                 Section { Text(model.hostLibraryStatus).font(.footnote).foregroundStyle(.secondary) }
             }
         }, actions: {
+            // Removing a machine is deliberate, not one slip beside Connect: it lives in the
+            // row's context menu and at the bottom of the edit sheet (2026-09-11).
             HStack {
                 GlassShellConnectControl(model: model, hostID: host.id, prominent: true)
                 Button("Edit") { setupMode = .editHost(host) }.accessibilityIdentifier("host-edit")
-                Button("Delete", role: .destructive) { deleting = host }.accessibilityIdentifier("host-delete")
             }.buttonStyle(.bordered).controlSize(.large)
         })
     }
@@ -201,7 +206,7 @@ public struct GlassShellLibraryView: View {
     /// trailing edge (the 900-pt minimum window showed the trash button cut off, 2026-09-11).
     private func serviceRow(_ service: HostServiceLink, host: GlassShellHost) -> some View {
         let identity = HStack(spacing: 10) {
-            Image(systemName: GlassServicePresentation.symbolName(for: service.kind))
+            GlassServiceIcon(GlassServicePresentation.symbol(for: service.kind))
                 .foregroundStyle(.secondary)
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 2) {
@@ -292,13 +297,15 @@ public struct GlassShellLibraryView: View {
     }
 }
 
-/// Connect plus the service picker: a chevron menu beside the button on Mac,
-/// press-and-hold on touch. A host with one service is a plain Connect.
+/// A split control, never a word: the play glyph opens **every** service on the host, and the
+/// chevron beside it opens one. The chevron is its own hit region on every platform, because a
+/// press-and-hold menu is not discoverable and cannot be pinched on visionOS. A host with a
+/// single service is a plain play button with no chevron.
 public struct GlassShellConnectControl: View {
     private let model: GlassShellModel
     private let hostID: HostID
     private let prominent: Bool
-    /// Icon-only, single line, for narrow rows; the picker still opens on press-and-hold.
+    /// Smaller metrics for narrow rows, such as the spatial sidebar.
     private let compact: Bool
 
     public init(model: GlassShellModel, hostID: HostID, prominent: Bool = false, compact: Bool = false) {
@@ -314,47 +321,80 @@ public struct GlassShellConnectControl: View {
         if services.isEmpty {
             EmptyView()
         } else if services.count == 1 {
-            connectButton
-        } else {
-            #if os(macOS)
-            HStack(spacing: 0) {
-                connectButton
-                Menu { serviceButtons } label: { Image(systemName: "chevron.down") }
-                    .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-                    .accessibilityLabel("Choose a service")
-                    .accessibilityIdentifier("host-connect-menu")
-            }
-            #else
-            connectButton
-                .contextMenu { serviceButtons }
-                .accessibilityHint("Touch and hold to choose a service")
-            #endif
-        }
-    }
-
-    @ViewBuilder private var connectButton: some View {
-        if compact {
-            Button("Connect", systemImage: "play.fill") { model.connect(hostID: hostID) }
+            Button("Connect", systemImage: "play.fill") { model.connectAll(hostID: hostID) }
                 .labelStyle(.iconOnly)
                 .buttonStyle(.borderedProminent)
-                .controlSize(.small)
+                .controlSize(prominent ? .large : .small)
                 .fixedSize()
                 .accessibilityLabel("Connect")
                 .accessibilityIdentifier("host-connect")
         } else {
-            Button("Connect", systemImage: "play.fill") { model.connect(hostID: hostID) }
-                .lineLimit(1)
-                .fixedSize()
-                .buttonStyle(.borderedProminent)
-                .controlSize(prominent ? .large : .small)
-                .accessibilityIdentifier("host-connect")
+            splitControl
         }
+    }
+
+    /// SwiftUI has no native split button (`Menu(primaryAction:)` only opens its menu on a long
+    /// press off macOS), so the two halves are drawn in one accent capsule with a hairline
+    /// between them — the platform's own split-button idiom.
+    private var splitControl: some View {
+        HStack(spacing: 0) {
+            Button { model.connectAll(hostID: hostID) } label: {
+                Image(systemName: "play.fill")
+                    .padding(.horizontal, metrics.playPadding)
+                    .padding(.vertical, metrics.verticalPadding)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Connect all services")
+            .accessibilityIdentifier("host-connect")
+
+            Rectangle()
+                .fill(.white.opacity(0.35))
+                .frame(width: 1)
+                .accessibilityHidden(true)
+
+            Menu { serviceButtons } label: {
+                Image(systemName: "chevron.down")
+                    .padding(.horizontal, metrics.chevronPadding)
+                    .padding(.vertical, metrics.verticalPadding)
+                    .contentShape(Rectangle())
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .accessibilityLabel("Choose a service")
+            .accessibilityIdentifier("host-connect-menu")
+        }
+        .font(metrics.font)
+        .fixedSize()
+        .foregroundStyle(.white)
+        .background(Color.accentColor, in: Capsule())
+        .accessibilityElement(children: .contain)
+    }
+
+    private var metrics: Metrics {
+        if prominent { return Metrics(playPadding: 16, chevronPadding: 11, verticalPadding: 9, font: .body) }
+        if compact { return Metrics(playPadding: 9, chevronPadding: 6, verticalPadding: 4, font: .caption) }
+        return Metrics(playPadding: 11, chevronPadding: 8, verticalPadding: 5, font: .callout)
+    }
+
+    private struct Metrics {
+        let playPadding: CGFloat
+        let chevronPadding: CGFloat
+        let verticalPadding: CGFloat
+        let font: Font
     }
 
     @ViewBuilder private var serviceButtons: some View {
         ForEach(services) { service in
-            Button(service.displayName, systemImage: GlassServicePresentation.symbolName(for: service.kind)) {
+            Button {
                 model.connect(hostID: hostID, endpointID: service.endpointID)
+            } label: {
+                Label {
+                    Text(service.displayName)
+                } icon: {
+                    GlassServiceIcon(GlassServicePresentation.symbol(for: service.kind))
+                }
             }
             .accessibilityIdentifier("host-connect-menu-\(service.kind.rawValue)")
         }

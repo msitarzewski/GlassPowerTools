@@ -1,5 +1,6 @@
 import SwiftUI
 import GlassConnectionKit
+import GlassConnectionUI
 
 /// How a capability's `open` ended, reported back to the shell once, at the first terminal
 /// state. Only `.connected` counts as a connection: the shell stamps "last connected" on it and
@@ -172,11 +173,13 @@ public struct GlassCapabilitySettingsPage: Identifiable, Sendable {
 /// Presentation symbols for service kinds, used by the row accessory, the
 /// picker and the placeholder. One place so no capability invents its own.
 public enum GlassServicePresentation {
-    public static func symbolName(for kind: HostServiceKind) -> String {
+    /// Terminal and desktop are SF Symbols; the database is Heroicons' `circle-stack`, vendored
+    /// in the kit (`GlassServiceIcon`). Draw these with `GlassServiceIcon`, not `Image(systemName:)`.
+    public static func symbol(for kind: HostServiceKind) -> GlassServiceSymbol {
         switch kind {
-        case .ssh: "terminal"
-        case .database: "externaldrive"
-        case .rdp: "display"
+        case .ssh: .system("terminal")
+        case .database: .circleStack
+        case .rdp: .system("display")
         }
     }
 

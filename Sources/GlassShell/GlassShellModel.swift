@@ -454,16 +454,34 @@ public final class GlassShellModel {
 
     public func connect(hostID: HostID, endpointID: EndpointID) {
         guard let host = host(hostID) else { errorMessage = GlassShellError.hostNotFound(hostID).localizedDescription; return }
-        guard let service = host.services.first(where: { $0.endpointID == endpointID }),
-              let owner = host.member(owning: endpointID) else {
+        guard host.services.contains(where: { $0.endpointID == endpointID }) else {
             errorMessage = GlassShellError.serviceNotFound(endpointID).localizedDescription; return
         }
         // The user chose this service, so remember it either way; but "last connected" is only
         // true when a capability reports a live session. A failed attempt and a cancelled prompt
-        // connect nothing. The capability receives the record that owns the endpoint — its
-        // endpoint id is what the capability's own store is keyed by.
+        // connect nothing.
         preferences[host: host.id].lastUsedEndpointID = endpointID
         do { try persistPreferences() } catch { errorMessage = GlassShellError.message(for: error) }
+        open(endpointID, on: host)
+    }
+
+    /// Every service on the host, in the order the host lists them. This is what the library
+    /// row's play button does: the machine has three services, the user wants the machine.
+    /// It records no "last used" service, because the user picked the host, not one service.
+    /// A kind with no capability in this build reports itself and the rest still open.
+    public func connectAll(hostID: HostID) {
+        guard let host = host(hostID) else { errorMessage = GlassShellError.hostNotFound(hostID).localizedDescription; return }
+        guard !host.services.isEmpty else { return }
+        for service in host.services { open(service.endpointID, on: host) }
+    }
+
+    /// Hands one service to its capability. The capability receives the record that owns the
+    /// endpoint — its endpoint id is what the capability's own store is keyed by.
+    private func open(_ endpointID: EndpointID, on host: GlassShellHost) {
+        guard let service = host.services.first(where: { $0.endpointID == endpointID }),
+              let owner = host.member(owning: endpointID) else {
+            errorMessage = GlassShellError.serviceNotFound(endpointID).localizedDescription; return
+        }
         // A kind no capability in this build owns cannot be connected: say so and connect nothing.
         guard let capability = registry.capability(for: service.kind) else {
             errorMessage = Self.unavailableMessage(for: service.kind)

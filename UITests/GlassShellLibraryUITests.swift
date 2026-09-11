@@ -121,7 +121,12 @@ final class GlassShellLibraryUITests: XCTestCase {
     /// alert covers the app and every later assertion fails. The app keeps credentials in its own
     /// store, so the answer is always "Not Now" (observed on the visionOS simulator, 2026-09-11).
     private func dismissSystemPasswordPrompt() {
+        // Springboard only exists on the touch platforms; asking for it on macOS fails the test.
+        #if os(macOS)
+        var targets: [XCUIApplication] = []
+        #else
         var targets = [XCUIApplication(bundleIdentifier: "com.apple.springboard")]
+        #endif
         if let app { targets.append(app) }
         for target in targets {
             let notNow = target.buttons["Not Now"].firstMatch
@@ -265,6 +270,26 @@ final class GlassShellLibraryUITests: XCTestCase {
         snap("06-favorites-scope")
     }
 
+    /// Deleting a machine is deliberate: it is not beside Connect in the detail's action bar, it
+    /// is at the bottom of the sheet that edits the host (and in the row's context menu).
+    func testDeleteHostLivesInTheEditSheetNotTheActionBar() {
+        addHost(named: "Doomed Host")
+        openDetail(of: "Doomed Host")
+        XCTAssertTrue(element("host-edit").waitForExistence(timeout: 10), "Edit stays in the action bar")
+        XCTAssertFalse(element("host-delete").exists, "Delete is not one slip away from Connect")
+
+        tap("host-edit")
+        XCTAssertTrue(element("host-editor-name").waitForExistence(timeout: 10), "the edit sheet")
+        let delete = reveal("host-editor-delete")
+        XCTAssertTrue(delete.exists, "the edit sheet is where a host is removed")
+        snap("11-delete-in-edit-sheet")
+        press(delete)
+        let confirm = element("host-delete-confirm")
+        XCTAssertTrue(confirm.waitForExistence(timeout: 10), "removal is confirmed")
+        press(confirm)
+        XCTAssertTrue(element("host-row-Doomed Host").waitForNonExistence(timeout: 15), "the host is gone")
+    }
+
     func testSearchFiltersRows() throws {
         addHost(named: "Searchable Host")
         #if os(iOS)
@@ -378,5 +403,41 @@ final class GlassShellLibraryUITests: XCTestCase {
         XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "host-service-rdp").count, 2)
         #endif
         snap("09-consolidated-hosts")
+    }
+
+    /// The row's control carries no words: a play glyph that opens every service, and its own
+    /// chevron that picks one. The chevron is a hit region on every platform, not a long press.
+    func testRowConnectControlIsSplitAndCarriesNoLabel() {
+        app.terminate()
+        runID = UUID()
+        app = launch(extraArguments: ["--ui-testing-seed-hosts", "oscar@10.9.8.7:rdp+ssh+database"])
+        enterAllConnections()
+        let row = element("host-row-oscar")
+        XCTAssertTrue(row.waitForExistence(timeout: 15), "oscar row")
+
+        // The row no longer dates the last connection or names/counts the services; the icons do
+        // that. "Connect" survives only as the play button's accessibility label, which VoiceOver
+        // needs — what must be gone is the visible word.
+        for banned in ["Never", "3 services", "Desktop · Terminal"] {
+            XCTAssertFalse(row.label.contains(banned), "row still shows \(banned): \(row.label)")
+        }
+        XCTAssertFalse(app.staticTexts["Connect"].exists, "the control is a glyph, not a word")
+        snap("10a-row-icons-and-split-control")
+
+        // The chevron is exercised from the detail: on macOS the kit row combines its children
+        // into one element, so controls inside a row are not addressable there.
+        press(row)
+        let chevron = element("host-connect-menu")
+        XCTAssertTrue(chevron.waitForExistence(timeout: 10), "the chevron is its own control")
+        XCTAssertTrue(chevron.isHittable, "and a real hit region, not a long press")
+        press(chevron)
+        let terminalItem = element("host-connect-menu-ssh")
+        XCTAssertTrue(terminalItem.waitForExistence(timeout: 10), "the menu lists each service")
+        snap("10-row-connect-menu")
+        press(terminalItem)
+        // The terminal capability owns .ssh, so choosing it opens a terminal rather than the
+        // shell's "not part of this build" message that .rdp would raise.
+        XCTAssertFalse(app.staticTexts["Desktop is not part of this build yet. Nothing was connected."].exists,
+                       "the chosen service connected, not another one")
     }
 }

@@ -91,3 +91,9 @@ optional ones under an Advanced disclosure; the tab label marks enabled services
 nothing. The same sheet serves Add Host, Add a service (tab preselected, host fields read-only)
 and Edit service. Aliases and collections sit under a disclosure. Apple HIG patterns throughout
 (rule 15).
+
+**Refined 2026-09-11 (user): the library row.** No "Connect" text, no last-connected value, no
+services-count subtitle on any platform — the service icons already say how many there are. The
+connect control is one button with two regions: the play glyph connects **every** service on the
+host; the chevron picks a single service (tap, click or pinch, not hover-only). The database icon
+is Heroicons `circle-stack`; terminal and desktop keep their SF Symbols. Applies family-wide.

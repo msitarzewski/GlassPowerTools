@@ -112,6 +112,13 @@ public final class GlassShellSetupModel {
         return true
     }
 
+    /// The host this sheet edits, when it is the machine itself being edited. Only that mode
+    /// offers to delete it: adding, or editing one service, is not where a machine is removed.
+    public var editedHost: GlassShellHost? {
+        if case .editHost(let host) = mode { return host }
+        return nil
+    }
+
     public var showsOrganizeSection: Bool {
         switch mode {
         case .addHost, .editHost: true
@@ -314,6 +321,7 @@ public struct GlassShellHostSetupSheet: View {
     private let onSaved: (HostID) -> Void
     @FocusState private var focusedHostField: GlassShellSetupModel.HostField?
     @State private var organizeExpanded = false
+    @State private var confirmingDelete = false
     @Environment(\.dismiss) private var dismiss
 
     public init(model: GlassShellModel, mode: GlassShellSetupMode, onSaved: @escaping (HostID) -> Void = { _ in }) {
@@ -328,6 +336,7 @@ public struct GlassShellHostSetupSheet: View {
                 machineSection
                 if setup.showsServiceTabs { servicesSection }
                 if setup.showsOrganizeSection { organizeSection }
+                if let host = setup.editedHost { deleteSection(host) }
                 if let error = setup.error {
                     Section { Text(error).foregroundStyle(.red).accessibilityIdentifier("host-editor-error") }
                 }
@@ -470,6 +479,34 @@ public struct GlassShellHostSetupSheet: View {
                 }
                 .disclosureGroupStyle(GlassFormDisclosureStyle())
             }
+        }
+    }
+
+    // MARK: Delete
+
+    /// Removing a machine is deliberate: it sits at the bottom of the sheet that edits it, behind
+    /// a confirmation, rather than beside Connect in the detail's action bar. The library row's
+    /// context menu is the other way to reach it.
+    private func deleteSection(_ host: GlassShellHost) -> some View {
+        Section {
+            Button("Delete Host…", role: .destructive) { confirmingDelete = true }
+                .accessibilityIdentifier("host-editor-delete")
+        } footer: {
+            Text(host.services.isEmpty
+                 ? "Removes \(host.displayName) from the shared library. Credentials are not touched."
+                 : "Removes \(host.displayName) and its \(host.services.count) service link\(host.services.count == 1 ? "" : "s") from the shared library. Credentials are not touched.")
+        }
+        .alert("Delete Host?", isPresented: $confirmingDelete) {
+            Button("Delete", role: .destructive) {
+                Task {
+                    do { try await model.deleteHost(host.id) } catch { model.errorMessage = GlassShellError.message(for: error) }
+                    dismiss()
+                }
+            }
+            .accessibilityIdentifier("host-delete-confirm")
+            Button("Cancel", role: .cancel) { confirmingDelete = false }
+        } message: {
+            Text("This cannot be undone.")
         }
     }
 

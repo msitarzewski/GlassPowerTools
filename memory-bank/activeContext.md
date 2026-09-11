@@ -446,3 +446,38 @@ test passed on visionOS before the nested-sheet change and passes on macOS and i
 previous app in derived data, so an install step gated only on the log's exit line can silently
 ship the old binary — check `CFBundleShortVersionString` after every install (this happened once,
 caused by `navigationBarTitleDisplayMode` being iOS-only in the kit's new compact settings list).
+
+**Preview builds 0.2.46 (2026-09-11 ~13:00):** built from W9's in-progress working tree (compiles;
+macOS UI green on W9's runs, iPhone had one failing settings-pages test at the time, visionOS not
+yet run). Installed and version-verified on the Mac (`/Applications`, launched), iPhone (launched)
+and Vision Pro. Coordinator's own capture of the Mac window confirms W9's row work by eye: no
+"Connect" text, no last-connected, no services subtitle, merged play+chevron control, circle-stack
+database icon, and the detail action bar now spans the full width with its material.
+
+## W9 done — 2026-09-11 afternoon (committed)
+
+Library row: name + service icons + one split control, no words — play runs `connectAll` (every
+service; records no "last used" because the machine was chosen), chevron is its own hit region on
+all three platforms and picks one. `lastConnected` removed from the kit row API; no subtitle.
+Delete left the detail action bar for the row's context menu and a destructive "Delete Host…"
+section in the edit sheet (`.editHost` only). Detail action bar spans full width with a divider,
+matching the sheets. **Database icon is the genuine Heroicons `circle-stack`**: vendored at
+`../GlassConnectionKit/Vendor/heroicons/{circle-stack.svg,LICENSE}` (MIT, Tailwind Labs) and
+translated one-for-one into `HeroiconCircleStack`.
+
+Results: kit 53 tests, package **485 / 30 suites**, builds on all three platforms, **macOS UI 14/14
+with the real host**, **iPhone 13/13**, visionOS 11 passed / 1 skipped / 1 failed (the pre-existing
+XCUITest scene-ID simulator fault on the real-host test).
+
+Two regressions W9 found and fixed: `dismissSystemPasswordPrompt()` asked for `com.apple.springboard`,
+which does not exist on macOS and failed five macOS tests; and the compact settings `pushList` left
+the presenter's Done on the root, so a pushed page could not be dismissed on iPhone (the settings
+view now carries its own Done on compact iOS).
+
+**Sibling call sites broken by dropping `lastConnected:` (not edited, user's call):**
+`../glassdb/glassdb/ConnectionManagerView.swift:756-760`,
+`../glassDT/Sources/GlassDesktopUI/DesktopLibraryView.swift:48-49`,
+`../glas.sh/glas.sh/ConnectionManagerView.swift:3385-3387`.
+
+**Run trap:** macOS UI runs must reuse `scratchpad/dd-uitest` — a fresh derived-data path produces a
+binary without the Local Network grant, and the real-host test then fails as if the VM were down.

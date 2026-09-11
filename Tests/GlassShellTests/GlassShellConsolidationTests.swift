@@ -237,6 +237,48 @@ struct GlassShellConsolidationTests {
         #expect(Set(stored.first?.aliases ?? []) == ["10.0.0.5", "juliet.local"])
         #expect(model.hosts.count == 1 && model.records.count == 1)
     }
+
+    @Test("The play button opens every service on the host, in order, and remembers no single one")
+    func connectAllOpensEveryService() async throws {
+        let (model, root, sibling) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let older = try record("juliet", kinds: [.ssh], createdAt: t0)
+        let newer = try record("juliet", kinds: [.rdp], createdAt: t0.addingTimeInterval(1))
+        try await sibling.upsert(older); try await sibling.upsert(newer)
+        let terminal = RecordingCapability(kind: .ssh)
+        let desktop = RecordingCapability(kind: .rdp)
+        model.registry.register(terminal); model.registry.register(desktop)
+        await model.load()
+        let host = try #require(model.hosts.first)
+
+        model.connectAll(hostID: host.id)
+
+        let opened = terminal.opened.map(\.0.endpointID) + desktop.opened.map(\.0.endpointID)
+        #expect(Set(opened) == Set(host.services.map(\.endpointID)), "every service was opened")
+        #expect(terminal.opened.first?.1.id == older.id, "each capability gets the record owning its endpoint")
+        #expect(desktop.opened.first?.1.id == newer.id)
+        #expect(model.lastUsedService(for: host.id) == nil, "connecting the machine chooses no one service")
+
+        terminal.pendingReport?(.connected)
+        #expect(model.lastConnected(host.id) != nil, "a reported session still stamps the host")
+    }
+
+    @Test("Connecting every service reports the kinds this build cannot open and still opens the rest")
+    func connectAllReportsUnavailableKinds() async throws {
+        let (model, root, sibling) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let host = try record("juliet", kinds: [.ssh, .database], createdAt: t0)
+        try await sibling.upsert(host)
+        let terminal = RecordingCapability(kind: .ssh)
+        model.registry.register(terminal)      // no database capability in this build
+        await model.load()
+        let grouped = try #require(model.hosts.first)
+
+        model.connectAll(hostID: grouped.id)
+
+        #expect(terminal.opened.count == 1, "the kind with a capability still opened")
+        #expect(model.errorMessage?.contains("Database") == true, "and the one without says so")
+    }
 }
 
 @MainActor
