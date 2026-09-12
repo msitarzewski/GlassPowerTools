@@ -45,8 +45,8 @@ struct GlassShellModelTests {
         try await sibling.upsert(try HostProfile(displayName: "Alpha", services: [link]))
         await model.load()
         #expect(model.hasSharedContainer)
-        #expect(model.hosts.map(\.displayName) == ["Alpha"])
-        #expect(model.serviceKinds(for: model.hosts[0].id) == [.ssh])
+        #expect(model.catalogHosts.map(\.displayName) == ["Alpha"])
+        #expect(model.serviceKinds(for: model.catalogHosts[0].id) == [.ssh])
         #expect(model.catalogFileURL.path.hasSuffix("group/GlassHostCatalog/hosts.json"))
     }
 
@@ -56,7 +56,7 @@ struct GlassShellModelTests {
         defer { try? FileManager.default.removeItem(at: root) }
         _ = try await model.addHost(displayName: "Zed", tags: ["Prod"])
         _ = try await model.addHost(displayName: "Alpha", tags: ["prod", "Lab"])
-        let first = model.items, second = model.items
+        let first = model.catalogItems, second = model.catalogItems
         #expect(first.map(\.id) == second.map(\.id))
         #expect(first.map(\.sortKeys) == second.map(\.sortKeys))
         #expect(first.map(\.name) == ["Alpha", "Zed"])
@@ -78,7 +78,7 @@ struct GlassShellModelTests {
                                                  resolveSharedContainer: false, layers: GlassLayerStore()), root)
         await reloaded.load()
         #expect(reloaded.services(for: host.id).map(\.displayName) == ["Postgres"])
-        #expect(reloaded.items.first?.subtitle == "Database")
+        #expect(reloaded.catalogItems.first?.subtitle == "Database")
         try await reloaded.removeService(link.endpointID, from: host.id)
         #expect(reloaded.services(for: host.id).isEmpty)
     }
@@ -133,7 +133,7 @@ struct GlassShellModelTests {
                                     resolveSharedContainer: false, layers: GlassLayerStore())
         await again.load()
         #expect(again.isFavorite(host.id))
-        #expect(again.items.first?.isFavorite == true)
+        #expect(again.catalogItems.first?.isFavorite == true)
         #expect(again.lastUsedService(for: host.id) != nil)
         #expect(again.writerID == writer)
         #expect(again.preferencesProblem == nil)
@@ -161,7 +161,7 @@ struct GlassShellModelTests {
         #expect(model.hostLibraryStatus.contains("group.sh.glas.shared"))
         #expect(model.catalogFileURL.path.hasPrefix(root.appendingPathComponent("app").path))
         _ = try await model.addHost(displayName: "Local")
-        #expect(model.hosts.count == 1)
+        #expect(model.catalogHosts.count == 1)
     }
 
     @Test("Deleting a host tombstones it and clears its preferences")
@@ -171,7 +171,7 @@ struct GlassShellModelTests {
         let host = try await model.addHost(displayName: "Gone")
         model.toggleFavorite(host.id)
         try await model.deleteHost(host.id)
-        #expect(model.hosts.isEmpty)
+        #expect(model.catalogHosts.isEmpty)
         #expect(!model.isFavorite(host.id))
         let all = try await model.catalog.snapshot(includeDeleted: true)
         #expect(all.first?.deletedAt != nil)

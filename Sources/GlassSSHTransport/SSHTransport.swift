@@ -395,6 +395,43 @@ public actor SSHTransport {
         )
     }
 
+    /// The same channel, wrapped **inside the channel initializer** rather than after the open
+    /// returns.
+    ///
+    /// This matters for any protocol whose server speaks first. MySQL sends its greeting the
+    /// moment the forwarded connection is accepted, and the SSH server can deliver that data in
+    /// the same read as the channel-open confirmation — before a wrap performed afterwards has
+    /// installed anything to consume it. The greeting is then dropped at the end of an empty
+    /// pipeline, the client waits for a handshake it will never see, and the server gives up at
+    /// its own `connect_timeout` with "Got timeout reading communication packets". PostgreSQL,
+    /// where the client speaks first, never reproduces it — which is exactly how this hid.
+    ///
+    /// Wrapping in the initializer means the `NIOAsyncChannel` exists before the channel is ever
+    /// active, so no inbound byte can arrive unclaimed.
+    func openDirectAsyncChannel(toHost host: String, port: Int) async throws -> NIOAsyncChannel<ByteBuffer, ByteBuffer> {
+        guard let client, client.isConnected else { throw SSHTransportError.notConnected }
+        let wrapped = OSAllocatedUnfairLock<Result<NIOAsyncChannel<ByteBuffer, ByteBuffer>, any Error>?>(initialState: nil)
+        _ = try await client.createDirectTCPIPChannel(
+            using: .init(targetHost: host, targetPort: port, originatorAddress: try .init(ipAddress: "127.0.0.1", port: 0)),
+            initialize: { channel in
+                do {
+                    let async = try NIOAsyncChannel<ByteBuffer, ByteBuffer>(wrappingChannelSynchronously: channel)
+                    wrapped.withLock { $0 = .success(async) }
+                    return channel.eventLoop.makeSucceededVoidFuture()
+                } catch {
+                    wrapped.withLock { $0 = .failure(error) }
+                    return channel.eventLoop.makeFailedFuture(error)
+                }
+            }
+        )
+        // The initializer runs as part of the open, so this is populated by the time it returns.
+        switch wrapped.withLock({ $0 }) {
+        case .success(let channel): return channel
+        case .failure(let error): throw error
+        case nil: throw SSHTransportError.notConnected
+        }
+    }
+
     /// A local (`-L`) forward: 127.0.0.1:`localPort` (0 for any free port) → `host:port` through
     /// the server. The database and desktop capabilities connect to `tunnel.localPort`.
     public func forward(localPort: Int = 0, toHost host: String, port: Int) async throws -> SSHTunnel {
@@ -432,6 +469,9 @@ public actor SSHTransport {
         let transport: SSHTransport
         func openDirectChannel(toHost host: String, port: Int) async throws -> any Channel {
             try await transport.openDirectChannel(toHost: host, port: port)
+        }
+        func openDirectAsyncChannel(toHost host: String, port: Int) async throws -> NIOAsyncChannel<ByteBuffer, ByteBuffer> {
+            try await transport.openDirectAsyncChannel(toHost: host, port: port)
         }
     }
 }

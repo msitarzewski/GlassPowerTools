@@ -90,7 +90,9 @@ public struct GlassShellSettingsView: View {
             LabeledContent("Sharing", value: model.hasSharedContainer ? "Shared with the Glass family" : "This app only")
             Text(model.hostLibraryStatus).font(.footnote).foregroundStyle(.secondary)
             LabeledContent("Hosts", value: model.hosts.count, format: .number)
-            if model.records.count != model.hosts.count {
+            // Counted against the catalog's own hosts: this device is not one of its records
+            // and would otherwise make the two numbers differ on every launch.
+            if model.records.count != model.catalogHosts.count {
                 // Diagnostics only: the family apps each published their own record per machine.
                 LabeledContent("Catalog records", value: model.records.count, format: .number)
                 Text("Records that describe the same machine are shown as one host. They are combined here, not rewritten in the shared library.")
@@ -98,6 +100,14 @@ public struct GlassShellSettingsView: View {
             }
             if let problem = model.preferencesProblem {
                 Text(problem).font(.footnote).foregroundStyle(.orange)
+            }
+            // The device's own host is kept out of the shared file on purpose (D8), so its state
+            // is reported separately — including when it could not be created at all.
+            if let problem = model.localHostProblem {
+                Text(problem).font(.footnote).foregroundStyle(.orange)
+                    .accessibilityIdentifier("settings-local-host-problem")
+            } else {
+                LabeledContent("This device", value: "Kept in this app only, never shared")
             }
         }
     }

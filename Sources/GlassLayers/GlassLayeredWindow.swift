@@ -152,10 +152,11 @@ public enum GlassLayerResolution {
     /// Transparency still wins, because an opaque window is an accessibility promise.
     public static func resolve(_ state: GlassLayerState, reduceTransparency: Bool, paintsTheme: Bool) -> GlassLayerState {
         if reduceTransparency {
-            return GlassLayerState(opacity: 1, frost: 1, material: state.material, paintsTheme: true)
+            return GlassLayerState(opacity: 1, frost: 1, material: state.material)
         }
         guard paintsTheme else {
-            return GlassLayerState(opacity: state.opacity, frost: state.frost, material: state.material, paintsTheme: false)
+            // The surface paints its own theme colour, so the layer paints none.
+            return GlassLayerState(opacity: 0, frost: state.frost, material: state.material)
         }
         return state
     }

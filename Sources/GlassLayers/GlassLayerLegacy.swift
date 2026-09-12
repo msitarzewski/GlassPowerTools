@@ -69,21 +69,21 @@ enum GlassLayerLegacy {
         let frost = suite.object(forKey: GlasSH.blurBackground).map(blurValue) ?? 1
         let materialRaw = suite.string(forKey: GlasSH.glassFrost) ?? suite.string(forKey: GlasSH.glassMaterialStyle)
         let material = materialRaw.flatMap(GlassLayerMaterial.init(rawValue:)) ?? .ultraThin
-        return GlassLayerState(opacity: opacity, frost: frost, material: material, paintsTheme: opacity > 0)
+        return GlassLayerState(opacity: opacity, frost: frost, material: material)
     }
 
     static func glassdb(in suite: UserDefaults) -> GlassLayerState? {
         guard Glassdb.keys.contains(where: { suite.object(forKey: $0) != nil }) else { return nil }
         let opacity = suite.object(forKey: Glassdb.windowOpacity).flatMap(numericUnit) ?? 0.95
         let frost = suite.object(forKey: Glassdb.blurBackground).map(blurValue) ?? 1
-        return GlassLayerState(opacity: opacity, frost: frost, material: .ultraThin, paintsTheme: opacity > 0)
+        return GlassLayerState(opacity: opacity, frost: frost, material: .ultraThin)
     }
 
     static func glassDT(in suite: UserDefaults) -> GlassLayerState? {
         guard GlassDT.keys.contains(where: { suite.object(forKey: $0) != nil }) else { return nil }
         let opacity = suite.object(forKey: GlassDT.opacity).flatMap(numericUnit) ?? 1
         let frost = suite.object(forKey: GlassDT.frost).flatMap(numericUnit) ?? 0.25
-        return GlassLayerState(opacity: opacity, frost: frost, material: .ultraThin, paintsTheme: opacity > 0)
+        return GlassLayerState(opacity: opacity, frost: frost, material: .ultraThin)
     }
 
     /// The original blur setting was a Boolean toggle; later builds store a slider value.

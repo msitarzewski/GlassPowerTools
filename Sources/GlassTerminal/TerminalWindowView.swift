@@ -628,11 +628,6 @@ struct TerminalWindowView: View {
             .padding(.vertical, terminalCanvasPadding)
         }
         .clipShape(RoundedRectangle(cornerRadius: terminalCanvasCornerRadius, style: .continuous))
-        #if os(macOS)
-        // The rounded canvas floats inside a small margin of window glass instead of sitting
-        // flush against the sidebar divider and the window edges; the top stays under the toolbar.
-        .padding([.leading, .bottom, .trailing], TerminalCanvasMetrics.macOuterMargin)
-        #endif
         .contentShape(.rect)
         .onTapGesture {
             if terminalCanOwnFocus {
@@ -815,7 +810,9 @@ struct TerminalWindowView: View {
 
     private var terminalCanvasCornerRadius: CGFloat {
         #if os(macOS)
-        showsMacPaneChrome ? TerminalCanvasMetrics.macCornerRadius : 0
+        // Square. The window already has Apple's rounded glass edge and clips to it, so a second
+        // rounded rectangle inset inside it reads as an extra border rather than as the canvas.
+        0
         #elseif os(iOS)
         UIDevice.current.userInterfaceIdiom == .phone ? 0 : 18
         #else
@@ -1183,7 +1180,7 @@ struct TerminalWindowView: View {
             ToolbarItemGroup(placement: .primaryAction) {
                 bottomStatusBarContents(compact: true)
             }
-            .macKeepVisibleWhenCompact()
+            .glassKeepVisibleWhenCompact()
         }
     }
     #endif
@@ -2454,7 +2451,7 @@ extension Color {
 enum TerminalCanvasMetrics {
     /// The rounded canvas's corner radius when it shows its Mac pane chrome.
     static let macCornerRadius: CGFloat = 18
-    /// Margin of window glass on the leading, bottom and trailing edges of the canvas, so the
-    /// theme colour never sits flush against the sidebar divider or the window edges.
-    static let macOuterMargin: CGFloat = 3
+    /// Retired 2026-09-12. The canvas used to float inside a 3 pt margin of window glass with its
+    /// own 18 pt corners; against Apple's own rounded glass edge that read as a second, redundant
+    /// border. The canvas now fills the content area and the window's edge is the only edge.
 }

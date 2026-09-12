@@ -3,6 +3,8 @@
 import AppKit
 import GlassTerminalEmulator
 import SwiftUI
+import GlassLayers
+import GlassShell
 
 struct MacLocalTerminalPaneView: View {
     let runtime: SwiftTermLocalProcessRuntime
@@ -19,6 +21,9 @@ struct MacLocalTerminalPaneView: View {
     let onProcessStatusChange: (String?) -> Void
 
     @Environment(SettingsManager.self) private var settingsManager
+    /// Present whenever this pane is inside the app's workspace scene. Used only to answer the
+    /// shell when it asked for this local shell by name (D8); nil in previews and tests.
+    @Environment(GlassTerminalRuntime.self) private var terminalRuntime: GlassTerminalRuntime?
     @Environment(\.openWindow) private var openWindow
     @ObservedObject var hostModel: SwiftTermHostModel
     @ObservedObject var processState: SwiftTermLocalProcessState
@@ -36,6 +41,9 @@ struct MacLocalTerminalPaneView: View {
     @State private var terminalColumns = 120
     @State private var terminalRows = 40
     @State private var localTerminalWindow: NSWindow?
+    /// One outcome per pane: `reportLocalShell` answers the oldest waiting request, so a second
+    /// call from the same pane would steal another request's answer.
+    @State private var didReportLocalShell = false
     @State private var isLocalFullScreen = false
     @State private var showVisualBell = false
     @FocusState private var searchFieldFocused: Bool
@@ -70,6 +78,7 @@ struct MacLocalTerminalPaneView: View {
                     }
                 },
                 onProcessReady: {
+                    reportLocalShellOnce(.connected)
                     guard let ticket = claimStartupCommand() else { return }
                     _ = processState.sendCommand(ticket.command)
                 },
@@ -95,8 +104,7 @@ struct MacLocalTerminalPaneView: View {
             }
             // A framed canvas: the background is clipped to the session canvas's corner radius
             // and floats inside a margin of window glass (top stays flush under the toolbar).
-            .clipShape(RoundedRectangle(cornerRadius: TerminalCanvasMetrics.macCornerRadius, style: .continuous))
-            .padding([.leading, .bottom, .trailing], TerminalCanvasMetrics.macOuterMargin)
+            // No inset and no corner of its own: the window's glass edge is the only edge.
             .overlay {
                 if let launchError = processState.launchError {
                     ContentUnavailableView(
@@ -117,6 +125,12 @@ struct MacLocalTerminalPaneView: View {
             }
         }
         .contentShape(Rectangle())
+        // The shell is told the truth about the shell it asked for: the process started, or it
+        // did not. Opening a window is neither, so neither is reported here (D8).
+        .onAppear { if let error = processState.launchError { reportLocalShellOnce(.failed(error)) } }
+        .onChange(of: processState.launchError) { _, error in
+            if let error { reportLocalShellOnce(.failed(error)) }
+        }
         .background {
             MacTerminalWindowAccessor { window in
                 if localTerminalWindow !== window {
@@ -166,7 +180,7 @@ struct MacLocalTerminalPaneView: View {
                     localRecordingIndicator
                     localToolsMenu
                 }
-                .macKeepVisibleWhenCompact()
+                .glassKeepVisibleWhenCompact()
             }
         }
         .onAppear {
@@ -474,6 +488,15 @@ struct MacLocalTerminalPaneView: View {
     private func presentRecordings() {
         hostModel.setFocusOwnershipAllowed(false)
         showingRecordings = true
+    }
+
+    /// Answers the shell's waiting request, at most once for this pane. Does nothing when the
+    /// shell asked for nothing — the toolbar's Local Terminal button and a pane split from inside
+    /// the workspace both arrive here with no request outstanding.
+    private func reportLocalShellOnce(_ outcome: GlassCapabilityOutcome) {
+        guard !didReportLocalShell else { return }
+        didReportLocalShell = true
+        terminalRuntime?.reportLocalShell(outcome)
     }
 
     private func disconnectLocalTerminal() {

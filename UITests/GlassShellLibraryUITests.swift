@@ -151,17 +151,13 @@ final class GlassShellLibraryUITests: XCTestCase {
         return target
     }
 
-    /// The Terminal tab is selected by default; its toggle turns the service on.
+    /// Choosing the tab is what adds the service — there is no separate toggle.
     private func enableTerminalTab() {
-        let toggle = element("setup-enable-ssh")
-        XCTAssertTrue(toggle.waitForExistence(timeout: 10), "Terminal tab toggle")
-        #if os(macOS)
-        press(toggle)
-        #elseif os(iOS)
-        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
-        #else
-        toggle.tap()
-        #endif
+        let sections = element("setup-sections")
+        XCTAssertTrue(sections.waitForExistence(timeout: 10), "service tabs")
+        let tab = sections.buttons["Terminal"].exists ? sections.buttons["Terminal"] : sections.radioButtons["Terminal"]
+        XCTAssertTrue(tab.waitForExistence(timeout: 5), "Terminal tab")
+        press(tab)
     }
 
     /// After saving, the shell selects the new host; on iPhone that pushes to detail directly.
@@ -220,15 +216,21 @@ final class GlassShellLibraryUITests: XCTestCase {
         if empty.waitForExistence(timeout: 3) { press(empty) } else { tap("connection-library-add-host") }
         XCTAssertTrue(element("host-editor-name").waitForExistence(timeout: 10))
         XCTAssertTrue(element("setup-sections").waitForExistence(timeout: 5), "service tabs under the machine fields")
-        let databaseToggle = element("setup-enable-database")
-        // The Database tab exists but is disabled: nothing arrives before Stage 3.
+        // Stage 3 registered the database capability, so the tab that was disabled now offers
+        // the real form. Choosing the tab is what adds the service — there is no toggle — and its
+        // required fields are engine, database, username and password, deliberately with no
+        // address and no SSH section (D7).
         let sections = element("setup-sections")
         let databaseTab = sections.buttons["Database"].exists ? sections.buttons["Database"] : sections.radioButtons["Database"]
         if databaseTab.waitForExistence(timeout: 3) {
             press(databaseTab)
-            XCTAssertTrue(databaseToggle.waitForExistence(timeout: 5))
-            XCTAssertFalse(databaseToggle.isEnabled, "no capability: the tab's toggle is disabled")
-            snap("02-database-tab-disabled")
+            XCTAssertFalse(element("setup-enable-database").exists, "the tab is the toggle; there is no second one")
+            XCTAssertTrue(element("add-database-engine").waitForExistence(timeout: 5), "the engine picker")
+            XCTAssertTrue(element("add-database-database").exists, "the database field")
+            XCTAssertTrue(element("add-database-username").exists, "the username field")
+            XCTAssertTrue(element("add-database-password").exists, "the password field")
+            snap("02-database-tab-live")
+            // Back to Terminal: choosing another tab replaces the choice, never adds a second.
             let terminalTab = sections.buttons["Terminal"].exists ? sections.buttons["Terminal"] : sections.radioButtons["Terminal"]
             press(terminalTab)
         }

@@ -153,7 +153,7 @@ struct GlassShellHostAddressTests {
                                  createdAt: Date(timeIntervalSince1970: 4), updatedAt: Date(timeIntervalSince1970: 4))
         for record in [a, b, loop1, loop2, c1, c2] { try await sibling.upsert(record) }
         await model.load()
-        #expect(model.hosts.count == 4, "same address groups; loopback never does; same name groups")
+        #expect(model.catalogHosts.count == 4, "same address groups; loopback never does; same name groups")
         let grouped = try #require(model.host(a.id))
         #expect(grouped.members.map(\.id) == [a.id, b.id] && grouped.address == "10.9.9.9" && grouped.addresses == ["10.9.9.9"])
 

@@ -75,7 +75,7 @@ enum SSHError: LocalizedError {
 
 /// Hands glas.sh's already-resolved credential material (SessionManager.prepareConnection) to the
 /// transport. Nothing is looked up twice and no secret crosses the engine boundary as a String.
-private struct PreparedCredentialResolver: SSHCredentialResolver {
+struct PreparedCredentialResolver: SSHCredentialResolver {
     let materials: [UUID: SessionAuthenticationMaterial]   // keyed by server id
 
     func resolve(_ reference: SSHCredentialReference, for endpoint: SSHEndpoint) async throws -> SSHResolvedCredential {

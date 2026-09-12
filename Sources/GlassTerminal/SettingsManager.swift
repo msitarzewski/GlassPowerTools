@@ -175,9 +175,7 @@ class SettingsManager {
     var windowOpacity: Double {
         get { layers.state.effectiveOpacity }
         set {
-            let value = Self.unitValue(newValue)
-            layers.state.opacity = value
-            layers.state.paintsTheme = value > 0
+            layers.state.opacity = Self.unitValue(newValue)
         }
     }
     /// Strength of the independently composited system blur layer.

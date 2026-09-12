@@ -134,7 +134,7 @@ struct GlassShellSecurityFixTests {
         #expect(model.errorMessage == GlassShellModel.unavailableMessage(for: .ssh))
         #expect(model.lastUsedService(for: host.id)?.endpointID == link.endpointID)
         #expect(model.lastConnected(host.id) == nil)
-        #expect(model.items[0].lastConnected == nil)
+        #expect(model.catalogItems[0].lastConnected == nil)
     }
 }
 
@@ -150,7 +150,7 @@ struct GlassShellFirstRunTests {
         await model.load()
         #expect(model.isLoaded)
         #expect(model.errorMessage == nil, "first run must not alert: \(model.errorMessage ?? "")")
-        #expect(model.hosts.isEmpty)
+        #expect(model.catalogHosts.isEmpty)
         #expect(model.hasSharedContainer)
     }
 
@@ -163,7 +163,7 @@ struct GlassShellFirstRunTests {
         #expect(model.errorMessage == nil, "load must not alert: \(model.errorMessage ?? "")")
         _ = try await model.addHost(displayName: "First")
         #expect(FileManager.default.fileExists(atPath: model.catalogFileURL.path))
-        #expect(model.hosts.count == 1)
+        #expect(model.catalogHosts.count == 1)
     }
 
     @Test("A shared container the sandbox refuses degrades to the private catalog with a visible reason, no alert")
@@ -182,7 +182,7 @@ struct GlassShellFirstRunTests {
         #expect(model.hostLibraryStatus.contains("not allowed"))
         #expect(model.catalogFileURL.path.hasPrefix(root.appendingPathComponent("app").path))
         _ = try await model.addHost(displayName: "Local Only")
-        #expect(model.hosts.count == 1)
+        #expect(model.catalogHosts.count == 1)
         #expect(!FileManager.default.fileExists(atPath: group.appendingPathComponent("GlassHostCatalog").path))
     }
 }

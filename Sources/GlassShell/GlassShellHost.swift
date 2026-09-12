@@ -21,21 +21,60 @@ public struct GlassShellHost: Identifiable, Hashable, Sendable {
     public let aliases: [String]
     public let tags: [String]
     /// Union of every member's services, canonical member first, deduplicated by endpoint.
+    /// On the local host the capabilities' built-in services come first, then the saved ones.
     public let services: [HostServiceLink]
     public let createdAt: Date
     /// Canonical first.
     public let members: [HostProfile]
+    /// This is the device itself (D8), not a machine to reach. See `GlassLocalHost`.
+    public let isLocal: Bool
+    /// Services a capability provides on this device without setup, so nothing is stored for
+    /// them: they cannot be edited or removed, and the capability that minted the endpoint id
+    /// recognises it in `open`. Always empty off the local host.
+    public let builtInEndpointIDs: Set<EndpointID>
 
     public var canonical: HostProfile { members[0] }
     public var isConsolidated: Bool { members.count > 1 }
+
+    public func isBuiltIn(_ endpointID: EndpointID) -> Bool { builtInEndpointIDs.contains(endpointID) }
+
+    /// Whether "connect the machine" means anything here. False on the device itself: see
+    /// `GlassShellModel.connectAll(hostID:)` for the reasoning.
+    public var allowsConnectAll: Bool { !isLocal }
 
     public func member(owning endpointID: EndpointID) -> HostProfile? {
         members.first { $0.services.contains { $0.endpointID == endpointID } }
     }
 
+    /// The record a service belongs to. A built-in local service has no stored link, so it is
+    /// answered by the local record itself: it is that device's service, just not a saved one.
+    public func record(owning endpointID: EndpointID) -> HostProfile? {
+        member(owning: endpointID) ?? (isBuiltIn(endpointID) ? canonical : nil)
+    }
+
     public func contains(_ hostID: HostID) -> Bool { members.contains { $0.id == hostID } }
 
+    /// The device's own host: one record, never grouped with anything, plus whatever the
+    /// registered capabilities provide on it without setup.
+    init(local record: HostProfile, builtInServices: [HostServiceLink]) {
+        id = record.id
+        displayName = record.displayName
+        // The host has no address; its services are given `GlassLocalHost.address` at commit time.
+        address = nil
+        addresses = []
+        aliases = record.aliases
+        tags = record.tags
+        var seen = Set<EndpointID>()
+        services = (builtInServices + record.services).filter { seen.insert($0.endpointID).inserted }
+        createdAt = record.createdAt
+        members = [record]
+        isLocal = true
+        builtInEndpointIDs = Set(builtInServices.map(\.endpointID))
+    }
+
     init(members: [HostProfile]) {
+        isLocal = false
+        builtInEndpointIDs = []
         precondition(!members.isEmpty)
         let ordered = members.sorted {
             if $0.createdAt != $1.createdAt { return $0.createdAt < $1.createdAt }

@@ -4,6 +4,7 @@ import AppKit
 import Observation
 import GlassTerminalEmulator
 import SwiftUI
+import GlassLayers
 
 struct MacWorkspaceSceneRoot: View {
     private let request: MacWorkspaceLaunchRequest
@@ -96,31 +97,17 @@ struct MacWorkspaceView: View {
                 // "Show Sidebar" label once this toolbar is crowded (observed on a connected
                 // session, 2026-09-11). Own it instead: a fixed leading control that reads the
                 // column's state, beside New Terminal Tab.
+                // Applied twice on purpose — not a copy-paste slip. Once is not enough to
+                // suppress the system toggle on a NavigationSplitView here: with a single
+                // removal it comes back at the window's trailing edge as a full "Toggle Sidebar"
+                // button once the toolbar is crowded, which is exactly the drift this owns.
+                // Deleted as redundant on 2026-09-12 and the symptom returned within the hour.
                 .toolbar(removing: .sidebarToggle)
                 .toolbar(removing: .sidebarToggle)
                 .toolbar {
                     // Push the group to the sidebar column's trailing edge, matching the library.
                     if #available(macOS 26.0, *) { ToolbarSpacer(.flexible, placement: .automatic) }
-                    // Both controls live in the sidebar column's own toolbar region, in this
-                    // order, so the window matches the library: New Tab then the sidebar toggle
-                    // at the column's trailing edge. `.navigation` would push them into the
-                    // content region, and the system's own toggle drifts to the window's trailing
-                    // edge with a "Show Sidebar" label once this toolbar is crowded.
-                    ToolbarItem(id: "new-terminal-tab", placement: .automatic) {
-                        Button("New Terminal Tab", systemImage: "plus", action: addTab)
-                            .help("New Terminal Tab")
-                            .disabled(!windowController.canAddTab)
-                            .accessibilityIdentifier("mac-workspace-new-tab")
-                    }
-                    .macKeepVisibleWhenCompact()
-                    ToolbarItem(id: "sidebar-toggle", placement: .automatic) {
-                        Button("Toggle Sidebar", systemImage: "sidebar.leading") {
-                            withAnimation { columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly }
-                        }
-                        .help(columnVisibility == .detailOnly ? "Show Sidebar" : "Hide Sidebar")
-                        .accessibilityIdentifier("mac-workspace-sidebar-toggle")
-                    }
-                    .macKeepVisibleWhenCompact()
+                    columnControls(placement: .automatic)
                 }
         } detail: {
             MacWorkspaceTabContent(
@@ -328,6 +315,27 @@ struct MacWorkspaceView: View {
         }
     }
 
+    /// New Tab and the sidebar toggle. Rendered in the sidebar column while it is visible and in
+    /// the detail column while it is not, never both, so the ids cannot collide.
+    @ToolbarContentBuilder
+    private func columnControls(placement: ToolbarItemPlacement) -> some ToolbarContent {
+        ToolbarItem(id: "new-terminal-tab", placement: placement) {
+            Button("New Terminal Tab", systemImage: "plus", action: addTab)
+                .help("New Terminal Tab")
+                .disabled(!windowController.canAddTab)
+                .accessibilityIdentifier("mac-workspace-new-tab")
+        }
+        .glassKeepVisibleWhenCompact()
+        ToolbarItem(id: "sidebar-toggle", placement: placement) {
+            Button("Toggle Sidebar", systemImage: "sidebar.leading") {
+                withAnimation { columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly }
+            }
+            .help(columnVisibility == .detailOnly ? "Show Sidebar" : "Hide Sidebar")
+            .accessibilityIdentifier("mac-workspace-sidebar-toggle")
+        }
+        .glassKeepVisibleWhenCompact()
+    }
+
     @ToolbarContentBuilder
     private func workspaceToolbar(selected: MacWorkspaceController) -> some ToolbarContent {
             ToolbarItem(id: "terminal-overview") {
@@ -335,7 +343,7 @@ struct MacWorkspaceView: View {
                     .help("Show all terminal tabs as a grid or carousel")
                     .accessibilityIdentifier("mac-workspace-overview")
             }
-            .macKeepVisibleWhenCompact()
+            .glassKeepVisibleWhenCompact()
             ToolbarItem(id: "save-workspace") {
                 Button("Save Workspace as Workgroup…", systemImage: "rectangle.stack.badge.plus") {
                     saveWorkspace()
@@ -344,7 +352,7 @@ struct MacWorkspaceView: View {
                 .help("Save this window’s tabs and split layout as a Workgroup")
                 .accessibilityIdentifier("mac-workspace-save-workgroup")
             }
-            .macOverflowFirstWhenCompact()
+            .glassOverflowFirstWhenCompact()
 
             if windowController.canTransferSelectedTab {
                 ToolbarItem(id: MacTerminalToolbarItemID.tabActions) {
@@ -355,7 +363,7 @@ struct MacWorkspaceView: View {
                     }
                     .help("Tab Actions")
                 }
-                .macOverflowFirstWhenCompact()
+                .glassOverflowFirstWhenCompact()
             }
 
             ToolbarItemGroup(placement: .primaryAction) {
@@ -382,7 +390,7 @@ struct MacWorkspaceView: View {
                 .disabled(selected.focusedPaneID == nil)
                 .accessibilityIdentifier("mac-workspace-secure-keyboard-entry")
             }
-            .macOverflowFirstWhenCompact()
+            .glassOverflowFirstWhenCompact()
     }
 
     private func saveWorkspace() {
@@ -848,26 +856,6 @@ private struct MacWorkspaceTabContent: View {
             get: { secureKeyboardEntry.lastError != nil },
             set: { if !$0 { secureKeyboardEntry.clearError() } }
         )
-    }
-}
-
-extension ToolbarContent {
-    @ToolbarContentBuilder
-    func macOverflowFirstWhenCompact() -> some ToolbarContent {
-        if #available(macOS 26.1, *) {
-            visibilityPriority(.low)
-        } else {
-            self
-        }
-    }
-
-    @ToolbarContentBuilder
-    func macKeepVisibleWhenCompact() -> some ToolbarContent {
-        if #available(macOS 26.1, *) {
-            visibilityPriority(.high)
-        } else {
-            self
-        }
     }
 }
 

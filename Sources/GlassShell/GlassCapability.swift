@@ -22,8 +22,91 @@ public struct GlassCapabilityHostAccess: Sendable {
     /// without one; a service created in this app always has a host with an address.
     public let address: String?
 
-    public init(address: String?) {
+    /// Supplied by the shell when this host has an SSH service whose capability can open a
+    /// forward. Nil means no forward is possible and the caller must connect directly or say so.
+    private let openForward: (@MainActor @Sendable (String, Int) async throws -> any GlassHostPortForward)?
+
+    /// Supplied by the shell alongside `openForward`, from the same capability.
+    private let resolveTrust: (@MainActor @Sendable () async -> GlassHostTrustOutcome)?
+
+    public init(address: String?,
+                openForward: (@MainActor @Sendable (String, Int) async throws -> any GlassHostPortForward)? = nil,
+                resolveTrust: (@MainActor @Sendable () async -> GlassHostTrustOutcome)? = nil) {
         self.address = address
+        self.openForward = openForward
+        self.resolveTrust = resolveTrust
+    }
+
+    /// Whether `forwardPort` can succeed at all: the host has an SSH service and a registered
+    /// capability owns it. Ask before offering the user a "connect through SSH" choice.
+    public var canForwardPorts: Bool { openForward != nil }
+
+    /// Borrows the host's own SSH service to open a local port that reaches `remoteHost:port`
+    /// **from the host's machine** — the D7 replacement for a per-service SSH configuration.
+    /// The caller closes the returned forward when it is finished with it.
+    ///
+    /// `remoteHost` defaults to loopback because the common case is a service listening only on
+    /// the machine itself. The caller never learns which capability served the request and never
+    /// imports it: the shell brokers this.
+    public func forwardPort(toHost remoteHost: String = "127.0.0.1",
+                            port: Int) async throws -> any GlassHostPortForward {
+        guard let openForward else { throw GlassPortForwardError.unavailable }
+        guard (1...65_535).contains(port) else { throw GlassPortForwardError.invalidPort(port) }
+        return try await openForward(remoteHost, port)
+    }
+
+    /// Settles this machine's SSH host-key trust now, prompting if it is not yet pinned (D14).
+    /// Safe to call when the key is already trusted: it returns `.trusted` without prompting.
+    ///
+    /// Meant for the moment a service is *set up* to tunnel, so that connecting later simply
+    /// works. It resolves and reports; it never blocks the caller's own save, and `.declined`
+    /// is a legitimate answer rather than a failure.
+    public func resolveHostTrust() async -> GlassHostTrustOutcome {
+        guard let resolveTrust else { return .unavailable }
+        return await resolveTrust()
+    }
+}
+
+/// How a request to settle a machine's SSH host-key trust ended. Three cases rather than a
+/// boolean, because the setup sheet must say something different about each — and because a
+/// **changed** host key reaching the user as the same `false` as "there was nobody to ask"
+/// would be precisely the swallowed error the project rules forbid.
+public enum GlassHostTrustOutcome: Sendable, Equatable {
+    /// Already pinned, or the user reviewed the fingerprint and accepted it just now.
+    case trusted
+    /// The user declined. Expected, not an error: do not present it as a failure.
+    case declined
+    /// Nothing could be asked — no SSH service, no capability owns `.ssh`, or no prompt could
+    /// be shown (the user has host-key verification set to strict).
+    case unavailable
+}
+
+/// A local TCP port that proxies to a service reachable from the host's machine. Opened by the
+/// capability that owns the host's SSH service, used by another capability that never imports it.
+public protocol GlassHostPortForward: AnyObject, Sendable {
+    /// The port on this device to connect to. Always a real bound port, never a request.
+    var localPort: Int { get }
+    /// Tears the forward down. Calling it more than once is harmless.
+    func close() async
+}
+
+public enum GlassPortForwardError: Error, LocalizedError {
+    /// The host has no SSH service, no capability owns `.ssh`, or the host is this device.
+    case unavailable
+    case invalidPort(Int)
+    /// The machine's SSH host key is not trusted yet. A background tunnel must not prompt for a
+    /// fingerprint and must never trust one silently, so the user is sent to the Terminal service.
+    case hostNotTrusted(name: String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .unavailable:
+            "This machine has no Terminal service to tunnel through. Add one, or connect directly."
+        case .invalidPort(let port):
+            "\(port) is not a usable TCP port."
+        case .hostNotTrusted(let name):
+            "The SSH host key for \(name) has not been trusted on this device. Connect its Terminal service once to review the fingerprint, then try again."
+        }
     }
 }
 
@@ -100,6 +183,24 @@ public protocol GlassCapability: AnyObject {
     /// (configuration, credentials). Default: nothing.
     func removeService(_ service: HostServiceLink, host: HostProfile) async throws
 
+    /// Opens a local port reaching `remoteHost:port` **from `host`'s machine**, over this
+    /// capability's own transport and this host's existing trust. Only the capability that owns
+    /// `.ssh` implements it; the shell calls it on behalf of others so that, for example, the
+    /// database capability can tunnel without importing the terminal. Default: throws
+    /// `GlassPortForwardError.unavailable`.
+    ///
+    /// Isolated to the main actor like the rest of the protocol, so an implementation must do
+    /// the network work by awaiting its own transport actor — never synchronously here.
+    func openPortForward(host: HostProfile, toHost remoteHost: String,
+                         port: Int) async throws -> any GlassHostPortForward
+
+    /// Settles `host`'s SSH host-key trust, prompting if needed, using this capability's own
+    /// prompt (D14). Only the capability that owns `.ssh` implements it; the shell calls it on
+    /// behalf of others, so a database service can have its machine's fingerprint reviewed at
+    /// setup time without importing the capability that owns the connection. Default:
+    /// `.unavailable` — the same refusing default as `openPortForward`.
+    func resolveHostTrust(host: HostProfile) async -> GlassHostTrustOutcome
+
     /// Settings pages the capability contributes to the one settings surface, appended after the
     /// shell's own pages. Default: none.
     var settingsPages: [GlassCapabilitySettingsPage] { get }
@@ -113,6 +214,19 @@ public protocol GlassCapability: AnyObject {
     /// configured service makes available rather than services of their own. The terminal offers
     /// Files (SFTP) when the server supports it; Stage 5's editor joins here.
     func serviceTools(service: HostServiceLink, host: HostProfile) -> [GlassServiceTool]
+
+    /// Services this capability provides on the built-in local host (D8) with nothing to set up
+    /// and nothing stored: the Mac's own shell is one. The endpoint ids **must be constants** —
+    /// the shell writes no record for them, and the capability recognises them again in `open`.
+    /// Returning services here for a platform that has none is the dishonest case to avoid: the
+    /// Mac's local shell exists, an iPhone's does not. Default: none.
+    func builtInLocalServices() -> [HostServiceLink]
+
+    /// Whether the user may add a service of this kind to the local host through the setup sheet.
+    /// Default: `true` — the user's answer to "which kinds belong on This Mac?" was "all of them",
+    /// so a capability opts out rather than in. The terminal opts out: its local service is the
+    /// built-in shell above, and a second way to make one would only be a worse one.
+    var supportsLocalSetup: Bool { get }
 }
 
 /// A tool a service makes available: its own row in the host detail, with the service it rides.
@@ -145,10 +259,17 @@ public extension GlassCapability {
     func makeSetupDraft() -> any GlassServiceDraft { GlassUnavailableServiceDraft(kind: kind, capabilityName: displayName) }
     func setupDraft(for service: HostServiceLink, host: HostProfile) -> (any GlassServiceDraft)? { nil }
     func removeService(_ service: HostServiceLink, host: HostProfile) async throws {}
+    func openPortForward(host: HostProfile, toHost remoteHost: String,
+                         port: Int) async throws -> any GlassHostPortForward {
+        throw GlassPortForwardError.unavailable
+    }
+    func resolveHostTrust(host: HostProfile) async -> GlassHostTrustOutcome { .unavailable }
     var settingsPages: [GlassCapabilitySettingsPage] { [] }
     func libraryToolbarItems() -> AnyView { AnyView(EmptyView()) }
     func serviceDetailActions(service: HostServiceLink, host: HostProfile) -> AnyView { AnyView(EmptyView()) }
     func serviceTools(service: HostServiceLink, host: HostProfile) -> [GlassServiceTool] { [] }
+    func builtInLocalServices() -> [HostServiceLink] { [] }
+    var supportsLocalSetup: Bool { true }
 }
 
 /// The draft of a capability that offers no setup. Honest, not a stub: it says so in the
@@ -242,6 +363,21 @@ public final class GlassCapabilityRegistry {
     /// Every capability's settings pages, in kind order.
     public var settingsPages: [GlassCapabilitySettingsPage] {
         registered.flatMap(\.settingsPages)
+    }
+
+    /// Every capability's built-in local services (D8), in kind order, with any capability that
+    /// returns a duplicate endpoint id ignored for the duplicate — a constant id belongs to one
+    /// capability, and a host record refuses a repeated endpoint anyway.
+    public var builtInLocalServices: [HostServiceLink] {
+        var seen = Set<EndpointID>()
+        return registered.flatMap { $0.builtInLocalServices() }
+            .filter { seen.insert($0.endpointID).inserted }
+    }
+
+    /// The kinds the user may add to the local host through the setup sheet: registered, and not
+    /// opted out. A kind with no capability in this build is absent here as it is anywhere else.
+    public var localSetupKinds: [HostServiceKind] {
+        registered.filter(\.supportsLocalSetup).map(\.kind)
     }
 
     /// The owning capability's detail actions for a service, or nothing if no capability owns

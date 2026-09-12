@@ -112,8 +112,12 @@ public struct GlassShellLibraryView: View {
             Button("Connect") { model.connect(hostID: item.id) }
             Button("Edit") { if let host = model.host(item.id) { setupMode = .editHost(host) } }
             Button(item.isFavorite ? "Remove Favorite" : "Add Favorite") { model.toggleFavorite(item.id) }
-            Button("Delete", role: .destructive) { deleting = model.host(item.id) }
-                .accessibilityIdentifier("host-delete")
+            // The device itself is not a record the user added and is not one they can remove
+            // (D8); its services are removed individually from the detail.
+            if model.host(item.id)?.isLocal != true {
+                Button("Delete", role: .destructive) { deleting = model.host(item.id) }
+                    .accessibilityIdentifier("host-delete")
+            }
         }
     }
 
@@ -151,31 +155,45 @@ public struct GlassShellLibraryView: View {
         GlassLibraryDetail(title: host.displayName, content: {
             Section("Services") {
                 if host.services.isEmpty {
-                    Text("No services yet. Add a terminal, database or desktop to this host.")
+                    Text(host.isLocal
+                         ? "No services yet. Add a database on this device — a SQLite file, or a server running here."
+                         : "No services yet. Add a terminal, database or desktop to this host.")
                         .foregroundStyle(.secondary)
                 }
                 ForEach(host.services) { service in
                     serviceRow(service, host: host)
                         .contextMenu {
-                            Button("Remove Service", role: .destructive) {
-                                Task { await run { try await model.removeService(service.endpointID, from: host.id) } }
+                            // A built-in local service has nothing stored behind it, so there is
+                            // nothing to remove — and offering the item would only produce an
+                            // error the user could not act on.
+                            if !host.isBuiltIn(service.endpointID) {
+                                Button("Remove Service", role: .destructive) {
+                                    Task { await run { try await model.removeService(service.endpointID, from: host.id) } }
+                                }
                             }
                         }
                 }
                 // Tools a configured service makes available, as peer rows: Files (SFTP) today,
                 // the editor in Stage 5. They are not services and are never configured here.
                 ForEach(host.services) { service in
-                    if let owner = host.member(owning: service.endpointID) {
+                    if let owner = host.record(owning: service.endpointID) {
                         ForEach(model.registry.serviceTools(service: service, host: owner)) { tool in
                             toolRow(tool)
                         }
                     }
                 }
-                Button("Add a service…", systemImage: "plus.circle") { setupMode = .addService(host, .ssh) }
-                    .accessibilityIdentifier("host-add-service")
+                if let kind = addableKind(for: host) {
+                    Button("Add a service…", systemImage: "plus.circle") { setupMode = .addService(host, kind) }
+                        .accessibilityIdentifier("host-add-service")
+                }
             }
             Section("Host") {
-                if host.addresses.count > 1 {
+                if host.isLocal {
+                    // This device: there is nothing to reach and nothing to type (D8).
+                    LabeledContent("Address", value: "This device").accessibilityIdentifier("host-detail-address")
+                    Text("Services here run on this machine: they reach it at \(GlassLocalHost.address), or open a file you choose. Nothing about this host is shared with the other Glass apps or with your other devices.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                } else if host.addresses.count > 1 {
                     LabeledContent("Address", value: host.addresses.joined(separator: " · "))
                         .accessibilityIdentifier("host-detail-address")
                     Text("The records that make up this host disagree on the address. Edit the host to settle it.")
@@ -209,6 +227,14 @@ public struct GlassShellLibraryView: View {
         })
     }
 
+    /// The tab "Add a service…" opens on: the first kind this host will take that a capability
+    /// in this build can create. Nil when the host takes none, and then the button is not shown
+    /// rather than opening a sheet that can only refuse.
+    private func addableKind(for host: GlassShellHost) -> HostServiceKind? {
+        let kinds = GlassShellSetupModel.setupKinds(for: host, registry: model.registry)
+        return kinds.first { model.registry.capability(for: $0) != nil } ?? kinds.first
+    }
+
     private func toolRow(_ tool: GlassServiceTool) -> some View {
         HStack(spacing: 10) {
             Image(systemName: tool.symbolName)
@@ -235,13 +261,16 @@ public struct GlassShellLibraryView: View {
     /// inline they collapse into one overflow menu beside Connect, so nothing ever clips at the
     /// trailing edge (the 900-pt minimum window showed the trash button cut off, 2026-09-11).
     private func serviceRow(_ service: HostServiceLink, host: GlassShellHost) -> some View {
+        let suffix = Self.identifierSuffix(for: service, in: host)
+        let isBuiltIn = host.isBuiltIn(service.endpointID)
         let identity = HStack(spacing: 10) {
             GlassServiceIcon(GlassServicePresentation.symbol(for: service.kind))
                 .foregroundStyle(.secondary)
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 2) {
                 Text(service.displayName).lineLimit(1).truncationMode(.tail)
-                Text(GlassServicePresentation.displayName(for: service.kind))
+                Text(isBuiltIn ? "\(GlassServicePresentation.displayName(for: service.kind)) · Built in"
+                     : GlassServicePresentation.displayName(for: service.kind))
                     .font(.footnote).foregroundStyle(.secondary).lineLimit(1)
             }
         }
@@ -252,14 +281,20 @@ public struct GlassShellLibraryView: View {
             .labelStyle(.iconOnly)
             .buttonStyle(.bordered)
             .help("Connect")
-            .accessibilityIdentifier("host-service-connect-\(service.kind.rawValue)")
-        // Edit is the shell's: it opens the one host sheet on this service's tab.
-        let edit = Button("Edit", systemImage: "pencil") { setupMode = .editService(host, service) }
-            .labelStyle(.iconOnly)
-            .buttonStyle(.bordered)
-            .help("Edit")
-            .accessibilityIdentifier("host-service-edit-\(service.kind.rawValue)")
-        let owner = host.member(owning: service.endpointID)
+            .accessibilityIdentifier("host-service-connect-\(service.kind.rawValue)\(suffix)")
+        // Edit is the shell's: it opens the one host sheet on this service's tab. A built-in
+        // local service has no saved configuration to open, so it has no Edit either — the
+        // sheet would have nothing to show and would say so as though something were broken.
+        let edit = Group {
+            if !isBuiltIn {
+                Button("Edit", systemImage: "pencil") { setupMode = .editService(host, service) }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.bordered)
+                    .help("Edit")
+                    .accessibilityIdentifier("host-service-edit-\(service.kind.rawValue)\(suffix)")
+            }
+        }
+        let owner = host.record(owning: service.endpointID)
         return ViewThatFits(in: .horizontal) {
             HStack(spacing: 12) {
                 identity
@@ -287,13 +322,25 @@ public struct GlassShellLibraryView: View {
                         .labelStyle(.iconOnly)
                         .menuIndicator(.hidden)
                         .fixedSize()
-                        .accessibilityIdentifier("host-service-more-\(service.kind.rawValue)")
+                        .accessibilityIdentifier("host-service-more-\(service.kind.rawValue)\(suffix)")
                     }
                 }
                 .fixedSize()
                 .layoutPriority(1)
             }
         }
+    }
+
+    /// Several services of one kind on one host are legal in the catalog and are what the device's
+    /// own host is made of (D8) — two databases and a shell on one row. Identifiers have to stay
+    /// unique or UI automation matches an arbitrary one of them. The first service of a kind keeps
+    /// the bare identifier every existing surface and test already uses; the second and later
+    /// carry their 1-based position within that kind, which is stable for a given host.
+    static func identifierSuffix(for service: HostServiceLink, in host: GlassShellHost) -> String {
+        let sameKind = host.services.filter { $0.kind == service.kind }
+        guard let index = sameKind.firstIndex(where: { $0.endpointID == service.endpointID }),
+              index > 0 else { return "" }
+        return "-\(index + 1)"
     }
 
     /// "Desktop · What is this?" — the kind first, because the endpoint's own name came from
@@ -352,20 +399,31 @@ public struct GlassShellConnectControl: View {
     }
 
     private var services: [HostServiceLink] { model.services(for: hostID) }
+    /// Whether "connect the machine" means anything for this host. See
+    /// `GlassShellModel.connectAll(hostID:)` — on the device itself it does not, so the play
+    /// half of the split control is not drawn at all rather than drawn and refused.
+    private var allowsConnectAll: Bool { model.host(hostID)?.allowsConnectAll ?? true }
 
     public var body: some View {
         if services.isEmpty {
             EmptyView()
         } else if services.count == 1 {
-            Button("Connect", systemImage: "play.fill") { model.connectAll(hostID: hostID) }
+            // One service, so "all of them" and "this one" are the same act; the local host
+            // connects it by name because `connectAll` refuses there on principle.
+            Button("Connect", systemImage: "play.fill") {
+                if allowsConnectAll { model.connectAll(hostID: hostID) }
+                else if let only = services.first { model.connect(hostID: hostID, endpointID: only.endpointID) }
+            }
                 .labelStyle(.iconOnly)
                 .buttonStyle(.borderedProminent)
                 .controlSize(prominent ? .large : .small)
                 .fixedSize()
                 .accessibilityLabel("Connect")
                 .accessibilityIdentifier("host-connect")
-        } else {
+        } else if allowsConnectAll {
             splitControl
+        } else {
+            pickerOnlyControl
         }
     }
 
@@ -408,6 +466,29 @@ public struct GlassShellConnectControl: View {
         .accessibilityElement(children: .contain)
     }
 
+    /// The same capsule with the play half removed: one control that opens the service menu.
+    /// Used on the device's own host, where the services are unrelated local things picked by
+    /// name — a shell, a SQLite file, a MySQL instance — and never a machine entered as a whole.
+    private var pickerOnlyControl: some View {
+        Menu { serviceButtons } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "play.fill")
+                Image(systemName: "chevron.down").font(metrics.font.weight(.semibold))
+            }
+            .padding(.horizontal, metrics.playPadding)
+            .padding(.vertical, metrics.verticalPadding)
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .font(metrics.font)
+        .foregroundStyle(.white)
+        .background(Color.accentColor, in: Capsule())
+        .accessibilityLabel("Choose a service")
+        .accessibilityIdentifier("host-connect-menu")
+    }
+
     private var metrics: Metrics {
         if prominent { return Metrics(playPadding: 16, chevronPadding: 11, verticalPadding: 9, font: .body) }
         if compact { return Metrics(playPadding: 9, chevronPadding: 6, verticalPadding: 4, font: .caption) }
@@ -422,6 +503,7 @@ public struct GlassShellConnectControl: View {
     }
 
     @ViewBuilder private var serviceButtons: some View {
+        let host = model.host(hostID)
         ForEach(services) { service in
             Button {
                 model.connect(hostID: hostID, endpointID: service.endpointID)
@@ -432,7 +514,8 @@ public struct GlassShellConnectControl: View {
                     GlassServiceIcon(GlassServicePresentation.symbol(for: service.kind))
                 }
             }
-            .accessibilityIdentifier("host-connect-menu-\(service.kind.rawValue)")
+            .accessibilityIdentifier("host-connect-menu-\(service.kind.rawValue)"
+                                     + (host.map { GlassShellLibraryView.identifierSuffix(for: service, in: $0) } ?? ""))
         }
     }
 }

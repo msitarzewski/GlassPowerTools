@@ -11,14 +11,11 @@ public struct GlassLayerControls: View {
     public var body: some View {
         @Bindable var layers = layers
         Section {
-            Toggle("Paint Theme Color", isOn: paintsTheme)
-                .accessibilityIdentifier("layers-paints-theme")
             GlassSettingSlider(
                 title: "Opacity", value: $layers.state.opacity, detents: [0, 0.5, 1],
                 leadingAccessibilityLabel: "Transparent", trailingAccessibilityLabel: "Opaque",
                 accessibilityIdentifier: "layers-opacity"
             )
-            .disabled(!layers.state.paintsTheme)
             GlassSettingSlider(
                 title: "Frost", value: $layers.state.frost, detents: [0, 0.5, 1],
                 leadingAccessibilityLabel: "Clear", trailingAccessibilityLabel: "Frosted",
@@ -45,19 +42,5 @@ public struct GlassLayerControls: View {
         .disabled(reduceTransparency)
     }
 
-    /// Turning theme paint on with a zero slider would show nothing; start it at glassdb's
-    /// familiar 95% so the toggle has a visible effect.
-    private var paintsTheme: Binding<Bool> {
-        Binding(
-            get: { layers.state.paintsTheme },
-            set: { on in
-                var state = layers.state
-                state.paintsTheme = on
-                if on, state.opacity == 0 { state.opacity = GlassLayerControls.firstPaintOpacity }
-                layers.state = state
-            }
-        )
-    }
 
-    static let firstPaintOpacity = 0.95
 }

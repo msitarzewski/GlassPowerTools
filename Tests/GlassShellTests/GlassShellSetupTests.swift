@@ -80,12 +80,12 @@ struct GlassShellSetupTests {
         model.registry.register(ssh)
         let setup = GlassShellSetupModel(model: model, mode: .addHost)
         #expect(setup.isAvailable(.ssh) && !setup.isAvailable(.database), "unregistered kinds are disabled tabs")
-        #expect(setup.canToggle(.ssh) && !setup.canToggle(.database))
         setup.name = "scratch"
         setup.address = "192.0.2.6"
-        setup.setEnabled(.ssh, true)
-        setup.setEnabled(.database, true)
-        #expect(setup.enabledKinds == [.ssh], "a kind without a capability cannot be enabled")
+        setup.select(.database)
+        #expect(setup.selection == nil, "a kind without a capability cannot be selected")
+        setup.select(.ssh)
+        #expect(setup.enabledKinds == [.ssh], "the chosen tab is the service being added")
 
         let id = try #require(await setup.save())
         let host = try #require(model.host(id))
@@ -108,7 +108,7 @@ struct GlassShellSetupTests {
         var issues = setup.validateForSave()
         #expect(issues.host.map(\.field) == ["name", "address"])
         #expect(setup.hostIssue(.name) != nil && setup.hostIssue(.address) != nil)
-        #expect(await setup.save() == nil && model.hosts.isEmpty, "nothing saved while invalid")
+        #expect(await setup.save() == nil && model.catalogHosts.isEmpty, "nothing saved while invalid")
 
         setup.name = "box"
         setup.address = "user@bad:22"
@@ -116,7 +116,7 @@ struct GlassShellSetupTests {
         #expect(issues.host.map(\.field) == ["address"], "an invalid address is reported before any draft")
 
         setup.address = "box.example"
-        setup.setEnabled(.ssh, true)
+        setup.select(.ssh)
         let draft = try #require(setup.draft(for: .ssh) as? FakeDraft)
         draft.username = ""
         issues = setup.validateForSave()
@@ -125,28 +125,74 @@ struct GlassShellSetupTests {
         #expect(setup.selectedKind == .ssh)
     }
 
-    @Test("All or nothing: a failing second service removes the first and the new host")
-    func allOrNothing() async throws {
+    @Test("One service per sheet: choosing another tab replaces the choice rather than adding both")
+    func oneServicePerSheet() async throws {
         let (model, root) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
-        // Commits run in kind order; whichever of the two comes second is the one that fails.
-        let order = GlassShellSetupModel.tabOrder.filter { [.ssh, .rdp].contains($0) }
-        let first = SetupCapability(kind: order[0]), second = SetupCapability(kind: order[1])
-        second.nextFails = true
-        model.registry.register(first); model.registry.register(second)
+        let ssh = SetupCapability(kind: .ssh), rdp = SetupCapability(kind: .rdp)
+        model.registry.register(ssh); model.registry.register(rdp)
+        let setup = GlassShellSetupModel(model: model, mode: .addHost)
+
+        #expect(setup.enabledKinds == [.ssh], "adding a machine starts on the first live tab")
+        setup.select(.rdp)
+        #expect(setup.enabledKinds == [.rdp], "the second choice replaces the first; never both")
+        setup.select(.ssh)
+        #expect(setup.enabledKinds == [.ssh])
+        setup.select(nil)
+        #expect(setup.enabledKinds == [.ssh], "None is not offered while adding, so it cannot be chosen")
+    }
+
+    @Test("A service that fails to commit takes the host this save created with it")
+    func failedServiceRollsBackTheNewHost() async throws {
+        let (model, root) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let ssh = SetupCapability(kind: .ssh)
+        ssh.nextFails = true
+        model.registry.register(ssh)
         let setup = GlassShellSetupModel(model: model, mode: .addHost)
         setup.name = "half"
         setup.address = "half.example"
-        setup.setEnabled(.ssh, true)
-        setup.setEnabled(.rdp, true)
+        setup.select(.ssh)
 
         #expect(await setup.save() == nil)
         #expect(setup.error != nil)
-        #expect(model.hosts.isEmpty, "the host created by this save is deleted again")
-        let firstDraft = try #require(first.made.first)
-        #expect(firstDraft.commits.count == 1, "the first service was committed before the second failed")
-        #expect(first.removed == [try #require(firstDraft.commits.first?.0)], "and is removed through its capability")
-        #expect(second.made.first?.rollbacks.count == 1, "the failed draft is asked to roll back")
+        #expect(model.catalogHosts.isEmpty, "the host created by this save is deleted again")
+        #expect(ssh.made.first?.rollbacks.count == 1, "the failed draft is asked to roll back")
+    }
+
+    @Test("Adding a machine adds a service: the first live tab is chosen and None is not offered")
+    func addingAMachineAddsAService() async throws {
+        let (model, root) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let ssh = SetupCapability(kind: .ssh)
+        model.registry.register(ssh)
+        let setup = GlassShellSetupModel(model: model, mode: .addHost)
+
+        #expect(setup.selection == .ssh, "a machine with nothing on it is not worth a row")
+        #expect(!setup.allowsNoService, "and there is no way to opt out while adding")
+
+        setup.name = "box"
+        setup.address = "box.example"
+        let draft = try #require(setup.draft(for: .ssh) as? FakeDraft)
+        draft.username = "michael"
+        let id = try #require(await setup.save())
+        #expect(model.services(for: id).count == 1)
+    }
+
+    @Test("Editing a machine adds nothing on its own")
+    func editingAMachineAddsNoService() async throws {
+        let (model, root) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        model.registry.register(SetupCapability(kind: .ssh))
+        let created = try await model.addHost(displayName: "box", address: "box.example")
+        let host = try #require(model.host(created.id))
+        let setup = GlassShellSetupModel(model: model, mode: .editHost(host))
+
+        #expect(setup.selection == nil, "editing is not adding")
+        #expect(setup.allowsNoService)
+        setup.name = "renamed"
+        _ = try #require(await setup.save())
+        #expect(model.services(for: created.id).isEmpty, "a rename does not grow a service")
     }
 
     @Test("Add a service to an existing host: the tab is preselected, host fields locked, address required if missing")
@@ -158,7 +204,7 @@ struct GlassShellSetupTests {
         let bare = try await model.addHost(displayName: "bare")
         let shellHost = try #require(model.host(bare.id))
         let setup = GlassShellSetupModel(model: model, mode: .addService(shellHost, .ssh))
-        #expect(setup.selectedKind == .ssh && setup.isEnabled(.ssh) && !setup.canToggle(.ssh))
+        #expect(setup.selectedKind == .ssh && setup.isEnabled(.ssh) && !setup.allowsNoService)
         #expect(!setup.nameEditable && setup.addressEditable, "no address yet: it is collected here, on the host")
         #expect(!setup.showsOrganizeSection)
         #expect(await setup.save() == nil && setup.hostIssue(.address) != nil, "a service needs the machine's address")
@@ -187,7 +233,7 @@ struct GlassShellSetupTests {
         ssh.stored = [link.endpointID]
         let host = try #require(model.host(created.id))
         let setup = GlassShellSetupModel(model: model, mode: .editService(host, link))
-        #expect(setup.offeredKinds == [.ssh] && !setup.canToggle(.ssh) && !setup.nameEditable && !setup.addressEditable)
+        #expect(setup.offeredKinds == [.ssh] && !setup.allowsNoService && !setup.nameEditable && !setup.addressEditable)
         #expect(!setup.editedServiceIsBroken)
         _ = try #require(await setup.save())
         let draft = try #require(ssh.made.first)
@@ -240,8 +286,8 @@ struct GlassShellSetupTests {
         model.registry.register(Bare())
         let setup = GlassShellSetupModel(model: model, mode: .addHost)
         setup.name = "x"; setup.address = "x.example"
-        setup.setEnabled(.database, true)
+        setup.select(.database)
         #expect(setup.draft(for: .database) is GlassUnavailableServiceDraft)
-        #expect(await setup.save() == nil && model.hosts.isEmpty)
+        #expect(await setup.save() == nil && model.catalogHosts.isEmpty)
     }
 }

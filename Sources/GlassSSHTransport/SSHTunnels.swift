@@ -7,6 +7,20 @@ import os
 /// channels; tests provide plain TCP ones.
 public protocol SSHDirectChannelProvider: Sendable {
     func openDirectChannel(toHost host: String, port: Int) async throws -> any Channel
+    /// Wrapped before the channel is active, so a server that speaks first cannot lose its
+    /// opening bytes. Forwarding uses this; see `SSHTransport.openDirectAsyncChannel`.
+    func openDirectAsyncChannel(toHost host: String, port: Int) async throws -> NIOAsyncChannel<ByteBuffer, ByteBuffer>
+}
+
+public extension SSHDirectChannelProvider {
+    /// Default for providers that predate the distinction: wrap after the open. Correct only for
+    /// protocols where the client speaks first.
+    func openDirectAsyncChannel(toHost host: String, port: Int) async throws -> NIOAsyncChannel<ByteBuffer, ByteBuffer> {
+        let channel = try await openDirectChannel(toHost: host, port: port)
+        return try await channel.eventLoop.submit {
+            try NIOAsyncChannel<ByteBuffer, ByteBuffer>(wrappingChannelSynchronously: channel)
+        }.get()
+    }
 }
 
 /// Tracks accepted local sockets separately from the listening socket. Closing only the
@@ -192,8 +206,7 @@ enum SSHTunnelFactory {
         provider: any SSHDirectChannelProvider
     ) async {
         do {
-            let remoteChannel = try await provider.openDirectChannel(toHost: remoteHost, port: remotePort)
-            let remote = try await wrap(remoteChannel)
+            let remote = try await provider.openDirectAsyncChannel(toHost: remoteHost, port: remotePort)
             try await localClient.executeThenClose { localInbound, localOutbound in
                 try await remote.executeThenClose { remoteInbound, remoteOutbound in
                     try await withThrowingTaskGroup(of: Void.self) { group in
@@ -287,9 +300,9 @@ enum SSHTunnelFactory {
                 case .invalidVersion, .incomplete: return
                 }
 
-                let remoteChannel: any Channel
+                let remote: NIOAsyncChannel<ByteBuffer, ByteBuffer>
                 do {
-                    remoteChannel = try await provider.openDirectChannel(toHost: target.host, port: target.port)
+                    remote = try await provider.openDirectAsyncChannel(toHost: target.host, port: target.port)
                 } catch {
                     try await localOutbound.write(SOCKS5Protocol.reply(code: 0x01))
                     return
@@ -297,7 +310,6 @@ enum SSHTunnelFactory {
                 handshakeTimeoutTask.cancel()
                 await handshakePermit.release()
 
-                let remote = try await wrap(remoteChannel)
                 try await localOutbound.write(SOCKS5Protocol.reply(code: 0x00))
 
                 let pending = buffered

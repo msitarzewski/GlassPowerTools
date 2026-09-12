@@ -12,6 +12,7 @@ import OSLog
 import GlassConnectionKit
 import GlassShell
 import GlassLayers
+import GlassSSHTransport
 
 /// What the shell asked the terminal to open.
 public enum GlassTerminalOpenPurpose: Sendable { case terminal, sftp }
@@ -42,6 +43,8 @@ public final class GlassTerminalRuntime {
         case deleteServer(ServerConfiguration)
         case localTerminal
         case showWorkgroups
+        // (`localTerminal` carries no report: the outcome is claimed by the pane that actually
+        // starts a shell — see `expectLocalShell`.)
         case showTailscale
         /// Show the connect flow's failure alert with this message (a link with nothing behind it).
         case showFailure(String)
@@ -53,12 +56,20 @@ public final class GlassTerminalRuntime {
     /// `SettingsManager` so no second material system exists.
     public let layers: GlassLayerStore
 
+    /// D14: the second source the terminal's trust prompt can be driven from, for callers that
+    /// have no `TerminalSession` — a borrowed port forward, or a setup-time trust resolution.
+    let trustBroker: TerminalHostTrustBroker
+
     public init(layers: GlassLayerStore? = nil, windowRecovery: GlassWindowRecoveryManager? = nil) {
         let layers = layers ?? GlassLayerStore()
         self.layers = layers
+        let settingsManager = SettingsManager(loadImmediately: false, layers: layers)
         sessionManager = SessionManager(loadImmediately: false)
-        settingsManager = SettingsManager(loadImmediately: false, layers: layers)
+        self.settingsManager = settingsManager
         windowRecoveryManager = windowRecovery ?? GlassWindowRecoveryManager()
+        trustBroker = TerminalHostTrustBroker {
+            settingsManager.hostKeyVerificationMode == HostKeyVerificationMode.ask.rawValue
+        }
     }
 
     /// Connect to the saved server whose id is the shell's endpoint id. Consumed by the bootstrap.
@@ -96,6 +107,28 @@ public final class GlassTerminalRuntime {
     }
     /// macOS: a new workspace window with a local shell. Elsewhere this is a no-op.
     public func requestLocalTerminal() { enqueue(.localTerminal) }
+
+    // MARK: The device's own shell (D8)
+
+    /// Outcomes owed to the shell for local shells it asked for, oldest first. Opening a window
+    /// is not a session, so the report waits for the pane that actually starts a process — or
+    /// fails to start one — rather than claiming success the moment a window appears.
+    private var pendingLocalShellReports: [GlassCapabilityReport] = []
+
+    /// Records that the shell is waiting on the outcome of the local terminal being opened now.
+    /// Nothing is queued for the toolbar's own Local Terminal button, which asks for no outcome.
+    func expectLocalShell(report: GlassCapabilityReport?) {
+        guard let report else { return }
+        pendingLocalShellReports.append(report)
+    }
+
+    /// Called by a local pane once its process has started or failed to. Answers the oldest
+    /// waiting request; with none waiting it does nothing, which is the normal case — most local
+    /// panes are opened from the workspace itself and nobody is listening.
+    func reportLocalShell(_ outcome: GlassCapabilityOutcome) {
+        guard !pendingLocalShellReports.isEmpty else { return }
+        pendingLocalShellReports.removeFirst()(outcome)
+    }
     public func requestShowWorkgroups() { enqueue(.showWorkgroups) }
     public func requestShowTailscale() { enqueue(.showTailscale) }
 
@@ -175,6 +208,10 @@ public final class GlassTerminalCapability: GlassCapability {
 
     public func open(service: HostServiceLink, host: HostProfile, hostAccess: GlassCapabilityHostAccess,
                      report: @escaping GlassCapabilityReport) {
+        if service.endpointID == Self.localShellEndpointID {
+            openLocalShell(report: report)
+            return
+        }
         let serverID = service.endpointID.rawValue
         if runtime.hasServer(id: serverID) {
             runtime.requestConnect(serverID: serverID, report: report)
@@ -189,6 +226,44 @@ public final class GlassTerminalCapability: GlassCapability {
 
     public func hostAddressDidChange(host: HostProfile, address: String?) {
         runtime.applyHostAddress(address, to: host)
+    }
+
+    // MARK: The device's own shell (D8)
+
+    /// The endpoint id of the Mac's built-in local shell. A constant, because the shell stores no
+    /// record for a built-in service: this is how the same service is recognised again in `open`.
+    /// Readable as "GLAS…LOCALSHELL" in a JSON dump, and one no generated `UUID` will produce.
+    public static let localShellEndpointID = EndpointID(rawValue: UUID(uuidString: "4c4f4341-4c00-0000-0000-5348454c4c00")!)
+
+    /// The terminal's contribution to the device's own host: on a Mac, its shell. On iPhone, iPad
+    /// and Vision Pro there is no local shell to open — no `posix_spawn` of a login shell, no PTY
+    /// — so nothing is offered rather than a row that would do nothing when pressed.
+    public func builtInLocalServices() -> [HostServiceLink] {
+        #if os(macOS)
+        [HostServiceLink(endpointID: Self.localShellEndpointID, kind: .ssh, displayName: "Local Shell")]
+        #else
+        []
+        #endif
+    }
+
+    /// The terminal opts out of local setup: its service on this device is the built-in shell
+    /// above, and a second, configurable way to make one would only be a worse one — glas.sh's
+    /// workgroups already hold a saved shell, directory and layout.
+    public var supportsLocalSetup: Bool { false }
+
+    /// Connecting the built-in shell opens another local terminal — the same act as the toolbar's
+    /// Local Terminal button, so pressing either repeatedly gives the user as many as they want.
+    private func openLocalShell(report: @escaping GlassCapabilityReport) {
+        #if os(macOS)
+        runtime.expectLocalShell(report: report)
+        runtime.requestLocalTerminal()
+        #else
+        // Not reachable through the library — `builtInLocalServices()` offers nothing off macOS —
+        // but a stale link must still say why rather than appear to work.
+        let message = "A local shell is only available on the Mac."
+        runtime.enqueue(.showFailure(message))
+        report(.failed(message))
+        #endif
     }
 
     // MARK: Shell hooks
@@ -328,6 +403,137 @@ enum GlassTerminalHostAddressSync {
             var updated = server
             updated.host = address
             return updated
+        }
+    }
+}
+
+// MARK: - Lending the host's SSH transport to another capability (D7)
+
+/// The shell's `GlassHostPortForward` over a real `SSHTunnel`. Closing it also releases this
+/// borrower's claim on the transport, so a transport opened only for a tunnel goes away with it
+/// while one shared with a live terminal session stays up.
+private final class GlassTerminalPortForward: GlassHostPortForward {
+    let localPort: Int
+    private let tunnel: SSHTunnel
+    private let transport: SSHTransport
+    private let owner: UUID
+
+    init(tunnel: SSHTunnel, transport: SSHTransport, owner: UUID) {
+        self.localPort = tunnel.localPort
+        self.tunnel = tunnel
+        self.transport = transport
+        self.owner = owner
+    }
+
+    func close() async {
+        await tunnel.close()
+        await transport.release(owner: owner)
+    }
+}
+
+extension GlassTerminalCapability {
+    /// Opens a `-L` forward from this device to `remoteHost:port` **as seen from `host`**, using
+    /// the host's saved SSH service — its credentials, its jump chain and its already-established
+    /// host-key trust. This is what lets the database capability reach a server bound to the
+    /// machine's loopback without owning any SSH configuration of its own.
+    ///
+    /// **D14:** host-key trust is resolved here by asking, not by refusing. Opening a database is
+    /// a foreground action — the user pressed play and is waiting — so an unknown or changed key
+    /// surfaces the terminal's *own* fingerprint prompt through `TerminalHostTrustBroker`, and
+    /// the transport pins and retries on acceptance. Auto-trusting remains forbidden: declining,
+    /// or having host-key verification set to strict, still returns `hostNotTrusted`.
+    public func openPortForward(host: HostProfile, toHost remoteHost: String,
+                                port: Int) async throws -> any GlassHostPortForward {
+        guard let link = host.services.first(where: { $0.kind == .ssh }),
+              let server = runtime.sessionManager.serverManager.server(for: link.endpointID.rawValue)
+        else { throw GlassPortForwardError.unavailable }
+
+        let preparation = try runtime.sessionManager.prepareConnection(for: server)
+        var materials: [UUID: SessionAuthenticationMaterial] = [
+            preparation.authentication.target.serverID: preparation.authentication.target.material
+        ]
+        for hop in preparation.authentication.jumpHosts { materials[hop.serverID] = hop.material }
+
+        let route = SSHConnection.makeRoute(for: server, jumpHostChain: preparation.jumpHostChain)
+        let transport = SSHTransport(
+            route: route,
+            credentials: PreparedCredentialResolver(materials: materials),
+            trustStore: SecretStoreHostTrustStore(configuration: KeychainManager.config),
+            trustDecider: BrokeredHostTrustDecider(broker: runtime.trustBroker)
+        )
+        let owner = UUID()
+        _ = await transport.acquire(owner: owner)
+        do {
+            try await transport.connect()
+            let tunnel = try await transport.forward(localPort: 0, toHost: remoteHost, port: port)
+            return GlassTerminalPortForward(tunnel: tunnel, transport: transport, owner: owner)
+        } catch let error as SSHTransportError {
+            await transport.release(owner: owner)
+            switch error {
+            case .hostTrustRequired, .hostTrustRejected:
+                throw GlassPortForwardError.hostNotTrusted(name: server.host)
+            default:
+                throw error
+            }
+        } catch {
+            await transport.release(owner: owner)
+            throw error
+        }
+    }
+
+    /// Settles this machine's host-key trust without opening a tunnel (D14), so that a database
+    /// service being *set up* to tunnel can have its fingerprint reviewed once, there and then,
+    /// and simply connect later.
+    ///
+    /// Already-pinned machines are answered from the trust store without touching the network,
+    /// so the setup sheet may call this unconditionally.
+    public func resolveHostTrust(host: HostProfile) async -> GlassHostTrustOutcome {
+        guard let link = host.services.first(where: { $0.kind == .ssh }),
+              let server = runtime.sessionManager.serverManager.server(for: link.endpointID.rawValue)
+        else { return .unavailable }
+
+        let trustStore = SecretStoreHostTrustStore(configuration: KeychainManager.config)
+        if let pinned = try? trustStore.authorizedKeys(host: server.host, port: server.port), !pinned.isEmpty {
+            return .trusted
+        }
+
+        // Not pinned yet, so the key has to be seen to be judged: connect far enough to be
+        // offered it, let the prompt settle it, then drop the transport again. Nothing is left
+        // open — this is a trust decision, not a session.
+        let preparation: SessionManager.ConnectionPreparationResult
+        do {
+            preparation = try runtime.sessionManager.prepareConnection(for: server)
+        } catch {
+            // No usable credential yet: there is nothing to ask about, and saying "declined"
+            // would blame the user for something they never saw.
+            return .unavailable
+        }
+        var materials: [UUID: SessionAuthenticationMaterial] = [
+            preparation.authentication.target.serverID: preparation.authentication.target.material
+        ]
+        for hop in preparation.authentication.jumpHosts { materials[hop.serverID] = hop.material }
+
+        let transport = SSHTransport(
+            route: SSHConnection.makeRoute(for: server, jumpHostChain: preparation.jumpHostChain),
+            credentials: PreparedCredentialResolver(materials: materials),
+            trustStore: trustStore,
+            trustDecider: BrokeredHostTrustDecider(broker: runtime.trustBroker)
+        )
+        let owner = UUID()
+        _ = await transport.acquire(owner: owner)
+        defer { Task { await transport.release(owner: owner) } }
+        do {
+            try await transport.connect()
+            return .trusted
+        } catch let error as SSHTransportError {
+            switch error {
+            case .hostTrustRejected, .hostTrustRequired: return .declined
+            // Anything else — unreachable, bad credential — is not the user declining, and
+            // must not be reported as though it were.
+            default: return .unavailable
+            }
+        } catch {
+            return .unavailable
         }
     }
 }

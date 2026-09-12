@@ -168,17 +168,13 @@ final class GlassTerminalUITests: XCTestCase {
         XCTAssertTrue(element("host-editor-save").waitForNonExistence(timeout: 20), "the sheet closes after Save")
     }
 
+    /// Choosing the tab is what adds the service — there is no separate toggle.
     private func enableTerminalTab() {
-        let toggle = element("setup-enable-ssh")
-        XCTAssertTrue(toggle.waitForExistence(timeout: 10), "Terminal tab toggle")
-        #if os(macOS)
-        press(toggle)
-        #elseif os(iOS)
-        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
-        #else
-        toggle.tap()
-        #endif
-        XCTAssertTrue(element("add-server-username").waitForExistence(timeout: 10), "required fields appear once enabled")
+        let sections = element("setup-sections")
+        XCTAssertTrue(sections.waitForExistence(timeout: 10), "service tabs")
+        let tab = sections.buttons["Terminal"].exists ? sections.buttons["Terminal"] : sections.radioButtons["Terminal"]
+        XCTAssertTrue(tab.waitForExistence(timeout: 5), "Terminal tab")
+        press(tab)
     }
 
     private func openDetail(of name: String) {
@@ -556,7 +552,7 @@ final class GlassTerminalUITests: XCTestCase {
         let user = element("edit-server-username")
         XCTAssertTrue(user.waitForExistence(timeout: 10))
         XCTAssertEqual(user.value as? String, "probe", "the saved terminal's fields are loaded")
-        XCTAssertFalse(element("setup-enable-ssh").exists, "the service being edited has no toggle")
+        XCTAssertFalse(element("setup-enable-ssh").exists, "the tab is the toggle; there is no second one")
         let advanced = element("setup-advanced-ssh")
         XCTAssertTrue(advanced.waitForExistence(timeout: 5), "Advanced disclosure")
         expandDisclosure(advanced)

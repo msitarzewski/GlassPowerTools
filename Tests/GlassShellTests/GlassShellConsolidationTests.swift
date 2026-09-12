@@ -57,14 +57,14 @@ struct GlassShellConsolidationTests {
         await model.load()
 
         #expect(model.records.count == 2)
-        #expect(model.hosts.count == 1)
-        let host = try #require(model.hosts.first)
+        #expect(model.catalogHosts.count == 1)
+        let host = try #require(model.catalogHosts.first)
         #expect(host.id == older.id, "canonical is the oldest record")
         #expect(host.displayName == "juliet")
         #expect(host.services.count == 2)
         #expect(model.serviceKinds(for: host.id) == [.rdp, .ssh])
-        #expect(model.items.count == 1)
-        #expect(model.items.first?.subtitle == "Desktop · Terminal")
+        #expect(model.catalogItems.count == 1)
+        #expect(model.catalogItems.first?.subtitle == "Desktop · Terminal")
         #expect(host.member(owning: newer.services[0].endpointID)?.id == newer.id)
     }
 
@@ -75,9 +75,9 @@ struct GlassShellConsolidationTests {
         try await sibling.upsert(try record("Max Beast", aliases: ["10.0.0.5"], kinds: [.ssh], createdAt: t0))
         try await sibling.upsert(try record("juliet-desktop", aliases: ["10.0.0.5"], kinds: [.rdp], createdAt: t0.addingTimeInterval(1)))
         await model.load()
-        #expect(model.hosts.count == 1)
-        #expect(model.hosts.first?.services.count == 2)
-        #expect(model.hosts.first?.aliases == ["10.0.0.5"])
+        #expect(model.catalogHosts.count == 1)
+        #expect(model.catalogHosts.first?.services.count == 2)
+        #expect(model.catalogHosts.first?.aliases == ["10.0.0.5"])
     }
 
     @Test("Unrelated names stay separate, and loopback aliases never group")
@@ -88,8 +88,8 @@ struct GlassShellConsolidationTests {
         try await sibling.upsert(try record("beta", aliases: ["localhost"], kinds: [.database], createdAt: t0))
         try await sibling.upsert(try record("gamma", kinds: [.rdp], createdAt: t0))
         await model.load()
-        #expect(model.hosts.count == 3)
-        #expect(model.hosts.allSatisfy { !$0.isConsolidated })
+        #expect(model.catalogHosts.count == 3)
+        #expect(model.catalogHosts.allSatisfy { !$0.isConsolidated })
     }
 
     @Test("A record that already holds two services is one host and is left exactly as stored")
@@ -99,7 +99,7 @@ struct GlassShellConsolidationTests {
         let oscar = try record("oscar", kinds: [.rdp, .ssh], createdAt: t0)
         try await sibling.upsert(oscar)
         await model.load()
-        let host = try #require(model.hosts.first)
+        let host = try #require(model.catalogHosts.first)
         #expect(host.id == oscar.id)
         #expect(!host.isConsolidated)
         #expect(host.services.map(\.endpointID) == oscar.services.map(\.endpointID))
@@ -145,9 +145,9 @@ struct GlassShellConsolidationTests {
         try await sibling.upsert(try record("juliet", kinds: [.rdp], createdAt: t0.addingTimeInterval(1)))
         try await sibling.upsert(try record("other", kinds: [.ssh], createdAt: t0))
         await model.load()
-        let host = try #require(model.hosts.first { $0.displayName == "juliet" })
+        let host = try #require(model.catalogHosts.first { $0.displayName == "juliet" })
         try await model.deleteHost(host.id)
-        #expect(model.hosts.map(\.displayName) == ["other"])
+        #expect(model.catalogHosts.map(\.displayName) == ["other"])
         #expect(try await sibling.snapshot().count == 1)
     }
 
@@ -163,12 +163,12 @@ struct GlassShellConsolidationTests {
         let stored = try await sibling.snapshot()
         #expect(stored.first { $0.id == older.id }?.services.contains { $0.endpointID == added.endpointID } == true)
         #expect(stored.first { $0.id == newer.id }?.services.count == 1)
-        #expect(model.hosts.first?.services.count == 3)
+        #expect(model.catalogHosts.first?.services.count == 3)
 
         try await model.removeService(newer.services[0].endpointID, from: older.id)
         let after = try await sibling.snapshot()
         #expect(after.first { $0.id == newer.id }?.services.isEmpty == true)
-        #expect(model.hosts.first?.services.count == 2)
+        #expect(model.catalogHosts.first?.services.count == 2)
     }
 
     @Test("The picker lists every service of the group and Connect hands the owning record to the capability")
@@ -181,7 +181,7 @@ struct GlassShellConsolidationTests {
         let desktop = RecordingCapability(kind: .rdp)
         model.registry.register(desktop)
         await model.load()
-        let host = try #require(model.hosts.first)
+        let host = try #require(model.catalogHosts.first)
         #expect(Set(model.services(for: host.id).map(\.endpointID)) == Set([older.services[0].endpointID, newer.services[0].endpointID]))
         model.connect(hostID: newer.id, endpointID: newer.services[0].endpointID)
         #expect(desktop.opened.count == 1)
@@ -201,7 +201,7 @@ struct GlassShellConsolidationTests {
         let terminal = RecordingCapability(kind: .ssh)
         model.registry.register(terminal)
         await model.load()
-        let host = try #require(model.hosts.first)
+        let host = try #require(model.catalogHosts.first)
 
         model.connect(hostID: host.id)
         terminal.pendingReport?(.failed("authentication failed"))
@@ -235,7 +235,7 @@ struct GlassShellConsolidationTests {
         #expect(stored.first?.id == older.id)
         #expect(stored.first?.services.count == 2)
         #expect(Set(stored.first?.aliases ?? []) == ["10.0.0.5", "juliet.local"])
-        #expect(model.hosts.count == 1 && model.records.count == 1)
+        #expect(model.catalogHosts.count == 1 && model.records.count == 1)
     }
 
     @Test("The play button opens every service on the host, in order, and remembers no single one")
@@ -249,7 +249,7 @@ struct GlassShellConsolidationTests {
         let desktop = RecordingCapability(kind: .rdp)
         model.registry.register(terminal); model.registry.register(desktop)
         await model.load()
-        let host = try #require(model.hosts.first)
+        let host = try #require(model.catalogHosts.first)
 
         model.connectAll(hostID: host.id)
 
@@ -272,7 +272,7 @@ struct GlassShellConsolidationTests {
         let terminal = RecordingCapability(kind: .ssh)
         model.registry.register(terminal)      // no database capability in this build
         await model.load()
-        let grouped = try #require(model.hosts.first)
+        let grouped = try #require(model.catalogHosts.first)
 
         model.connectAll(hostID: grouped.id)
 

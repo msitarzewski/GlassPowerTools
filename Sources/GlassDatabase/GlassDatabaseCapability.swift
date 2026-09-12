@@ -1,0 +1,257 @@
+//
+//  GlassDatabaseCapability.swift
+//  Glass Power Tools — GlassDatabase
+//
+//  The database capability's public surface: the runtime the app owns, and the capability the
+//  shell routes Connect through. Everything else in this module stays internal.
+//
+//  Shaped after `Sources/GlassTerminal/GlassTerminalCapability.swift`, which is the worked
+//  example of every hook here.
+//
+
+import SwiftUI
+import OSLog
+import GlassConnectionKit
+import GlassShell
+import GlassLayers
+
+/// The shell's outcome callback for one connect attempt (see `GlassCapabilityOutcome`).
+public typealias GlassDatabaseReport = @MainActor (GlassCapabilityOutcome) -> Void
+
+/// Owns the database managers for the process. One per app, created in the composition root.
+@MainActor @Observable
+public final class GlassDatabaseRuntime {
+    let connectionManager: ConnectionManager
+    let sessionManager: DatabaseSessionManager
+    let settingsManager: SettingsManager
+
+    /// Everything the shell and the module's own surfaces can ask the database to do. One
+    /// queue, consumed by the scenes in stage 3, so opening a workspace — and the failure
+    /// alert when it cannot be opened — exists in exactly one place.
+    enum Request {
+        /// Connect to the saved connection behind this endpoint and open its workspace.
+        /// `openForward` is nil when the host cannot lend one; `report` is the shell's callback.
+        case connect(connectionID: UUID,
+                     openForward: DatabaseSessionManager.PortForwardProvider?,
+                     report: GlassDatabaseReport?)
+        /// Open a SQL editor against an already-connected session.
+        case openQueryEditor(sessionID: UUID)
+        /// Show the failure alert with this message (a link with nothing behind it).
+        case showFailure(String)
+    }
+    private(set) var requestSerial = 0
+    private var pendingRequests: [Request] = []
+
+    /// The one layering state, shared with the shell so no second material system exists.
+    public let layers: GlassLayerStore
+
+    /// How to ask the shell what a capability may do with a host. Set by the composition root,
+    /// because the shell model owns the brokering and a capability must not hold the model.
+    /// Only the setup sheet needs it: `open` is handed a `GlassCapabilityHostAccess` directly.
+    public var hostAccess: (@MainActor (HostProfile) -> GlassCapabilityHostAccess)?
+
+    public init(layers: GlassLayerStore? = nil) {
+        self.layers = layers ?? GlassLayerStore()
+        connectionManager = ConnectionManager(loadImmediately: false)
+        sessionManager = DatabaseSessionManager(loadImmediately: false)
+        settingsManager = SettingsManager(loadImmediately: false)
+    }
+
+    func enqueue(_ request: Request) {
+        pendingRequests.append(request)
+        requestSerial &+= 1
+    }
+
+    func takeRequests() -> [Request] {
+        defer { pendingRequests.removeAll() }
+        return pendingRequests
+    }
+
+    /// True when a saved database connection exists for this endpoint id.
+    public func hasConnection(id: UUID) -> Bool {
+        connectionManager.connection(for: id) != nil
+    }
+
+    /// Saved connections the shell can surface (command palette, service actions).
+    public var savedConnectionIDs: [UUID] { connectionManager.connections.map(\.id) }
+    public func savedConnectionName(id: UUID) -> String? { connectionManager.connection(for: id)?.name }
+
+    /// A live session over this saved connection, if one is open.
+    func liveSessionID(for connectionID: UUID) -> UUID? {
+        sessionManager.sessions.first { $0.value.connectionConfig.id == connectionID }?.key
+    }
+}
+
+/// The shell's database capability. A service is created complete through the shell's host
+/// sheet: the draft commits the connection record and its password under the shell's endpoint
+/// id, which is the link. `open` connects to that record; a link with nothing behind it is
+/// reported as such rather than silently doing nothing.
+@MainActor
+public final class GlassDatabaseCapability: GlassCapability {
+    public let kind: HostServiceKind = .database
+    public let displayName = "Database"
+    /// The database's real icon is Heroicons' `circle-stack`, vendored in the kit and drawn
+    /// through `GlassServiceIcon` — `GlassServicePresentation.symbol(for: .database)` returns
+    /// it. That is not an SF Symbol name, and this property is one: the shell's tool rows feed
+    /// names like it straight to `Image(systemName:)` (`GlassShellLibraryView.swift:214`), where
+    /// "circle-stack" would render nothing at all. So this is a real SF Symbol that reads the
+    /// same way, and the vendored icon stays the canonical one.
+    public let symbolName = "cylinder.split.1x2"
+    private let runtime: GlassDatabaseRuntime
+
+    public init(runtime: GlassDatabaseRuntime) { self.runtime = runtime }
+
+    // MARK: Setup (the shell's host sheet)
+
+    public func makeSetupDraft() -> any GlassServiceDraft {
+        // No host context here: the Add Host sheet has no host yet, so whether a forward is
+        // possible is genuinely unknown and the tunnel row says nothing rather than guessing.
+        DatabaseServiceDraft(connectionManager: runtime.connectionManager)
+    }
+
+    public func setupDraft(for service: HostServiceLink, host: HostProfile) -> (any GlassServiceDraft)? {
+        guard let config = runtime.connectionManager.connection(for: service.endpointID.rawValue) else { return nil }
+        // D14: this host is committed, so its fingerprint can be settled here rather than at
+        // first connect. The resolver is the shell's, brokered to whichever capability owns
+        // `.ssh` — this module still never imports it.
+        var resolveTrust: (@MainActor @Sendable () async -> GlassHostTrustOutcome)?
+        if let access = runtime.hostAccess?(host) {
+            resolveTrust = { await access.resolveHostTrust() }
+        }
+        return DatabaseServiceDraft(editing: config,
+                                    connectionManager: runtime.connectionManager,
+                                    hostCanForwardPorts: hostCanForwardPorts(host),
+                                    resolveHostTrust: resolveTrust)
+    }
+
+    public func removeService(_ service: HostServiceLink, host: HostProfile) async throws {
+        guard let config = runtime.connectionManager.connection(for: service.endpointID.rawValue) else { return }
+        // Order matters: the credential first, then the record. `ConnectionManager.delete`
+        // already removes the credentials and any managed SQLite working copy transactionally.
+        try runtime.connectionManager.delete(config)
+    }
+
+    /// The saved record's address, for hosts that predate addresses on the host record. SQLite's
+    /// "host" is a file path, not a machine, so it is never offered as one.
+    public func knownAddress(service: HostServiceLink, host: HostProfile) -> String? {
+        guard let config = runtime.connectionManager.connection(for: service.endpointID.rawValue),
+              config.engine != .sqlite else { return nil }
+        let address = config.host.trimmingCharacters(in: .whitespacesAndNewlines)
+        return address.isEmpty ? nil : address
+    }
+
+    /// The machine's address changed in the shell: every saved connection that is a service of
+    /// that host follows it, so the machine's identity is edited once. SQLite records are left
+    /// alone — their `host` is a managed file path.
+    public func hostAddressDidChange(host: HostProfile, address: String?) {
+        runtime.applyHostAddress(address, to: host)
+    }
+
+    // MARK: Connect
+
+    public func open(service: HostServiceLink, host: HostProfile, report: @escaping GlassDatabaseReport) {
+        open(service: service, host: host,
+             hostAccess: GlassCapabilityHostAccess(address: host.address), report: report)
+    }
+
+    public func open(service: HostServiceLink, host: HostProfile, hostAccess: GlassCapabilityHostAccess,
+                     report: @escaping GlassDatabaseReport) {
+        let connectionID = service.endpointID.rawValue
+        guard let config = runtime.connectionManager.connection(for: connectionID) else {
+            // A link another family app recorded with no saved connection behind it.
+            let message = "\(service.displayName) has no saved database configuration. Edit the service to set it up, or remove it."
+            runtime.enqueue(.showFailure(message))
+            report(.failed(message))
+            return
+        }
+        // D7: the forward, when this service wants one, is the host's own SSH service. The
+        // shell brokers it; this module never learns which capability served it.
+        var openForward: DatabaseSessionManager.PortForwardProvider?
+        if config.usesHostTunnel, hostAccess.canForwardPorts {
+            openForward = { remoteHost, port in
+                try await hostAccess.forwardPort(toHost: remoteHost, port: port)
+            }
+        }
+        runtime.enqueue(.connect(connectionID: connectionID, openForward: openForward, report: report))
+    }
+
+    // MARK: Shell hooks
+
+    /// Query is a tool rather than a service: it rides this database's connection, credentials
+    /// and session, exactly as Files rides the terminal's. Offered only once the service has a
+    /// saved connection behind it.
+    public func serviceTools(service: HostServiceLink, host: HostProfile) -> [GlassServiceTool] {
+        let connectionID = service.endpointID.rawValue
+        guard runtime.hasConnection(id: connectionID) else { return [] }
+        let runtime = self.runtime
+        return [
+            GlassServiceTool(id: "query-\(connectionID.uuidString.lowercased())",
+                             title: "Query",
+                             symbolName: "text.and.command.macwindow",
+                             subtitle: "Write and run SQL against this database") {
+                if let sessionID = runtime.liveSessionID(for: connectionID) {
+                    runtime.enqueue(.openQueryEditor(sessionID: sessionID))
+                } else {
+                    // Nothing is connected yet, so there is nothing to query. Say that rather
+                    // than opening an editor with no session behind it.
+                    runtime.enqueue(.showFailure("Connect this database first, then open Query."))
+                }
+            }
+        ]
+    }
+
+    /// Whether a forward can actually be borrowed for this machine, for telling the user in the
+    /// setup sheet before they commit.
+    ///
+    /// **Ask the shell; never infer it from the services.** The presence of an `.ssh` service is
+    /// not the same question: the built-in local host has one and is deliberately excluded from
+    /// the broker (D8), because its services are already local and must never tunnel. Inferring
+    /// it here produced an Advanced row offering a tunnel that would never be used — nothing
+    /// failed at connect, which is precisely why it would have survived.
+    private func hostCanForwardPorts(_ host: HostProfile) -> Bool {
+        runtime.hostAccess?(host).canForwardPorts ?? false
+    }
+}
+
+/// Which saved connections follow a host's address, and to what. Pure so it is testable without
+/// a Keychain, mirroring `GlassTerminalHostAddressSync`.
+enum GlassDatabaseHostAddressSync {
+    /// Persists the change for every following connection; one that fails is logged and skipped
+    /// so a single bad record does not stop the rest. Returns the ids updated. A cleared address
+    /// leaves the records alone: they still need something to connect to.
+    @MainActor @discardableResult
+    static func apply(_ address: String?, to host: HostProfile, in manager: ConnectionManager) -> [UUID] {
+        guard let address else { return [] }
+        var applied: [UUID] = []
+        for config in connections(manager.connections, following: host, address: address) {
+            do {
+                try manager.update(config)
+                applied.append(config.id)
+            } catch {
+                Logger.connections.error(
+                    "Host address sync skipped \(config.id.uuidString, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                )
+            }
+        }
+        return applied
+    }
+
+    static func connections(_ connections: [DatabaseConnectionConfig], following host: HostProfile,
+                            address: String) -> [DatabaseConnectionConfig] {
+        let owned = Set(host.services.filter { $0.kind == .database }.map(\.endpointID.rawValue))
+        return connections.compactMap { config in
+            // A SQLite record's `host` is a managed file path, not a machine address.
+            guard owned.contains(config.id), config.engine != .sqlite, config.host != address else { return nil }
+            var updated = config
+            updated.host = address
+            return updated
+        }
+    }
+}
+
+extension GlassDatabaseRuntime {
+    @discardableResult
+    func applyHostAddress(_ address: String?, to host: HostProfile) -> [UUID] {
+        GlassDatabaseHostAddressSync.apply(address, to: host, in: connectionManager)
+    }
+}

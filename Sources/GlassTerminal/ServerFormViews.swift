@@ -10,6 +10,7 @@ import GlasSecretStore
 import GlassConnectionKit
 import GlassShell
 import os
+import GlassLayers
 
 extension View {
     @ViewBuilder
@@ -694,8 +695,7 @@ struct TerminalAdvancedFields: View {
     private var colorTagPicker: some View {
         Picker("Color tag", selection: $draft.colorTag) {
             ForEach(ServerColorTag.allCases, id: \.self) { tag in
-                Label(tag.rawValue.capitalized, systemImage: "circle.fill")
-                    .foregroundStyle(tag.color)
+                GlassColorTagRow(title: tag.rawValue.capitalized, color: tag.color)
                     .tag(tag)
             }
         }

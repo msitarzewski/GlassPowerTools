@@ -10,13 +10,16 @@
 import SwiftUI
 import GlassShell
 import GlassLayers
+import GlassConnectionKit
 import GlassTerminal
+import GlassDatabase
 
 @main
 struct GlassPowerToolsApp: App {
     @State private var layers: GlassLayerStore
     @State private var model: GlassShellModel
     @State private var terminal: GlassTerminalRuntime
+    @State private var database: GlassDatabaseRuntime
     @State private var windowRecovery: GlassWindowRecoveryManager
     #if os(macOS)
     @NSApplicationDelegateAdaptor(MacTerminalAppDelegate.self) private var appDelegate
@@ -50,9 +53,21 @@ struct GlassPowerToolsApp: App {
         let windowRecovery = GlassWindowRecoveryManager()
         let terminal = GlassTerminalRuntime(layers: layers, windowRecovery: windowRecovery)
         model.registry.register(GlassTerminalCapability(runtime: terminal))
+        // Stage 3: the database capability. Its managers live for the process in the runtime;
+        // the shell routes Connect for `.database` services through the capability, and the
+        // tunnel a service asks for is brokered back to whichever capability owns `.ssh` (D7).
+        let database = GlassDatabaseRuntime(layers: layers)
+        // The setup sheet settles a machine's SSH host-key trust through the shell's broker
+        // (D14). Handed in here because the shell model owns the brokering and a capability
+        // must not hold the model.
+        database.hostAccess = { [weak model] host in
+            model?.hostAccess(for: host.id) ?? GlassCapabilityHostAccess(address: host.address)
+        }
+        model.registry.register(GlassDatabaseCapability(runtime: database))
         _layers = State(initialValue: layers)
         _model = State(initialValue: model)
         _terminal = State(initialValue: terminal)
+        _database = State(initialValue: database)
         _windowRecovery = State(initialValue: windowRecovery)
     }
 
@@ -62,7 +77,9 @@ struct GlassPowerToolsApp: App {
     private var mainScene: some Scene {
         let group = WindowGroup("Connections", id: "main") {
             GlassTerminalBootstrap(runtime: terminal) {
-                GlassShellLibraryView(model: model)
+                GlassDatabaseBootstrap(runtime: database) {
+                    GlassShellLibraryView(model: model)
+                }
             }
             .glassLayers(layers)
             .trackWindowPresence(key: "main", recovery: windowRecovery)
@@ -97,6 +114,7 @@ struct GlassPowerToolsApp: App {
     var body: some Scene {
         mainScene
         GlassTerminalScenes(runtime: terminal)
+        GlassDatabaseScenes(runtime: database)
         #if os(macOS)
         Settings {
             GlassShellSettingsView(model: model)

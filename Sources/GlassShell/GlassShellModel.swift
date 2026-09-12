@@ -10,6 +10,14 @@ public enum GlassShellError: LocalizedError, Equatable {
     case serviceNotFound(EndpointID)
     case invalidName
     case preferencesReadOnly
+    /// The device's own host cannot be deleted (D8): it is not a record the user created, and
+    /// removing it would take its saved databases with it.
+    case localHostNotRemovable
+    /// A built-in local service has nothing stored behind it, so there is nothing to edit or
+    /// remove. See `GlassCapability.builtInLocalServices()`.
+    case builtInServiceNotEditable(String)
+    /// The local host has no address and never asks for one (D8).
+    case localHostHasNoAddress
 
     public var errorDescription: String? {
         switch self {
@@ -17,6 +25,9 @@ public enum GlassShellError: LocalizedError, Equatable {
         case .serviceNotFound: "That service is no longer on the host."
         case .invalidName: "Enter a name."
         case .preferencesReadOnly: "Favorites and recent services are read-only until the preferences file can be read or is reset in Settings."
+        case .localHostNotRemovable: "\(GlassLocalHost.displayName) is this device and is always in the library. Remove its services instead."
+        case .builtInServiceNotEditable(let name): "\(name) is built in to this device. There is nothing to configure and nothing to remove."
+        case .localHostHasNoAddress: "\(GlassLocalHost.displayName) is this device, so it has no address to set."
         }
     }
 
@@ -79,8 +90,21 @@ public final class GlassShellModel {
     /// over it until `resetPreferences()` or a later successful read.
     public private(set) var preferencesReadOnly = false
 
+    /// Why the device's own host is missing from the library, when it is. Nil in the normal case.
+    /// Surfaced in Settings rather than as an alert: the rest of the library still works, and
+    /// `load()` runs on every activation, so an alert would nag on every switch back to the app.
+    public private(set) var localHostProblem: String?
+
     public let storageDirectory: URL
     public private(set) var catalog: HostCatalogStore
+    /// The device's own host (D8), kept in this app's private storage and **never** in the App
+    /// Group file the three source applications also read: a record they cannot open has no
+    /// business appearing in their libraries, and the device's host is local to the device.
+    public let localCatalog: HostCatalogStore
+    /// Mirrored like `catalogFileURL`, so views and tests need not hop to the actor.
+    public let localCatalogFileURL: URL
+    /// The stored local record, once `load()` has read or created it.
+    public private(set) var localRecord: HostProfile?
     /// Mirrored here so views and tests need not hop to the actor.
     public private(set) var catalogFileURL: URL
     public let writerID: WriterID
@@ -115,6 +139,9 @@ public final class GlassShellModel {
         let shared = sharedContainerURL ?? (resolveSharedContainer
             ? FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: Self.sharedContainerIdentifier) : nil)
         self.writerID = writerID
+        // Always the app's own directory, never `shared`: that is the whole point (D8).
+        localCatalogFileURL = directory.appendingPathComponent(GlassLocalHost.storeRelativePath)
+        localCatalog = HostCatalogStore(fileURL: localCatalogFileURL, writerID: writerID)
         if let shared {
             let fileURL = shared.appendingPathComponent(Self.catalogRelativePath)
             catalogFileURL = fileURL
@@ -171,6 +198,7 @@ public final class GlassShellModel {
             #endif
             records = try await catalog.snapshot()
             hosts = GlassShellHostGrouping.group(records)
+            await loadLocalHost()
             migratePreferencesToCanonicalHosts()
             isLoaded = true
             errorMessage = nil
@@ -189,6 +217,67 @@ public final class GlassShellModel {
             }
             errorMessage = "The host library could not be read: \(GlassShellError.message(for: error))"
         }
+    }
+
+    // MARK: The device's own host (D8)
+
+    /// Reads the device's host from its own store, creating it the first time, and puts it at the
+    /// head of the library: the machine you are holding comes before the ones you reach. It never
+    /// goes through `GlassShellHostGrouping`, so it can never merge with a discovered machine that
+    /// happens to share its name.
+    private func loadLocalHost() async {
+        do {
+            let stored = try await localCatalog.snapshot()
+            let record: HostProfile
+            if let existing = stored.first(where: { $0.id == GlassLocalHost.id }) {
+                record = existing
+            } else {
+                record = try HostProfile(id: GlassLocalHost.id, displayName: GlassLocalHost.displayName,
+                                         lastWriterID: writerID)
+                try await localCatalog.upsert(record)
+            }
+            #if DEBUG
+            try await seedLocalServicesForUITestingIfRequested(on: record)
+            #endif
+            let current = (try await localCatalog.snapshot()).first { $0.id == GlassLocalHost.id } ?? record
+            localRecord = current
+            localHostProblem = nil
+            hosts.insert(GlassShellHost(local: current, builtInServices: registry.builtInLocalServices), at: 0)
+        } catch {
+            // The library is still usable without it, so this is reported rather than thrown:
+            // silence would be the honest-status failure, an alert on every activation would be
+            // noise. Settings says what happened.
+            localRecord = nil
+            localHostProblem = "\(GlassLocalHost.displayName) is not in the library: its record could not be read or created (\(GlassShellError.message(for: error)))."
+        }
+    }
+
+    /// True for the device's own host, for any of its ids.
+    public func isLocalHost(_ id: HostID) -> Bool { id == GlassLocalHost.id }
+
+    /// The local host, when it loaded.
+    public var localHost: GlassShellHost? { hosts.first { $0.isLocal } }
+
+    /// The library minus this device: the machines that came from the shared catalog. What
+    /// diagnostics about that file should count, and what a test about it should assert on.
+    public var catalogHosts: [GlassShellHost] { hosts.filter { !$0.isLocal } }
+
+    /// `items` without this device. Internal: the library itself always shows every row, and
+    /// this exists so a test about the shared catalog can say which rows it means.
+    var catalogItems: [GlassLibraryItem<HostID>] { items.filter { $0.id != GlassLocalHost.id } }
+
+    /// Writes the device's own record and reloads. Separate from `updateHost` because the local
+    /// record lives in its own store and carries no address.
+    private func updateLocalRecord(_ body: (inout HostProfile) -> Void) async throws {
+        let stored = try await localCatalog.snapshot()
+        guard let current = stored.first(where: { $0.id == GlassLocalHost.id }) else {
+            throw GlassShellError.hostNotFound(GlassLocalHost.id)
+        }
+        var updated = current
+        body(&updated)
+        try updated.validate()
+        try await localCatalog.upsert(updated)
+        await load()
     }
 
     // MARK: Projection
@@ -223,8 +312,12 @@ public final class GlassShellModel {
         hosts.first { $0.id == id } ?? hosts.first { $0.contains(id) }
     }
 
-    /// The stored record with this id, if any.
-    public func record(_ id: HostID) -> HostProfile? { records.first { $0.id == id } }
+    /// The stored record with this id, if any — the device's own included, though it is not in
+    /// `records`, which is the shared catalog as stored.
+    public func record(_ id: HostID) -> HostProfile? {
+        if id == GlassLocalHost.id { return localRecord }
+        return records.first { $0.id == id }
+    }
 
     /// The canonical id for any host or member id.
     public func canonicalID(for id: HostID) -> HostID { host(id)?.id ?? id }
@@ -294,6 +387,17 @@ public final class GlassShellModel {
         guard let host = host(id) else { throw GlassShellError.hostNotFound(id) }
         let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw GlassShellError.invalidName }
+        if host.isLocal {
+            // Rename, aliases and collections are the user's; an address is not a thing this host
+            // has, and an attempt to set one is refused rather than quietly dropped.
+            guard Self.blankToNil(address) == nil else { throw GlassShellError.localHostHasNoAddress }
+            try await updateLocalRecord { record in
+                record.displayName = trimmed
+                record.aliases = aliases
+                record.tags = tags
+            }
+            return
+        }
         let newAddress = try Self.blankToNil(address).map(HostProfile.normalizedAddress)
         let snapshot = try await catalog.snapshot()
         var updatedMembers: [HostProfile] = []
@@ -332,9 +436,52 @@ public final class GlassShellModel {
         }
     }
 
-    /// What a capability may read about a host while it sets a service up or connects.
-    func hostAccess(for id: HostID) -> GlassCapabilityHostAccess {
-        GlassCapabilityHostAccess(address: host(id)?.address)
+    /// What a capability may read about a host while it sets a service up or connects, plus the
+    /// brokered forward: when the machine has an SSH service, any capability may borrow it to
+    /// reach a service that only listens on the machine itself (D7), without importing the
+    /// capability that owns it.
+    /// Public because the composition root hands it to capabilities that need it outside a
+    /// connect — the database's setup sheet settles host-key trust through it (D14).
+    /// The tidier-looking alternative, passing access through `setupDraft(for:host:)`, was
+    /// considered and rejected: `makeSetupDraft()` has no host, so it would cover only half the
+    /// cases — exactly the one-and-done sheet that creates a host and its services in one save.
+    public func hostAccess(for id: HostID) -> GlassCapabilityHostAccess {
+        guard let host = host(id) else { return GlassCapabilityHostAccess(address: nil) }
+        return GlassCapabilityHostAccess(address: host.address,
+                                         openForward: portForwardProvider(for: host),
+                                         resolveTrust: hostTrustResolver(for: host))
+    }
+
+    /// The forward provider for a host, or nil when there is nothing to borrow: the machine has
+    /// no SSH service, no registered capability owns that kind, or the machine is this device.
+    /// Resolved once per access so a caller's `canForwardPorts` answers the same question the
+    /// call will.
+    ///
+    /// **The local host is excluded explicitly (D8), and it has to be**: it carries a Terminal
+    /// service — the Mac's own shell — so the plain "does this host have an `.ssh` service?" test
+    /// says yes, and the database capability would then tunnel to loopback through loopback to
+    /// reach a server already listening on it.
+    private func portForwardProvider(for host: GlassShellHost)
+    -> (@MainActor @Sendable (String, Int) async throws -> any GlassHostPortForward)? {
+        guard !host.isLocal else { return nil }
+        guard let capability = registry.capability(for: .ssh),
+              let member = host.members.first(where: { $0.services.contains { $0.kind == .ssh } })
+        else { return nil }
+        return { remoteHost, port in
+            try await capability.openPortForward(host: member, toHost: remoteHost, port: port)
+        }
+    }
+
+    /// The host-key trust resolver for a host (D14), resolved against the same SSH service the
+    /// forward would use so that settling trust settles it for the forward. Nil on exactly the
+    /// same conditions, so `resolveHostTrust` cannot promise more than `forwardPort` can deliver.
+    private func hostTrustResolver(for host: GlassShellHost)
+    -> (@MainActor @Sendable () async -> GlassHostTrustOutcome)? {
+        guard !host.isLocal else { return nil }
+        guard let capability = registry.capability(for: .ssh),
+              let member = host.members.first(where: { $0.services.contains { $0.kind == .ssh } })
+        else { return nil }
+        return { await capability.resolveHostTrust(host: member) }
     }
 
     /// An address one of the host's capabilities already stores for a service of the host — a
@@ -361,7 +508,9 @@ public final class GlassShellModel {
         guard !isAdoptingAddresses else { return }
         isAdoptingAddresses = true
         defer { isAdoptingAddresses = false }
-        let candidates = hosts.filter { $0.address == nil }.compactMap { host in
+        // The local host is skipped: it has no address by design, and a SQLite file path or a
+        // loopback literal saved on one of its services is not a machine to adopt.
+        let candidates = hosts.filter { $0.address == nil && !$0.isLocal }.compactMap { host in
             knownAddress(for: host).map { (host.id, $0) }
         }
         for (id, address) in candidates {
@@ -372,9 +521,11 @@ public final class GlassShellModel {
         }
     }
 
-    /// Deletes every record that makes up the host.
+    /// Deletes every record that makes up the host. The device's own host is not one the user
+    /// created and is not one they can remove (D8) — its services are removed individually.
     public func deleteHost(_ id: HostID) async throws {
         guard let host = host(id) else { throw GlassShellError.hostNotFound(id) }
+        guard !host.isLocal else { throw GlassShellError.localHostNotRemovable }
         for member in host.members { try await catalog.delete(hostID: member.id) }
         for member in host.members { preferences.hosts[member.id] = nil }
         try persistPreferences()
@@ -390,7 +541,11 @@ public final class GlassShellModel {
         let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw GlassShellError.invalidName }
         let link = HostServiceLink(endpointID: endpointID, kind: kind, displayName: trimmed)
-        try await catalog.pair(link, with: canonicalID(for: id))
+        if isLocalHost(canonicalID(for: id)) {
+            try await localCatalog.pair(link, with: GlassLocalHost.id)
+        } else {
+            try await catalog.pair(link, with: canonicalID(for: id))
+        }
         await load()
         return link
     }
@@ -400,11 +555,19 @@ public final class GlassShellModel {
     /// harmless, a link to nothing is not.
     public func removeService(_ endpointID: EndpointID, from id: HostID) async throws {
         guard let host = host(id) else { throw GlassShellError.hostNotFound(id) }
+        if host.isBuiltIn(endpointID) {
+            let name = host.services.first { $0.endpointID == endpointID }?.displayName ?? "That service"
+            throw GlassShellError.builtInServiceNotEditable(name)
+        }
         guard let owner = host.member(owning: endpointID),
               let service = owner.services.first(where: { $0.endpointID == endpointID }) else {
             throw GlassShellError.serviceNotFound(endpointID)
         }
-        try await catalog.unpair(endpointID: endpointID, from: owner.id)
+        if host.isLocal {
+            try await localCatalog.unpair(endpointID: endpointID, from: owner.id)
+        } else {
+            try await catalog.unpair(endpointID: endpointID, from: owner.id)
+        }
         if preferences[host: host.id].lastUsedEndpointID == endpointID {
             preferences[host: host.id].lastUsedEndpointID = nil
             try persistPreferences()
@@ -469,8 +632,16 @@ public final class GlassShellModel {
     /// row's play button does: the machine has three services, the user wants the machine.
     /// It records no "last used" service, because the user picked the host, not one service.
     /// A kind with no capability in this build reports itself and the rest still open.
+    ///
+    /// **Not offered on the local host (D8).** "Connect the machine" is an act of reaching a box;
+    /// this device is already here, and its services are unrelated local things — a shell, a
+    /// SQLite file, a MySQL instance, a VM. Opening all of them at once is never what anyone
+    /// means, and it is the one host where a mis-click costs a window per service on the display
+    /// you are looking at. Its row shows the service picker alone (`GlassShellConnectControl`),
+    /// so this is the model-level guarantee behind that, not a second opinion about it.
     public func connectAll(hostID: HostID) {
         guard let host = host(hostID) else { errorMessage = GlassShellError.hostNotFound(hostID).localizedDescription; return }
+        guard host.allowsConnectAll else { return }
         guard !host.services.isEmpty else { return }
         for service in host.services { open(service.endpointID, on: host) }
     }
@@ -479,7 +650,7 @@ public final class GlassShellModel {
     /// endpoint — its endpoint id is what the capability's own store is keyed by.
     private func open(_ endpointID: EndpointID, on host: GlassShellHost) {
         guard let service = host.services.first(where: { $0.endpointID == endpointID }),
-              let owner = host.member(owning: endpointID) else {
+              let owner = host.record(owning: endpointID) else {
             errorMessage = GlassShellError.serviceNotFound(endpointID).localizedDescription; return
         }
         // A kind no capability in this build owns cannot be connected: say so and connect nothing.
@@ -501,6 +672,9 @@ public final class GlassShellModel {
     }
 
     #if DEBUG
+    private var didSeedHostsForUITesting = false
+    private var didSeedLocalServicesForUITesting = false
+
     /// UI tests seed the isolated catalog through a launch argument, because the runner cannot
     /// reach the app's container on iOS or visionOS:
     /// `--ui-testing-seed-hosts "juliet:ssh|juliet:rdp|oscar:ssh+database"` creates one record
@@ -512,8 +686,12 @@ public final class GlassShellModel {
         let arguments = ProcessInfo.processInfo.arguments
         guard arguments.contains("--ui-testing"),
               let index = arguments.firstIndex(of: "--ui-testing-seed-hosts"), arguments.indices.contains(index + 1),
-              !catalogFileURL.path.contains("Group Containers"),
-              try await catalog.snapshot().isEmpty else { return }
+              !catalogFileURL.path.contains("Group Containers"), !didSeedHostsForUITesting else { return }
+        // Claimed before the first await. `load()` has two callers — the library's `.task` and
+        // its scene-phase observer — which can interleave, and an emptiness check made *after*
+        // an await is passed by both of them, seeding the same hosts twice.
+        didSeedHostsForUITesting = true
+        guard try await catalog.snapshot().isEmpty else { return }
         for (offset, entry) in arguments[index + 1].split(separator: "|").enumerated() {
             let parts = entry.split(separator: ":", maxSplits: 1)
             guard let nameAndAddress = parts.first.map(String.init), !nameAndAddress.isEmpty else { continue }
@@ -528,6 +706,32 @@ public final class GlassShellModel {
             let created = Date(timeIntervalSince1970: 1_700_000_000 + Double(offset))
             try await catalog.upsert(try HostProfile(displayName: name, address: address, aliases: [], services: services,
                                                      createdAt: created, updatedAt: created, lastWriterID: writerID))
+        }
+    }
+    #endif
+
+    #if DEBUG
+    /// The device's own host cannot be seeded through `--ui-testing-seed-hosts`, which writes the
+    /// shared catalog, so it has its own argument with the same shape and the same guards:
+    /// `--ui-testing-seed-local-services "database:notes.sqlite|database:gpt_test"` pairs one link
+    /// per `|` entry, kind before the colon. Only alongside `--ui-testing`, only into a store
+    /// outside a real Group Container, and only when the host has no services yet.
+    private func seedLocalServicesForUITestingIfRequested(on record: HostProfile) async throws {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard arguments.contains("--ui-testing"),
+              let index = arguments.firstIndex(of: "--ui-testing-seed-local-services"),
+              arguments.indices.contains(index + 1),
+              !localCatalogFileURL.path.contains("Group Containers"),
+              !didSeedLocalServicesForUITesting, record.services.isEmpty else { return }
+        // One shot, claimed before the first await: see `seedForUITestingIfRequested`.
+        didSeedLocalServicesForUITesting = true
+        for entry in arguments[index + 1].split(separator: "|") {
+            let parts = entry.split(separator: ":", maxSplits: 1)
+            guard let kind = parts.first.flatMap({ HostServiceKind(rawValue: String($0)) }) else { continue }
+            let name = parts.count > 1 ? String(parts[1]) : GlassServicePresentation.displayName(for: kind)
+            guard !name.isEmpty else { continue }
+            try await localCatalog.pair(HostServiceLink(endpointID: EndpointID(), kind: kind, displayName: name),
+                                        with: GlassLocalHost.id)
         }
     }
     #endif

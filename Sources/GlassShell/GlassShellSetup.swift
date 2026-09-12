@@ -10,6 +10,9 @@ public enum GlassShellSetupMode: Identifiable, Sendable {
     case addService(GlassShellHost, HostServiceKind)
     case editService(GlassShellHost, HostServiceLink)
 
+    /// Adding a machine is the one mode that must end with a service.
+    public var isAddHost: Bool { if case .addHost = self { return true }; return false }
+
     public var id: String {
         switch self {
         case .addHost: "add-host"
@@ -42,8 +45,13 @@ public final class GlassShellSetupModel {
     public var address: String
     public var aliases: [String]
     public var tags: [String]
+    /// The kind being added, or nil for "no service". Selecting a tab **is** the decision to add
+    /// that service — there is no separate toggle, and a sheet adds at most one new service.
+    public var selection: HostServiceKind?
+    /// The tab whose fields are on screen. Nil selection still shows a tab, so the user can see
+    /// what a kind would ask for before choosing it.
     public var selectedKind: HostServiceKind
-    public private(set) var enabledKinds: Set<HostServiceKind> = []
+    public var enabledKinds: Set<HostServiceKind> { selection.map { [$0] } ?? [] }
     /// Host-field problems, shown once a save was attempted.
     public private(set) var hostIssues: [GlassSetupIssue] = []
     public private(set) var attemptedSave = false
@@ -63,12 +71,15 @@ public final class GlassShellSetupModel {
         case .addHost, .editHost:
             // The first tab that can actually be enabled; the user's order is Terminal, Database, Desktop.
             selectedKind = Self.tabOrder.first { model.registry.capability(for: $0) != nil } ?? Self.tabOrder[0]
+            // Adding a machine adds a service: a machine with nothing on it is not worth a row.
+            // Editing one does not, since its services are managed from the detail.
+            selection = mode.isAddHost && model.registry.capability(for: selectedKind) != nil ? selectedKind : nil
         case .addService(_, let kind):
             selectedKind = kind
-            enabledKinds = [kind]
+            selection = kind
         case .editService(_, let service):
             selectedKind = service.kind
-            enabledKinds = [service.kind]
+            selection = service.kind
         }
     }
 
@@ -98,24 +109,31 @@ public final class GlassShellSetupModel {
         }
     }
 
+    /// This sheet is about the device itself (D8): no address is collected, and it cannot be
+    /// deleted from here.
+    public var isLocalHost: Bool { mode.host?.isLocal == true }
+
     /// The address is always the host's. It is editable when the host is being defined, and
-    /// when an existing host has none yet — a service cannot be created without one.
+    /// when an existing host has none yet — a service cannot be created without one. Never on
+    /// the device itself, which has none and is never asked for one.
     public var addressEditable: Bool {
+        guard !isLocalHost else { return false }
         switch mode {
-        case .addHost, .editHost: true
-        case .addService(let host, _), .editService(let host, _): host.address == nil
+        case .addHost, .editHost: return true
+        case .addService(let host, _), .editService(let host, _): return host.address == nil
         }
     }
 
     public var showsServiceTabs: Bool {
         if case .editHost = mode { return false }
-        return true
+        return !offeredKinds.isEmpty
     }
 
     /// The host this sheet edits, when it is the machine itself being edited. Only that mode
     /// offers to delete it: adding, or editing one service, is not where a machine is removed.
+    /// The device's own host is never deletable, so it never reaches the delete section either.
     public var editedHost: GlassShellHost? {
-        if case .editHost(let host) = mode { return host }
+        if case .editHost(let host) = mode, !host.isLocal { return host }
         return nil
     }
 
@@ -133,27 +151,42 @@ public final class GlassShellSetupModel {
     /// disabled. In edit mode only the service's own kind is offered.
     public var offeredKinds: [HostServiceKind] {
         if case .editService(_, let service) = mode { return [service.kind] }
-        return Self.tabOrder
+        return Self.setupKinds(for: mode.host, registry: model.registry)
+    }
+
+    /// Which kinds a host will take. Every kind on a machine you reach. On the device itself
+    /// (D8) only the kinds a capability will actually create locally, plus the kinds no
+    /// capability owns in this build — those stay visible and disabled here as they do
+    /// everywhere else, rather than vanishing and implying the device cannot ever have them.
+    public static func setupKinds(for host: GlassShellHost?, registry: GlassCapabilityRegistry) -> [HostServiceKind] {
+        guard host?.isLocal == true else { return tabOrder }
+        let local = Set(registry.localSetupKinds)
+        return tabOrder.filter { local.contains($0) || registry.capability(for: $0) == nil }
     }
 
     public func isAvailable(_ kind: HostServiceKind) -> Bool {
         model.registry.capability(for: kind) != nil
     }
 
-    public func isEnabled(_ kind: HostServiceKind) -> Bool { enabledKinds.contains(kind) }
+    public func isEnabled(_ kind: HostServiceKind) -> Bool { selection == kind }
 
-    /// The toggle is fixed on in edit mode and for the kind an Add-a-service was opened with.
-    public func canToggle(_ kind: HostServiceKind) -> Bool {
-        switch mode {
-        case .editService: false
-        case .addService(_, let preselected): kind != preselected && isAvailable(kind)
-        case .addHost, .editHost: isAvailable(kind)
-        }
+    /// Whether the sheet offers a "no service" choice. Only while **editing** a machine: adding
+    /// one adds a service (a machine with nothing on it is not worth a row), an Add-a-service
+    /// sheet exists to add one, and an edit sheet is editing one.
+    public var allowsNoService: Bool {
+        if case .editHost = mode { return true }
+        return false
     }
 
-    public func setEnabled(_ kind: HostServiceKind, _ on: Bool) {
-        guard canToggle(kind) else { return }
-        if on { enabledKinds.insert(kind) } else { enabledKinds.remove(kind) }
+    /// Choosing a tab selects that service; a kind with no capability in this build cannot be
+    /// chosen, and choosing nothing is only possible where `allowsNoService` says so.
+    public func select(_ kind: HostServiceKind?) {
+        guard let kind else {
+            if allowsNoService { selection = nil }
+            return
+        }
+        selectedKind = kind
+        selection = isAvailable(kind) ? kind : nil
     }
 
     /// The capability's draft for a kind, created on first use: fresh for a new service,
@@ -200,8 +233,11 @@ public final class GlassShellSetupModel {
         return issues
     }
 
-    /// The address the enabled services will be committed with.
+    /// The address the enabled services will be committed with. On the device itself the host
+    /// has none and never asks for one, so its services are committed against loopback (D8) —
+    /// the one that needs no address at all, SQLite, ignores it and saves a file path instead.
     private var effectiveAddress: String {
+        if isLocalHost { return GlassLocalHost.address }
         let typed = address.trimmingCharacters(in: .whitespacesAndNewlines)
         if !typed.isEmpty { return typed }
         return mode.host?.address ?? ""
@@ -407,6 +443,12 @@ public struct GlassShellHostSetupSheet: View {
                     Text("The records that make up this host disagree: \(host.addresses.joined(separator: ", ")). Saving applies one address to all of them.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
+            } else if setup.isLocalHost {
+                // The device has no address and is never asked for one (D8). Saying "This device"
+                // is the honest label; "Not set" would read as something still to be filled in.
+                LabeledContent("Address", value: "This device").accessibilityIdentifier("host-editor-address")
+                Text("Services on \(GlassLocalHost.displayName) reach it at \(GlassLocalHost.address), or open a file you choose.")
+                    .font(.footnote).foregroundStyle(.secondary)
             } else {
                 LabeledContent("Address", value: setup.address).accessibilityIdentifier("host-editor-address")
             }
@@ -417,10 +459,19 @@ public struct GlassShellHostSetupSheet: View {
 
     private var servicesSection: some View {
         Section {
-            if setup.offeredKinds.count > 1 {
-                Picker("Service", selection: $setup.selectedKind) {
+            if setup.offeredKinds.count > 1 || setup.allowsNoService {
+                // The tab **is** the choice: picking one adds that service, and a sheet adds at
+                // most one. "None" exists only where a machine may be saved without a service.
+                Picker("Service", selection: Binding(
+                    get: { setup.selection },
+                    set: { setup.select($0) }
+                )) {
+                    if setup.allowsNoService {
+                        Text("None").tag(HostServiceKind?.none)
+                    }
                     ForEach(setup.offeredKinds, id: \.self) { kind in
-                        Text(tabTitle(kind)).tag(kind)
+                        Text(GlassServicePresentation.displayName(for: kind))
+                            .tag(HostServiceKind?.some(kind))
                     }
                 }
                 .pickerStyle(.segmented)
@@ -437,39 +488,24 @@ public struct GlassShellHostSetupSheet: View {
         }
     }
 
-    private func tabTitle(_ kind: HostServiceKind) -> String {
-        let name = GlassServicePresentation.displayName(for: kind)
-        return setup.isEnabled(kind) ? "✓ \(name)" : name
-    }
-
-    /// Database and Desktop arrive in Stages 3 and 4.
+    /// Shown when no capability is registered for a kind, so the tab is disabled rather than
+    /// offering a half-made service. Phrased for what the user can see, not for our build order:
+    /// a released build that is missing a capability says so plainly instead of naming a stage.
     static func unavailableNote(for kind: HostServiceKind) -> String {
-        switch kind {
-        case .database: "Database services arrive in Stage 3."
-        case .rdp: "Desktop services arrive in Stage 4."
-        case .ssh: "Terminal is not part of this build."
-        }
+        let name = GlassServicePresentation.displayName(for: kind)
+        return "\(name) services are not available in this build."
     }
 
     @ViewBuilder
     private func tabContent(_ kind: HostServiceKind) -> some View {
         let name = GlassServicePresentation.displayName(for: kind)
         if !setup.isAvailable(kind) {
-            Toggle("Add \(name) to this host", isOn: .constant(false))
-                .disabled(true)
-                .accessibilityIdentifier("setup-enable-\(kind.rawValue)")
+            EmptyView()
         } else if setup.editedServiceIsBroken {
             Text("This \(name.lowercased()) has no saved configuration behind it. Remove the service and add it again.")
                 .foregroundStyle(.secondary)
                 .accessibilityIdentifier("setup-broken-\(kind.rawValue)")
         } else {
-            if setup.canToggle(kind) {
-                Toggle("Add \(name) to this host", isOn: Binding(
-                    get: { setup.isEnabled(kind) },
-                    set: { setup.setEnabled(kind, $0) }
-                ))
-                .accessibilityIdentifier("setup-enable-\(kind.rawValue)")
-            }
             if setup.isEnabled(kind), let draft = setup.draft(for: kind) {
                 draft.requiredFields()
                 DisclosureGroup {

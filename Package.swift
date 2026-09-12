@@ -17,6 +17,8 @@ let package = Package(
         .library(name: "GlassSSHTransport", targets: ["GlassSSHTransport"]),
         .library(name: "GlassTerminal", targets: ["GlassTerminal"]),
         .library(name: "GlassTerminalEmulator", targets: ["GlassTerminalEmulator"]),
+        .library(name: "GlassDBKit", targets: ["GlassDBKit"]),
+        .library(name: "GlassDatabase", targets: ["GlassDatabase"]),
     ],
     dependencies: [
         .package(path: "../GlassConnectionKit"),
@@ -27,6 +29,15 @@ let package = Package(
         .package(path: "Packages/swift-nio-ssh"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.101.3"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.14.0"),
+        // The database engines, moved from glassdb with its tunnel manager left behind (D7).
+        // The mysql-nio fork is mandatory and pinned by revision: upstream PR 126 (empty-password
+        // caching_sha2_password) was closed unmerged. See the Stage 3 plan.
+        .package(
+            url: "https://github.com/msitarzewski/mysql-nio.git",
+            revision: "69489876bebca3b54c46680e519669789060d0ae"
+        ),
+        .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.33.0"),
+        .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.36.0"),
         // Terminal emulator host (glas.sh's misnamed RealityKitContent package) and its engine.
         .package(url: "https://github.com/migueldeicaza/SwiftTerm", exact: "1.15.0"),
     ],
@@ -64,6 +75,18 @@ let package = Package(
         ),
         // The SSH capability: glas.sh moved in as one module (decision 2026-09-10). Files stay
         // `internal`; only capability registration, scene views and settings pages are public.
+        // The database engine: no UI, no shell dependency. Moved from glassdb's Packages/GlassDBKit
+        // minus SSHTunnelManager.swift — the host's own SSH service supplies the forward (D7), so
+        // the engine has no Citadel edge and the swift-crypto conflict does not arise.
+        .target(
+            name: "GlassDBKit",
+            dependencies: [
+                .product(name: "MySQLNIO", package: "mysql-nio"),
+                .product(name: "PostgresNIO", package: "postgres-nio"),
+                .product(name: "NIOSSL", package: "swift-nio-ssl"),
+            ],
+            linkerSettings: [.linkedLibrary("sqlite3")]
+        ),
         .target(
             name: "GlassTerminalEmulator",
             dependencies: [.product(name: "SwiftTerm", package: "SwiftTerm")],
@@ -100,7 +123,36 @@ let package = Package(
                 .enableUpcomingFeature("MemberImportVisibility"),
             ]
         ),
+        // The database capability: glassdb's app files moved in as one module (Stage 3). Its
+        // library is the shell's, its Appearance page is the shell's, and it never imports
+        // GlassTerminal — the tunnel it needs comes from the shell's forward broker (D7).
+        .target(
+            name: "GlassDatabase",
+            dependencies: [
+                "GlassDBKit",
+                "GlassShell",
+                "GlassLayers",
+                .product(name: "GlassConnectionKit", package: "GlassConnectionKit"),
+                .product(name: "GlassConnectionUI", package: "GlassConnectionKit"),
+                .product(name: "GlasSecretStore", package: "GlasSecretStore"),
+                // The SQL editor surface and the record editor's JSON fields are GlassEditorKit.
+                .product(name: "GlassEditorKit", package: "GlassEditorKit"),
+            ],
+            swiftSettings: [.enableUpcomingFeature("MemberImportVisibility")]
+        ),
         .testTarget(name: "GlassLayersTests", dependencies: ["GlassLayers"]),
+        .testTarget(
+            name: "GlassDatabaseTests",
+            dependencies: [
+                "GlassDatabase",
+                "GlassDBKit",
+                "GlassShell",
+                // Live-tunnel tests only: they open a real SSH forward the way the terminal
+                // capability does. The module under test never imports the transport.
+                "GlassSSHTransport",
+                .product(name: "GlasSecretStore", package: "GlasSecretStore"),
+            ]
+        ),
         .testTarget(
             name: "GlassTerminalTests",
             dependencies: [
@@ -124,6 +176,14 @@ let package = Package(
                 "GlassSSHTransport",
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
+            ]
+        ),
+        .testTarget(
+            name: "GlassDBKitTests",
+            dependencies: [
+                "GlassDBKit",
+                .product(name: "MySQLNIO", package: "mysql-nio"),
+                .product(name: "PostgresNIO", package: "postgres-nio"),
             ]
         ),
         .testTarget(name: "GlassShellTests", dependencies: ["GlassShell"]),

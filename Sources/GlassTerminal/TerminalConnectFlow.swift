@@ -12,6 +12,7 @@
 import SwiftUI
 import GlassLayers
 import GlassShell
+import GlassSSHTransport
 
 /// Attached once by `GlassTerminalBootstrap`; runs connect requests posted to the runtime.
 struct TerminalConnectFlow: ViewModifier {
@@ -26,6 +27,10 @@ struct TerminalConnectFlow: ViewModifier {
 
     @State private var pendingTrustSession: TerminalSession?
     @State private var pendingTrustChallenge: HostKeyTrustChallenge?
+    /// D14: the same prompt, driven by a caller that has no session — a borrowed port forward,
+    /// or a setup-time trust resolution. Non-nil means the currently shown challenge came from
+    /// the broker and the answer goes back to it rather than to a session.
+    @State private var pendingTrustBrokerRequest: TerminalHostTrustBroker.Request?
     @State private var connectionFailureMessage: String?
     @State private var connectingServerIDs: Set<UUID> = []
     /// The shell's outcome callbacks for attempts still in flight (trust prompt, password
@@ -62,6 +67,12 @@ struct TerminalConnectFlow: ViewModifier {
             presenting: pendingTrustChallenge
         ) { challenge in
             Button(trustPromptConfirmTitle, role: challenge.reason == .changed ? .destructive : nil) {
+                if pendingTrustBrokerRequest != nil {
+                    // The transport pins the key and retries; trust is keyed `host:port` in the
+                    // store, so accepting here settles this machine for every capability.
+                    answerTrustBroker(.trust(remember: true))
+                    return
+                }
                 guard let session = pendingTrustSession else {
                     clearPendingTrustPrompt()
                     return
@@ -81,10 +92,23 @@ struct TerminalConnectFlow: ViewModifier {
                 }
             }
             Button("Cancel", role: .cancel) {
+                if pendingTrustBrokerRequest != nil {
+                    answerTrustBroker(.reject)
+                    return
+                }
                 closePendingTrustSessionAndClearPrompt()
             }
         } message: { challenge in
             Text(trustPromptMessage(for: challenge))
+        }
+        // A session-less challenge arriving from the broker drives the very same alert above.
+        // A session's own challenge, if one is already showing, keeps the screen: the broker
+        // queues, and its request is promoted when this one is answered.
+        .onChange(of: runtime.trustBroker.pending?.id) { _, _ in
+            adoptBrokeredTrustRequestIfIdle()
+        }
+        .onChange(of: pendingTrustChallenge == nil) { _, isClear in
+            if isClear { adoptBrokeredTrustRequestIfIdle() }
         }
         .alert("Connection Failed", isPresented: connectionFailureAlertBinding) {
             Button("OK", role: .cancel) {}
@@ -536,9 +560,13 @@ struct TerminalConnectFlow: ViewModifier {
             get: { interactiveHostKeyTrustIsAllowed && pendingTrustChallenge != nil },
             set: { isPresented in
                 if !isPresented {
-                    if !interactiveHostKeyTrustIsAllowed,
-                       let challenge = pendingTrustChallenge,
-                       let session = pendingTrustSession {
+                    if pendingTrustBrokerRequest != nil {
+                        // Dismissed without an explicit answer: the caller is still suspended,
+                        // so it gets a refusal rather than waiting forever.
+                        answerTrustBroker(.reject)
+                    } else if !interactiveHostKeyTrustIsAllowed,
+                              let challenge = pendingTrustChallenge,
+                              let session = pendingTrustSession {
                         rejectStrictHostKeyChallenge(challenge, for: session)
                     } else {
                         closePendingTrustSessionAndClearPrompt()
@@ -546,6 +574,20 @@ struct TerminalConnectFlow: ViewModifier {
                 }
             }
         )
+    }
+
+    /// Shows the broker's next request, but never over a session's own challenge.
+    private func adoptBrokeredTrustRequestIfIdle() {
+        guard pendingTrustChallenge == nil, pendingTrustBrokerRequest == nil,
+              let request = runtime.trustBroker.pending else { return }
+        pendingTrustBrokerRequest = request
+        pendingTrustChallenge = request.challenge
+    }
+
+    private func answerTrustBroker(_ decision: SSHHostTrustDecision) {
+        pendingTrustBrokerRequest = nil
+        pendingTrustChallenge = nil
+        runtime.trustBroker.answer(decision)
     }
 
     private var interactiveHostKeyTrustIsAllowed: Bool {
