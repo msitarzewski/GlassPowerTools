@@ -517,3 +517,20 @@ scene-ID fault; the three sibling call sites that break on the kit's dropped `la
 (`../GlassConnectionKit`) has substantial uncommitted work** — host address, tag field, settings
 sections, sidebar actions, native list selection, service icon, window chrome separator — and is
 the user's to commit.
+
+## Next: Stage 3, the Database capability — planned and approved 2026-09-12
+
+Read [the Stage 3 plan](tasks/2026-09/2026-09-12_stage-3-database-plan.md) first; the two read-only
+surveys it is built on are beside it in `tasks/2026-09/surveys/`. It supersedes the 2026-09-10
+draft. Decisions D7–D11 are in [decisions](decisions.md); **D8 (a real "This Mac" host taking every
+service kind, several of a kind allowed) and D9 (parity-plus) are approved**, and the user approved
+**installing MySQL and PostgreSQL on the test VM** (`192.0.2.6`, sudo available, least-privilege
+test users, never root).
+
+Start with wave 1: move `Packages/GlassDBKit` minus its tunnel manager and Citadel edge, prove the
+swift-crypto graph by building, sweep for API above the 26.0 floor (measured: one call at
+`Constants.swift:663`, so the real floor is 26.1), and provision the VM databases.
+
+Stage 2 close-out still open: widget on a device, live iCloud sync, the visionOS real-host UI test
+blocked by XCUITest's scene-ID fault, and the three sibling call sites broken by the kit's dropped
+`lastConnected`.

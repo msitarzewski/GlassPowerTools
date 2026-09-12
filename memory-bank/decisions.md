@@ -173,3 +173,36 @@ SSH transport" in the merge plan and the Stage 1 note.
 
 Commit messages carry co-author attribution and no session URLs, per the user's global rules.
 
+
+## D7 — a database service tunnels through its host's own SSH service — Proposed 2026-09-12
+
+A database service carries no SSH fields. When the database is not directly reachable the capability
+borrows the host's SSH transport from the shell and forwards to the database port. Host trust is
+therefore shared with the terminal. Needs `GlassCapabilityHostAccess.sshTransport(for:)`;
+capabilities still never import each other. Detail in
+[the Stage 3 plan](tasks/2026-09/2026-09-12_stage-3-database-plan.md).
+
+## D8 — "This Mac" is a real host, holding every service kind — Approved 2026-09-12
+
+The user approved a built-in local host that behaves like any other connection and accepts several
+services of the same kind: SQLite files and local MySQL/PostgreSQL as databases, a new local shell
+on each click of the terminal toolbar icon, containers and VMs as desktops in Stage 4, and the local
+filesystem as Files. It has no address and is never asked for one, is never published to the shared
+catalog, and its services never tunnel.
+
+## D9 — Stage 3 ships parity-plus, not parity — Approved 2026-09-12
+
+glassdb's gaps are closed during the port rather than carried: row deletion (with the existing
+exactly-one-affected-row guard), foreign-key navigation, a viewer for the audit log it already
+writes, the AI assistant on iOS, and the explicitly unfixed SQL draft-loss bug. CREATE/DDL breadth
+and streaming export stay out of Stage 3.
+
+## D10 — results stay fully materialised in Stage 3 — Proposed 2026-09-12
+
+No `AsyncSequence` exists in GlassDBKit; rows are bounded by appending a limit plus a sentinel row.
+Kept as-is and revisited with export.
+
+## D11 — cancelling a query drops the connection, and the UI says so — Proposed 2026-09-12
+
+MySQL and PostgreSQL cancel by closing the transport; only SQLite cancels in place. Behaviour is
+kept and surfaced honestly rather than disguised.

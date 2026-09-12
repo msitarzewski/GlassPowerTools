@@ -41,19 +41,36 @@ Open sub-question: a database on a *different* machine reached through this host
 supports it implicitly (ssh host ≠ db host). Either model it as a second host with its own service,
 or keep an advanced "reach through another host" picker. Recommend the former; decide before W2.
 
-### D8 — SQLite has no host (needs the user)
+### D8 — "This Mac" is a real host — **APPROVED 2026-09-12**
 
-A SQLite connection has no address, no port, no credentials — it is a managed file copy in
-Application Support. The shell's library is organised by machine. Options:
+The user: "It should behave like a connection (All Connections) with multiple options allowed for
+database (for SQLite, local MySQL, Postgres, etc). Multiple local terminals with each click of the
+terminal icon in the toolbar. Files is weird, but monitor/screen could allow for containers/VMs on
+localhost too. So... all of them?" — **yes, all of them.**
 
-1. A built-in **"This Mac"** host that always exists, holding local services (SQLite files, and the
-   Mac's local terminal, which today lives only in the terminal window's ⌘N).
-2. SQLite files are **not services**: a separate Files-style tool row, or a documents surface.
-3. Skip SQLite in Stage 3 and keep it in glassdb only.
+A built-in local host appears in the library like any other machine and takes every service kind:
 
-Recommend option 1: it gives the local terminal a home too, and matches how the Mac already thinks.
+| Kind | On the local host |
+|---|---|
+| Database | SQLite files, and a local MySQL or PostgreSQL on 127.0.0.1 — **several at once**, each its own service |
+| Terminal | a local shell; **each click of the terminal toolbar icon opens another one**, so the local host holds many |
+| Desktop | Stage 4: containers and VMs on localhost |
+| Files | the local filesystem — allowed, though the user notes it reads oddly; it follows from treating this as a host |
 
-### D9 — parity or parity-plus (needs the user)
+Consequences to design for, not to discover later:
+
+- **The host has no address and never asks for one.** The address gate (W7's work) must exempt it;
+  its services bind to `127.0.0.1` or a file path.
+- **It is never published to the shared catalog** and never merges with a discovered host. It is
+  local to this device, so each device has its own.
+- **Its services never tunnel.** D7's "borrow the host's SSH transport" does not apply.
+- **`connectAll` on it would open everything at once.** Decide whether the play glyph is even right
+  there, or whether the local host's row offers only the chevron.
+- The Mac's local terminal, which today lives only behind ⌘N in the terminal window, gets a home.
+- Several services of the same kind on one host is already legal in the catalog; the shell's
+  detail, icons and `connectAll` must be checked against three terminals and two databases.
+
+### D9 — parity-plus — **APPROVED 2026-09-12**
 
 The survey lists what glassdb does **not** do. Porting faithfully ports these gaps:
 
@@ -68,9 +85,12 @@ The survey lists what glassdb does **not** do. Porting faithfully ports these ga
 | iOS Settings omits Appearance entirely (`SettingsView.swift:129-152`) | Trivial: the shell owns Appearance now, so this resolves itself |
 | **Open bug: SQL draft data loss** on window close / app quit, explicitly unfixed and explicitly not to be described as fixed | Medium: durable drafts. **Porting verbatim ports the bug.** |
 
-Recommend: close the four trivial/small ones during the port (row deletion, FK navigation, audit
-viewer, the two platform gaps), fix the draft-loss bug as part of moving the editor, and leave
-CREATE/DDL breadth and streaming export to a later stage.
+**Decided: parity-plus.** The user: "Parity plus since we're here." So Stage 3 ships every small
+and medium closure in the table above — row deletion with the same exactly-one-affected-row guard
+the update path uses, foreign-key navigation, the audit viewer, AI on iOS, and **the SQL draft-loss
+fix**, which is a correctness bug and must not be carried over. CREATE/DDL breadth (tables,
+databases, triggers, functions, views, sequences, enums) and streaming export stay out of Stage 3
+and are recorded as the database capability's own backlog.
 
 ### D10 — result streaming (proposed)
 
@@ -125,7 +145,9 @@ postgres-nio and swift-nio-ssl — the combination the Stage 3 gate already prov
 | 1 | **W-floor** | read-only sweep | every API above the 26.0 floor listed — **measured: exactly two errors, both `Constants.swift:663` (`visibilityPriority`), so the real floor is 26.1, not 27.0**; adapt with `if #available` |
 | 2 | **W-capability** | `Sources/GlassDatabase`, `Tests/GlassDatabaseTests`, `App/` | the 22 files moved; library replaced by the shell's; the draft/commit contract; the tunnel over the engine (D7); scenes |
 | 2 | **W-shell** | `Sources/GlassShell` | `GlassCapabilityHostAccess.sshTransport(for:)` so a capability can borrow the host's SSH transport without importing another capability; unit-tested with a fake |
-| 3 | **W-gaps** | `Sources/GlassDatabase` | the D9 closures the user approves: row deletion, FK navigation, audit viewer, AI availability, and the SQL draft-loss fix |
+| 2 | **W-local** | `Sources/GlassShell`, `Sources/GlassTerminal` | the built-in local host (D8): always present, never published, exempt from the address gate, several services of one kind, each terminal-icon click opening another local shell; the shell's detail, icons and `connectAll` verified against three terminals and two databases |
+| 3 | **W-gaps** | `Sources/GlassDatabase` | the approved D9 closures: row deletion, FK navigation, audit viewer, AI on iOS, and the SQL draft-loss fix |
+| 1 | **W-vm** | the test VM only | install MySQL and PostgreSQL on `192.0.2.6` with sudo; least-privilege test users, never root; seed a small schema; record the exact commands here; export `GPT_DB_TEST_*` |
 | 3 | **W-settings** | settings pages | folded into the one surface; Appearance removed |
 | 4 | **security review** | read-only | the tunnel replacement; credentials never as `String` (the survey found `SecureBytes` downgraded to `String` at `DatabaseSessionManager.swift:131-132`); the record-editor predicate path; export paths; AI SQL gating and prompt-injection defences |
 | 4 | **integration** | `UITests/` | three platforms; add a database service in the one sheet; connect direct and over a tunnel; browse schema; run a query; edit a record |
@@ -133,9 +155,11 @@ postgres-nio and swift-nio-ssl — the combination the Stage 3 gate already prov
 ## Verification
 
 - `swift test` for GlassDBKit (28) and the ported app tests (152 in glassdb's suite — moved, not rewritten).
-- Real databases. **The test VM at `192.0.2.6` needs MySQL and PostgreSQL installed** — a user
-  action, or a documented `docker compose` on the VM. Gated like the SSH suite:
-  `GPT_DB_TEST_*`. Without it, Stage 3 cannot claim parity honestly.
+- Real databases. **APPROVED 2026-09-12: install MySQL and PostgreSQL on the test VM
+  (`192.0.2.6`, user `michael`, sudo available).** Do it over the app's own SSH engine or plain
+  ssh, record the exact commands and the seeded schema in this note, and create a least-privilege
+  test user per engine — **never the root account** (global rule). Gate the suite on `GPT_DB_TEST_*`
+  the way the SSH suite is gated. Without real databases Stage 3 cannot claim parity honestly.
 - UI suites on macOS, iPhone and visionOS, with the known platform quirks (macOS `click()`, iOS
   toggle at dx 0.92, lazy rows need `reveal()`, the visionOS "Save Password?" alert).
 - Device installs, version verified per rule 16.
