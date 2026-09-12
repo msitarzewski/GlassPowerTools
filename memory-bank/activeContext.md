@@ -484,3 +484,14 @@ binary without the Local Network grant, and the real-host test then fails as if 
 
 **0.2.47 deployed (2026-09-11):** Mac `/Applications`, iPhone and Vision Pro all on 0.2.47 from
 `98a6094`, each version read back from the installed bundle.
+
+**App icon, SVG-first (2026-09-11, W10):** `App/GlassPowerTools.icon` is four hand-authored SVG
+layers (Prompt, Screen, Bezel, Database) with `glass: true` and per-appearance solid fills —
+light: near-white gradient + grey secondaries; dark: near-black gradient + white secondaries; red
+screen `srgb:0.906,0.035,0.039` sampled from the user's composite. Clear/tinted are derived by the
+system, not authored. Schema copied from the family's approved document at
+`~/Software/icon-lab/archive/2026-09-06/approved-source-icons/.../AppIcon.icon/icon.json`.
+`actool` compiles clean; `assetutil --info` shows Aqua, DarkAqua and Tintable variants for all four
+layers. **Limitation recorded:** the CLI cannot render the dark or clear renditions as the OS
+composites them (`iconutil` extracts only the default; `assetutil` reports structure). Dark was
+verified as a flat colour composite only — real dark/clear need the installed app or Icon Composer.

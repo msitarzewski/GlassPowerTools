@@ -1,38 +1,161 @@
 {
-  "fill" : {
-    "automatic-gradient" : "extended-srgb:0.05882,0.06275,0.07059,1.00000"
-  },
-  "groups" : [
+  "fill-specializations": [
     {
-      "layers" : [
-        {
-          "image-name" : "prompt.png",
-          "name" : "Prompt"
-        },
-        {
-          "image-name" : "screen.png",
-          "name" : "Screen"
-        },
-        {
-          "image-name" : "database.png",
-          "name" : "Database"
-        }
-      ],
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.5
-      },
-      "specular" : true,
-      "translucency" : {
-        "enabled" : true,
-        "value" : 0.5
+      "value": {
+        "linear-gradient": [
+          "srgb:0.98500,0.98500,0.98500,1.00000",
+          "srgb:0.94500,0.94500,0.94500,1.00000"
+        ]
+      }
+    },
+    {
+      "appearance": "dark",
+      "value": {
+        "linear-gradient": [
+          "srgb:0.18000,0.19000,0.21000,1.00000",
+          "srgb:0.07500,0.08000,0.09500,1.00000"
+        ]
       }
     }
   ],
-  "supported-platforms" : {
-    "circles" : [
+  "groups": [
+    {
+      "blur-material": null,
+      "layers": [
+        {
+          "glass": true,
+          "image-name": "Prompt.svg",
+          "name": "Prompt",
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "srgb:1.00000,1.00000,1.00000,1.00000"
+              }
+            },
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "srgb:1.00000,1.00000,1.00000,1.00000"
+              }
+            }
+          ]
+        }
+      ],
+      "name": "Prompt",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.04
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": false,
+        "value": 0.05
+      }
+    },
+    {
+      "blur-material": null,
+      "layers": [
+        {
+          "glass": true,
+          "image-name": "Screen.svg",
+          "name": "Screen",
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "srgb:0.90588,0.03529,0.03922,1.00000"
+              }
+            },
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "srgb:0.90588,0.03529,0.03922,1.00000"
+              }
+            }
+          ]
+        }
+      ],
+      "name": "Screen",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.04
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": false,
+        "value": 0.05
+      }
+    },
+    {
+      "blur-material": null,
+      "layers": [
+        {
+          "glass": true,
+          "image-name": "Bezel.svg",
+          "name": "Bezel",
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "srgb:0.62000,0.62000,0.63000,1.00000"
+              }
+            },
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "srgb:1.00000,1.00000,1.00000,1.00000"
+              }
+            }
+          ]
+        }
+      ],
+      "name": "Bezel",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.04
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": false,
+        "value": 0.12
+      }
+    },
+    {
+      "blur-material": null,
+      "layers": [
+        {
+          "glass": true,
+          "image-name": "Database.svg",
+          "name": "Database",
+          "fill-specializations": [
+            {
+              "value": {
+                "solid": "srgb:0.62000,0.62000,0.63000,1.00000"
+              }
+            },
+            {
+              "appearance": "dark",
+              "value": {
+                "solid": "srgb:1.00000,1.00000,1.00000,1.00000"
+              }
+            }
+          ]
+        }
+      ],
+      "name": "Database",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.04
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": false,
+        "value": 0.12
+      }
+    }
+  ],
+  "supported-platforms": {
+    "circles": [
       "watchOS"
     ],
-    "squares" : "shared"
+    "squares": "shared"
   }
 }
