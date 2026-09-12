@@ -26,6 +26,7 @@ three source applications are still the working software.
 | [Service setup and key window](tasks/2026-09/2026-09-11_service-setup-and-key-window.md) | W7: address gate before service setup, Add SSH Key sheet per rule 15, Services row overflow |
 | [Row connect and icons](tasks/2026-09/2026-09-11_row-connect-and-icons.md) | W9: wordless split connect control, row cleanup, Heroicons circle-stack, Delete relocation, detail action bar |
 | [App icon](tasks/2026-09/2026-09-11_app-icon.md) | Icon Composer document, per-appearance artwork, what the CLI can and cannot verify |
+| [Stage 3 plan](tasks/2026-09/2026-09-12_stage-3-database-plan.md) | The Database capability, planned from a full survey of glassdb; supersedes the 2026-09-10 draft |
 | [Stage 3 — database](tasks/2026-09/2026-09-10_stage-3-database.md) | GlassDBKit + GlassDatabase over the shared SSH engine; tunnel replacement; ownership |
 | [Stage 4 — desktop](tasks/2026-09/2026-09-10_stage-4-desktop.md) | glassDT engines and Core/UI moved; pairing machinery deleted; validation ledger |
 | [September tasks](tasks/2026-09/README.md) | Monthly index |
