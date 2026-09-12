@@ -1,7 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
 <title>Glass Power Tools — shell prompt</title>
+<!-- glass-icon-scale: Icon Composer maps an SVG viewBox to the icon grid, not the
+     full canvas, so geometry measured from the composite rendered at 82%. Scale
+     1.22 about the centre puts it back on the approved proportions. -->
+<g transform="translate(512 512) scale(1.22) translate(-512 -512)">
 <g fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round">
 <path stroke-width="36" d="M420 357L490 412L420 464"/>
 <path stroke-width="30" d="M529 467H615"/>
+</g>
+
 </g>
 </svg>
