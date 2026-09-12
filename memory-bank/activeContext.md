@@ -495,3 +495,26 @@ system, not authored. Schema copied from the family's approved document at
 layers. **Limitation recorded:** the CLI cannot render the dark or clear renditions as the OS
 composites them (`iconutil` extracts only the default; `assetutil` reports structure). Dark was
 verified as a flat colour composite only — real dark/clear need the installed app or Icon Composer.
+
+## App icon shipped — 2026-09-11, 0.2.60
+
+`App/GlassPowerTools.icon` is an Icon Composer document with three layers of the user's delivered
+renders. Dark uses the artwork as delivered; light uses variants whose **neutral** pixels are gamma
+curved (γ 1.75) so the bezel and discs stay white with their own shading reading against a
+near-white ground; the prompt glyph is the white artwork in both. Clear and tinted are the system's.
+Full detail, geometry and the three findings are in
+[the app icon note](tasks/2026-09/2026-09-11_app-icon.md); rule 17 records the standing constraints.
+
+**Mac is on 0.2.60. The iPhone and Vision Pro are still on 0.2.56** — they carry the earlier
+raster-composite icon and none of the row, Files, separator or icon work since. Push them when the
+user next wants a device build.
+
+### Stage 2 close-out still open
+Widget on a device; live iCloud sync; the visionOS real-host UI test blocked by XCUITest's own
+scene-ID fault; the three sibling call sites that break on the kit's dropped `lastConnected`
+(`../glassdb/glassdb/ConnectionManagerView.swift:756-760`,
+`../glassDT/Sources/GlassDesktopUI/DesktopLibraryView.swift:48-49`,
+`../glas.sh/glas.sh/ConnectionManagerView.swift:3385-3387`). **The kit itself
+(`../GlassConnectionKit`) has substantial uncommitted work** — host address, tag field, settings
+sections, sidebar actions, native list selection, service icon, window chrome separator — and is
+the user's to commit.

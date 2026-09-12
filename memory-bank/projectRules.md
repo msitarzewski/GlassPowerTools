@@ -51,3 +51,12 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     derived data, so installing on a stale bundle looks successful. Stamp device and Mac builds with
     `CURRENT_PROJECT_VERSION`/`MARKETING_VERSION` from the commit count and read
     `CFBundleShortVersionString` back from the installed app before reporting it.
+
+17. **The app icon is an Icon Composer document, and its layers are the delivered artwork.**
+    `App/GlassPowerTools.icon` carries one layer per element with `image-name-specializations`, so
+    light and dark use different *artwork*, not just different fills. Light variants are generated
+    from the delivered renders by a gamma curve on neutral pixels — never redrawn, never flattened
+    to grey, and never applied to the prompt glyph, which is white in every appearance because it
+    sits on the red screen. Clear and tinted belong to the system; do not author them. Verify a
+    change with `actool` plus `assetutil --info`, and say plainly that only the default appearance
+    can be rendered from the command line.
