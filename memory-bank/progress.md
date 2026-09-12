@@ -74,3 +74,70 @@ pages, real-host connect to a live shell). iPhone: all suites green with the rea
 472 tests / 28 suites. Engine real-host suite 5/5. Fourth /Applications build pending install.
 Remaining for Stage 2 close-out: visionOS UI re-run, widget on a device, live iCloud sync,
 W4's post-failure accessibility recursion, the "Set Up…" bypass of the address gate.
+
+## 2026-09-12 — Stage 3 waves 1–2: the Database capability, proven against real servers
+
+**Verified.** Package **592 tests / 45 suites**, one known issue (D13). App builds on macOS, iOS
+Simulator and visionOS Simulator with the capability registered. **12 gated live tests** against real
+MySQL 8.4.11 and PostgreSQL 18.6: both engines connect through the capability, schema and foreign
+keys, real rows, the read-only guard refusing a real `UPDATE` with rows read back unchanged, and
+both engines **over a real SSH forward** with read-only still holding — so D7 is tested, not asserted.
+MySQL additionally proven against a **flushed** auth cache, which is the only run that exercises
+mysql-nio's RSA path on swift-crypto 4.5.2, a combination this port created.
+
+**Landed.** `Sources/GlassDBKit` (engine, minus the tunnel manager — the swift-crypto conflict
+dissolved with it); `Sources/GlassDatabase` (glassdb's app files, Database tab live in the one
+sheet); D7's brokered forward; D14's trust prompt via a second source rather than a second prompt;
+D15's read-only guard on the connection; D12's floor guard extracted to `GlassLayers`.
+
+**Defects found by running, not reading.** Two independent PostgreSQL foreign-key bugs: an
+owner-scoped `information_schema` view that returned nothing for non-owning accounts (an empty tab,
+indistinguishable from a table with no keys), and composite keys returned as a **cross product**
+asserting relationships that do not exist. Both fixed; the test that found the first now guards both.
+
+**Open and honest.**
+- **D13** — no way to trust a self-signed database certificate. Needs a CA-only verification mode
+  *and* a CA import path; both MySQL and PostgreSQL self-sign by default.
+- **Two ~10s tunnel failures, unexplained.** Three hypotheses proposed — cold-cache, contention,
+  reverse DNS — **all three refuted by measurement**, two of them the coordinator's. Instrumented
+  with `log_error_verbosity=3`, a counter baseline and a three-signature discriminator table,
+  because three different things fail at exactly ten seconds on that path.
+- **Unproven by anyone:** the D14 fingerprint prompt through SwiftUI. It needs a person, not a test.
+- The macOS UI suite figure is unattributable until W-local settles; a drag-staging flake is unowned.
+- Whether existing glassdb users get an import path for saved connections — credentials and hosts
+  carry across the App Group and Keychain, **the connection list does not**. Awaiting the user.
+
+**Nothing is committed.** 48 files in the working tree.
+
+## 2026-09-12 (afternoon) — shipped to /Applications, and corrected by using it
+
+Builds **0.3.56 → 0.3.67**, each installed with the version read back from the installed bundle.
+**615 tests / 48 suites**, one known issue (D13). **Nothing committed — 63 files in the tree.**
+
+**Verified by the user in the running app:** the canvas border, the service tabs, the colour menus,
+the `tinyint` fix, and — the important one — a database connecting over the D7 tunnel to a
+loopback-only MySQL on a Tailscale host.
+
+**Closed: the two unexplained ~10s tunnel failures.** The SSH forward dropped a server-first
+protocol's opening bytes; MySQL greets immediately, and the channel was wrapped in a
+`NIOAsyncChannel` only after the open returned. Fixed by wrapping inside the channel initializer —
+[note](tasks/2026-09/2026-09-12_ssh-forward-server-first.md).
+
+**Three defects that passed every test**, each found by a person using the app: that forward bug
+(the live tunnel test cannot catch it), `isBool` matching a bare `tinyint` so a score column
+rendered as a toggle and **would have written 0 over real data**, and temporal columns accepting any
+string at all. Rule 22 now records why the suite could not reach them.
+
+**Also landed:** record-editor validation for size and format from the *declared* type (D17),
+"Paint Theme Color" removed, the database name made optional, service tabs as the choice,
+`Set to NULL` in the column tool row, and a Release-only link failure fixed by **not** sharing a
+result-builder availability guard across modules (D16).
+
+**Two self-inflicted regressions**, both now rules: a deleted `.toolbar(removing:)` line
+investigated everywhere except the diff (rule 23), and an unverified mechanism propagated to a
+worker (rule 19).
+
+**Next, and re-planned against the code that exists** — see *Remaining work, re-planned* in the
+Stage 3 plan. R1 the SQL draft-loss fix (in-memory only; it loses work), then row deletion and
+foreign-key navigation. Two original estimates were wrong: AI on iOS is already done, and the audit
+viewer has **no store to view** — only `os.Logger` output — so it needs a decision first.

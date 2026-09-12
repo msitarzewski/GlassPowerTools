@@ -527,9 +527,299 @@ service kind, several of a kind allowed) and D9 (parity-plus) are approved**, an
 **installing MySQL and PostgreSQL on the test VM** (`192.0.2.6`, sudo available, least-privilege
 test users, never root).
 
-Start with wave 1: move `Packages/GlassDBKit` minus its tunnel manager and Citadel edge, prove the
-swift-crypto graph by building, sweep for API above the 26.0 floor (measured: one call at
-`Constants.swift:663`, so the real floor is 26.1), and provision the VM databases.
+### Wave 1 — in progress, 2026-09-12
+
+| Piece | State |
+|---|---|
+| **W-kit**, the engine moved | **done**, [note](tasks/2026-09/2026-09-12_stage-3-kit-move.md). Landed as `Sources/GlassDBKit` (a target, not a nested package — same role as `GlassSSHTransport`, and the Xcode project needed no edit). 22 tests; the six that tested `SSHTunnelManager` left with it and each has a named owner in `GlassSSHTransport`. **The survey's top risk is dead: the merged graph resolves on swift-crypto 4.5.2**, proven by `swift package resolve`, not by argument |
+| **W-shell**, borrowing the host's forward (D7) | **done**, [note](tasks/2026-09/2026-09-12_stage-3-shell-forward.md). Pulled forward from wave 2. `GlassCapabilityHostAccess.forwardPort(toHost:port:)` + `GlassCapability.openPortForward`, implemented by the terminal. 7 unit tests. **Never opened a real socket yet** — first honest test is wave 2 |
+| **W-floor**, the availability sweep | running |
+| **W-vm**, real databases on the VM | running |
+
+Package now **514 tests / 34 suites**, and the app builds for macOS, iOS Simulator and visionOS
+Simulator with the database engine in the graph. Nothing committed yet.
+
+### Wave 2 — in progress, 2026-09-12
+
+**W-capability: the port is built.** `Sources/GlassDatabase`, 26 files. The Database tab in the
+one-and-done sheet is **live** (UI-tested, not inspected); scenes and bootstrap mirror the
+terminal's; D7's forward is wired from `hostAccess.forwardPort`; D14's trust broker is built as a
+*second source for the existing prompt*, not a second prompt; read-only is enforced on the
+connection, not the UI (**D15** — five write paths bypass `executeQuery`, so a guard there would
+have protected nothing while looking correct). Note:
+[the capability note](tasks/2026-09/2026-09-12_stage-3-capability.md).
+
+**W-local: running**, on D8's built-in "This Mac" host.
+
+**The numbers, stated honestly.** Valid as measured **before W-local started**: `swift test` 560
+passed / 0 failed; app builds on macOS, iOS and visionOS; macOS UI 18/19 with the single failure
+isolated by experiment to the untracked tag-vocabulary work. Anything sampled since is
+**unattributable** — the tree is mid-edit and `swift build` currently fails at
+`GlassShellSetup.swift:114`. A UI re-run and a coordinator-run UI suite were both contaminated this
+way and are discarded rather than cited.
+
+**Coordination lesson (coordinator's error).** W-local was started while W-capability still had
+work needing a green tree, so it is blocked and its measurements are meaningless. Standing rule
+adopted: a worker sharing this tree lands compiling increments, and warns before any sweeping change
+so the others can be held rather than sample noise.
+
+### Since Stage 3 closed: shipped to /Applications and corrected in use — 2026-09-12
+
+Builds **0.3.56 → 0.3.67**, each installed and the version read back from the installed bundle.
+Package **615 tests / 48 suites**, one known issue (D13). **Nothing is committed** — 63 files.
+
+**The finding that matters: the SSH forward dropped a server-first protocol's opening bytes.**
+[Full note](tasks/2026-09/2026-09-12_ssh-forward-server-first.md). MySQL greets first; the channel
+was wrapped in a `NIOAsyncChannel` *after* the open returned, so a greeting delivered in the same
+read as the channel-open confirmation landed in an empty pipeline and was discarded — the server
+then timed out at its `connect_timeout` of exactly 10s. PostgreSQL is client-first and never
+reproduced it. Fixed by wrapping **inside the channel initializer**. This is the
+"two unexplained ~10s tunnel failures" that had been open since the morning; it is now closed, and
+the user confirmed it in the running app against a loopback-only MySQL on a Tailscale host.
+
+It passed every test, including the live tunnel test, because the VM's MySQL listens on `0.0.0.0`
+and the race depends on packet coalescing. `openDirectChannel` is byte-for-byte identical to
+glas.sh's, which felt like proof of correctness and actually means **glas.sh has the same latent
+bug**. Three hypotheses were refuted along the way, and the right diagnosis was abandoned early for
+the wrong reason — a failed remedy was read as a failed theory.
+
+**UI and validation work** — [note](tasks/2026-09/2026-09-12_ui-and-validation.md): the canvas
+border, "Paint Theme Color" removed, service tabs as the choice (which also fixed the Terminal tab
+demanding new credentials during a database add), real colour swatches, the database name made
+optional, `Set to NULL` moved into the column tool row, and record-editor validation for size
+(`ColumnTypeConstraint`) and format (`ColumnValueFormat`). Two defects surfaced doing it: a
+Release-only link failure from sharing a result-builder availability guard across modules (**D16**),
+and `isBool` matching a bare `tinyint` so a score column rendered as a toggle and **would have saved
+`0` over real data** (**D17**).
+
+**Two regressions of my own, both recorded as rules:** a deleted `.toolbar(removing:)` line that I
+then investigated everywhere except my own diff (rule 23), and an unverified mechanism propagated to
+a worker who wrote it into a task note (rule 19).
+
+### What is left before Stage 4
+
+The plan's remaining work is **re-planned against the code that now exists**, with `file:line`
+anchors — see *Remaining work, re-planned* in
+[the Stage 3 plan](tasks/2026-09/2026-09-12_stage-3-database-plan.md). Two estimates in the original
+were wrong: **AI on iOS is already done**, and the **audit viewer is not "one list view"** — there is
+no audit store at all, only `os.Logger` output, so it needs a decision between building a store and
+reading `OSLogStore`.
+
+Order: **R1 the SQL draft-loss fix** (it loses work: `QueryDocumentTab.text` is in memory only and
+nothing persists it), then **R2 row deletion** and **R3 foreign-key navigation** — the approved
+parity-plus a user will notice — then settings, the audit decision, one command palette, D13, and
+the smaller items. Desktop should not start until R1–R3 are done.
+
+### Proven against real servers, 2026-09-12
+
+`Tests/GlassDatabaseTests/LiveDatabaseIntegrationTests.swift` ran against MySQL 8.4.11 and
+PostgreSQL 18.6 on the VM. **Stage 3's central claim is no longer a compile-and-unit-test claim.**
+
+| Proof | Result |
+|---|---|
+| Both engines connect **through the capability**, real server version | **passed** |
+| Seeded tables and the `members → teams` foreign key (MySQL) | **passed** |
+| `SELECT` through the session manager returns the seeded rows, both engines | **passed** |
+| **The read-only guard refuses a real `UPDATE`, row provably unchanged**, both engines | **passed** |
+| MySQL and PostgreSQL each over **a real SSH forward** | **UNDER INVESTIGATION — see below** |
+| **Read-only still refuses writes through a tunnel** | passed (same caveat) |
+
+**The D7 tunnel claim is WITHDRAWN pending a controlled A/B.** It was made on runs that were on a
+warm MySQL auth cache. `MySQL over a real SSH forward` then failed twice with
+`Got timeout reading communication packets` at ~10s, and began passing again only after the cache
+was warmed — unintentionally — by a `mysql` CLI connection through a plain `ssh -L`. Through a
+forward the server sees the client as `127.0.0.1`, a **different `caching_sha2_password` cache entry
+from the direct path**, which is why only the tunnel exposes it. PostgreSQL over the same forward
+passes every time because it is client-first and never exercises the path.
+
+This is the same warm-cache trap W-vm caught on the direct engine path, one layer up. Whole package
+with the live and tunnel environments set: **592 tests / 45 suites**.
+
+**Ruled out so far, by evidence not argument:**
+- *Not* our forwarding diverging from proven code: `SSHTransport.openDirectChannel` is byte-for-byte
+  identical to glas.sh's shipping implementation (`../glas.sh/glas.sh/Models.swift:2466`), and both
+  vendored Citadel copies of `DirectTCPIP+Client.swift` are the same file.
+- *Not* a lost server-first greeting: disabling `autoRead` on that hunch made the test **hang**, so
+  the theory is wrong. Reverted.
+- MySQL through a plain `ssh -L` forward works; MySQL direct works.
+
+**The cold-cache theory was tested and is REFUTED.** W-vm flushed at `05:39:28Z` and stood off the
+server; the first `gpt_test` connection afterwards was the Swift tunnel test, and
+`MySQL over a real SSH forward` **passed in 0.072s**, all three tunnel tests green. Cold
+`caching_sha2_password` full auth over our forward works. The OpenSSH control arm was therefore not
+run — there is no fault to isolate.
+
+The framing was wrong twice, and W-vm caught the second before the experiment ran: **only
+`gpt_test@%` exists, and MySQL keys its cache by the matched account, not the client address.** The
+tunnel never had its own cache entry, so "the tunnel is cold while the direct path is warm" was not
+a mechanism that existed.
+
+**Still unexplained, and the contention hypothesis is NOT supported.** Two reproducible failures at
+almost exactly 10s — MySQL's `connect_timeout`, so round-trip-shaped rather than throughput-shaped.
+
+*Provenance, since it was questioned and the answer matters:* the string came from the **client**
+surfacing a server `ERR` packet — mysql-nio formats `MySQLError.server` as `"Server error: …"`
+(`MySQLError.swift:40`). The VM's error log does not contain it, which is **consistent, not
+exculpatory**: at `log_error_verbosity=2` the `MY-010914` note is not written, while the ERR packet
+still reaches the client. Absence in the log and presence on the wire are one event seen twice.
+Nothing listens on 3306 or 33306 on this Mac, so no local MySQL could have produced it — the
+investigation is on the right machine.
+
+*What the server's own counters say* (W-vm, for the 05:15Z–05:25Z window):
+
+| Evidence | Reading |
+|---|---|
+| `Max_used_connections = 4` vs `max_connections = 151` | nowhere near a limit |
+| `Connection_errors_{max_connections,accept,internal,peer_address,tcpwrap}` | all **0** |
+| sshd journal, whole day, for throttle/refusal/timeout patterns | **no matches at all** |
+| sshd `MaxStartups 10:30:100`; busiest second 7 accepts | below the throttle floor |
+| `performance_schema.host_cache` for the Mac | `SUM_CONNECT_ERRORS = 0`, validated |
+
+So **contention is recorded as proposed and unsupported.** It is not disproved either — a
+client-side stall leaves no server trace at verbosity 2 — but it will not be kept alive for
+convenience. A reverse-DNS stall was also chased and **ruled out**: `skip_name_resolve=0` made a
+2×5s resolver timeout fit suspiciously well, but the lookup measures 6ms and the host cache holds a
+validated entry.
+
+**Armed for a recurrence:** `log_error_verbosity` raised to 3 (`SET GLOBAL` + `SET PERSIST`) with a
+counter baseline snapshotted at `05:43:08Z` (`Aborted_connects 55`, `Aborted_clients 0`,
+`Connections 210`, `Max_used_connections 4`). Only the **diff** from that baseline is meaningful.
+Revert with `SET GLOBAL log_error_verbosity=2; RESET PERSIST log_error_verbosity;`.
+
+**Read that log with two facts in hand, or it will mislead you.**
+
+*First, much of the aborted-connect noise is ours by design.* Verbosity 3 immediately caught four
+notes inside 12ms — three `Got an error reading communication packets` and one `Bad handshake`.
+That is `MySQLAdapter.serverAdvertisesTLS` (`MySQLAdapter.swift:76-94`), which deliberately opens a
+raw connection, reads **only the unauthenticated greeting** to check for `CLIENT_SSL`, and closes
+without authenticating — a fail-closed design so mysql-nio's opportunistic TLS can never send an
+auth response to a server that does not offer encryption. From the server it is indistinguishable
+from a client giving up. It runs whenever `tlsPolicy.isRequired`, so every suite run that exercises
+a TLS-required policy drifts `Aborted_connects` upward with no fault behind it.
+
+*Second, and this is what makes the trap escapable:* the probe's notes say **"Got an error** reading
+communication packets"; the unexplained failure said **"Got timeout** reading communication
+packets". **Different reason path, so the two are distinguishable in the log.** Anyone grepping
+later will find a pile of aborted-connect notes that are not the bug; match on *timeout*.
+
+The `Bad handshake` note in the same cluster is the probe too — it closes mid-handshake by design —
+and is **not** a lead, despite pointing at the handshake rather than a read stall.
+
+**Three distinct things fail at ten seconds on this path.** They are told apart only by their
+strings, so the table matters more than any of them individually:
+
+| Signature | Source |
+|---|---|
+| `Got timeout reading communication packets` — a server `ERR` packet over the wire | **the open bug** |
+| `Got an error…` / `Bad handshake` in the server log | our fail-closed TLS probe; benign |
+| `Timed out waiting for the MySQL server greeting.` — a client-side string | the probe's own greeting timeout (`MySQLAdapter.swift:86`) |
+
+`serverAdvertisesTLS` carries its own `connectTimeout(.seconds(10))` at `:80` as well, so the
+coincidence is threefold and none of them is evidence for another.
+
+**The probe's interaction with a tunnel was checked, and is correct.** With TLS required over a
+forward it opens a *second* forwarded connection before the real one. Both are correctly targeted:
+the transport plan sets `databaseHost = "127.0.0.1"` and `databasePort = tunnelLocalPort`
+(`DatabaseSessionManager.swift:230-236`) and the probe receives exactly those, so it tests the
+endpoint the session will actually use. And the policy over a tunnel is
+`.requiredSystemTrustForHost(config.host)` (`:218`), so the certificate is verified against **the
+machine's real name, not loopback** — the thing a tunnel implementation usually gets wrong, already
+right. A cost, not a defect.
+
+### macOS UI suite — the first attributable run, 2026-09-12
+
+**18 passed, 1 failed, 1 skipped**, on a machine verified quiet before the run and with nothing else
+started during it (rule 21). Three earlier runs were discarded as unattributable.
+
+- `GlassShellLibraryUITests` **7/7** — including `testAddHostWithTerminalInOneSheetThenConnect`,
+  which had failed in a contended suite with an event-synthesis timeout and **passes here in the
+  suite at 77.9 s**. That settles it as contamination, not a defect, and is the evidence rule 21
+  was missing.
+- `GlassShellLocalHostUITests` **4/4** — D8 verified against the running app.
+- `GlassTerminalUITests` 4 passed, 1 skipped. `LaunchSmokeUITests` 1/1.
+- **`GlassShellTagFieldUITests.testCollectionsAreChipsAndFeedTheSystemWideVocabulary` — failed.**
+
+**The one failure, with what is established and what is not.** It is pre-existing, in **untracked
+Stage 2 tag-vocabulary work** (`Sources/GlassShell/GlassShellTagVocabulary.swift`,
+`UITests/GlassShellTagFieldUITests.swift`), and was independently reproduced by two workers with
+Stage 3 absent.
+
+*Established:* it fails **only at the final assertion** — the `Clients` collection appearing in the
+sidebar; every earlier assertion passes. The sidebar does render collections as their own section
+from `projection.collections` (`GlassLibraryCategories.swift`). The setup sheet **does** pass tags
+to `addHost`/`updateHost` (`GlassShellSetup.swift:275,287`). The model-level equivalent passes in
+`GlassShellModelTests` (`projection.collections.map(\.name) == ["Lab", "Prod"]`).
+
+*The useful narrowing:* the test's earlier success — the suggestion reading "Add Clients" — proves
+**the vocabulary store persisted the tag**, which is a *different store* from the host record. It is
+not evidence that the host itself carries the tag, and the two are easy to conflate.
+
+*Not established:* why the sidebar row is absent. **No mechanism is offered here deliberately**
+(rule 19); it needs a run with element inspection, which is its own task.
+
+### D8 — "This Mac" is built, 2026-09-12
+
+[The local-host note](tasks/2026-09/2026-09-12_stage-3-local-host.md). The device is a real host:
+a fixed `HostID`, its record in a **second catalog store under app-local storage** rather than the
+App Group (which is what "never published" means in practice, while reusing the kit's locking and
+validation), inserted at the head of `hosts` after grouping so a discovered machine of the same name
+cannot swallow it. Built-in services are **declared by the capability, not stored**;
+`supportsLocalSetup` defaults to **true**, so a capability opts *out* — `Sources/GlassDatabase` was
+never touched and gets local database setup free.
+
+`connectAll` on that row is **picker-only, no play glyph** — see the D8 addendum in
+[decisions](decisions.md) for the four-part reasoning, which is recorded because someone will ask.
+
+**The row appears on every platform and is emptier off the Mac, not dead.** No local shell exists on
+iPhone, iPad or Vision Pro, so the terminal contributes *no* row rather than one that does nothing;
+SQLite is real everywhere and this is the **only place a SQLite file can live in the product**, which
+is why the row is not suppressed when empty. Named "This iPhone" etc. rather than the device's own
+name, so it cannot be confused with the same machine reached over SSH in the shared library.
+
+**Open limit, stated plainly: iOS and visionOS are compile-verified only.** The UI tests are written
+to run there and have **not** been run there, so the row's appearance in the running app on those
+platforms is a build result, not a device result.
+
+Full detail, including both hypotheses recorded by name and outcome and a ruled-out subsection for
+reverse DNS (which fits well enough that someone will re-propose it), is in
+[the VM note](tasks/2026-09/2026-09-12_stage-3-vm-databases.md), under a heading that says
+*Read this before grepping the error log*. **Do not lower `log_error_verbosity` while this is open**
+— doing so silently disarms the trap.
+
+**Status: open.** The failure is real, it came from the VM's MySQL as a `connect_timeout` expiry,
+and nothing yet explains it. It is not closed by "it passes now".
+
+**"It passes now" is not the resolution.** It passed before, too. Until the log explains the two
+failures, the honest status of the D7 tunnel is *works in clean conditions, with an unexplained
+failure mode under load* — which, if it is contention, is a lesson about how live tests are run
+rather than a defect in D7.
+
+**Still not proven by a human:** no fingerprint has been compared in the actual SwiftUI prompt. D14's
+broker is unit-tested and the flow through the UI is not.
+
+**A real defect, found by the live run and now fixed.** `PostgreSQLAdapter.foreignKeys(in:database:)`
+inner-joined `information_schema.constraint_column_usage`, which PostgreSQL restricts to tables the
+current user **owns**. The constraint was visible in `table_constraints` and invisible in
+`constraint_column_usage`, so the join dropped it and the Foreign Keys tab rendered **empty —
+indistinguishable from a table with no keys**, for exactly the least-privilege accounts a careful
+user connects with. D9 commits us to foreign-key navigation, so it would have shipped looking
+correct and showing nothing.
+
+Fixed: the adapter reads `pg_catalog` (`pg_constraint`/`pg_class`/`pg_attribute`), house-consistent
+with `tableStatus` in the same file. The test that found it now guards it and asserts the key
+positively. Its comment warns against "simplifying" it by seeding as the connecting account — the
+non-ownership **is** the condition under test.
+
+**Why this one matters beyond itself.** It was invisible to every unit test, every compile and every
+reading of the code; it needed a real server *and* a realistic least-privilege account. It is the
+third time this stage that the shape of an API suggested one thing and the call sites or the real
+server said another — see D13, D15. That is now a rule worth applying, not an anecdote.
+
+The `withKnownIssue` discipline paid for itself: the fix made the test fail with "Known issue was
+not recorded", which is what removed the wrapper rather than leaving a stale one behind.
+
+Then: W-palette (one macOS command palette — glassdb's and glas.sh's are two implementations of one
+surface), the D9 gap closures, W-settings, the security review, and integration.
 
 Stage 2 close-out still open: widget on a device, live iCloud sync, the visionOS real-host UI test
 blocked by XCUITest's scene-ID fault, and the three sibling call sites broken by the kit's dropped

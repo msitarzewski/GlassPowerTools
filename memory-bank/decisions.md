@@ -174,12 +174,19 @@ SSH transport" in the merge plan and the Stage 1 note.
 Commit messages carry co-author attribution and no session URLs, per the user's global rules.
 
 
-## D7 — a database service tunnels through its host's own SSH service — Proposed 2026-09-12
+## D7 — a database service tunnels through its host's own SSH service — Implemented 2026-09-12
 
 A database service carries no SSH fields. When the database is not directly reachable the capability
 borrows the host's SSH transport from the shell and forwards to the database port. Host trust is
-therefore shared with the terminal. Needs `GlassCapabilityHostAccess.sshTransport(for:)`;
-capabilities still never import each other. Detail in
+therefore shared with the terminal. Capabilities still never import each other.
+
+**Built.** The hook landed as `GlassCapabilityHostAccess.forwardPort(toHost:port:)` rather than the
+proposed `sshTransport(for:)`: the borrower needs a local port, not a transport, and returning a
+port keeps the NIO graph out of `GlassShell` entirely. The lender side is
+`GlassCapability.openPortForward(host:toHost:port:)`, defaulting to a refusal, implemented by
+`GlassTerminalCapability`. 7 unit tests; **no live tunnel opened yet**. Host-key trust is refused
+rather than prompted or assumed — see the limitation in
+[the W-shell note](tasks/2026-09/2026-09-12_stage-3-shell-forward.md). Detail in
 [the Stage 3 plan](tasks/2026-09/2026-09-12_stage-3-database-plan.md).
 
 ## D8 — "This Mac" is a real host, holding every service kind — Approved 2026-09-12
@@ -189,6 +196,40 @@ services of the same kind: SQLite files and local MySQL/PostgreSQL as databases,
 on each click of the terminal toolbar icon, containers and VMs as desktops in Stage 4, and the local
 filesystem as Files. It has no address and is never asked for one, is never published to the shared
 catalog, and its services never tunnel.
+
+## D8 addendum — what building it corrected, 2026-09-12
+
+Implemented — [the local-host note](tasks/2026-09/2026-09-12_stage-3-local-host.md). Four
+corrections to D8 as written, all found by building it:
+
+1. **Files is not a service kind, and was not shipped.** It is a `GlassServiceTool` riding a
+   Terminal service's live SSH session; no local-filesystem browser exists in the tree. A Files row
+   on the local host would have opened nothing, so it was deliberately omitted rather than stubbed.
+   Closing it needs a local backend for `SFTPBrowserView` or a new browser.
+2. **`connectAll` on the local host is picker-only — no play glyph.** The device is already here;
+   there is nothing to connect *to*, and its services are not facets of one thing. The failure mode
+   is asymmetric: on a remote host a stray play costs a few sessions to one box, but here it would
+   open a terminal, a database workspace per database and a VM console at once on the display you
+   are looking at. With exactly one service the row stays a plain play button.
+3. **Opening a window is not a session.** The terminal could have reported `.connected` the moment a
+   local shell was *asked for*, stamping "last connected" on a shell that may have failed to launch.
+   The outcome is queued instead and answered by the pane that actually starts the process, or by
+   its `launchError`.
+4. **Several services of one kind collided in the accessibility identifiers.** Three terminals on one
+   host produced three *identical* identifiers, so every existing UI test was matching an arbitrary
+   row and passing by luck — a defect in the test surface, invisible precisely because the tests
+   stayed green. The first of a kind keeps the bare identifier; later ones carry their position.
+
+Two further defects were found on the way, one pre-existing: `load()` can run twice concurrently
+(`.task` plus the scene-phase observer), and **both** UI-test seeders checked "is it empty?" *after*
+an await, so both could pass — producing four database rows where two were expected, visible in a
+screenshot and in no unit test. Both now claim a one-shot flag synchronously before their first
+await; the pre-existing `--ui-testing-seed-hosts` carried the same latent race.
+
+The forward-broker trap D8 predicted was real and is closed: the broker offered a tunnel to any host
+with an `.ssh` service, and the local host has one. Excluded in both the forward path and D14's trust
+resolver, with a test that adds a real `.ssh` link to the local host so it fails if the guard goes.
+
 
 ## D9 — Stage 3 ships parity-plus, not parity — Approved 2026-09-12
 
@@ -206,3 +247,189 @@ Kept as-is and revisited with export.
 
 MySQL and PostgreSQL cancel by closing the transport; only SQLite cancels in place. Behaviour is
 kept and surfaced honestly rather than disguised.
+
+## D12 — the product floor stays at 26.0; glassdb's 27.0 was never justified — Approved 2026-09-12
+
+glassdb declares `MACOSX_DEPLOYMENT_TARGET = 27.0` in all four configurations. A compile-based
+sweep at 26.0 produced **exit 65, two diagnostics, one call site**: `visibilityPriority` and `.high`
+at `../glassdb/glassdb/Constants.swift:663`. The SDK puts that API at **macOS 26.1** — not 27.0 —
+so glassdb's floor was over-stated by a major version for a reason that does not exist. One
+`if #available(macOS 26.1, *)` and the same project builds at 26.0 on macOS, iOS device, iOS
+Simulator and visionOS Simulator. `GlassDBKit` contains zero availability annotations.
+
+**No floor change.** Keeping 26.0 needs no new approval; raising it would. The cost of the guard is
+that the SQL Run control loses its pinned toolbar slot at narrow widths and can fall into the `»`
+overflow — cosmetic, nothing functional. Evidence and the exact commands:
+[the floor sweep](tasks/2026-09/2026-09-12_stage-3-floor-sweep.md).
+
+Implemented ahead of the port: the guard now lives once, in
+`Sources/GlassLayers/GlassToolbarVisibility.swift`, as `glassKeepVisibleWhenCompact()` and
+`glassOverflowFirstWhenCompact()`, covering macOS 26.1, iOS 27.0 and visionOS (where the API is
+unavailable outright, not merely newer). `GlassTerminal`'s two private copies were replaced by it
+across 8 call sites, so the database capability inherits the guard instead of adding a third copy.
+
+## D13 — pinned-CA TLS cannot reach a stock MySQL server — Observed 2026-09-12
+
+`.requiredCertificates(_, serverName:)` always sets `certificateVerification = .fullVerification`
+and hands `serverName` to NIOSSL as the hostname to match. A stock MySQL 8.4 generates a
+certificate with CN `MySQL_Server_8.4.11_Auto_Generated_Server_Certificate` and **no
+subjectAltName at all**, so neither of the two available routes works:
+
+- `serverName: <the IP>` — no SAN and a CN that is not the address, so verification fails.
+- `serverName: <the CN>` — **NIOSSL refuses the string before contacting the server**:
+  `NIOSSLExtraError.serverHostnameImpossibleToMatch … contains non-DNS characters`.
+
+**The second reason is not what it first looks like, and the distinction decides the fix.** CN
+fallback itself works: measured with OpenSSL against this server,
+`s_client -verify_hostname MySQL_Server_8.4.11_Auto_Generated_Server_Certificate` returns
+`Verification: OK`, code 0, while the same check against `192.0.2.6` gives `hostname mismatch`.
+So the CN *would* match; NIOSSL simply will not accept a non-DNS string as a hostname to match
+against. (Measured with OpenSSL; BoringSSL is expected to agree but that was not confirmed inside
+NIOSSL.)
+
+The fix is therefore **not** a better server name — no string works — but a policy that
+authenticates the chain without matching a name: MySQL's own `VERIFY_CA`, as distinct from
+`VERIFY_IDENTITY`. `DatabaseTLSPolicy` can express only the latter, so a user who pins the CA of a
+default MySQL install cannot use TLS at all.
+
+Found by running the live test against a real server rather than by reading. **Not yet fixed** — it
+changes the engine's security surface, so it goes to the wave-4 security review.
+
+**Severity settled 2026-09-12: a defect, not a blocker.** The open question was whether MySQL would
+force TLS. Measured against a flushed auth cache, `mysql8LiveRoundTrip` passes over plaintext, so
+mysql-nio does complete `caching_sha2_password` full authentication over the RSA public-key
+exchange. A user on a stock MySQL therefore loses pinned-CA TLS and falls back to an unencrypted
+connection that still authenticates safely — bad, worth fixing, not stopping anything.
+
+The suite records this with `withKnownIssue` at `Tests/GlassDBKitTests/GlassDBKitTests.swift` rather
+than deleting the block or asserting the failure as correct: the defect stays visible in every run,
+and when the policy gains a CA-only mode Swift Testing will report the known issue as unrecorded and
+send someone back to remove the wrapper.
+
+### Two corrections after checking the call sites, 2026-09-12
+
+**There is no silent fallback to plaintext.** It was suggested that a user asking for pinned-CA TLS
+would quietly get an unencrypted connection, which would put the honest-status rule at stake rather
+than only certificate handling. The code does not do this. `DatabaseSessionManager.swift:238-243`
+chooses the policy **once** from `config.useTLS` and there is no retry path; a TLS failure throws
+and propagates. The two `tlsPolicy: .disabled` sites at `:106` and `:234` are SQLite, which is a
+local file and cannot have transport security at all — not a downgrade. Checked rather than
+accepted, because "fails loudly" and "downgrades silently" are opposite findings.
+
+**The real gap is larger than the one above, and it is in the app, not the engine.** grep of the
+whole of `../glassdb/glassdb/` finds **no construction of `.requiredCertificates` anywhere**: the
+app only ever builds `.requiredSystemTrust` or `.requiredSystemTrustForHost` (`:240-241`). So the
+pinned-CA path is reachable only from tests, and there is no UI to supply a CA. Since a default
+MySQL **and** a default PostgreSQL both generate self-signed certificates, the practical position
+is: *a user who ticks "Use TLS" against a stock server gets a hard failure and no remedy inside the
+app.* The engine has had the capability all along and the app never exposed it.
+
+That reframes the work. Closing D13 needs both a CA-only verification mode **and** a way to import
+or point at a certificate — which makes it a parity-plus item for Stage 3's own backlog alongside
+the D9 closures, not merely a note for the wave-4 reviewer. Recorded here; not yet scheduled.
+
+## D14 — host-key trust is resolved in the connect flow, not refused — Approved 2026-09-12
+
+Supersedes the interim behaviour recorded in
+[the W-shell note](tasks/2026-09/2026-09-12_stage-3-shell-forward.md), where
+`GlassTerminalCapability.openPortForward` passes `trustDecider: nil` and an untrusted machine gets
+`GlassPortForwardError.hostNotTrusted` telling the user to go and connect the Terminal service first.
+
+**Why that was wrong.** It was justified on the grounds that a background tunnel is the wrong place
+to ask a user to compare a fingerprint. The security instinct holds — auto-trusting would be a
+silent downgrade — but the classification does not: opening a database service is a **foreground**
+action. The user pressed play and is waiting. That is exactly the moment DBeaver, DataGrip and
+Sequel Ace all resolve trust.
+
+**Approved design.** The database connect flow surfaces the terminal's own trust prompt — the same
+challenge, the same fingerprint UI, one flow for the product — rather than refusing. Where possible,
+resolve trust **at setup time**: when a database service is added to a machine whose key is not yet
+pinned, settle the fingerprint in the setup sheet so connecting later simply works.
+
+**What makes this ours rather than a copy of theirs.** Trust is keyed `host:port` in
+`SecretStoreHostTrustStore` (`Sources/GlassSSHTransport/SSHHostTrust.swift:81-95`), which lives in
+the transport and is owned by no capability. So trust is an attribute of **the machine**, and pinning
+it once in any capability is inherited by every other. Every comparable tool treats "the SSH host"
+and "the database host" as unrelated strings that happen to coincide, so trusting a box for one
+connection's tunnel does nothing for the next. The same structure is why the database service asks
+for no SSH details at all (D7).
+
+Owner: wave 2, W-capability, including the `GlassTerminal` edits — sequenced ahead of W-local rather
+than locked, so the trust flow stays in one head. The refusal path stays as the honest fallback for
+the case where no prompt can be shown.
+
+**Approved shape, 2026-09-12.** The connect path needs **no new protocol hook**: `forwardPort` is
+already async and main-actor isolated, so `GlassTerminalCapability.openPortForward` simply swaps
+`trustDecider: nil` for one that routes into the existing prompt and awaits the answer. The database
+side calls `forwardPort` unchanged.
+
+The setup path does need one, because at setup time there is no connection to challenge:
+
+```swift
+public enum GlassHostTrustOutcome: Sendable { case trusted, declined, unavailable }
+
+// GlassCapabilityHostAccess
+func resolveHostTrust() async -> GlassHostTrustOutcome
+// GlassCapability, defaulting to .unavailable — the same refusing default as openPortForward
+func resolveHostTrust(host: HostProfile) async -> GlassHostTrustOutcome
+```
+
+Brokered exactly as `forwardPort` is, so capabilities still never import each other. **Not a `Bool`:**
+a bare `false` would conflate "the user declined", "there was nobody to ask" and "**the host key
+changed**" — and reporting a changed key as an ordinary failure is the swallowed-error pattern the
+project rules forbid. Named `resolve` rather than `ensure` because it reports rather than guarantees.
+
+**Known limit, by design.** The one-and-done sheet can create a host, its Terminal service and its
+Database service in a single save, so when the Database tab's tunnel toggle flips there may be no
+committed SSH service to challenge yet. Setup-time resolution therefore works only when adding a
+database to a machine that already has a Terminal service; the combined case returns `.unavailable`
+and falls back to prompting at first connect. Save is never blocked on it.
+
+## D15 — read-only mode is enforced on the connection, not in the UI — Implemented 2026-09-12
+
+A read-only database service must refuse writes. The obvious place is the session manager's
+`executeQuery`, and it would have been wrong: **five write paths call the driver directly and never
+go through it** — `SchemaBrowserView.swift:518` (truncate and drop), `TableDetailView.swift:3966`
+(row update), `:4060` (a pasted range), `:4146` (insert) and `:4756` (schema change). A guard at
+`executeQuery` would have left every one of them open while looking correct. Verified at the first
+call site rather than taken on trust.
+
+`ReadOnlyDatabaseConnection` therefore wraps the connection itself at connect time, so classification
+happens **before the wire** and there is no path around it. Session-control statements pass, because
+they select what you are reading. A statement the classifier cannot read is refused rather than
+allowed: `unknown` is not evidence that something is safe. Eight tests drive it the way those five
+callers do and assert that nothing refused reaches the driver.
+
+The general lesson, which has now cost this stage twice: the shape of an API suggests where a rule
+belongs, and the call sites decide it.
+
+## D16 — a result-builder availability guard cannot be shared across modules — Observed 2026-09-12
+
+`visibilityPriority` sits above the product floor, so its `if #available` lives inside a
+`@ToolbarContentBuilder`. Extracting that guard into `GlassLayers` so two capabilities could share
+it **broke the Release link**: `ToolbarContentBuilder.buildLimitedAvailability` undefined,
+referenced from `GlassTerminal.o`. The compiler emits that symbol for the availability branch and
+its opaque type descriptor does not resolve across a module boundary. `@inlinable` does not help.
+
+Debug built clean, 592 unit tests passed and all three platforms built — only a **Release** build
+found it. The guard is therefore duplicated per module on purpose
+(`TerminalToolbarVisibility.swift`, `DatabaseToolbarVisibility.swift`), each carrying a comment
+saying so, because it looks exactly like something to tidy away.
+
+## D17 — validation reads the declared type, never result-set metadata — Implemented 2026-09-12
+
+The record editor validates size and format from the column's **declared type** (`varchar(40)`,
+`decimal(10,2)`, `enum('a','b')`) rather than from the driver's column metadata.
+
+Reason: MySQL reports `columnLength` in **bytes**, so a `varchar(40)` in utf8mb4 arrives as 160 — a
+limit built on it would let a user type 160 characters and fail at the server. PostgreSQL reports
+no length at all. The declared type is identical on both engines, needs no adapter change, and is
+already displayed beside the field.
+
+`ColumnTypeConstraint` (what fits) and `ColumnValueFormat` (what is well formed) are separate, so a
+value that does not parse is reported as the wrong *type* rather than the wrong *size*.
+
+**Corrected while doing it:** `isBool` matched a bare `tinyint`. `tinyint(1)` is MySQL's boolean
+convention; plain `tinyint` is an integer. A score column rendered as a toggle and **saving would
+have written 0 over the stored value**. See
+[the UI and validation note](tasks/2026-09/2026-09-12_ui-and-validation.md).

@@ -60,3 +60,70 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     sits on the red screen. Clear and tinted belong to the system; do not author them. Verify a
     change with `actool` plus `assetutil --info`, and say plainly that only the default appearance
     can be rendered from the command line.
+
+
+18. **Verify a rule's placement at the call sites, not from the API's shape.** Three Stage 3
+    defects shared a shape: the type signature suggested where a rule belonged and the call sites
+    decided otherwise. Read-only looked like it belonged in `executeQuery`; five write paths reach
+    the driver without it, so a guard there would have protected nothing while looking correct
+    (D15). `.requiredCertificates(_, serverName:)` looked like it could pin a CA; no string works
+    against a stock MySQL certificate, and the app never constructs that case at all (D13).
+    `information_schema` looked like the portable way to read foreign keys; it is owner-restricted,
+    so the tab rendered empty for non-owning accounts. So: grep every call site before placing a
+    guard, and where a real server is involved, test against a realistic **account**, not just a
+    reachable server. A permission-shaped defect is invisible to compilation, to unit tests and to
+    reading.
+
+19. **State a mechanism only after checking it — a confident wrong explanation travels.** The
+    coordinator explained a failing tunnel test with "MySQL keys its auth cache by source address,
+    so a forward is a different entry from the direct path." Plausible, confident, and wrong: the
+    cache is keyed by the **matched account**, and only `gpt_test@%` exists. The cost was not the
+    wrong idea but its distribution — a worker took it on trust and wrote it into a task note as
+    grounds for withdrawing a sound result, and a controlled test then refuted the theory outright.
+    When explaining a failure to anyone else, say which parts are **measured** and which are
+    **hypothesis**. "I do not know why yet" is safe to propagate; a confident wrong explanation is
+    not, because it gets acted on. Two corollaries: never record "it passes now" as a resolution —
+    it passed before, too; and **retract in place rather than delete**, because the route an error
+    took is more instructive than the corrected fact.
+
+20. **A capability is asked for, never inferred from the presence of a service.**
+    `host.services.contains { $0.kind == .ssh }` reads like "can this machine lend a forward?" but
+    asks "does it have a Terminal service?" — the same question only while every Terminal service
+    was a real SSH connection elsewhere. The built-in local host has one and is deliberately
+    excluded from the broker (D8); so will a missing credential, an unreachable jump host or an
+    unregistered capability. It went wrong twice in one stage, in the shell's forward provider and
+    in the database capability's Advanced row, and **neither failed at connect time**, which is why
+    both would have shipped. Ask `GlassCapabilityHostAccess.canForwardPorts` — **including from UI
+    that only means to describe it**, since the second judgement is the one nobody tests.
+
+21. **Only one macOS UI suite may run on this machine at a time.** XCUITest drives the app with
+    synthesized events, which go to the **frontmost** application, so two runs interfere by
+    construction and surface as `Failed to synthesize event: Timed out while synthesizing event` —
+    an event-synthesis timeout, not an assertion failure (the hazard is already noted at
+    `UITests/GlassShellLibraryUITests.swift:42`). Three runs were discarded in one session for this,
+    two of them the coordinator's. **Checking at launch is not enough:** a run is attributable only
+    if the machine was quiet for its *whole duration*, and a suite that starts clean is still
+    contaminated by an instance appearing halfway through. Announce a UI run before starting it. When
+    a UI test fails with an event-synthesis timeout, the first question is **what else was on
+    screen**, not what changed in the code. And "passes in isolation" is weaker evidence than
+    "passes in the suite" — re-running one test alone shows it *can* pass, not that it passes where
+    it failed.
+
+22. **A green test is not a green feature: the shape of the test decides what it can catch.** Three
+    Stage 3 defects passed every test that existed. The SSH forward dropped a server-first
+    protocol's opening bytes — the live tunnel test could not catch it, because the test server
+    listens on `0.0.0.0` and the race depends on packet coalescing. `isBool` matched a bare
+    `tinyint`, so a score column rendered as a toggle and would have saved `0` over real data — no
+    test held a `tinyint` that was not a boolean. Temporal columns accepted any string at all. Each
+    was found by a person using the app against their own data. So: when a feature's correctness
+    depends on **someone else's** schema, server configuration or timing, say plainly what the
+    suite cannot reach, and get it in front of real data before calling it done.
+
+23. **Before investigating a regression, read your own diff.** The macOS sidebar toggle drifted into
+    the `»` overflow after a line was deleted as an apparent duplicate — `.toolbar(removing:)`
+    applied twice, where once is not enough. An investigation went looking at how macOS re-homes a
+    collapsed column's toolbar items and reported "still open, needs watching"; `git diff` on the
+    one edited file would have answered it in seconds. A failing test that deliberately collapsed
+    the sidebar was pointing at it and was misread as protecting an intentional decision. When
+    something worked recently and does not now, the first question is what changed, and the cheapest
+    place to look is the uncommitted diff.
