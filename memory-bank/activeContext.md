@@ -505,9 +505,8 @@ near-white ground; the prompt glyph is the white artwork in both. Clear and tint
 Full detail, geometry and the three findings are in
 [the app icon note](tasks/2026-09/2026-09-11_app-icon.md); rule 17 records the standing constraints.
 
-**Mac is on 0.2.60. The iPhone and Vision Pro are still on 0.2.56** — they carry the earlier
-raster-composite icon and none of the row, Files, separator or icon work since. Push them when the
-user next wants a device build.
+**All three are on 0.2.60** (Mac, iPhone launched, Vision Pro installed; each version read back
+from the installed bundle).
 
 ### Stage 2 close-out still open
 Widget on a device; live iCloud sync; the visionOS real-host UI test blocked by XCUITest's own
