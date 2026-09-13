@@ -433,3 +433,32 @@ value that does not parse is reported as the wrong *type* rather than the wrong 
 convention; plain `tinyint` is an integer. A score column rendered as a toggle and **saving would
 have written 0 over the stored value**. See
 [the UI and validation note](tasks/2026-09/2026-09-12_ui-and-validation.md).
+
+
+## D18 — credentials synchronize through iCloud Keychain — Approved 2026-09-13
+
+The user: *"We can't truly sync database sessions if the database passwords stay app-private. That
+must change… define everything on Mac, then pick up Vision Pro and get to work without having to
+mess with settings and passwords."*
+
+`GlasSecretStore` was built for this and defaulted off. `SecretMobilityPolicy.iCloudKeychain` exists,
+`validateMobility` already enforces Apple's constraints, `kSecAttrSynchronizable` is wired into every
+write, and the eligible-services list already names passwords, SSH passwords, RDP credentials and SSH
+private keys. **`iCloudKeychain` appears zero times in the app** — the mechanism is complete and
+unused, the same shape as `DatabaseCommands` and `DatabaseSession.openForward`.
+
+**The distinction that was being conflated:** the access group controls which *apps on one device*
+can read an item; `kSecAttrSynchronizable` controls whether it reaches the user's *other devices*.
+The requirement needs the second, not the first — so the security review's F3 (database passwords
+written into the shared Glass-family group, unreachable and never cleaned up) remains a bug to fix
+and does not work against this decision.
+
+**Why SSH keys can travel after all:** Apple synchronizes password-class items only, not keys or
+certificates — but `GlasSecretStore` stores everything as `kSecClassGenericPassword`, so key bytes
+ride inside a password item. Secure Enclave–backed keys genuinely cannot sync and
+`validateMobility` already refuses them; that refusal stays.
+
+See [Stage 3.5](tasks/2026-09/2026-09-13_stage-3.5-continuity.md). D19 (CloudKit for the catalog),
+D20 (Secure Enclave keys stay device-bound and the UI says so) are **Proposed**; D21 (opt-in or
+default, per-record or global) and D22 (what happens to existing device-only secrets) are **open and
+need the user**.
