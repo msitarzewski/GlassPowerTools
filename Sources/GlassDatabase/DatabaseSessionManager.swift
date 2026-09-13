@@ -984,10 +984,25 @@ class DatabaseSessionManager {
     ) throws -> (database: String, ssh: String?) {
         let databasePassword: String
         if config.engine.supportsCredentials {
+            // A missing credential is reported, not substituted.
+            //
+            // This used to answer `""` for `notFound`, which is indistinguishable from a password
+            // the user deliberately saved as empty — and against a server configured for
+            // passwordless auth for that account (`trust` in `pg_hba.conf`, `auth_socket` in MySQL)
+            // an empty password **succeeds**, connecting with no credential where the user believes
+            // one is required.
+            //
+            // The two cases are distinguishable and only one is silent: a deliberately empty
+            // password is *found* and returns "" from the line below. `notFound` means nothing was
+            // ever stored, or it was stranded — which the delete sweep in `KeychainManager` used to
+            // make possible by only ever clearing the current policy's descriptor.
+            //
+            // Observed, not theorised: a live PostgreSQL reconnect authenticated with an empty
+            // password for exactly this reason on 2026-09-13.
             do {
                 databasePassword = try KeychainManager.retrievePassword(for: config)
             } catch SecretStoreError.notFound {
-                databasePassword = ""
+                throw SessionError.credentialMissing(config.name)
             }
         } else {
             databasePassword = ""
@@ -1025,6 +1040,9 @@ class DatabaseSessionManager {
         case connectionLost
         case localNetworkPermissionDenied
         case invalidConfiguration(String)
+        /// No saved password could be found for a service that needs one. Distinct from an empty
+        /// password the user chose: that one is *found*, and connects.
+        case credentialMissing(String)
 
         var errorDescription: String? {
             switch self {
@@ -1036,6 +1054,9 @@ class DatabaseSessionManager {
                 return "Local Network access is off for Glass Power Tools. Allow it in Settings, then reconnect."
             case .invalidConfiguration(let message):
                 return message
+            case .credentialMissing(let name):
+                return "No saved password was found for \(name). Open the service and enter it again. "
+                    + "Connecting without one would send an empty password, which some servers accept."
             }
         }
     }

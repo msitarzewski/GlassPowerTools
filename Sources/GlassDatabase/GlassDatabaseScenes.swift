@@ -191,11 +191,12 @@ public struct GlassDatabaseBootstrap<Content: View>: View {
     /// rather than this layer guessing that the password is the problem.
     private static func storedPassword(for config: DatabaseConnectionConfig) throws -> String {
         guard config.engine.supportsCredentials else { return "" }
-        do {
-            return try KeychainManager.retrievePassword(for: config)
-        } catch SecretStoreError.notFound {
-            return ""
-        }
+        // Deliberately NOT caught here, unlike before: `notFound` used to become `""`, which a
+        // server configured for passwordless auth will happily accept — connecting with no
+        // credential where the user believes one is required. A password the user *chose* to leave
+        // empty is found and returns "" from this call; only a genuinely absent one throws, and the
+        // caller reports it rather than guessing. See `DatabaseSessionManager.storedCredentials`.
+        return try KeychainManager.retrievePassword(for: config)
     }
 
     private func present(_ request: DatabaseWorkspaceWindowRequest) {

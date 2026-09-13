@@ -328,16 +328,28 @@ enum KeychainManager {
         store: CredentialMutationStore = .live
     ) throws -> CredentialDeletionReceipt {
         var locations: [CredentialLocation] = []
-        if connection.engine.supportsCredentials {
+        // **Both kinds are swept across every policy, unconditionally.**
+        //
+        // The database password used to be swept only at the record's *current* policy, and only
+        // while `engine.supportsCredentials` — an asymmetry with the SSH sweep below that stranded
+        // secrets in the Keychain with nothing left pointing at them:
+        //
+        //   • Change the engine to SQLite and delete the service. `supportsCredentials` is now
+        //     false, so the MySQL password it was saved with is never swept. Nothing will ever
+        //     remove it, because nothing records that it was there.
+        //   • Change the storage policy. The descriptor the secret actually lives at is the OLD
+        //     policy's, and only the new one was swept.
+        //
+        // Sweeping every descriptor costs three lookups that usually find nothing, and is the only
+        // version that cannot leave a password behind. The engine condition is gone deliberately:
+        // what the record can hold *today* says nothing about what was written under it before.
+        for policy in [CredentialStoragePolicy.sharedWithGlas, .appOnly, .requireAuthentication] {
             locations.append(CredentialLocation(
                 account: databaseAccount(for: connection.id),
-                descriptor: descriptor(for: connection.databaseCredentialPolicy, kind: .databasePassword)
+                descriptor: descriptor(for: policy, kind: .databasePassword)
             ))
-        }
-        // A version-1 record may still have an SSH password glassdb wrote for it. This app
-        // never writes one, but deleting the service must not leave that secret behind, so
-        // every descriptor it could have been written under is swept.
-        for policy in [CredentialStoragePolicy.sharedWithGlas, .appOnly, .requireAuthentication] {
+            // A version-1 record may still have an SSH password glassdb wrote for it. This app
+            // never writes one, but deleting the service must not leave that secret behind.
             locations.append(CredentialLocation(
                 account: sshAccount(for: connection.id),
                 descriptor: descriptor(for: policy, kind: .sshPassword)
@@ -407,24 +419,24 @@ enum KeychainManager {
             )
         }
 
-        var databaseCount = 0
-        var failures: [String] = []
-
-        for connection in connections {
-            do {
-                if try migrateLegacyCredentialIfPresent(
-                    destinationAccount: databaseAccount(for: connection.id),
-                    legacyAccount: legacyDatabaseAccount(for: connection),
-                    primaryService: config.passwordsService,
-                    legacySuffix: "passwords"
-                ) {
-                    databaseCount += 1
-                }
-            } catch {
-                failures.append("Database password for ‘\(connection.name)’ was not migrated.")
-            }
-
-        }
+        // **The database-password migration is deliberately gone (D22, 2026-09-13).**
+        //
+        // It wrote to `config.passwordsService`, and `config` is `sharedConfig` — service
+        // `sh.glas.passwords` in the Glass-family access group. Every read, meanwhile, resolves its
+        // descriptor from `connection.databaseCredentialPolicy`, which the decoder clamps to
+        // `.appOnly` (`Models.swift:206-212`) — service `app.glassdb.private.passwords`, no access
+        // group. So the migration copied database secrets into the group glas.sh, glassdb and
+        // glassDT can read, never cleaned them up, and **delivered nothing**: no read path has ever
+        // consulted the location it wrote to. The legacy fallback that would have
+        // (`guard policy == .sharedWithGlas` at `:229`) is unreachable for the same reason.
+        //
+        // It contradicted the rule stated one file over — *"Database passwords are never shared
+        // across the Glass family — no other capability has a use for them"* — and D22 removes any
+        // reason to keep it: there is no installed base, so a credential that predates this product
+        // is re-entered rather than moved. The scaffold and the version marker stay, so the next
+        // migration that genuinely needs to run has somewhere to hang.
+        let databaseCount = 0
+        let failures: [String] = []
 
         let report = CredentialMigrationReport(
             migratedDatabasePasswords: databaseCount,
