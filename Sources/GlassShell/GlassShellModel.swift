@@ -201,6 +201,12 @@ public final class GlassShellModel {
             records = try await catalog.snapshot()
             hosts = GlassShellHostGrouping.group(records)
             await loadLocalHost()
+            // D19: pull the library from the user's other devices before showing it. Deliberately
+            // awaited rather than fired and forgotten — a host added on the Vision Pro should be
+            // present when the Mac's library first appears, not arrive a moment later and move
+            // under the pointer. It fails quietly: an unavailable iCloud account is a normal state,
+            // not an error the user caused, and the local catalog is complete on its own.
+            await synchronizeCatalog()
             migratePreferencesToCanonicalHosts()
             isLoaded = true
             errorMessage = nil
@@ -262,6 +268,58 @@ public final class GlassShellModel {
 
     /// The library minus this device: the machines that came from the shared catalog. What
     /// diagnostics about that file should count, and what a test about it should assert on.
+    // MARK: - Catalog synchronization (D19)
+
+    /// The remote half of the library. Nil until `enableCatalogSync` supplies one, so a build or a
+    /// test that has no business talking to CloudKit does not.
+    private var catalogBackend: (any GlassCatalogSyncBackend)?
+    private var catalogSyncToken: Data?
+    public private(set) var catalogSyncStatus: GlassCatalogSyncStatus = .idle
+
+    /// Starts syncing the library through `backend`.
+    ///
+    /// Injected rather than constructed here so the merge can be driven by a fake in tests, and so
+    /// the shell does not require CloudKit to exist at all — the app supplies
+    /// `GlassCloudKitCatalogBackend`; a unit test supplies whatever it needs to assert.
+    public func enableCatalogSync(_ backend: any GlassCatalogSyncBackend) {
+        catalogBackend = backend
+    }
+
+    /// One pull-merge-push cycle.
+    ///
+    /// Both directions in one pass, because they are the same question asked twice: what does this
+    /// device have that the account does not, and vice versa. `GlassCatalogMerge.reconcile` decides;
+    /// nothing here does.
+    public func synchronizeCatalog() async {
+        guard let catalogBackend else { return }
+        catalogSyncStatus = .syncing
+        do {
+            let (remote, token) = try await catalogBackend.fetchChanges(since: catalogSyncToken)
+            // `includeDeleted: true`: a tombstone is a record, and publishing the library without
+            // them would let a host deleted here come back from a device that never heard.
+            let local = try await catalog.snapshot(includeDeleted: true)
+            let outcome = GlassCatalogMerge.reconcile(local: local, remote: remote)
+
+            for profile in outcome.toApplyLocally {
+                try await catalog.upsert(profile)
+            }
+            if !outcome.toPublish.isEmpty {
+                try await catalogBackend.save(outcome.toPublish)
+            }
+            catalogSyncToken = token
+
+            if !outcome.toApplyLocally.isEmpty {
+                records = try await catalog.snapshot()
+                hosts = GlassShellHostGrouping.group(records)
+            }
+            catalogSyncStatus = .synced(Date())
+        } catch {
+            // Signed out of iCloud, restricted, or offline: all normal, none the user's mistake,
+            // and none worth an alert. The library on this device is complete without the others.
+            catalogSyncStatus = .failed(error.localizedDescription)
+        }
+    }
+
     public var catalogHosts: [GlassShellHost] { hosts.filter { !$0.isLocal } }
 
     /// `items` without this device. Internal: the library itself always shows every row, and

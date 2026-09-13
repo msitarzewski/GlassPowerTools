@@ -48,6 +48,15 @@ struct GlassPowerToolsApp: App {
             accessGroup: isolatedDirectory == nil ? accessGroup : nil,
             layers: layers
         )
+        // Stage 3.5 (D19): the host library reaches the user's other devices.
+        //
+        // Attached here rather than constructed inside the model on purpose — the shell must not
+        // require CloudKit to exist, and a UI test running against an isolated directory has no
+        // business talking to the user's iCloud account. `isolatedDirectory` is exactly the "this
+        // is a test run" signal, so the backend is supplied only for the real app.
+        if isolatedDirectory == nil {
+            model.enableCatalogSync(GlassCloudKitCatalogBackend())
+        }
         // Stage 2: the SSH capability. glas.sh's managers live for the process in the runtime; the
         // shell routes Connect for `.ssh` services through the capability.
         let windowRecovery = GlassWindowRecoveryManager()
