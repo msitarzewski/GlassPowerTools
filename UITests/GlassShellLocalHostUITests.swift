@@ -64,6 +64,25 @@ final class GlassShellLocalHostUITests: XCTestCase {
         #endif
     }
 
+    /// The same split for a coordinate, which is why this overload exists at all.
+    ///
+    /// `XCUICoordinate.click()` is declared `API_AVAILABLE(ios(15.0), macCatalyst(13.0))` in
+    /// `XCUIAutomation/XCUICoordinate.h`, and visionOS does **not** inherit that the way it inherits
+    /// most iOS availability: the Swift interface simply has no `click` member, so a bare
+    /// `coordinate(...).click()` is a hard compile error on xrOS — "value of type 'XCUICoordinate'
+    /// has no member 'click'". `tap()`, `doubleTap()` and `pressForDuration:` carry no annotation
+    /// and are available everywhere.
+    ///
+    /// One unguarded call here kept the **entire visionOS UI test target from linking**, so no
+    /// visionOS UI test had ever run — on the platform this product was started for.
+    private func press(_ c: XCUICoordinate) {
+        #if os(macOS)
+        c.click()
+        #else
+        c.tap()
+        #endif
+    }
+
     private func snap(_ name: String) {
         let sheet = app.sheets.firstMatch
         let subject = sheet.exists ? sheet : app.windows.firstMatch
@@ -131,16 +150,26 @@ final class GlassShellLocalHostUITests: XCTestCase {
         enterAllConnections()
         let row = element("host-row-\(localName)")
         XCTAssertTrue(row.waitForExistence(timeout: 20))
-        // macOS folds a row's children into the row element, so its label is where the control's
-        // shape is visible: the picker is there and the connect-the-machine half is not.
-        XCTAssertTrue(row.label.contains("Choose a service"), "the picker is the control: \(row.label)")
-        XCTAssertFalse(row.label.contains("Connect all services"),
+        // Asked of the row's label AND of the tree, because the two platforms expose the same
+        // control differently: macOS folds a row's children into the row element, so the control's
+        // shape shows up in `row.label`, while visionOS leaves the picker as its own element and
+        // the row's label is just the host's name. Testing only the macOS shape made this fail on
+        // visionOS for a property that actually holds there — the first thing the visionOS UI suite
+        // said when it could finally run at all.
+        func offersControl(_ label: String) -> Bool {
+            if row.label.contains(label) { return true }
+            return app.descendants(matching: .any)
+                .matching(NSPredicate(format: "label == %@", label)).firstMatch.exists
+        }
+        XCTAssertTrue(offersControl("Choose a service"),
+                      "the picker is the control: \(row.label)")
+        XCTAssertFalse(offersControl("Connect all services"),
                        "there is no connect-the-machine button on this device: \(row.label)")
         snap("34-local-host-picker-only")
 
         // The row's trailing control is a menu, so the click that selects the host has to land on
         // the name rather than in the middle of the row.
-        row.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5)).click()
+        press(row.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5)))
 
         // Both databases are separate services on one host — the case the shell had never been
         // exercised with — and each row is addressable on its own.
