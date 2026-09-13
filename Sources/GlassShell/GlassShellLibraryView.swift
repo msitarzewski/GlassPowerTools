@@ -90,11 +90,12 @@ public struct GlassShellLibraryView: View {
             // The spatial sidebar is narrow: an icon-only Connect (press and hold still opens the
             // picker) and the service icons in one row, so nothing wraps. Wide rows keep the label.
             #if os(visionOS)
-            HStack(spacing: 6) {
+            HStack(spacing: 12) {
                 serviceIcons(for: item.id)
                 GlassShellConnectControl(model: model, hostID: item.id, compact: true)
             }
             .fixedSize(horizontal: true, vertical: false)
+            .glassGazeHighlight()
             #else
             HStack(spacing: 8) {
                 serviceIcons(for: item.id)
@@ -148,7 +149,22 @@ public struct GlassShellLibraryView: View {
             }
         } actions: {
             Button("Add Host") { setupMode = .addHost }.accessibilityIdentifier("connection-library-add-host-empty")
+                #if os(visionOS)
+                // The one control on an otherwise empty pane, and the first thing a new user is
+                // asked to do. `ContentUnavailableView`'s default button is sized for a list on a
+                // Mac; here it is the whole point of the screen.
+                .buttonStyle(.borderedProminent)
+                .controlSize(.extraLarge)
+                #endif
         }
+        #if os(visionOS)
+        // Given the pane rather than floating in the middle of it, and set at reading distance.
+        // The default composes a compact card, which on a Mac sits neatly inside a detail column
+        // and in a headset reads as a small object adrift in a large empty rectangle.
+        .font(.title3)
+        .frame(maxWidth: 560)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        #endif
     }
 
     private func detail(_ host: GlassShellHost) -> some View {
@@ -490,9 +506,20 @@ public struct GlassShellConnectControl: View {
     }
 
     private var metrics: Metrics {
+        #if os(visionOS)
+        // A control that is aimed with the eyes cannot be sized for a cursor. `compact` exists so a
+        // narrow sidebar does not wrap, and on the Mac `.caption` at 4 pt of padding is a perfectly
+        // reasonable answer to that — in a headset it is a target smaller than the eye can settle
+        // on, which is why the row's Connect button read as a speck. The spatial sidebar is given
+        // the width to carry these instead (`GlassConnectionLibrary.visionNavigation`).
+        if prominent { return Metrics(playPadding: 20, chevronPadding: 14, verticalPadding: 12, font: .body) }
+        if compact { return Metrics(playPadding: 14, chevronPadding: 10, verticalPadding: 9, font: .body) }
+        return Metrics(playPadding: 16, chevronPadding: 12, verticalPadding: 10, font: .body)
+        #else
         if prominent { return Metrics(playPadding: 16, chevronPadding: 11, verticalPadding: 9, font: .body) }
         if compact { return Metrics(playPadding: 9, chevronPadding: 6, verticalPadding: 4, font: .caption) }
         return Metrics(playPadding: 11, chevronPadding: 8, verticalPadding: 5, font: .callout)
+        #endif
     }
 
     private struct Metrics {

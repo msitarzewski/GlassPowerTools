@@ -135,9 +135,29 @@ struct GlassLayerBackground: View {
                     .fill(Color.glassThemeBackground)
                     .opacity(state.effectiveOpacity)
             }
-            GlassCanvasBackdrop(material: state.material.material, blurAmount: state.frost)
+            frost
         }
         .allowsHitTesting(false)
+    }
+
+    /// The frost layer.
+    ///
+    /// **On visionOS the system already provides the glass, and painting over it is what made the
+    /// window read as a flat plate.** A `Material` fill is a *simulation* of depth designed for a
+    /// 2-D display: on a Mac it samples the desktop behind the window and looks like glass, but in
+    /// a headset it composites as an even translucent sheet with no specular edge and no response
+    /// to the room's light — laid across the whole window it covers the real glass underneath with
+    /// a convincing-looking grey rectangle.
+    ///
+    /// So here the frost *is* the window's own surface. The theme paint above still composites over
+    /// it, which is the point of keeping opacity and frost independent: all four combinations
+    /// survive, including a fully clear surface.
+    @ViewBuilder private var frost: some View {
+        #if os(visionOS)
+        EmptyView()
+        #else
+        GlassCanvasBackdrop(material: state.material.material, blurAmount: state.frost)
+        #endif
     }
 }
 
