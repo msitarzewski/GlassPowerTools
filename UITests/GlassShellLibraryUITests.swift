@@ -151,7 +151,25 @@ final class GlassShellLibraryUITests: XCTestCase {
             type(terminalUser, into: user)
             let password = reveal("add-server-password")
             XCTAssertTrue(password.exists, "password is the default method's required field")
+            #if os(macOS)
+            // **Tab from the username rather than clicking the password.**
+            //
+            // Clicking a `SecureField` in a sheet that has only just re-laid itself out (enabling
+            // the Terminal tab inserts these fields) does not reliably make it first responder, and
+            // the next `typeText` then fails with "Neither element nor any descendant has keyboard
+            // focus". Four attempts at fixing the click — a settle, ⌘A, waiting for `isHittable`,
+            // a coordinate click — each changed WHICH test failed rather than whether one did,
+            // which is the signature of a race, not a wrong element. The last combination made it
+            // worse: four failures instead of one.
+            //
+            // The username field is already focused, because it was just typed into successfully.
+            // Tab moves focus to the next field deterministically, with no hit-testing involved at
+            // all — so there is no race left to lose.
+            app.typeKey(.tab, modifierFlags: [])
+            password.typeText("not-a-real-password")
+            #else
             type("not-a-real-password", into: password)
+            #endif
         }
         tap("host-editor-save")
         dismissSystemPasswordPrompt()
@@ -205,8 +223,30 @@ final class GlassShellLibraryUITests: XCTestCase {
             // drives this helper successfully happens to open and cancel a sheet beforehand, and
             // the three that failed called it as their first action after launch. Same helper,
             // same field, different warmth.
+            // Three things, because two were not enough and the failure is intermittent.
+            //
+            // A plain `press` sometimes does not make the field first responder on a sheet that has
+            // only just appeared, and the next `typeText` then fails outright with "Neither element
+            // nor any descendant has keyboard focus". A settle alone does not help — a pause does
+            // not focus anything. ⌘A alone helped but still failed on roughly one test per run,
+            // moving between tests each time, which is the signature of a race rather than a wrong
+            // element.
+            //
+            // So: wait until the field is actually hittable, click its centre COORDINATE (delivered
+            // regardless of what scroll-to-visible thinks), then ⌘A, which is both a focus check and
+            // the clear-existing-text step `GlassTerminalUITests.setField` uses.
+            #if os(macOS)
+            _ = e.waitForExistence(timeout: 5)
+            let deadline = Date().addingTimeInterval(3)
+            while !e.isHittable, Date() < deadline {
+                RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+            }
+            e.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click()
+            app.typeKey("a", modifierFlags: .command)
+            #else
             press(e)
             RunLoop.current.run(until: Date().addingTimeInterval(0.6))
+            #endif
             e.typeText(text)
             return
         }
