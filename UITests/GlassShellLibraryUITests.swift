@@ -94,7 +94,16 @@ final class GlassShellLibraryUITests: XCTestCase {
     /// Adds a host through the one setup sheet: name and address are the machine's, entered
     /// once. With `terminalUser` the Terminal tab is enabled and its required fields filled, so
     /// the host and its terminal are created together (password auth; nothing connects).
-    private func addHost(named name: String, address: String = "10.9.8.7", terminalUser: String? = nil) {
+    /// Adds a host through the setup sheet.
+    ///
+    /// `terminalUser` defaults to a real value because **Add Host now requires a service**: a
+    /// machine with nothing on it is not worth a row, so the sheet pre-selects the first available
+    /// tab and its fields are required (`GlassShellSetup.swift:76`). Three tests here passed `nil`,
+    /// which produced "Error: Enter the SSH username." and a sheet that correctly refused to close
+    /// — reported as *"the sheet closes after Save"*, which reads like a dismissal bug and is the
+    /// opposite: validation working. They had been failing on macOS too, unnoticed since the rule
+    /// landed, because the suite was not re-run.
+    private func addHost(named name: String, address: String = "10.9.8.7", terminalUser: String? = "tester") {
         let empty = element("connection-library-add-host-empty")
         if empty.waitForExistence(timeout: 3) { press(empty) } else { tap("connection-library-add-host") }
         let field = element("host-editor-name")
@@ -107,10 +116,10 @@ final class GlassShellLibraryUITests: XCTestCase {
             enableTerminalTab()
             let user = element("add-server-username")
             XCTAssertTrue(user.waitForExistence(timeout: 10), "the Terminal tab's required fields appear once enabled")
-            press(user); user.typeText(terminalUser)
+            type(terminalUser, into: user)
             let password = reveal("add-server-password")
             XCTAssertTrue(password.exists, "password is the default method's required field")
-            press(password); password.typeText("not-a-real-password")
+            type("not-a-real-password", into: password)
         }
         tap("host-editor-save")
         dismissSystemPasswordPrompt()
@@ -132,6 +141,53 @@ final class GlassShellLibraryUITests: XCTestCase {
             let notNow = target.buttons["Not Now"].firstMatch
             if notNow.waitForExistence(timeout: 1) { notNow.tap(); return }
         }
+    }
+
+    /// Types into a field and checks the text actually landed.
+    ///
+    /// On visionOS a field can report `Keyboard Focused, Focused` and still swallow the first
+    /// `typeText` when focus has just moved — which is exactly what happens after
+    /// `enableTerminalTab()` switches tab. The symptom is not a typing error but a **save that is
+    /// correctly refused**: the host's Name and Address type fine, the Terminal tab's Username
+    /// arrives empty, the form shows "Error: Enter the SSH username." and the sheet stays open.
+    /// Four visionOS tests failed on `"the sheet closes after Save"` for that reason, which reads
+    /// like a dismissal bug and is nothing of the kind — the app was right to refuse.
+    ///
+    /// A `SecureTextField` reports its value as bullets, so "did it land" is "is the value
+    /// non-empty and not the placeholder" rather than an equality check.
+    private func type(_ text: String, into e: XCUIElement,
+                      file: StaticString = #filePath, line: UInt = #line) {
+        // A SecureTextField gets ONE attempt and no verification: its value is bullets or nil, so
+        // "did it land" cannot be read, and pressing it again when it is already focused drops
+        // focus — the retry then fails with "Neither element nor any descendant has keyboard
+        // focus". That is a regression this helper caused on macOS the first time it was written,
+        // on a field that had never been the problem: visionOS swallowed the USERNAME, a plain
+        // text field, after a tab switch.
+        guard e.elementType != .secureTextField else {
+            // One press, then a settle, then type — and never a second press.
+            //
+            // Two distinct faults meet on this field. Re-pressing it once focused DROPS focus, so
+            // the verifying loop below must not run here (its value is bullets or nil and can
+            // never satisfy `landed()` anyway). And on a COLD launch the first sheet's secure
+            // field does not take focus by the time `typeText` dispatches: the one test that
+            // drives this helper successfully happens to open and cancel a sheet beforehand, and
+            // the three that failed called it as their first action after launch. Same helper,
+            // same field, different warmth.
+            press(e)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.6))
+            e.typeText(text)
+            return
+        }
+        func landed() -> Bool {
+            guard let value = e.value as? String else { return false }
+            return !value.isEmpty && value != (e.placeholderValue ?? "")
+        }
+        for _ in 0..<3 {
+            press(e)
+            e.typeText(text)
+            if landed() { return }
+        }
+        XCTAssertTrue(landed(), "‘\(text)’ did not reach \(e.identifier)", file: file, line: line)
     }
 
     /// SwiftUI builds list rows lazily: a row below the fold is absent from the accessibility
@@ -324,56 +380,57 @@ final class GlassShellLibraryUITests: XCTestCase {
         XCTAssertTrue(element("host-row-Searchable Host").waitForExistence(timeout: 10))
     }
 
+    /// An Appearance choice survives a relaunch.
+    ///
+    /// Rewritten 2026-09-13. It used to drive `layers-paints-theme`, which **no longer exists**:
+    /// "Paint Theme Color" was removed deliberately — painting the glass is the point of the app,
+    /// so it was never optional — and nothing updated the test. It then failed on every platform,
+    /// unnoticed, because the macOS suite was not re-run after that change. visionOS surfaced it
+    /// only because it could finally run at all.
+    ///
+    /// Material is the control used now: it is a `Picker` rather than a slider, and slider drags
+    /// synthesize on iOS alone (the visionOS simulator and macOS refuse them), so this is the one
+    /// appearance control whose change can be driven on all three platforms.
     func testAppearanceOpacityPersistsAcrossRelaunch() {
         openSettings()
         selectSettingsPage("Appearance")
-        // Toggle is a Switch on touch platforms and a CheckBox on macOS; `.any` can match the
-        // enclosing row, so prefer the control itself.
-        let anyPaints = element("layers-paints-theme")
-        XCTAssertTrue(anyPaints.waitForExistence(timeout: 10))
-        let control = app.switches.matching(identifier: "layers-paints-theme").firstMatch
-        let box = app.checkBoxes.matching(identifier: "layers-paints-theme").firstMatch
-        let paints = control.exists ? control : (box.exists ? box : anyPaints)
-        let paintsBefore = "\(paints.value ?? "")"
-        // D2 default is off, so this turns it on. On touch platforms the Switch element spans the
-        // whole Form row and only the trailing knob toggles, so press near the trailing edge.
-        #if os(macOS)
-        press(paints)                                   // CheckBox: centre click
-        #elseif os(iOS)
-        paints.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()   // row-wide Switch: knob is trailing
-        #else
-        paints.tap()                                    // visionOS: the centre tap toggles; edge taps miss
-        #endif
-        // The value updates asynchronously after the gesture; never read it synchronously.
-        let changed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in "\(paints.value ?? "")" != paintsBefore }, object: nil)
-        XCTAssertEqual(XCTWaiter().wait(for: [changed], timeout: 5), .completed, "theme toggle value changed")
-        let paintsAfter = "\(paints.value ?? "")"
-        XCTAssertNotEqual(paintsBefore, paintsAfter, "theme toggle changed")
-        var sliderValue: String?
-        #if os(iOS)
-        // Slider drags synthesize on iOS only (visionOS simulator and macOS refuse); the toggle
-        // is the persisted change elsewhere.
-        let slider = element("layers-opacity")
-        XCTAssertTrue(slider.waitForExistence(timeout: 5))
-        slider.adjust(toNormalizedSliderPosition: 0.6)
-        sliderValue = slider.value as? String
-        XCTAssertNotNil(sliderValue)
-        #endif
-        snap("08-appearance-opacity")
+
+        let material = element("layers-material")
+        XCTAssertTrue(material.waitForExistence(timeout: 10), "the Material picker")
+        let before = "\(material.value ?? "")"
+
+        // Pick a value that is definitely not the current one. The titles are NOT the case names:
+        // `GlassLayerMaterial.title` maps ultraThin/thin/regular/thick to
+        // **Light / Medium / Heavy / Max** (`GlassLayerState.swift:13-20`). D2's default is
+        // ultraThin, so the picker reads "Light" on a fresh launch.
+        let wanted = before.contains("Max") ? "Light" : "Max"
+        press(material)
+        // macOS renders a `Picker` as a PopUpButton whose options are MENU ITEMS; the touch
+        // platforms put them in the view tree. Ask for the menu item first, then fall back.
+        let item = app.menuItems[wanted].firstMatch
+        let anywhere = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", wanted)).firstMatch
+        let option = item.waitForExistence(timeout: 3) ? item : anywhere
+        XCTAssertTrue(option.waitForExistence(timeout: 5),
+                      "‘\(wanted)’ is offered; picker read ‘\(before)’")
+        press(option)
+
+        let changed = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in "\(material.value ?? "")" != before }, object: nil)
+        XCTAssertEqual(XCTWaiter().wait(for: [changed], timeout: 5), .completed,
+                       "the picker took the new material")
+        let after = "\(material.value ?? "")"
+        snap("08-appearance-material")
         closeSettings()
 
         app.terminate()
         app = launch()
         openSettings()
         selectSettingsPage("Appearance")
-        let paintsAgain = element("layers-paints-theme")
-        XCTAssertTrue(paintsAgain.waitForExistence(timeout: 10))
-        XCTAssertEqual("\(paintsAgain.value ?? "")", paintsAfter, "theme toggle persisted across relaunch")
-        if let sliderValue {
-            let again = element("layers-opacity")
-            XCTAssertTrue(again.waitForExistence(timeout: 10))
-            XCTAssertEqual(again.value as? String, sliderValue, "opacity persisted across relaunch")
-        }
+        let again = element("layers-material")
+        XCTAssertTrue(again.waitForExistence(timeout: 10))
+        XCTAssertEqual("\(again.value ?? "")", after, "the material persisted across relaunch")
+
         tap("layers-reset")   // leave the app's own defaults at D2
         closeSettings()
     }
