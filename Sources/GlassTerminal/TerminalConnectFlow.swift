@@ -605,9 +605,9 @@ struct TerminalConnectFlow: ViewModifier {
     private func trustPromptMessage(for challenge: HostKeyTrustChallenge) -> String {
         switch challenge.reason {
         case .unknown:
-            return "\(challenge.summary)\n\nAlgorithm: \(challenge.algorithm)\nFingerprint (SHA-256): \(challenge.fingerprintSHA256)"
+            return "\(challenge.summary)\n\nAlgorithm: \(challenge.algorithm)\nFingerprint: \(challenge.fingerprintSHA256)"
         case .changed:
-            return "The saved host key for \(challenge.host):\(challenge.port) no longer matches the server. This can happen after a legitimate server rebuild, but it can also indicate a security risk.\n\nNew algorithm: \(challenge.algorithm)\nNew fingerprint (SHA-256): \(challenge.fingerprintSHA256)"
+            return "The saved host key for \(challenge.host):\(challenge.port) no longer matches the server. This can happen after a legitimate server rebuild, but it can also indicate a security risk.\n\nNew algorithm: \(challenge.algorithm)\nNew fingerprint: \(challenge.fingerprintSHA256)"
         }
     }
 

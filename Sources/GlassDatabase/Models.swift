@@ -7,6 +7,69 @@
 
 import Foundation
 import SwiftUI
+import GlassDBKit
+
+// MARK: - TLS verification
+
+/// How a service checks the certificate the server presents, once `useTLS` is on.
+///
+/// Three named modes, all chosen by the user. The app never moves between them on its own and
+/// never retries a rejected connection with a weaker one: a failed handshake stays a failure
+/// (D13). The weakest of the three still authenticates the certificate chain — none of them is
+/// "encrypt and trust anything".
+enum DatabaseTLSVerification: String, Codable, CaseIterable, Hashable, Sendable {
+    /// Verified against the system's trust roots and against this machine's name.
+    case systemTrust
+    /// Verified against a certificate the user supplied, and against this machine's name.
+    case pinnedCertificate
+    /// Verified against a certificate the user supplied. **The name is not checked.**
+    case pinnedCertificateAuthorityOnly
+
+    var displayName: String {
+        switch self {
+        case .systemTrust: "Verify with the system's certificate authorities"
+        case .pinnedCertificate: "Verify with a certificate I supply"
+        case .pinnedCertificateAuthorityOnly: "Verify with a certificate I supply, without checking the server's name"
+        }
+    }
+
+    /// Said plainly, and said in the sheet, because this is where a user decides how much of the
+    /// connection is actually authenticated. Each says what it checks *and* what it does not.
+    var explanation: String {
+        switch self {
+        case .systemTrust:
+            "The certificate must be issued by an authority this device already trusts and must name this machine. A server that presents anything else is refused."
+        case .pinnedCertificate:
+            "The certificate must be issued by the authority in the file you choose and must name this machine. Nothing else is accepted, including certificates this device would otherwise trust."
+        case .pinnedCertificateAuthorityOnly:
+            "The certificate must be issued by the authority in the file you choose. Its name is not checked, so another machine holding a certificate from the same authority could take this connection unnoticed. Use this only when the server's certificate does not carry a usable name — a default MySQL or PostgreSQL install is exactly that case."
+        }
+    }
+
+    /// A short form for a row that has no room for the explanation.
+    var shortDescription: String {
+        switch self {
+        case .systemTrust: "System authorities, server name checked"
+        case .pinnedCertificate: "Supplied certificate, server name checked"
+        case .pinnedCertificateAuthorityOnly: "Supplied certificate, server name not checked"
+        }
+    }
+
+    var requiresCertificate: Bool {
+        switch self {
+        case .systemTrust: false
+        case .pinnedCertificate, .pinnedCertificateAuthorityOnly: true
+        }
+    }
+
+    /// False for exactly one mode, and the UI has to be able to say so without re-deriving it.
+    var verifiesServerIdentity: Bool {
+        switch self {
+        case .systemTrust, .pinnedCertificate: true
+        case .pinnedCertificateAuthorityOnly: false
+        }
+    }
+}
 
 // MARK: - Database Connection Configuration
 
@@ -42,6 +105,18 @@ struct DatabaseConnectionConfig: Identifiable, Codable, Hashable {
     var rowPageSize: Int?
     var databaseCredentialPolicy: CredentialStoragePolicy
     var useTLS: Bool
+    /// How the server's certificate is checked when `useTLS` is on. Meaningless when it is off,
+    /// and deliberately left at whatever the user last chose rather than reset, so turning TLS
+    /// back on restores the mode they picked instead of quietly reverting to another one.
+    var tlsVerification: DatabaseTLSVerification
+    /// The trust root the two pinned modes verify against: the bytes of the certificate file the
+    /// user imported, PEM or DER, carried in the record rather than in GlasSecretStore.
+    ///
+    /// A CA certificate is public trust metadata, not a secret — it is what the server hands to
+    /// every client that connects — and the project rule is to keep metadata out of the secret
+    /// store. Inline also means there is no managed file beside the record to lose, to validate
+    /// for escape, or to leave behind on delete, which the SQLite import has to do.
+    var tlsCertificate: Data?
     var isFavorite: Bool
     var colorTag: ConnectionColorTag
     let dateAdded: Date
@@ -64,6 +139,8 @@ struct DatabaseConnectionConfig: Identifiable, Codable, Hashable {
         rowPageSize: Int? = nil,
         databaseCredentialPolicy: CredentialStoragePolicy = .appOnly,
         useTLS: Bool = false,
+        tlsVerification: DatabaseTLSVerification = .systemTrust,
+        tlsCertificate: Data? = nil,
         isFavorite: Bool = false,
         colorTag: ConnectionColorTag = .none,
         dateAdded: Date = Date(),
@@ -83,6 +160,8 @@ struct DatabaseConnectionConfig: Identifiable, Codable, Hashable {
         self.rowPageSize = rowPageSize.map { Self.clampedRowPageSize($0) }
         self.databaseCredentialPolicy = databaseCredentialPolicy
         self.useTLS = useTLS
+        self.tlsVerification = tlsVerification
+        self.tlsCertificate = tlsCertificate
         self.isFavorite = isFavorite
         self.colorTag = colorTag
         self.dateAdded = dateAdded
@@ -96,7 +175,8 @@ struct DatabaseConnectionConfig: Identifiable, Codable, Hashable {
         case id, name, engine, host, port, username, defaultDatabase
         case usesHostTunnel, isReadOnly, rowPageSize
         case databaseCredentialPolicy
-        case useTLS, isFavorite, colorTag, dateAdded, lastConnected, tags
+        case useTLS, tlsVerification, tlsCertificate
+        case isFavorite, colorTag, dateAdded, lastConnected, tags
         /// Version 1 only. Read to migrate, never written.
         case useSSHTunnel
     }
@@ -131,6 +211,13 @@ struct DatabaseConnectionConfig: Identifiable, Codable, Hashable {
             ? .appOnly
             : decodedDatabasePolicy
         useTLS = try values.decodeIfPresent(Bool.self, forKey: .useTLS) ?? false
+        // Absent on every record written before D13 was closed, and system trust is what those
+        // records meant. A record whose mode needs a certificate and has none is **not** quietly
+        // moved to another mode here: `DatabaseSessionManager.transportPlan` refuses it by name,
+        // because silently choosing a different way to verify a server is the thing this whole
+        // decision exists to prevent.
+        tlsVerification = try values.decodeIfPresent(DatabaseTLSVerification.self, forKey: .tlsVerification) ?? .systemTrust
+        tlsCertificate = try values.decodeIfPresent(Data.self, forKey: .tlsCertificate)
         isFavorite = try values.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
         colorTag = try values.decodeIfPresent(ConnectionColorTag.self, forKey: .colorTag) ?? .none
         dateAdded = try values.decodeIfPresent(Date.self, forKey: .dateAdded) ?? Date()
@@ -154,6 +241,8 @@ struct DatabaseConnectionConfig: Identifiable, Codable, Hashable {
         try values.encodeIfPresent(rowPageSize, forKey: .rowPageSize)
         try values.encode(databaseCredentialPolicy, forKey: .databaseCredentialPolicy)
         try values.encode(useTLS, forKey: .useTLS)
+        try values.encode(tlsVerification, forKey: .tlsVerification)
+        try values.encodeIfPresent(tlsCertificate, forKey: .tlsCertificate)
         try values.encode(isFavorite, forKey: .isFavorite)
         try values.encode(colorTag, forKey: .colorTag)
         try values.encode(dateAdded, forKey: .dateAdded)
@@ -164,6 +253,36 @@ struct DatabaseConnectionConfig: Identifiable, Codable, Hashable {
     /// The grid's own page-size control accepts 1 through 10,000; a per-service override
     /// obeys the same bounds.
     static func clampedRowPageSize(_ value: Int) -> Int { min(max(value, 1), 10_000) }
+
+    /// A certificate file is a few hundred bytes to a few kilobytes; a chain of them is still
+    /// well inside this. Enforced at import and again here, because the record can also arrive
+    /// from a hand-edited defaults plist.
+    static let maximumTLSCertificateBytes = 64 * 1024
+
+    /// The trust root as the engine takes it, or nil when this service has none.
+    ///
+    /// PEM and DER are told apart by content, not by the file's extension: a `.crt` may hold
+    /// either, and guessing from the name would hand DER bytes to the PEM parser.
+    var tlsCertificateMaterial: DatabaseTLSCertificate? {
+        guard let tlsCertificate, !tlsCertificate.isEmpty,
+              tlsCertificate.count <= Self.maximumTLSCertificateBytes else { return nil }
+        return DatabaseTLSCertificate(bytes: tlsCertificate, format: Self.certificateFormat(of: tlsCertificate))
+    }
+
+    static func certificateFormat(of bytes: Data) -> DatabaseTLSCertificate.Format {
+        // PEM is ASCII armour; anything that does not carry the armour header is treated as DER
+        // and will be rejected by the parser if it is neither.
+        let prefix = bytes.prefix(1024)
+        return prefix.range(of: Data("-----BEGIN".utf8)) != nil ? .pem : .der
+    }
+
+    /// What this service actually verifies, in one line, for any surface that reports the
+    /// transport. Never says "encrypted" without saying what is checked.
+    var transportVerificationSummary: String {
+        guard engine.supportsTLS else { return "Not encrypted in transit" }
+        guard useTLS else { return "Not encrypted" }
+        return tlsVerification.shortDescription
+    }
 
     var displaySubtitle: String {
         if engine == .sqlite {
@@ -402,6 +521,17 @@ struct MutationAuditRecord: Identifiable, Codable, Sendable {
     let timestamp: Date
     let outcome: MutationOutcome
     let affectedRows: UInt64?
+    /// The predicate's **shape only** — the SQL with its bound placeholders left in, never the
+    /// parameters. The optimistic predicate these paths build is the primary key plus every
+    /// original column value of the row, so the parameters are a verbatim copy of the user's
+    /// record; writing them here would put complete rows into `UserDefaults` in plaintext, in a
+    /// store whose whole purpose is to be read back and displayed. The shape still answers which
+    /// columns identified the row, whether NULLs took part, and how wide the conflict check was.
+    /// It deliberately cannot answer *which* row: a primary key is routinely identifying in
+    /// itself, so there is no subset of the parameters that is safely "just the key".
+    ///
+    /// Optional, so records already written under `glassdb.mutationAudit.v1` still decode.
+    let predicate: String?
 
     init(
         id: UUID = UUID(),
@@ -412,7 +542,8 @@ struct MutationAuditRecord: Identifiable, Codable, Sendable {
         source: String,
         timestamp: Date = Date(),
         outcome: MutationOutcome,
-        affectedRows: UInt64?
+        affectedRows: UInt64?,
+        predicate: String? = nil
     ) {
         self.id = id
         self.connectionID = connectionID
@@ -423,6 +554,7 @@ struct MutationAuditRecord: Identifiable, Codable, Sendable {
         self.timestamp = timestamp
         self.outcome = outcome
         self.affectedRows = affectedRows
+        self.predicate = predicate
     }
 }
 

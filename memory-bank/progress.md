@@ -141,3 +141,79 @@ worker (rule 19).
 Stage 3 plan. R1 the SQL draft-loss fix (in-memory only; it loses work), then row deletion and
 foreign-key navigation. Two original estimates were wrong: AI on iOS is already done, and the audit
 viewer has **no store to view** — only `os.Logger` output — so it needs a decision first.
+
+## 2026-09-12 (evening) — Stage 3 remaining work R1–R8 closed
+
+**711 tests / 61 suites, no known issues.** D13's `withKnownIssue` is gone because the defect is
+fixed, not suppressed. Three workers in parallel plus the coordinator; nothing committed at time of
+writing.
+
+Done: the SQL draft-loss fix (and a **second instance** the worker found itself, `tableSQLDrafts`);
+row deletion, with *a row edited underneath the user reporting 0 against both real servers*;
+foreign-key navigation that **fails closed** on a repeated ordinal, so this morning's cross-product
+defect cannot return through it; the mutation audit viewer, storing the predicate's shape and never
+its parameters; settings folded onto the one `GlassLayerStore`; one command palette; D13's
+certificate trust with the connection detail now saying *what* TLS verifies; PostgreSQL array
+formats; and ~1,295 lines of unreachable `ConnectionFormView` deleted.
+
+**The correction worth carrying:** an engine-level test proved the *engine* could do `VERIFY_CA` —
+it could not prove a saved record reaches it. Until `transportPlan` mapped the mode, every piece
+existed and nothing joined them. Only a **capability-level** test tells those two states apart.
+"It works" and "the parts that would make it work all exist" look identical from below.
+
+**Open, and none of it is code.** Driving deletion and a foreign-key follow through the running app;
+the D14 fingerprint prompt; whether SQL-draft restore fires at all; iOS and visionOS, still
+compile-verified only. **No test in this stage opens a window.** Plus `text`/`blob` limits at six of
+eight MySQL families — bare `text`/`blob` left unconstrained rather than wrongly limited, since a
+missing limit only fails to warn while a borrowed one silently refuses storable data.
+
+## 2026-09-12 (night) — Stage 3 device pass: the Database UI suite passes 7/7
+
+**`UITests/GlassDatabaseUITests.swift` is the first test in this product to open a window on the
+Database capability, and it passes in full** — `exit status 0`, machine verified quiet before and
+after (rule 21). Package **811 tests / 68 suites**, all passing. **Nothing committed; 73 files.**
+
+**Driven through the real UI for the first time:** row deletion on **both** MySQL and PostgreSQL;
+a **composite** foreign-key follow landing on exactly one row, against a fixture holding both
+`(1,2)` and `(2,1)` so a transposed pairing lands on a row that *exists*; Run All Statements
+executing every statement; SQL-draft restore; and the SQL editor publishing its text as its AX value.
+
+**Two questions that had been open since Stage 3 began are closed by observation, not inference.**
+Draft restore fires — `onChange(of:initial:)` had been *read* and never watched. And
+`db-query-editor` really does carry SQL as its value, which was a mechanism argument until measured.
+
+**Six product defects, none visible to 800 passing unit tests.** Full table in
+[the device-pass note](tasks/2026-09/2026-09-12_device-pass.md). The two a user would have hit:
+the **entire Database menu bar was attached to nothing** (`DatabaseCommands`' only reference was its
+own declaration — ⌘↩ Run, ⌘N/⌘O/⌘S, the whole Query menu, all unreachable), and **"Open in New
+Window" pointed at a window group that does not exist**. Both found on the suite's first run.
+
+**~100 tests added to five modules that moved from glassdb with none** — `SQLHighlighter`
+(D15's read-only gate delegates to it), `SQLiteFileImporter.validatedURL` (its result is passed to
+`removeItem`), `SchemaContext`, `GridServerQueryBuilder`, `GridExportFormatter`. **Every one was
+already correct.** The gap was that nothing guarded them, which is a quieter risk than a bug: a
+future "simplification" of `validatedURL`'s component walk into a `hasPrefix` would have passed
+review.
+
+**Two corrections worth carrying, both mine.**
+- I reported that "Run All Statements" ran only the first statement of a script. **It does not — it
+  is correct.** I queried the scratch database after a run, found it empty, and read that as a
+  fixture that never populated; it was empty because the test's own cleanup had dropped the tables,
+  which the activity log already said. The real cause was a VoiceOver label prefix on grid cells.
+- I concluded the Follow Reference submenu "cannot be opened by any synthesized gesture" and had
+  written that into a skip. The activity trace then showed the composite follow **working**. The
+  actual fault was `click()`/`rightClick()` scrolling to visible against a `ScrollView` with no hit
+  point, two call sites one line apart.
+
+**The transferable class, which cost more than any individual bug:** *`exists` is not `clickable`,
+and a lookup succeeding is not an interaction succeeding.* Four separate failures were that same
+confusion — a Touch Bar proxy sharing an identifier with the control it mirrors, a multi-match query,
+an identifier landing on a `ScrollView` instead of a nested `NSMenuItem`, and scroll-to-visible.
+**And: export the UI hierarchy from the result bundle on the first failure, not the fourth.**
+
+**Still not verified by anyone:** the D14 fingerprint *prompt* through the UI — the fingerprint text
+is now correct and known-answer tested against `ssh-keygen`, but nobody has driven the prompt. iOS
+and visionOS remain compile-verified only; the visionOS UI target cannot link
+(`GlassShellLocalHostUITests.swift:143` calls `.click()` on an `XCUICoordinate`, absent from xrOS).
+An accessibility gap is recorded and deliberately unfixed: schema rows expose no accessibility action
+for the single-click selection they exist for.

@@ -52,6 +52,7 @@ struct SQLRunControl: View {
         .labelStyle(.titleAndIcon)
         .help("\(availability.title) (Command-Return); Run All Statements (Shift-Command-Return)")
         .accessibilityLabel(runAll ? "Run All Statements" : availability.title)
+        .accessibilityIdentifier("db-query-run")
         #if os(macOS)
         .onModifierKeysChanged(mask: [.command, .shift]) { _, modifiers in
             runAll = modifiers.contains([.command, .shift])

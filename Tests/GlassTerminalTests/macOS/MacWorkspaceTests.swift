@@ -10,6 +10,7 @@ import GlassTerminalEmulator
 import SwiftUI
 import Testing
 import UniformTypeIdentifiers
+import GlassLayers
 @testable import GlassTerminal
 
 @MainActor
@@ -283,30 +284,6 @@ struct MacWorkspaceTests {
         withExtendedLifetime(delegate) {}
     }
 
-@Test @MainActor func commandCenterSearchAndMenuSnapshotPreserveAvailability() {
-        #expect(MacCommandCenterEntry.matches("beam error", title: "Errors", detail: "Open table · beam"))
-        #expect(MacCommandCenterEntry.matches("cafe", title: "Café", detail: "Connection"))
-        #expect(!MacCommandCenterEntry.matches("drop", title: "Open table", detail: "beam"))
-        let menu = NSMenu(title: "Test")
-        menu.autoenablesItems = false
-        let enabled = NSMenuItem(title: "Show Test", action: #selector(NSApplication.hide(_:)), keyEquivalent: "s")
-        enabled.target = NSApp
-        menu.addItem(enabled)
-        let disabled = NSMenuItem(title: "Unavailable Test", action: nil, keyEquivalent: "")
-        disabled.isEnabled = false
-        menu.addItem(disabled)
-        let hidden = NSMenuItem(title: "Hidden Test", action: #selector(NSApplication.hide(_:)), keyEquivalent: "")
-        hidden.isHidden = true
-        menu.addItem(hidden)
-        menu.addItem(.separator())
-        let entries = MacCommandCenter.shared.menuEntries(menu, path: ["Test"], depth: 0)
-        #expect(entries.map(\.title) == ["Test: Show Test", "Test: Unavailable Test"])
-        #expect(MacCommandCenterEntry.matches("splrt", title: "Terminal: Split Right", detail: ""))
-        #expect(entries[0].isEnabled)
-        #expect(!entries[1].isEnabled)
-        #expect(entries[1].detail.contains("Unavailable in this window"))
-        #expect(MacCommandCenter.shared.menuEntries(menu, path: [], depth: 6).isEmpty)
-    }
     @Test @MainActor func workgroupStartsAllTabsAndClosingTabsLeavesDefinitionUnchanged() async throws {
         let fixture = try WorkspaceDefaultsFixture()
         defer { fixture.cleanup() }

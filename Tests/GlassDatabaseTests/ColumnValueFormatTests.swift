@@ -9,6 +9,59 @@ struct ColumnValueFormatTests {
         ColumnValueFormat.parse(type)?.formatMessage(for: value, column: "c")
     }
 
+    // MARK: PostgreSQL arrays
+
+    @Test("Array types are recognised in both spellings, including nested dimensions")
+    func arrayTypesAreRecognised() {
+        #expect(ColumnValueFormat.arrayElementTypeName(in: "integer[]") == "integer")
+        #expect(ColumnValueFormat.arrayElementTypeName(in: "_int4") == "int4")
+        // In PostgreSQL `integer[][]` is the same type as `integer[]`; the dimension count is
+        // documentation, not a constraint, so every trailing pair is stripped.
+        #expect(ColumnValueFormat.arrayElementTypeName(in: "integer[][]") == "integer")
+        #expect(ColumnValueFormat.arrayElementTypeName(in: "text[]") == "text")
+        #expect(ColumnValueFormat.arrayElementTypeName(in: "integer") == nil)
+        #expect(ColumnValueFormat.arrayElementTypeName(in: "_") == nil)
+    }
+
+    @Test("An array column takes an array literal and says so when it does not")
+    func arrayLiteralShape() {
+        #expect(message("integer[]", "{1,2,3}") == nil)
+        #expect(message("integer[]", "{}") == nil, "the empty array")
+        #expect(message("integer[]", "{{1,2},{3,4}}") == nil)
+        #expect(message("integer[]", "{1,NULL,3}") == nil)
+        #expect(message("_int4", "{1,2}") == nil)
+
+        // The gap this closes: before it, every one of these was accepted and failed at the
+        // server.
+        #expect(message("integer[]", "1,2,3") != nil, "no braces")
+        #expect(message("integer[]", "{1,2") != nil, "unclosed brace")
+        #expect(message("integer[]", "1}") != nil)
+        #expect(message("integer[]", "{\"unterminated}") != nil)
+    }
+
+    @Test("Elements are checked as their own type")
+    func arrayElementsAreChecked() {
+        // The reuse that makes this worth having: `date[]` inherits the date check, so the day
+        // that a bare `date` column rejects is rejected inside an array too.
+        #expect(message("date[]", "{2026-09-12,2028-02-29}") == nil)
+        #expect(message("date[]", "{2026-02-30}") != nil)
+        #expect(message("date[]", "{yesterday}") != nil)
+        #expect(message("date[]", "{2026-09-12,NULL}") == nil, "an unquoted NULL is the array null")
+        #expect(message("uuid[]", "{\(UUID().uuidString)}") == nil)
+        #expect(message("uuid[]", "{not-a-uuid}") != nil)
+        // An element type with no format of its own leaves the literal check as the whole check.
+        #expect(message("integer[]", "{not-a-number}") == nil,
+                "integers are ColumnTypeConstraint's business, not this file's")
+    }
+
+    @Test("Quoting is honoured, so a quoted NULL is the four-character string")
+    func arrayQuoting() {
+        #expect(message("text[]", "{\"a,b\",c}") == nil, "the comma is inside quotes")
+        #expect(message("date[]", "{\"NULL\"}") != nil,
+                "quoted, so it is a value and not the array null — and not a date")
+        #expect(message("text[]", "{\"he said \\\"hi\\\"\"}") == nil, "an escaped quote")
+    }
+
     @Test("Dates must be real days, not merely the right shape")
     func dates() {
         #expect(message("date", "2026-09-12") == nil)

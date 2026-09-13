@@ -392,15 +392,17 @@ struct ConnectionOverviewView: View {
         return "\(config.host):\(config.port)"
     }
 
+    /// Says **what TLS verifies**, not merely that it is on. "Required TLS" is true of a mode that
+    /// checks the server's name against public authorities and equally true of one that accepts any
+    /// certificate from a supplied CA without checking the name at all — and a user reading a
+    /// connection's detail cannot be expected to remember which they picked. The record already
+    /// phrases it (`DatabaseConnectionConfig.transportVerificationSummary`); this shows it.
     private var transportDescription: String {
         guard let config else { return "Unavailable" }
         if config.engine == .sqlite { return "Local file" }
-        return switch (config.usesHostTunnel, config.useTLS) {
-        case (true, true): "Host tunnel + required TLS"
-        case (true, false): "Host tunnel"
-        case (false, true): "Required TLS"
-        case (false, false): "Direct"
-        }
+        let route = config.usesHostTunnel ? "Host tunnel" : "Direct"
+        guard config.useTLS else { return route }
+        return "\(route) · TLS: \(config.tlsVerification.shortDescription.lowercased())"
     }
 
     @MainActor

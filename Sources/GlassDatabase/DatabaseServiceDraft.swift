@@ -22,11 +22,12 @@ import os
 final class DatabaseServiceDraft: GlassServiceDraft {
     enum Field: String, Hashable, Sendable {
         case name, engine, databaseFile, database, username, password, port, rowPageSize
+        case tlsCertificate
     }
 
     /// The order issues are reported and focus is moved in.
     static let orderedFields: [Field] = [.name, .engine, .databaseFile, .database, .username,
-                                         .password, .port, .rowPageSize]
+                                         .password, .port, .rowPageSize, .tlsCertificate]
 
     let kind: HostServiceKind = .database
 
@@ -60,6 +61,20 @@ final class DatabaseServiceDraft: GlassServiceDraft {
     var name: String
     var port: String
     var useTLS: Bool
+    /// How the certificate is checked once TLS is on (D13). Only ever changed by the user.
+    var tlsVerification: DatabaseTLSVerification
+    /// The imported trust root, staged in the draft until commit like every other field. Held as
+    /// bytes rather than a file path: there is no managed copy to clean up if the sheet is
+    /// abandoned, unlike the SQLite import below.
+    var tlsCertificate: Data?
+    /// What the imported file turned out to contain — count, fingerprint, validity — for the row
+    /// to show. Nil when no certificate is staged or it has not been parsed yet.
+    var tlsCertificateSummary: String?
+    /// The chosen file's name, so the row can say which file this came from.
+    var tlsCertificateFileName: String?
+    /// Kept apart from `importError`, which belongs to the SQLite file: two importers reporting
+    /// through one slot would show a SQLite failure under the certificate row.
+    var certificateImportError: String?
     var usesHostTunnel: Bool
     var isReadOnly: Bool
     /// Blank means "follow the app's result-row setting".
@@ -94,6 +109,8 @@ final class DatabaseServiceDraft: GlassServiceDraft {
         name = editing?.name ?? ""
         port = editing.map { String($0.port) } ?? String(DatabaseEngineType.mysql.defaultPort)
         useTLS = editing?.useTLS ?? false
+        tlsVerification = editing?.tlsVerification ?? .systemTrust
+        tlsCertificate = editing?.tlsCertificate
         usesHostTunnel = editing?.usesHostTunnel ?? false
         isReadOnly = editing?.isReadOnly ?? false
         rowPageSize = editing?.rowPageSize.map(String.init) ?? ""
@@ -103,6 +120,9 @@ final class DatabaseServiceDraft: GlassServiceDraft {
         credentialPolicy = storedPolicy == .sharedWithGlas ? .appOnly : storedPolicy
         sqlitePath = editing?.engine == .sqlite ? (editing?.host ?? "") : ""
         if let editing { username = editing.username }
+        // Re-parsed rather than trusted: a certificate saved a year ago may have expired since,
+        // and the row must say so while the sheet is open rather than at the next connection.
+        describeStagedCertificate()
         loadStoredPasswordIfNeeded()
     }
 
@@ -118,6 +138,10 @@ final class DatabaseServiceDraft: GlassServiceDraft {
         username = newEngine.defaultUsername
         database = ""
         useTLS = false
+        // The trust root belongs to one server's certificate authority, so it does not survive a
+        // change of engine any more than the port or the username does.
+        tlsVerification = .systemTrust
+        clearCertificate()
         usesHostTunnel = false
         if newEngine != .sqlite { discardStagedSQLiteFile() }
     }
@@ -180,6 +204,13 @@ final class DatabaseServiceDraft: GlassServiceDraft {
         if Int(port).map({ (1...65_535).contains($0) }) != true {
             issues[.port] = "Enter a port from 1 through 65535."
         }
+        // A mode that verifies against a supplied certificate and has none cannot connect at
+        // all. Refusing the save is the only honest option: the alternative is a service that
+        // looks configured and fails at every connection, or one quietly moved to a different
+        // way of verifying the server than the user asked for.
+        if engine.supportsTLS, useTLS, tlsVerification.requiresCertificate, tlsCertificate == nil {
+            issues[.tlsCertificate] = "Choose the certificate this connection should verify against."
+        }
         appendRowPageSizeIssue(&issues)
         return issues
     }
@@ -207,7 +238,7 @@ final class DatabaseServiceDraft: GlassServiceDraft {
         switch first {
         case .name, .database, .username, .password, .port, .rowPageSize: focusRequest = first
         // Not text fields: revealing the message is all that can be done.
-        case .engine, .databaseFile: focusRequest = nil
+        case .engine, .databaseFile, .tlsCertificate: focusRequest = nil
         }
     }
 
@@ -307,11 +338,61 @@ final class DatabaseServiceDraft: GlassServiceDraft {
             rowPageSize: Int(Self.normalized(rowPageSize)).map(DatabaseConnectionConfig.clampedRowPageSize),
             databaseCredentialPolicy: credentialPolicy,
             useTLS: engine.supportsTLS && useTLS,
+            tlsVerification: tlsVerification,
+            // Written only when it is actually used, so turning TLS off or moving back to system
+            // trust does not leave a trust root in the record that nothing verifies against.
+            tlsCertificate: (engine.supportsTLS && useTLS && tlsVerification.requiresCertificate)
+                ? tlsCertificate
+                : nil,
             isFavorite: editing?.isFavorite ?? false,
             colorTag: colorTag,
             dateAdded: editing?.dateAdded ?? Date(),
             lastConnected: editing?.lastConnected
         )
+    }
+
+    // MARK: - Certificate import (D13)
+
+    /// Reads the chosen certificate, parses it, and stages it on the draft. A file that is not a
+    /// certificate is rejected here, with the reason, rather than being saved and failing at the
+    /// next connection.
+    func importCertificateFile(_ result: Result<[URL], any Error>) {
+        do {
+            guard let url = try result.get().first else { return }
+            let (bytes, inspection) = try DatabaseCertificateImport.read(from: url)
+            tlsCertificate = bytes
+            tlsCertificateFileName = url.lastPathComponent
+            tlsCertificateSummary = DatabaseCertificateImport.summary(of: inspection)
+            certificateImportError = nil
+            markTouched(.tlsCertificate)
+        } catch {
+            // The previously staged certificate is left alone: a failed attempt to replace one
+            // must not silently remove the one that was working.
+            certificateImportError = error.localizedDescription
+        }
+    }
+
+    func clearCertificate() {
+        tlsCertificate = nil
+        tlsCertificateFileName = nil
+        tlsCertificateSummary = nil
+        certificateImportError = nil
+    }
+
+    /// Parses whatever is staged and refreshes the summary. Called when the draft is created for
+    /// an existing service, where the bytes came from the record rather than from a file.
+    private func describeStagedCertificate() {
+        guard let tlsCertificate else { return }
+        do {
+            tlsCertificateSummary = DatabaseCertificateImport.summary(
+                of: try DatabaseCertificateImport.inspect(tlsCertificate)
+            )
+        } catch {
+            // Saved bytes that no longer parse are reported, not discarded: the user chose this
+            // file, and dropping it silently would turn a broken trust root into an absent one.
+            tlsCertificateSummary = nil
+            certificateImportError = error.localizedDescription
+        }
     }
 
     // MARK: - SQLite import

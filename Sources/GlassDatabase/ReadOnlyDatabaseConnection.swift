@@ -48,13 +48,37 @@ final class ReadOnlyDatabaseConnection: DatabaseConnection {
     }
 
     /// The one gate. Everything that reaches the server passes through it.
+    ///
+    /// **Every statement in the string is classified, not the string.**
+    /// `safetyClassification` reads a single statement: it classifies from the leading keyword, so
+    /// `SELECT 1; DELETE FROM members` comes back `.readOnly` — the `DELETE` is past the point it
+    /// looks at. That is not a bug in the classifier, which is documented to classify one
+    /// statement, but it would be a hole here if this gate trusted it with a script.
+    ///
+    /// Today no caller sends one: both execution paths (`QueryEditorView.execute` and
+    /// `TableDetailView.execute`) split with `statementsToExecute` first and run `statement.text`
+    /// one at a time, so the gate has only ever seen single statements. **That is exactly why this
+    /// splits too.** This file's whole argument is that read-only should be a property of the
+    /// session and not of how carefully the next surface was written; trusting callers to have
+    /// split first would put the guarantee straight back into the caller's hands. A future path
+    /// that passes editor text through unsplit — the natural way to add a "run script" command —
+    /// would otherwise open every write in the script at once, silently and with nothing failing.
+    ///
+    /// An empty or unparseable string yields no statements, so the whole string is classified
+    /// instead: that path returns `.unknown`, which is refused. Never permit by default here.
     private func checkReadOnly(_ query: String) throws {
-        let classification = SQLHighlighter.safetyClassification(of: query)
-        switch classification {
-        case .readOnly, .sessionControl:
-            return
-        case .mutation, .destructive, .unknown:
-            throw ReadOnlyServiceError(classification: classification, connectionName: connectionName)
+        let statements = SQLHighlighter.statements(in: query)
+        let classifications = statements.isEmpty
+            ? [SQLHighlighter.safetyClassification(of: query)]
+            : statements.map(\.safety)
+
+        for classification in classifications {
+            switch classification {
+            case .readOnly, .sessionControl:
+                continue
+            case .mutation, .destructive, .unknown:
+                throw ReadOnlyServiceError(classification: classification, connectionName: connectionName)
+            }
         }
     }
 

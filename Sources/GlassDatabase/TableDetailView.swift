@@ -59,6 +59,15 @@ struct TableDetailView: View {
             #endif
         }
         .onPreferenceChange(SQLRunAvailabilityKey.self) { runAvailability = $0 }
+        .onReceive(NotificationCenter.default.publisher(for: .glassdbOpenTable)) { notification in
+            // Following a reference lands on rows, so show them: a table opened this way while the
+            // user was on Structure or Foreign Keys would otherwise apply its filter out of sight.
+            guard let request = notification.object as? OpenTableRequest,
+                  request.sessionID == sessionID,
+                  request.database == database,
+                  request.table == table else { return }
+            selectedTab = .data
+        }
         .toolbar {
             if isWorkspaceActive {
                 #if os(macOS)
@@ -95,6 +104,7 @@ struct TableDetailView: View {
                         .help(tab.helpText)
                         .accessibilityLabel(tab.title)
                         .accessibilityHint(tab.helpText)
+                        .accessibilityIdentifier(tab.accessibilityIdentifier)
                     }
                 }
                 ToolbarSpacer(.fixed, placement: databaseToolbarPlacement)
@@ -108,6 +118,7 @@ struct TableDetailView: View {
                             ForEach(TableTab.allCases) { tab in
                                 Label(tab.title, systemImage: tab.systemImage)
                                     .tag(tab)
+                                    .accessibilityIdentifier(tab.accessibilityIdentifier)
                             }
                         }
                     } label: {
@@ -299,6 +310,16 @@ extension Notification.Name {
     static let glassdbStartRepeat = Notification.Name("glassdbStartRepeat")
     static let glassdbTransfer = Notification.Name("glassdbTransfer")
     static let glassdbOpenSQLDraft = Notification.Name("glassdbOpenSQLDraft")
+    /// Posted when one table wants another opened — today only by foreign-key navigation.
+    /// Observed by the workspace, which owns the tab strip; the same seam `glassdbOpenSQLDraft`
+    /// already uses, so a detail view still does not reach into navigation itself.
+    static let glassdbOpenTable = Notification.Name("glassdbOpenTable")
+}
+
+struct OpenTableRequest: Sendable {
+    let sessionID: UUID
+    let database: String
+    let table: String
 }
 
 struct SQLDraftRequest: Sendable {
@@ -330,6 +351,16 @@ enum TableTab: Hashable, CaseIterable, Identifiable {
         case .ddl: "curlybraces"
         case .indexes: "arrow.triangle.branch"
         case .foreignKeys: "link"
+        }
+    }
+
+    var accessibilityIdentifier: String {
+        switch self {
+        case .data: "db-tab-data"
+        case .structure: "db-tab-structure"
+        case .ddl: "db-tab-ddl"
+        case .indexes: "db-tab-indexes"
+        case .foreignKeys: "db-tab-foreign-keys"
         }
     }
 
@@ -401,12 +432,24 @@ struct GridColumnFilter: Codable, Hashable, Identifiable, Sendable {
         self.value = value
     }
 
-    func boundValue() throws -> DatabaseValue? {
+    /// The filter's text as a bound parameter, validated the same way a record edit is.
+    ///
+    /// `dialect` is the connection's and is a **parameter rather than a stored property** on
+    /// purpose. A saved filter outlives the session that made it, and the engine it will next be
+    /// applied against is a fact about the connection, not about the filter — storing it would
+    /// persist something that can change and then quietly disagree with reality. It is also why
+    /// `GridColumnFilter` stays `Codable` without a migration.
+    ///
+    /// Passing nil leaves bare `text`/`blob` unconstrained, which is the safe reading: those two
+    /// names mean ~1 GB on PostgreSQL and `SQLITE_MAX_LENGTH` on SQLite, so borrowing MySQL's
+    /// 65,535 would refuse values that are perfectly storable. A missing limit only fails to warn.
+    func boundValue(dialect: DatabaseDialect? = nil) throws -> DatabaseValue? {
         guard operation.requiresValue else { return nil }
         return try StagedEdit(
             columnIndex: 0,
             columnName: columnName,
             columnType: columnType,
+            dialect: dialect,
             isPrimaryKey: false,
             isNullable: true,
             isUnsigned: isUnsigned,
@@ -419,13 +462,32 @@ struct GridColumnFilter: Codable, Hashable, Identifiable, Sendable {
         ).boundValue()
     }
 
-    var validationError: String? {
+    /// Why this filter cannot be applied, or nil when it can.
+    ///
+    /// Two checks, in order, matching `StagedEdit.validationError` so the type error is reported
+    /// before the size one ("abc" in an int says it is not a number, not that it is out of range).
+    ///
+    /// **The size check runs for `.equals` only, and that limit is deliberate.** A filter is a
+    /// read, not a write, so the question is not "will the server store this?" but "can any stored
+    /// row match it?". For `=` the answer is provably no: a value too large for the column cannot
+    /// be in it, so the query is guaranteed to return nothing and saying so is more useful than
+    /// silently returning an empty page. For `<>` the same value matches *every* row, and for `<`
+    /// and `>` an out-of-range bound is an ordinary and meaningful way to express "all of them" —
+    /// refusing those would block legitimate queries to enforce a rule that does not apply to them.
+    ///
+    /// Before this, filters ran no size check at all: `varchar(4)` accepted `"12345"` and returned
+    /// an empty page with no explanation. `ColumnTypeConstraint` was written to serve both the
+    /// record editor and the grid, and only one of the two was calling it.
+    func validationError(dialect: DatabaseDialect? = nil) -> String? {
         do {
-            _ = try boundValue()
-            return nil
+            _ = try boundValue(dialect: dialect)
         } catch {
             return error.localizedDescription
         }
+        guard operation == .equals else { return nil }
+        return ColumnTypeConstraint
+            .parse(columnType, isUnsigned: isUnsigned, dialect: dialect)?
+            .overflowMessage(for: value, column: columnName)
     }
 }
 
@@ -456,7 +518,8 @@ enum GridDisplayFilterEvaluator {
     static func matchingRowIndices(
         rows: [[DatabaseValue]],
         columns: [ColumnInfo],
-        filters: [GridColumnFilter]
+        filters: [GridColumnFilter],
+        dialect: DatabaseDialect? = nil
     ) -> [Int] {
         guard !filters.isEmpty else { return Array(rows.indices) }
         var columnIndices: [String: Int] = [:]
@@ -467,19 +530,24 @@ enum GridDisplayFilterEvaluator {
             filters.allSatisfy { filter in
                 guard let columnIndex = columnIndices[filter.columnName],
                       rows[rowIndex].indices.contains(columnIndex) else { return false }
-                return matches(rows[rowIndex][columnIndex], filter: filter)
+                return matches(rows[rowIndex][columnIndex], filter: filter, dialect: dialect)
             }
         }
     }
 
-    private static func matches(_ value: DatabaseValue, filter: GridColumnFilter) -> Bool {
+    private static func matches(
+        _ value: DatabaseValue,
+        filter: GridColumnFilter,
+        dialect: DatabaseDialect?
+    ) -> Bool {
         switch filter.operation {
         case .isNull:
             return value.isNull
         case .isNotNull:
             return !value.isNull
         case .equals, .notEquals, .greaterThan, .lessThan:
-            guard !value.isNull, let comparison = try? filter.boundValue() else { return false }
+            guard !value.isNull,
+                  let comparison = try? filter.boundValue(dialect: dialect) else { return false }
             let ordering = compare(value, comparison)
             switch filter.operation {
             case .equals: return ordering == .orderedSame
@@ -796,7 +864,7 @@ enum GridServerQueryBuilder {
             case .isNull: clauses.append("\(identifier) IS NULL")
             case .isNotNull: clauses.append("\(identifier) IS NOT NULL")
             case .equals, .notEquals, .greaterThan, .lessThan:
-                guard let value = try filter.boundValue() else { continue }
+                guard let value = try filter.boundValue(dialect: dialect) else { continue }
                 let operation: String
                 switch filter.operation {
                 case .equals: operation = "="
@@ -1017,7 +1085,8 @@ enum GridPastePlanBuilder {
         result: QueryResult,
         columns: [ColumnInfo],
         visibleColumnIndices: [Int],
-        mappingMode: GridPasteMappingMode
+        mappingMode: GridPasteMappingMode,
+        dialect: DatabaseDialect? = nil
     ) throws -> GridPastePlan {
         guard result.rows.indices.contains(anchor.row), columns == result.columns || columns.count == result.columns.count else {
             throw RecordValueError.invalidValue(column: "Paste", expected: "a current base-table result row")
@@ -1097,6 +1166,7 @@ enum GridPastePlanBuilder {
                     columnIndex: columnIndex,
                     columnName: column.name,
                     columnType: column.type,
+                    dialect: dialect,
                     isPrimaryKey: column.isPrimaryKey,
                     isNullable: column.isNullable,
                     isUnsigned: column.isUnsigned,
@@ -1160,6 +1230,7 @@ private enum PendingRecordMutation {
     case update(edits: [StagedEdit], rowIndex: Int)
     case insert(edits: [StagedEdit])
     case batchUpdate(GridPastePlan)
+    case delete(rowIndices: [Int])
 }
 
 private enum MutationExecutionError: LocalizedError {
@@ -1265,6 +1336,12 @@ struct DataTabView: View {
     // Server-side grid state
     @State private var filters: [GridColumnFilter] = []
     @State private var displayFilters: [GridColumnFilter] = []
+    /// This table's followable relationships, loaded beside the column metadata.
+    @State private var foreignKeyRelationships: [ForeignKeyRelationship] = []
+    /// Which table the relationships above describe. Foreign keys do not change between pages, and
+    /// `loadData` runs on every page turn, so the catalog is read once per table rather than once
+    /// per page.
+    @State private var foreignKeysLoadedFor: String?
     @State private var sorts: [GridSortDescriptor] = []
     @State private var groupColumns: [String] = []
     @State private var aggregates: [GridAggregateDescriptor] = []
@@ -1451,7 +1528,7 @@ struct DataTabView: View {
     }
 
     private var filterValidationError: String? {
-        filterDraft?.validationError
+        filterDraft?.validationError(dialect: session?.connection?.dialect)
     }
 
     private var canApplyFilter: Bool {
@@ -1531,7 +1608,8 @@ struct DataTabView: View {
                         in: queryText,
                         selectedRange: selectedRange,
                         schemaIdentifiers: effectiveCompletionIdentifiers + columnMeta.map(\.name)
-                    )
+                    ),
+                    textViewIdentifier: "db-query-editor"
                 )
                 .frame(height: editorHeight)
                 .databaseCanvasSurface(opacity: settingsManager.windowOpacity, strength: 0.045)
@@ -1679,6 +1757,7 @@ struct DataTabView: View {
                 RecordEditorView(
                     columns: columnMeta.isEmpty ? result.columns : columnMeta,
                     mode: .edit(rowIndex: rowIdx, originalRow: result.rows[rowIdx]),
+                    dialect: session?.connection?.dialect,
                     onSave: { edits, mode in
                         queuedRecordMutation = .update(edits: edits, rowIndex: rowIdx)
                         showEditor = false
@@ -1691,6 +1770,7 @@ struct DataTabView: View {
             RecordEditorView(
                 columns: columnMeta,
                 mode: .add,
+                dialect: session?.connection?.dialect,
                 onSave: { edits, _ in
                     queuedRecordMutation = .insert(edits: edits)
                     addingNewRow = false
@@ -1755,8 +1835,10 @@ struct DataTabView: View {
             set: { if !$0 { pendingRecordMutation = nil } }
         )) {
             Button("Commit", role: .destructive) { commitPendingRecordMutation() }
+                .accessibilityIdentifier("db-delete-confirm")
             Button("Cancel", role: .cancel) { pendingRecordMutation = nil }
                 .keyboardShortcut(.cancelAction)
+                .accessibilityIdentifier("db-delete-cancel")
         } message: {
             Text(recordMutationPreview)
         }
@@ -1818,7 +1900,9 @@ struct DataTabView: View {
         }
     }
 
-    private var interactionView: some View {
+    /// Split from `interactionView` on purpose: with the foreign-key observer added, the single
+    /// chain stopped type-checking in reasonable time. Two properties, same view.
+    private var observedView: some View {
         presentedView
         .onReceive(NotificationCenter.default.publisher(for: .glassdbExecuteQuery)) { notification in
             guard isWorkspaceActive, isTableContext,
@@ -1831,11 +1915,22 @@ struct DataTabView: View {
             guard notification.object as? UUID == actionScope else { return }
             addingNewRow = true
         }
+        .onReceive(NotificationCenter.default.publisher(for: .glassdbOpenTable)) { notification in
+            // The workspace switches to the tab; if this one already exists it is mounted and its
+            // `.task` will not run again, so the staged filters are claimed here instead.
+            guard let request = notification.object as? OpenTableRequest,
+                  request.sessionID == sessionID,
+                  request.database == database,
+                  request.table == table else { return }
+            guard claimStagedForeignKeyFilters() else { return }
+            Task { await loadData() }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .glassdbRefreshData)) { notification in
             guard let scope = notification.object as? UUID,
                   scope == actionScope || scope == sessionID else { return }
             queryText = ""
             totalRowCount = nil
+            foreignKeysLoadedFor = nil
             Task { await loadData() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .glassdbShowAI)) { notification in
@@ -1850,6 +1945,10 @@ struct DataTabView: View {
         .onReceive(NotificationCenter.default.publisher(for: .glassdbTransfer)) { notification in
             handleTransfer(notification.object)
         }
+    }
+
+    private var interactionView: some View {
+        observedView
         .fileExporter(
             isPresented: $showExporter,
             document: exportResult.map {
@@ -1902,6 +2001,10 @@ struct DataTabView: View {
         if isTableContext {
             loadColumnLayout()
             loadGridQueryState()
+            // A foreign-key follow that opened this tab for the first time left its filters here.
+            // Claimed after the persisted state so it wins over it, and before the first fetch so
+            // the table never appears unfiltered and then jumps.
+            claimStagedForeignKeyFilters()
             await loadData()
         } else {
             isAutoQuery = false
@@ -2197,9 +2300,10 @@ struct DataTabView: View {
         List(selection: $selectedRowIndices) {
             ForEach(displayedRowIndices(in: result), id: \.self) { rowIndex in
                 let row = result.rows[rowIndex]
+                let displayedRowNumber = (currentPage - 1) * pageSize + rowIndex + 1
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text("Row \((currentPage - 1) * pageSize + rowIndex + 1)")
+                        Text("Row \(displayedRowNumber)")
                             .font(.headline.monospacedDigit())
                         Spacer()
                         if selectedRowIndices.contains(rowIndex) {
@@ -2217,10 +2321,12 @@ struct DataTabView: View {
                                 .lineLimit(2)
                                 .multilineTextAlignment(.trailing)
                         }
+                        .accessibilityIdentifier("db-grid-cell-\(displayedRowNumber)-\(result.columns[columnIndex].name)")
                     }
                 }
                 .padding(.vertical, 4)
                 .contentShape(Rectangle())
+                .accessibilityIdentifier("db-grid-row-\(displayedRowNumber)")
                 .tag(rowIndex)
                 .onTapGesture {
                     if editMode?.wrappedValue != .active {
@@ -2232,10 +2338,19 @@ struct DataTabView: View {
                         Button("Edit Row", systemImage: "pencil") {
                             openEditor(for: rowIndex)
                         }
+                        .accessibilityIdentifier("db-row-menu-edit")
                     }
                     Button("Copy Row", systemImage: "doc.on.doc") {
                         selectedRowIndices = [rowIndex]
                         copySelectedRange()
+                    }
+                    followReferenceMenu(for: rowIndex)
+                    if isTableContext {
+                        Divider()
+                        Button("Delete Row…", systemImage: "trash", role: .destructive) {
+                            requestDeleteRow(rowIndex)
+                        }
+                        .accessibilityIdentifier("db-row-menu-delete")
                     }
                 }
                 .accessibilityHint(isTableContext
@@ -2302,6 +2417,10 @@ struct DataTabView: View {
                     copySelectedRange()
                 }
                 .disabled(selectedRowIndices.isEmpty)
+                Button("Delete Selected Rows…", systemImage: "trash", role: .destructive) {
+                    requestDeleteSelectedRows()
+                }
+                .disabled(!canDeleteSelectedRows)
                 Button("Import TSV", systemImage: "square.and.arrow.down") {
                     showTSVImporter = true
                 }
@@ -2423,6 +2542,14 @@ struct DataTabView: View {
                 Label("Copy", systemImage: "doc.on.doc")
             }
             .disabled(selectedRectangle == nil && selectedRowIndices.isEmpty)
+
+            Button(role: .destructive) {
+                requestDeleteSelectedRows()
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+            .disabled(!canDeleteSelectedRows)
+            .help(deleteControlHelp)
 
             Menu {
                 ForEach(GridExportFormat.allCases) { format in
@@ -2717,11 +2844,13 @@ struct DataTabView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { pendingRecordMutation = nil }
                         .keyboardShortcut(.cancelAction)
+                        .accessibilityIdentifier("db-delete-cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Commit", role: .destructive) { commitPendingRecordMutation() }
                         .keyboardShortcut(.defaultAction)
                         .help("Commit this reviewed row mutation")
+                        .accessibilityIdentifier("db-delete-confirm")
                 }
             }
         }
@@ -2758,7 +2887,8 @@ struct DataTabView: View {
         let matching = GridDisplayFilterEvaluator.matchingRowIndices(
             rows: result.rows,
             columns: result.columns,
-            filters: filterSet ?? displayFilters
+            filters: filterSet ?? displayFilters,
+            dialect: session?.connection?.dialect
         )
         guard !isTableContext else { return matching }
         return GridDisplaySortEvaluator.sortedRowIndices(
@@ -2918,9 +3048,10 @@ struct DataTabView: View {
                             // Data rows with a pinned row-number gutter
                             ForEach(displayedRows, id: \.self) { rowIndex in
                                 let row = result.rows[rowIndex]
+                                let displayedRowNumber = (currentPage - 1) * pageSize + rowIndex + 1
                                 HStack(spacing: 0) {
                                     // Keep the generated row-number gutter fixed and legible while data scrolls.
-                                    Text("\((currentPage - 1) * pageSize + rowIndex + 1)")
+                                    Text("\(displayedRowNumber)")
                                         .font(.system(size: fontSize - 1).monospacedDigit())
                                         .foregroundStyle(.secondary)
                                         .frame(width: rowNumWidth, height: rowHeight, alignment: .center)
@@ -2940,10 +3071,31 @@ struct DataTabView: View {
                                         .contentShape(Rectangle())
                                         .onTapGesture(count: 2) { openEditor(for: rowIndex) }
                                         .onTapGesture { selectRow(rowIndex) }
-                                        .accessibilityLabel("Row \((currentPage - 1) * pageSize + rowIndex + 1)")
+                                        .accessibilityLabel("Row \(displayedRowNumber)")
                                         .accessibilityHint("Selects the entire row. Use Shift or Command for multiple rows. Double-click to edit.")
                                         .accessibilityAddTraits(.isButton)
-                                        .help("Select row \((currentPage - 1) * pageSize + rowIndex + 1); Shift-click extends, Command-click toggles, and double-click edits")
+                                        .accessibilityIdentifier("db-grid-row-\(displayedRowNumber)")
+                                        .help("Select row \(displayedRowNumber); Shift-click extends, Command-click toggles, and double-click edits")
+                                        .contextMenu {
+                                            if isTableContext, !isAnalysisActive {
+                                                Button("Edit Row", systemImage: "pencil") {
+                                                    openEditor(for: rowIndex)
+                                                }
+                                                .accessibilityIdentifier("db-row-menu-edit")
+                                                followReferenceMenu(for: rowIndex)
+                                                Divider()
+                                                Button(deleteRowMenuTitle(for: rowIndex),
+                                                       systemImage: "trash",
+                                                       role: .destructive) {
+                                                    if selectedRowIndices.contains(rowIndex) {
+                                                        requestDeleteSelectedRows()
+                                                    } else {
+                                                        requestDeleteRow(rowIndex)
+                                                    }
+                                                }
+                                                .accessibilityIdentifier("db-row-menu-delete")
+                                            }
+                                        }
 
                                     // Data cells
                                     ForEach(Array(visibleIndices.enumerated()), id: \.element) { visibleOffset, colIndex in
@@ -2981,6 +3133,7 @@ struct DataTabView: View {
                                             }
                                             .zIndex(isFrozen ? 2 : 0)
                                             .accessibilityLabel("\(result.columns[colIndex].name): \(value.isNull ? "null" : value.displayString)")
+                                            .accessibilityIdentifier("db-grid-cell-\(displayedRowNumber)-\(result.columns[colIndex].name)")
                                             .contentShape(Rectangle())
                                             .onTapGesture(count: 2) { openEditor(for: rowIndex) }
                                             .onTapGesture { selectCell(row: rowIndex, column: colIndex) }
@@ -3235,7 +3388,8 @@ struct DataTabView: View {
                 result: result,
                 columns: columns,
                 visibleColumnIndices: visible,
-                mappingMode: pasteMappingMode
+                mappingMode: pasteMappingMode,
+                dialect: session?.connection?.dialect
             )
             queuedRecordMutation = plan.rows.count == 1
                 ? .update(edits: plan.rows[0].edits, rowIndex: plan.rows[0].rowIndex)
@@ -3286,7 +3440,8 @@ struct DataTabView: View {
     }
 
     private func addStagedFilter() {
-        guard let filter = filterDraft, filter.validationError == nil else { return }
+        guard let filter = filterDraft,
+              filter.validationError(dialect: session?.connection?.dialect) == nil else { return }
         if filterApplicationMode == .updateQuery {
             stagedQueryFilters.removeAll { $0.columnName == filter.columnName }
             stagedQueryFilters.append(filter)
@@ -3371,6 +3526,7 @@ struct DataTabView: View {
             case .update(let edits, let rowIndex): await applyEdits(edits, rowIndex: rowIndex)
             case .insert(let edits): await insertRow(edits)
             case .batchUpdate(let plan): await applyBatchPaste(plan)
+            case .delete(let rowIndices): await deleteRows(rowIndices)
             case .none: break
             }
         }
@@ -3652,6 +3808,7 @@ struct DataTabView: View {
         showEditor = false
         do {
             columnMeta = try await connection.columns(in: table, database: database)
+            await loadForeignKeyRelationships()
             let validColumnNames = Set(columnMeta.map(\.name))
             displayFilters.removeAll { !validColumnNames.contains($0.columnName) }
             columnLayout.reconcile(columns: columnMeta)
@@ -3847,6 +4004,8 @@ struct DataTabView: View {
             return "Connection: \(session?.connectionConfig.name ?? "Disconnected")\nDatabase: \(database)\nTable: \(table)\nOperation: UPDATE one row\nChanged columns: \(edits.map(\.columnName).joined(separator: ", "))\nPredicate: primary key plus all original row values (optimistic conflict check)\nTransaction: atomic commit or rollback"
         case .insert(let edits):
             return "Connection: \(session?.connectionConfig.name ?? "Disconnected")\nDatabase: \(database)\nTable: \(table)\nOperation: INSERT one row\nProvided columns: \(edits.map(\.columnName).joined(separator: ", "))\nOmitted columns: server DEFAULT\nTransaction: atomic commit or rollback"
+        case .delete(let rowIndices):
+            return "Connection: \(session?.connectionConfig.name ?? "Disconnected")\nDatabase: \(database)\nTable: \(table)\nOperation: DELETE \(rowIndices.count) row(s)\nPredicate: primary key plus every original row value (optimistic conflict check)\nGuard: every statement must affect exactly one row, or nothing is committed\nTransaction: all rows commit together or all rows roll back\nThis cannot be undone from the app."
         case .batchUpdate(let plan):
             return "Connection: \(session?.connectionConfig.name ?? "Disconnected")\nDatabase: \(database)\nTable: \(table)\nOperation: UPDATE \(plan.rows.count) changed row(s) from \(plan.sourceRowCount) pasted row(s)\nMapped columns: \(plan.mappedColumnNames.joined(separator: ", "))\nMapping: \(plan.mappingMode == .headerRow ? "exact header names" : "positional from selected cell")\nPredicate: primary key plus every original row value (optimistic conflict checks)\nTransaction: all rows commit together or all rows roll back"
         }
@@ -3939,6 +4098,9 @@ struct DataTabView: View {
         var parameters: [DatabaseValue] = []
         var transactionStarted = false
         var commitAttempted = false
+        /// The predicate's shape, for the audit. Declared out here so a failure records the same
+        /// predicate a success would have. Never the parameters — see `MutationAuditRecord`.
+        var predicateShape: String?
         do {
             let setClauses = try edits.map { edit -> String in
                 guard edit.columnIndex < cols.count else {
@@ -3948,19 +4110,18 @@ struct DataTabView: View {
                 return "\(connection.quotedIdentifier(cols[edit.columnIndex].name)) = \(connection.parameterPlaceholder(at: parameters.count))"
             }.joined(separator: ", ")
 
-            var whereClauses: [String] = []
-            for (index, column) in cols.enumerated() where index < result.rows[rowIndex].count {
-                let original = result.rows[rowIndex][index]
-                let identifier = connection.quotedIdentifier(column.name)
-                if original.isNull {
-                    whereClauses.append("\(identifier) IS NULL")
-                } else {
-                    parameters.append(original)
-                    whereClauses.append("\(identifier) = \(connection.parameterPlaceholder(at: parameters.count))")
-                }
-            }
+            // The optimistic row identity, shared with the pasted range and with deletion.
+            let identity = try RowMutationSQL.identityPredicate(
+                columns: cols,
+                row: result.rows[rowIndex],
+                identifierQuote: connection.identifierQuoteCharacter,
+                dialect: connection.dialect,
+                parameterOffset: parameters.count
+            )
+            parameters.append(contentsOf: identity.parameters)
+            predicateShape = identity.auditShape
 
-            let sql = "UPDATE \(connection.quotedIdentifier(database)).\(connection.quotedIdentifier(table)) SET \(setClauses) WHERE \(whereClauses.joined(separator: " AND "))"
+            let sql = "UPDATE \(connection.quotedIdentifier(database)).\(connection.quotedIdentifier(table)) SET \(setClauses) WHERE \(identity.sql)"
             try await connection.beginTransaction()
             transactionStarted = true
             let updateResult = try await connection.execute(sql, parameters: parameters)
@@ -3978,7 +4139,8 @@ struct DataTabView: View {
                 normalizedOperation: "update",
                 source: "record-editor",
                 outcome: .committed,
-                affectedRows: updateResult.affectedRows
+                affectedRows: updateResult.affectedRows,
+                predicate: predicateShape
             ))
             sessionManager.invalidateTableStatistics(sessionID: sessionID, database: database)
             withAnimation { showEditor = false }
@@ -4002,7 +4164,8 @@ struct DataTabView: View {
                 normalizedOperation: "update",
                 source: "record-editor",
                 outcome: outcome,
-                affectedRows: nil
+                affectedRows: nil,
+                predicate: predicateShape
             ))
             errorMessage = "Update failed (\(outcomeDescription(outcome))): \(error.localizedDescription)"
             errorIsQueryFailure = false
@@ -4023,6 +4186,9 @@ struct DataTabView: View {
         var transactionStarted = false
         var commitAttempted = false
         var affectedRows: UInt64 = 0
+        /// The shape of the last predicate built. Every row in a pasted range is identified the
+        /// same way, so one shape describes the batch; on failure it names the row that stopped it.
+        var predicateShape: String?
         isLoading = true
         errorMessage = nil
         errorIsQueryFailure = false
@@ -4042,21 +4208,16 @@ struct DataTabView: View {
                     return "\(connection.quotedIdentifier(columns[edit.columnIndex].name)) = \(connection.parameterPlaceholder(at: parameters.count))"
                 }.joined(separator: ", ")
 
-                var predicates: [String] = []
-                for (index, column) in columns.enumerated() where index < result.rows[rowEdit.rowIndex].count {
-                    let original = result.rows[rowEdit.rowIndex][index]
-                    let identifier = connection.quotedIdentifier(column.name)
-                    if original.isNull {
-                        predicates.append("\(identifier) IS NULL")
-                    } else {
-                        parameters.append(original)
-                        predicates.append("\(identifier) = \(connection.parameterPlaceholder(at: parameters.count))")
-                    }
-                }
-                guard !predicates.isEmpty else {
-                    throw RecordValueError.invalidValue(column: "Paste", expected: "an optimistic row predicate")
-                }
-                let sql = "UPDATE \(connection.quotedIdentifier(database)).\(connection.quotedIdentifier(table)) SET \(setClauses) WHERE \(predicates.joined(separator: " AND "))"
+                let identity = try RowMutationSQL.identityPredicate(
+                    columns: columns,
+                    row: result.rows[rowEdit.rowIndex],
+                    identifierQuote: connection.identifierQuoteCharacter,
+                    dialect: connection.dialect,
+                    parameterOffset: parameters.count
+                )
+                parameters.append(contentsOf: identity.parameters)
+                predicateShape = identity.auditShape
+                let sql = "UPDATE \(connection.quotedIdentifier(database)).\(connection.quotedIdentifier(table)) SET \(setClauses) WHERE \(identity.sql)"
                 let updateResult = try await connection.execute(sql, parameters: parameters)
                 if let serverError = updateResult.error { throw MutationExecutionError.server(serverError) }
                 guard updateResult.affectedRows == 1 else {
@@ -4074,7 +4235,8 @@ struct DataTabView: View {
                 normalizedOperation: "update-batch",
                 source: "grid-paste",
                 outcome: .committed,
-                affectedRows: affectedRows
+                affectedRows: affectedRows,
+                predicate: predicateShape
             ))
             sessionManager.invalidateTableStatistics(sessionID: sessionID, database: database)
             await loadData()
@@ -4097,12 +4259,262 @@ struct DataTabView: View {
                 normalizedOperation: "update-batch",
                 source: "grid-paste",
                 outcome: outcome,
-                affectedRows: affectedRows
+                affectedRows: affectedRows,
+                predicate: predicateShape
             ))
             errorMessage = "Batch paste failed after \(affectedRows) row(s) (\(outcomeDescription(outcome))): \(error.localizedDescription)"
             errorIsQueryFailure = false
             isLoading = false
         }
+    }
+
+    // MARK: - Foreign-Key Navigation
+
+    /// Loaded beside the column metadata, and non-fatal: a table still browses when the account
+    /// cannot read the catalog. Refusing to show data because a *navigation affordance* could not
+    /// be built would be the wrong trade.
+    private func loadForeignKeyRelationships(force: Bool = false) async {
+        guard isTableContext, let connection = session?.connection else {
+            foreignKeyRelationships = []
+            foreignKeysLoadedFor = nil
+            return
+        }
+        let token = "\(database).\(table)"
+        guard force || foreignKeysLoadedFor != token else { return }
+        foreignKeysLoadedFor = token
+        do {
+            foreignKeyRelationships = ForeignKeyNavigation.relationships(
+                from: try await connection.foreignKeys(in: table, database: database)
+            )
+        } catch {
+            foreignKeyRelationships = []
+            // Retry on the next load rather than remembering a failure as "this table has none".
+            foreignKeysLoadedFor = nil
+        }
+    }
+
+    private func canFollow(_ relationship: ForeignKeyRelationship, from rowIndex: Int) -> Bool {
+        guard let result, result.rows.indices.contains(rowIndex) else { return false }
+        return relationship.pairs.allSatisfy { pair in
+            guard let index = columnsForMutation.firstIndex(where: { $0.name == pair.column }),
+                  index < result.rows[rowIndex].count else { return false }
+            return !result.rows[rowIndex][index].isNull
+        }
+    }
+
+    /// Opens the referenced table showing the referenced row.
+    ///
+    /// The referenced table's own columns are fetched first so the filter is parsed against the
+    /// type the *target* declares (D17) rather than the type of the column being left.
+    private func followForeignKey(_ relationship: ForeignKeyRelationship, from rowIndex: Int) async {
+        guard let result, result.rows.indices.contains(rowIndex),
+              let connection = session?.connection else { return }
+        do {
+            let referencedColumns = try await connection.columns(in: relationship.referencedTable,
+                                                                 database: database)
+            let newFilters = try ForeignKeyNavigation.filters(
+                following: relationship,
+                row: result.rows[rowIndex],
+                columns: columnsForMutation,
+                referencedColumns: referencedColumns,
+                dialect: session?.connection?.dialect
+            )
+            ForeignKeyFilterHandoff.stage(newFilters, for: .init(sessionID: sessionID,
+                                                                 database: database,
+                                                                 table: relationship.referencedTable))
+            NotificationCenter.default.post(
+                name: .glassdbOpenTable,
+                object: OpenTableRequest(sessionID: sessionID,
+                                         database: database,
+                                         table: relationship.referencedTable)
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+            errorIsQueryFailure = false
+        }
+    }
+
+    /// Takes filters staged for this table by a foreign-key follow, if any are waiting.
+    /// Returns whether anything was applied, so the caller can decide about reloading.
+    @discardableResult
+    private func claimStagedForeignKeyFilters() -> Bool {
+        guard isTableContext,
+              let staged = ForeignKeyFilterHandoff.claim(.init(sessionID: sessionID,
+                                                               database: database,
+                                                               table: table)) else { return false }
+        filters = staged
+        displayFilters = []
+        currentPage = 1
+        totalRowCount = nil
+        clearGridSelection()
+        persistGridQueryState()
+        return true
+    }
+
+    @ViewBuilder
+    private func followReferenceMenu(for rowIndex: Int) -> some View {
+        if isTableContext, !isAnalysisActive, !foreignKeyRelationships.isEmpty {
+            Menu("Follow Reference", systemImage: "arrow.triangle.turn.up.right.diamond") {
+                ForEach(foreignKeyRelationships) { relationship in
+                    Button(relationship.summary) {
+                        Task { await followForeignKey(relationship, from: rowIndex) }
+                    }
+                    .disabled(!canFollow(relationship, from: rowIndex))
+                    .accessibilityIdentifier("db-row-menu-follow-\(relationship.constraintName)")
+                }
+            }
+            .accessibilityIdentifier("db-row-menu-follow")
+        }
+    }
+
+    // MARK: - Delete Rows
+
+    /// Rows the current selection can delete: a table context, not an aggregate projection,
+    /// and every selected index still present in the loaded page.
+    private var deletableSelectedRowIndices: [Int] {
+        guard isTableContext, !isAnalysisActive, let result else { return [] }
+        return selectedRowIndices.sorted().filter { result.rows.indices.contains($0) }
+    }
+
+    private var canDeleteSelectedRows: Bool {
+        !deletableSelectedRowIndices.isEmpty && columnsForMutation.contains(where: \.isPrimaryKey)
+    }
+
+    /// `columnMeta` is the table's real schema and carries primary-key flags; a free-form result's
+    /// columns do not. The write paths have always preferred it and fallen back to the result.
+    private var columnsForMutation: [ColumnInfo] {
+        guard let result else { return columnMeta }
+        return columnMeta.isEmpty ? result.columns : columnMeta
+    }
+
+    private func deleteRowMenuTitle(for rowIndex: Int) -> String {
+        let count = selectedRowIndices.contains(rowIndex) ? deletableSelectedRowIndices.count : 1
+        return count == 1 ? "Delete Row…" : "Delete \(count) Rows…"
+    }
+
+    /// Says why the control is unavailable rather than leaving a dimmed button unexplained.
+    /// Read-only services are deliberately *not* mentioned here: the refusal belongs on the
+    /// connection (D15), and a UI that pre-judges it would be a second, untested opinion.
+    private var deleteControlHelp: String {
+        if !isTableContext {
+            return "Deletion is available from a table tab, where rows have a known identity"
+        }
+        if isAnalysisActive {
+            return "Deletion is unavailable while a grouped or aggregated projection is shown"
+        }
+        if !columnsForMutation.contains(where: \.isPrimaryKey) {
+            return "This table has no primary key, so a single row cannot be identified safely"
+        }
+        if deletableSelectedRowIndices.isEmpty {
+            return "Select one or more rows to delete"
+        }
+        let count = deletableSelectedRowIndices.count
+        return "Review and delete \(count) selected row\(count == 1 ? "" : "s")"
+    }
+
+    private func requestDeleteSelectedRows() {
+        let rowIndices = deletableSelectedRowIndices
+        guard !rowIndices.isEmpty else { return }
+        guard columnsForMutation.contains(where: \.isPrimaryKey) else {
+            errorMessage = RowIdentityError.noPrimaryKey.localizedDescription
+            errorIsQueryFailure = false
+            return
+        }
+        pendingRecordMutation = .delete(rowIndices: rowIndices)
+    }
+
+    private func requestDeleteRow(_ rowIndex: Int) {
+        guard let result, result.rows.indices.contains(rowIndex) else { return }
+        selectedRowIndices = [rowIndex]
+        rowSelectionAnchor = rowIndex
+        selectedRowIndex = rowIndex
+        selectionAnchor = nil
+        selectionEnd = nil
+        requestDeleteSelectedRows()
+    }
+
+    /// Deletion, built on the update paths rather than beside them: the same optimistic row
+    /// identity (`RowMutationSQL.identityPredicate`), the same exactly-one-affected-row guard, the
+    /// same transaction and the same audit record. A row edited by someone else since this page
+    /// loaded matches no predicate, reports 0 affected rows and rolls the whole batch back.
+    private func deleteRows(_ rowIndices: [Int]) async {
+        guard let result, let connection = session?.connection else { return }
+        let columns = columnsForMutation
+        let targets = rowIndices.filter { result.rows.indices.contains($0) }
+        guard !targets.isEmpty else { return }
+
+        var transactionStarted = false
+        var commitAttempted = false
+        var deletedRows: UInt64 = 0
+        /// The shape of the last predicate built, for the audit. Values are never recorded.
+        var predicateShape: String?
+        isLoading = true
+        errorMessage = nil
+        errorIsQueryFailure = false
+        do {
+            try await connection.beginTransaction()
+            transactionStarted = true
+            for rowIndex in targets {
+                let statement = try RowMutationSQL.delete(
+                    database: database,
+                    table: table,
+                    columns: columns,
+                    row: result.rows[rowIndex],
+                    identifierQuote: connection.identifierQuoteCharacter,
+                    dialect: connection.dialect
+                )
+                predicateShape = statement.predicate.auditShape
+                let deleteResult = try await connection.execute(
+                    statement.sql,
+                    parameters: statement.predicate.parameters
+                )
+                if let serverError = deleteResult.error { throw MutationExecutionError.server(serverError) }
+                guard deleteResult.affectedRows == 1 else {
+                    throw MutationExecutionError.affectedRows(expected: 1, actual: deleteResult.affectedRows)
+                }
+                deletedRows += 1
+            }
+            commitAttempted = true
+            try await connection.commitTransaction()
+            transactionStarted = false
+            recordDeleteAudit(outcome: .committed, affectedRows: deletedRows, predicate: predicateShape)
+            sessionManager.invalidateTableStatistics(sessionID: sessionID, database: database)
+            clearGridSelection()
+            selectedRowIndex = nil
+            showEditor = false
+            totalRowCount = nil
+            await loadData()
+        } catch {
+            let outcome: MutationOutcome
+            if commitAttempted {
+                outcome = .serverStateUnknown
+            } else if transactionStarted {
+                outcome = await rollback(connection) ? .rolledBack : .serverStateUnknown
+            } else {
+                outcome = .notStarted
+            }
+            if outcome == .serverStateUnknown {
+                sessionManager.invalidateTableStatistics(sessionID: sessionID, database: database)
+            }
+            recordDeleteAudit(outcome: outcome, affectedRows: deletedRows, predicate: predicateShape)
+            errorMessage = "Delete failed after \(deletedRows) row(s) (\(outcomeDescription(outcome))): \(error.localizedDescription)"
+            errorIsQueryFailure = false
+            isLoading = false
+        }
+    }
+
+    private func recordDeleteAudit(outcome: MutationOutcome, affectedRows: UInt64,
+                                   predicate: String?) {
+        MutationAuditStore.append(MutationAuditRecord(
+            connectionID: session?.connectionConfig.id ?? sessionID,
+            database: database,
+            object: table,
+            normalizedOperation: "delete",
+            source: "grid-delete",
+            outcome: outcome,
+            affectedRows: affectedRows,
+            predicate: predicate
+        ))
     }
 
     // MARK: - Insert Row
@@ -5644,6 +6056,20 @@ struct ForeignKeysTabView: View {
                                     .foregroundStyle(.secondary)
                                 }
                                 Spacer()
+                                Button {
+                                    NotificationCenter.default.post(
+                                        name: .glassdbOpenTable,
+                                        object: OpenTableRequest(sessionID: sessionID,
+                                                                 database: database,
+                                                                 table: key.referencedTable)
+                                    )
+                                } label: {
+                                    Image(systemName: "arrow.up.forward.square")
+                                }
+                                .buttonStyle(.borderless)
+                                .disabled(key.referencedTable.isEmpty)
+                                .help("Open \(key.referencedTable)")
+                                .accessibilityLabel("Open \(key.referencedTable)")
                                 if canAlterForeignKeys {
                                     Button(role: .destructive) { prepareDrop(key) } label: {
                                         Image(systemName: "trash")

@@ -11,6 +11,7 @@
 import SwiftUI
 import GlassConnectionKit
 import GlassShell
+import GlassLayers
 
 /// Toolbar entries for the shell's library toolbar.
 public struct GlassTerminalLibraryToolbar: View {

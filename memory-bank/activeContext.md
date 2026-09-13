@@ -757,6 +757,31 @@ not evidence that the host itself carries the tag, and the two are easy to confl
 *Not established:* why the sidebar row is absent. **No mechanism is offered here deliberately**
 (rule 19); it needs a run with element inspection, which is its own task.
 
+### Stage 3 remaining work: R1–R8 closed, 2026-09-12
+
+Three workers in parallel plus the coordinator. Package **711 tests / 61 suites, no known issues**
+— D13's `withKnownIssue` is gone because the defect is fixed, not suppressed. Nothing committed.
+
+| | Outcome |
+|---|---|
+| **R1** SQL draft loss | [note](tasks/2026-09/2026-09-12_sql-drafts.md). Query history's *shape* reused, its *medium* rejected — history is capped at 500 because `UserDefaults` is materialised at launch, and a draft is unbounded. Found and fixed a **second instance**: `tableSQLDrafts` |
+| **R2** Row deletion | [note](tasks/2026-09/2026-09-12_rows-and-audit.md). Predicate extracted so deletion is a third caller, not a fourth copy. **A row edited underneath the user reports 0 against both real servers** |
+| **R3** FK navigation | Composite keys **fail closed** on a repeated ordinal. Live fixture holds both `(1,2)` and `(2,1)` so a transposed pairing cannot pass for the wrong reason |
+| **R4** Mutation audit | Viewer plus a `predicate` field storing the **shape only** — never the parameters, which are a verbatim copy of the user's row |
+| **R5** Settings | Appearance folded onto the one `GlassLayerStore`; persistence deleted, not added |
+| **R6** Command palette | **One implementation pasted twice**, not two implementations. 650 lines deleted |
+| **R7** D13 | [note](tasks/2026-09/2026-09-12_certificate-trust.md). CA-only as a *named, chosen* mode with no automatic downgrade; the connection detail now says what TLS verifies |
+| **R8** Smaller items | PG arrays, dead fields, `ConnectionFormView` (~1,295 lines) gone. `text`/`blob` **open at six of eight** |
+
+**The correction worth carrying:** an engine-level test proved the *engine* could do VERIFY_CA — it
+could not prove a saved record reaches it. Until `transportPlan` mapped the mode, every piece
+existed and nothing joined them, and only a **capability-level** test distinguishes those two
+states. "It works" and "the parts that would make it work all exist" look identical from below.
+
+**Still owed, and it is not code:** driving deletion and a foreign-key follow through the running
+app; the D14 fingerprint prompt; whether SQL-draft restore fires at all; iOS and visionOS, which
+remain compile-verified only. No test opens a window anywhere in this stage.
+
 ### D8 — "This Mac" is built, 2026-09-12
 
 [The local-host note](tasks/2026-09/2026-09-12_stage-3-local-host.md). The device is a real host:
@@ -824,3 +849,170 @@ surface), the D9 gap closures, W-settings, the security review, and integration.
 Stage 2 close-out still open: widget on a device, live iCloud sync, the visionOS real-host UI test
 blocked by XCUITest's scene-ID fault, and the three sibling call sites broken by the kit's dropped
 `lastConnected`.
+
+### The device pass, and two things found while preparing it — 2026-09-12 (night)
+
+Stage 3's R1–R8 are closed; what remained was described as "not code, a device pass". Preparing
+that pass produced code anyway, which is the finding worth keeping: **the act of trying to test a
+thing surfaced defects that reading it never did**, for the third time this stage.
+
+#### D14: the fingerprint was spelled in a way nothing else spells it
+
+`SSHHostTrustEvaluator` returned bare **padded** base64. Every other SSH tool — `ssh-keygen -lf`,
+OpenSSH's own first-connect prompt — prints `SHA256:` followed by **unpadded** base64.
+
+| Source | String |
+|---|---|
+| `ssh-keygen -lf` | `SHA256:O/zNAQP8+gbY+no+sgjwkOLRBlT2Q2MVq6Ltk6KnRqg` |
+| Glass Power Tools, until now | `O/zNAQP8+gbY+no+sgjwkOLRBlT2Q2MVq6Ltk6KnRqg=` |
+
+Same 32 bytes — the VM's ed25519 blob was decoded and both digests computed to confirm it. **The
+bytes were never wrong; the string was.** D14 exists so a *person* can compare what the app shows
+against what the server tells them, and they were being asked to compare two differently-spelled
+renderings of the same hash.
+
+**Why no test could have caught it.** The trust decision is made on the key blob
+(`SSHHostTrust.swift:182`), never on the fingerprint text, so nothing rejected a connection and
+nothing misbehaved. The only symptom was a human squinting. It survived two days of successful
+connections.
+
+**Why the fix was small rather than a migration**, all three established before changing anything:
+- `PinnedSSHHostKey.sha256Fingerprint(for:)` in GlasSecretStore **already** produced the canonical
+  form for the Keychain record. The fix delegates to it, so the fingerprint shown and the
+  fingerprint stored are now one line of code instead of two opinions.
+- `KeychainManager.validatedHostKeyData:586` already accepted **all three** historical spellings
+  (canonical, bare unpadded, bare padded). Someone knew these had diverged and made the *validator*
+  tolerant without fixing the *display*. Records written before the change still verify.
+- `TrustedHostKeyEntry` is decode-only, a legacy migration source read into the Keychain.
+
+The label changed too: `Fingerprint (SHA-256): SHA256:…` says it twice. Now `Fingerprint: SHA256:…`,
+matching `ssh`. Three call sites (`TerminalConnectFlow.swift:608,610`, `TerminalWindowView.swift:422`).
+
+**The old test was pinning the defect.** `#expect(...sha256Base64(of: blob).count == 44)` — 44
+characters *is* the padded form. Replaced with a known-answer test whose expectation came from
+`ssh-keygen` on a throwaway key (private half destroyed, public blob only), so the assertion is not
+the implementation agreeing with itself.
+
+#### SQLHighlighter had no tests at all, and was correct anyway
+
+Asked whether glassdb's test files were useful, a worker found our suite is **not** a subset of
+theirs — we cover TLS modes, FK navigation, the audit store, live integration, none of which they
+tested. But **whole modules moved across verbatim and arrived with no tests**, and glassdb's file
+is the only record of what they guarded.
+
+The load-bearing one: `SQLHighlighter` had **zero test references** anywhere in `Tests/` or
+`UITests/`. `ReadOnlyDatabaseConnection.checkReadOnly:52` — D15's whole gate — is one line
+delegating to `safetyClassification`. `ReadOnlyServiceTests` proved the *wrapper* against seven
+unambiguous statements (`DELETE FROM members`, `DROP TABLE teams`), which is exactly the set that
+survives any plausible regression. **The wrapper was tested; the classifier it trusts was not.**
+
+`Tests/GlassDatabaseTests/SQLSafetyClassificationTests.swift` now covers it — 10 tests, all passing.
+**No defect was found: the classifier is correct.** What was missing was anything guarding that it
+stays correct. A tokenizer change that stopped recognising a string literal or a `/* */` comment
+would silently reclassify, and a read-only production service would begin passing writes with
+nothing failing.
+
+The suite asserts the security property *directly* — `writeNeverClassifiesAsPermitted` runs 25
+statements that mutate a real server and asserts none is permitted, rather than trusting the
+case-by-case expectations to stay exhaustive. **The asymmetry is deliberate and written down:** a
+read wrongly refused is an inconvenience seen immediately; a write wrongly permitted is silent,
+reaches a production server, and is found afterwards or never.
+
+Also reported with no coverage and still open: `Sources/GlassDatabase/KeychainManager.swift` (773
+lines, live on every database service, including a credential-rollback path that fails silently)
+and the `TableSchemaSQL` DDL builder (`TableDetailView.swift:4613`), whose `validatedType:4940` is
+the guard stopping a column *type* string from carrying executable SQL into `ALTER TABLE`.
+
+#### Why no test opened a window on the Database capability
+
+Not an oversight in this port: **glassdb has no UI tests either** — one 194 KB unit file, no
+XCUITest target, nothing outside vendored packages. The capability inherited the absence. The
+workspace also carried accessibility *labels* but almost no *identifiers* (19 in the module, 16 of
+them in the setup form), so it could not be driven even if someone had tried.
+
+#### The `text`/`blob` item was mislabelled — filters never size-checked at all
+
+The carried-forward item read: *"`text`/`blob` limits at six of eight MySQL families (bare
+`text`/`blob` need the dialect at `GridColumnFilter`, deliberately left unconstrained)"*. That
+described a narrower problem than the one that was there.
+
+Threading a dialect into `GridColumnFilter.boundValue()` turned out to be **inert**:
+`StagedEdit.boundValue()` is type *conversion* only (`RecordEditorView.swift:219`) and never
+consults `ColumnTypeConstraint`. The size check lives in `StagedEdit.validationError:196`.
+`GridColumnFilter.validationError` was a **second, weaker implementation** that called `boundValue()`
+and stopped — so a grid filter ran **no size check at all**, on any type, on any engine.
+`varchar(4)` accepted `"12345"` and returned an empty page with no explanation.
+`ColumnTypeConstraint` was written to serve the record editor *and* the grid; only one was calling it.
+
+**How it was caught, and this is the transferable part.** The first version of the new test
+asserted only the dialect-dependent cases — bare `text` on MySQL versus PostgreSQL — and would have
+passed for the wrong reason had the plumbing worked. Adding `varchar(4)`, which needs **no** dialect
+and should have worked since the day size checking was written, is what exposed it. **A test aimed
+only at the part you suspect will agree with you.** Same shape as R7's correction, arriving in a new
+disguise.
+
+**The fix, and the judgement in it.** `GridColumnFilter.validationError(dialect:)` now consults the
+constraint — but **for `.equals` only**, and that limit is deliberate rather than an oversight:
+
+| Operator | Out-of-range value | Decision |
+|---|---|---|
+| `=` | cannot match any stored row — the query provably returns nothing | **reported** |
+| `<>` | matches *every* row | allowed |
+| `<` / `>` | an ordinary way to express "all of them" | allowed |
+
+A filter is a read, not a write, so the question is not "will the server store this?" but "can any
+stored row match it?". Blocking the other three would refuse correct queries to enforce a rule that
+does not apply to them. `onlyEqualityIsSizeChecked` exists to stop someone tidying that condition away.
+
+The dialect is a **parameter, not a stored property**: a saved filter outlives its session and the
+engine belongs to the connection, so storing it would persist a fact that can change — and it is why
+`GridColumnFilter` stays `Codable` with no migration. Threaded at five call sites
+(`TableDetailView.swift` filter validation, staged filters, display-filter evaluation, the server
+query builder, and `ForeignKeyNavigation.filters`).
+
+**A second defect, found by the suite and not by the compiler.** Changing `validationError` from a
+property to a method left `ForeignKeyNavigationTests.swift:105` reading
+`filters[0].validationError == nil`. That still **compiles**: the unparenthesised reference is a
+*function value*, which `== nil` promotes to `Optional` and answers `false` for — a comparison that
+can never hold and never warns. Worth knowing as a class: a property-to-method change does not
+reliably break its call sites in Swift when they are compared against nil.
+
+**Package: 729 tests / 63 suites, all passing.**
+
+#### D15 hardened: the read-only gate now splits scripts
+
+**Stated precisely, because the distinction matters: this was not a reachable vulnerability.**
+
+`SQLHighlighter.safetyClassification` classifies **one** statement, from its leading keyword. Given
+a script it answers for the first statement only, so `SELECT 1; DELETE FROM members` returns
+`.readOnly` — the `DELETE` is past the point it looks at. That is correct behaviour for a function
+documented to classify a statement, and it was measured, not assumed.
+
+`ReadOnlyDatabaseConnection.checkReadOnly` passed the whole query string to it. **No caller sends a
+multi-statement string**: both execution paths (`QueryEditorView.execute:951` and
+`TableDetailView.execute:4039`) split with `statementsToExecute` and run `statement.text` one at a
+time, which was verified before drawing any conclusion. So nothing was ever exposed.
+
+**Why it was changed anyway.** The guarantee rested entirely on every caller splitting first, and
+the file's own header argues against precisely that: *"Wrapping the connection is the only placement
+where 'read-only' is a property of the session and not a property of how carefully the next surface
+was written."* Trusting callers to have split puts the guarantee back in the caller's hands. A
+"run script" command — the natural next feature for a SQL editor, and the obvious way to add one is
+to pass the editor's text straight through — would have opened every write in the script at once,
+silently, with nothing failing.
+
+The gate now classifies **every** statement and refuses if any is not permitted. An empty or
+unparseable string yields no statements, so the whole string is classified instead and returns
+`.unknown`, which is refused — never permit by default.
+
+Four tests pin it, including the two that stop it being over-tightened: a script of pure reads must
+still pass, and a semicolon **inside a string literal** must not split a statement, or the hardening
+becomes a way to refuse good reads.
+
+**How it was found.** Not by reading the gate. A worker comparing our tests against glassdb's
+mentioned the statement splitter in passing; the question "what does the classifier do with two
+statements?" took one probe to answer. The same shape as the rest of this session — the defect, or
+here the latent fragility, sat behind a question nobody had asked out loud.
+
+**Package: 733 tests / 63 suites, all passing** — the seven existing `ReadOnlyServiceTests` included,
+so the hardening did not change what the gate already refused.

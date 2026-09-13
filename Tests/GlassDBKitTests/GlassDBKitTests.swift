@@ -5,6 +5,7 @@
 
 import Foundation
 import MySQLNIO
+import NIOSSL
 import Testing
 @testable import GlassDBKit
 
@@ -117,6 +118,85 @@ import Testing
         #expect(DatabaseTLSPolicy.requiredSystemTrust.isRequired)
         #expect(DatabaseTLSPolicy.requiredSystemTrustForHost("db.example.com").isRequired)
         #expect(DatabaseTLSPolicy.requiredCertificates([], serverName: nil).isRequired)
+        // The CA-only mode is still a required mode: it never falls back to plaintext.
+        #expect(DatabaseTLSPolicy.requiredCertificatesWithoutHostnameVerification([]).isRequired)
+    }
+
+    /// The CA-only mode's whole reason to exist is that it verifies *less* than the mode beside
+    /// it, so the difference has to be stated somewhere a UI can read and a reviewer can check.
+    @Test func onlyTheCAOnlyModeDeclinesToVerifyServerIdentity() {
+        #expect(!DatabaseTLSPolicy.disabled.verifiesServerIdentity)
+        #expect(DatabaseTLSPolicy.requiredSystemTrust.verifiesServerIdentity)
+        #expect(DatabaseTLSPolicy.requiredSystemTrustForHost("db.example.com").verifiesServerIdentity)
+        #expect(DatabaseTLSPolicy.requiredCertificates([], serverName: nil).verifiesServerIdentity)
+        #expect(!DatabaseTLSPolicy.requiredCertificatesWithoutHostnameVerification([]).verifiesServerIdentity)
+    }
+
+    /// `serverName: nil` on `.requiredCertificates` means "match the host I am connecting to" and
+    /// must keep meaning that. Turning it into "match nothing" would have been the cheap way to
+    /// add VERIFY_CA and would have silently downgraded every existing call site.
+    @Test func nilServerNameStillMeansMatchTheConnectionHost() throws {
+        let certificate = DatabaseTLSCertificate(bytes: Data(unrelatedCertificateAuthorityPEM.utf8), format: .pem)
+
+        let (pinned, pinnedName) = try DatabaseTLSPolicy
+            .requiredCertificates([certificate], serverName: nil)
+            .makeTLSConfiguration(connectionHost: "db.example.com")
+        #expect(pinnedName == "db.example.com")
+        #expect(pinned?.certificateVerification == .fullVerification)
+
+        let (caOnly, caOnlyName) = try DatabaseTLSPolicy
+            .requiredCertificatesWithoutHostnameVerification([certificate])
+            .makeTLSConfiguration(connectionHost: "db.example.com")
+        // No name is matched, so no name is sent: a hostname here would set SNI while the
+        // configuration claims to check no name.
+        #expect(caOnlyName == nil)
+        #expect(caOnly?.certificateVerification == .noHostnameVerification)
+        #expect(caOnly?.minimumTLSVersion == .tlsv12)
+    }
+
+    /// Rule 18: the mode that skips the hostname check must not also skip the chain check. A
+    /// policy with no usable trust root has to fail while it is still a configuration error.
+    @Test func caOnlyModeRejectsMissingAndMalformedTrustRootsBeforeNetworkUse() async {
+        let policies: [DatabaseTLSPolicy] = [
+            .requiredCertificatesWithoutHostnameVerification([]),
+            .requiredCertificatesWithoutHostnameVerification([
+                .init(bytes: Data("not a certificate".utf8), format: .pem)
+            ]),
+            .requiredCertificatesWithoutHostnameVerification([
+                .init(bytes: Data([0, 1, 2, 3]), format: .der)
+            ]),
+        ]
+        for policy in policies {
+            #expect(throws: DatabaseError.self) {
+                _ = try policy.makeTLSConfiguration(connectionHost: "db.example.com")
+            }
+            await #expect(throws: DatabaseError.self) {
+                _ = try await MySQLEngine().connect(
+                    host: "127.0.0.1", port: 1, username: "user", password: "password",
+                    database: nil, tlsPolicy: policy
+                )
+            }
+            await #expect(throws: DatabaseError.self) {
+                _ = try await PostgreSQLEngine().connect(
+                    host: "127.0.0.1", port: 1, username: "user", password: "password",
+                    database: nil, tlsPolicy: policy
+                )
+            }
+        }
+    }
+
+    /// SQLite is a local file and has no transport to secure. The new case must be refused there
+    /// like every other required policy, not silently accepted because the switch grew a case.
+    @Test func sqliteRefusesTheCAOnlyModeLikeEveryOtherRequiredPolicy() async {
+        await #expect(throws: DatabaseError.self) {
+            _ = try await SQLiteEngine().connect(
+                host: "/tmp/does-not-matter.sqlite", port: 0, username: "", password: "",
+                database: nil,
+                tlsPolicy: .requiredCertificatesWithoutHostnameVerification([
+                    .init(bytes: Data(unrelatedCertificateAuthorityPEM.utf8), format: .pem)
+                ])
+            )
+        }
     }
 
     @Test func mysqlTLSGreetingPreflightFailsClosed() {
@@ -473,6 +553,33 @@ import Testing
 
 /// Live-engine settings, supplied by the environment so the suite can aim at the project's test VM
 /// (see the Stage 3 VM note) rather than a hardcoded localhost port. Absent password disables the test.
+/// A self-signed CA that signed nothing. Used to prove that the CA-only mode still verifies the
+/// chain: pointed at a real server it must fail, exactly as the server's own CA must succeed.
+/// Generated with `openssl req -x509 -newkey rsa:2048 -nodes -days 7300`; the private key was
+/// discarded and never existed in this repository. Carries no secret.
+private let unrelatedCertificateAuthorityPEM = """
+-----BEGIN CERTIFICATE-----
+MIIDVzCCAj+gAwIBAgIUV3wDIwbSRLq92vNQjAI7pW2jApswDQYJKoZIhvcNAQEL
+BQAwOzE5MDcGA1UEAwwwR2xhc3MgUG93ZXIgVG9vbHMgVGVzdCBDQSAobm90IGEg
+cmVhbCBhdXRob3JpdHkpMB4XDTI2MDkxMjE5MzE1NVoXDTQ2MDkwNzE5MzE1NVow
+OzE5MDcGA1UEAwwwR2xhc3MgUG93ZXIgVG9vbHMgVGVzdCBDQSAobm90IGEgcmVh
+bCBhdXRob3JpdHkpMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqAqJ
+8fpDJY5Rn2EHZlqyHmK/7m3dbM3jtBEVq06n/zkvzMa44+wF4qsGvl94vHwO9qV6
+kJdNUIH4+QQtsfpoln6ULCJ0KGeIpG8ALQp6vIEOAmLy2HRNkZG/AEDYZ2hxaoBo
+GMnREfEeMoUotPpE+tgDWE28/K3kta9wIEQCZAITL6FCupI1fogvBZhEJLWF40p3
+KbuWQENBS4X1B+ZknIFAem7t6SFHKCQfBroObfhJfBYSVb2c1KfUkbiqlwikvKK8
+2ERqmhaSYT283kaRYCMN3oBroahgkMIVEYG8dyuXXFMzGVuiT7ioWtwCcHRPC0eq
+abPnNA/GnX/m9Q4l3QIDAQABo1MwUTAdBgNVHQ4EFgQUJfKynwiJ4zo0PUrtXF4P
+DCC1E4EwHwYDVR0jBBgwFoAUJfKynwiJ4zo0PUrtXF4PDCC1E4EwDwYDVR0TAQH/
+BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEAXfdyHs0O/RcjXNf7HUFbgKEm1fQ2
+EZ2iNjJsm8lPZl1Q+V/WSP3c/oDK/X1JdEO+nWP2JAAAfqEXn/jd9pVqIaqTRNhn
+Mbn8jJNL8yhNYtTBuuzaEKqRl5uAWmuKaDiK59TM3FPtpWAuivzd9JYTUxXyit0m
+8MTDkQFE/aCtjJyUFQMuw3i1N54vwfjmUY013EW0SUpd66pztIqeKffXkM+ztNkw
+CAYTtMs2R+RUqIzOL/kK6V6Gltv5esnXLyhD7huTs/7TrgCyJAv2UnjL5RsQw4vl
+DshIAueLo5G03I6meg5BZwifBCfJTQzcITj7WsfYg6s35c8puZ8uFpDIPw==
+-----END CERTIFICATE-----
+"""
+
 private enum LiveDatabaseEnvironment {
     static func value(_ name: String) -> String? {
         ProcessInfo.processInfo.environment[name].flatMap { $0.isEmpty ? nil : $0 }
@@ -618,33 +725,65 @@ private enum LiveDatabaseEnvironment {
         }
 
         // The pinned-CA path, which is what a user with a self-signed server actually uses.
+        // D13 was recorded here with `withKnownIssue`; the wrapper is gone because the defect is.
         //
-        // Known to fail today (D13). A stock MySQL 8.4 certificate has no subjectAltName and a CN
-        // that is not a DNS name, so `serverName:` can be neither the address (no SAN to match)
-        // nor the CN (NIOSSL rejects a non-DNS string outright, before contacting the server).
-        // `.requiredCertificates` hardcodes `.fullVerification`, so MySQL's own VERIFY_CA —
-        // authenticate the chain, do not match a name — cannot be expressed at all.
-        //
-        // Recorded as a known issue rather than deleted or asserted-as-correct: the defect stays
-        // visible in the suite, and when the policy gains that mode Swift Testing will report the
-        // known issue as unrecorded and send someone back here to delete this wrapper.
+        // Two assertions, and the pair is the point. A stock MySQL 8.4 certificate has no
+        // subjectAltName and a CN that is not a DNS name, so every name-matching mode must still
+        // fail — including with the CN itself, which NIOSSL rejects as a string before contacting
+        // the server. Only the CA-only mode connects. If the first assertion ever stops throwing,
+        // the second one is no longer evidence of anything.
         if let caPath = LiveDatabaseEnvironment.mysqlCAPath,
            let serverName = LiveDatabaseEnvironment.mysqlTLSServerName {
             let ca = try Data(contentsOf: URL(fileURLWithPath: caPath))
-            await withKnownIssue("D13: DatabaseTLSPolicy cannot express MySQL's VERIFY_CA") {
+
+            await #expect(throws: Error.self, "A CN that is not a DNS name cannot be matched") {
+                let tlsConnection = try await engine.connect(
+                    host: LiveDatabaseEnvironment.host,
+                    port: LiveDatabaseEnvironment.mysqlPort,
+                    username: LiveDatabaseEnvironment.mysqlUser,
+                    password: password,
+                    database: LiveDatabaseEnvironment.mysqlScratchDatabase,
+                    tlsPolicy: .requiredCertificates(
+                        [DatabaseTLSCertificate(bytes: ca, format: .pem)],
+                        serverName: serverName
+                    )
+                )
+                try await tlsConnection.close()
+            }
+
             let tlsConnection = try await engine.connect(
                 host: LiveDatabaseEnvironment.host,
                 port: LiveDatabaseEnvironment.mysqlPort,
                 username: LiveDatabaseEnvironment.mysqlUser,
                 password: password,
                 database: LiveDatabaseEnvironment.mysqlScratchDatabase,
-                tlsPolicy: .requiredCertificates(
-                    [DatabaseTLSCertificate(bytes: ca, format: .pem)],
-                    serverName: serverName
+                tlsPolicy: .requiredCertificatesWithoutHostnameVerification(
+                    [DatabaseTLSCertificate(bytes: ca, format: .pem)]
                 )
             )
             #expect(await tlsConnection.isConnected)
+            // Not merely connected: the session is usable and really is over TLS, which the
+            // server reports for its own connection rather than the client asserting it.
+            let cipher = try await tlsConnection.execute("SHOW SESSION STATUS LIKE 'Ssl_cipher'", parameters: [])
+            #expect(cipher.rows.first?[1] != .string(""))
+            #expect(cipher.rows.first?[1] != .null)
             try await tlsConnection.close()
+
+            // The chain is genuinely checked: a syntactically valid CA that did not sign this
+            // server must be refused by the same mode. Without this, "CA-only" and "no
+            // verification at all" would look identical from the outside.
+            await #expect(throws: Error.self, "An unrelated CA must not validate this server") {
+                let unrelated = try await engine.connect(
+                    host: LiveDatabaseEnvironment.host,
+                    port: LiveDatabaseEnvironment.mysqlPort,
+                    username: LiveDatabaseEnvironment.mysqlUser,
+                    password: password,
+                    database: LiveDatabaseEnvironment.mysqlScratchDatabase,
+                    tlsPolicy: .requiredCertificatesWithoutHostnameVerification(
+                        [DatabaseTLSCertificate(bytes: Data(unrelatedCertificateAuthorityPEM.utf8), format: .pem)]
+                    )
+                )
+                try await unrelated.close()
             }
         }
     }

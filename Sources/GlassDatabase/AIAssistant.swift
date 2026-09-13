@@ -115,12 +115,30 @@ struct SchemaContext: Sendable {
     }
 
     private func promptLiteral(_ value: String) -> String {
-        let escaped = value
+        // Quote and backslash first — this one is embedded as a literal — then the region
+        // delimiters, shared with the free-text regions so both cannot drift apart.
+        let quoted = value
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
+        return "\"\(UntrustedPromptRegion.escapingDelimiters(quoted))\""
+    }
+}
+
+/// Neutralises the two characters that can forge a region delimiter inside a prompt.
+///
+/// Every untrusted value in this file is fenced between `<UNTRUSTED_…>` tags, and a fence is only
+/// a fence if the content cannot close it. `SchemaContext.promptLiteral` has always escaped these;
+/// the free-text regions that carry the user's query and the **server's error message** did not,
+/// and a server error routinely echoes identifiers and row data back verbatim. A value containing
+/// `</UNTRUSTED_DATABASE_ERROR>` ended its own region, after which the rest was read as prompt.
+///
+/// Escaped rather than stripped, so the model still sees what the server actually said — a SQL
+/// error about a `<` comparison stays legible, it just cannot form a tag.
+enum UntrustedPromptRegion {
+    static func escapingDelimiters(_ value: String) -> String {
+        value
             .replacingOccurrences(of: "<", with: "\\u003C")
             .replacingOccurrences(of: ">", with: "\\u003E")
-        return "\"\(escaped)\""
     }
 }
 
@@ -311,10 +329,10 @@ final class AIAssistant {
 
             let userPrompt = """
             <UNTRUSTED_QUERY>
-            \(query)
+            \(UntrustedPromptRegion.escapingDelimiters(query))
             </UNTRUSTED_QUERY>
             <UNTRUSTED_DATABASE_ERROR>
-            \(error)
+            \(UntrustedPromptRegion.escapingDelimiters(error))
             </UNTRUSTED_DATABASE_ERROR>
             """
             let response = try await session.respond(to: userPrompt)

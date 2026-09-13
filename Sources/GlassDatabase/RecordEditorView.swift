@@ -127,6 +127,14 @@ struct StagedEdit: Identifiable {
     let columnIndex: Int
     let columnName: String
     let columnType: String
+    /// The engine whose spelling `columnType` is in, when it is known.
+    ///
+    /// Only the size rules need it, and only for the two type names the engines disagree about:
+    /// MySQL's bare `text` and `blob` cap at 65,535 **bytes**, while the same names mean roughly a
+    /// gigabyte on PostgreSQL and SQLite. `ColumnTypeConstraint.parse` therefore leaves those two
+    /// unconstrained when this is `nil`, which is the safe direction — a missing limit only fails
+    /// to warn, whereas a borrowed one would refuse values that store perfectly well.
+    var dialect: DatabaseDialect?
     let isPrimaryKey: Bool
     let isNullable: Bool
     let isUnsigned: Bool
@@ -164,7 +172,7 @@ struct StagedEdit: Identifiable {
 
     /// What the column's declared type permits — `varchar(40)`, `decimal(10,2)`, `tinyint`.
     var constraint: ColumnTypeConstraint? {
-        ColumnTypeConstraint.parse(columnType, isUnsigned: isUnsigned)
+        ColumnTypeConstraint.parse(columnType, isUnsigned: isUnsigned, dialect: dialect)
     }
 
     /// How full the field is, for the live counter. Nil when the type has no size to show.
@@ -188,12 +196,14 @@ struct StagedEdit: Identifiable {
         return constraint?.overflowMessage(for: editText, column: columnName)
     }
 
-    static func initialValue(for column: ColumnInfo, columnIndex: Int) -> StagedEdit {
+    static func initialValue(for column: ColumnInfo, columnIndex: Int,
+                             dialect: DatabaseDialect? = nil) -> StagedEdit {
         let usesDefault = column.isGenerated || column.defaultValue != nil
         return StagedEdit(
             columnIndex: columnIndex,
             columnName: column.name,
             columnType: column.type,
+            dialect: dialect,
             isPrimaryKey: column.isPrimaryKey,
             isNullable: column.isNullable,
             isUnsigned: column.isUnsigned,
@@ -322,6 +332,8 @@ struct RecordEditorView: View {
 
     let columns: [ColumnInfo]
     let mode: RecordEditorMode
+    /// The connected engine, so size rules can tell MySQL's 64 KiB `text` from PostgreSQL's.
+    var dialect: DatabaseDialect?
     let onSave: ([StagedEdit], RecordEditorMode) -> Void
     let onDiscard: () -> Void
 
@@ -375,7 +387,8 @@ struct RecordEditorView: View {
         case .add:
             return edits.enumerated().contains { index, edit in
                 guard columns.indices.contains(index) else { return true }
-                let initial = StagedEdit.initialValue(for: columns[index], columnIndex: index)
+                let initial = StagedEdit.initialValue(for: columns[index], columnIndex: index,
+                                                      dialect: dialect)
                 return edit.editText != initial.editText
                     || edit.isNull != initial.isNull
                     || edit.useDefault != initial.useDefault
@@ -392,6 +405,7 @@ struct RecordEditorView: View {
                         Button("Cancel") { requestDiscard() }
                             .keyboardShortcut(.cancelAction)
                             .help("Discard changes and close the record editor")
+                            .accessibilityIdentifier("record-editor-cancel")
                     }
                     ToolbarItem(placement: .confirmationAction) {
                         Button(isAddMode ? "Insert" : "Apply \(changeCount > 0 ? "(\(changeCount))" : "")") {
@@ -400,6 +414,7 @@ struct RecordEditorView: View {
                         .keyboardShortcut(.defaultAction)
                         .disabled(!canSubmit)
                         .help(isAddMode ? "Stage this row for insertion" : "Stage the modified fields for update")
+                        .accessibilityIdentifier("record-editor-save")
                     }
                 }
         }
@@ -503,6 +518,7 @@ struct RecordEditorView: View {
                     .font(.caption)
                     .foregroundStyle(.red)
                     .accessibilityLabel("Invalid value for \(edit.columnName): \(validationError)")
+                    .accessibilityIdentifier("record-editor-error-\(edit.columnName)")
             }
         } header: {
             HStack(spacing: 6) {
@@ -561,6 +577,7 @@ struct RecordEditorView: View {
                         .monospacedDigit()
                         .foregroundStyle(usage.used > usage.limit ? .red : .orange)
                         .accessibilityLabel("\(usage.used) of \(usage.limit) used in \(edit.columnName)")
+                        .accessibilityIdentifier("record-editor-counter-\(edit.columnName)")
                 }
                 if edit.isModified {
                     Text("Modified")
@@ -588,6 +605,7 @@ struct RecordEditorView: View {
         .databaseNoAutocapitalization()
         .databaseASCIICapableKeyboard()
         .accessibilityLabel("\(edit.columnName), \(edit.columnType)")
+        .accessibilityIdentifier("record-editor-field-\(edit.columnName)")
         .help("Enter a \(edit.columnType) value for \(edit.columnName)")
     }
 
@@ -609,6 +627,7 @@ struct RecordEditorView: View {
         .databaseNoAutocapitalization()
         .databaseASCIICapableKeyboard()
         .accessibilityLabel("\(edit.columnName), \(edit.columnType)")
+        .accessibilityIdentifier("record-editor-field-\(edit.columnName)")
         .help("Enter a \(edit.columnType) value for \(edit.columnName)")
     }
 
@@ -633,6 +652,7 @@ struct RecordEditorView: View {
             .labelsHidden()
             .accessibilityLabel("\(edit.columnName), Boolean value")
             .accessibilityValue(displayValue)
+            .accessibilityIdentifier("record-editor-field-\(edit.columnName)")
             .help("Toggle the Boolean value for \(edit.columnName)")
             Text(displayValue)
                 .monospacedDigit()
@@ -661,6 +681,7 @@ struct RecordEditorView: View {
             .databaseNoAutocapitalization()
             .databaseASCIICapableKeyboard()
             .accessibilityLabel("\(edit.columnName), JSON")
+            .accessibilityIdentifier("record-editor-field-\(edit.columnName)")
             .help("Enter valid JSON for \(edit.columnName)")
         } else {
             if let model = jsonEditorModels[index] {
@@ -683,6 +704,7 @@ struct RecordEditorView: View {
                         jsonFieldRenderedHeights[index] = height
                     }
                     .accessibilityLabel("\(edit.columnName), JSON")
+                    .accessibilityIdentifier("record-editor-field-\(edit.columnName)")
                     .help("Enter valid JSON for \(edit.columnName)")
                     .onChange(of: model.text) { _, newText in
                         // Route through the shared binding so staging
@@ -729,6 +751,7 @@ struct RecordEditorView: View {
                     .frame(minHeight: 120, maxHeight: 300)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityLabel("\(edit.columnName), JSON")
+                    .accessibilityIdentifier("record-editor-field-\(edit.columnName)")
                     .help("Enter valid JSON for \(edit.columnName)")
             }
 
@@ -794,6 +817,7 @@ struct RecordEditorView: View {
                     columnIndex: colIndex,
                     columnName: col.name,
                     columnType: col.type,
+                    dialect: dialect,
                     isPrimaryKey: col.isPrimaryKey,
                     isNullable: col.isNullable,
                     isUnsigned: col.isUnsigned,
@@ -814,7 +838,7 @@ struct RecordEditorView: View {
             }
         case .add:
             edits = columns.enumerated().map { colIndex, col in
-                StagedEdit.initialValue(for: col, columnIndex: colIndex)
+                StagedEdit.initialValue(for: col, columnIndex: colIndex, dialect: dialect)
             }
         }
         rebuildJSONEditorModels()

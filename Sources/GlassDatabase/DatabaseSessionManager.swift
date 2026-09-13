@@ -25,11 +25,16 @@ class DatabaseSessionManager {
     private var statisticsLoads: [DatabaseStatisticsLoadKey: DatabaseStatisticsLoad] = [:]
     private var aggregateStatisticsLoads: [UUID: AggregateStatisticsLoad] = [:]
 
+    /// Where the driver's socket goes and what the transport verifies. Nothing else: it carried
+    /// `tunnelRemoteHost`/`tunnelRemotePort` until 2026-09-12, written at every return and
+    /// **never read**. They were worse than dead weight — they read as the forward's target and
+    /// are not one. The forward is opened with `openForward("127.0.0.1", config.port)`: loopback
+    /// **as the host's machine sees it**, which is the whole of D7. A later maintainer
+    /// "correcting" the forward to use a remembered remote host would silently break every
+    /// database bound only to the server's own loopback.
     struct TransportPlan: Equatable, Sendable {
         let databaseHost: String
         let databasePort: Int
-        let tunnelRemoteHost: String?
-        let tunnelRemotePort: Int?
         let tlsPolicy: DatabaseTLSPolicy
     }
 
@@ -205,20 +210,42 @@ class DatabaseSessionManager {
             return TransportPlan(
                 databaseHost: config.host,
                 databasePort: 0,
-                tunnelRemoteHost: nil,
-                tunnelRemotePort: nil,
                 tlsPolicy: .disabled
             )
         }
 
-        // Through a tunnel the socket goes to 127.0.0.1, so the certificate must still be
-        // checked against the machine's real name rather than loopback.
-        let tlsPolicy: DatabaseTLSPolicy = if config.useTLS {
-            config.usesHostTunnel
-                ? .requiredSystemTrustForHost(config.host)
-                : .requiredSystemTrust
+        // The one place a saved record becomes a transport-security decision. Keep it that way:
+        // a second place that decides what is verified is the D15 mistake in a new spot.
+        //
+        // Through a tunnel the socket goes to 127.0.0.1, so the certificate is still checked
+        // against the machine's real name rather than loopback — `config.host` in every pinned
+        // case, for the same reason.
+        let tlsPolicy: DatabaseTLSPolicy
+        if config.useTLS {
+            switch config.tlsVerification {
+            case .systemTrust:
+                tlsPolicy = config.usesHostTunnel
+                    ? .requiredSystemTrustForHost(config.host)
+                    : .requiredSystemTrust
+            case .pinnedCertificate:
+                guard let certificate = config.tlsCertificateMaterial else {
+                    throw SessionError.invalidConfiguration(
+                        "\(config.name) is set to verify with a pinned certificate, but no usable certificate is saved. Re-import it, or change the verification mode."
+                    )
+                }
+                tlsPolicy = .requiredCertificates([certificate], serverName: config.host)
+            case .pinnedCertificateAuthorityOnly:
+                guard let certificate = config.tlsCertificateMaterial else {
+                    throw SessionError.invalidConfiguration(
+                        "\(config.name) is set to verify the certificate authority only, but no usable certificate is saved. Re-import it, or change the verification mode."
+                    )
+                }
+                // Chain verified against the supplied roots; no name matched. Reached only because
+                // the user chose it — there is no path here from a failed full verification.
+                tlsPolicy = .requiredCertificatesWithoutHostnameVerification([certificate])
+            }
         } else {
-            .disabled
+            tlsPolicy = .disabled
         }
 
         if config.usesHostTunnel {
@@ -230,8 +257,6 @@ class DatabaseSessionManager {
             return TransportPlan(
                 databaseHost: "127.0.0.1",
                 databasePort: tunnelLocalPort,
-                tunnelRemoteHost: config.host,
-                tunnelRemotePort: config.port,
                 tlsPolicy: tlsPolicy
             )
         }
@@ -239,8 +264,6 @@ class DatabaseSessionManager {
         return TransportPlan(
             databaseHost: config.host,
             databasePort: config.port,
-            tunnelRemoteHost: nil,
-            tunnelRemotePort: nil,
             tlsPolicy: tlsPolicy
         )
     }

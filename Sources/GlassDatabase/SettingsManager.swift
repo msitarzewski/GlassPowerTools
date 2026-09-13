@@ -12,6 +12,7 @@ import Observation
 import GlasSecretStore
 import os
 import GlassConnectionUI
+import GlassLayers
 
 enum QueryFailureNotificationPreference: String, Sendable {
     case undecided
@@ -24,8 +25,19 @@ enum QueryFailureNotificationPreference: String, Sendable {
 class SettingsManager {
     var maxQueryHistoryItems: Int = 500
     var resultRowLimit: Int = 1000
-    var windowOpacity: Double = 0.95
-    var blurBackground: Double = 1.0
+    /// Appearance is the shell's, not this module's. These are computed over the one
+    /// `GlassLayerStore` so a database canvas and a terminal canvas cannot drift apart, exactly as
+    /// `GlassTerminal.SettingsManager` already does (`SettingsManager.swift:169-185`). They used to
+    /// be stored here with their own `UserDefaults` persistence — a second copy of the same state,
+    /// and the reason the Appearance page had nowhere to write when the shell took it over.
+    var windowOpacity: Double {
+        get { layers.state.effectiveOpacity }
+        set { layers.state.opacity = min(max(newValue, 0), 1) }
+    }
+    var blurBackground: Double {
+        get { layers.state.frost }
+        set { layers.state.frost = min(max(newValue, 0), 1) }
+    }
     var showSidebarByDefault: Bool = true
     var editorFontSize: Double = 14.0
     var dataGridFontSize: Double = 13.0
@@ -46,11 +58,17 @@ class SettingsManager {
         queryFailureNotificationPreference == .undecided
     }
 
+    let layers: GlassLayerStore
+
     init(
         loadImmediately: Bool = true,
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = .standard,
+        layers: GlassLayerStore? = nil
     ) {
         self.defaults = defaults
+        // Without an injected store (tests, previews) the layer state lives in the same suite as
+        // the rest of these settings, matching the terminal's arrangement.
+        self.layers = layers ?? GlassLayerStore(defaults: defaults)
         if loadImmediately {
             loadIfNeeded()
         }
@@ -67,21 +85,6 @@ class SettingsManager {
         let savedRowLimit = defaults.integer(forKey: UserDefaultsKeys.resultRowLimit)
         if savedRowLimit > 0 {
             resultRowLimit = savedRowLimit
-        }
-        if defaults.object(forKey: UserDefaultsKeys.windowOpacity) != nil {
-            windowOpacity = min(
-                max(defaults.double(forKey: UserDefaultsKeys.windowOpacity), 0.0),
-                1.0
-            )
-        }
-        if let savedBlur = defaults.object(forKey: UserDefaultsKeys.blurBackground) {
-            // Migrate the original Boolean toggle without collapsing later slider values.
-            if let number = savedBlur as? NSNumber,
-               CFGetTypeID(number) == CFBooleanGetTypeID() {
-                blurBackground = number.boolValue ? 1.0 : 0.0
-            } else if let number = savedBlur as? NSNumber {
-                blurBackground = min(max(number.doubleValue, 0.0), 1.0)
-            }
         }
         if defaults.object(forKey: UserDefaultsKeys.showSidebarByDefault) != nil {
             showSidebarByDefault = defaults.bool(forKey: UserDefaultsKeys.showSidebarByDefault)
@@ -117,12 +120,8 @@ class SettingsManager {
         resultRowLimit = min(max(resultRowLimit, 1), 100_000)
         editorFontSize = min(max(editorFontSize, 10), 32)
         dataGridFontSize = min(max(dataGridFontSize, 10), 32)
-        windowOpacity = min(max(windowOpacity, 0.0), 1.0)
-        blurBackground = min(max(blurBackground, 0.0), 1.0)
         defaults.set(maxQueryHistoryItems, forKey: UserDefaultsKeys.maxQueryHistoryItems)
         defaults.set(resultRowLimit, forKey: UserDefaultsKeys.resultRowLimit)
-        defaults.set(windowOpacity, forKey: UserDefaultsKeys.windowOpacity)
-        defaults.set(blurBackground, forKey: UserDefaultsKeys.blurBackground)
         defaults.set(showSidebarByDefault, forKey: UserDefaultsKeys.showSidebarByDefault)
         defaults.set(editorFontSize, forKey: UserDefaultsKeys.editorFontSize)
         defaults.set(dataGridFontSize, forKey: UserDefaultsKeys.dataGridFontSize)

@@ -34,6 +34,9 @@ three source applications are still the working software.
 | [Stage 3 — VM databases](tasks/2026-09/2026-09-12_stage-3-vm-databases.md) | Real MySQL 8.4.11 and PostgreSQL 18.6; least-privilege users; **read this before grepping the error log** |
 | [Stage 3 — the local host](tasks/2026-09/2026-09-12_stage-3-local-host.md) | D8: "This Mac" as a real host; connectAll picker-only; four corrections to the plan |
 | [SSH forward: server-first bytes](tasks/2026-09/2026-09-12_ssh-forward-server-first.md) | A real defect every test passed. MySQL's greeting dropped before the channel was wrapped; three refuted hypotheses recorded |
+| [SQL drafts](tasks/2026-09/2026-09-12_sql-drafts.md) | R1: durable per-connection drafts; query history's shape reused, its medium rejected |
+| [Rows and audit](tasks/2026-09/2026-09-12_rows-and-audit.md) | R2–R4: deletion proven live, foreign keys failing closed, the audit viewer |
+| [Certificate trust](tasks/2026-09/2026-09-12_certificate-trust.md) | R7/D13: CA-only as a named mode, proven at the capability level |
 | [UI and validation from use](tasks/2026-09/2026-09-12_ui-and-validation.md) | Builds 0.3.56–0.3.67: canvas border, Paint Theme removed, service tabs, colour swatches, record-editor validation, the `tinyint` data-loss bug |
 | [Stage 3 — database (superseded draft)](tasks/2026-09/2026-09-10_stage-3-database.md) | Predates the setup sheet, the draft contract and the address-on-the-host rule. **Superseded by the plan above** |
 | [Stage 4 — desktop](tasks/2026-09/2026-09-10_stage-4-desktop.md) | glassDT engines and Core/UI moved; pairing machinery deleted; validation ledger |

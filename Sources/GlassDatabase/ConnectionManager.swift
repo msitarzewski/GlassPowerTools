@@ -254,6 +254,12 @@ class ConnectionManager {
         }
         connections = candidate
         removeUnreferencedSQLiteFile(from: connection, replacingWith: nil)
+        // Unsaved SQL written against this connection goes with it, rather than ageing out of the
+        // draft store over ninety days. Drafts are the user's own text and can hold anything the
+        // schema does; deleting the connection is the clearest statement that they are finished
+        // with it. Placed here rather than in the capability because every deletion path — the
+        // shell's `removeService` included — converges on this method.
+        SQLDraftStore.shared.removeAll(connectionID: connection.id)
     }
 
     private func removeUnreferencedSQLiteFile(

@@ -69,6 +69,7 @@ struct SchemaBrowserView: View {
     @State private var exactCountTask: Task<Void, Never>?
     @State private var destructiveOperation: String?
     @State private var operationError: String?
+    @State private var showingMutationAudit = false
 
     private var session: DatabaseSession? {
         sessionManager.session(for: sessionID)
@@ -120,6 +121,18 @@ struct SchemaBrowserView: View {
                 }
                 .help("Reload databases and tables")
             }
+            ToolbarItem(placement: .secondaryAction) {
+                Button {
+                    showingMutationAudit = true
+                } label: {
+                    Label("Mutation Log", systemImage: "list.bullet.rectangle.portrait")
+                }
+                .help("Review every row and schema change this app has made")
+            }
+        }
+        .sheet(isPresented: $showingMutationAudit) {
+            MutationAuditView(connectionID: session?.connectionConfig.id,
+                              connectionName: session?.connectionConfig.name)
         }
         .task {
             await loadDatabases()
@@ -237,6 +250,7 @@ struct SchemaBrowserView: View {
             NavigationLink(value: CompactSchemaDatabaseDestination(name: database)) {
                 Label(database, systemImage: "cylinder")
             }
+            .accessibilityIdentifier("db-schema-database-\(database)")
             .contextMenu {
                 Button("Open Database Overview", systemImage: "info.circle") {
                     onSelectionChanged?(.database(database))
@@ -312,6 +326,7 @@ struct SchemaBrowserView: View {
             onOpenSelection?(.table(database: database, table: table))
         })
         .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("db-schema-table-\(table)")
         .accessibilityAction(named: "Open Table") {
             onOpenSelection?(.table(database: database, table: table))
         }
@@ -363,6 +378,7 @@ struct SchemaBrowserView: View {
                         onOpenSelection?(.database(database))
                     }
                     .help("Single-click for statistics; double-click to open a database tab")
+                    .accessibilityIdentifier("db-schema-database-\(database)")
                     .contextMenu {
                         databaseActionMenu(database)
                     }
@@ -391,6 +407,7 @@ struct SchemaBrowserView: View {
             onOpenSelection?(.table(database: database, table: table))
         }
         .help("Single-click for statistics; double-click to open the Data workspace")
+        .accessibilityIdentifier("db-schema-table-\(table)")
         .contextMenu {
             tableActionMenu(table, database: database)
         }
@@ -447,7 +464,7 @@ struct SchemaBrowserView: View {
                 initialSelection: .database(database)
             )
             openWindow(
-                id: "query-editor",
+                id: "database-workspace",
                 value: sessionManager.registerWorkspace(request)
             )
         }

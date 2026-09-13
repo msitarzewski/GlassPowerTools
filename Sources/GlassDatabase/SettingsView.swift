@@ -33,8 +33,6 @@ struct SettingsView: View {
         .onChange(of: settings.dataGridFontSize) { _, _ in settingsManager.saveSettings() }
         .onChange(of: settings.showLineNumbers) { _, _ in settingsManager.saveSettings() }
         .onChange(of: settings.autoFormatJSONInRecordEditor) { _, _ in settingsManager.saveSettings() }
-        .onChange(of: settings.windowOpacity) { _, _ in settingsManager.saveSettings() }
-        .onChange(of: settings.blurBackground) { _, _ in settingsManager.saveSettings() }
         .onChange(of: settings.showSidebarByDefault) { _, _ in settingsManager.saveSettings() }
     }
 

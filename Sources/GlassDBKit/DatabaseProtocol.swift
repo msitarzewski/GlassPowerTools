@@ -74,8 +74,9 @@ public struct DatabaseTLSCertificate: Sendable, Hashable {
     }
 }
 
-/// The transport policy for a database connection. Both required modes fail closed
-/// when the server cannot negotiate TLS; they never fall back to plaintext.
+/// The transport policy for a database connection. Every required mode fails closed
+/// when the server cannot negotiate TLS; they never fall back to plaintext, and no mode
+/// is ever selected by the engine as a retry after a stricter one failed.
 public enum DatabaseTLSPolicy: Sendable, Hashable {
     case disabled
     case requiredSystemTrust
@@ -83,10 +84,33 @@ public enum DatabaseTLSPolicy: Sendable, Hashable {
     /// connected through a local SSH tunnel.
     case requiredSystemTrustForHost(String)
     case requiredCertificates([DatabaseTLSCertificate], serverName: String? = nil)
+    /// Verifies the server's certificate chain against the supplied roots and **does not check
+    /// that the certificate names the server being contacted**. MySQL calls this `VERIFY_CA` and
+    /// PostgreSQL `sslmode=verify-ca`, as against their `VERIFY_IDENTITY` / `verify-full`.
+    ///
+    /// What it stops: anyone who cannot present a certificate issued by one of these roots. What
+    /// it does not stop: a machine that holds *any* certificate from those roots impersonating
+    /// this one — so against a private CA that issues a certificate per machine, an attacker who
+    /// controls one of those machines and can redirect the connection is not detected.
+    ///
+    /// It exists because a default MySQL or PostgreSQL install self-signs a certificate with no
+    /// `subjectAltName` and a CN that is not a hostname, which no name-matching mode can accept
+    /// (D13). It is never chosen automatically; a user asks for it by name.
+    case requiredCertificatesWithoutHostnameVerification([DatabaseTLSCertificate])
 
     public var isRequired: Bool {
         switch self {
         case .disabled: false
+        case .requiredSystemTrust, .requiredSystemTrustForHost,
+             .requiredCertificates, .requiredCertificatesWithoutHostnameVerification: true
+        }
+    }
+
+    /// True when the server's identity is checked against the name being connected to. False for
+    /// the CA-only mode, so a UI can say plainly which of the two a connection used.
+    public var verifiesServerIdentity: Bool {
+        switch self {
+        case .disabled, .requiredCertificatesWithoutHostnameVerification: false
         case .requiredSystemTrust, .requiredSystemTrustForHost, .requiredCertificates: true
         }
     }

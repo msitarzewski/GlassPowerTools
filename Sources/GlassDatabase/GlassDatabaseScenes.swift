@@ -47,6 +47,20 @@ public struct GlassDatabaseScenes: Scene {
         .restorationBehavior(.disabled)
         .defaultLaunchBehavior(.suppressed)
         #endif
+        // The Database menu bar. `DatabaseCommands` was written, guarded for macOS, and then
+        // attached to nothing: until 2026-09-12 its only reference anywhere in the codebase was
+        // its own declaration, so the Query menu, ⌘↩ Run Statement, ⌘N/⌘O/⌘S for SQL documents
+        // and the database command palette were all unreachable. The terminal attaches its
+        // equivalent at `GlassTerminalScenes.swift:57`; this is the line that was missing.
+        //
+        // Found by the first UI test that opened a window on this capability — no unit test can
+        // see an unattached `Commands`, because the type is perfectly valid on its own.
+        #if os(macOS)
+        .commands {
+            DatabaseCommands(connectionManager: runtime.connectionManager,
+                             sessionManager: sessionManager)
+        }
+        #endif
 
         // Detached result grids — pin a result beside the query that produced it.
         WindowGroup(id: "database-results", for: UUID.self) { $resultSetID in

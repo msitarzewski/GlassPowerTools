@@ -419,7 +419,7 @@ struct TerminalWindowView: View {
                 session.pendingHostKeyChallenge = nil
             }
         } message: { challenge in
-            Text("\(challenge.summary)\n\nAlgorithm: \(challenge.algorithm)\nFingerprint (SHA-256): \(challenge.fingerprintSHA256)")
+            Text("\(challenge.summary)\n\nAlgorithm: \(challenge.algorithm)\nFingerprint: \(challenge.fingerprintSHA256)")
         }
         .alert(
             "Open External Link?",

@@ -11,6 +11,7 @@
 //
 
 import Foundation
+import GlassDBKit
 
 /// The limit a value must respect to be storable in its column.
 enum ColumnTypeConstraint: Equatable, Sendable {
@@ -25,9 +26,43 @@ enum ColumnTypeConstraint: Equatable, Sendable {
     /// `decimal(10,2)` — total significant digits and digits after the point.
     case decimal(precision: Int, scale: Int)
 
+    /// MySQL's four `TEXT` and four `BLOB` families, and the **bytes** each one stores.
+    ///
+    /// Bytes, not characters. MySQL 8.4 §13.7 gives the storage as `L + n` bytes with `L` bounded
+    /// by `2^(8n)`, so a `TEXT` holds 65,535 bytes however many characters that is — the docs'
+    /// "65,535 characters" is the ASCII case and they add that "the effective maximum length is
+    /// less if the value contains multibyte characters". `usage(of:)` and `overflowMessage(for:)`
+    /// already count `.bytes` as UTF-8 bytes, which is exact for a utf8mb4 column and
+    /// conservative for a single-byte one: it can refuse a value the server would have taken, but
+    /// it never lets through one the server would truncate.
+    ///
+    /// Six of these eight names exist only in MySQL. Bare `text` and bare `blob` do not — they
+    /// are also PostgreSQL's and SQLite's names for effectively unbounded values — so those two
+    /// need the dialect, and without it they are left unconstrained rather than wrongly limited.
+    static let mysqlLargeObjectByteLimits: [String: Int] = [
+        "tinytext": 255, "tinyblob": 255,
+        "text": 65_535, "blob": 65_535,
+        "mediumtext": 16_777_215, "mediumblob": 16_777_215,
+        "longtext": 4_294_967_295, "longblob": 4_294_967_295,
+    ]
+
+    /// The two names above that are ambiguous across the three engines.
+    private static let dialectAmbiguousLargeObjects: Set<String> = ["text", "blob"]
+
     /// Parses the declared type. Returns nil when the type carries no limit worth enforcing
-    /// client-side (`text`, `json`, `timestamp`, an unparameterised `blob`).
-    static func parse(_ declaredType: String, isUnsigned: Bool) -> ColumnTypeConstraint? {
+    /// client-side (`json`, `timestamp`, a PostgreSQL `text`).
+    ///
+    /// `dialect` is the connection's, and only MySQL's large-object limits depend on it: on
+    /// PostgreSQL `text` and `bytea` run to about a gigabyte and on SQLite to `SQLITE_MAX_LENGTH`,
+    /// neither of which an editor field can reach. Passing nil keeps the six unambiguous MySQL
+    /// names working and leaves bare `text`/`blob` unconstrained — the safe reading, since
+    /// applying MySQL's 65,535 to a PostgreSQL `text` would refuse values that are perfectly
+    /// storable.
+    static func parse(
+        _ declaredType: String,
+        isUnsigned: Bool,
+        dialect: DatabaseDialect? = nil
+    ) -> ColumnTypeConstraint? {
         let lower = declaredType.lowercased()
         // `int unsigned`, `double precision`, `character varying(40)`
         let unsigned = isUnsigned || lower.contains("unsigned")
@@ -56,8 +91,22 @@ enum ColumnTypeConstraint: Equatable, Sendable {
         case "int", "integer", "int4": return integerRange(bits: 32, unsigned: unsigned)
         case "bigint", "int8": return integerRange(bits: 64, unsigned: unsigned)
         default:
+            return largeObjectLimit(base: base, dialect: dialect)
+        }
+    }
+
+    /// The `TEXT`/`BLOB` byte limit for this name, when it can be established.
+    private static func largeObjectLimit(base: String, dialect: DatabaseDialect?) -> ColumnTypeConstraint? {
+        guard let limit = mysqlLargeObjectByteLimits[base] else { return nil }
+        if dialectAmbiguousLargeObjects.contains(base) {
+            // Only MySQL bounds these at all, so an unknown dialect means no limit.
+            guard dialect == .mysql else { return nil }
+        } else if let dialect, dialect != .mysql {
+            // A name that only MySQL has, reported by another engine: believe the engine, not
+            // the name, and enforce nothing.
             return nil
         }
+        return .bytes(limit)
     }
 
     /// The inclusive range a signed or unsigned integer of this width allows.

@@ -34,13 +34,32 @@ struct SSHHostTrustTests {
         #expect(try store.authorizedKeys(host: "h", port: 2222).isEmpty, "trust is per host and port")
     }
 
-    @Test func wireDataAlgorithmAndFingerprintAreDerivedFromTheKeyBlob() {
+    @Test func wireDataAlgorithmIsDerivedFromTheKeyBlob() {
         var blob = Data([0x00, 0x00, 0x00, 0x0B])
         blob.append(contentsOf: "ssh-ed25519".utf8)
         blob.append(contentsOf: [1, 2, 3])
         #expect(SSHHostTrustEvaluator.algorithm(fromWireData: blob) == "ssh-ed25519")
         #expect(SSHHostTrustEvaluator.algorithm(fromWireData: Data([0, 0])) == "unknown")
-        #expect(SSHHostTrustEvaluator.sha256Base64(of: blob).count == 44)
+    }
+
+    /// The fingerprint must be the string OpenSSH prints, not merely the right 32 bytes.
+    ///
+    /// This is a **known-answer test**: the blob and the expected fingerprint were produced by
+    /// `ssh-keygen -t ed25519` and `ssh-keygen -lf` on a throwaway key whose private half was
+    /// destroyed, so the expectation comes from OpenSSH rather than from this implementation
+    /// agreeing with itself. A public key blob is not secret.
+    ///
+    /// The previous version of this test asserted `.count == 44`, which **pinned the defect**:
+    /// 44 characters is bare base64 *with* its padding, and OpenSSH prints 43 characters after a
+    /// `SHA256:` prefix. Both spellings hash the same bytes, so nothing failed and nothing could
+    /// — the damage was to the one person D14 asks to compare two strings by eye.
+    @Test func fingerprintIsSpelledTheWayOpenSSHSpellsIt() throws {
+        let blob = try #require(Data(base64Encoded:
+            "AAAAC3NzaC1lZDI1NTE5AAAAIP/2cuwqHC8FXKsS5HkDszxrr/hjCRi1avykqzrxgvCf"))
+        let fingerprint = SSHHostTrustEvaluator.sha256Fingerprint(of: blob)
+        #expect(fingerprint == "SHA256:g2yTKmItHjGynkazA4MAUR1lvsDTkLXPRusxTHFs6/8")
+        #expect(fingerprint.hasPrefix("SHA256:"), "a user compares this against ssh-keygen output")
+        #expect(!fingerprint.hasSuffix("="), "OpenSSH strips base64 padding; a trailing = does not match")
     }
 
     @Test func challengeRoundTripsThroughCodable() throws {

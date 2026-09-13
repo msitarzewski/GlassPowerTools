@@ -21,9 +21,16 @@ enum ColumnValueFormat: Equatable, Sendable {
     case oneOf([String])
     /// `set('read','write')` — a comma-separated subset, possibly empty.
     case subsetOf([String])
+    /// A PostgreSQL array — `integer[]`, `text[][]`, or the internal spelling `_int4`. The
+    /// payload is the element type's own format when it has one, so a `date[]` checks its
+    /// elements as dates; `indirect` because that element format is a `ColumnValueFormat`.
+    indirect case array(elementTypeName: String, element: ColumnValueFormat?)
 
     static func parse(_ declaredType: String) -> ColumnValueFormat? {
         let lower = declaredType.lowercased()
+        if let elementTypeName = Self.arrayElementTypeName(in: lower) {
+            return .array(elementTypeName: elementTypeName, element: Self.parse(elementTypeName))
+        }
         let base = (lower.split(separator: "(", maxSplits: 1).first.map(String.init) ?? lower)
             .trimmingCharacters(in: .whitespaces)
         switch base {
@@ -80,8 +87,148 @@ enum ColumnValueFormat: Equatable, Sendable {
             guard unknown.isEmpty else {
                 return "‘\(column)’ takes any of: \(members.joined(separator: ", ")). Not recognised: \(unknown.joined(separator: ", "))."
             }
+        case .array(let elementTypeName, let element):
+            let elements: [ArrayElement]
+            do {
+                elements = try Self.parseArrayLiteral(value)
+            } catch let error as ArrayLiteralError {
+                return "‘\(column)’ takes a PostgreSQL array such as {1,2,3}. \(error.reason)"
+            } catch {
+                return "‘\(column)’ takes a PostgreSQL array such as {1,2,3}."
+            }
+            guard let element else { return nil }
+            // Each element is checked as its own type, so `date[]` rejects {2026-02-30} for the
+            // same reason a bare `date` column does. An unquoted NULL is the array's null and is
+            // not a value to check.
+            for entry in elements where !entry.isUnquotedNull {
+                if let message = element.formatMessage(for: entry.text, column: column) {
+                    return "‘\(column)’ is an array of \(elementTypeName). \(message)"
+                }
+            }
         }
         return nil
+    }
+
+    // MARK: PostgreSQL arrays
+
+    /// The element type of an array type, or nil when this is not one.
+    ///
+    /// Two spellings reach us. `information_schema` and `format_type` give the SQL one,
+    /// `integer[]` — and `integer[][]`, which in PostgreSQL is the *same* type as `integer[]`
+    /// (the number of dimensions is not enforced), so every trailing `[]` is stripped. `pg_type`
+    /// gives the internal one, `_int4`, a leading underscore on the element type's name.
+    static func arrayElementTypeName(in lower: String) -> String? {
+        var body = lower.trimmingCharacters(in: .whitespaces)
+        guard !body.isEmpty else { return nil }
+        if body.hasSuffix("[]") {
+            while body.hasSuffix("[]") { body = String(body.dropLast(2)).trimmingCharacters(in: .whitespaces) }
+            return body.isEmpty ? nil : body
+        }
+        // `_int4`, but not a column type that merely starts with an underscore and is not an
+        // array: PostgreSQL's internal array names are exactly "underscore + element type".
+        if body.hasPrefix("_"), body.count > 1, !body.dropFirst().hasPrefix("_") {
+            return String(body.dropFirst())
+        }
+        return nil
+    }
+
+    struct ArrayElement: Equatable, Sendable {
+        let text: String
+        /// PostgreSQL's array NULL is the bare word; `"NULL"` in quotes is the four-character
+        /// string, which is why the distinction is carried rather than compared after the fact.
+        let isUnquotedNull: Bool
+    }
+
+    struct ArrayLiteralError: Error {
+        let reason: String
+    }
+
+    /// Parses a PostgreSQL array literal into its leaf elements, flattened across dimensions.
+    ///
+    /// Only checks that the literal is *well formed* — braces balanced, quotes closed, escapes
+    /// complete. It does not check that the dimensions are rectangular, which the server does and
+    /// which cannot be decided without also deciding what an empty array means.
+    static func parseArrayLiteral(_ value: String) throws -> [ArrayElement] {
+        var elements: [ArrayElement] = []
+        var depth = 0
+        var sawOpeningBrace = false
+        var current = ""
+        var currentWasQuoted = false
+        var inQuotes = false
+        var index = value.startIndex
+
+        func finishElement() {
+            let trimmed = currentWasQuoted ? current : current.trimmingCharacters(in: .whitespaces)
+            // `{}` is the empty array, and `{1,}` is a syntax error the server would reject; an
+            // unquoted empty run between separators is only legitimate for the empty array,
+            // which never reaches here because it closes before any separator.
+            if !trimmed.isEmpty || currentWasQuoted {
+                elements.append(ArrayElement(
+                    text: trimmed,
+                    isUnquotedNull: !currentWasQuoted && trimmed.lowercased() == "null"
+                ))
+            }
+            current = ""
+            currentWasQuoted = false
+        }
+
+        while index < value.endIndex {
+            let character = value[index]
+            if inQuotes {
+                if character == "\\" {
+                    let next = value.index(after: index)
+                    guard next < value.endIndex else {
+                        throw ArrayLiteralError(reason: "The literal ends in an incomplete escape.")
+                    }
+                    current.append(value[next])
+                    index = value.index(after: next)
+                    continue
+                }
+                if character == "\"" {
+                    inQuotes = false
+                } else {
+                    current.append(character)
+                }
+                index = value.index(after: index)
+                continue
+            }
+            switch character {
+            case "{":
+                guard current.trimmingCharacters(in: .whitespaces).isEmpty else {
+                    throw ArrayLiteralError(reason: "A value appears outside any braces.")
+                }
+                depth += 1
+                sawOpeningBrace = true
+                current = ""
+            case "}":
+                guard depth > 0 else {
+                    throw ArrayLiteralError(reason: "There is a closing brace with no opening one.")
+                }
+                finishElement()
+                depth -= 1
+            case ",":
+                guard depth > 0 else {
+                    throw ArrayLiteralError(reason: "A separator appears outside any braces.")
+                }
+                finishElement()
+            case "\"":
+                currentWasQuoted = true
+                inQuotes = true
+            default:
+                guard depth > 0 || character.isWhitespace else {
+                    throw ArrayLiteralError(reason: "A value appears outside any braces.")
+                }
+                if depth > 0 { current.append(character) }
+            }
+            index = value.index(after: index)
+        }
+
+        if inQuotes { throw ArrayLiteralError(reason: "A quoted value is not closed.") }
+        guard sawOpeningBrace else {
+            throw ArrayLiteralError(reason: "An array literal is written inside braces.")
+        }
+        guard depth == 0 else { throw ArrayLiteralError(reason: "A brace is not closed.") }
+        return elements
     }
 
     // MARK: Parsing

@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import GlassLayers
 import GlassDBKit
 import UniformTypeIdentifiers
 #if os(iOS)
@@ -15,7 +16,7 @@ import UIKit
 
 // MARK: - Selection Model
 
-enum WorkspaceSelection: Hashable, Codable {
+enum WorkspaceSelection: Hashable, Codable, Sendable {
     case connection
     case database(String)
     case table(database: String, table: String)
@@ -129,6 +130,14 @@ struct WorkspaceTabState: Equatable {
         selected = destination
     }
 
+    /// Puts durable drafts back as tabs without stealing the selection: reopening a workspace
+    /// lands on the overview it was opened with, with the restored SQL waiting in the tab strip.
+    mutating func restore(_ destinations: [WorkspaceSelection]) {
+        for destination in destinations where !tabs.contains(destination) {
+            tabs.append(destination)
+        }
+    }
+
     mutating func preview(_ destination: WorkspaceSelection) {
         switch destination {
         case .database, .table:
@@ -213,6 +222,14 @@ struct DatabaseWorkspaceView: View {
     /// including hidden ZStack members. Only the active tab's bundle is ever
     /// consulted, so stale registrations cannot clobber command routing.
     @State private var editorCommandHandlers: [UUID: QueryEditorCommandHandlers] = [:]
+    /// This window's identity for the draft store's restore claim. `@State` because a SwiftUI
+    /// `View` is a value that is rebuilt constantly; a stored `let` would mint a new UUID per
+    /// rebuild and every window would look like a new claimant.
+    @State private var workspaceInstanceID = UUID()
+    /// The connection whose drafts this workspace owns, captured once. Read from here rather than
+    /// from `session`, which goes away on a dropped connection while the drafts must not.
+    @State private var draftConnectionID: UUID?
+    @State private var hasRestoredDrafts = false
 
     private var session: DatabaseSession? {
         sessionManager.session(for: sessionID)
@@ -357,6 +374,15 @@ struct DatabaseWorkspaceView: View {
                   request.sessionID == sessionID else { return }
             openQueryDocument(QueryDocumentTab(text: request.sql))
         }
+        .onReceive(NotificationCenter.default.publisher(for: .glassdbOpenTable)) { notification in
+            // Following a foreign key opens a *different* table, and the tab strip is the
+            // workspace's. Same seam as `.glassdbOpenSQLDraft` above, so a detail view still does
+            // not reach into navigation itself. The `sessionID` guard matters: with several
+            // workspaces open, only the one the request names may act on it.
+            guard let request = notification.object as? OpenTableRequest,
+                  request.sessionID == sessionID else { return }
+            openWorkspace(.table(database: request.database, table: request.table))
+        }
         .fileExporter(
             isPresented: $showingQueryExporter,
             document: queryPendingExport.flatMap { sqlDocument(for: $0) }.map {
@@ -395,7 +421,7 @@ struct DatabaseWorkspaceView: View {
             }
             .keyboardShortcut(.defaultAction)
         } message: {
-            Text("This editor contains changes that are only stored in the current workspace session.")
+            Text("Closing this editor discards its SQL. Save it to a file to keep a copy.")
         }
         .alert("SQL Document Error", isPresented: .init(
             get: { queryDocumentError != nil },
@@ -414,9 +440,80 @@ struct DatabaseWorkspaceView: View {
                     )
                 }
             } else {
+                // Leaving the foreground is the last reliable moment before a quit, so the
+                // debounced draft writes are forced out here rather than waited on.
+                SQLDraftStore.shared.flush()
                 sessionManager.noteSessionSuspended(sessionID: sessionID)
             }
         }
+        .onChange(of: session?.connectionConfig.id, initial: true) { _, _ in
+            restoreDraftsIfNeeded()
+        }
+        .onDisappear {
+            SQLDraftStore.shared.flush()
+            if let draftConnectionID {
+                SQLDraftStore.shared.releaseDrafts(
+                    connectionID: draftConnectionID,
+                    workspace: workspaceInstanceID
+                )
+            }
+        }
+    }
+
+    // MARK: - Durable Drafts
+
+    /// Restores this connection's drafts once, the first time a connection identity is known.
+    ///
+    /// Only `.query` drafts become tabs. A `.table` draft goes back into `tableSQLDrafts`, where
+    /// it reappears when the user opens that table again — restoring it as a tab would open table
+    /// editors the user never asked for.
+    private func restoreDraftsIfNeeded() {
+        guard !hasRestoredDrafts, let connectionID = session?.connectionConfig.id else { return }
+        hasRestoredDrafts = true
+        draftConnectionID = connectionID
+        let restored = SQLDraftStore.shared.claimDrafts(
+            connectionID: connectionID,
+            workspace: workspaceInstanceID
+        )
+        guard !restored.isEmpty else { return }
+        var restoredTabs: [WorkspaceSelection] = []
+        for record in restored {
+            switch record.selection {
+            case .query(let id):
+                guard queryDocuments[id] == nil else { continue }
+                queryDocuments[id] = QueryDocumentTab(
+                    id: id,
+                    text: record.sql,
+                    selectedRange: record.clampedSelection
+                )
+                restoredTabs.append(record.selection)
+            case .table:
+                guard tableSQLDrafts[record.selection] == nil else { continue }
+                tableSQLDrafts[record.selection] = QueryDocumentTab(
+                    text: record.sql,
+                    selectedRange: record.clampedSelection
+                )
+            case .connection, .database:
+                continue
+            }
+        }
+        guard !restoredTabs.isEmpty else { return }
+        var updatedState = tabState
+        updatedState.restore(restoredTabs)
+        tabState = updatedState
+    }
+
+    /// Writes one editor's text through to the draft store, which debounces it. Called from the
+    /// document bindings, so every edit path — typing, Format, history insertion, Clear — is
+    /// covered by the one choke point rather than by each command remembering to save.
+    private func recordDraft(_ document: QueryDocumentTab, for destination: WorkspaceSelection) {
+        guard let draftConnectionID else { return }
+        SQLDraftStore.shared.record(
+            sql: document.text,
+            selection: destination,
+            selectedRange: document.selectedRange,
+            connectionID: draftConnectionID
+        )
     }
 
     // MARK: - Connection Recovery
@@ -985,6 +1082,11 @@ struct DatabaseWorkspaceView: View {
             queryDocuments.removeValue(forKey: id)
         }
         tableSQLDrafts.removeValue(forKey: destination)
+        // Closing a *tab* is the deliberate discard. Closing the window is not, and must leave
+        // the draft on disk — that is the defect this store exists to fix.
+        if let draftConnectionID {
+            SQLDraftStore.shared.remove(selection: destination, connectionID: draftConnectionID)
+        }
     }
 
     /// Command-W has exactly one window-level registration. Hidden workspace
@@ -1056,7 +1158,10 @@ struct DatabaseWorkspaceView: View {
     private func queryDocumentBinding(for id: UUID) -> Binding<QueryDocumentTab> {
         Binding(
             get: { queryDocuments[id] ?? QueryDocumentTab(id: id) },
-            set: { queryDocuments[id] = $0 }
+            set: { updated in
+                queryDocuments[id] = updated
+                recordDraft(updated, for: .query(id: id))
+            }
         )
     }
 
@@ -1068,7 +1173,10 @@ struct DatabaseWorkspaceView: View {
     private func tableSQLDraftBinding(for destination: WorkspaceSelection) -> Binding<QueryDocumentTab> {
         Binding(
             get: { tableSQLDrafts[destination] ?? QueryDocumentTab() },
-            set: { tableSQLDrafts[destination] = $0 }
+            set: { updated in
+                tableSQLDrafts[destination] = updated
+                recordDraft(updated, for: destination)
+            }
         )
     }
 

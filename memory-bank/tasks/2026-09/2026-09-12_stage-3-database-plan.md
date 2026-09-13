@@ -189,10 +189,31 @@ wrong.
   (`AIAssistant.swift:176, 217, 282, 364, 396`). Nothing to do.
 - **iOS Settings omitting Appearance.** Resolved by the shell owning appearance, as predicted.
 
-### R1 — the SQL draft-loss fix (correctness; do this first)
+### R1 — the SQL draft-loss fix — **DONE 2026-09-12**
+
+[Note](2026-09-12_sql-drafts.md). Drafts live in `Application Support/GlassPowerTools/SQLDrafts/`,
+one file per connection — query history's *shape* reused, its *medium* deliberately rejected:
+history is capped at 500 entries because `UserDefaults` is materialised at launch and rewritten
+whole, and a draft is unbounded (10 MiB imports). Scoped to the connection, not the session, because
+replaying a `DELETE … WHERE` written for one schema into an editor pointed at another loses data.
+Restored once per workspace via a claim, so a second window does not duplicate every tab. Pruned at
+24 drafts / 8 MiB per connection with a 90-day expiry, and dropped outright when the connection is
+deleted (`ConnectionManager.swift:262`).
+
+**It found a second instance of the same bug:** `tableSQLDrafts` (`DatabaseWorkspaceView.swift:203`)
+holds SQL written against *table* tabs, equally unsaved, equally lost on quit, and absent from this
+plan. Persisted too — and restored back into `tableSQLDrafts` rather than opened as tabs nobody
+asked for.
+
+**Unproven and wanting a person in front of the app:** that restore fires at all —
+`onChange(of: session?.connectionConfig.id, initial: true)` assumes a session exists by first
+render, which is *read, not observed*. Everything else is worthless if that does not run.
+
+### R1 — original brief (kept for the reasoning)
 
 **Confirmed by reading the port:** `QueryDocumentTab` holds its SQL in `var text: String`
-(`QueryEditorView.swift:68`) and **nothing persists it** — there is no `UserDefaults`, no
+(`QueryEditorView.swift:345`, its `text` at `:347` — this note first cited `:68`, which is
+`SQLTextDocument.text`; the conclusion held, the line did not) and **nothing persists it** — there is no `UserDefaults`, no
 `@AppStorage` and no file backing in `QueryEditorView.swift` or `DatabaseWorkspaceView.swift`.
 Closing the window or quitting loses every unsaved statement. The user agreed this must not be
 carried over; it is the one item here that loses work rather than merely lacking a feature.
@@ -202,7 +223,11 @@ Shape: give each tab a durable draft keyed by its workspace and tab identity, wr
 as the index. Query *history* is already persisted (`DatabaseSessionManager.swift:21`
 `persistentQueryHistory`), so the storage pattern to follow is in the same module.
 
-### R2 — row deletion
+### R2 — row deletion — **DONE 2026-09-12**
+
+[Note](2026-09-12_rows-and-audit.md). The optimistic row-identity predicate was extracted out of the two update paths into `RowMutationSQL.swift`, so deletion is a **third caller** rather than a fourth copy. Three layers guard it: `identityPredicate` throws before any SQL exists if the table has no primary key or the row yields no clauses (a collapsed predicate would empty the table); every statement runs in a transaction requiring `affectedRows == 1`; and against **real MySQL 8.4.11 and PostgreSQL 18.6** a current row reports 1, a row with a NULL column reports 1 through `IS NULL`, and **a row edited underneath the user reports 0 and survives** — the optimistic check firing, not a description of it firing.
+
+### R2 — original brief
 
 None exists: `grep` for `DELETE FROM` across the module returns nothing. The two write paths to
 copy are the single-row update (`TableDetailView.swift:3963`) and the pasted-range update
@@ -215,7 +240,13 @@ Note the plan's phrase "one predicate path already exists" pointed at
 `TableDetailView.swift:781 static func predicate(...)`, which is the **browsing** filter used by
 SELECT and COUNT (`:625`, `:650`) — not the row-identity predicate. Use the update path's.
 
-### R3 — foreign-key navigation
+### R3 — foreign-key navigation — **DONE 2026-09-12**
+
+`ForeignKeyNavigation.swift`, a Follow Reference menu and a per-relationship button. **Composite keys fail closed:** `relationships(from:)` refuses a key whose ordinals repeat rather than guessing — fed the exact four-row cross product the PostgreSQL adapter used to return, it returns nothing instead of a confidently wrong `x → b`, so this morning's defect cannot return through this path. Proven live on both engines with a fixture parent holding **both `(1,2)` and `(2,1)`**, so a transposed pairing would land on a row that *exists* and a test whose wrong answer was "no rows" could not pass for the wrong reason.
+
+A staged handoff that nothing ever claims goes stale after 30 s — otherwise it would have filtered the user's **next ordinary visit** to that table, which looks exactly like the app working.
+
+### R3 — original brief
 
 `foreignKeys(in:database:)` is now trustworthy on both engines — it was wrong in two independent
 ways until today (owner-scoped view, and composite keys returned as a cross product; see
@@ -223,30 +254,61 @@ ways until today (owner-scoped view, and composite keys returned as a cross prod
 act of following one: open the referenced table filtered to the referencing value. Composite keys
 must carry every column pair, which is exactly what the cross-product bug would have broken.
 
-### R4 — the mutation audit viewer — **the plan's estimate was wrong**
+### R4 — the mutation audit — **DONE 2026-09-12** (and corrected twice; read this)
 
-The plan said "Small: one list view". **There is no audit store to view.** `Logger.swift` defines
-seven `os.Logger` categories and none of them is an audit log; mutations are written to the system
-log under subsystem `app.glassdb`. So "written but never read" means *written to OSLog*.
+This section was wrong in both directions, and the second error is the instructive one.
 
-That makes this a decision, not a small job:
-- **(a) Build a real audit store** — a record per mutation (table, operation, predicate, affected
-  rows, timestamp), persisted like `persistentQueryHistory`, with a viewer. Medium, and it is the
-  only option that works on iOS.
-- **(b) Read `OSLogStore`** for our subsystem. Cheap on macOS, **restricted on iOS**, and it shows
-  log lines rather than structured mutations.
+The original plan said "Small: one list view". The re-plan then said **"there is no audit store"** —
+also wrong. There is: `MutationOutcome`, `MutationAuditRecord` and `MutationAuditStore` at
+`Models.swift:388-445`, persisting a 1,000-record ring under `glassdb.mutationAudit.v1`
+(`Constants.swift:30`), with **11 call sites already appending** — single-row update, pasted range,
+insert, truncate and drop (`SchemaBrowserView.swift:520,542`), schema change
+(`TableDetailView.swift:4766,4784`) and confirmed query-editor statements (`:3885`). W-capability
+built it during the port and it already follows the `persistentQueryHistory` pattern.
 
-Recommend (a). Also note the subsystem is still `app.glassdb` across `Logger.swift`; it should
-become the merged product's, and that rename is the moment to add the audit category.
+**How the re-plan got it wrong:** it grepped for `auditLog`, `AuditEntry`, `writeAudit` and
+`mutationHistory`, found nothing, checked `Logger.swift`, saw no audit category and concluded
+absence. It searched for **the names it expected rather than the concept**. A negative claim —
+"there is no X" — needs more care than a positive one, because a positive claim carries its own
+evidence and a negative one only proves where you looked.
 
-### R5 — settings
+**So the actual work is:** a viewer, and one new field. `MutationAuditRecord` gained
+`predicate: String?` (optional, so records already on disk still decode).
+
+**What a record stores, decided deliberately:** the predicate's **shape only** — the SQL with its
+bound placeholders left in — and **never the parameters**. The optimistic predicate these paths
+build is the primary key plus every original column value, so the parameters are a verbatim copy of
+the user's row; writing them into `UserDefaults` in plaintext, in a store that exists to be read
+back and displayed, would create a copy of the user's data nobody asked for. The shape still answers
+which columns identified the row, whether NULLs took part, and how wide the conflict check was.
+
+It deliberately **cannot** answer *which* row. Storing primary-key values would close that and is
+refused: a key is routinely itself identifying (an email, an account number), so there is no subset
+of the parameters that is safely "just the key". Row-level traceability is a separate decision to be
+taken in the open, not smuggled in under "audit".
+
+### R5 — settings — **DONE 2026-09-12**
+
+`windowOpacity` and `blurBackground` were *stored* in `Sources/GlassDatabase/SettingsManager.swift`
+with their own `UserDefaults` persistence — a second copy of state the shell already owns, and the
+reason the Appearance page had nowhere to write once the shell took it over. They are now computed
+over the one `GlassLayerStore`, exactly as `GlassTerminal.SettingsManager` has always done, and the
+runtime passes the store it was already holding. Net effect: persistence deleted, not code added.
+
+### R5 — original brief
 
 `Sources/GlassDatabase/SettingsManager.swift` still carries appearance values (`windowOpacity`,
 `blurBackground`) that drive the database canvas with **no page to change them**, because the
 Appearance page was dropped when the shell took ownership. Fold them onto the shell's
 `GlassLayerStore`, exactly as `GlassTerminal`'s `SettingsManager(…layers:)` already does.
 
-### R6 — one macOS command palette
+### R6 — one macOS command palette — **DONE 2026-09-12**
+
+Not "two implementations of one surface" as this plan said all day: **one implementation pasted twice**, byte-for-byte identical at 286 lines, differing only by a trailing `#endif`. Each module also defined its own `MacCommandCenterEntry` and its own `macCommandCenterEntries` focused-value key — *same names, different types* — so a database workspace's commands could never reach the terminal's palette. Two palettes that could not see each other.
+
+Now `Sources/GlassLayers/GlassCommandPalette.swift`, with a `GlassCommandPalette.present(...)` facade so consumers contribute entries without touching the table view or responder handling. 650 lines deleted, 7 added; the test moved to `GlassLayersTests` with the behaviour. **Release** built as well as Debug, because D16 was a Release-only link failure from sharing code across a module boundary.
+
+### R6 — original brief
 
 Two implementations of one surface: glassdb's `MacCommandCenter`/`CommandPalettePanel`
 (`Sources/GlassDatabase/Constants.swift`) and glas.sh's
@@ -255,7 +317,15 @@ is cheap**: the dynamic entries are already produced as data at `DatabaseWorkspa
 and `Constants.swift:793-799`, and only then handed to the panel. A shell-owned palette can take
 those lists as id/title/action with the producers unchanged.
 
-### R7 — D13: trusting a self-signed database certificate
+### R7 — D13 — **DONE 2026-09-12**
+
+[Note](2026-09-12_certificate-trust.md). `.requiredCertificatesWithoutHostnameVerification` — a **separate case**, not a reinterpretation of `serverName: nil`, which still means "match the connection host" and has a test guarding it. Reachable only because a user picked it by name; **no path from a failed full verification**. The connection detail now states what TLS verifies rather than that it is on.
+
+**The distinction that matters:** the engine-level test proved the *engine* could do VERIFY_CA. It could not prove a saved record reaches it — until `transportPlan` mapped the mode, every piece existed and nothing joined them. Three **capability-level** live tests tell those two states apart: a saved CA-only service connects through `DatabaseSessionManager` and the *server* reports a non-empty `Ssl_cipher`; the name-checking mode still throws; a pinned service with no certificate throws and leaves no session behind.
+
+`ConnectionFormView` — ~1,295 unreachable lines — deleted after `SQLiteFileImporter` was extracted, every nested type grepped first.
+
+### R7 — original brief
 
 Needs **both** halves, which is why it is bigger than it looks: a CA-only verification mode
 (MySQL's `VERIFY_CA`, which `DatabaseTLSPolicy` cannot express) **and** a way to supply a
@@ -263,7 +333,20 @@ certificate, since the app never constructs `.requiredCertificates` at all. Both
 PostgreSQL self-sign by default, so today "Use TLS" against a stock server is a hard failure with
 no in-app remedy.
 
-### R8 — smaller items found by using the app
+### R8 — smaller items — **mostly done 2026-09-12**
+
+PostgreSQL arrays closed — both spellings, literal well-formedness, each element checked against its
+own type so `date[]` inherits the date check. `TransportPlan.tunnelRemoteHost`/`tunnelRemotePort`
+deleted, along with two tests that were circular: they asserted a field nothing reads was written.
+`ConnectionFormView` deleted. `StagedEdit.dialect` threaded from `session?.connection?.dialect`.
+
+**Still open: `text`/`blob`.** Six of MySQL's eight family names work. Bare `text` and `blob` are
+also PostgreSQL's and SQLite's words for roughly a gigabyte, so they are left **unconstrained**
+without the dialect — a missing limit only fails to warn, a borrowed one silently refuses data that
+would have stored. `GridColumnFilter` deliberately passes `nil`: it is `Codable` and persisted per
+table, and a filter value is matched by the server, never stored by it.
+
+### R8 — original brief
 
 | Item | Where |
 |---|---|

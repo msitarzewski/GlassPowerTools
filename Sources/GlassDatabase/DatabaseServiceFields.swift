@@ -140,6 +140,7 @@ struct DatabaseRequiredFields: View {
 struct DatabaseAdvancedFields: View {
     @Bindable var draft: DatabaseServiceDraft
     @FocusState private var focusedField: DatabaseServiceDraft.Field?
+    @State private var showingCertificateImporter = false
 
     private var issues: [DatabaseServiceDraft.Field: String] { draft.issues(address: "-") }
     private var identifierPrefix: String { draft.isEditing ? "edit-database" : "add-database" }
@@ -162,6 +163,9 @@ struct DatabaseAdvancedFields: View {
             if draft.engine.supportsTLS {
                 Toggle("Encrypt the database connection", isOn: $draft.useTLS)
                     .accessibilityIdentifier("\(identifierPrefix)-tls")
+                if draft.useTLS {
+                    tlsVerificationRows
+                }
             }
 
             readOnlyRow
@@ -190,6 +194,71 @@ struct DatabaseAdvancedFields: View {
                 focusedField = request
                 draft.focusRequest = nil
             }
+            .fileImporter(isPresented: $showingCertificateImporter,
+                          allowedContentTypes: DatabaseCertificateImport.contentTypes,
+                          allowsMultipleSelection: false) { result in
+                draft.importCertificateFile(result)
+            }
+    }
+
+    /// D13's user-facing half. Three named modes, each saying what it checks and what it does
+    /// not, and a certificate to check against for the two that need one.
+    ///
+    /// **There is no automatic fallback here and there must never be one.** The app does not
+    /// react to a failed handshake by verifying less; a user picks the weaker mode by name,
+    /// having read what it gives up, or the connection stays broken.
+    @ViewBuilder
+    private var tlsVerificationRows: some View {
+        observing(databaseLabeledContent("Verification") {
+            Picker("Verification", selection: $draft.tlsVerification) {
+                ForEach(DatabaseTLSVerification.allCases, id: \.self) { mode in
+                    Text(mode.displayName).tag(mode)
+                }
+            }
+            .databaseControlPresentation()
+            .accessibilityIdentifier("\(identifierPrefix)-tls-verification")
+        })
+
+        Text(draft.tlsVerification.explanation)
+            .font(.caption)
+            .foregroundStyle(draft.tlsVerification.verifiesServerIdentity ? .secondary : .primary)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("\(identifierPrefix)-tls-verification-explanation")
+
+        if draft.tlsVerification.requiresCertificate {
+            LabeledContent {
+                Text(draft.tlsCertificateFileName ?? "No certificate chosen")
+                    .foregroundStyle(draft.tlsCertificate == nil ? .secondary : .primary)
+                    .lineLimit(1)
+                    .accessibilityIdentifier("\(identifierPrefix)-tls-certificate")
+            } label: {
+                DatabaseRequiredFieldLabel(title: "Certificate", isRequired: true)
+            }
+            Button {
+                showingCertificateImporter = true
+            } label: {
+                Label(draft.tlsCertificate == nil ? "Choose Certificate…" : "Choose Different Certificate…",
+                      systemImage: "doc.badge.plus")
+            }
+            .accessibilityIdentifier("\(identifierPrefix)-tls-certificate-choose")
+
+            if let summary = draft.tlsCertificateSummary {
+                // The fingerprint is here to be compared, not decoration: it is what the user
+                // checks against the server, the way the terminal's host-key fingerprint is.
+                Text(summary)
+                    .font(.caption.monospaced())
+                    .textSelection(.enabled)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("\(identifierPrefix)-tls-certificate-summary")
+            }
+            DatabaseValidationMessage(message: draft.message(for: .tlsCertificate, in: issues),
+                                      identifier: "\(identifierPrefix)-tls-certificate-validation")
+            if let certificateImportError = draft.certificateImportError {
+                DatabaseValidationMessage(message: certificateImportError,
+                                          identifier: "\(identifierPrefix)-tls-certificate-import-error")
+            }
+        }
     }
 
     /// D7's whole replacement for glassdb's SSH Tunnel section: one switch. Everything a tunnel

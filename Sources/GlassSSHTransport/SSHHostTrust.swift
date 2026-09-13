@@ -142,8 +142,23 @@ public enum SSHHostTrustEvaluator {
         return String(data: data[4..<(4 + length)], encoding: .utf8) ?? "unknown"
     }
 
-    public static func sha256Base64(of data: Data) -> String {
-        Data(SHA256.hash(data: data)).base64EncodedString()
+    /// The host key's fingerprint **in the form every other SSH tool prints it**:
+    /// `SHA256:` followed by unpadded base64, exactly what `ssh-keygen -lf` and OpenSSH's own
+    /// first-connect prompt show.
+    ///
+    /// This used to return bare padded base64. The bytes were right and the *string* was not:
+    /// D14 exists so a person can compare what the app shows against what they get from the
+    /// server, and they were being asked to compare `…k6KnRqg=` against `SHA256:…k6KnRqg`.
+    /// Nothing rejected the connection, so no test could see it — the only symptom was a human
+    /// squinting at two strings that did not look alike.
+    ///
+    /// `PinnedSSHHostKey.sha256Fingerprint(for:)` already computed the canonical form for the
+    /// Keychain record, so this is the same function rather than a second opinion about it:
+    /// the fingerprint on screen and the fingerprint stored are now produced by one line of code.
+    /// `KeychainManager.validatedHostKeyData` accepts all three historical spellings, so records
+    /// written before this change still verify.
+    public static func sha256Fingerprint(of data: Data) -> String {
+        PinnedSSHHostKey.sha256Fingerprint(for: data)
     }
 }
 
@@ -179,7 +194,7 @@ final class SSHPromptingHostKeyValidator: NIOSSHClientServerAuthenticationDelega
         if let challenge = SSHHostTrustEvaluator.evaluate(
             presentedKeyBase64: presented,
             algorithm: SSHHostTrustEvaluator.algorithm(fromWireData: keyData),
-            fingerprintSHA256: SSHHostTrustEvaluator.sha256Base64(of: keyData),
+            fingerprintSHA256: SSHHostTrustEvaluator.sha256Fingerprint(of: keyData),
             host: host,
             port: port,
             authorizedKeys: trustedKeyBase64Set

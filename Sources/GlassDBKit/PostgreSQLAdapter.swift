@@ -59,51 +59,16 @@ public final class PostgreSQLEngine: DatabaseEngine, @unchecked Sendable {
         return PostgreSQLDatabaseConnection(connection: connection, logger: logger)
     }
 
+    /// Delegates to the one policy-to-NIOSSL mapping in `DatabaseTLSConfiguration.swift`, shared
+    /// with the MySQL adapter so the two engines cannot drift on what a policy verifies. The only
+    /// PostgreSQL-specific part is the wrapping: `.disable` versus `.require(NIOSSLContext)`.
     private static func makeTLS(
         policy: DatabaseTLSPolicy,
         connectionHost: String
     ) throws -> (PostgresConnection.Configuration.TLS, String?) {
-        switch policy {
-        case .disabled:
-            return (.disable, nil)
-        case .requiredSystemTrust:
-            var configuration = TLSConfiguration.makeClientConfiguration()
-            configuration.minimumTLSVersion = .tlsv12
-            return (.require(try NIOSSLContext(configuration: configuration)), connectionHost)
-        case .requiredSystemTrustForHost(let serverName):
-            var configuration = TLSConfiguration.makeClientConfiguration()
-            configuration.minimumTLSVersion = .tlsv12
-            return (.require(try NIOSSLContext(configuration: configuration)), serverName)
-        case .requiredCertificates(let certificateSources, let serverName):
-            guard !certificateSources.isEmpty else {
-                throw DatabaseError.invalidTLSCertificate("At least one certificate is required.")
-            }
-            do {
-                let certificates = try certificateSources.flatMap { source -> [NIOSSLCertificate] in
-                    switch source.format {
-                    case .pem:
-                        return try NIOSSLCertificate.fromPEMBytes(Array(source.bytes))
-                    case .der:
-                        return [try NIOSSLCertificate(bytes: Array(source.bytes), format: .der)]
-                    }
-                }
-                guard !certificates.isEmpty else {
-                    throw DatabaseError.invalidTLSCertificate("No certificates were found in the supplied data.")
-                }
-                var configuration = TLSConfiguration.makeClientConfiguration()
-                configuration.minimumTLSVersion = .tlsv12
-                configuration.trustRoots = .certificates(certificates)
-                configuration.certificateVerification = .fullVerification
-                return (
-                    .require(try NIOSSLContext(configuration: configuration)),
-                    serverName ?? connectionHost
-                )
-            } catch let error as DatabaseError {
-                throw error
-            } catch {
-                throw DatabaseError.invalidTLSCertificate(error.localizedDescription)
-            }
-        }
+        let (configuration, serverName) = try policy.makeTLSConfiguration(connectionHost: connectionHost)
+        guard let configuration else { return (.disable, nil) }
+        return (.require(try NIOSSLContext(configuration: configuration)), serverName)
     }
 
 }

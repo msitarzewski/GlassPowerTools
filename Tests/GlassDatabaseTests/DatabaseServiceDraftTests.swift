@@ -11,6 +11,31 @@ import Testing
 import GlassShell
 @testable import GlassDatabase
 
+/// Import material for the TLS rows: a self-signed CA that signed nothing, whose private key was
+/// discarded. A certificate is public in any case.
+private let draftCertificatePEM = """
+-----BEGIN CERTIFICATE-----
+MIIDVzCCAj+gAwIBAgIUV3wDIwbSRLq92vNQjAI7pW2jApswDQYJKoZIhvcNAQEL
+BQAwOzE5MDcGA1UEAwwwR2xhc3MgUG93ZXIgVG9vbHMgVGVzdCBDQSAobm90IGEg
+cmVhbCBhdXRob3JpdHkpMB4XDTI2MDkxMjE5MzE1NVoXDTQ2MDkwNzE5MzE1NVow
+OzE5MDcGA1UEAwwwR2xhc3MgUG93ZXIgVG9vbHMgVGVzdCBDQSAobm90IGEgcmVh
+bCBhdXRob3JpdHkpMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqAqJ
+8fpDJY5Rn2EHZlqyHmK/7m3dbM3jtBEVq06n/zkvzMa44+wF4qsGvl94vHwO9qV6
+kJdNUIH4+QQtsfpoln6ULCJ0KGeIpG8ALQp6vIEOAmLy2HRNkZG/AEDYZ2hxaoBo
+GMnREfEeMoUotPpE+tgDWE28/K3kta9wIEQCZAITL6FCupI1fogvBZhEJLWF40p3
+KbuWQENBS4X1B+ZknIFAem7t6SFHKCQfBroObfhJfBYSVb2c1KfUkbiqlwikvKK8
+2ERqmhaSYT283kaRYCMN3oBroahgkMIVEYG8dyuXXFMzGVuiT7ioWtwCcHRPC0eq
+abPnNA/GnX/m9Q4l3QIDAQABo1MwUTAdBgNVHQ4EFgQUJfKynwiJ4zo0PUrtXF4P
+DCC1E4EwHwYDVR0jBBgwFoAUJfKynwiJ4zo0PUrtXF4PDCC1E4EwDwYDVR0TAQH/
+BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOCAQEAXfdyHs0O/RcjXNf7HUFbgKEm1fQ2
+EZ2iNjJsm8lPZl1Q+V/WSP3c/oDK/X1JdEO+nWP2JAAAfqEXn/jd9pVqIaqTRNhn
+Mbn8jJNL8yhNYtTBuuzaEKqRl5uAWmuKaDiK59TM3FPtpWAuivzd9JYTUxXyit0m
+8MTDkQFE/aCtjJyUFQMuw3i1N54vwfjmUY013EW0SUpd66pztIqeKffXkM+ztNkw
+CAYTtMs2R+RUqIzOL/kK6V6Gltv5esnXLyhD7huTs/7TrgCyJAv2UnjL5RsQw4vl
+DshIAueLo5G03I6meg5BZwifBCfJTQzcITj7WsfYg6s35c8puZ8uFpDIPw==
+-----END CERTIFICATE-----
+"""
+
 @MainActor
 @Suite("Database service draft")
 struct DatabaseServiceDraftTests {
@@ -114,17 +139,104 @@ struct DatabaseServiceDraftTests {
         #expect(draft.issues(address: "")[.databaseFile] != nil)
     }
 
+    // MARK: TLS verification (D13 / R7)
+
+    @Test("A pinned mode with no certificate refuses to save")
+    func pinnedModeNeedsACertificate() {
+        let draft = networkDraft()
+        draft.useTLS = true
+
+        draft.tlsVerification = .systemTrust
+        #expect(draft.issues(address: "db.example.test")[.tlsCertificate] == nil)
+
+        for mode in [DatabaseTLSVerification.pinnedCertificate, .pinnedCertificateAuthorityOnly] {
+            draft.tlsVerification = mode
+            #expect(draft.issues(address: "db.example.test")[.tlsCertificate] != nil,
+                    "\(mode) verifies against a certificate and there is none")
+        }
+
+        draft.tlsCertificate = Data(draftCertificatePEM.utf8)
+        #expect(draft.issues(address: "db.example.test")[.tlsCertificate] == nil)
+    }
+
+    @Test("A certificate is only demanded where it is actually used")
+    func certificateIsNotDemandedWhenTLSIsOff() {
+        let draft = networkDraft()
+        draft.tlsVerification = .pinnedCertificateAuthorityOnly
+        draft.useTLS = false
+        // The mode is remembered rather than reset, but it verifies nothing while TLS is off, so
+        // it must not block the save either.
+        #expect(draft.issues(address: "db.example.test")[.tlsCertificate] == nil)
+    }
+
+    @Test("The certificate reaches the record only when the mode uses it")
+    func certificateReachesTheRecordOnlyWhenUsed() {
+        let draft = networkDraft()
+        draft.useTLS = true
+        draft.tlsVerification = .pinnedCertificateAuthorityOnly
+        draft.tlsCertificate = Data(draftCertificatePEM.utf8)
+
+        let pinned = draft.configuration(id: UUID(), address: "db.example.test", name: "Fixture")
+        #expect(pinned.tlsVerification == .pinnedCertificateAuthorityOnly)
+        #expect(pinned.tlsCertificate != nil)
+
+        // Moving back to system trust must not leave a trust root in the record that nothing
+        // verifies against — it would read as a pinned connection to anyone inspecting it.
+        draft.tlsVerification = .systemTrust
+        let system = draft.configuration(id: UUID(), address: "db.example.test", name: "Fixture")
+        #expect(system.tlsCertificate == nil)
+
+        draft.tlsVerification = .pinnedCertificate
+        draft.useTLS = false
+        let plaintext = draft.configuration(id: UUID(), address: "db.example.test", name: "Fixture")
+        #expect(plaintext.tlsCertificate == nil)
+    }
+
+    @Test("Editing an existing service reloads its certificate and describes it")
+    func editingReloadsTheCertificate() {
+        let pem = Data(draftCertificatePEM.utf8)
+        let saved = DatabaseConnectionConfig(
+            name: "Fixture", engine: .mysql, host: "db.example.test", port: 3306,
+            username: "reader", useTLS: true,
+            tlsVerification: .pinnedCertificateAuthorityOnly, tlsCertificate: pem
+        )
+        let draft = DatabaseServiceDraft(editing: saved, connectionManager: isolatedManager())
+        #expect(draft.tlsVerification == .pinnedCertificateAuthorityOnly)
+        #expect(draft.tlsCertificate == pem)
+        // Re-parsed on open, so an expiry that has happened since is visible in the sheet.
+        #expect(draft.tlsCertificateSummary?.contains("SHA-256") == true)
+        #expect(draft.certificateImportError == nil)
+    }
+
+    @Test("Saved bytes that no longer parse are reported, not discarded")
+    func unparseableStoredCertificateIsReported() {
+        let saved = DatabaseConnectionConfig(
+            name: "Fixture", engine: .mysql, useTLS: true,
+            tlsVerification: .pinnedCertificate, tlsCertificate: Data("not a certificate".utf8)
+        )
+        let draft = DatabaseServiceDraft(editing: saved, connectionManager: isolatedManager())
+        #expect(draft.certificateImportError != nil)
+        #expect(draft.tlsCertificateSummary == nil)
+        #expect(draft.tlsCertificate != nil, "the user chose this file; it is reported, not dropped")
+    }
+
     @Test("Changing engine resets the previous engine's defaults, tunnel included")
     func engineChangeResets() {
         let draft = networkDraft()
         draft.usesHostTunnel = true
         draft.useTLS = true
+        draft.tlsVerification = .pinnedCertificateAuthorityOnly
+        draft.tlsCertificate = Data(draftCertificatePEM.utf8)
         draft.engineDidChange(to: .mysql)
         #expect(draft.port == "3306")
         #expect(draft.username == "root")
         #expect(draft.database.isEmpty)
         #expect(!draft.usesHostTunnel)
         #expect(!draft.useTLS)
+        // The trust root belonged to the previous server's authority.
+        #expect(draft.tlsVerification == .systemTrust)
+        #expect(draft.tlsCertificate == nil)
+        #expect(draft.tlsCertificateSummary == nil)
     }
 
     @Test("The advanced switches reach the record")

@@ -51,10 +51,13 @@ public final class GlassDatabaseRuntime {
     public var hostAccess: (@MainActor (HostProfile) -> GlassCapabilityHostAccess)?
 
     public init(layers: GlassLayerStore? = nil) {
-        self.layers = layers ?? GlassLayerStore()
+        let resolvedLayers = layers ?? GlassLayerStore()
+        self.layers = resolvedLayers
         connectionManager = ConnectionManager(loadImmediately: false)
         sessionManager = DatabaseSessionManager(loadImmediately: false)
-        settingsManager = SettingsManager(loadImmediately: false)
+        // The same store the shell uses, so appearance cannot drift between a database canvas
+        // and a terminal canvas.
+        settingsManager = SettingsManager(loadImmediately: false, layers: resolvedLayers)
     }
 
     func enqueue(_ request: Request) {

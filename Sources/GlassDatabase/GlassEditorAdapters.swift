@@ -184,6 +184,10 @@ struct SQLEditorSurface: View {
     var onTabComplete: (() -> Bool)?
     /// Dimmed inline preview of what Tab would append at the caret.
     var ghostSuffix: String?
+    /// Applied to the hosted text view itself, not the SwiftUI wrapper: a
+    /// representable's accessibility modifiers do not reach the AppKit/UIKit
+    /// element that actually carries the text as its value.
+    var textViewIdentifier: String?
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(SettingsManager.self) private var settingsManager
@@ -199,7 +203,8 @@ struct SQLEditorSurface: View {
         schemaIdentifiers: [String] = [],
         controller: SQLEditorController? = nil,
         onTabComplete: (() -> Bool)? = nil,
-        ghostSuffix: String? = nil
+        ghostSuffix: String? = nil,
+        textViewIdentifier: String? = nil
     ) {
         _text = text
         self.fontSize = fontSize
@@ -210,6 +215,7 @@ struct SQLEditorSurface: View {
         self.controller = controller
         self.onTabComplete = onTabComplete
         self.ghostSuffix = ghostSuffix
+        self.textViewIdentifier = textViewIdentifier
 
         let snapshot = DocumentSnapshot(
             content: text.wrappedValue,
@@ -236,6 +242,7 @@ struct SQLEditorSurface: View {
             controller: controller,
             onTabComplete: onTabComplete,
             ghostSuffix: ghostSuffix,
+            textViewIdentifier: textViewIdentifier,
             onModelTextChange: { newText in
                 if text != newText { text = newText }
             },
@@ -298,6 +305,7 @@ private struct SQLEditorRepresentable: NSViewRepresentable {
     let controller: SQLEditorController?
     var onTabComplete: (() -> Bool)?
     var ghostSuffix: String?
+    var textViewIdentifier: String?
     var onModelTextChange: (String) -> Void
     var onModelSelectionChange: (NSRange) -> Void
     @Environment(\.sqlEditorFocusToken) private var focusToken
@@ -330,6 +338,9 @@ private struct SQLEditorRepresentable: NSViewRepresentable {
             width: CGFloat.greatestFiniteMagnitude,
             height: CGFloat.greatestFiniteMagnitude
         )
+        if let textViewIdentifier {
+            textView.setAccessibilityIdentifier(textViewIdentifier)
+        }
         return scrollView
     }
 
@@ -408,6 +419,7 @@ private struct SQLEditorRepresentable: UIViewRepresentable {
     // ghost preview on iPad are known gaps until the package exposes hooks.
     var onTabComplete: (() -> Bool)?
     var ghostSuffix: String?
+    var textViewIdentifier: String?
     var onModelTextChange: (String) -> Void
     var onModelSelectionChange: (NSRange) -> Void
     @Environment(\.sqlEditorFocusToken) private var focusToken
@@ -427,6 +439,9 @@ private struct SQLEditorRepresentable: UIViewRepresentable {
             ) { range in
                 engine.selectedRange = range
             }
+        }
+        if let textViewIdentifier {
+            context.coordinator.engine.textView.accessibilityIdentifier = textViewIdentifier
         }
         return context.coordinator.engine.containerView
     }

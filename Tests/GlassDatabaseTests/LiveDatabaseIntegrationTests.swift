@@ -40,9 +40,27 @@ private enum LiveDB {
     static var postgresUser: String { value("GPT_DB_TEST_PG_USER") ?? "gpt_test" }
     static var postgresDatabase: String { value("GPT_DB_TEST_PG_DB") ?? "gpt_test" }
     static var postgresScratchDatabase: String { value("GPT_DB_TEST_PG_SCRATCH_DB") ?? "gpt_scratch" }
+    static var mysqlScratchDatabase: String { value("GPT_DB_TEST_MYSQL_SCRATCH_DB") ?? "gpt_scratch" }
+
+    /// Where a test may create and drop: the scratch database on both engines, named as SQL sees
+    /// it. On PostgreSQL the namespace inside `gpt_scratch` is `public`; on MySQL it is the
+    /// database itself.
+    static func scratchNamespace(_ engine: DatabaseEngineType) -> String {
+        engine == .postgresql ? "public" : mysqlScratchDatabase
+    }
+
+    static func scratchDatabase(_ engine: DatabaseEngineType) -> String {
+        engine == .postgresql ? postgresScratchDatabase : mysqlScratchDatabase
+    }
 
     static var hasMySQL: Bool { mysqlPassword != nil }
     static var hasPostgres: Bool { postgresPassword != nil }
+
+    /// The MySQL server's own CA, fetched to `~/.config` by the wave-1 VM setup, and the CN on
+    /// its auto-generated certificate. Never read into a note or an assertion message.
+    static var mysqlCAPath: String? { value("GPT_DB_TEST_MYSQL_CA_PATH") }
+    static var mysqlTLSServerName: String? { value("GPT_DB_TEST_MYSQL_TLS_SERVER_NAME") }
+    static var hasMySQLCA: Bool { hasMySQL && mysqlCAPath != nil && mysqlTLSServerName != nil }
 
     /// The service record the capability would have written for this engine, built the way
     /// `DatabaseServiceDraft.configuration(id:address:name:)` builds it — the host's address on
@@ -121,6 +139,78 @@ struct LiveDatabaseIntegrationTests {
         #expect(!version.isEmpty)
         #expect(connection.dialect == .postgresql)
         await manager.disconnect(sessionID: sessionID)
+    }
+
+    // MARK: 1b — D13: a saved service that pins the server's CA actually connects
+
+    /// The end of R7, through the capability's own path rather than the engine's.
+    ///
+    /// This is the test that matters: `GlassDBKitTests` proves the *engine* can do VERIFY_CA, and
+    /// this proves a **saved record** carrying the user's choice reaches it — record →
+    /// `transportPlan` → policy → real server. Until `transportPlan` mapped the mode, every piece
+    /// existed and nothing joined them, and only a test at this level could tell the difference.
+    @Test("MySQL: a service pinning the server's CA connects, and the server confirms it is TLS",
+          .enabled(if: LiveDB.hasMySQLCA))
+    func mysqlPinnedCertificateAuthorityConnects() async throws {
+        let caPath = try #require(LiveDB.mysqlCAPath)
+        let ca = try Data(contentsOf: URL(fileURLWithPath: caPath))
+
+        var config = LiveDB.config(.mysql)
+        config.useTLS = true
+        config.tlsVerification = .pinnedCertificateAuthorityOnly
+        config.tlsCertificate = ca
+
+        let manager = DatabaseSessionManager(loadImmediately: false)
+        let sessionID = try await manager.connect(config: config, password: LiveDB.password(.mysql))
+        let connection = try #require(manager.sessions[sessionID]?.connection)
+
+        // Not "it connected": the server is asked what it negotiated for this very session, so a
+        // silently plaintext connection could not pass.
+        let cipher = try await connection.execute("SHOW SESSION STATUS LIKE 'Ssl_cipher'", parameters: [])
+        let negotiated = try #require(cipher.rows.first?[1])
+        #expect(negotiated != .string(""), "an empty Ssl_cipher means the session is not encrypted")
+        #expect(negotiated != .null)
+
+        // And it is a working session, not merely an open socket.
+        #expect(!(try await connection.serverVersion()).isEmpty)
+        await manager.disconnect(sessionID: sessionID)
+    }
+
+    @Test("MySQL: the same service verifying the name still fails — the pair is the evidence",
+          .enabled(if: LiveDB.hasMySQLCA))
+    func mysqlPinnedCertificateWithNameStillFails() async throws {
+        let caPath = try #require(LiveDB.mysqlCAPath)
+        let ca = try Data(contentsOf: URL(fileURLWithPath: caPath))
+
+        // A stock MySQL 8.4 certificate has no subjectAltName and a CN that is not a DNS name.
+        // If this ever stops failing, the CA-only mode has stopped being necessary — and the test
+        // above stops being evidence that it works.
+        var config = LiveDB.config(.mysql)
+        config.useTLS = true
+        config.tlsVerification = .pinnedCertificate
+        config.tlsCertificate = ca
+
+        let manager = DatabaseSessionManager(loadImmediately: false)
+        await #expect(throws: (any Error).self) {
+            _ = try await manager.connect(config: config, password: LiveDB.password(.mysql))
+        }
+    }
+
+    @Test("A pinned service whose certificate is missing refuses rather than connecting weaker",
+          .enabled(if: LiveDB.hasMySQL))
+    func mysqlPinnedWithoutCertificateRefuses() async throws {
+        var config = LiveDB.config(.mysql)
+        config.useTLS = true
+        config.tlsVerification = .pinnedCertificateAuthorityOnly
+        config.tlsCertificate = nil
+
+        let manager = DatabaseSessionManager(loadImmediately: false)
+        await #expect(throws: (any Error).self) {
+            _ = try await manager.connect(config: config, password: LiveDB.password(.mysql))
+        }
+        // Against a real, reachable server: the refusal is the policy's, not the network's, and
+        // no session is left behind that a caller could mistake for a working one.
+        #expect(manager.sessions.isEmpty)
     }
 
     // MARK: 2 — what the schema browser shows: the seeded tables and the foreign key
@@ -324,6 +414,228 @@ struct LiveDatabaseIntegrationTests {
         #expect(stillReadable.error == nil)
         #expect(!stillReadable.rows.isEmpty)
         _ = namespace
+    }
+}
+
+// MARK: - 4b. Row deletion against a real server
+//
+// `RowMutationSQLTests` proves the SQL's shape. Only this proves what the guard is actually for:
+// that a real server reports **exactly one** affected row for a real delete, and **zero** for a
+// predicate that has gone stale — which is the whole optimistic conflict check, and the only
+// evidence that deletion cannot quietly remove more than the user chose.
+//
+// Everything here happens in `gpt_scratch`. `gpt_test` holds the fixture and is DML-only; a
+// deletion test must never point at it.
+
+@MainActor
+@Suite("Live row deletion (gated)", .serialized)
+struct LiveRowDeletionTests {
+
+    @Test("MySQL: a delete affects exactly one row, and a stale predicate affects none",
+          .enabled(if: LiveDB.hasMySQL))
+    func mysqlDeleteAffectsExactlyOneRow() async throws {
+        try await deleteAffectsExactlyOneRow(.mysql)
+    }
+
+    @Test("PostgreSQL: a delete affects exactly one row, and a stale predicate affects none",
+          .enabled(if: LiveDB.hasPostgres))
+    func postgresDeleteAffectsExactlyOneRow() async throws {
+        try await deleteAffectsExactlyOneRow(.postgresql)
+    }
+
+    private func deleteAffectsExactlyOneRow(_ engine: DatabaseEngineType) async throws {
+        var config = LiveDB.config(engine)
+        config.defaultDatabase = LiveDB.scratchDatabase(engine)
+        let manager = DatabaseSessionManager(loadImmediately: false)
+        let sessionID = try await manager.connect(config: config, password: LiveDB.password(engine))
+        defer { Task { await manager.disconnect(sessionID: sessionID) } }
+        let connection = try #require(manager.sessions[sessionID]?.connection)
+        let namespace = LiveDB.scratchNamespace(engine)
+        let quote = connection.identifierQuoteCharacter
+        let table = "gpt_delete_probe"
+        let qualified = "\(quote)\(namespace)\(quote).\(quote)\(table)\(quote)"
+
+        func exec(_ sql: String, _ parameters: [DatabaseValue] = []) async throws -> QueryResult {
+            try await connection.execute(sql, parameters: parameters)
+        }
+        // Awaited, not deferred into a detached Task — the composite-key test above was left
+        // behind by exactly that mistake once already.
+        func dropProbe() async {
+            _ = try? await connection.execute("DROP TABLE IF EXISTS \(qualified)", parameters: [])
+        }
+        await dropProbe()
+
+        let textType = engine == .postgresql ? "text" : "varchar(40)"
+        _ = try await exec("CREATE TABLE \(qualified) (id int PRIMARY KEY, name \(textType), score int)")
+        _ = try await exec("INSERT INTO \(qualified) (id, name, score) VALUES (1, 'one', 10)")
+        _ = try await exec("INSERT INTO \(qualified) (id, name, score) VALUES (2, 'two', 20)")
+        _ = try await exec("INSERT INTO \(qualified) (id, name, score) VALUES (3, NULL, 30)")
+
+        let columns = try await connection.columns(in: table, database: namespace)
+        #expect(columns.contains { $0.name == "id" && $0.isPrimaryKey },
+                "the probe must have a primary key or the predicate builder refuses outright")
+
+        // The row exactly as the grid would hold it, in the column order the metadata gives.
+        func probeRow(id: Int64, name: DatabaseValue, score: Int64) -> [DatabaseValue] {
+            columns.map { column in
+                switch column.name {
+                case "id": return .int(id)
+                case "name": return name
+                default: return .int(score)
+                }
+            }
+        }
+
+        // 1 — a current row deletes, and the server says exactly one.
+        let statement = try RowMutationSQL.delete(
+            database: namespace, table: table, columns: columns,
+            row: probeRow(id: 2, name: .string("two"), score: 20),
+            identifierQuote: quote, dialect: connection.dialect)
+        let deleted = try await exec(statement.sql, statement.predicate.parameters)
+        #expect(deleted.error == nil)
+        #expect(deleted.affectedRows == 1, "exactly one row, which is the guard the UI enforces")
+
+        let afterDelete = try await exec("SELECT id FROM \(qualified) ORDER BY id")
+        #expect(afterDelete.rows.count == 2)
+        #expect(!afterDelete.rows.contains { $0.first?.displayString == "2" }, "row 2 is the one that went")
+
+        // 2 — a NULL column takes part in the predicate as IS NULL, and still matches its row.
+        let nullStatement = try RowMutationSQL.delete(
+            database: namespace, table: table, columns: columns,
+            row: probeRow(id: 3, name: .null, score: 30),
+            identifierQuote: quote, dialect: connection.dialect)
+        #expect(nullStatement.sql.contains("IS NULL"), "a NULL is compared, never bound as a parameter")
+        let deletedNull = try await exec(nullStatement.sql, nullStatement.predicate.parameters)
+        #expect(deletedNull.affectedRows == 1, "`= NULL` would have matched nothing; IS NULL matches the row")
+
+        // 3 — the optimistic check. Someone else edits row 1; the grid still holds the old values.
+        _ = try await exec("UPDATE \(qualified) SET \(quote)score\(quote) = 99 WHERE \(quote)id\(quote) = 1")
+        let staleStatement = try RowMutationSQL.delete(
+            database: namespace, table: table, columns: columns,
+            row: probeRow(id: 1, name: .string("one"), score: 10),
+            identifierQuote: quote, dialect: connection.dialect)
+        let staleDelete = try await exec(staleStatement.sql, staleStatement.predicate.parameters)
+        #expect(staleDelete.affectedRows == 0,
+                "a row changed underneath the user matches no predicate, so the UI's == 1 guard fails it")
+
+        let survivors = try await exec("SELECT id, score FROM \(qualified) ORDER BY id")
+        #expect(survivors.rows.count == 1, "the concurrently edited row is still there")
+        #expect(survivors.rows.first?.last?.displayString == "99", "and still carries the other edit")
+
+        await dropProbe()
+        let remaining = try await connection.tables(in: namespace)
+        #expect(!remaining.contains(table), "the scratch database is left as it was found")
+    }
+}
+
+// MARK: - 4c. Following a composite foreign key, end to end against a real server
+//
+// The unit tests prove the pairing logic against the exact cross product the PostgreSQL adapter
+// used to return. This proves the whole chain on a live server: real `foreignKeys()` rows → real
+// ordinals → `ForeignKeyNavigation.relationships` → `filters(following:)` → the browsing SELECT
+// the grid builds → the row that actually comes back.
+//
+// The fixture is built so a wrong pairing returns **a different real row** rather than nothing:
+// the parent holds both `(1, 2)` and `(2, 1)`. Swapping the pairs — which is precisely what the
+// cross-product defect did — lands on a row that exists, so the failure would have been silent and
+// confident rather than empty. Everything happens in `gpt_scratch`.
+
+@MainActor
+@Suite("Live foreign-key navigation (gated)", .serialized)
+struct LiveForeignKeyNavigationTests {
+
+    @Test("MySQL: a composite key opens the one row it references, not the transposed one",
+          .enabled(if: LiveDB.hasMySQL))
+    func mysqlCompositeFollow() async throws {
+        try await compositeFollowLandsOnOneRow(.mysql)
+    }
+
+    @Test("PostgreSQL: a composite key opens the one row it references, not the transposed one",
+          .enabled(if: LiveDB.hasPostgres))
+    func postgresCompositeFollow() async throws {
+        try await compositeFollowLandsOnOneRow(.postgresql)
+    }
+
+    private func compositeFollowLandsOnOneRow(_ engine: DatabaseEngineType) async throws {
+        var config = LiveDB.config(engine)
+        config.defaultDatabase = LiveDB.scratchDatabase(engine)
+        let manager = DatabaseSessionManager(loadImmediately: false)
+        let sessionID = try await manager.connect(config: config, password: LiveDB.password(engine))
+        defer { Task { await manager.disconnect(sessionID: sessionID) } }
+        let connection = try #require(manager.sessions[sessionID]?.connection)
+        let namespace = LiveDB.scratchNamespace(engine)
+        let quote = connection.identifierQuoteCharacter
+        func qualified(_ table: String) -> String {
+            "\(quote)\(namespace)\(quote).\(quote)\(table)\(quote)"
+        }
+        func exec(_ sql: String, _ parameters: [DatabaseValue] = []) async throws -> QueryResult {
+            try await connection.execute(sql, parameters: parameters)
+        }
+        // Child first: the foreign key depends on the parent. Awaited, never deferred.
+        func dropFixtures() async {
+            _ = try? await connection.execute("DROP TABLE IF EXISTS \(qualified("gpt_nav_child"))", parameters: [])
+            _ = try? await connection.execute("DROP TABLE IF EXISTS \(qualified("gpt_nav_parent"))", parameters: [])
+        }
+        await dropFixtures()
+
+        let textType = engine == .postgresql ? "text" : "varchar(40)"
+        _ = try await exec("""
+            CREATE TABLE \(qualified("gpt_nav_parent"))
+              (a int, b int, label \(textType), PRIMARY KEY (a, b))
+            """)
+        // Both (1, 2) and (2, 1) exist, so a transposed pairing finds a real, wrong row.
+        _ = try await exec("INSERT INTO \(qualified("gpt_nav_parent")) (a, b, label) VALUES (1, 1, 'one-one')")
+        _ = try await exec("INSERT INTO \(qualified("gpt_nav_parent")) (a, b, label) VALUES (1, 2, 'one-two')")
+        _ = try await exec("INSERT INTO \(qualified("gpt_nav_parent")) (a, b, label) VALUES (2, 1, 'two-one')")
+        _ = try await exec("""
+            CREATE TABLE \(qualified("gpt_nav_child"))
+              (x int PRIMARY KEY, y int, name \(textType),
+               CONSTRAINT gpt_nav_two FOREIGN KEY (x, y) REFERENCES \(qualified("gpt_nav_parent")) (a, b))
+            """)
+        _ = try await exec("INSERT INTO \(qualified("gpt_nav_child")) (x, y, name) VALUES (1, 2, 'child')")
+
+        // 1 — the real catalog, through the real adapter.
+        let keys = try await connection.foreignKeys(in: "gpt_nav_child", database: namespace)
+        let relationships = ForeignKeyNavigation.relationships(from: keys)
+            .filter { $0.constraintName == "gpt_nav_two" }
+        let relationship = try #require(relationships.first,
+                                        "a live composite key must survive the ordinal check")
+        #expect(relationship.isComposite)
+        #expect(relationship.pairs.map(\.column) == ["x", "y"])
+        #expect(relationship.pairs.map(\.referencedColumn) == ["a", "b"],
+                "x pairs with a and y with b, on a real server")
+
+        // 2 — the row the user would have selected, as the grid holds it.
+        let childColumns = try await connection.columns(in: "gpt_nav_child", database: namespace)
+        let parentColumns = try await connection.columns(in: "gpt_nav_parent", database: namespace)
+        let childRows = try await exec("SELECT * FROM \(qualified("gpt_nav_child"))")
+        let childRow = try #require(childRows.rows.first)
+
+        let filters = try ForeignKeyNavigation.filters(
+            following: relationship, row: childRow,
+            columns: childColumns, referencedColumns: parentColumns)
+        #expect(filters.map(\.columnName) == ["a", "b"])
+        #expect(filters.map(\.value) == ["1", "2"])
+
+        // 3 — the browsing SELECT the grid builds from those filters, run for real.
+        let query = try GridServerQueryBuilder.select(
+            database: namespace, table: "gpt_nav_parent", columns: parentColumns,
+            filters: filters, sorts: [], page: 1, pageSize: 100,
+            identifierQuote: quote, dialect: connection.dialect)
+        let opened = try await exec(query.sql, query.parameters)
+        #expect(opened.error == nil)
+        #expect(opened.rows.count == 1, "a composite follow lands on exactly one row")
+
+        let labelIndex = try #require(opened.columns.firstIndex { $0.name == "label" })
+        let label = opened.rows[0][labelIndex].displayString
+        #expect(label == "one-two")
+        #expect(label != "two-one",
+                "the transposed pairing the old adapter produced would have opened this row instead")
+
+        await dropFixtures()
+        let remaining = try await connection.tables(in: namespace)
+        #expect(!remaining.contains("gpt_nav_child"))
+        #expect(!remaining.contains("gpt_nav_parent"))
     }
 }
 

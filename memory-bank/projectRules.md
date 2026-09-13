@@ -127,3 +127,13 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     the sidebar was pointing at it and was misread as protecting an intentional decision. When
     something worked recently and does not now, the first question is what changed, and the cheapest
     place to look is the uncommitted diff.
+
+24. **A negative claim needs more evidence than a positive one.** "There is no audit store" was
+    written into a plan after grepping for `auditLog`, `AuditEntry` and `writeAudit`, finding
+    nothing, and checking that no `os.Logger` category was named for it. The store existed as
+    `MutationAuditRecord` / `MutationAuditStore` with eleven call sites already writing to it, and a
+    worker nearly built a second one on the strength of the claim. A positive finding carries its own
+    evidence — here is the line. A negative one only ever proves **where you looked**. So search for
+    the *concept* and not the name you expect: the behaviour, the call sites, the persistence key,
+    the types it would have to produce. And when reporting one, say what you searched for, so the
+    next reader can see the shape of the hole rather than trusting the conclusion.

@@ -1,4 +1,5 @@
 import Foundation
+import GlassDBKit
 import Testing
 @testable import GlassDatabase
 
@@ -21,10 +22,53 @@ struct ColumnTypeConstraintTests {
 
     @Test("An unbounded type has no limit to enforce")
     func unbounded() {
-        #expect(ColumnTypeConstraint.parse("text", isUnsigned: false) == nil)
         #expect(ColumnTypeConstraint.parse("json", isUnsigned: false) == nil)
         #expect(ColumnTypeConstraint.parse("timestamp", isUnsigned: false) == nil)
+        // Bare `text` and `blob` are the two names all three engines use, so without the
+        // dialect they stay unconstrained — see `largeObjectsNeedTheDialectForTheAmbiguousTwo`.
+        #expect(ColumnTypeConstraint.parse("text", isUnsigned: false) == nil)
         #expect(ColumnTypeConstraint.parse("blob", isUnsigned: false) == nil)
+    }
+
+    @Test("MySQL's TEXT and BLOB families are bounded in bytes")
+    func largeObjectByteLimits() {
+        #expect(ColumnTypeConstraint.parse("tinytext", isUnsigned: false, dialect: .mysql) == .bytes(255))
+        #expect(ColumnTypeConstraint.parse("TEXT", isUnsigned: false, dialect: .mysql) == .bytes(65_535))
+        #expect(ColumnTypeConstraint.parse("mediumtext", isUnsigned: false, dialect: .mysql) == .bytes(16_777_215))
+        #expect(ColumnTypeConstraint.parse("longtext", isUnsigned: false, dialect: .mysql) == .bytes(4_294_967_295))
+        #expect(ColumnTypeConstraint.parse("tinyblob", isUnsigned: false, dialect: .mysql) == .bytes(255))
+        #expect(ColumnTypeConstraint.parse("blob", isUnsigned: false, dialect: .mysql) == .bytes(65_535))
+        #expect(ColumnTypeConstraint.parse("mediumblob", isUnsigned: false, dialect: .mysql) == .bytes(16_777_215))
+        #expect(ColumnTypeConstraint.parse("longblob", isUnsigned: false, dialect: .mysql) == .bytes(4_294_967_295))
+    }
+
+    @Test("A TEXT limit is bytes, so multibyte characters fill it faster than they look")
+    func largeObjectLimitsCountBytes() throws {
+        let constraint = try #require(ColumnTypeConstraint.parse("tinytext", isUnsigned: false, dialect: .mysql))
+        // 128 two-byte characters is 256 bytes: one over a TINYTEXT, and well under 255
+        // *characters*, which is what a count of characters would have allowed through.
+        let value = String(repeating: "é", count: 128)
+        #expect(value.count == 128)
+        #expect(constraint.usage(of: value)?.used == 256)
+        #expect(constraint.overflowMessage(for: value, column: "note")?.contains("255 bytes") == true)
+        #expect(constraint.overflowMessage(for: String(repeating: "a", count: 255), column: "note") == nil)
+    }
+
+    @Test("The two ambiguous names are limited only when the dialect says MySQL")
+    func largeObjectsNeedTheDialectForTheAmbiguousTwo() {
+        // PostgreSQL `text` and SQLite `TEXT` run to about a gigabyte. Applying MySQL's 65,535
+        // to them would refuse values that store perfectly well.
+        for dialect in [DatabaseDialect.postgresql, .sqlite] {
+            #expect(ColumnTypeConstraint.parse("text", isUnsigned: false, dialect: dialect) == nil)
+            #expect(ColumnTypeConstraint.parse("blob", isUnsigned: false, dialect: dialect) == nil)
+        }
+        #expect(ColumnTypeConstraint.parse("text", isUnsigned: false, dialect: nil) == nil)
+        #expect(ColumnTypeConstraint.parse("blob", isUnsigned: false, dialect: nil) == nil)
+
+        // The six MySQL-only spellings are safe without the dialect, and are not forced on an
+        // engine that reports one of them anyway.
+        #expect(ColumnTypeConstraint.parse("mediumtext", isUnsigned: false, dialect: nil) == .bytes(16_777_215))
+        #expect(ColumnTypeConstraint.parse("mediumtext", isUnsigned: false, dialect: .sqlite) == nil)
     }
 
     @Test("Binary types count bytes, not characters")
