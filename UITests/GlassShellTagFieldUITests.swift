@@ -55,6 +55,25 @@ final class GlassShellTagFieldUITests: XCTestCase {
         press(e)
     }
 
+    /// The hierarchy at the moment of a failure, attached to the result bundle. Guessing at what
+    /// the tree contained cost four re-runs the last time this suite broke; this costs one.
+    ///
+    /// **One snapshot of one element, never an enumeration.** The first version of this helper
+    /// inventoried `app.staticTexts.allElementsBoundByIndex` the way `GlassTerminalUITests` does,
+    /// and each of those collection reads takes its own snapshot — so with the UI still settling it
+    /// raised "Failed to get matching snapshot: No matches found for Element at index 34" and, with
+    /// `continueAfterFailure = false`, failed the test *from inside the diagnostic*, hiding the
+    /// failure it was added to explain. `debugDescription` on a single window or sheet element
+    /// prints the whole subtree from one snapshot and cannot race with itself.
+    private func dumpTree(_ name: String) {
+        let sheet = app.sheets.firstMatch
+        let root = sheet.exists ? sheet : app.windows.firstMatch
+        let subtree = XCTAttachment(string: root.exists ? root.debugDescription : app.debugDescription)
+        subtree.name = "tag-tree-\(name)"
+        subtree.lifetime = .keepAlways
+        add(subtree)
+    }
+
     private func snap(_ name: String) {
         let sheet = app.sheets.firstMatch
         captureOwnWindow(sheet.exists ? sheet : app.windows.firstMatch, app: app, name: name)
@@ -70,6 +89,50 @@ final class GlassShellTagFieldUITests: XCTestCase {
         let address = element("host-editor-address")
         XCTAssertTrue(address.waitForExistence(timeout: 5))
         press(address); address.typeText("\(name).example")
+        fillTerminalService(user: "probe")
+    }
+
+    /// The add-host sheet arrives with the Terminal service already selected — *"adding a machine
+    /// without a service doesn't make sense"* — so its required fields have to be filled or Save is
+    /// **correctly refused** and the sheet stays open.
+    ///
+    /// This test asserted nothing about services and so never filled them, which is why it read as
+    /// a tag-field failure for a week. The tree at the failure said
+    /// `add-server-username-validation = "Error: Enter the SSH username"`; nothing was wrong with
+    /// the chips at all. Same stale-test class as the four `GlassShellLibraryUITests` cases the
+    /// same product decision invalidated — this suite was simply missed when those were repaired.
+    private func fillTerminalService(user: String) {
+        let username = element("add-server-username")
+        XCTAssertTrue(username.waitForExistence(timeout: 10), "the Terminal tab's username field")
+        press(username); username.typeText(user)
+        let password = element("add-server-password")
+        XCTAssertTrue(password.waitForExistence(timeout: 5), "the default method's password field")
+        #if os(macOS)
+        // Tab from the username rather than clicking the password: clicking a `SecureField` on a
+        // freshly laid-out sheet does not reliably take first responder, and the next `typeText`
+        // fails with "Neither element nor any descendant has keyboard focus". The username is
+        // already focused, so Tab moves focus with no hit-testing and no race. Established in
+        // `GlassShellLibraryUITests` after four attempts at fixing the click.
+        app.typeKey(.tab, modifierFlags: [])
+        password.typeText("not-a-real-password")
+        #else
+        press(password); password.typeText("not-a-real-password")
+        #endif
+    }
+
+    /// visionOS offers to save a typed password to iCloud Keychain once the sheet commits, and the
+    /// alert covers the app so every later assertion fails. The app stores credentials itself.
+    private func dismissSystemPasswordPrompt() {
+        #if os(macOS)
+        var targets: [XCUIApplication] = []
+        #else
+        var targets = [XCUIApplication(bundleIdentifier: "com.apple.springboard")]
+        #endif
+        if let app { targets.append(app) }
+        for target in targets {
+            let notNow = target.buttons["Not Now"].firstMatch
+            if notNow.waitForExistence(timeout: 1) { notNow.tap(); return }
+        }
     }
 
     /// Types a token and commits it with Return.
@@ -126,7 +189,22 @@ final class GlassShellTagFieldUITests: XCTestCase {
         addTag("Beast", to: "host-editor-aliases")
         XCTAssertTrue(element("host-editor-aliases.tag.0").waitForExistence(timeout: 5), "alias chip")
         tap("host-editor-save")
-        XCTAssertTrue(element("host-add-service").waitForExistence(timeout: 15) || element("host-row-alpha").waitForExistence(timeout: 15))
+        dismissSystemPasswordPrompt()
+        if !(element("host-add-service").waitForExistence(timeout: 15) || element("host-row-alpha").waitForExistence(timeout: 15)) {
+            snap("save-did-not-settle")
+            dumpTree("save-did-not-settle")
+            // The sheet staying open means the save was refused, and the form says why. Read it
+            // out rather than reporting "the sheet did not close", which describes a symptom and
+            // has misled this project before.
+            // The sheet reports per-field validation, not one `host-editor-error` banner — reading
+            // only the banner is how this failure stayed anonymous.
+            let banner = element("host-editor-error")
+            let field = app.descendants(matching: .any).matching(
+                NSPredicate(format: "identifier ENDSWITH '-validation'")).firstMatch
+            let reason = banner.exists ? banner.label
+                : (field.exists ? "\(field.identifier): \((field.value as? String) ?? "")" : "")
+            XCTFail("after Save neither the detail nor the row appeared\(reason.isEmpty ? "" : "; form error: \(reason)")")
+        }
 
         // Second host: the vocabulary offers the first host's collections before anything is typed.
         openHostEditor(named: "beta")
@@ -145,6 +223,7 @@ final class GlassShellTagFieldUITests: XCTestCase {
         XCTAssertTrue(element("host-editor-tags.suggestion.0").waitForExistence(timeout: 5))
         XCTAssertEqual(element("host-editor-tags.suggestion.0").label, "Add Lab")
         tap("host-editor-save")
+        dismissSystemPasswordPrompt()
 
         #if !os(visionOS)
         // The sidebar's Collections scope lists the shared tag. iPhone pushed to the new host's
@@ -155,9 +234,21 @@ final class GlassShellTagFieldUITests: XCTestCase {
             press(app.navigationBars.buttons.element(boundBy: 0))   // results → scopes
         }
         #endif
-        let collection = app.descendants(matching: .any).matching(
-            NSPredicate(format: "identifier BEGINSWITH 'glass-library-scope-collection-' AND label CONTAINS[c] 'Clients'")).firstMatch
-        XCTAssertTrue(collection.waitForExistence(timeout: 10), "the Clients collection appears in the sidebar")
+        // Matched by identifier, not by label. A sidebar scope row publishes its text as the
+        // element's **value** and leaves `label` empty, so the previous
+        // `label CONTAINS[c] 'Clients'` predicate could never match however right the app was —
+        // the tree at the failure showed `glass-library-scope-collection-clients` sitting there
+        // with `value: Clients` and a count of 1. The identifier carries the collection's slug,
+        // which is the tag lowercased, so it says the same thing without depending on where the
+        // text surfaces.
+        let collection = element("glass-library-scope-collection-clients")
+        if !collection.waitForExistence(timeout: 10) {
+            snap("no-collection-scope")
+            dumpTree("no-collection-scope")
+            XCTFail("the Clients collection does not appear in the sidebar")
+        }
+        XCTAssertEqual("\(collection.value ?? "")", "Clients",
+                       "the scope row names the collection the first host introduced")
         #endif
     }
 }
