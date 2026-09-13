@@ -340,11 +340,29 @@ own type so `date[]` inherits the date check. `TransportPlan.tunnelRemoteHost`/`
 deleted, along with two tests that were circular: they asserted a field nothing reads was written.
 `ConnectionFormView` deleted. `StagedEdit.dialect` threaded from `session?.connection?.dialect`.
 
-**Still open: `text`/`blob`.** Six of MySQL's eight family names work. Bare `text` and `blob` are
-also PostgreSQL's and SQLite's words for roughly a gigabyte, so they are left **unconstrained**
-without the dialect — a missing limit only fails to warn, a borrowed one silently refuses data that
-would have stored. `GridColumnFilter` deliberately passes `nil`: it is `Codable` and persisted per
-table, and a filter value is matched by the server, never stored by it.
+**`text`/`blob` — CLOSED 2026-09-12 (night), and the item was mislabelled.**
+
+It read as "six of eight families work; bare `text`/`blob` need the dialect at `GridColumnFilter`".
+The real gap was larger: `GridColumnFilter.validationError` was a **second, weaker copy** of the
+record editor's check that called `boundValue()` and stopped — and `boundValue()` is type
+*conversion* only (`RecordEditorView.swift:219`), never consulting `ColumnTypeConstraint`. So a grid
+filter ran **no size check at all**, on any type, on any engine: `varchar(4)` accepted `"12345"` and
+returned an empty page with no explanation.
+
+Now consults the constraint, and takes the dialect as a **parameter rather than a stored property** —
+a saved filter outlives its session and the engine belongs to the connection, which is also why
+`GridColumnFilter` stays `Codable` with no migration. Threaded at five call sites.
+
+**Size-checked for `.equals` only, deliberately.** A filter is a read, so the question is not "will
+the server store this?" but "can any stored row match it?". For `=` the answer is provably no. For
+`<>` the same value matches every row, and for `<`/`>` an out-of-range bound is an ordinary way to
+say "all of them"; refusing those would block correct queries. `onlyEqualityIsSizeChecked` exists to
+stop someone tidying that condition away.
+
+**How it was caught, which is the transferable part:** the first version of the test asserted only
+the dialect-dependent cases and would have passed for the wrong reason. Adding `varchar(4)` — which
+needs no dialect and should have worked since the day size checking was written — is what exposed it.
+*A test aimed only at the part you suspect will agree with you.*
 
 ### R8 — original brief
 
@@ -356,13 +374,34 @@ table, and a filter value is matched by the server, never stored by it.
 | Files failed once from a cold app and worked after a quit/restart — stale state, not reproduced since, **not closed** | `GlassTerminalCapability.swift:292-304` |
 | `createSFTPSession(sharing:)` has **no callers** — dead code that implies Files needs an existing session when it does not | `SessionManager.swift:424` |
 
-### R9 — verification still owed
+### R9 — verification: partly closed 2026-09-12 (night), and this is what keeps Stage 3 open
 
-- Security review (wave 4): the tunnel replacement, credential handling, the record-editor
-  predicate path, export paths, AI SQL gating and prompt-injection defences.
-- Integration UI across three platforms.
-- **iOS and visionOS are compile-verified only** — never launched, never installed on a device.
-- The tag-vocabulary UI test failure, pre-existing and in untracked Stage 2 work.
+**Closed.**
+- **macOS integration UI.** `UITests/GlassDatabaseUITests.swift` passes **7/7** against real MySQL
+  8.4.11 and PostgreSQL 18.6 — see [the device-pass note](2026-09-12_device-pass.md). Row deletion,
+  a composite foreign-key follow, Run All Statements, draft restore and the editor's AX value are
+  driven through the running app on both engines. This also answered R1's *"unproven and wanting a
+  person in front of the app"*: **restore fires.**
+- **Prompt-injection defences**, **export paths** and **AI SQL gating** now have tests where they had
+  none — `SchemaContextTests`, `UntrustedPromptRegionTests`, `GridExportFormatterTests`,
+  `SQLSafetyClassificationTests`, `GridServerQueryBuilderTests`, `SQLiteManagedStorageTests`.
+  All five implementations were already correct; nothing had been guarding them.
+- **Installed on device.** 0.3.69 is on the iPhone 17 Pro Max and the Vision Pro, version read back
+  from the installed bundle. *Installed is not driven* — see below.
+
+**Still owed, and Stage 3 is not closed until these are:**
+1. **iOS and visionOS UI verification.** The suites are written to run there and have never been run
+   there. The **visionOS UI target cannot link at all**: `GlassShellLocalHostUITests.swift:143` calls
+   `.click()` on an `XCUICoordinate`, which the xrOS SDK does not have. That is a hard blocker on
+   the platform this product was started for, and it should be fixed before Stage 4.
+2. **The formal security review** as a pass in its own right — the tunnel replacement, credential
+   handling and the record-editor predicate path are still unreviewed, even though neighbouring
+   surfaces gained tests.
+3. **The D14 fingerprint prompt.** The fingerprint *text* is now correct and known-answer tested
+   against `ssh-keygen`, but **nobody has driven the prompt** — not a test, not a person.
+4. The tag-vocabulary UI test failure, pre-existing and in untracked Stage 2 work.
+5. An **accessibility gap**, recorded and deliberately unfixed pending a decision: schema rows expose
+   no accessibility action for the single-click selection they exist for, and `tableRow` is the same.
 
 ### Suggested order
 
