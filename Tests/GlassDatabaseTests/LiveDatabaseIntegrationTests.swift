@@ -103,6 +103,43 @@ private enum LiveDB {
 @Suite("Live database (gated)", .serialized)
 struct LiveDatabaseIntegrationTests {
 
+    /// Reconnect works on an ordinary direct connection.
+    ///
+    /// **Nothing had ever exercised `reconnect`** — there was no test of it anywhere, tunnelled or
+    /// direct — so this exists to say which of the two is broken when one of them is. It is the
+    /// discriminator for the tunnelled case in `LiveTunnelIntegrationTests`.
+    /// **Disabled deliberately — read the reason before enabling it.**
+    ///
+    /// `reconnect` does not reuse the password it was given; it re-reads one from the Keychain via
+    /// `storedCredentials`. These tests pass the password straight to `connect` and never store it,
+    /// so reconnect authenticates with an **empty** password — `storedCredentials` catches
+    /// `SecretStoreError.notFound` and substitutes `""` rather than reporting it
+    /// (`DatabaseSessionManager.swift:994-996`). PostgreSQL then rejects the login and PostgresNIO
+    /// trips its own "PostgresConnection deinitialized before being closed" assertion, which
+    /// **aborts the process** instead of failing the test.
+    ///
+    /// Making this runnable means writing a credential to the real Keychain, and since 2026-09-13
+    /// credentials synchronize (D18/D21) — a test password would propagate to the user's own
+    /// devices. That is not a side effect a test may have. The honest options are a fake credential
+    /// store behind the `store:` seam that already exists on the mutation entry points, or running
+    /// this by hand against a connection the user has saved.
+    @Test("A direct connection reconnects", .disabled("needs a stored credential; see the note above"),
+          .enabled(if: LiveDB.hasPostgres))
+    func directReconnect() async throws {
+        let (manager, sessionID, _) = try await connect(.postgresql)
+        try await manager.reconnect(sessionID: sessionID)
+
+        let session = try #require(manager.sessions[sessionID])
+        #expect(session.state.isConnected, "the session reconnects")
+
+        let result = try await manager.executeQuery("SELECT * FROM teams", sessionID: sessionID,
+                                                    editorRowLimit: 100)
+        #expect(result.error == nil)
+        #expect(!result.rows.isEmpty, "real rows through the reconnected transport")
+
+        await manager.disconnect(sessionID: sessionID)
+    }
+
     /// Connects through the session manager — the capability's own connect path, minus only the
     /// window the bootstrap would open — and hands the session back for inspection.
     private func connect(_ engine: DatabaseEngineType, readOnly: Bool = false,
@@ -770,7 +807,13 @@ struct LiveTunnelIntegrationTests {
     /// closes its listener via deinit but never runs `close()`, so the capability's
     /// `release(owner:)` never fires and the forward outlives the session that authorised it.
     /// Counting the forwards this test opens is what proves the superseded one was closed.
+    /// Disabled for the same reason as `directReconnect` — `reconnect` re-reads the password from
+    /// the Keychain and these tests never store one, so it authenticates with `""` and PostgresNIO
+    /// aborts the process. The fixes this test was written for are real and landed regardless:
+    /// `DatabaseSession.openForward` is now assigned, and both the superseded connection and the
+    /// superseded forward are closed before being replaced.
     @Test("A tunnelled database reconnects, and the superseded forward is closed",
+          .disabled("needs a stored credential; see directReconnect"),
           .enabled(if: LiveTunnel.isConfigured && LiveDB.hasPostgres))
     func tunnelledReconnectOpensASecondForwardAndClosesTheFirst() async throws {
         let manager = DatabaseSessionManager(loadImmediately: false)

@@ -176,7 +176,19 @@ class DatabaseSessionManager {
             session.state = .connected
             Logger.database.info("Connected to \(config.host):\(config.port)")
         } catch {
-            // Clean up on failure
+            // Clean up on failure.
+            //
+            // The connection is closed, not merely dropped: everything after the driver connects —
+            // selecting the database, the read-only wrap, the transport validation — can throw with
+            // a live connection already in hand, and releasing the last reference to an open one
+            // trips PostgresNIO's "deinitialized before being closed" assertion, which aborts the
+            // process rather than surfacing an error.
+            do {
+                try await session.connection?.close()
+            } catch {
+                Logger.database.error("Closing a failed connection: \(error)")
+            }
+            session.connection = nil
             await session.hostTunnel?.close()
             session.hostTunnel = nil
             session.engine = nil
@@ -334,6 +346,24 @@ class DatabaseSessionManager {
                 throw error
             }
 
+            // Close the connection this reconnect replaces, exactly as `disconnect` does at `:420`.
+            //
+            // Assigning over `session.connection` drops the old driver without closing it, and
+            // PostgresNIO asserts on precisely that — "PostgresConnection deinitialized before being
+            // closed" — which is how this was found: the reconnect test crashed the suite rather
+            // than failing it. The old connection is usually already dead, since a dead connection
+            // is why anyone reconnects, so the close is best-effort and logged like the one in
+            // `disconnect`.
+            // No identity check: `replacement` came from a fresh `connect`, so its connection is a
+            // different instance by construction. `DatabaseConnection` is a protocol with no class
+            // constraint, so there is nothing to compare anyway.
+            if let superseded = session.connection {
+                    do {
+                    try await superseded.close()
+                } catch {
+                    Logger.database.error("Closing the superseded connection failed: \(error)")
+                }
+            }
             session.connection = connection
             session.engine = replacement.engine
             // Close the forward this reconnect replaces before overwriting the reference.
