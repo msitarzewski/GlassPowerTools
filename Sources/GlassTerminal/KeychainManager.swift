@@ -264,10 +264,18 @@ enum KeychainManager {
     nonisolated static let legacyTailscaleOAuthClientIDAccount = "tailscale-oauth-client-id"
     nonisolated static let legacyTailscaleOAuthClientSecretAccount = "tailscale-oauth-client-secret"
 
+    // D18/D21: SSH passwords, key passphrases and private keys travel with the user.
+    //
+    // Apple synchronizes password-class items only — not keys or certificates — which would rule
+    // SSH keys out, except that `GlasSecretStore` stores everything as `kSecClassGenericPassword`,
+    // so the key bytes ride inside a password item. That is why `sshKeysPrivateService` is already
+    // on `validateMobility`'s eligible list. Secure Enclave–backed keys are the real exception and
+    // are refused there regardless of this setting.
     nonisolated static let config = SecretStoreConfiguration(
         serviceNamePrefix: "sh.glas",
         accessGroup: resolvedAccessGroup,
-        useDataProtectionKeychain: true
+        useDataProtectionKeychain: true,
+        mobilityPolicy: .iCloudKeychain
     )
 
     nonisolated private static var resolvedAccessGroup: String? {

@@ -155,8 +155,10 @@ public final class GlassShellModel {
             hasSharedContainer = false
             hostLibraryStatus = "The shared App Group is unavailable, so hosts are kept in this app only. Check the group.sh.glas.shared entitlement and signing."
         }
+        // D18/D21: on by default, so a host defined on one device is usable from the next.
         secretConfiguration = SecretStoreConfiguration(serviceNamePrefix: "sh.glas", accessGroup: accessGroup,
-                                                       useDataProtectionKeychain: true, mobilityPolicy: .deviceOnly)
+                                                       useDataProtectionKeychain: true,
+                                                       mobilityPolicy: .iCloudKeychain)
     }
 
     /// Set when the file was unreadable for availability reasons (protected before first

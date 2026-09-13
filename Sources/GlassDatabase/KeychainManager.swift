@@ -149,19 +149,40 @@ enum KeychainManager {
         }
     }
 
+    // D18/D21: credentials travel with the user, on by default.
+    //
+    // The access group and mobility are **independent**: the group decides which apps on THIS
+    // device can read an item, `kSecAttrSynchronizable` decides whether it reaches the user's other
+    // devices. Only the second is needed to pick up a Vision Pro and work, which is why
+    // `appOnlyConfig` below syncs while staying private to this app.
     static let sharedConfig = SecretStoreConfiguration(
         serviceNamePrefix: "sh.glas",
         accessGroup: resolvedAccessGroup,
         legacyServiceNamePrefixes: ["app.glassdb"],
-        useDataProtectionKeychain: useDataProtectionKeychain
+        useDataProtectionKeychain: useDataProtectionKeychain,
+        mobilityPolicy: .iCloudKeychain
     )
 
+    /// Database passwords: private to this app, and present on every device the user owns.
+    ///
+    /// `accessGroup: nil` keeps them out of the Glass-family group — no other capability has a use
+    /// for them — while `.iCloudKeychain` is what makes a database defined on the Mac connect from
+    /// the Vision Pro without retyping anything.
     static let appOnlyConfig = SecretStoreConfiguration(
         serviceNamePrefix: "app.glassdb.private",
         accessGroup: nil,
-        useDataProtectionKeychain: useDataProtectionKeychain
+        useDataProtectionKeychain: useDataProtectionKeychain,
+        mobilityPolicy: .iCloudKeychain
     )
 
+    /// **Deliberately device-only, and it cannot be otherwise.**
+    ///
+    /// This is the `.requireAuthentication` policy, which stores with `.userPresence` protection.
+    /// `KeychainOperations.validateMobility` refuses that combination outright
+    /// (`CredentialMobilityError.deviceBoundProtection`), because a secret gated on this device's
+    /// biometrics is bound to this device's hardware. Setting `.iCloudKeychain` here would not sync
+    /// it; it would make every write throw. A user who chooses "require authentication" is choosing
+    /// a credential that does not travel, and the UI owes them that plainly (D20).
     static let authenticatedConfig = SecretStoreConfiguration(
         serviceNamePrefix: "app.glassdb.protected",
         accessGroup: nil,

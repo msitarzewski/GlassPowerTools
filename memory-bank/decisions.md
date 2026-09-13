@@ -462,3 +462,35 @@ See [Stage 3.5](tasks/2026-09/2026-09-13_stage-3.5-continuity.md). D19 (CloudKit
 D20 (Secure Enclave keys stay device-bound and the UI says so) are **Proposed**; D21 (opt-in or
 default, per-record or global) and D22 (what happens to existing device-only secrets) are **open and
 need the user**.
+
+
+## D21 — credential sync is on by default — Approved 2026-09-13
+
+The user: *"Default on for my intended audience."*
+
+The experience the product promises is picking up a Vision Pro and working; an opt-in buried in
+settings does not deliver that, because the moment a user has to discover a switch they have already
+had the bad first run this stage exists to prevent.
+
+**The cost, recorded so it is a decision and not a side effect:** a synced secret has a larger blast
+radius than a device-bound one. Items are end-to-end encrypted to the user's circle of trust and
+Apple cannot read them, but any device in that circle can. That is the trade the default takes, and
+the UI is expected to state what travels rather than let a user infer it (see D20).
+
+Secure Enclave–backed keys are unaffected: they cannot sync at all and `validateMobility` refuses
+them regardless of this setting.
+
+## D22 — existing device-only secrets are rewritten, not migrated — Approved 2026-09-13
+
+The user: *"no one uses this tool. rewrite."*
+
+There is no installed base to preserve, so the stage takes the simple path: a secret written under
+`.deviceOnly` is not migrated in place. It is replaced the next time it is saved, and the old item is
+deleted rather than left behind.
+
+This removes the expensive half of the work — no dual-read fallback, no half-migrated state to
+reason about, and none of the partial-failure rollback complexity the security review found untested
+in `applyCredentialMutation`. It also lets F3's stranded items be swept rather than reconciled.
+
+**This decision has a shelf life.** It is safe only while the user is the only user; the first real
+installation makes it false. It should be re-read, not reused, the moment that changes.
