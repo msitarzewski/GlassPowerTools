@@ -1016,3 +1016,59 @@ here the latent fragility, sat behind a question nobody had asked out loud.
 
 **Package: 733 tests / 63 suites, all passing** — the seven existing `ReadOnlyServiceTests` included,
 so the hardening did not change what the gate already refused.
+
+## 2026-09-13 (later) — Stage 3.5 closed out; Stage 4 is next
+
+**State DOCS.** Owner: coordinating agent. Working tree has uncommitted changes; **nothing has been
+committed this session** — the user commits.
+
+**Done here:** `GlasSecretStore` absorbed into `Sources/GlasSecretStore`; **D23** (pinned SSH host
+keys synchronize, one configuration for them, eligible set public on `SecretStoreConfiguration`);
+the D18 half-fix that left the trust prompt throwing, repaired; the Stage 2 tag-vocabulary UI
+failure closed as two stale test assumptions rather than a product defect; `AGENTS.md` and
+`memory-bank/toc.md` corrected where they still described the source apps as live software.
+
+**Verified by running, not reading:** package 946 tests / 90 suites; macOS / iOS / visionOS app
+builds; 5 real-host SSH transport tests; 21 live database tests; the macOS database UI suite 7/7
+against real MySQL 8.4.11 and PostgreSQL 18.6; and `testConnectsToRealHostThroughTheShell`, which
+now drives the **D14 trust prompt** — the first time anything has.
+
+**The limit that has not moved:** no test proves CloudKit delivers anything, and now also none proves
+a pin made on the Mac reaches the Vision Pro. Three tests in `HostTrustSynchronizationTests` report
+**skipped** for a measured reason: an unsigned `swift test` process cannot write a synchronizable
+Keychain item (`errSecMissingEntitlement`), and ad-hoc signing the entitlement gets the process
+killed. The seven-item device checklist in
+[Stage 3.5](tasks/2026-09/2026-09-13_stage-3.5-continuity.md) is still the only thing that can close
+this, and it needs the user with two devices.
+
+**Next action:** Stage 4 — the remote desktop capability, planned in
+[Stage 4 — desktop](tasks/2026-09/2026-09-10_stage-4-desktop.md). `RDPCredentialStore` is already in
+the absorbed module and `rdpCredentialsService` is already eligible, so the third credential kind
+arrives with its mobility decided — which was the reason Stage 3.5 went first.
+
+## 2026-09-13 (later still) — visionOS design pass 1 built, unverified on device
+
+**State BUILD.** Owner: coordinating agent. Sequenced before Stage 4 by the user's decision, so the
+desktop capability inherits the right patterns.
+
+**Authorization:** *"pay attention to the design. it's terribly off"*, scope *"1 plus our
+Glass/transparency/theme controls… 3 shouldn't be a separate wish, it's the goal"*, constraint
+*"familiar to a Mac user, but visionOS magic to use."*
+
+**Done:** ornament for primary actions; spatial sidebar widened rather than shrinking its contents;
+gaze-scale row metrics and `hoverEffect`; visionOS row type scale; empty detail given its pane; host
+sheet enlarged; **the window stopped painting a `Material` over visionOS's own glass**; **the
+ornament inset stopped applying when no ornament is shown**. All spatial numbers in
+`GlassSpatialMetrics.swift` (GlassConnectionKit), no-ops off visionOS.
+
+**Verified:** package 946/90; macOS UI 25/25 after every change; builds for macOS, iOS Simulator,
+visionOS Simulator and visionOS device; simulator captures at each step.
+
+**Blocked and honest about it:** the headset was locked for the whole pass, so **none of this has
+been seen on hardware**, and the simulator renders glass differently from what pass 1 changed. Also
+undiagnosed: two on-device UI failures (`testCollectionsAreChipsAndFeed…`,
+`testAddServiceCollectsTheAddressOnTheHost`) that pass on macOS.
+
+**Next action:** with the headset unlocked, capture library, host detail and Edit Host sheet on
+device; diagnose the two device failures from the result bundle; then the terminal and database
+surfaces; then Stage 4.

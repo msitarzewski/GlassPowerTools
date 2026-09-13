@@ -96,3 +96,35 @@
   **Found only by running against a real server and a realistic least-privilege account:** two independent PostgreSQL foreign-key defects — an owner-scoped view returning nothing, and composite keys returning a cross product asserting relationships that do not exist. Both fixed. **Open:** D13 (no way to trust a self-signed database certificate — needs a CA-only mode *and* a CA import), and two unexplained ~10s tunnel failures, instrumented with a three-signature discriminator table and a counter baseline. Three hypotheses proposed, all three refuted by measurement.
 - 2026-09-12 (afternoon) — **Stage 3 shipped to `/Applications` (0.3.56 → 0.3.67) and corrected in use.** Closed the two unexplained ~10s tunnel failures: the SSH forward dropped a **server-first** protocol's opening bytes, because the channel was wrapped after the open rather than inside the initializer — [note](2026-09-12_ssh-forward-server-first.md). Every test passed it, including the live tunnel test. UI and record-editor validation work, including a `tinyint` misread as boolean that **would have saved 0 over real data** — [note](2026-09-12_ui-and-validation.md). Package 615/48; **nothing committed**. Remaining Stage 3 work **re-planned against the code that now exists**, with `file:line` anchors, in the [plan](2026-09-12_stage-3-database-plan.md): two original estimates were wrong (AI on iOS already done; the audit viewer has no store to view). Rules 22 and 23 added, and decisions D16–D17.
 - 2026-09-12 (evening) — **Stage 3 R1–R8 closed**, three workers in parallel: [SQL drafts](2026-09-12_sql-drafts.md), [rows and audit](2026-09-12_rows-and-audit.md), [certificate trust](2026-09-12_certificate-trust.md). 711 tests / 61 suites, **no known issues**. R6 turned out to be *one implementation pasted twice* (650 lines deleted), not two implementations. R7 needed a capability-level test to distinguish "the engine can" from "a saved record reaches it". Remaining work is a device and UI pass, not code.
+
+## 2026-09-13 (later) — GlasSecretStore absorbed; D23; the last standing UI failure closed
+
+[Task note](2026-09-13_secretstore-absorbed.md) · [D23](../../decisions.md)
+
+`Sources/GlasSecretStore` is in-repo (15 source + 9 test files, no import changed). Answering the
+open "should pinned host keys sync?" question exposed that host trust did not work at all: the trust
+prompt's four write paths were on a configuration `validateMobility` refused. D23 makes host trust
+eligible, moves the eligible set onto `SecretStoreConfiguration.synchronizableServices`, and gives
+pins one configuration name.
+
+`testCollectionsAreChipsAndFeedTheSystemWideVocabulary`, failing since Stage 2, is fixed — two stale
+test assumptions, no product defect.
+
+**Verified by running:** package 946 tests / 90 suites (3 skipped with a measured reason); macOS,
+iOS and visionOS app builds; 5 real-host SSH tests; 21 live database tests; the macOS database UI
+suite 7/7 against real MySQL 8.4.11 and PostgreSQL 18.6; and the real-host terminal UI test driving
+the D14 trust prompt for the first time.
+
+## 2026-09-13 (later still) — visionOS design pass 1
+
+[Task note](2026-09-13_visionos-design-pass.md)
+
+Native visionOS HIG on the Glass language already in place. The premise that the source apps carry
+the spatial vocabulary was measured and found false — HIG conformance is new work everywhere; what
+they did carry is `GlassLayers`, and it stays. Two faults were the app overriding the platform: a
+`Material` painted across the window covering visionOS's real glass, and the ornament inset applied
+when no ornament is shown. Plus ornament toolbar, gaze-scale metrics, hover, type scale, empty state
+and sheet sizing.
+
+macOS UI 25/25 throughout — no Mac metric moved. **Unverified on the headset**, which was locked for
+the whole pass.

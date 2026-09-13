@@ -539,3 +539,58 @@ Keychain encrypted to the user's devices — **and that a service set to require
 not**. A key protected by this device's biometrics is bound to this device's hardware and cannot
 sync; `KeychainOperations.validateMobility` refuses it outright. Being asked for that one password
 again on another device is correct behaviour and indefensible as a surprise.
+
+## D23 — pinned SSH host keys synchronize, and there is one configuration for them — Implemented 2026-09-13
+
+**Approved by the standing continuity requirement, not by a fresh question.** The user's words for
+Stage 3.5 were *"define everything on Mac, then pick up Vision Pro and get to work without having to
+mess with settings and passwords."* Host trust was left device-bound as an open question, which in
+practice meant: every machine the Mac already trusts has to be re-approved, by fingerprint, on the
+Vision Pro and again on the iPhone. That is the thing the requirement names.
+
+A pinned host key is a **public** key — the fingerprint `ssh-keygen` prints. There is nothing to
+protect by keeping it local, and the protection it does provide (noticing when a server's key
+changes) is *stronger* when every device agrees on what the key was.
+
+`sshHostTrustService` joins `validateMobility`'s eligible set, and the set moved out of the function
+onto the configuration as the public `SecretStoreConfiguration.synchronizableServices`, so a caller
+can ask the same question the validator answers. Secure Enclave services stay off it permanently: a
+sealed token is usable only by the chip that minted it.
+
+### What this repaired, which was not the question it started as
+
+Checking whether host trust *should* sync surfaced that host trust did not work. D18's fix moved the
+**transport's** trust store to a device-bound configuration and left `KeychainManager`'s own
+`savePinnedHostKey`, `replaceHostKey`, `allPinnedHostKeys` and `trustedHostKeyBase64Set` on the
+synchronizing one. Those four are where the **trust prompt** writes. So:
+
+- accepting a fingerprint through the UI threw `ineligibleService` — the D14 prompt could not
+  complete;
+- and even without the throw, a synchronizable Keychain item and a device-only one with the same
+  account are *different items*, so a pin written on connect was invisible to the prompt.
+
+`KeychainManager.hostTrustConfig` is now the single name for where pins live, used by all four
+methods and by all three `SecretStoreHostTrustStore` construction sites. `deviceBoundConfig` remains
+for exactly one thing — Secure Enclave key material — and its documentation says so.
+
+### Why nothing caught it, stated so the gap is not re-created
+
+**No `swift test` process can write a synchronizable Keychain item.** Measured on this machine:
+`SecItemAdd` with `kSecAttrSynchronizable: true` returns `errSecMissingEntitlement` (-34018) with or
+without the data-protection Keychain, because the item needs `com.apple.application-identifier`;
+ad-hoc signing the test binary with that entitlement gets the process killed on launch. The real-host
+integration suite passes an `InMemoryHostTrustStore`, so it proves SSH works and proves nothing about
+storage. Every other mobility test asserted a configuration's *properties* rather than driving an
+item through the store.
+
+`HostTrustSynchronizationTests` now exists and **reports skipped, with that reason, rather than
+passing vacuously**. Its refusal half runs everywhere. The proof that the whole path works is
+`testConnectsToRealHostThroughTheShell` on macOS against the live VM: it reaches the prompt, accepts
+it, stores the pin under the app's real synchronizing configuration and connects — **the first time
+anything has driven the D14 prompt.**
+
+### Consequence accepted, per D22
+
+Pins written under the device-bound configuration are different Keychain items and are not carried
+over. Each host is trusted once more, through the prompt, and then travels. That is the rewrite
+D22 authorized, and it exercises the prompt rather than avoiding it.

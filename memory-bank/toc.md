@@ -3,8 +3,8 @@
 Created 2026-09-10. Aggregate owner: coordinating agent `/root` until handed off.
 
 Read [AGENTS.md](../AGENTS.md), then [active context](activeContext.md), [progress](progress.md) and
-the [merge plan](tasks/2026-09/2026-09-10_merge-plan.md). This project has not been built yet; the
-three source applications are still the working software.
+the [merge plan](tasks/2026-09/2026-09-10_merge-plan.md). Stages 1 to 3.5 are built and tested; the
+three source applications are obsolete and no longer compile.
 
 | Note | Purpose |
 |---|---|
@@ -13,7 +13,7 @@ three source applications are still the working software.
 | [System patterns](systemPatterns.md) | Intended module boundaries and what they replace |
 | [Technical context](techContext.md) | Measured sizes, dependencies, targets and identities |
 | [Active context](activeContext.md) | Current state, ownership and next action |
-| [Progress](progress.md) | What is actually done, which today is nothing but planning |
+| [Progress](progress.md) | What is verified by running, what is only compiled, and what two devices still have to prove |
 | [Project rules](projectRules.md) | Rules specific to this merge |
 | [Decisions](decisions.md) | Decisions with status and provenance |
 | [Merge plan](tasks/2026-09/2026-09-10_merge-plan.md) | The staged plan, its risks and open questions |
@@ -40,12 +40,15 @@ three source applications are still the working software.
 | [UI and validation from use](tasks/2026-09/2026-09-12_ui-and-validation.md) | Builds 0.3.56–0.3.67: canvas border, Paint Theme removed, service tabs, colour swatches, record-editor validation, the `tinyint` data-loss bug |
 | [Stage 3 — database (superseded draft)](tasks/2026-09/2026-09-10_stage-3-database.md) | Predates the setup sheet, the draft contract and the address-on-the-host rule. **Superseded by the plan above** |
 | [Stage 4 — desktop](tasks/2026-09/2026-09-10_stage-4-desktop.md) | glassDT engines and Core/UI moved; pairing machinery deleted; validation ledger |
+| [Stage 3.5 — continuity](tasks/2026-09/2026-09-13_stage-3.5-continuity.md) | D18–D22: credentials and the host catalog travel; the device checklist no test can replace |
+| [GlasSecretStore absorbed](tasks/2026-09/2026-09-13_secretstore-absorbed.md) | The package moved in-repo, and the host-trust defect that answering "should pins sync?" exposed (D23) |
+| [visionOS design pass](tasks/2026-09/2026-09-13_visionos-design-pass.md) | Native HIG on the Glass language; the two places the app was painting over the platform; how to actually get a capture |
 | [September tasks](tasks/2026-09/README.md) | Monthly index |
 
-This project is `~/Software/glass/GlassPowerTools`. Source applications and their own memory banks
-are sibling directories at `../glas.sh`, `../glassdb`, `../glassDT`, `../GlassConnectionKit`,
-`../GlasSecretStore` and `../GlassEditorKit`. Treat them as the record of what exists today; treat
-this bank as the record of what is being built. Two further siblings are **not** inputs:
+This project is `~/Software/glass/GlassPowerTools`. `../GlassConnectionKit` and `../GlassEditorKit`
+are live dependencies. `../glas.sh`, `../glassdb`, `../glassDT` and `../GlasSecretStore` are
+obsolete and do not compile — a historical record to read, never something to keep building.
+GlasSecretStore was absorbed into `Sources/GlasSecretStore` on 2026-09-13. Two further siblings are **not** inputs:
 `../docs` holds two July 2026 security audit reports whose still-open findings are tracked in
 [technical context](techContext.md). A stale copy of glassdb was archived to
 `../glassdb-connection-library.zip` and removed on 2026-09-10. The full layout is in [technical context](techContext.md).

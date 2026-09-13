@@ -288,3 +288,140 @@ Two OOM kills during this session, both from accumulated test artefacts: **37 wo
 directories (~99 GB)** and **XCUITest result bundles carrying full screen recordings** (~6 GB over
 twenty-odd runs). Neither is obvious until the machine complains. Clear the scratchpad between long
 UI campaigns.
+
+## 2026-09-13 (later) — GlasSecretStore absorbed, D23, and the last standing UI failure closed
+
+**`Sources/GlasSecretStore` is now part of this repository.** 15 source files and 9 test files moved
+in verbatim; the module name is unchanged so none of the 36 files that import it changed a line. The
+`.package(path: "../GlasSecretStore")` dependency is gone and `GlassPowerTools.xcodeproj` needed no
+edit — it references `.` as its only local package. `LICENSE` (MIT) is now at the repository root.
+
+**Package: 946 tests / 90 suites passing**, from 847/74. Three of those are recorded **skipped**, not
+passed — see below.
+
+### D23: host trust travels, and the defect that answering the question exposed
+
+The open item was *"should pinned SSH host keys sync?"*. Reading the call sites to answer it showed
+host trust **did not work**: D18's fix had moved the transport's trust store to a device-bound
+configuration and left `KeychainManager.savePinnedHostKey`, `replaceHostKey`, `allPinnedHostKeys` and
+`trustedHostKeyBase64Set` — where the **trust prompt** writes — on the synchronizing one, which
+`validateMobility` refused. Accepting a fingerprint threw `ineligibleService`. And even without the
+throw, a synchronizable Keychain item and a device-only one with the same account are *different
+items*, so a pin written on connect was invisible to the prompt.
+
+A pinned host key is a **public** key, and re-approving every machine on every device is the thing
+the continuity requirement exists to remove. So `sshHostTrustService` is eligible now, the eligible
+set moved out of `validateMobility` onto the configuration as the public
+`SecretStoreConfiguration.synchronizableServices` — so a caller can ask the question the validator
+answers — and `KeychainManager.hostTrustConfig` is the one name for where pins live. Secure Enclave
+services stay off the set permanently. Full account in [decisions](decisions.md) under **D23**.
+
+### Why 800 unit tests could not have caught either defect, measured
+
+**No `swift test` process can write a synchronizable Keychain item at all.** `SecItemAdd` with
+`kSecAttrSynchronizable: true` returns `errSecMissingEntitlement` (-34018) with *and* without the
+data-protection Keychain, because the item needs `com.apple.application-identifier`; ad-hoc signing
+the test binary with that entitlement gets the process killed on launch. Both measured here, not
+inferred. The real-host integration suite passes an `InMemoryHostTrustStore`, so it proves SSH works
+and proves nothing about storage.
+
+`HostTrustSynchronizationTests` therefore **reports skipped with that reason** rather than passing
+vacuously; its refusal half runs everywhere. The proof is
+`testConnectsToRealHostThroughTheShell` against the live VM, which reaches the D14 prompt, accepts
+it, stores the pin under the app's real configuration and connects — **the first time anything has
+driven that prompt.** Getting there needed one harness fix: the trust button was looked up
+application-wide and kept resolving to the Touch Bar's copy, which refuses every click.
+
+### The Stage 2 tag-vocabulary failure was never a product defect
+
+`testCollectionsAreChipsAndFeedTheSystemWideVocabulary` had been failing since Stage 2 and is now
+passing. **Two stale assumptions, no app bug:**
+
+1. The add-host sheet arrives with the Terminal service selected — *"adding a machine without a
+   service doesn't make sense"* — so Save was **correctly refused** with
+   `add-server-username-validation = "Error: Enter the SSH username"`. The test never filled the
+   service. Same class as the four `GlassShellLibraryUITests` cases that decision invalidated; this
+   suite was missed when those were repaired.
+2. The sidebar's collection row publishes its text as the element's **`value`** and leaves `label`
+   empty, so `label CONTAINS[c] 'Clients'` could never match however right the app was.
+
+**Two process notes worth more than the fix.** The first guess — "a service is required, so
+`validateForSave` rejects a service-less host" — was *wrong*: `validateForSave` requires no service;
+the enabled Terminal draft's own validation fails. Reading the source before acting caught it. And
+the first diagnostic added to find out **failed from inside itself**: it enumerated
+`app.staticTexts.allElementsBoundByIndex`, each read takes its own snapshot, and with the UI still
+settling it raised "No matches found for Element at index 34" and — with
+`continueAfterFailure = false` — failed the test, hiding the failure it was added to explain.
+`debugDescription` on a single window or sheet element is one snapshot and cannot race with itself.
+
+### Also corrected
+
+`AGENTS.md` said the source applications "must keep building until this product reaches parity" and
+named `../GlasSecretStore` as the owner of credentials. Both were stale and actively misleading;
+`memory-bank/toc.md` still said nothing had been built. Corrected.
+
+## 2026-09-13 (later still) — visionOS design pass 1
+
+**The user's verdict, from the physical headset:** *"pay attention to the design. it's terribly
+off… These are functional, but don't provide that polished magic visionOS experience."* Scope agreed
+as native visionOS HIG **plus** the Glass/transparency/theme language, sequenced **before Stage 4**
+so the desktop capability is built into the right patterns rather than inheriting the flat ones. The
+governing constraint: *"this should feel familiar to a Mac user, but should be visionOS magic to
+use"* — the information architecture stays; presentation and interaction change.
+
+### The premise was wrong, and measuring it first saved building on sand
+
+The expectation was that the source apps already carry most of the spatial language. Counted:
+glas.sh has 4 `glassBackgroundEffect` / 9 `.ornament` / 2 `hoverEffect`; glassdb and glassDT have
+**none**; this product already had 3 / 6 / 2 and GlassConnectionKit 3 / 4 / 0. glas.sh's vocabulary
+is essentially what already moved across. What the source apps *did* carry, and what genuinely is in
+place, is the Glass language itself — `Sources/GlassLayers`, its two independent dimensions and the
+four frost materials mapped to glas.sh's persisted values. **HIG conformance is new work in all four
+codebases**, and saying so up front was better than discovering it late.
+
+### Two faults where the app was fighting the platform
+
+Neither was missing polish; both were the app actively overriding visionOS.
+
+**The window painted over the system glass.** At the default state (`opacity` 0, `frost` 1) the whole
+window was filled with `RoundedRectangle.fill(.ultraThinMaterial)`. A `Material` is a *2-D
+simulation* of glass — on a Mac it samples the desktop behind the window and convinces completely,
+which is why this was never wrong before. In a headset it composites as an even translucent sheet
+with no specular edge and no response to the room's light, covering the real glass with a
+convincing-looking grey rectangle. `GlassLibraryDetail`'s `.background(.bar)` was the same fault one
+control smaller.
+
+**The seam was our own padding.** `GlassNativeWindowFrame` inset content 22/34/26 pt to clear the
+title and control ornaments — and applied it even when neither ornament is shown. The library shows
+neither, so its `NavigationSplitView` floated inside the window and visionOS drew the sidebar surface
+inside the inset: a darker rectangle with a seam on all four sides. Removing the frost is what
+*exposed* it; under a grey plate it was invisible.
+
+### Also in pass 1
+
+Primary actions moved from `.toolbar(.primaryAction)` — three ~30 pt circles inside the window's
+corner — to an ornament below the window. The spatial sidebar widened to 320–460 pt instead of
+shrinking the row to fit it. Row Connect went from `.caption`/4 pt to `.body`/9–12 pt, past Apple's
+60 pt gaze target. Row type from `.headline`/`.caption` to `.title3`/`.callout`, visionOS only.
+`hoverEffect(.highlight)` on rows, because a control that does not answer a look reads as disabled.
+The empty detail given the pane rather than floating as a card in it. The host sheet enlarged with
+large controls.
+
+`GlassSpatialMetrics.swift` holds every spatial number in one place, as no-ops or pass-throughs off
+visionOS. **No macOS metric changed** — by construction, and proven by macOS UI staying 25/25.
+
+### Two capture facts, measured, that cost two failed runs
+
+- **The visionOS simulator cannot screenshot through XCUITest at all** — *"Unable to take a
+  screenshot - remote interface does not have this capability."* A suite that snaps on every step
+  fails there for that reason alone, nothing to do with the app.
+- **`xcrun simctl io <udid> screenshot` works.** So the loop without a headset is build → install →
+  launch → `simctl` screenshot. That shows layout — and it is what caught both structural faults —
+  but not how glass behaves in a real room.
+
+### The gap, stated plainly
+
+**Nothing in pass 1 has been seen on the headset.** It locked at *"Unlock My Vision Pro to
+Continue"* before the first change and stayed locked. The simulator renders glass differently from
+hardware, which is exactly what pass 1 altered, so the frost and inset fixes are **unconfirmed**.
+Also still undiagnosed: two on-device UI failures that pass on macOS.
