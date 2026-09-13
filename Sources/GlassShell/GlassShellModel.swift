@@ -463,11 +463,46 @@ public final class GlassShellModel {
     /// service — the Mac's own shell — so the plain "does this host have an `.ssh` service?" test
     /// says yes, and the database capability would then tunnel to loopback through loopback to
     /// reach a server already listening on it.
+    /// The member whose SSH service a borrowed forward runs through.
+    ///
+    /// **A host is a group, not a machine.** `GlassShellHostGrouping.group` joins records whose
+    /// normalised display names match, which is one of three ways in and does not require the
+    /// addresses to agree — `GlassShellHost` says so itself, keeping `addresses` plural and taking
+    /// `address` as the first. Two records both called "db" on different machines are one row.
+    ///
+    /// Taking simply "the first member with an `.ssh` service" therefore picks a machine by
+    /// creation order. A database on the newer record would be tunnelled through the SSH service on
+    /// the older one, and `DatabaseSessionManager` then opens the forward to `127.0.0.1:port` **as
+    /// that other machine sees it** and sends the username and password down it. With TLS off — the
+    /// ordinary setting for a tunnelled database — nothing notices.
+    ///
+    /// So the SSH service must belong to the machine the host *is*: the address shown in the UI and
+    /// the one the user believes they are reaching. When no SSH member carries that address the
+    /// group is genuinely ambiguous, and this returns nil rather than guessing — tunnelling to the
+    /// wrong machine is worse than not tunnelling, and the caller already reports the absence.
+    ///
+    /// One selection serves both the forward and the trust resolver on purpose, so a fingerprint
+    /// the user approves belongs to the machine the bytes go to.
+    /// Internal rather than private so the selection can be tested directly. Reaching it through
+    /// `hostAccess` proves nothing without a registered `.ssh` capability, and the rule being
+    /// tested — which machine is chosen — is independent of whether one is registered.
+    func sshMember(of host: GlassShellHost) -> HostProfile? {
+        let candidates = host.members.filter { $0.services.contains { $0.kind == .ssh } }
+        guard let address = host.address, !address.isEmpty else {
+            // No address to agree with: only one candidate is unambiguous.
+            return candidates.count == 1 ? candidates.first : nil
+        }
+        let matching = candidates.filter { $0.address == address }
+        // More than one member at the same address is the same machine recorded twice, which is
+        // what grouping exists for; any of them reaches it.
+        return matching.first
+    }
+
     private func portForwardProvider(for host: GlassShellHost)
     -> (@MainActor @Sendable (String, Int) async throws -> any GlassHostPortForward)? {
         guard !host.isLocal else { return nil }
         guard let capability = registry.capability(for: .ssh),
-              let member = host.members.first(where: { $0.services.contains { $0.kind == .ssh } })
+              let member = sshMember(of: host)
         else { return nil }
         return { remoteHost, port in
             try await capability.openPortForward(host: member, toHost: remoteHost, port: port)
@@ -481,7 +516,7 @@ public final class GlassShellModel {
     -> (@MainActor @Sendable () async -> GlassHostTrustOutcome)? {
         guard !host.isLocal else { return nil }
         guard let capability = registry.capability(for: .ssh),
-              let member = host.members.first(where: { $0.services.contains { $0.kind == .ssh } })
+              let member = sshMember(of: host)
         else { return nil }
         return { await capability.resolveHostTrust(host: member) }
     }
