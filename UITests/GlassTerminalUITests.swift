@@ -180,6 +180,11 @@ final class GlassTerminalUITests: XCTestCase {
         }
         snap(fixture == nil ? "02-add-host" : "04-add-host-terminal-filled")
         press("host-editor-save")
+        // visionOS offers to save the typed password to iCloud Keychain once the sheet commits, and
+        // that system alert covers the app: every later assertion then fails against an app it
+        // cannot see. This helper only started typing a password when Add Host began requiring a
+        // service, so the alert is new here even though the hazard was documented on 2026-09-11.
+        dismissSystemPasswordPrompt()
         XCTAssertTrue(element("host-editor-save").waitForNonExistence(timeout: 20), "the sheet closes after Save")
     }
 
@@ -522,9 +527,11 @@ final class GlassTerminalUITests: XCTestCase {
                       "Save refuses without the address")
         press(addressField); addressField.typeText("10.9.8.7")
         setField("add-server-username", to: "probe")
-        let password = reveal("add-server-password")
-        XCTAssertTrue(password.exists)
-        press(password); password.typeText("not-a-real-password")
+        _ = reveal("add-server-password")
+        // `setField`, not a raw press-and-type: it calls `selectAll()` between the two, which is
+        // what guarantees focus. A bare `typeText` into a SecureTextField lands only when the sheet
+        // happens to be warm, so this passed and failed on alternate runs for no visible reason.
+        setField("add-server-password", to: "not-a-real-password")
         press("host-editor-save")
         dismissSystemPasswordPrompt()
         XCTAssertTrue(element("host-editor-save").waitForNonExistence(timeout: 15))

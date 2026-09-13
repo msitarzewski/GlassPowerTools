@@ -68,6 +68,38 @@ final class GlassShellLibraryUITests: XCTestCase {
     }
 
     /// Our own window only (project rule 11); see `UITestCapture.swift`.
+    /// The control inventory at a failure, attached to the result bundle.
+    ///
+    /// Added because every diagnosis in this file's recent history came from the tree and not from
+    /// the assertion text: the same `Picker` is a PopUpButton with menu items on macOS and a pushed
+    /// list of buttons off it, and "the picker did not change" says nothing about which of those
+    /// was on screen.
+    /// What the Material picker currently shows.
+    ///
+    /// macOS exposes the selection as the element's `value`. visionOS exposes **nothing** there and
+    /// puts it in the label instead, as `"Material\nMax"` — title and selection together. Reading
+    /// only `value` made a working selection look like a picker that refused to change: the test
+    /// failed with *"it still reads ''"* while the control on screen already said `Max`.
+    private func materialSelection() -> String {
+        let picker = element("layers-material")
+        let value = "\(picker.value ?? "")"
+        return value.isEmpty ? picker.label : value
+    }
+
+    private func dumpTree(_ name: String) {
+        var lines: [String] = []
+        lines.append("buttons: " + app.buttons.allElementsBoundByIndex.prefix(60)
+            .map { "'\($0.label)'/'\($0.identifier)'" }.joined(separator: ", "))
+        lines.append("staticTexts: " + app.staticTexts.allElementsBoundByIndex.prefix(60)
+            .map { "'\($0.label.prefix(40))'/'\($0.identifier)'" }.joined(separator: ", "))
+        lines.append("cells: \(app.cells.count)  menuItems: " + app.menuItems.allElementsBoundByIndex
+            .prefix(40).map { "'\($0.label)'" }.joined(separator: ", "))
+        let attachment = XCTAttachment(string: lines.joined(separator: "\n"))
+        attachment.name = "shell-tree-\(name)"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     private func snap(_ name: String) {
         let sheet = app.sheets.firstMatch
         let subject = sheet.exists ? sheet : app.windows.firstMatch
@@ -397,7 +429,7 @@ final class GlassShellLibraryUITests: XCTestCase {
 
         let material = element("layers-material")
         XCTAssertTrue(material.waitForExistence(timeout: 10), "the Material picker")
-        let before = "\(material.value ?? "")"
+        let before = materialSelection()
 
         // Pick a value that is definitely not the current one. The titles are NOT the case names:
         // `GlassLayerMaterial.title` maps ultraThin/thin/regular/thick to
@@ -405,21 +437,35 @@ final class GlassShellLibraryUITests: XCTestCase {
         // ultraThin, so the picker reads "Light" on a fresh launch.
         let wanted = before.contains("Max") ? "Light" : "Max"
         press(material)
-        // macOS renders a `Picker` as a PopUpButton whose options are MENU ITEMS; the touch
-        // platforms put them in the view tree. Ask for the menu item first, then fall back.
-        let item = app.menuItems[wanted].firstMatch
-        let anywhere = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label == %@", wanted)).firstMatch
-        let option = item.waitForExistence(timeout: 3) ? item : anywhere
-        XCTAssertTrue(option.waitForExistence(timeout: 5),
-                      "‘\(wanted)’ is offered; picker read ‘\(before)’")
+        // The same `Picker` is three different controls. macOS renders a PopUpButton whose options
+        // are MENU ITEMS. visionOS and iOS render a navigation-style list inside the Form, so the
+        // options are buttons or cells in the view tree and selecting one pops back on its own.
+        // Asking only for menu items finds nothing off the Mac; asking `.any` for a label can match
+        // the picker's own row, which is already showing that label once selected.
+        let byMenuItem = app.menuItems[wanted].firstMatch
+        let byButton = app.buttons[wanted].firstMatch
+        let byCell = app.cells.containing(.staticText, identifier: wanted).firstMatch
+        _ = byMenuItem.waitForExistence(timeout: 3) || byButton.waitForExistence(timeout: 3)
+        let option = byMenuItem.exists ? byMenuItem : (byButton.exists ? byButton : byCell)
+        guard option.exists else {
+            dumpTree("material-options-\(wanted)")
+            XCTFail("‘\(wanted)’ is offered; picker read ‘\(before)’", file: #filePath, line: #line)
+            return
+        }
         press(option)
 
-        let changed = XCTNSPredicateExpectation(
-            predicate: NSPredicate { _, _ in "\(material.value ?? "")" != before }, object: nil)
-        XCTAssertEqual(XCTWaiter().wait(for: [changed], timeout: 5), .completed,
-                       "the picker took the new material")
-        let after = "\(material.value ?? "")"
+        // Re-resolved rather than reusing `material`: off the Mac the selection happens on a pushed
+        // list and the Form rebuilds when it pops, so the original reference can describe a row that
+        // no longer exists.
+        let deadline = Date().addingTimeInterval(8)
+        var settled = false
+        repeat {
+            if materialSelection().contains(wanted) { settled = true; break }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        } while Date() < deadline
+        if !settled { dumpTree("material-after-select-\(wanted)") }
+        XCTAssertTrue(settled, "the picker took the new material; it still reads ‘\(before)’")
+        let after = materialSelection()
         snap("08-appearance-material")
         closeSettings()
 
@@ -429,7 +475,7 @@ final class GlassShellLibraryUITests: XCTestCase {
         selectSettingsPage("Appearance")
         let again = element("layers-material")
         XCTAssertTrue(again.waitForExistence(timeout: 10))
-        XCTAssertEqual("\(again.value ?? "")", after, "the material persisted across relaunch")
+        XCTAssertEqual(materialSelection(), after, "the material persisted across relaunch")
 
         tap("layers-reset")   // leave the app's own defaults at D2
         closeSettings()
