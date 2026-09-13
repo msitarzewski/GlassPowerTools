@@ -88,6 +88,15 @@ class DatabaseSessionManager {
     ) async throws -> UUID {
         let sessionID = UUID()
         let session = DatabaseSession(connectionConfig: config)
+        // Retained so `reconnect` can open a second forward through the same broker.
+        //
+        // `DatabaseSession.openForward` was declared and read by `reconnect` and **never assigned**,
+        // so every tunnelled database failed to reconnect: `reconnect` passed nil, `connect` hit the
+        // `usesHostTunnel` guard, and the user was told no Terminal service was available to tunnel
+        // through — about the very service they had just connected through. It failed closed, which
+        // is the right direction, but Reconnect is an explicit user action (`:360`) and it did not
+        // work.
+        session.openForward = openForward
         sessions[sessionID] = session
 
         do {
@@ -327,6 +336,15 @@ class DatabaseSessionManager {
 
             session.connection = connection
             session.engine = replacement.engine
+            // Close the forward this reconnect replaces before overwriting the reference.
+            // Assigning over it drops the `SSHTunnel` — whose deinit closes the listener — but
+            // never runs `GlassTerminalPortForward.close()`, so the capability's
+            // `transport.release(owner:)` is never called and the forward outlives the session
+            // that authorised it. Unreachable while `openForward` was never assigned; assigning it
+            // above is exactly what would have made it reachable.
+            if let superseded = session.hostTunnel, superseded !== replacement.hostTunnel {
+                await superseded.close()
+            }
             session.hostTunnel = replacement.hostTunnel
             session.currentDatabase = config.engine == .sqlite
                 ? "main"

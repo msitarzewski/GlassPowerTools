@@ -4907,12 +4907,121 @@ enum TableSchemaSQL {
     private static func existingDefaultExpression(_ value: String, type: String) throws -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         let upper = trimmed.uppercased()
-        if upper == "NULL"
-            || (upper.hasPrefix("CURRENT_TIMESTAMP") && isTemporalType(type))
-            || (trimmed.hasPrefix("(") && trimmed.hasSuffix(")")) {
+        // **This string comes from the server**, not the operator: it is
+        // `INFORMATION_SCHEMA.COLUMNS.COLUMN_DEFAULT`, copied verbatim by the adapter
+        // (`MySQLAdapter.swift:624`). Anyone with DDL rights on a table the operator later opens
+        // chooses it, so this is a trust boundary and the three shapes below were all returned
+        // unchecked: `CURRENT_TIMESTAMP, DROP COLUMN secret` matched the prefix test, and
+        // `(1), DROP COLUMN secret, ADD pad int DEFAULT (1)` starts with `(` and ends with `)`.
+        // The route is ordinary — `beginEditing` sets the default behaviour to **Keep Current**,
+        // so it is reached by opening the column editor and applying any change at all.
+        if upper == "NULL" {
             return trimmed
         }
+        if (upper.hasPrefix("CURRENT_TIMESTAMP") && isTemporalType(type))
+            || (trimmed.hasPrefix("(") && trimmed.hasSuffix(")")) {
+            return try rejectingClauseEscape(trimmed, type: type)
+        }
         return try literalExpression(trimmed, type: type)
+    }
+
+    /// Refuses a default expression that could close its own clause and begin another.
+    ///
+    /// `ALTER TABLE … SET DEFAULT <expr>` is one statement, so neither of the protocol-level
+    /// protections applies: mysql-nio omits `CLIENT_MULTI_STATEMENTS` and PostgresNIO's extended
+    /// protocol refuses multi-statement strings — but a **comma** needs neither. `0, DROP COLUMN
+    /// secret` stays a single `ALTER TABLE` with a second clause bolted on.
+    ///
+    /// `validatedType` has enforced exactly this rule for column *types* since it was written
+    /// (a comma is legal only inside parentheses); default expressions were simply never given the
+    /// same treatment.
+    ///
+    /// **Backslashes are deliberately not treated as escapes inside quotes.** PostgreSQL with
+    /// `standard_conforming_strings` on — the default since 9.1 — ends the string at `\'`, and so
+    /// does MySQL under `NO_BACKSLASH_ESCAPES`. Honouring the escape would leave this scanner
+    /// believing it is still inside a literal while the server has already left it, which is the
+    /// dangerous direction; ending the string early can only make this stricter.
+    private static func rejectingClauseEscape(_ expression: String, type: String) throws -> String {
+        let characters = Array(expression)
+        var depth = 0
+        var quote: Character?
+        var index = 0
+
+        while index < characters.count {
+            let character = characters[index]
+            if let active = quote {
+                if character == active {
+                    // A doubled quote is an escaped quote in both engines.
+                    if index + 1 < characters.count, characters[index + 1] == active {
+                        index += 2
+                        continue
+                    }
+                    quote = nil
+                }
+                index += 1
+                continue
+            }
+            switch character {
+            case "'", "\"", "`":
+                quote = character
+            case "(":
+                depth += 1
+            case ")":
+                depth -= 1
+                guard depth >= 0 else { throw TableSchemaEditError.unsupported(defaultRefusal(type)) }
+            case ",", ";":
+                guard depth > 0 else { throw TableSchemaEditError.unsupported(defaultRefusal(type)) }
+            default:
+                break
+            }
+            index += 1
+        }
+        guard depth == 0, quote == nil else {
+            throw TableSchemaEditError.unsupported(defaultRefusal(type))
+        }
+        guard !expression.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains) else {
+            throw TableSchemaEditError.unsupported(defaultRefusal(type))
+        }
+        return expression
+    }
+
+    private static func defaultRefusal(_ type: String) -> String {
+        "The default for \(type) is not a single value or expression. Remove anything after it."
+    }
+
+    /// The whole string must be the number — not a prefix of it.
+    ///
+    /// `Decimal(string:)` parses a leading number and ignores the rest, so it answers non-nil for
+    /// `0, DROP COLUMN secret`, `1; DROP TABLE t --`, `0 OR 1=1` and `0x41`. Guarding on it and then
+    /// emitting the ORIGINAL string verbatim is what made a numeric default an injection point.
+    private static func isEntirelyNumeric(_ value: String) -> Bool {
+        var scalars = Array(value.unicodeScalars)
+        guard !scalars.isEmpty else { return false }
+        if scalars[0] == "+" || scalars[0] == "-" { scalars.removeFirst() }
+        guard !scalars.isEmpty else { return false }
+
+        var digits = 0, points = 0, exponents = 0, index = 0
+        while index < scalars.count {
+            let scalar = scalars[index]
+            if CharacterSet.decimalDigits.contains(scalar) {
+                digits += 1
+            } else if scalar == "." {
+                points += 1
+                guard points == 1, exponents == 0 else { return false }
+            } else if scalar == "e" || scalar == "E" {
+                exponents += 1
+                guard exponents == 1, digits > 0, index + 1 < scalars.count else { return false }
+                let next = scalars[index + 1]
+                if next == "+" || next == "-" {
+                    guard index + 2 < scalars.count else { return false }
+                    index += 1
+                }
+            } else {
+                return false
+            }
+            index += 1
+        }
+        return digits > 0
     }
 
     private static func literalExpression(_ value: String, type: String) throws -> String {
@@ -4921,7 +5030,7 @@ enum TableSchemaSQL {
             throw TableSchemaEditError.unsupported("Enter a default literal before reviewing SQL.")
         }
         if isNumericType(type) {
-            guard Decimal(string: trimmed, locale: Locale(identifier: "en_US_POSIX")) != nil else {
+            guard isEntirelyNumeric(trimmed) else {
                 throw TableSchemaEditError.unsupported("The default must be a valid number for \(type).")
             }
             return trimmed

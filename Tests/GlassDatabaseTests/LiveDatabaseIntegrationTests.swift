@@ -17,6 +17,7 @@
 //
 
 import Foundation
+import os
 import Testing
 import GlassDBKit
 import GlassShell
@@ -681,6 +682,15 @@ private final class LiveForward: GlassHostPortForward {
     private let tunnel: SSHTunnel
     private let transport: SSHTransport
     private let owner: UUID
+    /// Whether `close()` actually ran.
+    ///
+    /// The distinction this records is the whole point of the reconnect test: dropping the last
+    /// reference to an `SSHTunnel` closes its listener through deinit, so the port stops accepting
+    /// and everything *looks* tidy — while `close()` never runs and the transport is never
+    /// released. Only an explicit flag tells "closed" apart from "collected".
+    private let closed = OSAllocatedUnfairLock(initialState: false)
+    var isClosed: Bool { closed.withLock { $0 } }
+
     init(tunnel: SSHTunnel, transport: SSHTransport, owner: UUID) {
         localPort = tunnel.localPort
         self.tunnel = tunnel
@@ -688,6 +698,7 @@ private final class LiveForward: GlassHostPortForward {
         self.owner = owner
     }
     func close() async {
+        closed.withLock { $0 = true }
         await tunnel.close()
         await transport.release(owner: owner)
     }
@@ -744,6 +755,57 @@ struct LiveTunnelIntegrationTests {
         await manager.disconnect(sessionID: sessionID)
         #expect(manager.sessions[sessionID] == nil)
         await opened?.close()
+    }
+
+    /// Reconnect works for a tunnelled database, and does not leave the first forward behind.
+    ///
+    /// `DatabaseSession.openForward` was declared, read by `reconnect`, and **never assigned**, so
+    /// this path threw "…no Terminal service is available to tunnel through" — about the very
+    /// service the session had just tunnelled through. It failed closed, so nothing was exposed,
+    /// but Reconnect is an explicit user action (`DatabaseSessionManager.swift:360`) and it did not
+    /// work for any tunnelled database.
+    ///
+    /// The second assertion is the one that would have been missed by wiring alone: `reconnect`
+    /// assigned over `session.hostTunnel` without closing what was there. Dropping an `SSHTunnel`
+    /// closes its listener via deinit but never runs `close()`, so the capability's
+    /// `release(owner:)` never fires and the forward outlives the session that authorised it.
+    /// Counting the forwards this test opens is what proves the superseded one was closed.
+    @Test("A tunnelled database reconnects, and the superseded forward is closed",
+          .enabled(if: LiveTunnel.isConfigured && LiveDB.hasPostgres))
+    func tunnelledReconnectOpensASecondForwardAndClosesTheFirst() async throws {
+        let manager = DatabaseSessionManager(loadImmediately: false)
+        nonisolated(unsafe) var opened: [LiveForward] = []
+
+        let sessionID = try await manager.connect(
+            config: LiveDB.config(.postgresql, usesHostTunnel: true),
+            password: LiveDB.password(.postgresql),
+            openForward: { [self] _, port in
+                let forward = try await openForward(to: port) as! LiveForward
+                opened.append(forward)
+                return forward
+            })
+
+        let first = try #require(manager.sessions[sessionID]?.hostTunnel)
+        #expect(opened.count == 1)
+
+        try await manager.reconnect(sessionID: sessionID)
+
+        let session = try #require(manager.sessions[sessionID])
+        #expect(session.state.isConnected, "the tunnelled session reconnects at all")
+        #expect(opened.count == 2, "reconnect asked the same broker for a second forward")
+        let second = try #require(session.hostTunnel)
+        #expect(second !== first, "the session holds the new forward, not the old one")
+
+        // The query proves the new tunnel actually carries traffic, not merely that it exists.
+        let result = try await manager.executeQuery("SELECT * FROM teams", sessionID: sessionID,
+                                                    editorRowLimit: 100)
+        #expect(result.error == nil)
+        #expect(!result.rows.isEmpty, "real rows through the forward reconnect opened")
+
+        #expect(opened[0].isClosed, "the superseded forward was closed, not orphaned")
+
+        await manager.disconnect(sessionID: sessionID)
+        for forward in opened { await forward.close() }
     }
 
     @Test("MySQL over a real SSH forward: the driver connects to the local end and returns rows",
