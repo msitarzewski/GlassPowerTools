@@ -154,14 +154,29 @@ final class GlassTerminalUITests: XCTestCase {
     /// Adds a host through the one setup sheet. The address is the machine's, typed once here;
     /// with `terminal` the Terminal tab is enabled and filled (username, SSH key added through
     /// the nested key sheet), so the host and its terminal are created together.
-    private func addHost(named name: String, address: String, terminal fixture: HostFixture? = nil) throws {
+    private func addHost(named name: String, address: String, terminal fixture: HostFixture? = nil,
+                         placeholderUser: String = "tester") throws {
         let empty = element("connection-library-add-host-empty")
         if empty.waitForExistence(timeout: 3) { press(empty) } else { press("connection-library-add-host") }
         type(name, into: "host-editor-name")
         type(address, into: "host-editor-address")
+        // A service is required: Add Host pre-selects the first available tab and its fields are
+        // mandatory, because "a machine with nothing on it is not worth a row"
+        // (`GlassShellSetup.swift:76`). Without a fixture this used to leave the tab empty, so Save
+        // was correctly refused and the sheet stayed — reported as "the sheet closes after Save",
+        // which reads like a dismissal bug and is validation working.
+        enableTerminalTab()
         if let fixture {
-            enableTerminalTab()
             try fillTerminalTab(fixture)
+        } else {
+            // Both through `setField`, which is this file's own helper and already handles the
+            // thing a hand-rolled press-and-type does not: it presses, then `selectAll()`, which
+            // forces focus before the first keystroke. Typing into a cold sheet's SecureTextField
+            // without that fails outright with "Neither element nor any descendant has keyboard
+            // focus".
+            setField("add-server-username", to: placeholderUser)
+            _ = reveal("add-server-password")
+            setField("add-server-password", to: "not-a-real-password")
         }
         snap(fixture == nil ? "02-add-host" : "04-add-host-terminal-filled")
         press("host-editor-save")
@@ -527,17 +542,13 @@ final class GlassTerminalUITests: XCTestCase {
     /// the optional settings. Password auth, nothing connects.
     func testEditTerminalOpensTheSheetWithAdvanced() throws {
         app = launch()
-        try addHost(named: "editable", address: "editable.example")
+        // The terminal is created by `addHost` itself, because Add Host now requires a service.
+        // This test used to make a service-less host and then add one — a flow the product no
+        // longer allows — which left TWO ssh services and an Edit that opened the first while the
+        // assertions described the second. "Add a service opens on the Terminal tab" is covered on
+        // its own by `testAddServiceCollectsTheAddressOnTheHost`.
+        try addHost(named: "editable", address: "editable.example", placeholderUser: "probe")
         openDetail(of: "editable")
-        press("host-add-service")
-        XCTAssertTrue(element("add-server-username").waitForExistence(timeout: 10), "Add a service opens on the Terminal tab, enabled")
-        setField("add-server-username", to: "probe")
-        let password = reveal("add-server-password")
-        XCTAssertTrue(password.exists)
-        press(password); password.typeText("not-a-real-password")
-        press("host-editor-save")
-        dismissSystemPasswordPrompt()
-        XCTAssertTrue(element("host-editor-save").waitForNonExistence(timeout: 15))
 
         // A sheet presented while the previous one is still animating away is swallowed on iOS,
         // so wait for the detail to settle and press again if the first press did not take.
