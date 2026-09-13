@@ -74,6 +74,35 @@ final class GlassTerminalUITests: XCTestCase {
         app.descendants(matching: .any).matching(identifier: identifier).firstMatch
     }
 
+    /// Containers that hold no Touch Bar.
+    ///
+    /// macOS mirrors an alert's default buttons onto the Touch Bar, and the proxy is a *second*
+    /// element carrying the same title as the real control while refusing every click
+    /// ("cannot be called with Touch Bar elements"). It is not a descendant of a window, a menu or
+    /// a sheet, so a lookup that stays inside those never finds it. Same approach as
+    /// `GlassDatabaseUITests`, which met this first.
+    private var touchBarFreeScopes: [XCUIElementQuery] {
+        [app.windows, app.menus, app.menuBars, app.sheets, app.dialogs]
+    }
+
+    /// A button by its visible title, never the Touch Bar's copy of it. `.firstMatch` inside each
+    /// scope is required rather than tidy: `scope` is a query over every window, so
+    /// `scope.buttons[title]` can match in several at once — `.exists` answers true for that while
+    /// `.click()` refuses it as ambiguous.
+    private func titledButton(_ titles: [String], timeout: TimeInterval = 5) -> XCUIElement? {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            for scope in touchBarFreeScopes {
+                for title in titles {
+                    let button = scope.buttons[title].firstMatch
+                    if button.exists { return button }
+                }
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        } while Date() < deadline
+        return nil
+    }
+
     /// macOS: `tap()` compiles but does not drive SwiftUI controls under Xcode 27; `click()` does.
     private func press(_ element: XCUIElement) {
         #if os(macOS)
@@ -382,13 +411,20 @@ final class GlassTerminalUITests: XCTestCase {
         #endif
     }
 
-    private func acceptTrustPromptIfShown() {
-        let trust = firstExisting([app.buttons["Trust and Connect"].firstMatch,
-                                   app.buttons["Trust Changed Key"].firstMatch], timeout: 20)
-        if let trust {
-            snap("05-trust-prompt")
-            press(trust)
+    /// Accepts the D14 host-key prompt. This is the only automated coverage the prompt has, and
+    /// with D23 it is also the only place a pin written under the app's real synchronizing
+    /// configuration is exercised — no `swift test` process can write a synchronizable Keychain
+    /// item at all (`errSecMissingEntitlement`), so the signed app is the only witness.
+    @discardableResult
+    private func acceptTrustPromptIfShown() -> Bool {
+        // Scoped to windows and sheets: the application-wide query returns the Touch Bar's copy of
+        // the default button about half the time, and that copy refuses every click.
+        guard let trust = titledButton(["Trust and Connect", "Trust Changed Key"], timeout: 20) else {
+            return false
         }
+        snap("05-trust-prompt")
+        press(trust)
+        return true
     }
 
     /// The terminal is live when a workspace window for the server appears on macOS, or the

@@ -271,20 +271,21 @@ enum KeychainManager {
     // so the key bytes ride inside a password item. That is why `sshKeysPrivateService` is already
     // on `validateMobility`'s eligible list. Secure Enclave–backed keys are the real exception and
     // are refused there regardless of this setting.
-    /// Host-key pins and anything else `validateMobility` does not list as eligible.
+    /// Secure Enclave key material, which can never travel.
     ///
-    /// **This exists because enabling D18 on the one shared config broke SSH outright.**
-    /// `KeychainOperations.saveData` and `retrieveData` both call `validateMobility`, whose
-    /// eligible list is `passwords`, `sshPasswords`, `rdpCredentials`, `sshKeysPrivate` and
-    /// `sshKeysPassphrase` — `sshHostTrustService` is not on it. Under `.iCloudKeychain` every pin
-    /// and every lookup therefore threw `ineligibleService`, `validator(for:)` threw with it, and
-    /// no SSH connection could complete. It failed closed, which is the right direction and total.
+    /// A `TRUE_SE_P256:` or `SECURE_ENCLAVE_P256:` value is an opaque token usable only by the chip
+    /// that minted it, and it is written to `sshKeysPrivateService` — which *is* eligible for
+    /// synchronization. Without this configuration it would sync: a key present on every device and
+    /// usable on exactly one, listed as available on all of them. `isDeviceBoundKeyMaterial` routes
+    /// it here, and this is the only thing that still belongs on `.deviceOnly`.
     ///
-    /// Host trust is kept on `.deviceOnly` here rather than added to that list, because widening
-    /// the list is a change to a shared package and a product decision in its own right: a pinned
-    /// host key is a **public** key, not a secret, and syncing it is defensible and probably
-    /// desirable — trusting a machine on the Mac ought to trust it on the Vision Pro. Until that is
-    /// decided deliberately, a host is trusted per device, which is how it behaved before D18.
+    /// **Host-key pins used to live here too, and that was a half-fix.** Enabling D18 on the one
+    /// shared configuration made every pin throw `ineligibleService` — `sshHostTrustService` was not
+    /// on `validateMobility`'s eligible list — so the trust store moved here and SSH connected
+    /// again. But `KeychainManager`'s own host-trust methods kept using `config`, so the *user*
+    /// accepting a fingerprint still threw, and a pin written by one path could not be read by the
+    /// other. D23 settles it: host trust is eligible and synchronizes, and there is one
+    /// configuration for it.
     nonisolated static let deviceBoundConfig = SecretStoreConfiguration(
         serviceNamePrefix: "sh.glas",
         accessGroup: resolvedAccessGroup,
@@ -297,6 +298,15 @@ enum KeychainManager {
         useDataProtectionKeychain: true,
         mobilityPolicy: .iCloudKeychain
     )
+
+    /// The configuration pinned host keys are stored under (D23).
+    ///
+    /// It is a named property rather than `config` spelled out at each call site because the last
+    /// defect here was two paths disagreeing: the transport pinned under one configuration while
+    /// this type's own `savePinnedHostKey`/`replaceHostKey` used another, so a pin written on
+    /// connect could not be read by the trust prompt, and the prompt itself threw. One name means
+    /// one answer, and one place for a future change to land.
+    nonisolated static var hostTrustConfig: SecretStoreConfiguration { config }
 
     nonisolated private static var resolvedAccessGroup: String? {
         guard let rawValue = Bundle.main.object(forInfoDictionaryKey: accessGroupInfoKey) as? String else {
@@ -612,7 +622,7 @@ enum KeychainManager {
             publicKeyData: publicKeyData
         )
         try hostKey.validate()
-        try SSHHostTrustKeychainStore.save(hostKey, config: config)
+        try SSHHostTrustKeychainStore.save(hostKey, config: hostTrustConfig)
     }
 
     static func replaceHostKey(with challenge: HostKeyTrustChallenge) throws {
@@ -626,7 +636,7 @@ enum KeychainManager {
             algorithm: challenge.algorithm,
             publicKeyData: publicKeyData
         )
-        try SSHHostTrustKeychainStore.replace(with: replacement, config: config)
+        try SSHHostTrustKeychainStore.replace(with: replacement, config: hostTrustConfig)
     }
 
     static func saveHostKey(_ entry: TrustedHostKeyEntry) throws {
@@ -666,15 +676,15 @@ enum KeychainManager {
     }
 
     static func savePinnedHostKey(_ hostKey: PinnedSSHHostKey) throws {
-        try SSHHostTrustKeychainStore.save(hostKey, config: config)
+        try SSHHostTrustKeychainStore.save(hostKey, config: hostTrustConfig)
     }
 
     static func allPinnedHostKeys() throws -> [PinnedSSHHostKey] {
-        try SSHHostTrustKeychainStore.allPinnedHosts(config: config)
+        try SSHHostTrustKeychainStore.allPinnedHosts(config: hostTrustConfig)
     }
 
     static func trustedHostKeyBase64Set(host: String, port: Int) throws -> Set<String> {
-        let records = try SSHHostTrustKeychainStore.authorizedRecords(host: host, port: port, config: config)
+        let records = try SSHHostTrustKeychainStore.authorizedRecords(host: host, port: port, config: hostTrustConfig)
         return Set(records.map { $0.publicKeyData.base64EncodedString() })
     }
 

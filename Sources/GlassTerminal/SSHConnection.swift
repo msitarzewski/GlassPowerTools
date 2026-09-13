@@ -242,7 +242,7 @@ class SSHConnection {
         let transport = SSHTransport(
             route: route,
             credentials: PreparedCredentialResolver(materials: materials),
-            trustStore: SecretStoreHostTrustStore(configuration: KeychainManager.deviceBoundConfig),
+            trustStore: SecretStoreHostTrustStore(configuration: KeychainManager.hostTrustConfig),
             trustDecider: trustDecider
         )
         _ = await transport.acquire(owner: ownerID)

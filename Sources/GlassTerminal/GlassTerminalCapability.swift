@@ -458,7 +458,7 @@ extension GlassTerminalCapability {
         let transport = SSHTransport(
             route: route,
             credentials: PreparedCredentialResolver(materials: materials),
-            trustStore: SecretStoreHostTrustStore(configuration: KeychainManager.deviceBoundConfig),
+            trustStore: SecretStoreHostTrustStore(configuration: KeychainManager.hostTrustConfig),
             trustDecider: BrokeredHostTrustDecider(broker: runtime.trustBroker)
         )
         let owner = UUID()
@@ -492,7 +492,7 @@ extension GlassTerminalCapability {
               let server = runtime.sessionManager.serverManager.server(for: link.endpointID.rawValue)
         else { return .unavailable }
 
-        let trustStore = SecretStoreHostTrustStore(configuration: KeychainManager.deviceBoundConfig)
+        let trustStore = SecretStoreHostTrustStore(configuration: KeychainManager.hostTrustConfig)
         if let pinned = try? trustStore.authorizedKeys(host: server.host, port: server.port), !pinned.isEmpty {
             return .trusted
         }

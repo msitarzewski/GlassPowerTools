@@ -12,6 +12,7 @@ let package = Package(
         .visionOS(.v26),
     ],
     products: [
+        .library(name: "GlasSecretStore", targets: ["GlasSecretStore"]),
         .library(name: "GlassShell", targets: ["GlassShell"]),
         .library(name: "GlassLayers", targets: ["GlassLayers"]),
         .library(name: "GlassSSHTransport", targets: ["GlassSSHTransport"]),
@@ -22,7 +23,6 @@ let package = Package(
     ],
     dependencies: [
         .package(path: "../GlassConnectionKit"),
-        .package(path: "../GlasSecretStore"),
         .package(path: "../GlassEditorKit"),
         // The SSH stack vendored from glas.sh, verbatim (see Stage 2 transport note).
         .package(path: "Packages/Citadel"),
@@ -42,6 +42,11 @@ let package = Package(
         .package(url: "https://github.com/migueldeicaza/SwiftTerm", exact: "1.15.0"),
     ],
     targets: [
+        // Credentials, trust storage and mobility. Absorbed from the standalone GlasSecretStore
+        // package on 2026-09-13: that repository is obsolete, Glass Power Tools is now the only
+        // consumer, and the split had become a reason not to fix its own eligibility list.
+        // The module name is unchanged, so no `import` moved.
+        .target(name: "GlasSecretStore"),
         .target(
             name: "GlassLayers",
             dependencies: [
@@ -55,7 +60,7 @@ let package = Package(
                 .product(name: "GlassConnectionKit", package: "GlassConnectionKit"),
                 .product(name: "GlassConnectionUI", package: "GlassConnectionKit"),
                 .product(name: "GlassHostCatalog", package: "GlassConnectionKit"),
-                .product(name: "GlasSecretStore", package: "GlasSecretStore"),
+                "GlasSecretStore",
                 .product(name: "GlassEditorCore", package: "GlassEditorKit"),
             ]
         ),
@@ -69,7 +74,7 @@ let package = Package(
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "Logging", package: "swift-log"),
-                .product(name: "GlasSecretStore", package: "GlasSecretStore"),
+                "GlasSecretStore",
                 .product(name: "GlassConnectionKit", package: "GlassConnectionKit"),
             ]
         ),
@@ -102,7 +107,7 @@ let package = Package(
                 .product(name: "GlassConnectionKit", package: "GlassConnectionKit"),
                 .product(name: "GlassConnectionUI", package: "GlassConnectionKit"),
                 .product(name: "GlassHostCatalog", package: "GlassConnectionKit"),
-                .product(name: "GlasSecretStore", package: "GlasSecretStore"),
+                "GlasSecretStore",
                 // glas.sh's SFTP remote editor already uses GlassEditorUI; parity brings it.
                 .product(name: "GlassEditorKit", package: "GlassEditorKit"),
                 .product(name: "SwiftTerm", package: "SwiftTerm"),
@@ -134,12 +139,13 @@ let package = Package(
                 "GlassLayers",
                 .product(name: "GlassConnectionKit", package: "GlassConnectionKit"),
                 .product(name: "GlassConnectionUI", package: "GlassConnectionKit"),
-                .product(name: "GlasSecretStore", package: "GlasSecretStore"),
+                "GlasSecretStore",
                 // The SQL editor surface and the record editor's JSON fields are GlassEditorKit.
                 .product(name: "GlassEditorKit", package: "GlassEditorKit"),
             ],
             swiftSettings: [.enableUpcomingFeature("MemberImportVisibility")]
         ),
+        .testTarget(name: "GlasSecretStoreTests", dependencies: ["GlasSecretStore"]),
         .testTarget(name: "GlassLayersTests", dependencies: ["GlassLayers"]),
         .testTarget(
             name: "GlassDatabaseTests",
@@ -150,14 +156,14 @@ let package = Package(
                 // Live-tunnel tests only: they open a real SSH forward the way the terminal
                 // capability does. The module under test never imports the transport.
                 "GlassSSHTransport",
-                .product(name: "GlasSecretStore", package: "GlasSecretStore"),
+                "GlasSecretStore",
             ]
         ),
         .testTarget(
             name: "GlassTerminalTests",
             dependencies: [
                 "GlassTerminal",
-                .product(name: "GlasSecretStore", package: "GlasSecretStore"),
+                "GlasSecretStore",
                 .product(name: "GlassEditorKit", package: "GlassEditorKit"),
                 .product(name: "Citadel", package: "Citadel"),
                 .product(name: "NIOSSH", package: "swift-nio-ssh"),

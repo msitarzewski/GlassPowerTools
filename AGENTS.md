@@ -8,11 +8,16 @@
 Glass Power Tools is an MIT-licensed, native Apple application that merges the previously separate
 glas.sh (SSH/terminal), glassdb (databases) and glassDT (RDP/VNC remote desktop) apps into one
 product, with GlassEditorKit available as a further capability. Bundle identifier
-`com.glasspowertools`. The merge was decided on 2026-09-10; nothing has been built yet.
+`com.glasspowertools`. The merge was decided on 2026-09-10. Stages 1 to 3.5 are built: the shell,
+the SSH/terminal capability, the database capability and cross-device continuity.
 
 **Read first:** `memory-bank/toc.md`, then `memory-bank/activeContext.md` and the merge plan in
-`memory-bank/tasks/2026-09/2026-09-10_merge-plan.md`. The three source applications remain at
-`../glas.sh`, `../glassdb` and `../glassDT` and must keep building until this product reaches parity.
+`memory-bank/tasks/2026-09/2026-09-10_merge-plan.md`.
+
+**The source applications are obsolete and no longer compile** — the user's words, 2026-09-13:
+*"THEY ARE NOT COMPILING THEYRE OBSOLETE."* `../glas.sh`, `../glassdb`, `../glassDT` and
+`../GlasSecretStore` are a historical record to read, not software to keep building. Do not spend
+effort preserving them, and do not treat a change here as needing to stay compatible with them.
 
 **Why one product.** The shared catalog already models a host owning several services, so the three
 apps were each a partial view of one model. Merging removes machinery that exists only to keep three
@@ -28,7 +33,10 @@ three separately pinned copies of the shared packages.
 - One settings and configuration surface for all capabilities, replacing three drifting designs.
 - Preserve the family library, favorites, groups, selection and detail-panel patterns. Users must not
   have to learn a new navigation model.
-- Credentials stay in GlasSecretStore with its existing eligibility and mobility policy.
+- Credentials live in `Sources/GlasSecretStore`, absorbed from the standalone package on
+  2026-09-13. Its eligibility and mobility policy is now this project's to set, and D18/D21/D23
+  changed it: credentials and host-key pins synchronize through iCloud Keychain by default, Secure
+  Enclave material never does.
 - visionOS uses normal native windows with the shared Glass framing; the spatial workspace where a
   host's terminal, database and desktop coexist is the product's differentiator.
 
@@ -53,7 +61,7 @@ repositories. Not yet actioned, and not to be actioned without the user's instru
 | Database browsing and query surfaces | `../glassdb/glassdb/` (about 22,200 lines) |
 | RDP and VNC engines, Metal presentation, spatial canvas | `../glassDT/` (about 5,600 lines plus `Packages/RDPKit`, `Packages/VNCKit`, transports) |
 | Host identities, library projection, shared library UI, host catalog | `../GlassConnectionKit` |
-| Credentials, trust storage, mobility | `../GlasSecretStore` |
+| Credentials, trust storage, mobility | `Sources/GlasSecretStore` (absorbed 2026-09-13) |
 | Text editing and syntax analysis | `../GlassEditorKit` |
 
 Reuse means moving these in as modules, not rewriting them. Record what actually moved.
