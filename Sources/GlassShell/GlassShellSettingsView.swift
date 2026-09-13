@@ -113,12 +113,35 @@ public struct GlassShellSettingsView: View {
     }
 
     private var privacy: some View {
-        Section("Credentials") {
-            LabeledContent("Store", value: "GlasSecretStore in the Keychain")
-            LabeledContent("Access group", value: model.secretConfiguration.accessGroup ?? "Not shared (no access group)")
-            LabeledContent("Default mobility", value: model.secretConfiguration.mobilityPolicy == .deviceOnly ? "This device only" : "iCloud Keychain")
-            Text("Each service keeps its own credential and trust. Nothing here reads a secret; capabilities ask for what they need when connecting.")
-                .font(.footnote).foregroundStyle(.secondary)
+        Group {
+            Section("Credentials") {
+                LabeledContent("Store", value: "GlasSecretStore in the Keychain")
+                LabeledContent("Access group", value: model.secretConfiguration.accessGroup ?? "Not shared (no access group)")
+                LabeledContent("Default mobility", value: model.secretConfiguration.mobilityPolicy == .deviceOnly ? "This device only" : "iCloud Keychain")
+                    .accessibilityIdentifier("settings-credential-mobility")
+                Text("Each service keeps its own credential and trust. Nothing here reads a secret; capabilities ask for what they need when connecting.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+            // D20: say what travels and what does not.
+            //
+            // With sync on by default (D21), a user is entitled to know which of their secrets
+            // reaches their other devices before they find out by a connection failing on one.
+            // The Secure Enclave line is the one that matters: a key protected by this device's
+            // biometrics is bound to this device's hardware and CANNOT sync — `validateMobility`
+            // refuses it outright — so a service set to require authentication will ask for its
+            // password again elsewhere. That is correct behaviour and indefensible as a surprise.
+            Section("On your other devices") {
+                LabeledContent("Host library", value: model.catalogSyncStatusDescription)
+                    .accessibilityIdentifier("settings-catalog-sync-status")
+                Text("Passwords, SSH key passphrases and private keys travel with you through "
+                     + "iCloud Keychain, encrypted so that only your devices can read them.")
+                    .font(.footnote).foregroundStyle(.secondary)
+                Text("A service set to require authentication does not. Its password is protected "
+                     + "by this device's biometrics and cannot leave it, so you will be asked for "
+                     + "that one again on another device.")
+                    .font(.footnote).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("settings-device-bound-note")
+            }
         }
     }
 

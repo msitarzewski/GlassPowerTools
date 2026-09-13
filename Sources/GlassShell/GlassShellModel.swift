@@ -320,6 +320,21 @@ public final class GlassShellModel {
         }
     }
 
+    /// The library's sync state, in words a person can act on.
+    ///
+    /// "Not set up" rather than an error when no backend is attached: a build without CloudKit, or
+    /// a UI test, is not broken — it simply has no other devices to talk to.
+    public var catalogSyncStatusDescription: String {
+        switch catalogSyncStatus {
+        case .idle: return catalogBackend == nil ? "Not synced on this build" : "Waiting to sync"
+        case .syncing: return "Syncing…"
+        case .synced(let date):
+            return "Synced \(date.formatted(date: .omitted, time: .shortened))"
+        case .unavailable(let reason): return reason
+        case .failed(let message): return "Not synced — \(message)"
+        }
+    }
+
     public var catalogHosts: [GlassShellHost] { hosts.filter { !$0.isLocal } }
 
     /// `items` without this device. Internal: the library itself always shows every row, and

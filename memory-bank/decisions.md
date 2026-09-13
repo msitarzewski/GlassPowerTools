@@ -494,3 +494,48 @@ in `applyCredentialMutation`. It also lets F3's stranded items be swept rather t
 
 **This decision has a shelf life.** It is safe only while the user is the only user; the first real
 installation makes it false. It should be re-read, not reused, the moment that changes.
+
+
+## D19 — the host catalog syncs through CloudKit, not the key-value store — Implemented 2026-09-13
+
+`GlassShellSettingsSync` already syncs terminal themes through `NSUbiquitousKeyValueStore`, so
+reusing it for the library was the obvious move and the wrong one. KVS is **1 MB across 1024 keys**,
+every write **replaces the whole value** for its key, and there is no partial update — two devices
+editing different hosts would overwrite each other. Apple's own line decides it: *a value* belongs
+in KVS, *records* belong in CloudKit. A host library is records and grows with use.
+
+KVS keeps the preferences it already carries. The boundary is stated so it does not drift.
+
+`HostProfile` needed no changes: `updatedAt` orders writes, `deletedAt` is a tombstone rather than
+an absence, and `lastWriterID` names the device. The catalog has modelled convergence since it was
+written for three apps sharing one file.
+
+**The merge rule, stated so the trade is visible rather than discovered:** last write wins by
+`updatedAt`. Per-field merging would be better for two people editing one host at the same moment
+and is not worth its cost here — the library is edited rarely, by one person, usually on one device.
+A **tombstone beats an edit at the same instant**, because a deletion undone by a stale edit is the
+failure people notice. Equal timestamps otherwise keep the local copy, so a device echoing back what
+it sent does not churn.
+
+The whole profile travels as one encoded field rather than a CloudKit schema mirroring its
+properties: a record type is a schema commitment, `HostProfile` already versions itself, and nothing
+is queried by field.
+
+Container `iCloud.com.glasspowertools`, provisioned automatically under the existing automatic
+signing. Verified in the signed entitlements on macOS, iOS and visionOS.
+
+**Not proven by any test here, and no unit test can prove it:** that CloudKit delivers the records,
+that a change token resumes correctly, or that two real devices converge. Those need two devices and
+an iCloud account — the device checklist in [Stage 3.5](tasks/2026-09/2026-09-13_stage-3.5-continuity.md).
+
+## D20 — the interface says what travels and what does not — Implemented 2026-09-13
+
+With sync on by default (D21), a user is entitled to know which secrets reach their other devices
+**before** they find out by a connection failing on one.
+
+Settings ▸ Privacy now carries an "On your other devices" section: the library's sync state in words,
+and the plain statement that passwords, SSH key passphrases and private keys travel through iCloud
+Keychain encrypted to the user's devices — **and that a service set to require authentication does
+not**. A key protected by this device's biometrics is bound to this device's hardware and cannot
+sync; `KeychainOperations.validateMobility` refuses it outright. Being asked for that one password
+again on another device is correct behaviour and indefensible as a surprise.
