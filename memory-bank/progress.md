@@ -217,3 +217,74 @@ and visionOS remain compile-verified only; the visionOS UI target cannot link
 (`GlassShellLocalHostUITests.swift:143` calls `.click()` on an `XCUICoordinate`, absent from xrOS).
 An accessibility gap is recorded and deliberately unfixed: schema rows expose no accessibility action
 for the single-click selection they exist for.
+
+## 2026-09-13 — visionOS UI testing unblocked, and the macOS regression it exposed
+
+**One unguarded call had blocked an entire platform's UI verification.**
+`GlassShellLocalHostUITests.swift:143` called `.click()` on an `XCUICoordinate`.
+`XCUIAutomation/XCUICoordinate.h` declares it `API_AVAILABLE(ios(15.0), macCatalyst(13.0))`, and
+visionOS does **not** inherit that the way it inherits most iOS availability — the Swift interface
+has no `click` member, so it is a hard compile error on xrOS. `tap()`, `doubleTap()` and
+`pressForDuration:` carry no annotation and exist everywhere. The file already split click/tap for
+*elements*; it had no coordinate overload. Because the fault broke **linking**, it failed the whole
+target rather than one test, which is why it read as "visionOS cannot be tested".
+
+Verified from the SDK header on this machine and by building, not from the web, which had nothing
+specific. The secondhand explanation was checked before being believed — visionOS usually *does*
+inherit iOS availability — and it held.
+
+### What running it found, and the correction that matters
+
+First run: **10/16**. The six failures looked like visionOS problems. They were not.
+**macOS failed identically** — same tests, same lines — so the real finding is that
+
+> **the macOS shell library suite had regressed from 7/7 to 3/7 and nobody noticed.**
+
+Two changes the user asked for had invalidated four tests, and the suite was never re-run:
+
+| Change | Test that still assumed the old behaviour |
+|---|---|
+| *"Adding a machine without a service doesn't make sense"* | three tests added a service-less host; Save was **correctly refused** |
+| *"Painting the glass isn't optional"* → Paint Theme removed | one test drove `layers-paints-theme`, which by then existed **only in the test file** |
+
+Both product changes are right. The tests were stale. **And the failure message actively misled:**
+*"the sheet closes after Save"* reads like a dismissal bug when the truth was validation working and
+an incomplete form being refused. A fifth test had become internally *incoherent* rather than merely
+stale — it built a service-less host then added a terminal, so under the new rule the host had two
+ssh services and Edit opened the first while the assertions described the second.
+
+**The rule worth carrying: a suite recorded green is only green as of its last run.** The memory bank
+said 7/7 as of 2026-09-12 and that was true when written; two deliberate decisions silently voided it.
+
+### Results
+
+| Suite | Result |
+|---|---|
+| macOS `GlassShellLibraryUITests` | **7/7** (recovered from a silent 3/7) |
+| macOS `GlassTerminalUITests` | **4 passed, 1 skipped** (gated real-host) |
+| macOS `GlassDatabaseUITests` | **7/7** |
+| visionOS full UI target | **12/15**, from a target that could not link at all |
+
+visionOS's three remaining: the Material picker does not take a selection there the way it does on
+macOS (the rewritten appearance test); `testEditTerminalOpensTheSheetWithAdvanced`, fixed on macOS and
+not yet re-run there; and the **pre-existing Stage 2** tag-vocabulary failure, which fails on macOS too
+and is tracked separately.
+
+### Mistakes recorded in the helpers rather than quietly fixed
+
+Both are easy to reintroduce by someone simplifying them:
+- The verifying `type()` helper must **not** touch a `SecureTextField`: its value is bullets or nil so
+  the check can never pass, and re-pressing a focused secure field **drops focus**. The field that
+  actually needed verification was the *username*, a plain text field, swallowed on visionOS after a
+  tab switch. Writing a general helper for a specific fault broke a working path.
+- On a **cold launch** the first sheet's secure field has not taken focus when `typeText` dispatches.
+  `setField` — already in `GlassTerminalUITests` — handles this because it presses, calls
+  `selectAll()`, then types. That `selectAll` is the focus guarantee. Three hand-rolled versions were
+  written before the existing helper was reused.
+
+### Operational note
+
+Two OOM kills during this session, both from accumulated test artefacts: **37 worker DerivedData
+directories (~99 GB)** and **XCUITest result bundles carrying full screen recordings** (~6 GB over
+twenty-odd runs). Neither is obvious until the machine complains. Clear the scratchpad between long
+UI campaigns.
