@@ -271,6 +271,26 @@ enum KeychainManager {
     // so the key bytes ride inside a password item. That is why `sshKeysPrivateService` is already
     // on `validateMobility`'s eligible list. Secure Enclave–backed keys are the real exception and
     // are refused there regardless of this setting.
+    /// Host-key pins and anything else `validateMobility` does not list as eligible.
+    ///
+    /// **This exists because enabling D18 on the one shared config broke SSH outright.**
+    /// `KeychainOperations.saveData` and `retrieveData` both call `validateMobility`, whose
+    /// eligible list is `passwords`, `sshPasswords`, `rdpCredentials`, `sshKeysPrivate` and
+    /// `sshKeysPassphrase` — `sshHostTrustService` is not on it. Under `.iCloudKeychain` every pin
+    /// and every lookup therefore threw `ineligibleService`, `validator(for:)` threw with it, and
+    /// no SSH connection could complete. It failed closed, which is the right direction and total.
+    ///
+    /// Host trust is kept on `.deviceOnly` here rather than added to that list, because widening
+    /// the list is a change to a shared package and a product decision in its own right: a pinned
+    /// host key is a **public** key, not a secret, and syncing it is defensible and probably
+    /// desirable — trusting a machine on the Mac ought to trust it on the Vision Pro. Until that is
+    /// decided deliberately, a host is trusted per device, which is how it behaved before D18.
+    nonisolated static let deviceBoundConfig = SecretStoreConfiguration(
+        serviceNamePrefix: "sh.glas",
+        accessGroup: resolvedAccessGroup,
+        useDataProtectionKeychain: true
+    )
+
     nonisolated static let config = SecretStoreConfiguration(
         serviceNamePrefix: "sh.glas",
         accessGroup: resolvedAccessGroup,
@@ -522,18 +542,60 @@ enum KeychainManager {
 
     // MARK: - SSH Keys
 
+    /// Secure Enclave keys are stored device-bound; everything else travels.
+    ///
+    /// A Secure Enclave key's stored value is not key material at all — it is an **opaque token**
+    /// that only the chip which minted it can use (`SettingsManager.generateSecureEnclaveP256Key`
+    /// encodes `dataRepresentation` behind a `TRUE_SE_P256:` prefix). Syncing it would put a key on
+    /// every device that works on exactly one of them, and list it as available on the others.
+    ///
+    /// `validateMobility` already excludes the *legacy* `SECURE_ENCLAVE_P256:` representation by
+    /// keeping `sealedP256Service` off its eligible list — but the newer `TRUE_SE_P256:` form never
+    /// touches that service. It goes to `sshKeysPrivateService`, which **is** eligible, so under
+    /// D18 it would have synchronized: the guard existed and this path walked around it.
+    ///
+    /// This is the project's own non-negotiable — *device-bound keys cannot be advertised as
+    /// synchronized* — so the decision is made here, by where the key is written, rather than left
+    /// to the eligibility list to catch.
+    /// Exposed for the test that pins this rule; the decision itself stays private.
+    static func isDeviceBoundKeyMaterialForTesting(_ privateKey: String) -> Bool {
+        isDeviceBoundKeyMaterial(privateKey)
+    }
+
+    private static func isDeviceBoundKeyMaterial(_ privateKey: String) -> Bool {
+        privateKey.hasPrefix("TRUE_SE_P256:") || privateKey.hasPrefix("SECURE_ENCLAVE_P256:")
+    }
+
     static func saveSSHKey(_ privateKey: String, passphrase: String?, for keyID: UUID) throws {
         let secureKey = SecureBytes(Data(privateKey.utf8))
         let securePassphrase = passphrase.map { SecureBytes(Data($0.utf8)) }
-        try SSHKeyKeychainStore.save(privateKey: secureKey, passphrase: securePassphrase, for: keyID, config: config)
+        let destination = isDeviceBoundKeyMaterial(privateKey) ? deviceBoundConfig : config
+        try SSHKeyKeychainStore.save(privateKey: secureKey, passphrase: securePassphrase,
+                                     for: keyID, config: destination)
     }
 
+    /// Tries the synchronized store first and falls back to the device-bound one.
+    ///
+    /// Which store a key is in depends on what kind it is, and the caller has only an id — the
+    /// prefix that decides is *inside* the value. Two lookups is the price of not making every
+    /// caller know that.
     static func retrieveSSHKey(for keyID: UUID) throws -> SSHKeyMaterial {
-        try SSHKeyKeychainStore.retrieve(for: keyID, config: config)
+        do {
+            return try SSHKeyKeychainStore.retrieve(for: keyID, config: config)
+        } catch {
+            return try SSHKeyKeychainStore.retrieve(for: keyID, config: deviceBoundConfig)
+        }
     }
 
+    /// Deletes from both, because a key written before this split may be in either and leaving one
+    /// behind is how a secret becomes unreachable but not gone.
     static func deleteSSHKey(for keyID: UUID) throws {
-        try SSHKeyKeychainStore.delete(for: keyID, config: config)
+        var firstError: (any Error)?
+        do { try SSHKeyKeychainStore.delete(for: keyID, config: config) } catch { firstError = error }
+        do { try SSHKeyKeychainStore.delete(for: keyID, config: deviceBoundConfig) } catch {
+            if firstError == nil { firstError = error }
+        }
+        if let firstError { throw firstError }
     }
 
     // MARK: - SSH Host Trust
