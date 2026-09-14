@@ -274,6 +274,7 @@ public final class GlassShellModel {
     /// test that has no business talking to CloudKit does not.
     private var catalogBackend: (any GlassCatalogSyncBackend)?
     private var catalogSyncToken: Data?
+    private var remoteChangeTask: Task<Void, Never>?
     public private(set) var catalogSyncStatus: GlassCatalogSyncStatus = .idle
 
     /// Starts syncing the library through `backend`.
@@ -283,6 +284,33 @@ public final class GlassShellModel {
     /// `GlassCloudKitCatalogBackend`; a unit test supplies whatever it needs to assert.
     public func enableCatalogSync(_ backend: any GlassCatalogSyncBackend) {
         catalogBackend = backend
+        // Register for change notifications and start listening. Both halves matter: a
+        // subscription nothing listens for is a silent push into a void, and a listener with no
+        // subscription never hears one. This is the seventh time in this project that a working
+        // part existed with nothing joined to it, so they are wired together here, in one place.
+        Task { [weak self] in
+            try? await backend.subscribeToChanges()
+            await self?.listenForRemoteChanges()
+        }
+    }
+
+    /// Re-syncs whenever the platform tells us the library changed on another device.
+    ///
+    /// The notification is posted by whatever receives the silent push — an app delegate on Apple
+    /// platforms. The model does not import UIKit or AppKit to hear it, so this stays testable:
+    /// a test posts the same notification and asserts a sync ran.
+    public nonisolated static let remoteChangeNotification = Notification.Name("com.glasspowertools.catalog.remoteChange")
+
+    private func listenForRemoteChanges() async {
+        guard remoteChangeTask == nil else { return }
+        remoteChangeTask = Task { [weak self] in
+            for await _ in NotificationCenter.default.notifications(named: Self.remoteChangeNotification) {
+                guard let self, !Task.isCancelled else { return }
+                await synchronizeCatalog()
+                // A pull that changed nothing still leaves the view correct; one that did needs the
+                // projection rebuilt, and `synchronizeCatalog` has already done that.
+            }
+        }
     }
 
     /// One pull-merge-push cycle.

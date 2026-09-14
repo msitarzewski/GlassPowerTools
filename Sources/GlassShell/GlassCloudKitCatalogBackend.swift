@@ -36,6 +36,8 @@ public struct GlassCloudKitCatalogBackend: GlassCatalogSyncBackend {
     static let payloadKey = "profile"
     /// Mirrored out of the payload so the merge can order records without decoding them.
     static let updatedAtKey = "updatedAt"
+    /// Stable, so re-registering on every launch replaces rather than accumulates.
+    static let subscriptionID = "glass-host-catalog-changes"
 
     private let database: CKDatabase
     private let zoneID: CKRecordZone.ID
@@ -87,6 +89,32 @@ public struct GlassCloudKitCatalogBackend: GlassCatalogSyncBackend {
         let nextToken = try? NSKeyedArchiver.archivedData(withRootObject: result.changeToken,
                                                           requiringSecureCoding: true)
         return (profiles, nextToken)
+    }
+
+    /// Registers for silent pushes when anything in the zone changes, so a second device learns
+    /// about an edit while it is open rather than at its next foreground.
+    ///
+    /// `shouldSendContentAvailable` makes it a *silent* push: no alert, no badge, no sound, and no
+    /// user permission prompt — the app is woken to sync and nothing is shown. The subscription is
+    /// idempotent; a repeated save of the same id is not an error worth surfacing, which is why
+    /// `.serverRecordChanged` is swallowed the way `ensureZone` swallows it.
+    ///
+    /// **Silent push is best-effort by design.** The system may delay or drop it when the device is
+    /// busy, low on power, or the app has been backgrounded a long time. That is why this augments
+    /// the sync on foreground rather than replacing it: if the push never lands, the next
+    /// foreground still reconciles.
+    public func subscribeToChanges() async throws {
+        try await ensureZone()
+        let subscription = CKRecordZoneSubscription(zoneID: zoneID, subscriptionID: Self.subscriptionID)
+        let notification = CKSubscription.NotificationInfo()
+        notification.shouldSendContentAvailable = true
+        subscription.notificationInfo = notification
+        do {
+            _ = try await database.modifySubscriptions(saving: [subscription], deleting: [])
+        } catch let error as CKError where error.code == .serverRecordChanged {
+            // Already registered by an earlier launch.
+            return
+        }
     }
 
     public func save(_ profiles: [HostProfile]) async throws {

@@ -25,6 +25,11 @@ struct GlassPowerToolsApp: App {
     @State private var windowRecovery: GlassWindowRecoveryManager
     #if os(macOS)
     @NSApplicationDelegateAdaptor(MacTerminalAppDelegate.self) private var appDelegate
+    #else
+    // iOS and visionOS have no delegate of their own, so this is the one place silent pushes can
+    // be received. macOS routes the same three calls through MacTerminalAppDelegate, which already
+    // exists and which the platform will not let us add a second of.
+    @UIApplicationDelegateAdaptor(GlassPushDelegate.self) private var pushDelegate
     #endif
 
     init() {

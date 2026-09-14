@@ -32,6 +32,13 @@ public protocol GlassCatalogSyncBackend: Sendable {
     func fetchChanges(since token: Data?) async throws -> (profiles: [HostProfile], token: Data?)
     /// Publishes local records. Implementations are expected to be idempotent.
     func save(_ profiles: [HostProfile]) async throws
+    /// Asks the backend to notify this device when the library changes elsewhere. Optional: a
+    /// backend with no notion of push does nothing, and the sync on foreground still reconciles.
+    func subscribeToChanges() async throws
+}
+
+public extension GlassCatalogSyncBackend {
+    func subscribeToChanges() async throws {}
 }
 
 public enum GlassCatalogSyncStatus: Equatable, Sendable {

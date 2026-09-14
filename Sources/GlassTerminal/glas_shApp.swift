@@ -20,6 +20,26 @@ public final class MacTerminalAppDelegate: NSObject, NSApplicationDelegate {
     var settingsManager: SettingsManager?
     private var terminationInProgress = false
 
+    // MARK: Live library updates (D19)
+    //
+    // macOS allows one application delegate and the terminal already owns it, so the shell's
+    // receiver is called from here rather than taking a second one. The three methods below are
+    // the whole of it; the reconciling happens in `GlassShellModel`.
+
+    public func applicationDidFinishLaunching(_ notification: Notification) {
+        GlassRemoteChangeReceiver.register()
+    }
+
+    public func application(_ application: NSApplication,
+                            didReceiveRemoteNotification userInfo: [String: Any]) {
+        GlassRemoteChangeReceiver.handleRemoteNotification(userInfo)
+    }
+
+    public func application(_ application: NSApplication,
+                            didFailToRegisterForRemoteNotificationsWithError error: any Error) {
+        GlassRemoteChangeReceiver.registrationFailed(error)
+    }
+
     public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard !terminationInProgress else { return .terminateLater }
         let windows = MacTerminalWindowReader.Coordinator.active.allObjects

@@ -2,14 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>keychain-access-groups</key>
-	<array>
-		<string>$(AppIdentifierPrefix)sh.glas.shared</string>
-	</array>
-	<key>com.apple.security.application-groups</key>
-	<array>
-		<string>group.sh.glas.shared</string>
-	</array>
+	<key>com.apple.developer.aps-environment</key>
+	<string>development</string>
 	<key>com.apple.developer.icloud-container-identifiers</key>
 	<array>
 		<string>iCloud.com.glasspowertools</string>
@@ -20,5 +14,13 @@
 	</array>
 	<key>com.apple.developer.ubiquity-kvstore-identifier</key>
 	<string>$(TeamIdentifierPrefix)sh.glas.app</string>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.sh.glas.shared</string>
+	</array>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)sh.glas.shared</string>
+	</array>
 </dict>
 </plist>
