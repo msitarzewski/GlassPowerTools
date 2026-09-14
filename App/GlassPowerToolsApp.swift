@@ -13,6 +13,7 @@ import GlassLayers
 import GlassConnectionKit
 import GlassTerminal
 import GlassDatabase
+import GlassDesktop
 
 @main
 struct GlassPowerToolsApp: App {
@@ -20,6 +21,7 @@ struct GlassPowerToolsApp: App {
     @State private var model: GlassShellModel
     @State private var terminal: GlassTerminalRuntime
     @State private var database: GlassDatabaseRuntime
+    @State private var desktop: GlassDesktopRuntime
     @State private var windowRecovery: GlassWindowRecoveryManager
     #if os(macOS)
     @NSApplicationDelegateAdaptor(MacTerminalAppDelegate.self) private var appDelegate
@@ -73,10 +75,19 @@ struct GlassPowerToolsApp: App {
             model?.hostAccess(for: host.id) ?? GlassCapabilityHostAccess(address: host.address)
         }
         model.registry.register(GlassDatabaseCapability(runtime: database))
+        // Stage 4: the remote desktop capability. It owns `.rdp` and serves both RDP and
+        // VNC/Screen Sharing, because the protocol is a field on the saved desktop rather than a
+        // service kind — glassDT's model, which is why the catalog needs no fourth kind.
+        let desktop = GlassDesktopRuntime(layers: layers)
+        desktop.hostAccess = { [weak model] host in
+            model?.hostAccess(for: host.id) ?? GlassCapabilityHostAccess(address: host.address)
+        }
+        model.registry.register(GlassDesktopCapability(runtime: desktop))
         _layers = State(initialValue: layers)
         _model = State(initialValue: model)
         _terminal = State(initialValue: terminal)
         _database = State(initialValue: database)
+        _desktop = State(initialValue: desktop)
         _windowRecovery = State(initialValue: windowRecovery)
     }
 
@@ -87,7 +98,9 @@ struct GlassPowerToolsApp: App {
         let group = WindowGroup("Connections", id: "main") {
             GlassTerminalBootstrap(runtime: terminal) {
                 GlassDatabaseBootstrap(runtime: database) {
-                    GlassShellLibraryView(model: model)
+                    GlassDesktopBootstrap(runtime: desktop) {
+                        GlassShellLibraryView(model: model)
+                    }
                 }
             }
             .glassLayers(layers)
@@ -124,6 +137,7 @@ struct GlassPowerToolsApp: App {
         mainScene
         GlassTerminalScenes(runtime: terminal)
         GlassDatabaseScenes(runtime: database)
+        GlassDesktopScenes(runtime: desktop)
         #if os(macOS)
         Settings {
             GlassShellSettingsView(model: model)

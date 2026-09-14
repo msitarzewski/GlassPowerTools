@@ -23,6 +23,7 @@ let package = Package(
         .library(name: "VNCKit", targets: ["VNCKit"]),
         .library(name: "GlassRDPTransport", targets: ["GlassRDPTransport"]),
         .library(name: "GlassVNCTransport", targets: ["GlassVNCTransport"]),
+        .library(name: "GlassDesktop", targets: ["GlassDesktop"]),
     ],
     dependencies: [
         .package(path: "../GlassConnectionKit"),
@@ -165,6 +166,18 @@ let package = Package(
             dependencies: [.product(name: "RDPKit", package: "RDPKit")]
         ),
         .target(name: "GlassVNCTransport", dependencies: ["GlassRDPTransport", "VNCKit"]),
+        // Stage 4 W2: the remote desktop capability. glassDT's Core and UI merged into one target,
+        // as GlassDatabase merged glassdb's, with its three-process machinery left behind.
+        .target(
+            name: "GlassDesktop",
+            dependencies: [
+                "GlassRDPTransport", "GlassVNCTransport", "GlasSecretStore", "GlassShell", "GlassLayers",
+                .product(name: "GlassConnectionKit", package: "GlassConnectionKit"),
+                .product(name: "GlassConnectionUI", package: "GlassConnectionKit"),
+                .product(name: "GlassHostCatalog", package: "GlassConnectionKit"),
+            ]
+        ),
+        .testTarget(name: "GlassDesktopTests", dependencies: ["GlassDesktop"]),
         .testTarget(name: "VNCKitTests", dependencies: ["VNCKit"]),
         .testTarget(name: "GlassRDPTransportTests", dependencies: ["GlassRDPTransport"]),
         .testTarget(name: "GlassVNCTransportTests", dependencies: ["GlassVNCTransport"]),

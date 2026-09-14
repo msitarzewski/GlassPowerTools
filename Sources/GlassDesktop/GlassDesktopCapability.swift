@@ -1,0 +1,171 @@
+//
+//  GlassDesktopCapability.swift
+//  Glass Power Tools — GlassDesktop
+//
+//  The remote desktop capability's public surface: the runtime the app owns, and the capability
+//  the shell routes Connect through. Everything else in this module stays internal.
+//
+//  Shaped after `Sources/GlassDatabase/GlassDatabaseCapability.swift`, which is itself shaped
+//  after the terminal's. The one thing that differs: a desktop service carries its *protocol*
+//  (RDP or VNC/Screen Sharing) as a field on the saved record rather than as a service kind, the
+//  way glassDT modelled it. So this capability owns `.rdp` and serves both.
+//
+
+import SwiftUI
+import GlassConnectionKit
+import GlassShell
+import GlassLayers
+import GlassRDPTransport
+
+/// The shell's outcome callback for one connect attempt (see `GlassCapabilityOutcome`).
+public typealias GlassDesktopReport = @MainActor (GlassCapabilityOutcome) -> Void
+
+/// Owns the desktop model for the process. One per app, created in the composition root.
+@MainActor @Observable
+public final class GlassDesktopRuntime {
+    let app: DesktopAppModel
+
+    /// Everything the shell and this module's surfaces can ask the desktop to do. One queue,
+    /// consumed by the scenes, so opening a session — and the failure alert when it cannot be
+    /// opened — exists in exactly one place.
+    enum Request {
+        /// Open a session window for this saved connection.
+        case connect(connectionID: EndpointID, report: GlassDesktopReport?)
+        /// Show the failure alert with this message (a link with nothing behind it).
+        case showFailure(String)
+    }
+    private(set) var requestSerial = 0
+    private var pendingRequests: [Request] = []
+
+    /// The one layering state, shared with the shell so no second material system exists.
+    public let layers: GlassLayerStore
+
+    /// How to ask the shell what a capability may do with a host. Set by the composition root,
+    /// because the shell model owns the brokering and a capability must not hold the model.
+    public var hostAccess: (@MainActor (HostProfile) -> GlassCapabilityHostAccess)?
+
+    public init(layers: GlassLayerStore? = nil, app: DesktopAppModel? = nil) {
+        self.layers = layers ?? GlassLayerStore()
+        self.app = app ?? DesktopAppModel()
+    }
+
+    func enqueue(_ request: Request) {
+        pendingRequests.append(request)
+        requestSerial &+= 1
+    }
+
+    func takeRequests() -> [Request] {
+        defer { pendingRequests.removeAll() }
+        return pendingRequests
+    }
+
+    /// Reports the shell has asked for, held until the session window reaches a real state.
+    /// Keyed by endpoint so a second Connect to the same desktop replaces the first rather than
+    /// leaving a caller waiting forever.
+    private var heldReports: [EndpointID: GlassDesktopReport] = [:]
+
+    func holdReport(_ report: GlassDesktopReport?, for id: EndpointID) {
+        guard let report else { return }
+        heldReports[id] = report
+    }
+
+    /// Called once the session actually connected or failed. Removing it first means an outcome
+    /// is delivered exactly once, however many times the state changes afterwards.
+    func reportOutcome(_ state: GlassRDPState, for id: EndpointID?) {
+        guard let id, let report = heldReports.removeValue(forKey: id) else { return }
+        switch state {
+        case .connected: report(.connected)
+        case .failed(let message): report(.failed(message))
+        default: break
+        }
+    }
+
+    /// Loads saved desktops once, at first use.
+    public func loadIfNeeded() async {
+        guard !app.isLoaded else { return }
+        await app.load()
+    }
+
+    /// The saved desktop behind a shell endpoint, if there is one.
+    func connection(for id: EndpointID) -> DesktopConnection? {
+        app.connections.first { $0.id == id }
+    }
+}
+
+/// The shell's remote desktop capability. A service is created complete through the shell's host
+/// sheet: the draft commits the desktop record and its password under the shell's endpoint id,
+/// which is the link. `open` connects to that record; a link with nothing behind it is reported
+/// as such rather than silently doing nothing.
+@MainActor
+public final class GlassDesktopCapability: GlassCapability {
+    public let kind: HostServiceKind = .rdp
+    public let displayName = "Desktop"
+    public let symbolName = "display"
+    private let runtime: GlassDesktopRuntime
+
+    public init(runtime: GlassDesktopRuntime) { self.runtime = runtime }
+
+    // MARK: Setup (the shell's host sheet)
+
+    public func makeSetupDraft() -> any GlassServiceDraft {
+        DesktopServiceDraft(app: runtime.app)
+    }
+
+    public func setupDraft(for service: HostServiceLink, host: HostProfile) -> (any GlassServiceDraft)? {
+        guard let connection = runtime.connection(for: service.endpointID) else { return nil }
+        return DesktopServiceDraft(editing: connection, app: runtime.app)
+    }
+
+    /// D25: the shell deletes the host record and cascades here, so this removes only what the
+    /// capability itself stored — the desktop record and its Keychain credential.
+    public func removeService(_ service: HostServiceLink, host: HostProfile) async throws {
+        guard let connection = runtime.connection(for: service.endpointID) else { return }
+        await runtime.app.delete(connection)
+        if let message = runtime.app.errorMessage {
+            runtime.app.errorMessage = nil
+            throw AppStorageError.recovery(message)
+        }
+    }
+
+    /// The saved record's address, for hosts that predate addresses on the host record.
+    public func knownAddress(service: HostServiceLink, host: HostProfile) -> String? {
+        guard let connection = runtime.connection(for: service.endpointID) else { return nil }
+        let address = connection.host.trimmingCharacters(in: .whitespacesAndNewlines)
+        return address.isEmpty ? nil : address
+    }
+
+    /// The machine's address changed in the shell: every saved desktop that is a service of that
+    /// host follows it, so the machine's identity is edited once.
+    public func hostAddressDidChange(host: HostProfile, address: String?) {
+        guard let address else { return }
+        let owned = Set(host.services.filter { $0.kind == kind }.map(\.endpointID))
+        let following = runtime.app.connections.filter { owned.contains($0.id) && $0.host != address }
+        guard !following.isEmpty else { return }
+        let app = runtime.app
+        Task { @MainActor in
+            for var connection in following {
+                connection.host = address
+                // No password: this is a metadata edit and must not rebind the credential.
+                try? await app.save(connection, password: nil)
+            }
+        }
+    }
+
+    // MARK: Connect
+
+    public func open(service: HostServiceLink, host: HostProfile, report: @escaping GlassDesktopReport) {
+        open(service: service, host: host,
+             hostAccess: GlassCapabilityHostAccess(address: host.address), report: report)
+    }
+
+    public func open(service: HostServiceLink, host: HostProfile, hostAccess: GlassCapabilityHostAccess,
+                     report: @escaping GlassDesktopReport) {
+        guard runtime.connection(for: service.endpointID) != nil else {
+            let message = "\(service.displayName) has no saved desktop configuration. Edit the service to set it up, or remove it."
+            runtime.enqueue(.showFailure(message))
+            report(.failed(message))
+            return
+        }
+        runtime.enqueue(.connect(connectionID: service.endpointID, report: report))
+    }
+}

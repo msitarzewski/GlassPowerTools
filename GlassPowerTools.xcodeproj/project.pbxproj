@@ -11,6 +11,7 @@
 		6A000000000000000000AB41 /* Mac Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6A000000000000000000AB40 /* Mac Assets.xcassets */; };
 		6A000000000000000000AB63 /* GlassShell in Frameworks */ = {isa = PBXBuildFile; productRef = 6A000000000000000000AB61 /* GlassShell */; };
 		6A000000000000000000AB67 /* GlassDatabase in Frameworks */ = {isa = PBXBuildFile; productRef = 6A000000000000000000AB66 /* GlassDatabase */; };
+		6A000000000000000000AB69 /* GlassDesktop in Frameworks */ = {isa = PBXBuildFile; productRef = 6A000000000000000000AB68 /* GlassDesktop */; };
 		6A000000000000000000AB64 /* GlassLayers in Frameworks */ = {isa = PBXBuildFile; productRef = 6A000000000000000000AB62 /* GlassLayers */; };
 		6A000000000000000000AC0D /* GlassPowerToolsWidgets.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 6A000000000000000000AC0E /* GlassPowerToolsWidgets.appex */; platformFilters = (ios, xros, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
@@ -117,6 +118,7 @@
 			files = (
 				4C1FEBDB30535A73008A7EA7 /* GlassTerminal in Frameworks */,
 				6A000000000000000000AB67 /* GlassDatabase in Frameworks */,
+				6A000000000000000000AB69 /* GlassDesktop in Frameworks */,
 				6A000000000000000000AB63 /* GlassShell in Frameworks */,
 				6A000000000000000000AB64 /* GlassLayers in Frameworks */,
 			);
@@ -188,6 +190,7 @@
 				6A000000000000000000AB62 /* GlassLayers */,
 				6A000000000000000000AB65 /* GlassTerminal */,
 				6A000000000000000000AB66 /* GlassDatabase */,
+				6A000000000000000000AB68 /* GlassDesktop */,
 			);
 			productName = GlassPowerTools;
 			productReference = 6A000000000000000000AB17 /* GlassPowerTools.app */;
@@ -759,6 +762,10 @@
 		6A000000000000000000AB66 /* GlassDatabase */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = GlassDatabase;
+		};
+		6A000000000000000000AB68 /* GlassDesktop */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = GlassDesktop;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

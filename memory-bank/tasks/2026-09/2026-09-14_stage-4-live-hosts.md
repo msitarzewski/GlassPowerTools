@@ -66,7 +66,7 @@ RESULT: PASS
 `maximumMonitors=1` is the asymmetry the plan already records: VNC publishes capabilities only on
 ExtendedDesktopSize and never offers multi-monitor. The merged UI must keep gating on it.
 
-## Apple Screen Sharing — the exchange works; a signed-in session is still unproven
+## Apple Screen Sharing — the exchange, reproduced on the moved code
 
 **Host:** this Mac's own Screen Sharing service on `127.0.0.1:5900`, its settings untouched.
 
@@ -84,16 +84,45 @@ moved code.**
 
 The 32.4s on the second probe is server-side throttling after repeated failures, not client latency.
 
-**Still not proven, and Stage 4.5 item 1 remains open:** a completed, signed-in Apple Screen Sharing
-session, and the frames, input and resize behaviour that would follow. It needs a real Mac account,
-so it is the user's to run. The probe takes the password as a **file path** precisely so the secret
-never reaches a command line, a process list or this repository:
+What these two probes do **not** show is a completed session — they were never meant to, having no
+valid account. That is the next section, and it is now closed. To run the probe against a real
+account, the password is passed as a **file path** so the secret never reaches a command line, a
+process list or this repository:
 
 ```
 cd Tests/LiveDesktop && swift build
-printf '%s' 'THE-PASSWORD' > /tmp/msp.pw && chmod 600 /tmp/msp.pw
-./.build/debug/GlassVNCProbe 127.0.0.1 5900 "$(id -un)" /tmp/msp.pw ; rm -f /tmp/msp.pw
+read -rs -p "Password: " P; printf '%s' "$P" > /tmp/msp.pw; chmod 600 /tmp/msp.pw; unset P; echo
+./.build/debug/GlassVNCProbe <host> 5900 "$(id -un)" /tmp/msp.pw ; rm -f /tmp/msp.pw
 ```
+
+## Closed: a signed-in Apple Screen Sharing session works
+
+**2026-09-14, observed by the user in the running glassDT app and shown to the coordinator in a
+screenshot.** A saved desktop named `juliet`, reached over Tailscale:
+
+| Field | Value |
+|---|---|
+| Protocol | **Screen Sharing (VNC)** |
+| Port | 5900 |
+| Account | a real Mac account |
+| Last connected | **28 sec** |
+
+The user's words: *"Just verified port 5900, mac user name and password."*
+
+**This is the result that was never obtained.** `Documentation/Verification/VNC/README.md` recorded
+only that the Apple Remote Desktop exchange was *well formed*, with a deliberately invalid account,
+and listed "a completed Apple Screen Sharing session with a real Mac account" under **Not verified**.
+It is verified now.
+
+**What it settles:** security type 30 — the only Apple type `RFBSecurityType` implements
+(`RFBModels.swift:47-51`) — completes a signed-in session against current macOS. So **Stage 4.5
+item 2, Apple's security type 35, is not required**, and the largest unknown in either stage is
+retired. Screen sharing is a move, not new protocol work.
+
+**The limit on this evidence, stated plainly:** it is a user observation of the *source* app, not a
+captured probe run against the moved code, and it is one host. The moved code is proven only as far
+as the ARD exchange above. A probe run against a real account remains the way to prove the merged
+build, and W3 should do it once a desktop can be created in the shell.
 
 ## A fourth server is available but untouched
 
