@@ -169,7 +169,7 @@ class SettingsManager {
     let layers: GlassLayerStore
     var glassFrost: String {
         get { layers.state.material.rawValue }
-        set { layers.state.material = GlassLayerMaterial(rawValue: newValue) ?? .ultraThin }
+        set { layers.state.material = GlassLayerMaterial(rawValue: newValue) ?? GlassLayerState.default.material }
     }
     /// Theme-color coverage. Zero leaves the terminal canvas fully transparent.
     var windowOpacity: Double {

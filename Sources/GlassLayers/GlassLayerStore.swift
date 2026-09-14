@@ -7,6 +7,10 @@ import Observation
 public final class GlassLayerStore {
     public static let stateKey = "glass.layers.state"
     public static let migrationKey = "glass.layers.migrationSource"
+    /// Stamped once so the default-adoption below can never run twice — otherwise a user who
+    /// deliberately picks "Light" would be moved off it again on the next launch.
+    public static let defaultRevisionKey = "glass.layers.defaultRevision"
+    static let currentDefaultRevision = 1
 
     private let defaults: UserDefaults
     private var storage: GlassLayerState
@@ -30,9 +34,18 @@ public final class GlassLayerStore {
         self.defaults = defaults
         if let data = defaults.data(forKey: Self.stateKey) {
             if let stored = try? JSONDecoder().decode(GlassLayerState.self, from: data) {
-                storage = stored
                 migrationSource = defaults.string(forKey: Self.migrationKey)
                     .flatMap(GlassLayerMigrationSource.init(rawValue:)) ?? .none
+                // A state that is byte-for-byte the old default was never chosen — it is what the
+                // store wrote on first launch. Those users get the new default; anyone who moved a
+                // control keeps exactly what they set, including a deliberate `ultraThin`.
+                let stamped = defaults.integer(forKey: Self.defaultRevisionKey)
+                if stamped < Self.currentDefaultRevision, stored == .ultraThinDefault {
+                    storage = .default
+                    persist()
+                } else {
+                    storage = stored
+                }
             } else {
                 // A stored value exists but is unreadable: the user had a state of their own, so
                 // do not re-run the legacy migration over it. Start from the default.
@@ -46,6 +59,10 @@ public final class GlassLayerStore {
             migrationSource = source
             persist()
         }
+        // Unconditional, and after every read above: a store that only stamped when it changed
+        // something would re-examine the state on every launch and could move a later, deliberate
+        // `ultraThin` off itself.
+        defaults.set(Self.currentDefaultRevision, forKey: Self.defaultRevisionKey)
     }
 
     /// The App Group suite, this application's standard domain, and on macOS the three source

@@ -68,7 +68,9 @@ enum GlassLayerLegacy {
         let opacity = (canonical ?? legacy).flatMap(numericUnit) ?? 0
         let frost = suite.object(forKey: GlasSH.blurBackground).map(blurValue) ?? 1
         let materialRaw = suite.string(forKey: GlasSH.glassFrost) ?? suite.string(forKey: GlasSH.glassMaterialStyle)
-        let material = materialRaw.flatMap(GlassLayerMaterial.init(rawValue:)) ?? .ultraThin
+        // An absent material key is not a user choice, so it takes our default — the same rule
+        // `GlassLayerState`'s decoder uses. Only the sliders below carry an explicit choice across.
+        let material = materialRaw.flatMap(GlassLayerMaterial.init(rawValue:)) ?? GlassLayerState.default.material
         return GlassLayerState(opacity: opacity, frost: frost, material: material)
     }
 
@@ -76,14 +78,16 @@ enum GlassLayerLegacy {
         guard Glassdb.keys.contains(where: { suite.object(forKey: $0) != nil }) else { return nil }
         let opacity = suite.object(forKey: Glassdb.windowOpacity).flatMap(numericUnit) ?? 0.95
         let frost = suite.object(forKey: Glassdb.blurBackground).map(blurValue) ?? 1
-        return GlassLayerState(opacity: opacity, frost: frost, material: .ultraThin)
+        // glassdb had no material control, so there is no choice to preserve.
+        return GlassLayerState(opacity: opacity, frost: frost, material: GlassLayerState.default.material)
     }
 
     static func glassDT(in suite: UserDefaults) -> GlassLayerState? {
         guard GlassDT.keys.contains(where: { suite.object(forKey: $0) != nil }) else { return nil }
         let opacity = suite.object(forKey: GlassDT.opacity).flatMap(numericUnit) ?? 1
         let frost = suite.object(forKey: GlassDT.frost).flatMap(numericUnit) ?? 0.25
-        return GlassLayerState(opacity: opacity, frost: frost, material: .ultraThin)
+        // glassDT likewise had no material control.
+        return GlassLayerState(opacity: opacity, frost: frost, material: GlassLayerState.default.material)
     }
 
     /// The original blur setting was a Boolean toggle; later builds store a slider value.

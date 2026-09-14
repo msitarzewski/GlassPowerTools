@@ -4351,7 +4351,8 @@ struct glas_shTests {
         #expect(settings.visualBell == true)
         #expect(settings.cursorStyle == "Block")
         #expect(settings.blinkingCursor == true)
-        #expect(settings.glassFrost == "ultraThin")
+        // A view over the shell's layer state, so it tracks the default rather than a literal.
+        #expect(settings.glassFrost == GlassLayerState.default.material.rawValue)
         #expect(settings.backgroundFill == 0.0)
         #expect(settings.interactiveGlass == true)
         #expect(settings.glassTint == "None")

@@ -71,7 +71,7 @@ struct GlassLayerMigrationTests {
         legacy.defaults.set(0.3, forKey: "glassdb.blurBackground")
         let store = GlassLayerStore(defaults: own.defaults, legacyDefaults: [legacy.defaults])
         #expect(store.migrationSource == .glassdb)
-        #expect(store.state == GlassLayerState(opacity: 0.7, frost: 0.3, material: .ultraThin))
+        #expect(store.state == GlassLayerState(opacity: 0.7, frost: 0.3, material: GlassLayerState.default.material))
     }
 
     @Test("glassdb: its 0.95 default applies when only blur was set")
@@ -79,7 +79,7 @@ struct GlassLayerMigrationTests {
         let own = DefaultsFixture(), legacy = DefaultsFixture()
         legacy.defaults.set(false, forKey: "glassdb.blurBackground")
         let store = GlassLayerStore(defaults: own.defaults, legacyDefaults: [legacy.defaults])
-        #expect(store.state == GlassLayerState(opacity: 0.95, frost: 0, material: .ultraThin))
+        #expect(store.state == GlassLayerState(opacity: 0.95, frost: 0, material: GlassLayerState.default.material))
     }
 
     @Test("glassDT: display.glass.opacity and the frost stored under display.glass.material")
@@ -89,7 +89,7 @@ struct GlassLayerMigrationTests {
         legacy.defaults.set(0.2, forKey: "display.glass.material")
         let store = GlassLayerStore(defaults: own.defaults, legacyDefaults: [legacy.defaults])
         #expect(store.migrationSource == .glassDT)
-        #expect(store.state == GlassLayerState(opacity: 0.6, frost: 0.2, material: .ultraThin))
+        #expect(store.state == GlassLayerState(opacity: 0.6, frost: 0.2, material: GlassLayerState.default.material))
     }
 
     @Test("glassDT: its defaults 1.0 / 0.25 apply for unset keys")
@@ -97,7 +97,7 @@ struct GlassLayerMigrationTests {
         let own = DefaultsFixture(), legacy = DefaultsFixture()
         legacy.defaults.set(0.5, forKey: "display.glass.material")
         let store = GlassLayerStore(defaults: own.defaults, legacyDefaults: [legacy.defaults])
-        #expect(store.state == GlassLayerState(opacity: 1, frost: 0.5, material: .ultraThin))
+        #expect(store.state == GlassLayerState(opacity: 1, frost: 0.5, material: GlassLayerState.default.material))
     }
 
     @Test("Priority: glas.sh beats glassdb beats glassDT, and sources are not blended")
@@ -144,6 +144,70 @@ struct GlassLayerMigrationTests {
         #expect(store.state == .default)
         #expect(store.migrationSource == .none)
         #expect(GlassLayerStore(defaults: own.defaults, legacyDefaults: []).state == .default)
+    }
+
+    /// The values below are the ones actually stored by the installed source applications on the
+    /// developer's Mac, read 2026-09-13 from `~/Library/Preferences/{sh.glas.app,app.glassdb}.plist`.
+    /// Synthetic fixtures cannot catch a key that the real app writes in an unexpected shape, and
+    /// these are the only two source apps that still hold settings — glassDT has no plist.
+    @Test("The real settings the installed source apps hold migrate as expected")
+    func migratesTheSourceAppsActualStoredSettings() {
+        // glas.sh: an explicit transparent-with-frost choice, and a material key that is present.
+        let own = DefaultsFixture(), glasSH = DefaultsFixture()
+        glasSH.defaults.set(0.0, forKey: "windowOpacity")
+        glasSH.defaults.set(1.0, forKey: "blurBackground")
+        glasSH.defaults.set("ultraThin", forKey: "glassFrost")
+        let a = GlassLayerStore(defaults: own.defaults, legacyDefaults: [glasSH.defaults])
+        #expect(a.migrationSource == .glasSH)
+        #expect(a.state == GlassLayerState(opacity: 0, frost: 1, material: .ultraThin),
+                "a stored material is an explicit choice and is carried across verbatim")
+
+        // glassdb: explicit sliders, and **no material key at all** — it never had that control.
+        let own2 = DefaultsFixture(), glassdb = DefaultsFixture()
+        glassdb.defaults.set(0.46, forKey: "glassdb.windowOpacity")
+        glassdb.defaults.set(0.83, forKey: "glassdb.blurBackground")
+        let b = GlassLayerStore(defaults: own2.defaults, legacyDefaults: [glassdb.defaults])
+        #expect(b.migrationSource == .glassdb)
+        #expect(b.state.opacity == 0.46 && b.state.frost == 0.83, "both sliders are explicit choices")
+        #expect(b.state.material == GlassLayerState.default.material,
+                "no material was ever chosen, so it takes the current default rather than a literal")
+    }
+
+    @Test("An untouched old default is adopted forward; a deliberate choice is not")
+    func adoptsTheNewDefaultOnlyWhenUntouched() throws {
+        // Exactly what the store wrote on first launch before 2026-09-13, with no revision stamp.
+        let untouched = DefaultsFixture()
+        untouched.defaults.set(try JSONEncoder().encode(GlassLayerState.ultraThinDefault),
+                               forKey: GlassLayerStore.stateKey)
+        #expect(GlassLayerStore(defaults: untouched.defaults, legacyDefaults: []).state == .default)
+
+        // The same value, but chosen: the user moved a control, so the stamp is already present.
+        let chosen = DefaultsFixture()
+        chosen.defaults.set(try JSONEncoder().encode(GlassLayerState.ultraThinDefault),
+                            forKey: GlassLayerStore.stateKey)
+        chosen.defaults.set(GlassLayerStore.currentDefaultRevision,
+                            forKey: GlassLayerStore.defaultRevisionKey)
+        #expect(GlassLayerStore(defaults: chosen.defaults, legacyDefaults: []).state == .ultraThinDefault)
+
+        // Any other stored state is untouched even without a stamp.
+        let custom = DefaultsFixture()
+        let theirs = GlassLayerState(opacity: 0.4, frost: 0.2, material: .ultraThin)
+        custom.defaults.set(try JSONEncoder().encode(theirs), forKey: GlassLayerStore.stateKey)
+        #expect(GlassLayerStore(defaults: custom.defaults, legacyDefaults: []).state == theirs)
+    }
+
+    @Test("Adoption runs once: picking Light afterwards survives the next launch")
+    func adoptionIsNotRepeated() throws {
+        let own = DefaultsFixture()
+        own.defaults.set(try JSONEncoder().encode(GlassLayerState.ultraThinDefault),
+                         forKey: GlassLayerStore.stateKey)
+        let first = GlassLayerStore(defaults: own.defaults, legacyDefaults: [])
+        #expect(first.state == .default)
+
+        // The user then deliberately picks Light, landing on the very value that was adopted away.
+        first.state = .ultraThinDefault
+        #expect(GlassLayerStore(defaults: own.defaults, legacyDefaults: []).state == .ultraThinDefault,
+                "without the revision stamp this would silently move them back to the new default")
     }
 
     @Test("Assigning an equal state does not rewrite defaults")

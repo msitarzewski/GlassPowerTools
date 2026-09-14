@@ -4,12 +4,12 @@ import Testing
 
 @Suite("GlassLayerState")
 struct GlassLayerStateTests {
-    @Test("Default is decision D2: transparent, frost on, ultra-thin, theme off")
+    @Test("Default is decision D2: transparent, frost on, sidebar-weight material, theme off")
     func defaultMatchesDecision() {
         let state = GlassLayerState.default
         #expect(state.opacity == 0)
         #expect(state.frost == 1)
-        #expect(state.material == .ultraThin)
+        #expect(state.material == .regular, "one sheet covers the whole window; ultraThin left the columns reading as wallpaper")
         #expect(state.effectiveOpacity == 0)
         #expect(!state.isFullyTransparent)
     }
@@ -38,7 +38,7 @@ struct GlassLayerStateTests {
         let decoded = try JSONDecoder().decode(GlassLayerState.self, from: json)
         #expect(decoded.opacity == 1)
         #expect(decoded.frost == 0)
-        #expect(decoded.material == .ultraThin)
+        #expect(decoded.material == GlassLayerState.default.material, "an unknown material falls back to the current default, not a literal")
         #expect(decoded.effectiveOpacity == 1, "opacity alone says whether the theme is painted")
 
         let empty = try JSONDecoder().decode(GlassLayerState.self, from: "{}".data(using: .utf8)!)

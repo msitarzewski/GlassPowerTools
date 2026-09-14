@@ -51,8 +51,17 @@ public struct GlassLayerState: Codable, Equatable, Sendable {
         self.material = material
     }
 
-    /// Decision D2: transparent-first, frost on. glas.sh's look, adopted for the family.
-    public static let `default` = GlassLayerState(opacity: 0, frost: 1, material: .ultraThin)
+    /// Decision D2: transparent-first, frost on. The frost is `.regular` — the material a Mac
+    /// sidebar uses — because the window composites **one** sheet across the whole content area
+    /// (`GlassLayeredWindow.swift`, `GlassCanvasBackdrop`) and the columns deliberately paint no
+    /// surface of their own. At `.ultraThin` that one sheet left the results and detail columns
+    /// reading as bare wallpaper beside a sidebar AppKit frosts for us. Transparent-first survives:
+    /// opacity is still 0, and "Light" is still one step away in Settings.
+    public static let `default` = GlassLayerState(opacity: 0, frost: 1, material: .regular)
+
+    /// The default before 2026-09-13. Kept so `GlassLayerStore` can tell "never touched it" from
+    /// "chose this", and adopt the new default only for the first. Never assign it as a default.
+    public static let ultraThinDefault = GlassLayerState(opacity: 0, frost: 1, material: .ultraThin)
 
     /// The theme coverage actually painted.
     public var effectiveOpacity: Double { opacity }
