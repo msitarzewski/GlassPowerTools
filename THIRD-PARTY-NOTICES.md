@@ -13,6 +13,32 @@ Code carried in-tree under `Packages/`, with its own license file intact.
 | **RDPKit** | `steelbrain/RDPKit` 0.3.1, `2032fdbc9a300e6b78065abbaf8ed1acca14f938` | MIT, "Copyright (c) 2026 Steelbrain". `Packages/RDPKit/LICENSE` retained verbatim. Local changes recorded in `Packages/RDPKit/GLASSDT-PATCHES.md`; the implemented surface and its limits in `Packages/RDPKit/CAPABILITY-LEDGER.md`. Upstream's `Examples/` sample application was **not** carried. |
 | **Citadel** | `orlandos-nl/Citadel`, vendored via glas.sh | MIT, "Copyright (c) 2022 Orlandos". `Packages/Citadel/LICENSE` retained. |
 | **swift-nio-ssh** | `apple/swift-nio-ssh`, vendored via glas.sh | Apache License 2.0. `Packages/swift-nio-ssh/LICENSE` retained, NOTICE preserved. |
+| **TreeSitterYAML** | `tree-sitter-grammars/tree-sitter-yaml` @ `a1c4812a73ec5e089de8e441fdea3a921e8d5079` (2026-05-22) | MIT. `Packages/TreeSitterYAML/LICENSE` retained. **Vendored rather than depended on** because upstream's SPM manifest decides whether to compile `scanner.c` with a *relative* `FileManager.fileExists(atPath:)`, which is false when the package is a dependency — the scanner is silently dropped and the external-scanner symbols go undefined at link. Same commit, same licence, built with the correct sources. |
+
+## Tree-sitter grammars — pinned dependencies
+
+Consumed at exact revisions rather than version ranges, so a grammar cannot move underneath us.
+These were vendored while GlassEditorKit was a standalone package; on absorption (2026-09-14) they
+became dependencies, which removed **55 MB** of generated C from this repository. Every commit below
+is the one GlassEditorKit had vendored and licence-verified on 2026-08-11. `Tests/GlassEditorCoreTests`
+proves each one links, parses and compiles its highlight query — that test is what makes pinning safe.
+
+| Grammar | Upstream | Pinned commit | Licence |
+|---|---|---|---|
+| JSON | `tree-sitter/tree-sitter-json` | `001c28d7a29832b06b0e831ec77845553c89b56d` | MIT |
+| Bash | `tree-sitter/tree-sitter-bash` | `a06c2e4415e9bc0346c6b86d401879ffb44058f7` | MIT |
+| TOML | `tree-sitter-grammars/tree-sitter-toml` | `64b56832c2cffe41758f28e05c756a3a98d16f41` | MIT |
+| Markdown (block **and** inline, one package) | `tree-sitter-grammars/tree-sitter-markdown` | `a0a00f817d02412bd92c54d316f164d827b57b5c` | MIT |
+| SQL | `DerekStride/tree-sitter-sql` | `851e9cb257ba7c66cc8c14214a31c44d2f1e954e` | MIT |
+| YAML | see the vendored table above | | MIT |
+
+`SwiftTreeSitter` (BSD-3-Clause) and the `tree-sitter` runtime (MIT) arrive with them. The grammars
+declare `tree-sitter/swift-tree-sitter` where this project declares `ChimeHQ/SwiftTreeSitter`;
+SwiftPM resolves both to **one** package, verified in `Package.resolved`.
+
+**Highlight queries.** `Sources/GlassEditorCore/Grammar/Queries/*.scm` are each grammar's own
+`queries/highlights.scm`, taken at the pinned commit above and carried as resources. They remain
+under their grammar's MIT licence.
 
 ## Authored for this application
 
@@ -23,6 +49,8 @@ MIT, under this repository's own copyright.
 | `Sources/VNCKit` | RFB/VNC client written from RFC 6143 and the public RFB protocol registry. **No third-party VNC source was copied or linked.** |
 | `Sources/GlassRDPTransport`, `Sources/GlassVNCTransport` | Adapters: frame ownership, configuration and transport selection. |
 | `Sources/GlasSecretStore` | Absorbed from the standalone GlasSecretStore package, 2026-09-13. |
+| `Sources/GlassEditorCore`, `GlassEditorUI` | Text editing and syntax analysis. Absorbed from the standalone GlassEditorKit package, 2026-09-14. |
+| `Sources/GlassConnectionKit`, `GlassConnectionUI`, `GlassHostCatalog` | Host identities, library projection and the catalog. Absorbed, 2026-09-14. |
 | `Sources/GlassDBKit` | Database engines moved from glassdb, its tunnel manager left behind (D7). |
 | `Sources/GlassSSHTransport`, `Sources/GlassTerminal`, `Sources/GlassDatabase`, `Sources/GlassShell`, `Sources/GlassLayers` | Moved from glas.sh and glassdb; their MIT copyright notices remain applicable to extracted code. |
 

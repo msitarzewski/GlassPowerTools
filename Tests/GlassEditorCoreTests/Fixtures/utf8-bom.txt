@@ -1,0 +1,3 @@
+﻿byte order mark leads
+café
+🙂

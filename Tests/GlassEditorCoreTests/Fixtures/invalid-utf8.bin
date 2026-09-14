@@ -1,0 +1,6 @@
+plain ascii line
+lone continuation: €
+overlong solidus: À¯
+truncated multibyte: â‚
+latin1 accents: café naïve
+high bytes: ©®±ÿ

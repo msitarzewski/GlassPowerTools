@@ -1,0 +1,6 @@
+decomposed: é (e + U+0301)
+precomposed: é (U+00E9)
+stacked: à́̂̃
+hangul jamo: 각
+hangul precomposed: 각
+devanagari: क्षि

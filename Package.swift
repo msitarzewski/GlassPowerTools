@@ -16,6 +16,8 @@ let package = Package(
         .library(name: "GlassConnectionKit", targets: ["GlassConnectionKit"]),
         .library(name: "GlassConnectionUI", targets: ["GlassConnectionUI"]),
         .library(name: "GlassHostCatalog", targets: ["GlassHostCatalog"]),
+        .library(name: "GlassEditorCore", targets: ["GlassEditorCore"]),
+        .library(name: "GlassEditorUI", targets: ["GlassEditorUI"]),
         .library(name: "GlassShell", targets: ["GlassShell"]),
         .library(name: "GlassLayers", targets: ["GlassLayers"]),
         .library(name: "GlassSSHTransport", targets: ["GlassSSHTransport"]),
@@ -29,7 +31,24 @@ let package = Package(
         .library(name: "GlassDesktop", targets: ["GlassDesktop"]),
     ],
     dependencies: [
-        .package(path: "../GlassEditorKit"),
+        // The editor engine's own dependency, previously transitive through GlassEditorKit.
+        .package(url: "https://github.com/ChimeHQ/SwiftTreeSitter.git", from: "0.9.0"),
+        // Tree-sitter grammars, pinned to the exact commits GlassEditorKit had vendored and
+        // verified (its THIRD-PARTY-LICENSES.md, 2026-08-11). Taken as dependencies rather than
+        // carried: the seven vendored copies were 55 MB of generated C, all MIT, and every one of
+        // these repositories ships an SPM manifest at the pinned commit. Revisions, not ranges, so
+        // the grammar cannot move under us.
+        .package(url: "https://github.com/tree-sitter/tree-sitter-json",
+                 revision: "001c28d7a29832b06b0e831ec77845553c89b56d"),
+        .package(url: "https://github.com/tree-sitter/tree-sitter-bash",
+                 revision: "a06c2e4415e9bc0346c6b86d401879ffb44058f7"),
+        .package(url: "https://github.com/tree-sitter-grammars/tree-sitter-toml",
+                 revision: "64b56832c2cffe41758f28e05c756a3a98d16f41"),
+        // One package, two grammars: markdown is block and inline, combined by injection.
+        .package(url: "https://github.com/tree-sitter-grammars/tree-sitter-markdown",
+                 revision: "a0a00f817d02412bd92c54d316f164d827b57b5c"),
+        .package(url: "https://github.com/DerekStride/tree-sitter-sql",
+                 revision: "851e9cb257ba7c66cc8c14214a31c44d2f1e954e"),
         // The SSH stack vendored from glas.sh, verbatim (see Stage 2 transport note).
         .package(path: "Packages/Citadel"),
         .package(path: "Packages/swift-nio-ssh"),
@@ -64,6 +83,38 @@ let package = Package(
         .target(name: "GlassConnectionKit"),
         .target(name: "GlassConnectionUI", dependencies: ["GlassConnectionKit"]),
         .target(name: "GlassHostCatalog", dependencies: ["GlassConnectionKit"]),
+        // Text editing and syntax analysis. Absorbed from the standalone GlassEditorKit package on
+        // 2026-09-14: it is already in production behind the database's SQL and record editors and
+        // the terminal's SFTP remote editor, so it was never a future capability.
+        .target(
+            name: "GlassEditorCore",
+            dependencies: [
+                .product(name: "SwiftTreeSitter", package: "SwiftTreeSitter"),
+                .product(name: "TreeSitterJSON", package: "tree-sitter-json"),
+                .product(name: "TreeSitterBash", package: "tree-sitter-bash"),
+                "TreeSitterYAML",
+                .product(name: "TreeSitterTOML", package: "tree-sitter-toml"),
+                .product(name: "TreeSitterMarkdown", package: "tree-sitter-markdown"),
+                .product(name: "TreeSitterSql", package: "tree-sitter-sql"),
+            ],
+            resources: [.copy("Grammar/Queries")]
+        ),
+        // The one grammar that cannot be a dependency. Upstream's manifest decides whether to
+        // compile `scanner.c` with `FileManager.fileExists(atPath: "src/scanner.c")` — a *relative*
+        // path, resolved against the manifest process's working directory rather than the package
+        // root. True when you clone and build it in place; false when you are a dependency, so the
+        // scanner is silently dropped and every `tree_sitter_yaml_external_scanner_*` symbol goes
+        // undefined at link time. Vendored at the same pinned commit instead, with its MIT licence,
+        // and in `Packages/` because it is not our code.
+        .target(
+            name: "TreeSitterYAML",
+            path: "Packages/TreeSitterYAML",
+            exclude: ["src/schema.core.c", "src/schema.json.c", "src/schema.legacy.c"],
+            sources: ["src/parser.c", "src/scanner.c"],
+            publicHeadersPath: "include",
+            cSettings: [.headerSearchPath("src")]
+        ),
+        .target(name: "GlassEditorUI", dependencies: ["GlassEditorCore"]),
         .target(
             name: "GlassLayers",
             dependencies: [
@@ -78,7 +129,7 @@ let package = Package(
                 "GlassConnectionUI",
                 "GlassHostCatalog",
                 "GlasSecretStore",
-                .product(name: "GlassEditorCore", package: "GlassEditorKit"),
+                "GlassEditorCore",
             ]
         ),
         // The SSH engine: no UI, no shell dependency. Consumed by the terminal, database,
@@ -126,7 +177,7 @@ let package = Package(
                 "GlassHostCatalog",
                 "GlasSecretStore",
                 // glas.sh's SFTP remote editor already uses GlassEditorUI; parity brings it.
-                .product(name: "GlassEditorKit", package: "GlassEditorKit"),
+                "GlassEditorCore", "GlassEditorUI",
                 .product(name: "SwiftTerm", package: "SwiftTerm"),
                 // W2 TEMPORARY until the transport call sites move to GlassSSHTransport:
                 .product(name: "Citadel", package: "Citadel"),
@@ -158,7 +209,7 @@ let package = Package(
                 "GlassConnectionUI",
                 "GlasSecretStore",
                 // The SQL editor surface and the record editor's JSON fields are GlassEditorKit.
-                .product(name: "GlassEditorKit", package: "GlassEditorKit"),
+                "GlassEditorCore", "GlassEditorUI",
             ],
             swiftSettings: [.enableUpcomingFeature("MemberImportVisibility")]
         ),
@@ -194,6 +245,9 @@ let package = Package(
         .testTarget(name: "GlassConnectionKitTests", dependencies: ["GlassConnectionKit"]),
         .testTarget(name: "GlassConnectionUITests", dependencies: ["GlassConnectionUI"]),
         .testTarget(name: "GlassHostCatalogTests", dependencies: ["GlassConnectionKit", "GlassHostCatalog"]),
+        .testTarget(name: "GlassEditorCoreTests", dependencies: ["GlassEditorCore"],
+                    resources: [.copy("Fixtures")]),
+        .testTarget(name: "GlassEditorUITests", dependencies: ["GlassEditorUI"]),
         .testTarget(name: "GlassLayersTests", dependencies: ["GlassLayers"]),
         .testTarget(
             name: "GlassDatabaseTests",
@@ -212,7 +266,7 @@ let package = Package(
             dependencies: [
                 "GlassTerminal",
                 "GlasSecretStore",
-                .product(name: "GlassEditorKit", package: "GlassEditorKit"),
+                "GlassEditorCore", "GlassEditorUI",
                 .product(name: "Citadel", package: "Citadel"),
                 .product(name: "NIOSSH", package: "swift-nio-ssh"),
                 .product(name: "NIOCore", package: "swift-nio"),

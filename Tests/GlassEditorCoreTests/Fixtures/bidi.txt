@@ -1,0 +1,5 @@
+arabic: مرحبا GlassEditorKit وداعا
+hebrew: שלום world עולם
+with RLM: abc‏אבג‎def
+isolates: ⁦LTR⁩ ⁧RTL⁩ ⁨neutral⁩
+numbers: السعر 123.45 USD

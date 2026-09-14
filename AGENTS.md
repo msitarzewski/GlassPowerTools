@@ -33,6 +33,10 @@ three separately pinned copies of the shared packages.
 - One settings and configuration surface for all capabilities, replacing three drifting designs.
 - Preserve the family library, favorites, groups, selection and detail-panel patterns. Users must not
   have to learn a new navigation model.
+- **GlassEditorKit was absorbed on 2026-09-14 too.** It was never a future capability: the
+  database's SQL and record editors and the terminal's SFTP remote editor already use it. Its seven
+  tree-sitter grammars are now pinned dependencies rather than 55 MB of vendored C — except YAML,
+  whose upstream manifest cannot be consumed as a dependency (see `THIRD-PARTY-NOTICES.md`).
 - The shared connection kit was absorbed on 2026-09-14 for the same reason as the secret store:
   it existed so three separate applications could agree about one model, and there is one
   application now. `../GlassConnectionKit` is a historical record, not a dependency.
@@ -65,7 +69,7 @@ repositories. Not yet actioned, and not to be actioned without the user's instru
 | RDP and VNC engines, Metal presentation, spatial canvas | `../glassDT/` (about 5,600 lines plus `Packages/RDPKit`, `Packages/VNCKit`, transports) |
 | Host identities, library projection, shared library UI, host catalog | `Sources/GlassConnectionKit`, `GlassConnectionUI`, `GlassHostCatalog` (absorbed 2026-09-14) |
 | Credentials, trust storage, mobility | `Sources/GlasSecretStore` (absorbed 2026-09-13) |
-| Text editing and syntax analysis | `../GlassEditorKit` |
+| Text editing and syntax analysis | `Sources/GlassEditorCore`, `GlassEditorUI` (absorbed 2026-09-14) |
 
 Reuse means moving these in as modules, not rewriting them. Record what actually moved.
 
