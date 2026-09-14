@@ -633,13 +633,44 @@ public final class GlassShellModel {
 
     /// Deletes every record that makes up the host. The device's own host is not one the user
     /// created and is not one they can remove (D8) — its services are removed individually.
+    /// Deletes the machine, **and everything its capabilities stored for it**.
+    ///
+    /// The capability pass is the part that was missing. Removing the records unlinked the
+    /// services and left each capability's own configuration behind — the terminal's
+    /// `ServerConfiguration`, the database's connection, and the Keychain entries with them. The
+    /// orphans stayed reachable through surfaces that read the capability's store rather than the
+    /// catalog: a host deleted from the library went on appearing in Connect Saved Host, with no
+    /// way left to remove it, because the thing that owned it no longer existed.
+    ///
+    /// `removeService` has always done this for one service and says so in its own documentation.
+    /// Deleting the host simply never called it.
+    ///
+    /// Order matters and matches `removeService`: the records go first, then the capabilities are
+    /// asked to clean up. A stray configuration is harmless; a link to nothing is not. A capability
+    /// that throws must not strand the deletion either, so a failure there is collected and
+    /// reported after every other service has had its turn.
     public func deleteHost(_ id: HostID) async throws {
         guard let host = host(id) else { throw GlassShellError.hostNotFound(id) }
         guard !host.isLocal else { throw GlassShellError.localHostNotRemovable }
+        // Captured before the records go: afterwards there is nothing left to ask.
+        let owned = host.members.flatMap { member in
+            member.services.map { (service: $0, owner: member) }
+        }
         for member in host.members { try await catalog.delete(hostID: member.id) }
         for member in host.members { preferences.hosts[member.id] = nil }
         try persistPreferences()
         await load()
+
+        var firstFailure: Error?
+        for entry in owned {
+            do {
+                try await registry.capability(for: entry.service.kind)?
+                    .removeService(entry.service, host: entry.owner)
+            } catch {
+                if firstFailure == nil { firstFailure = error }
+            }
+        }
+        if let firstFailure { throw firstFailure }
     }
 
     /// Links a service to the host's canonical record. `endpointID` is the key the owning

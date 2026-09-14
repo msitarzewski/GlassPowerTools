@@ -273,6 +273,59 @@ struct GlassShellSetupTests {
         #expect(model.services(for: created.id).isEmpty)
     }
 
+    /// The sibling of `removeServiceReachesCapability`, and the one that was missing.
+    ///
+    /// `removeService` had always told the owning capability to delete what it stored; `deleteHost`
+    /// removed the records and told nobody. Every capability's configuration for that machine was
+    /// orphaned — and stayed *reachable*, because surfaces that read the capability's own store
+    /// rather than the catalog went on listing it. A host deleted from the library kept appearing
+    /// in the terminal's Connect Saved Host with nothing left that could remove it.
+    @Test("Deleting a host tells every owning capability to delete what it stored")
+    func deleteHostReachesCapabilities() async throws {
+        let (model, root) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let ssh = SetupCapability(kind: .ssh)
+        let database = SetupCapability(kind: .database)
+        model.registry.register(ssh)
+        model.registry.register(database)
+        let created = try await model.addHost(displayName: "doomed", address: "doomed.example")
+        let terminal = try await model.addService(kind: .ssh, displayName: "t", to: created.id)
+        let db = try await model.addService(kind: .database, displayName: "d", to: created.id)
+
+        try await model.deleteHost(created.id)
+
+        #expect(ssh.removed == [terminal.endpointID], "the terminal's server is deleted with the host")
+        #expect(database.removed == [db.endpointID], "and so is every other capability's")
+        #expect(model.host(created.id) == nil)
+    }
+
+    /// One capability failing must not leave the others holding orphans — the deletion has already
+    /// happened by then, so stopping at the first error would strand everything after it.
+    @Test("A capability that fails to clean up does not strand the others")
+    func deleteHostContinuesPastAFailure() async throws {
+        let (model, root) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        final class Refuses: GlassCapability {
+            let kind: HostServiceKind = .ssh
+            var displayName: String { "Refuses" }
+            var symbolName: String { "xmark" }
+            func open(service: HostServiceLink, host: HostProfile, report: @escaping @MainActor (GlassCapabilityOutcome) -> Void) {}
+            struct Failure: Error {}
+            func removeService(_ service: HostServiceLink, host: HostProfile) async throws { throw Failure() }
+        }
+        let refusing = Refuses()
+        let database = SetupCapability(kind: .database)
+        model.registry.register(refusing)
+        model.registry.register(database)
+        let created = try await model.addHost(displayName: "half", address: "half.example")
+        _ = try await model.addService(kind: .ssh, displayName: "t", to: created.id)
+        let db = try await model.addService(kind: .database, displayName: "d", to: created.id)
+
+        await #expect(throws: Refuses.Failure.self) { try await model.deleteHost(created.id) }
+        #expect(database.removed == [db.endpointID], "the other capability still cleaned up")
+        #expect(model.host(created.id) == nil, "and the machine is still gone")
+    }
+
     @Test("A capability without the setup contract cannot create a service")
     func unavailableDraftBlocksSave() async throws {
         let (model, root) = try makeModel()
