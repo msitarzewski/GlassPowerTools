@@ -72,7 +72,7 @@ public enum GlassShellError: LocalizedError, Equatable {
 /// to keep three processes agreeing (dual catalogs, publication, deletion outbox,
 /// pairing). One catalog, one writer, one store.
 @MainActor @Observable
-public final class GlassShellModel {
+public final class GlassShellModel: GlassServiceStore {
     public static let sharedContainerIdentifier = "group.sh.glas.shared"
     public static let catalogRelativePath = "GlassHostCatalog/hosts.json"
 
@@ -346,6 +346,58 @@ public final class GlassShellModel {
             // and none worth an alert. The library on this device is complete without the others.
             catalogSyncStatus = .failed(error.localizedDescription)
         }
+    }
+
+    // MARK: The one store for a connection (D26)
+    //
+    // A capability's configuration lives on its service link. These three methods are the whole of
+    // the read/write side; `GlassServiceStore` is the narrow protocol capabilities see, so none of
+    // them holds this model.
+
+    /// The link for an endpoint, wherever in the library it lives.
+    private func link(for endpointID: EndpointID) -> (host: HostProfile, link: HostServiceLink)? {
+        for record in records {
+            if let found = record.services.first(where: { $0.endpointID == endpointID }) {
+                return (record, found)
+            }
+        }
+        return nil
+    }
+
+    public func configuration(for endpointID: EndpointID) -> Data? {
+        link(for: endpointID)?.link.configuration
+    }
+
+    public func configurations(ofKind kind: HostServiceKind) -> [EndpointID: Data] {
+        var found: [EndpointID: Data] = [:]
+        for record in records {
+            for service in record.services where service.kind == kind {
+                if let configuration = service.configuration { found[service.endpointID] = configuration }
+            }
+        }
+        return found
+    }
+
+    /// Writes the capability's record onto its link and publishes it.
+    ///
+    /// The link is re-read from the catalog immediately before writing rather than taken from
+    /// `records`, which is a projection that may be a moment behind a sync. Writing a stale link
+    /// back would silently revert whatever arrived in between.
+    public func setConfiguration(_ data: Data?, for endpointID: EndpointID) async throws {
+        guard let located = link(for: endpointID) else {
+            throw GlassShellError.serviceNotFound(endpointID)
+        }
+        let isLocal = isLocalHost(located.host.id)
+        let store = isLocal ? localCatalog : catalog
+        let snapshot = try await store.snapshot()
+        guard let owner = snapshot.first(where: { $0.services.contains { $0.endpointID == endpointID } }),
+              var current = owner.services.first(where: { $0.endpointID == endpointID }) else {
+            throw GlassShellError.serviceNotFound(endpointID)
+        }
+        guard current.configuration != data else { return }
+        current.configuration = data
+        try await store.pair(current, with: owner.id)
+        await load()
     }
 
     /// The library's sync state, in words a person can act on.

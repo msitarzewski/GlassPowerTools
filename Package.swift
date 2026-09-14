@@ -13,6 +13,9 @@ let package = Package(
     ],
     products: [
         .library(name: "GlasSecretStore", targets: ["GlasSecretStore"]),
+        .library(name: "GlassConnectionKit", targets: ["GlassConnectionKit"]),
+        .library(name: "GlassConnectionUI", targets: ["GlassConnectionUI"]),
+        .library(name: "GlassHostCatalog", targets: ["GlassHostCatalog"]),
         .library(name: "GlassShell", targets: ["GlassShell"]),
         .library(name: "GlassLayers", targets: ["GlassLayers"]),
         .library(name: "GlassSSHTransport", targets: ["GlassSSHTransport"]),
@@ -26,7 +29,6 @@ let package = Package(
         .library(name: "GlassDesktop", targets: ["GlassDesktop"]),
     ],
     dependencies: [
-        .package(path: "../GlassConnectionKit"),
         .package(path: "../GlassEditorKit"),
         // The SSH stack vendored from glas.sh, verbatim (see Stage 2 transport note).
         .package(path: "Packages/Citadel"),
@@ -55,19 +57,26 @@ let package = Package(
         // consumer, and the split had become a reason not to fix its own eligibility list.
         // The module name is unchanged, so no `import` moved.
         .target(name: "GlasSecretStore"),
+        // Host identities, the shared library projection and the catalog. Absorbed from the
+        // standalone GlassConnectionKit package on 2026-09-14: it existed to let three separate
+        // applications agree about one model, and there is one application now. The module names
+        // are unchanged, so no `import` moved.
+        .target(name: "GlassConnectionKit"),
+        .target(name: "GlassConnectionUI", dependencies: ["GlassConnectionKit"]),
+        .target(name: "GlassHostCatalog", dependencies: ["GlassConnectionKit"]),
         .target(
             name: "GlassLayers",
             dependencies: [
-                .product(name: "GlassConnectionUI", package: "GlassConnectionKit"),
+                "GlassConnectionUI",
             ]
         ),
         .target(
             name: "GlassShell",
             dependencies: [
                 "GlassLayers",
-                .product(name: "GlassConnectionKit", package: "GlassConnectionKit"),
-                .product(name: "GlassConnectionUI", package: "GlassConnectionKit"),
-                .product(name: "GlassHostCatalog", package: "GlassConnectionKit"),
+                "GlassConnectionKit",
+                "GlassConnectionUI",
+                "GlassHostCatalog",
                 "GlasSecretStore",
                 .product(name: "GlassEditorCore", package: "GlassEditorKit"),
             ]
@@ -83,7 +92,7 @@ let package = Package(
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "Logging", package: "swift-log"),
                 "GlasSecretStore",
-                .product(name: "GlassConnectionKit", package: "GlassConnectionKit"),
+                "GlassConnectionKit",
             ]
         ),
         // The SSH capability: glas.sh moved in as one module (decision 2026-09-10). Files stay
@@ -112,9 +121,9 @@ let package = Package(
                 "GlassShell",
                 "GlassLayers",
                 "GlassSSHTransport",
-                .product(name: "GlassConnectionKit", package: "GlassConnectionKit"),
-                .product(name: "GlassConnectionUI", package: "GlassConnectionKit"),
-                .product(name: "GlassHostCatalog", package: "GlassConnectionKit"),
+                "GlassConnectionKit",
+                "GlassConnectionUI",
+                "GlassHostCatalog",
                 "GlasSecretStore",
                 // glas.sh's SFTP remote editor already uses GlassEditorUI; parity brings it.
                 .product(name: "GlassEditorKit", package: "GlassEditorKit"),
@@ -145,8 +154,8 @@ let package = Package(
                 "GlassDBKit",
                 "GlassShell",
                 "GlassLayers",
-                .product(name: "GlassConnectionKit", package: "GlassConnectionKit"),
-                .product(name: "GlassConnectionUI", package: "GlassConnectionKit"),
+                "GlassConnectionKit",
+                "GlassConnectionUI",
                 "GlasSecretStore",
                 // The SQL editor surface and the record editor's JSON fields are GlassEditorKit.
                 .product(name: "GlassEditorKit", package: "GlassEditorKit"),
@@ -172,9 +181,9 @@ let package = Package(
             name: "GlassDesktop",
             dependencies: [
                 "GlassRDPTransport", "GlassVNCTransport", "GlasSecretStore", "GlassShell", "GlassLayers",
-                .product(name: "GlassConnectionKit", package: "GlassConnectionKit"),
-                .product(name: "GlassConnectionUI", package: "GlassConnectionKit"),
-                .product(name: "GlassHostCatalog", package: "GlassConnectionKit"),
+                "GlassConnectionKit",
+                "GlassConnectionUI",
+                "GlassHostCatalog",
             ]
         ),
         .testTarget(name: "GlassDesktopTests", dependencies: ["GlassDesktop"]),
@@ -182,6 +191,9 @@ let package = Package(
         .testTarget(name: "GlassRDPTransportTests", dependencies: ["GlassRDPTransport"]),
         .testTarget(name: "GlassVNCTransportTests", dependencies: ["GlassVNCTransport"]),
         .testTarget(name: "GlasSecretStoreTests", dependencies: ["GlasSecretStore"]),
+        .testTarget(name: "GlassConnectionKitTests", dependencies: ["GlassConnectionKit"]),
+        .testTarget(name: "GlassConnectionUITests", dependencies: ["GlassConnectionUI"]),
+        .testTarget(name: "GlassHostCatalogTests", dependencies: ["GlassConnectionKit", "GlassHostCatalog"]),
         .testTarget(name: "GlassLayersTests", dependencies: ["GlassLayers"]),
         .testTarget(
             name: "GlassDatabaseTests",

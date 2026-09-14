@@ -46,8 +46,9 @@ three source applications are obsolete and no longer compile.
 | [Test pollution](tasks/2026-09/2026-09-13_test-pollution.md) | UI tests wrote into the real saved-server list; where the Mac's store actually lives, and the abandoned defaults suites still to sweep |
 | [September tasks](tasks/2026-09/README.md) | Monthly index |
 
-This project is `~/Software/glass/GlassPowerTools`. `../GlassConnectionKit` and `../GlassEditorKit`
-are live dependencies. `../glas.sh`, `../glassdb`, `../glassDT` and `../GlasSecretStore` are
+This project is `~/Software/glass/GlassPowerTools`. `../GlassEditorKit` is a live dependency and is
+to be absorbed when the editor capability arrives. `../GlassConnectionKit` was **absorbed on
+2026-09-14** and is now a historical record like the rest. `../glas.sh`, `../glassdb`, `../glassDT` and `../GlasSecretStore` are
 obsolete and do not compile — a historical record to read, never something to keep building.
 GlasSecretStore was absorbed into `Sources/GlasSecretStore` on 2026-09-13. Two further siblings are **not** inputs:
 `../docs` holds two July 2026 security audit reports whose still-open findings are tracked in

@@ -656,3 +656,69 @@ already gone, so stopping at the first error would orphan everything after it; t
 collected and rethrown once every service has had its turn.
 
 **Two tests, verified to bite:** with the capability pass disabled both fail; with it, both pass.
+
+## D26 — the catalog is the one store for a connection
+
+**Status: Approved** by the user, 2026-09-14: *"which if I read the options correctly... is D"*, and
+*"'Too big right now: it's a migration of existing local data' means making sure that any stores
+owned by Power Tools are cleaned up (including keys), and this is done correctly."*
+
+**The decision.** A service's own configuration lives on its `HostServiceLink`, encoded by the
+capability that owns it. The catalog *is* the store, not a copy of one. Each capability's separate
+store is **deleted**, not migrated: `servers` in SharedDefaults, `glassdb.connections`,
+`connections.json`, and the `sshKeys` library.
+
+**Why not the cheaper option.** An earlier write-up offered A — the same transport, but with each
+capability keeping its own store as master and the catalog carrying a copy. That leaves two copies
+of one truth and a rule about which wins. The user's answer removed the only reason A existed: there
+is no installed base to migrate, so "one store" costs no more than "two stores kept in step", and it
+is the version that stays correct.
+
+**Why migration was never a real constraint, recorded because it was got wrong three times.** The
+user has said since 2026-09-11 that the user base is the two of us — *"Data loss is fine. NO ONE
+USES IT YET"*. Pricing in a migration cost turned the correct design into "too big right now" and
+recommended the weaker one. **When the user has stated a constraint is absent, stop re-deriving it.**
+
+**What this makes true**, and it is the sentence the product is: add a host on any device, attach a
+service, import a key — and connect from any other device. Measured 2026-09-14, the pieces that
+already travel are the host profile, the SSH key material and passphrase
+(`sshKeysPrivateService`, `sshKeysPassphraseService`) and the host-key pin (D23). D adds the two
+that do not: the service configuration and the key record.
+
+**The deliberate exception.** Secure Enclave key material never synchronizes
+(`KeychainManager.swift:575-584` routes it to a device-bound configuration) because a hardware key
+cannot leave its device. "Works everywhere" is therefore true of an imported key and false of a
+generated hardware one, by design.
+
+**Amended the same day: keys are not a detail of this.** *"We need that key to live on its own …
+so the key itself survives if I delete the oscar Terminal connection, so that it can be reused for
+other hosts and services."* A key outlives connections and is shared by them, so it gets its own
+stage and its own manager — see
+[keys first class](tasks/2026-09/2026-09-14_d26-keys-first-class.md). The original scope item 2
+below understated it as folding a library into the Keychain.
+
+**Scope, as the user framed it — cleaned up correctly, including keys:**
+
+1. Connection configuration onto the service link; the per-capability stores deleted.
+2. Keys promoted to a first-class, workspace-level library with a manager surface, independent of
+   any connection's lifetime. **A service whose credential cannot leave the device does not appear
+   on other devices at all** — the user's model, 2026-09-14: *"the Terminal using a device bound key
+   becomes a device bound terminal and doesn't show on iPhone."* Secure Enclave material is the
+   trigger, the binding is derived from the credential rather than stored, and the publish/apply
+   pair must both be implemented or a device deletes its own hardware-key services on the second
+   sync.
+3. **Storage keys still carry the old app's names.** Measured on this Mac: 529 keys, 295 KB, of
+   which **82% is under `glassdb.*` or `app.glassdb.*`** — `glassdb.queryHistory` (151 KB),
+   `glassdb.connections` (59 KB), `glassdb.mutationAudit.v1`, and 206 `app.glassdb.grid*` keys. The
+   user-visible strings were renamed weeks ago; the storage keys never were.
+4. **Unbounded accumulation:** 263 `macWorkspaceRestoration.*` keys, never pruned.
+5. Synced deletion must cascade to capabilities as local deletion already does (D25). Today a host
+   deleted on one device vanishes from the others' libraries and leaves their configuration orphaned.
+6. View state (query history, grid layouts) stays local, under corrected key names.
+
+**No conversion path.** The new build reads nothing old and removes the legacy keys on first launch.
+Half-converted is the only outcome worth avoiding, and there is no data to preserve.
+
+**Acceptance, and no test replaces it:** add a host with a key on the Mac, connect from the phone,
+and watch whether it prompts for host trust. That single run proves the configuration sync, the key
+record sync and D23's pin sync together.

@@ -33,6 +33,9 @@ three separately pinned copies of the shared packages.
 - One settings and configuration surface for all capabilities, replacing three drifting designs.
 - Preserve the family library, favorites, groups, selection and detail-panel patterns. Users must not
   have to learn a new navigation model.
+- The shared connection kit was absorbed on 2026-09-14 for the same reason as the secret store:
+  it existed so three separate applications could agree about one model, and there is one
+  application now. `../GlassConnectionKit` is a historical record, not a dependency.
 - Credentials live in `Sources/GlasSecretStore`, absorbed from the standalone package on
   2026-09-13. Its eligibility and mobility policy is now this project's to set, and D18/D21/D23
   changed it: credentials and host-key pins synchronize through iCloud Keychain by default, Secure
@@ -60,7 +63,7 @@ repositories. Not yet actioned, and not to be actioned without the user's instru
 | Terminal, SFTP, port forwarding, workgroups | `../glas.sh/glas.sh/` (about 31,400 lines) |
 | Database browsing and query surfaces | `../glassdb/glassdb/` (about 22,200 lines) |
 | RDP and VNC engines, Metal presentation, spatial canvas | `../glassDT/` (about 5,600 lines plus `Packages/RDPKit`, `Packages/VNCKit`, transports) |
-| Host identities, library projection, shared library UI, host catalog | `../GlassConnectionKit` |
+| Host identities, library projection, shared library UI, host catalog | `Sources/GlassConnectionKit`, `GlassConnectionUI`, `GlassHostCatalog` (absorbed 2026-09-14) |
 | Credentials, trust storage, mobility | `Sources/GlasSecretStore` (absorbed 2026-09-13) |
 | Text editing and syntax analysis | `../GlassEditorKit` |
 
