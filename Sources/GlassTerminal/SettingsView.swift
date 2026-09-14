@@ -173,7 +173,7 @@ struct GeneralSettingsView: View {
                         .foregroundStyle(tailscaleTestResult.hasPrefix("Connected") ? .green : .red)
                 }
 
-                Text("Earlier-build Tailscale credentials are not imported from unnamespaced entries in the shared Keychain service. If a field is empty after updating, re-enter it once to store it in glas.sh's terminal namespace.")
+                Text("Earlier-build Tailscale credentials are not imported from unnamespaced entries in the shared Keychain service. If a field is empty after updating, re-enter it once to store it in the terminal's own namespace.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

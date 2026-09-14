@@ -751,7 +751,7 @@ public final class SwiftTermHostModel: ObservableObject {
             let notice = Data(
                 (
                     "\u{18}\u{1B}[0m\r\n"
-                        + "[glas.sh omitted \(droppedPendingRendererByteCount) bytes "
+                        + "[omitted \(droppedPendingRendererByteCount) bytes "
                         + "received before the terminal renderer attached]\r\n"
                 ).utf8
             )

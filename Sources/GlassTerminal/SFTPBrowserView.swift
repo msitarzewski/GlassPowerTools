@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import GlassLayers
 import NIOCore
 import GlassSSHTransport
 import NIOFoundationCompat
@@ -459,6 +460,9 @@ private final class SFTPBrowserSessionLifetime {
 
 struct SFTPBrowserView: View {
     let sessionID: UUID
+    /// The directory to open at, if the caller knows one. Applied once, before the first listing,
+    /// so the user does not watch the root load and then jump.
+    var initialPath: String?
     @Environment(SessionManager.self) private var sessionManager
     @Environment(SettingsManager.self) private var settingsManager
     @Environment(\.dismiss) private var dismiss
@@ -466,6 +470,8 @@ struct SFTPBrowserView: View {
     @State private var sftpClient: SFTPClient?
     @State private var sessionLifetime: SFTPBrowserSessionLifetime?
     @State private var currentPath: String = "/"
+    /// Set once from `initialPath`, so a redraw cannot send the browser home again.
+    @State private var appliedInitialPath = false
     @State private var entries: [SFTPPathComponent] = []
     @State private var listingPath: String?
     @State private var expandedDirectories: Set<String> = []
@@ -580,6 +586,17 @@ struct SFTPBrowserView: View {
         .task {
             if sessionLifetime == nil, let session, session.purpose == .sftp {
                 sessionLifetime = SFTPBrowserSessionLifetime(manager: sessionManager, session: session)
+            }
+            // Applied before the first listing, so the browser opens where the caller asked rather
+            // than loading the root and jumping. An absolute path only: the shell reports its
+            // directory over OSC 7 and a relative or malformed value is not something to navigate
+            // to — falling back to the root is the honest answer.
+            if !appliedInitialPath {
+                appliedInitialPath = true
+                if let initialPath, initialPath.hasPrefix("/") {
+                    currentPath = initialPath
+                    navigationStack = [initialPath]
+                }
             }
             await connectAndLoad()
         }
@@ -2032,7 +2049,7 @@ struct SFTPBrowserView: View {
 
                 Section {
                     Label(
-                        "The remote server checks permissions when the operation starts. glas.sh stages and verifies copied bytes before publishing them.",
+                        "The remote server checks permissions when the operation starts. \(GlassProduct.displayName) stages and verifies copied bytes before publishing them.",
                         systemImage: "lock.shield"
                     )
                     .font(.caption)
@@ -3236,7 +3253,7 @@ struct SFTPBrowserView: View {
                     continue
                 case .fileDrop:
                     guard FileManager.default.isReadableFile(atPath: url.path) else {
-                        error = "Upload failed: glas.sh could not access \(url.lastPathComponent)."
+                        error = "Upload failed: \(GlassProduct.displayName) could not access \(url.lastPathComponent)."
                         transferActivity.fail(
                             activityID,
                             detail: "glas.sh could not access this file."
@@ -4842,7 +4859,7 @@ struct SFTPBrowserView: View {
                 }
                 let message: String
                 if replacementCommitMayHaveRun {
-                    message = "The server did not confirm whether \(finalName) was replaced. glas.sh will verify the remote bytes before allowing another save."
+                    message = "The server did not confirm whether \(finalName) was replaced. \(GlassProduct.displayName) will verify the remote bytes before allowing another save."
                 } else if error is CancellationError {
                     message = "Save cancelled. The original remote file was not replaced."
                 } else {

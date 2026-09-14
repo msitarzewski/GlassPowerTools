@@ -1,6 +1,7 @@
 #if os(macOS)
 #if os(macOS)
 import Foundation
+import GlassLayers
 
 enum MacWorkspaceChromeText {
     static func sanitize(_ value: String?, maximumLength: Int) -> String? {
@@ -821,9 +822,9 @@ enum MacWorkspaceStateError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .unsupportedWorkspaceVersion:
-            "This workspace was saved by an unsupported version of glas.sh."
+            "This workspace was saved by an unsupported version of \(GlassProduct.displayName)."
         case .unsupportedPaneIntentVersion:
-            "A terminal pane was saved by an unsupported version of glas.sh."
+            "A terminal pane was saved by an unsupported version of \(GlassProduct.displayName)."
         case .workspaceIdentityMismatch:
             "The saved workspace identity does not match this window."
         case .invalidPaneIntent:

@@ -1080,7 +1080,7 @@ class SettingsManager {
             do {
                 var library = try JSONDecoder().decode(TerminalThemeLibrary.self, from: libraryData)
                 guard library.schemaVersion == TerminalThemeLibrary.currentSchemaVersion else {
-                    themeLibraryLoadError = "This theme library was created by a newer version of glas.sh and is read-only here."
+                    themeLibraryLoadError = "This theme library was created by a newer version of \(GlassProduct.displayName) and is read-only here."
                     return
                 }
                 var repairedLegacyColors = false

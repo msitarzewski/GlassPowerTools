@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import GlassLayers
 
 struct LayoutRestorationTarget {
     let intent: LayoutPreset.SessionIntent
@@ -32,7 +33,7 @@ struct LayoutRestorationPlan {
         for (index, intent) in preset.sessionIntents.enumerated() {
             let sessionNumber = index + 1
             guard intent.isSupported else {
-                failures.append("Session \(sessionNumber): this saved session intention is not supported by this version of glas.sh.")
+                failures.append("Session \(sessionNumber): this saved session intention is not supported by this version of \(GlassProduct.displayName).")
                 continue
             }
             switch intent.kind {

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import GlassLayers
 import GlassShell
 import GlassConnectionKit
 import os
@@ -27,7 +28,7 @@ public final class MacTerminalAppDelegate: NSObject, NSApplicationDelegate {
             || (settingsManager?.confirmBeforeClosing == true && !sessions.isEmpty)
         if needsConfirmation {
             let alert = NSAlert()
-            alert.messageText = "Quit glas.sh?"
+            alert.messageText = "Quit \(GlassProduct.displayName)?"
             alert.informativeText = "Running terminal sessions will be disconnected."
             alert.alertStyle = .warning
             alert.addButton(withTitle: "Quit")

@@ -5231,7 +5231,7 @@ private struct TableSchemaChangeSheet: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
 
-                Text("\(engineName) controls DDL transaction behavior. glassdb will refresh this tool after the server accepts the change.")
+                Text("\(engineName) controls DDL transaction behavior. \(GlassProduct.displayName) will refresh this tool after the server accepts the change.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 0)

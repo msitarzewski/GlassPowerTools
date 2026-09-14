@@ -393,7 +393,7 @@ enum CredentialStoragePolicy: String, Codable, CaseIterable, Identifiable, Senda
 
     var displayName: String {
         switch self {
-        case .sharedWithGlas: return "Shared with glas.sh"
+        case .sharedWithGlas: return "Shared with the Glass family"
         case .appOnly: return "This app only"
         case .requireAuthentication: return "Require authentication"
         }

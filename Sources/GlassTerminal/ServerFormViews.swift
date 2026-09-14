@@ -463,7 +463,7 @@ struct TerminalRequiredFields: View {
                 passwordField
                 if draft.requiresPasswordUpgrade {
                     Label {
-                        Text("Re-enter this password once to upgrade it. Earlier releases used an address-based Keychain account shared with glassdb; the ambiguous credential is not imported.")
+                        Text("Re-enter this password once to upgrade it. Earlier releases used an address-based Keychain account shared with the separate apps; the ambiguous credential is not imported.")
                     } icon: {
                         Image(systemName: "key.horizontal")
                     }
@@ -1012,25 +1012,23 @@ private struct ServerFormContent: View {
 extension View {
     @ViewBuilder
     func serverFormControlPresentation() -> some View {
-        #if os(macOS)
-        self
-            .labelsHidden()
-            .frame(width: 340, alignment: .leading)
-        #else
-        self
-        #endif
+        // A picker or toggle sits trailing in a form row on every Apple platform, and
+        // sizes itself. The fixed 340 pt left-aligned box matched the text fields' old
+        // override rather than the platform.
+        self.labelsHidden()
     }
 
     @ViewBuilder
     func serverFormTextFieldPresentation() -> some View {
-        #if os(macOS)
+        // Native: the label leads, the value sits trailing, and the field takes the
+        // width the form gives it. The previous fixed `.frame(width: 340, alignment:
+        // .leading)` with `.roundedBorder` was a macOS-only override that neither macOS
+        // nor any other platform lays a form out like, and on a narrow sheet it forced
+        // the content wider than its container. Kept: the Required badge and the
+        // validation message, which are behaviour rather than styling.
         self
             .labelsHidden()
-            .textFieldStyle(.roundedBorder)
-            .frame(width: 340, alignment: .leading)
-        #else
-        self
-        #endif
+            .multilineTextAlignment(.trailing)
     }
 }
 
