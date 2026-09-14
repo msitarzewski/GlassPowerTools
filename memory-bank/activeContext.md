@@ -1137,3 +1137,33 @@ only reason it was deferred — sibling apps unable to decode a `.vnc` kind — 
 
 **Next action:** the user's approval of the plan, and its three open decisions. Two read-only
 surveys of glassDT are still running to add the feature-for-feature parity checklist.
+
+## 2026-09-14 — Stage 4 W1/W2 shipped; the sync gap found
+
+**State BUILD.** Owner: coordinating agent. Committed through `523c301`; tree clean.
+
+**Done:** Stage 4 W1 (engines: `Packages/RDPKit` vendored with its licence chain, `Sources/VNCKit`
+and both transports as targets, `THIRD-PARTY-NOTICES.md` created) and W2 (the desktop as a
+capability of the shell — protocol picker, session window, D25 cascade). Live CloudKit updates via
+silent push. **998 tests / 98 suites**, plus RDPKit's 1014. Installed and verified at **0.4.92 (95)**
+on the Mac, an iPhone and the Vision Pro.
+
+**Proven on real hosts this session:** RDP against **Windows 11 Pro with NLA** — the certificate
+correctly refused unpinned, then a 1280×800 frame in 0.84s pinned; VNC against **TigerVNC 1.15.0**;
+and, by the user in the running app, a **signed-in Apple Screen Sharing session** on security
+type 30 — which closed Stage 4.5 items 1 and 2 and retired the largest unknown in either stage.
+
+**The open decision, and it is the user's:** [connection records do not
+sync](tasks/2026-09/2026-09-14_connection-records-do-not-sync.md). The catalog travels; no
+capability's own record does, so a second device shows the host, the service row and holds the
+password, then says "has no saved configuration". Three options are written up with a
+recommendation (A: an opaque `configuration: Data?` on `HostServiceLink`, no CloudKit schema
+change). **Nothing is being built until that is chosen** — it is an architecture decision, not a fix.
+
+**Also recorded:** a first diagnosis of this was wrong — publishing was never missing, because every
+mutation ends in `load()`, which syncs. Checking the callers of the callers corrected it.
+
+**Next action:** the sync decision, then Stage 4 W3 (presentation and input verified on real hosts),
+W4 (the 40-item parity sweep), W5 (spatial on the headset). The user has asked for all four parity
+gaps: desktop on Vision Pro, desktop on iPhone/iPad, remembered dividers everywhere, and SSH key
+records — the last of which the sync decision subsumes.
