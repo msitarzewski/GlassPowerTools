@@ -20,6 +20,9 @@ let package = Package(
         .library(name: "GlassTerminalEmulator", targets: ["GlassTerminalEmulator"]),
         .library(name: "GlassDBKit", targets: ["GlassDBKit"]),
         .library(name: "GlassDatabase", targets: ["GlassDatabase"]),
+        .library(name: "VNCKit", targets: ["VNCKit"]),
+        .library(name: "GlassRDPTransport", targets: ["GlassRDPTransport"]),
+        .library(name: "GlassVNCTransport", targets: ["GlassVNCTransport"]),
     ],
     dependencies: [
         .package(path: "../GlassConnectionKit"),
@@ -40,6 +43,10 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.36.0"),
         // Terminal emulator host (glas.sh's misnamed RealityKitContent package) and its engine.
         .package(url: "https://github.com/migueldeicaza/SwiftTerm", exact: "1.15.0"),
+        // Stage 4: the RDP engine. A vendored fork of steelbrain/RDPKit 0.3.1 (MIT, Steelbrain
+        // copyright retained), so it sits in Packages/ beside the other vendored forks rather than
+        // in Sources/ with our own code. Its patch record is Packages/RDPKit/GLASSDT-PATCHES.md.
+        .package(path: "Packages/RDPKit"),
     ],
     targets: [
         // Credentials, trust storage and mobility. Absorbed from the standalone GlasSecretStore
@@ -145,6 +152,22 @@ let package = Package(
             ],
             swiftSettings: [.enableUpcomingFeature("MemberImportVisibility")]
         ),
+        // Stage 4: the RFB/VNC engine. Unlike RDPKit this is ours — written from RFC 6143 and the
+        // public RFB protocol registry, with no third-party VNC source copied or linked — so it is
+        // a target here rather than a vendored package.
+        // `linkedLibrary("z")` is restated from the package it came from: ZlibInflater, and so the
+        // Zlib and ZRLE encodings, link against the system zlib. Dropping it does not fail to
+        // compile; it fails at link, or silently costs the two best encodings.
+        .target(name: "VNCKit", linkerSettings: [.linkedLibrary("z")]),
+        // The two adapters, also ours: frame ownership, configuration and transport selection.
+        .target(
+            name: "GlassRDPTransport",
+            dependencies: [.product(name: "RDPKit", package: "RDPKit")]
+        ),
+        .target(name: "GlassVNCTransport", dependencies: ["GlassRDPTransport", "VNCKit"]),
+        .testTarget(name: "VNCKitTests", dependencies: ["VNCKit"]),
+        .testTarget(name: "GlassRDPTransportTests", dependencies: ["GlassRDPTransport"]),
+        .testTarget(name: "GlassVNCTransportTests", dependencies: ["GlassVNCTransport"]),
         .testTarget(name: "GlasSecretStoreTests", dependencies: ["GlasSecretStore"]),
         .testTarget(name: "GlassLayersTests", dependencies: ["GlassLayers"]),
         .testTarget(

@@ -1,0 +1,246 @@
+import Foundation
+
+/// Decodes one framebuffer-update rectangle from the connection into the framebuffer.
+/// RFC 6143 §7.7 (Raw, CopyRect, RRE, Hextile, ZRLE) and the community registry (Zlib, Cursor).
+final class RFBRectangleDecoder {
+    private var zlibStream: ZlibInflater?
+    private var zrleStream: ZlibInflater?
+
+    init() {}
+
+    func decode(_ rect: RFBRectangle, encoding: RFBEncoding, from source: any RFBByteSource,
+                into framebuffer: RFBFramebuffer) async throws {
+        switch encoding {
+        case .raw:
+            let bytes = try await source.read(rect.width * rect.height * 4)
+            try framebuffer.storeRaw(rect, source: bytes[...])
+        case .copyRect:
+            let sourceX = Int(try await source.u16()), sourceY = Int(try await source.u16())
+            try framebuffer.copy(from: sourceX, sourceY, to: rect)
+        case .rre:
+            try await decodeRRE(rect, from: source, into: framebuffer)
+        case .hextile:
+            try await decodeHextile(rect, from: source, into: framebuffer)
+        case .zlib:
+            let length = Int(try await source.u32())
+            guard length <= RFBLimits.maximumEncodedRectangleBytes else {
+                throw RFBError.resourceLimit("The compressed rectangle is too large.")
+            }
+            let compressed = try await source.read(length)
+            if zlibStream == nil { zlibStream = try ZlibInflater() }
+            let raw = try zlibStream!.inflate(compressed, expectedOutput: rect.width * rect.height * 4)
+            try framebuffer.storeRaw(rect, source: raw[...])
+        case .zrle:
+            let length = Int(try await source.u32())
+            guard length <= RFBLimits.maximumEncodedRectangleBytes else {
+                throw RFBError.resourceLimit("The compressed rectangle is too large.")
+            }
+            let compressed = try await source.read(length)
+            if zrleStream == nil { zrleStream = try ZlibInflater() }
+            let tiles = try zrleStream!.inflateAll(compressed)
+            try Self.decodeZRLETiles(tiles, rect: rect, into: framebuffer)
+        case .cursor, .desktopSize, .lastRect, .extendedDesktopSize:
+            throw RFBError.protocolViolation("Pseudo-encodings are handled by the client, not the rectangle decoder.")
+        }
+    }
+
+    // MARK: RRE
+
+    private func decodeRRE(_ rect: RFBRectangle, from source: any RFBByteSource, into framebuffer: RFBFramebuffer) async throws {
+        let count = Int(try await source.u32())
+        guard count <= rect.width * rect.height else { throw RFBError.protocolViolation("Too many RRE subrectangles.") }
+        let background = try await source.read(4)
+        framebuffer.fill(rect, blue: background[0], green: background[1], red: background[2])
+        for _ in 0..<count {
+            let entry = try await source.read(12)
+            var reader = ByteReader(entry)
+            let blue = try reader.u8(), green = try reader.u8(), red = try reader.u8()
+            _ = try reader.u8()
+            let sub = try Self.subrectangle(x: Int(try reader.u16()), y: Int(try reader.u16()),
+                                            width: Int(try reader.u16()), height: Int(try reader.u16()), within: rect)
+            framebuffer.fill(sub, blue: blue, green: green, red: red)
+        }
+    }
+
+    static func subrectangle(x: Int, y: Int, width: Int, height: Int, within rect: RFBRectangle) throws -> RFBRectangle {
+        guard width >= 1, height >= 1, x + width <= rect.width, y + height <= rect.height else {
+            throw RFBError.protocolViolation("The server sent a subrectangle outside its rectangle.")
+        }
+        return RFBRectangle(x: rect.x + x, y: rect.y + y, width: width, height: height)
+    }
+
+    // MARK: Hextile
+
+    private func decodeHextile(_ rect: RFBRectangle, from source: any RFBByteSource, into framebuffer: RFBFramebuffer) async throws {
+        var background: (UInt8, UInt8, UInt8) = (0, 0, 0)
+        var foreground: (UInt8, UInt8, UInt8) = (0, 0, 0)
+        var tileY = rect.y
+        while tileY < rect.maxY {
+            let tileHeight = min(16, rect.maxY - tileY)
+            var tileX = rect.x
+            while tileX < rect.maxX {
+                let tileWidth = min(16, rect.maxX - tileX)
+                let tile = RFBRectangle(x: tileX, y: tileY, width: tileWidth, height: tileHeight)
+                let subencoding = try await source.u8()
+                if subencoding & 1 != 0 {
+                    let bytes = try await source.read(tileWidth * tileHeight * 4)
+                    try framebuffer.storeRaw(tile, source: bytes[...])
+                } else {
+                    if subencoding & 2 != 0 {
+                        let pixel = try await source.read(4)
+                        background = (pixel[0], pixel[1], pixel[2])
+                    }
+                    if subencoding & 4 != 0 {
+                        let pixel = try await source.read(4)
+                        foreground = (pixel[0], pixel[1], pixel[2])
+                    }
+                    framebuffer.fill(tile, blue: background.0, green: background.1, red: background.2)
+                    if subencoding & 8 != 0 {
+                        let count = Int(try await source.u8())
+                        let coloured = subencoding & 16 != 0
+                        let payload = try await source.read(count * (coloured ? 6 : 2))
+                        var reader = ByteReader(payload)
+                        for _ in 0..<count {
+                            var colour = foreground
+                            if coloured {
+                                let pixel = try reader.bytes(4)
+                                colour = (pixel[pixel.startIndex], pixel[pixel.startIndex + 1], pixel[pixel.startIndex + 2])
+                            }
+                            let xy = try reader.u8(), wh = try reader.u8()
+                            let sub = try Self.subrectangle(x: Int(xy >> 4), y: Int(xy & 15), width: Int(wh >> 4) + 1,
+                                                            height: Int(wh & 15) + 1, within: tile)
+                            framebuffer.fill(sub, blue: colour.0, green: colour.1, red: colour.2)
+                        }
+                    }
+                }
+                tileX += 16
+            }
+            tileY += 16
+        }
+    }
+
+    // MARK: ZRLE
+
+    /// CPIXEL is three bytes (B, G, R) because the client pixel format is 32 bpp, depth 24 with
+    /// all colour bits in the least significant three bytes (RFC 6143 §7.7.6).
+    static func decodeZRLETiles(_ bytes: [UInt8], rect: RFBRectangle, into framebuffer: RFBFramebuffer) throws {
+        var reader = ByteReader(bytes)
+        var tileY = rect.y
+        while tileY < rect.maxY {
+            let tileHeight = min(64, rect.maxY - tileY)
+            var tileX = rect.x
+            while tileX < rect.maxX {
+                let tileWidth = min(64, rect.maxX - tileX)
+                let tile = RFBRectangle(x: tileX, y: tileY, width: tileWidth, height: tileHeight)
+                try decodeZRLETile(&reader, tile: tile, into: framebuffer)
+                tileX += 64
+            }
+            tileY += 64
+        }
+        guard reader.isAtEnd else { throw RFBError.protocolViolation("The ZRLE rectangle has trailing data.") }
+    }
+
+    private static func decodeZRLETile(_ reader: inout ByteReader, tile: RFBRectangle, into framebuffer: RFBFramebuffer) throws {
+        let subencoding = try reader.u8()
+        let pixelCount = tile.width * tile.height
+        switch subencoding {
+        case 0:
+            let raw = try reader.bytes(pixelCount * 3)
+            var input = raw.startIndex
+            for y in tile.y..<tile.maxY {
+                for x in tile.x..<tile.maxX {
+                    framebuffer.store(x: x, y: y, blue: raw[input], green: raw[input + 1], red: raw[input + 2])
+                    input += 3
+                }
+            }
+        case 1:
+            let pixel = try reader.bytes(3)
+            framebuffer.fill(tile, blue: pixel[pixel.startIndex], green: pixel[pixel.startIndex + 1], red: pixel[pixel.startIndex + 2])
+        case 2...16:
+            let paletteSize = Int(subencoding)
+            let palette = Array(try reader.bytes(paletteSize * 3))
+            let bitsPerIndex = paletteSize == 2 ? 1 : (paletteSize <= 4 ? 2 : 4)
+            let rowBytes = (tile.width * bitsPerIndex + 7) / 8
+            let packed = try reader.bytes(rowBytes * tile.height)
+            let mask = UInt8((1 << bitsPerIndex) - 1)
+            for row in 0..<tile.height {
+                var bitOffset = (packed.startIndex + row * rowBytes) * 8
+                for column in 0..<tile.width {
+                    let byte = packed[bitOffset / 8]
+                    let shift = 8 - bitsPerIndex - (bitOffset % 8)
+                    let index = Int((byte >> UInt8(shift)) & mask)
+                    guard index < paletteSize else { throw RFBError.protocolViolation("ZRLE palette index out of range.") }
+                    framebuffer.store(x: tile.x + column, y: tile.y + row, blue: palette[index * 3],
+                                      green: palette[index * 3 + 1], red: palette[index * 3 + 2])
+                    bitOffset += bitsPerIndex
+                }
+            }
+        case 128:
+            var written = 0
+            while written < pixelCount {
+                let pixel = try reader.bytes(3)
+                let length = try runLength(&reader)
+                guard written + length <= pixelCount else { throw RFBError.protocolViolation("ZRLE run overflows its tile.") }
+                storeRun(tile: tile, from: written, length: length, blue: pixel[pixel.startIndex],
+                         green: pixel[pixel.startIndex + 1], red: pixel[pixel.startIndex + 2], into: framebuffer)
+                written += length
+            }
+        case 130...255:
+            let paletteSize = Int(subencoding) - 128
+            let palette = Array(try reader.bytes(paletteSize * 3))
+            var written = 0
+            while written < pixelCount {
+                let entry = try reader.u8()
+                let index = Int(entry & 0x7F)
+                guard index < paletteSize else { throw RFBError.protocolViolation("ZRLE palette index out of range.") }
+                let length = entry & 0x80 != 0 ? try runLength(&reader) : 1
+                guard written + length <= pixelCount else { throw RFBError.protocolViolation("ZRLE run overflows its tile.") }
+                storeRun(tile: tile, from: written, length: length, blue: palette[index * 3],
+                         green: palette[index * 3 + 1], red: palette[index * 3 + 2], into: framebuffer)
+                written += length
+            }
+        default:
+            throw RFBError.protocolViolation("Unsupported ZRLE subencoding \(subencoding).")
+        }
+    }
+
+    private static func runLength(_ reader: inout ByteReader) throws -> Int {
+        var length = 1
+        while true {
+            let byte = try reader.u8()
+            length += Int(byte)
+            guard length <= 64 * 64 + 1 else { throw RFBError.protocolViolation("ZRLE run length is too long.") }
+            if byte != 255 { return length }
+        }
+    }
+
+    private static func storeRun(tile: RFBRectangle, from start: Int, length: Int, blue: UInt8, green: UInt8, red: UInt8,
+                                 into framebuffer: RFBFramebuffer) {
+        for index in start..<(start + length) {
+            framebuffer.store(x: tile.x + index % tile.width, y: tile.y + index / tile.width, blue: blue, green: green, red: red)
+        }
+    }
+
+    // MARK: Cursor pseudo-encoding
+
+    /// Cursor pixels use the client pixel format, followed by a 1-bit-per-pixel bitmask with rows
+    /// padded to whole bytes, most significant bit first, where 1 marks an opaque pixel.
+    static func decodeCursor(_ rect: RFBRectangle, from source: any RFBByteSource) async throws -> VNCCursorImage {
+        guard rect.width <= 384, rect.height <= 384 else { throw RFBError.resourceLimit("The remote cursor is too large.") }
+        let pixelBytes = try await source.read(rect.width * rect.height * 4)
+        let maskRowBytes = (rect.width + 7) / 8
+        let maskBytes = try await source.read(maskRowBytes * rect.height)
+        var bgra = Data(count: rect.width * rect.height * 4)
+        var mask = Data(count: rect.width * rect.height)
+        for y in 0..<rect.height {
+            for x in 0..<rect.width {
+                let pixel = y * rect.width + x, offset = pixel * 4
+                let opaque = (maskBytes[y * maskRowBytes + x / 8] >> (7 - UInt8(x % 8))) & 1
+                mask[pixel] = opaque
+                bgra[offset] = pixelBytes[offset]; bgra[offset + 1] = pixelBytes[offset + 1]
+                bgra[offset + 2] = pixelBytes[offset + 2]; bgra[offset + 3] = opaque != 0 ? 255 : 0
+            }
+        }
+        return VNCCursorImage(width: rect.width, height: rect.height, hotSpotX: rect.x, hotSpotY: rect.y, bgra: bgra, mask: mask)
+    }
+}
