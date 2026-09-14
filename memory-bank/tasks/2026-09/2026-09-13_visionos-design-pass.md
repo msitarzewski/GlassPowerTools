@@ -1,6 +1,6 @@
 # visionOS design pass — native HIG, on the Glass language already built
 
-**Date** 2026-09-13 · **Owner** coordinating agent · **State** BUILD — pass 1 done, unverified on device
+**Date** 2026-09-13 · **Owner** coordinating agent · **State** BUILD — passes 1 and 2 done; pass 1 still unverified on device
 **Authorization:** the user, from the physical headset: *"pay attention to the design. it's terribly
 off… These are functional, but don't provide that polished magic visionOS experience."* Scope agreed:
 **native visionOS HIG conformance plus the Glass/transparency/theme controls**, with visionOS-first
@@ -160,3 +160,114 @@ anyone calls them right.
 - Device capture of the library, the host detail and the Edit Host sheet.
 - The two on-device UI failures, still undiagnosed.
 - Terminal and database surfaces, once the shell's language is settled.
+
+## Pass 2 — the user's list, from using build 0.3.81 on the headset
+
+Recorded as given so nothing is lost. Struck through as each lands.
+
+1. ~~**Setup modal overflows horizontally.**~~ Done. My own regression: `.frame(minWidth: 720)`
+   on the sheet's `Form` asked for more width than the sheet that presents it, so every label was
+   clipped at both edges — "Name" rendered as "me", "Address" as "dress". A visionOS sheet sizes
+   itself; a minimum width is an instruction it cannot honour and does not refuse. Removed;
+   `.controlSize(.large)` stays.
+2. ~~**Inputs should align right like native inputs** — "I'd overridden that at one point but want
+   to simplify. I want to keep the required interactions system though."~~ Done. Both capabilities
+   carried `.labelsHidden().textFieldStyle(.roundedBorder).frame(width: 340, alignment: .leading)`
+   on macOS, and the pickers carried the matching 340 pt box. That is not how any Apple platform
+   lays out a form row, and on a narrow sheet it forced the content wider than its container. Now
+   `.labelsHidden().multilineTextAlignment(.trailing)`, which is what the shell's own Name and
+   Address fields already did. **Kept:** the Required badge and the validation messages — those are
+   behaviour, not styling.
+3. ~~**Move the small connection type icons under the machine name, tight leading, all
+   platforms.**~~ Done. `GlassLibraryConnectionRow` gained a `badges` slot under the name; the
+   kinds moved out of the trailing accessory, where they had been competing with Connect for the
+   row's width and making the name truncate first. That competition is why the spatial sidebar had
+   been shrinking its own controls to cope.
+4. **Sidebars resizable on every platform, and positions remembered.** In progress.
+5. **"+ Add a host" at the top of the sidebar with a hide/show toggle, like the Mac.**
+6. **Settings in the top right.**
+7. **Workgroups become a fleet-wide panel in the Connections sidebar, like Collections.**
+
+5 and 6 are a re-arrangement of what pass 1 put in the bottom ornament, not a retreat from it — the
+user's words were *"love the bottom ornaments on the connections window!"* The ornament stays; what
+lives in it changes so the Mac's semantics carry over: Add Host belongs to the sidebar, Settings
+belongs top-trailing.
+
+7 is the largest of the seven: a new library scope alongside Collections, which lands in
+`GlassLibraryNavigation` and `GlassLibraryScope` in GlassConnectionKit, not in this app alone.
+
+
+## Pass 2 — implemented 2026-09-13, from the user driving builds 0.3.81 → 0.3.99
+
+Seven items were asked for; six landed, and working through them surfaced four defects nobody had
+asked about.
+
+| | |
+|---|---|
+| Setup modal clipped horizontally | **Mine.** `.frame(minWidth: 720)` on the sheet's `Form` demanded more width than the sheet presenting it, so labels clipped at both edges — "Name" rendered as "me". A visionOS sheet sizes itself; a minimum width is an instruction it cannot honour and does not refuse. |
+| Inputs not native | Both capabilities carried `.labelsHidden().textFieldStyle(.roundedBorder).frame(width: 340, alignment: .leading)` on macOS, and the pickers the matching box. No Apple platform lays a form row out that way. Now label leading, value trailing. **Required badges and validation kept** — behaviour, not styling. |
+| Service icons under the machine name | `GlassLibraryConnectionRow` gained a `badges` slot. They had been competing with Connect for row width and making the name truncate first — which is *why* the spatial sidebar had been shrinking its own controls. |
+| Sidebars resizable and remembered | Terminal, database and Workgroups windows had no `NSSplitView` autosave; every window reverted to its ideal width. **macOS only** — AppKit persists divider positions, SwiftUI exposes no equivalent, so this cannot be delivered on iPadOS or visionOS today. |
+| Workgroups as a library panel | See below. |
+| Settings top right / Add Host top of sidebar | Overtaken by **D24**, which settles where sidebar controls live. |
+| Network/Tailscale panel | **Not done.** `TerminalTailscaleView` needs the same split as Workgroups and carries more state. |
+
+### Workgroups is a contributed panel, not a window
+
+glas.sh had it in the sidebar all along: `ConnectionLibraryMode` carried `workgroups` and `network`
+beside the four scopes, and `libraryResults`/`libraryDetail` switched on it. The merge moved it to a
+window of its own, which is what made it stop feeling fleet-wide.
+
+**The slot for it already existed here and nothing called it.** `GlassLibraryNavigation` takes an
+`extras` builder documented verbatim as *"Apps can append Workgroups, Network, or other specialized
+sections without duplicating the common categories"*, and `GlassConnectionLibrary` used the
+no-extras convenience at both call sites.
+
+`GlassLibraryPanel` is contributed through `GlassCapability.libraryPanels()`, so the shell never
+learns a capability's surfaces by name. One `openPanelID` rather than two pieces of state, so "a
+panel is open" and "which scope is selected" cannot disagree. Handled in all three navigation
+shapes: sidebar section on Mac and iPad, a push on the iPhone stack, and **a tab in the visionOS
+tab-bar ornament** — the platform's own answer to the question glas.sh answered with a section.
+`TerminalWorkgroupsView` gained a `presentation` (`.results` / `.detail` / `.standalone`) over a
+shared `TerminalWorkgroupsModel` on the runtime, because the two halves now occupy two columns.
+
+### Found while working, not asked for
+
+- **The caret was black on blue.** `foregroundStyle` set on the enclosing `HStack` reached the play
+  triangle (a plain `Button`) and not the chevron, because `.menuStyle(.borderlessButton)` supplies
+  its own label colour — and setting it on the label content does not win either, since the style is
+  applied afterwards. A `ButtonStyle` is the hook that is not overridden: `GlassOnFilledLabelStyle`
+  and `.glassMenuOnFilled()` now carry it for the whole family.
+- **The app introduced itself as "glas.sh"** in its own quit dialog. `GlassProduct.displayName`
+  reads `CFBundleDisplayName` and falls back to a literal; ten user-visible strings use it. Storage
+  identifiers and provenance comments deliberately keep the old names — renaming a key orphans what
+  it points at, and rewriting a comment that records where a behaviour came from makes it a lie.
+- **"Open Folder Here"** opened Finder with the folder *selected in its parent*
+  (`activateFileViewerSelecting`) rather than opening it. Now `open`. The remote half needed almost
+  nothing: the shell already reports its directory over OSC 7 — the value the AI assistant uses —
+  so `SFTPBrowserContext` gained an `initialPath` and the browser applies it before the first
+  listing.
+- **UI tests were writing into the real store.** See below.
+
+### The glass went too far, and is still wrong
+
+The user asked for the columns to stop being opaque white and honour the transparency settings.
+`List` and `Form` each paint their own scroll background, so they were covering the window's layer —
+and every pixel they missed showed the desktop, which was the hairline at the column divider and the
+band under the footer. Hiding those backgrounds fixed the seams and **over-corrected**: at the
+default `ultraThin` material the columns read as bare wallpaper. The user's verdict: *"Now this is
+broken?!"*
+
+**Open.** Either a thicker default material (`.regular` is what a sidebar uses) or opaque columns.
+Not decided, and deliberately not changed unilaterally — it is a look, not a defect.
+
+## Capture and deployment notes
+
+- The **visionOS simulator cannot screenshot through XCUITest at all** ("remote interface does not
+  have this capability"), so a suite that captures on every step fails there for that reason alone.
+  `xcrun simctl io <udid> screenshot` works: build, install, launch, screenshot.
+- **Install to `/Applications`.** Builds went to a scratch directory for the first half of the
+  session while the user launched the app normally — so they were looking at **0.3.69 from the
+  previous day** while being told about the day's changes, which produced a "did you revert more
+  than you expected?" that cost real time. Every build since 0.3.86 replaces
+  `/Applications/GlassPowerTools.app` and the version is read back off the installed bundle.

@@ -1072,3 +1072,39 @@ undiagnosed: two on-device UI failures (`testCollectionsAreChipsAndFeed…`,
 **Next action:** with the headset unlocked, capture library, host detail and Edit Host sheet on
 device; diagnose the two device failures from the result bundle; then the terminal and database
 surfaces; then Stage 4.
+
+## 2026-09-13 (evening) — builds 0.3.81 → 0.3.99, driven by the user
+
+**State BUILD.** Owner: coordinating agent. Working tree committed at the end of this session.
+
+**Verified:** 948 tests / 90 suites; macOS, iOS Simulator and visionOS Simulator all build;
+`/Applications/GlassPowerTools.app` is **0.3.99**, version read back off the installed bundle.
+
+**Landed:** D24 (the family's sidebar toolbar arrangement — keep AppKit's toggle on macOS, app action
+on the content column at `.navigation`), D25 (deleting a machine deletes what its capabilities
+stored), Workgroups as a contributed library panel, `GlassProduct.displayName`, Open Folder Here for
+local *and* remote, native form fields, service icons under the machine name, remembered split-view
+dividers, the caret colour via `GlassOnFilledLabelStyle`, and UI-test isolation for
+`SharedDefaults`.
+
+**Open, in the order the user is most likely to raise them:**
+
+1. **The glass is over-transparent.** Columns stopped painting so the layering reaches them, and at
+   the default `ultraThin` they read as bare wallpaper. Needs a look decision — a thicker default
+   or opaque columns — not another patch.
+2. **Network/Tailscale panel.** Workgroups proved the pattern; `TerminalTailscaleView` needs the same
+   `presentation` + shared-model split and carries more state.
+3. **SSH key records do not sync.** Diagnosed and not fixed: the *material* travels (D18) but the
+   records live in `UserDefaults`. They belong in CloudKit beside the host catalog — the project's
+   own rule is *"keep metadata separate from secrets"*, so bundling them into the Keychain item is
+   the wrong fix. See [Stage 3.5](tasks/2026-09/2026-09-13_stage-3.5-continuity.md).
+4. **Thousands of abandoned test `UserDefaults` suites** — 4,112 `GlassLayersTests.<UUID>` and more.
+   See [test pollution](tasks/2026-09/2026-09-13_test-pollution.md).
+5. **The visionOS device run**, with its two undiagnosed failures, and pass 1 of the design work
+   still unseen on hardware.
+
+**Proven on hardware this session:** CloudKit *delivers* — a host defined on the Vision Pro appeared
+on the Mac unaided. That closes item 2 of the Stage 3.5 device checklist and is the first evidence
+D19's transport works rather than only its merge rules.
+
+**Next action:** the glass decision, then the Tailscale panel, then Stage 4.

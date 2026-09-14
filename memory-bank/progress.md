@@ -425,3 +425,70 @@ visionOS. **No macOS metric changed** — by construction, and proven by macOS U
 Continue"* before the first change and stayed locked. The simulator renders glass differently from
 hardware, which is exactly what pass 1 altered, so the frost and inset fixes are **unconfirmed**.
 Also still undiagnosed: two on-device UI failures that pass on macOS.
+
+## 2026-09-13 (evening) — a long session driving real builds, 0.3.81 → 0.3.99
+
+**948 tests / 90 suites.** The user ran the app on the Mac and the headset and reported what they
+saw; most of what follows was found that way, not by reading code.
+
+### Two decisions
+
+**D24 — the family's sidebar toolbar arrangement.** On macOS, *do not remove* `.sidebarToggle`;
+AppKit's own item sits at the sidebar's trailing edge, never overflows, and moves with the column.
+The app's action goes on the **content** column at `.navigation`. This is glassdb's
+`databaseSidebarChrome()` and glas.sh's arrangement, copied rather than reinvented — after five
+attempts at owning the toggle each failed in a different way, and after
+`workspaceUsesNativeTitle` turned out to be *pinning the deviation* and so requiring every fix to do
+something the standard deliberately does not.
+
+**D25 — deleting a machine deletes what its capabilities stored.** `deleteHost` removed the catalog
+records and told no capability, orphaning the terminal's `ServerConfiguration`, the database's
+connection and their Keychain entries — and leaving them reachable through surfaces that read a
+capability's store rather than the catalog. `removeService` had always done this correctly for one
+service and said so in its own documentation; deletion never called it.
+
+### The defect class, again
+
+Both of those, and two more this session, are the same shape recorded since Stage 2: **the
+machinery exists, documented, and nothing joins it.**
+
+- `GlassLibraryNavigation`'s `extras` builder — documented verbatim as the place to append
+  "Workgroups, Network, or other specialized sections" — with both call sites using the no-extras
+  convenience.
+- `columnControls` in the terminal, whose comment claimed it rendered "in the detail column while
+  [the sidebar] is not [visible]", called once, from the sidebar column.
+
+That is now six occurrences. It is worth grepping for *callers* before believing a feature exists.
+
+### Found by using the app
+
+- Workgroups restored to the library sidebar as a contributed `GlassLibraryPanel`, and a tab in the
+  visionOS tab-bar ornament.
+- The connect control's caret rendered black on the accent capsule: a `Menu` does not inherit
+  `foregroundStyle`, and setting it on the label content loses to the menu style. A `ButtonStyle`
+  is the hook that wins — `GlassOnFilledLabelStyle` / `.glassMenuOnFilled()`.
+- The app said "Quit glas.sh?" — `GlassProduct.displayName` now names it, reading the bundle.
+- "Open Folder Here" *selected* the folder in its parent instead of opening it; the remote half
+  works because the shell already reports its directory over OSC 7, so SFTP opens where the user is.
+- Native form fields: both capabilities had a macOS-only `.frame(width: 340, alignment: .leading)`.
+- Service icons moved under the machine name; split-view dividers now remembered (macOS only —
+  SwiftUI exposes no equivalent elsewhere).
+
+### Two things that are *not* finished
+
+**The glass is over-corrected.** Making the columns honour the transparency settings fixed the seams
+and left them reading as bare wallpaper at the default `ultraThin`. The user's words: *"Now this is
+broken?!"* A thicker default (`.regular`, what a sidebar uses) or opaque columns — not decided, and
+not changed unilaterally, because it is a look rather than a defect.
+
+**Network/Tailscale is still a window.** Workgroups proved the panel pattern; Tailscale needs the
+same split and carries more state.
+
+### Process, honestly
+
+Two things cost real time and both were mine. Builds went to a scratch directory for the first half
+of the session while the user launched the app normally, so they spent an hour looking at **0.3.69
+from the previous day** while being told about the day's changes. And a regex meant to rename ten
+user-visible strings spanned unbalanced quotes in comments and rewrote **105 occurrences across 64
+files**, including an enum's raw values and provenance comments; 18 files were restored from git and
+the rest repaired by hand. Explicit edits, or a constant, would have been faster than either.

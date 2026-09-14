@@ -594,3 +594,65 @@ anything has driven the D14 prompt.**
 Pins written under the device-bound configuration are different Keychain items and are not carried
 over. Each host is trusted once more, through the prompt, and then travels. That is the rewrite
 D22 authorized, and it exercises the prompt rather than avoiding it.
+
+## D24 — the family's sidebar toolbar arrangement — Implemented 2026-09-13
+
+**Approved by the user after an expensive detour**, and recorded because it had already been
+rediscovered and lost more than once: *"both Glas.sh and GlassDB use this pattern… copy it. It's
+already done and proven working. Then set this as the standard when there's a sidebar."*
+
+**On macOS, do not remove `.sidebarToggle`.** glassdb's `databaseSidebarChrome()`
+(`glassdb/Constants.swift:267-273`) removes it on every platform *except* macOS, and glas.sh never
+removed it at all. Left alone, AppKit's own item sits at the sidebar's trailing edge, never enters
+the overflow menu, and moves with the column.
+
+**The app's own action goes on the content column, at `.navigation`** — the placement glassdb gives
+Add Connection (`ConnectionManagerView.swift:327-330`). It leads the content region, just past the
+column divider.
+
+That is the whole standard. It now applies to the terminal workspace
+(`GlassTerminal/macOS/MacWorkspaceView.swift`) and the library (`GlassConnectionLibrary`), and is
+what any future window with a sidebar should do.
+
+### Why it kept regressing, stated so it stops
+
+Glass Power Tools had inherited `.toolbar(removing: .sidebarToggle)` — twice in the terminal — plus a
+hand-built "Toggle Sidebar" button. **A placed button cannot behave like the system item.** It is an
+ordinary toolbar item, so it drops into the overflow menu *with its title* once the toolbar is
+crowded, and if it sits in the sidebar's toolbar region it disappears when that column collapses.
+Neither is fixable by choosing a different placement, and on 2026-09-13 the following were each
+tried and each failed: `.navigation` always; `.automatic` with a flexible spacer; a placement
+switched on `columnVisibility`; a `ToolbarItemGroup`; and attaching the toolbar to the
+`NavigationSplitView` itself. The last removed AppKit's `NSTrackingSeparatorToolbarItem`, which only
+exists while the sidebar column contributes toolbar content.
+
+**`MacTerminalWindowPolicyTests.workspaceUsesNativeTitle` was part of the loop.** It pinned the
+app-supplied toggle ahead of the separator — encoding the deviation as a requirement, so every
+attempted fix had to satisfy something the family standard deliberately does not do. It now asserts
+the standard, with the reason in the test.
+
+**The lesson worth more than the fix:** a working implementation sat in a sibling directory the
+whole time. When it disagreed with reasoning about placements, the implementation was right.
+
+## D25 — deleting a machine deletes what its capabilities stored — Implemented 2026-09-13
+
+Found by the user: *"Is there still a cache somewhere? I deleted all of my stored sessions!"* — a
+host deleted from the library kept appearing in the terminal's Connect Saved Host.
+
+`deleteHost` removed the catalog records and the preferences and **told no capability**. Each one's
+own configuration was orphaned — the terminal's `ServerConfiguration`, the database's connection,
+their Keychain entries — and stayed *reachable*, because surfaces that read a capability's store
+rather than the catalog went on listing it. There was then no way to remove it: the machine that
+owned it no longer existed.
+
+`removeService` has always done this for one service and says so in its own documentation
+(*"then lets the owning capability delete what it stored for it"*). `deleteHost` never called it.
+The same shape as `DatabaseCommands`, `DatabaseSession.openForward`, `SecretMobilityPolicy` and
+`GlassLibraryNavigation`'s `extras`: written, documented, joined to nothing.
+
+Deletion now collects the host's services first, removes the records, then asks each owning
+capability to clean up. A capability that throws does not strand the others — the records are
+already gone, so stopping at the first error would orphan everything after it; the failure is
+collected and rethrown once every service has had its turn.
+
+**Two tests, verified to bite:** with the capability pass disabled both fail; with it, both pass.

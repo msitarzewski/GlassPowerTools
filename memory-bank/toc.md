@@ -43,6 +43,7 @@ three source applications are obsolete and no longer compile.
 | [Stage 3.5 — continuity](tasks/2026-09/2026-09-13_stage-3.5-continuity.md) | D18–D22: credentials and the host catalog travel; the device checklist no test can replace |
 | [GlasSecretStore absorbed](tasks/2026-09/2026-09-13_secretstore-absorbed.md) | The package moved in-repo, and the host-trust defect that answering "should pins sync?" exposed (D23) |
 | [visionOS design pass](tasks/2026-09/2026-09-13_visionos-design-pass.md) | Native HIG on the Glass language; the two places the app was painting over the platform; how to actually get a capture |
+| [Test pollution](tasks/2026-09/2026-09-13_test-pollution.md) | UI tests wrote into the real saved-server list; where the Mac's store actually lives, and the abandoned defaults suites still to sweep |
 | [September tasks](tasks/2026-09/README.md) | Monthly index |
 
 This project is `~/Software/glass/GlassPowerTools`. `../GlassConnectionKit` and `../GlassEditorKit`

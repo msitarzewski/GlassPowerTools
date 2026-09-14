@@ -128,3 +128,17 @@ and sheet sizing.
 
 macOS UI 25/25 throughout — no Mac metric moved. **Unverified on the headset**, which was locked for
 the whole pass.
+
+## 2026-09-13 (evening) — 0.3.81 → 0.3.99, driven from the running app
+
+[Design pass](2026-09-13_visionos-design-pass.md) · [Test pollution](2026-09-13_test-pollution.md) ·
+[D24, D25](../../decisions.md)
+
+The user ran the builds and reported what they saw; nearly everything here was found that way.
+Workgroups restored to the library sidebar as a contributed panel; the family's sidebar toolbar
+arrangement copied from glassdb rather than reinvented (D24); deleting a machine now deletes what its
+capabilities stored (D25); UI tests stopped writing into the real saved-server list, and the 122
+entries that had accumulated there were cleaned out.
+
+948 tests / 90 suites. **Open:** the glass is over-transparent and needs a look decision; the
+Tailscale panel; SSH key records over CloudKit; abandoned test defaults suites.
