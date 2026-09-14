@@ -10,6 +10,7 @@
 import SwiftUI
 import OSLog
 import GlassConnectionKit
+import GlassConnectionUI
 import GlassShell
 import GlassLayers
 import GlassSSHTransport
@@ -26,6 +27,11 @@ public final class GlassTerminalRuntime {
     let sessionManager: SessionManager
     let settingsManager: SettingsManager
     let windowRecoveryManager: WindowRecoveryManager
+
+    /// Shared by every Workgroups surface: the library panel's two columns, the standalone window
+    /// and the iOS sheet. One instance, so a workgroup selected in one is selected in all of them
+    /// and the two library columns agree about what is shown.
+    let workgroupsModel = TerminalWorkgroupsModel()
 
     /// Everything the library, the command palette, the workgroup and Tailscale surfaces and the
     /// shell can ask the terminal to do. One queue, consumed by `TerminalConnectFlow`, so the
@@ -281,6 +287,35 @@ public final class GlassTerminalCapability: GlassCapability {
         AnyView(GlassTerminalLibraryToolbar(runtime: runtime))
     }
 
+    /// Workgroups belongs in the library's sidebar, beside Collections, because it is fleet-wide:
+    /// a saved layout of sessions across several machines, not a property of one. glas.sh listed
+    /// it exactly here; the merge moved it to a window of its own and that is what made it feel
+    /// like a separate tool. Both columns read one `workgroupsModel` on the runtime, so the list
+    /// and the detail agree about the selection.
+    public func libraryPanels() -> [GlassLibraryPanel] {
+        let runtime = self.runtime
+        return [
+            GlassLibraryPanel(
+                id: "workgroups",
+                sectionTitle: "Workgroups",
+                title: "Workgroups",
+                symbolName: "rectangle.stack",
+                count: runtime.settingsManager.layoutPresets.count,
+                results: {
+                    TerminalWorkgroupsView(presentation: .results, model: runtime.workgroupsModel)
+                        .environment(runtime)
+                        .environment(runtime.sessionManager)
+                        .environment(runtime.settingsManager)
+                },
+                detail: {
+                    TerminalWorkgroupsView(presentation: .detail, model: runtime.workgroupsModel)
+                        .environment(runtime)
+                        .environment(runtime.sessionManager)
+                        .environment(runtime.settingsManager)
+                })
+        ]
+    }
+
     public func serviceDetailActions(service: HostServiceLink, host: HostProfile) -> AnyView {
         AnyView(GlassTerminalServiceActions(runtime: runtime, service: service, host: host))
     }
@@ -324,7 +359,7 @@ public struct GlassTerminalBootstrap<Content: View>: View {
             .modifier(TerminalConnectFlow())
             #if os(iOS)
             .sheet(isPresented: Binding(get: { router.showsWorkgroups }, set: { router.showsWorkgroups = $0 })) {
-                TerminalWorkgroupsView()
+                TerminalWorkgroupsView(model: runtime.workgroupsModel)
             }
             .sheet(isPresented: Binding(get: { router.showsTailscale }, set: { router.showsTailscale = $0 })) {
                 TerminalTailscaleView()
@@ -363,7 +398,7 @@ public struct GlassTerminalBootstrap<Content: View>: View {
         )) {
             if let context = router.sftpContext,
                runtime.sessionManager.session(for: context.sessionID) != nil {
-                SFTPBrowserView(sessionID: context.sessionID)
+                SFTPBrowserView(sessionID: context.sessionID, initialPath: context.initialPath)
             } else {
                 SFTPBrowserNotFoundView(context: router.sftpContext)
             }

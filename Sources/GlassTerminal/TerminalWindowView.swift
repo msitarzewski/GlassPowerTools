@@ -481,6 +481,18 @@ struct TerminalWindowView: View {
         }
     }
 
+    /// Opens this session's current directory in the file browser.
+    ///
+    /// A remote shell's directory arrives over OSC 7, so it is only known once the shell has
+    /// reported one — which is why the control appears with it rather than sitting disabled.
+    private func openFolderHere(_ directory: String) {
+        #if os(macOS) || os(visionOS)
+        openWindow(id: "sftp", value: SFTPBrowserContext(sessionID: session.id, initialPath: directory))
+        #else
+        iOSRouter.sftpContext = SFTPBrowserContext(sessionID: session.id, initialPath: directory)
+        #endif
+    }
+
     #if os(macOS)
     private func toggleMacFocusMode() {
         guard let window = macTerminalWindow ?? NSApp.keyWindow else { return }
@@ -1268,6 +1280,26 @@ struct TerminalWindowView: View {
             // Files left this toolbar when it became a peer row on the host detail: it is a
             // separate tool, reached from the machine, not a control of one terminal session.
             // The command palette still opens it per saved connection (`connection.sftp.*`).
+            //
+            // "Open Folder Here" is not that tool returning. Files browses *a machine*; this opens
+            // the directory **this shell is standing in**, which is a property of the session and
+            // of nothing else. The remote shell reports it over OSC 7 — the same value the AI
+            // assistant already uses — so the local and remote halves of the idea behave the same:
+            // Finder for a local shell, SFTP for a remote one, both arriving where the user is.
+            if let remoteDirectory = terminalHostModel.currentDirectory, remoteDirectory.hasPrefix("/") {
+                Button {
+                    openFolderHere(remoteDirectory)
+                } label: {
+                    Image(systemName: "folder")
+                }
+                #if os(visionOS)
+                .buttonStyle(.borderless)
+                #endif
+                .accessibilityLabel("Open Folder Here")
+                .accessibilityIdentifier("terminal-open-folder-here")
+                .help("Open \(remoteDirectory) over SFTP")
+            }
+
 
             #if os(visionOS)
             Button {

@@ -22,7 +22,7 @@ public struct GlassTerminalScenes: Scene {
         #if os(macOS) || os(visionOS)
         Window("Workgroups", id: "terminal-workgroups") {
             GlassLayeredWindow {
-                TerminalWorkgroupsView()
+                TerminalWorkgroupsView(model: runtime.workgroupsModel)
                     .environment(runtime)
                     .environment(sessionManager)
                     .environment(settingsManager)
@@ -57,7 +57,7 @@ public struct GlassTerminalScenes: Scene {
         .commands { MacWorkspaceCommands(sessionManager: sessionManager) }
         WindowGroup(id: "sftp", for: SFTPBrowserContext.self) { $context in
             if let context, sessionManager.session(for: context.sessionID) != nil {
-                SFTPBrowserView(sessionID: context.sessionID)
+                SFTPBrowserView(sessionID: context.sessionID, initialPath: context.initialPath)
                     .environment(sessionManager)
                     .environment(settingsManager)
                 .glassLayers(runtime.layers)
@@ -123,7 +123,7 @@ public struct GlassTerminalScenes: Scene {
         #endif
         WindowGroup(id: "sftp", for: SFTPBrowserContext.self) { $context in
             if let context, sessionManager.session(for: context.sessionID) != nil {
-                SFTPBrowserView(sessionID: context.sessionID)
+                SFTPBrowserView(sessionID: context.sessionID, initialPath: context.initialPath)
                     .environment(sessionManager)
                     .environment(settingsManager)
                 .glassLayers(runtime.layers)

@@ -162,11 +162,11 @@ struct MacLocalTerminalPaneView: View {
                         .help("AI Assistant")
                     }
 
-                    Button("Reveal Working Directory", systemImage: "folder.fill") {
-                        revealWorkingDirectory()
+                    Button("Open Folder Here", systemImage: "folder") {
+                        openFolderHere()
                     }
                     .labelStyle(.iconOnly)
-                    .help("Reveal Working Directory in Finder")
+                    .help("Open the shell’s working directory in Finder")
 
                     Button(
                         isLocalFullScreen ? "Exit Focus Mode" : "Focus Mode",
@@ -358,8 +358,8 @@ struct MacLocalTerminalPaneView: View {
                 }
                 .disabled(!processState.isRunning)
             }
-            Button("Reveal Working Directory", systemImage: "folder.fill") {
-                revealWorkingDirectory()
+            Button("Open Folder Here", systemImage: "folder") {
+                openFolderHere()
             }
             Button(
                 isLocalFullScreen ? "Exit Focus Mode" : "Focus Mode",
@@ -527,14 +527,17 @@ struct MacLocalTerminalPaneView: View {
         if isFocused { processState.focus() }
     }
 
-    private func revealWorkingDirectory() {
+    private func openFolderHere() {
         let path = runtime.currentWorkingDirectory
             ?? FileManager.default.homeDirectoryForCurrentUser.path
         var isDirectory = ObjCBool(false)
         guard path.hasPrefix("/"),
               FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
               isDirectory.boolValue else { return }
-        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path, isDirectory: true)])
+        // `open`, not `activateFileViewerSelecting`: selecting shows the folder highlighted
+        // inside its *parent*, which is the wrong place — the point of the control is to
+        // arrive where the shell already is. Opening the URL shows that directory's contents.
+        NSWorkspace.shared.open(URL(fileURLWithPath: path, isDirectory: true))
     }
 
     private func startRecording(capturesInput: Bool) {

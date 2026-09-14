@@ -1214,6 +1214,15 @@ struct HTMLPreviewContext: Identifiable, Hashable, Codable {
 
 struct SFTPBrowserContext: Codable, Hashable {
     let sessionID: UUID
+    /// Where to open, when the caller knows. "Open Folder Here" passes the shell's own working
+    /// directory, so the browser arrives where the user already is instead of at the root and
+    /// leaving them to walk back down. Nil keeps the previous behaviour.
+    var initialPath: String?
+
+    init(sessionID: UUID, initialPath: String? = nil) {
+        self.sessionID = sessionID
+        self.initialPath = initialPath
+    }
 }
 
 // MARK: - Snippets
