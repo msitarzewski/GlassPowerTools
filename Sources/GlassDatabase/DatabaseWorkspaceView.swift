@@ -10,6 +10,7 @@ import SwiftUI
 import GlassLayers
 import GlassDBKit
 import UniformTypeIdentifiers
+import GlassConnectionUI
 #if os(iOS)
 import UIKit
 #endif
@@ -263,6 +264,7 @@ struct DatabaseWorkspaceView: View {
             )
             .databaseSidebarColumnWidth()
             .databaseWorkspaceSidebarMaterial()
+            .glassLibraryColumnAutosave("com.glasspowertools.database.columns")
         } detail: {
             detailSurface
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

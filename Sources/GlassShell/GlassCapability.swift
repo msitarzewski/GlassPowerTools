@@ -206,6 +206,15 @@ public protocol GlassCapability: AnyObject {
     var settingsPages: [GlassCapabilitySettingsPage] { get }
     /// Controls the capability adds to the library toolbar (e.g. a quick-connect). Default: none.
     func libraryToolbarItems() -> AnyView
+
+    /// Surfaces the capability contributes to the library's sidebar, beside Collections.
+    ///
+    /// For things that span the whole fleet rather than belonging to one machine — Workgroups,
+    /// which is a saved layout of sessions across several hosts, and Network, which lists a
+    /// Tailscale tailnet. glas.sh listed both as sidebar sections and switched its results and
+    /// detail on the selected mode; the merge moved Workgroups to a window of its own, which is
+    /// how it stopped reading as part of the library. Default: none.
+    func libraryPanels() -> [GlassLibraryPanel]
     /// Actions shown beside a service's Connect in the host detail, asked only for the
     /// capability's own kind. `host` is the catalog record that owns the service. Default: none.
     func serviceDetailActions(service: HostServiceLink, host: HostProfile) -> AnyView
@@ -253,6 +262,7 @@ public extension GlassCapability {
         open(service: service, host: host, report: report)
     }
     func hostAddressDidChange(host: HostProfile, address: String?) {}
+    func libraryPanels() -> [GlassLibraryPanel] { [] }
     func knownAddress(service: HostServiceLink, host: HostProfile) -> String? { nil }
     /// A capability that has not adopted the setup contract yet: the sheet shows why and Save
     /// refuses, so no half-made service can be created through it.

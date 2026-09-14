@@ -20,13 +20,10 @@ public struct GlassTerminalLibraryToolbar: View {
     public init(runtime: GlassTerminalRuntime) { self.runtime = runtime }
 
     public var body: some View {
-        Button {
-            runtime.requestShowWorkgroups()
-        } label: {
-            Label("Workgroups", systemImage: "rectangle.stack")
-        }
-        .help("Workgroups")
-        .accessibilityIdentifier("connection-library-workgroups")
+        // Workgroups is not here any more: it is a panel in the library's own sidebar, beside
+        // Collections, which is where glas.sh had it and where it belongs — it spans the fleet
+        // rather than acting on the selected host. A toolbar button opening a second route to the
+        // same surface was the leftover from when it lived in a window of its own.
         if runtime.tailscaleIsConfigured {
             Button {
                 runtime.requestShowTailscale()

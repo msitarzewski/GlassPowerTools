@@ -9,10 +9,27 @@
 //
 
 import SwiftUI
+import GlassConnectionUI
 
 enum ConnectionWorkgroupSelection: Hashable {
     case live(UUID)
     case preset(UUID)
+}
+
+/// The state the Workgroups results list and its detail pane share.
+///
+/// It lives outside both views because they now occupy two different columns of the library's
+/// split view, and a `@State` in one cannot be read by the other. glas.sh had the same arrangement
+/// for the same reason: `ConnectionManagerView` — the parent of both halves — owned
+/// `selectedWorkgroupSelection`, not the results list.
+@MainActor @Observable
+final class TerminalWorkgroupsModel {
+    var selection: ConnectionWorkgroupSelection?
+    var searchQuery: String = ""
+    var editorContext: WorkgroupEditorContext?
+    var failureMessage: String?
+
+    init() {}
 }
 
 struct TerminalWorkgroupsView: View {
@@ -25,11 +42,17 @@ struct TerminalWorkgroupsView: View {
     #endif
 
     private var serverManager: ServerManager { sessionManager.serverManager }
-    @State private var selectedWorkgroupSelection: ConnectionWorkgroupSelection?
-    @State private var searchQuery: String = ""
+    /// Which column (or columns) this instance is drawing. The library renders `.results` and
+    /// `.detail` into two columns over one model; the standalone window still renders both.
+    enum Presentation { case results, detail, standalone }
+    let presentation: Presentation
+    @Bindable var model: TerminalWorkgroupsModel
     @FocusState private var searchIsFocused: Bool
-    @State private var workgroupEditorContext: WorkgroupEditorContext?
-    @State private var connectionFailureMessage: String?
+
+    init(presentation: Presentation = .standalone, model: TerminalWorkgroupsModel) {
+        self.presentation = presentation
+        self.model = model
+    }
 
     private var showsExplicitSearchAction: Bool {
         #if os(visionOS)
@@ -50,12 +73,37 @@ struct TerminalWorkgroupsView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
+        content
+            // The editor sheet, the failure alert and the pruning of a selection whose workgroup
+            // has gone are attached once, to whichever instance owns the results — never to both
+            // columns, or the sheet presents twice and the alert fights itself. Carried on a
+            // zero-size background the way the library carries its own presentation anchor.
+            .background { if presentation != .detail { sharedPresentations } }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch presentation {
+        case .standalone:
+            NavigationSplitView {
+                workgroupResults(connectionLibrary: connectionLibrary)
+                    .glassLibraryColumnAutosave("com.glasspowertools.workgroups.columns")
+            } detail: {
+                workgroupDetail(connectionLibrary: connectionLibrary)
+            }
+        case .results:
             workgroupResults(connectionLibrary: connectionLibrary)
-        } detail: {
+        case .detail:
             workgroupDetail(connectionLibrary: connectionLibrary)
         }
-        .sheet(item: $workgroupEditorContext) { context in
+    }
+
+    @ViewBuilder
+    fileprivate var sharedPresentations: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .accessibilityHidden(true)
+            .sheet(item: $model.editorContext) { context in
             WorkgroupEditorView(
                 context: context,
                 servers: serverManager.servers
@@ -64,24 +112,24 @@ struct TerminalWorkgroupsView: View {
             }
         }
         .alert("Workgroups", isPresented: Binding(
-            get: { connectionFailureMessage != nil },
-            set: { if !$0 { connectionFailureMessage = nil } }
+            get: { model.failureMessage != nil },
+            set: { if !$0 { model.failureMessage = nil } }
         )) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(connectionFailureMessage ?? "")
+            Text(model.failureMessage ?? "")
         }
         .onChange(of: settingsManager.layoutPresets.map(\.id)) { _, workgroupIDs in
-            if case .preset(let selectedWorkgroupID) = selectedWorkgroupSelection,
+            if case .preset(let selectedWorkgroupID) = model.selection,
                !workgroupIDs.contains(selectedWorkgroupID) {
-                selectedWorkgroupSelection = nil
+                model.selection = nil
             }
         }
         #if os(iOS)
         .onChange(of: sessionManager.workgroups.map(\.id)) { _, workgroupIDs in
-            if case .live(let selectedWorkgroupID) = selectedWorkgroupSelection,
+            if case .live(let selectedWorkgroupID) = model.selection,
                !workgroupIDs.contains(selectedWorkgroupID) {
-                selectedWorkgroupSelection = nil
+                model.selection = nil
             }
         }
         #endif
@@ -92,17 +140,17 @@ struct TerminalWorkgroupsView: View {
     private func workgroupResults(
         connectionLibrary: ConnectionLibraryProjection
     ) -> some View {
-        let presets = connectionLibrary.workgroups(matching: searchQuery)
-        let liveWorkgroups = matchingLiveWorkgroups(searchQuery)
+        let presets = connectionLibrary.workgroups(matching: model.searchQuery)
+        let liveWorkgroups = matchingLiveWorkgroups(model.searchQuery)
         let visibleSelections = liveWorkgroups.map { ConnectionWorkgroupSelection.live($0.id) }
             + presets.map { ConnectionWorkgroupSelection.preset($0.id) }
-        return List(selection: $selectedWorkgroupSelection) {
+        return List(selection: $model.selection) {
             if liveWorkgroups.isEmpty, presets.isEmpty {
                 ContentUnavailableView(
-                    searchQuery.isEmpty ? "No Workgroups" : "No Matching Workgroups",
+                    model.searchQuery.isEmpty ? "No Workgroups" : "No Matching Workgroups",
                     systemImage: "rectangle.stack",
                     description: Text(
-                        searchQuery.isEmpty
+                        model.searchQuery.isEmpty
                             ? "Create a reusable command-per-tab terminal workspace."
                             : "Try a different search."
                         )
@@ -132,7 +180,7 @@ struct TerminalWorkgroupsView: View {
                         .tag(ConnectionWorkgroupSelection.live(workgroup.id))
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            selectedWorkgroupSelection = .live(workgroup.id)
+                            model.selection = .live(workgroup.id)
                         }
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel(
@@ -179,7 +227,7 @@ struct TerminalWorkgroupsView: View {
                     #if os(iOS)
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        selectedWorkgroupSelection = .preset(preset.id)
+                        model.selection = .preset(preset.id)
                     }
                     #endif
                     .contextMenu {
@@ -187,10 +235,10 @@ struct TerminalWorkgroupsView: View {
                             runtime.requestOpenWorkgroup(preset.id)
                         }
                         Button("Edit", systemImage: "pencil") {
-                            workgroupEditorContext = .edit(preset)
+                            model.editorContext = .edit(preset)
                         }
                         Button("Duplicate", systemImage: "plus.square.on.square") {
-                            workgroupEditorContext = .duplicate(preset)
+                            model.editorContext = .duplicate(preset)
                         }
                         Divider()
                         Button("Delete", systemImage: "trash", role: .destructive) {
@@ -203,12 +251,11 @@ struct TerminalWorkgroupsView: View {
         }
         .accessibilityIdentifier("connection-library-results-workgroups")
         .navigationTitle("Workgroups")
-        .searchable(text: $searchQuery, prompt: "Search workgroups...")
+        .searchable(text: $model.searchQuery, prompt: "Search workgroups...")
         .searchFocused($searchIsFocused)
         .onChange(of: visibleSelections) { _, visibleSelections in
-            if let selectedWorkgroupSelection,
-               !visibleSelections.contains(selectedWorkgroupSelection) {
-                self.selectedWorkgroupSelection = nil
+            if let current = model.selection, !visibleSelections.contains(current) {
+                model.selection = nil
             }
         }
         .toolbar {
@@ -236,7 +283,7 @@ struct TerminalWorkgroupsView: View {
                 #endif
 
                 Button {
-                    workgroupEditorContext = .new()
+                    model.editorContext = .new()
                 } label: {
                     Image(systemName: "plus")
                 }
@@ -366,7 +413,7 @@ struct TerminalWorkgroupsView: View {
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 HStack {
                     Button("Edit", systemImage: "pencil") {
-                        workgroupEditorContext = .edit(preset)
+                        model.editorContext = .edit(preset)
                     }
                     .labelStyle(.titleAndIcon)
                     .help("Edit Workgroup")
@@ -398,7 +445,7 @@ struct TerminalWorkgroupsView: View {
                 Text("Workgroups open one configured command per terminal tab.")
             } actions: {
                 Button("New Workgroup", systemImage: "plus") {
-                    workgroupEditorContext = .new()
+                    model.editorContext = .new()
                 }
                 .accessibilityIdentifier("connection-library-add-workgroup-empty-detail")
             }
@@ -527,7 +574,7 @@ struct TerminalWorkgroupsView: View {
     private func selectedWorkgroup(
         in connectionLibrary: ConnectionLibraryProjection
     ) -> LayoutPreset? {
-        guard case .preset(let selectedWorkgroupID) = selectedWorkgroupSelection else {
+        guard case .preset(let selectedWorkgroupID) = model.selection else {
             return nil
         }
         return connectionLibrary.workgroups.first(where: { $0.id == selectedWorkgroupID })
@@ -535,7 +582,7 @@ struct TerminalWorkgroupsView: View {
 
     private var selectedLiveWorkgroup: TerminalWorkgroup? {
         #if os(iOS)
-        guard case .live(let selectedWorkgroupID) = selectedWorkgroupSelection else {
+        guard case .live(let selectedWorkgroupID) = model.selection else {
             return nil
         }
         return iOSRouter.liveWorkgroups(in: sessionManager).first {
@@ -590,10 +637,10 @@ struct TerminalWorkgroupsView: View {
     private func editCurrentSessionsAsWorkgroup() {
         let intents = currentSavedSessionIntents
         guard !intents.isEmpty else {
-            connectionFailureMessage = "No open sessions use a saved SSH connection."
+            model.failureMessage = "No open sessions use a saved SSH connection."
             return
         }
-        workgroupEditorContext = .new(
+        model.editorContext = .new(
             name: "Workgroup (\(intents.count) tabs)",
             sessionIntents: intents
         )
@@ -602,7 +649,7 @@ struct TerminalWorkgroupsView: View {
     #if os(iOS)
     private func resumeLiveWorkgroup(_ workgroupID: UUID) {
         guard iOSRouter.resumeTerminal(workgroupID: workgroupID, in: sessionManager) else {
-            connectionFailureMessage = "The terminal workgroup is no longer available."
+            model.failureMessage = "The terminal workgroup is no longer available."
             return
         }
     }

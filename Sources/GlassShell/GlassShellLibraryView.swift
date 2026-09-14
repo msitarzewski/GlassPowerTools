@@ -31,6 +31,14 @@ public struct GlassShellLibraryView: View {
                 GlassLayeredPanel(role: .embedded) {
                     if let id, let host = model.host(id) { detail(host) } else { emptyDetail }
                 }
+                // Fills the column so the layered surface behind it does too. **No opaque
+                // background of its own**: painting one here was an attempt to hide the seams by
+                // covering the glass, which cost the panel the opacity and frost settings and left
+                // the empty state as a white card floating on the wallpaper. The seams were never
+                // a missing background — they were the *presence* of opaque children over a
+                // translucent window. With the list and form no longer painting, there is one
+                // surface and nothing to seam.
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } toolbarActions: {
                 HStack {
                     ForEach(model.registry.registered, id: \.kind) { capability in
@@ -47,6 +55,7 @@ public struct GlassShellLibraryView: View {
             } presentationAnchor: {
                 alertAnchor
             }
+            .libraryPanels(model.registry.registered.flatMap { $0.libraryPanels() })
             #if os(macOS)
             .sidebarActions { addHostButton }
             #endif
@@ -87,20 +96,19 @@ public struct GlassShellLibraryView: View {
     private func row(_ item: GlassLibraryItem<HostID>) -> some View {
         GlassLibraryConnectionRow(name: item.name, isFavorite: item.isFavorite,
                                   nameAccessibilityIdentifier: "host-row-\(item.name)") {
-            // The spatial sidebar is narrow: an icon-only Connect (press and hold still opens the
-            // picker) and the service icons in one row, so nothing wraps. Wide rows keep the label.
+            // The machine's service kinds belong to the machine, so they sit under its name at the
+            // same leading edge rather than beside the control that acts on it. In the trailing
+            // accessory they competed with Connect for the row's width and made the name truncate
+            // first — worst in the spatial sidebar, which is why that column had been shrinking its
+            // own controls to cope.
+            serviceIcons(for: item.id)
+        } accessory: {
             #if os(visionOS)
-            HStack(spacing: 12) {
-                serviceIcons(for: item.id)
-                GlassShellConnectControl(model: model, hostID: item.id, compact: true)
-            }
-            .fixedSize(horizontal: true, vertical: false)
-            .glassGazeHighlight()
+            GlassShellConnectControl(model: model, hostID: item.id, compact: true)
+                .fixedSize(horizontal: true, vertical: false)
+                .glassGazeHighlight()
             #else
-            HStack(spacing: 8) {
-                serviceIcons(for: item.id)
-                GlassShellConnectControl(model: model, hostID: item.id)
-            }
+            GlassShellConnectControl(model: model, hostID: item.id)
             #endif
         }
         // The kit row combines its children into one element. macOS joins the children's
@@ -234,12 +242,15 @@ public struct GlassShellLibraryView: View {
                 Section { Text(model.hostLibraryStatus).font(.footnote).foregroundStyle(.secondary) }
             }
         }, actions: {
-            // Removing a machine is deliberate, not one slip beside Connect: it lives in the
-            // row's context menu and at the bottom of the edit sheet (2026-09-11).
-            HStack {
-                GlassShellConnectControl(model: model, hostID: host.id, prominent: true)
-                Button("Edit") { setupMode = .editHost(host) }.accessibilityIdentifier("host-edit")
-            }.buttonStyle(.bordered).controlSize(.large)
+            // Edit alone. Connect lived here too, which made three ways to start the same session
+            // from one screen — the row's own split control, the Connect beside each service in
+            // the Services section above, and this. The service rows are the precise ones: they
+            // say *which* service they open. Removing a machine stays deliberate, in the row's
+            // context menu and at the bottom of the edit sheet (2026-09-11).
+            Button("Edit") { setupMode = .editHost(host) }
+                .accessibilityIdentifier("host-edit")
+                .buttonStyle(.bordered)
+                .controlSize(.large)
         })
     }
 
@@ -467,9 +478,11 @@ public struct GlassShellConnectControl: View {
                 Image(systemName: "chevron.down")
                     .padding(.horizontal, metrics.chevronPadding)
                     .padding(.vertical, metrics.verticalPadding)
-                    .contentShape(Rectangle())
             }
-            .menuStyle(.borderlessButton)
+            // A menu does not inherit `foregroundStyle` the way a button does, and setting it on
+            // the label content does not win either — the menu style is applied afterwards. The
+            // button style is the hook that is not overridden, so the family shares one.
+            .glassMenuOnFilled()
             .menuIndicator(.hidden)
             .fixedSize()
             .accessibilityLabel("Choose a service")
@@ -493,13 +506,11 @@ public struct GlassShellConnectControl: View {
             }
             .padding(.horizontal, metrics.playPadding)
             .padding(.vertical, metrics.verticalPadding)
-            .contentShape(Rectangle())
         }
-        .menuStyle(.borderlessButton)
+        .glassMenuOnFilled()
         .menuIndicator(.hidden)
         .fixedSize()
         .font(metrics.font)
-        .foregroundStyle(.white)
         .background(Color.accentColor, in: Capsule())
         .accessibilityLabel("Choose a service")
         .accessibilityIdentifier("host-connect-menu")

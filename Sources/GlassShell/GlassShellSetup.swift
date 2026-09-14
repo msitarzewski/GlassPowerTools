@@ -395,12 +395,11 @@ public struct GlassShellHostSetupSheet: View {
             #if os(macOS)
             .frame(minWidth: 560, idealWidth: 620, maxWidth: 720, minHeight: 480, idealHeight: 640, maxHeight: 820)
             #elseif os(visionOS)
-            // Larger than the Mac's, and with large controls: a grouped `Form` inherits iOS
-            // metrics, so at reading distance its fields are both hard to read and small enough
-            // that the eye slides off them. The structure is unchanged — the same sections in the
-            // same order, so the sheet is still recognisably the Mac's.
+            // Large controls, and **no minimum width**. Asking for 720 pt here made the content
+            // wider than the sheet that presents it, so every label was clipped at both edges —
+            // "Name" became "me", "Address" became "dress". A sheet sizes itself on visionOS; a
+            // minimum width is an instruction it cannot honour and does not refuse.
             .controlSize(.large)
-            .frame(minWidth: 720, idealWidth: 800, minHeight: 640)
             #endif
         }
         .onAppear {

@@ -90,31 +90,36 @@ struct MacTerminalWindowPolicyTests {
             window.contentView?.layoutSubtreeIfNeeded()
             try await Task.sleep(for: .milliseconds(25))
         }
-        // The app supplies its own toggle ("sidebar-toggle"): AppKit's drifts to the window's
-        // trailing edge with a "Show Sidebar" label once this toolbar is crowded, and the two
-        // windows then disagree. Either identifier counts, and there must still be exactly one.
+        // **The family's sidebar arrangement**, as glassdb and glas.sh have always had it:
+        // AppKit's own toggle over the sidebar, the tracking separator at the column divider, and
+        // the app's add button leading the content region beyond it.
+        //
+        // This test used to pin the opposite — an app-supplied "sidebar-toggle" ahead of the
+        // separator — and that arrangement kept regressing in use. A placed button is an ordinary
+        // toolbar item: it drops into the overflow menu with its title once the toolbar is
+        // crowded, and it disappears with the sidebar region when the column collapses. AppKit's
+        // item does neither. `glassdb/Constants.swift:267-273` removes the system toggle on every
+        // platform *except* macOS for exactly this reason.
         let sidebarIndices = toolbar.items.indices.filter {
-            let id = toolbar.items[$0].itemIdentifier.rawValue
-            return id.contains("toggleSidebar") || id == "sidebar-toggle"
+            toolbar.items[$0].itemIdentifier.rawValue.contains("toggleSidebar")
         }
-        #expect(sidebarIndices.count == 1)
+        #expect(sidebarIndices.count == 1, "the system toggle, exactly once — not replaced")
         let sidebarIndex = try #require(sidebarIndices.first)
         let newTabIndex = try #require(toolbar.items.firstIndex {
             $0.itemIdentifier.rawValue == "new-terminal-tab"
         })
-        #expect(newTabIndex < sidebarIndex, "New Tab sits left of the sidebar toggle, as in the library")
         let save = try #require(toolbar.items.first {
             $0.itemIdentifier.rawValue == "save-workspace"
         })
         let separatorIndex = try #require(toolbar.items.firstIndex { $0 is NSTrackingSeparatorToolbarItem })
-        #expect(sidebarIndex < separatorIndex)
-        #expect(newTabIndex < separatorIndex)
-        // The toggle and add button are the only sidebar controls; redeclaring the native
-        // toggle without removing it leaves an empty glass slot.
+        #expect(sidebarIndex < separatorIndex, "the toggle belongs to the sidebar region")
+        #expect(separatorIndex < newTabIndex, "New Tab leads the content region, past the divider")
+        // The toggle is the sidebar region's only control: anything else placed there vanishes
+        // with the column when it collapses, which is the state this test has just put it in.
         let sidebarControls = toolbar.items.prefix(separatorIndex).filter {
             $0.itemIdentifier != .flexibleSpace && $0.itemIdentifier != .space
         }
-        #expect(sidebarControls.count == 2)
+        #expect(sidebarControls.count == 1)
         let itemIDs = toolbar.items.map(\.itemIdentifier)
         // Window updates no longer remove or replace any toolbar items.
         NotificationCenter.default.post(name: NSWindow.didUpdateNotification, object: window)

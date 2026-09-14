@@ -427,26 +427,24 @@ private extension View {
 
     @ViewBuilder
     func databaseTextFieldPresentation() -> some View {
-        #if os(macOS)
+        // Native: the label leads, the value sits trailing, and the field takes the
+        // width the form gives it. The previous fixed `.frame(width: 340, alignment:
+        // .leading)` with `.roundedBorder` was a macOS-only override that neither macOS
+        // nor any other platform lays a form out like, and on a narrow sheet it forced
+        // the content wider than its container. Kept: the Required badge and the
+        // validation message, which are behaviour rather than styling.
         self
             .labelsHidden()
-            .textFieldStyle(.roundedBorder)
-            .frame(width: 340, alignment: .leading)
-        #else
-        self
-        #endif
+            .multilineTextAlignment(.trailing)
     }
 }
 
 private extension View {
     @ViewBuilder
     func databaseControlPresentation() -> some View {
-        #if os(macOS)
-        self
-            .labelsHidden()
-            .frame(width: 340, alignment: .leading)
-        #else
-        self
-        #endif
+        // A picker or toggle sits trailing in a form row on every Apple platform, and
+        // sizes itself. The fixed 340 pt left-aligned box matched the text fields' old
+        // override rather than the platform.
+        self.labelsHidden()
     }
 }

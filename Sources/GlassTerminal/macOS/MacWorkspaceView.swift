@@ -1,6 +1,6 @@
 #if os(macOS)
-#if os(macOS)
 import AppKit
+import GlassConnectionUI
 import Observation
 import GlassTerminalEmulator
 import SwiftUI
@@ -92,23 +92,25 @@ struct MacWorkspaceView: View {
             }
             }
                 .listStyle(.sidebar)
-                .navigationSplitViewColumnWidth(min: 180, ideal: 240, max: 360)
-                // The system's own sidebar toggle drifts to the trailing edge and grows a
-                // "Show Sidebar" label once this toolbar is crowded (observed on a connected
-                // session, 2026-09-11). Own it instead: a fixed leading control that reads the
-                // column's state, beside New Terminal Tab.
-                // Applied twice on purpose — not a copy-paste slip. Once is not enough to
-                // suppress the system toggle on a NavigationSplitView here: with a single
-                // removal it comes back at the window's trailing edge as a full "Toggle Sidebar"
-                // button once the toolbar is crowded, which is exactly the drift this owns.
-                // Deleted as redundant on 2026-09-12 and the symptom returned within the hour.
-                .toolbar(removing: .sidebarToggle)
-                .toolbar(removing: .sidebarToggle)
-                .toolbar {
-                    // Push the group to the sidebar column's trailing edge, matching the library.
-                    if #available(macOS 26.0, *) { ToolbarSpacer(.flexible, placement: .automatic) }
-                    columnControls(placement: .automatic)
-                }
+                // A wider ceiling than 360: the sidebar carries a title and a monospaced subtitle
+                // per tab, and a user with long session names could not widen past truncation.
+                .navigationSplitViewColumnWidth(min: 180, ideal: 240, max: 520)
+                // Remember where the user put the divider. AppKit persists this per autosave name,
+                // and the terminal window had none — every new window reverted to the ideal width.
+                // Its own namespace, so it does not share a position with the library.
+                .glassLibraryColumnAutosave("com.glasspowertools.terminal.columns")
+                // **AppKit's own sidebar toggle, left alone — the family standard.**
+                //
+                // glassdb's `databaseSidebarChrome()` removes it on every platform *except* macOS
+                // (`glassdb/Constants.swift:267-273`), and glas.sh never removed it at all. Left
+                // alone, AppKit puts it at the sidebar's trailing edge, keeps it out of the
+                // overflow menu, and moves it with the column.
+                //
+                // Owning it is what kept regressing. A placed button is an ordinary toolbar item:
+                // it overflows when the toolbar is crowded and renders with its title, and if it
+                // sits in this column's region it disappears when the column collapses. Neither is
+                // fixable by choosing a different placement, which is what several attempts here
+                // tried. The sidebar column contributes no toolbar content of its own now.
         } detail: {
             MacWorkspaceTabContent(
                 controller: selected,
@@ -119,6 +121,17 @@ struct MacWorkspaceView: View {
             .id(selected.workspaceID)
             .navigationTitle(showingOverview && !overviewControlsVisible ? "" : identity.title)
             .navigationSubtitle(showingOverview && !overviewControlsVisible ? "" : identity.subtitle ?? "")
+            // New Tab leads the content region, immediately after the sidebar — the placement
+            // glassdb gives Add Connection (`ConnectionManagerView.swift:327-330`).
+            .toolbar {
+                ToolbarItem(id: "new-terminal-tab", placement: .navigation) {
+                    Button("New Terminal Tab", systemImage: "plus", action: addTab)
+                        .help("New Terminal Tab")
+                        .disabled(!windowController.canAddTab)
+                        .accessibilityIdentifier("mac-workspace-new-tab")
+                }
+                .glassKeepVisibleWhenCompact()
+            }
             .toolbar { workspaceToolbar(selected: selected) }
             .toolbar(showingOverview && !overviewControlsVisible ? .hidden : .visible, for: .windowToolbar)
         }
@@ -315,26 +328,6 @@ struct MacWorkspaceView: View {
         }
     }
 
-    /// New Tab and the sidebar toggle. Rendered in the sidebar column while it is visible and in
-    /// the detail column while it is not, never both, so the ids cannot collide.
-    @ToolbarContentBuilder
-    private func columnControls(placement: ToolbarItemPlacement) -> some ToolbarContent {
-        ToolbarItem(id: "new-terminal-tab", placement: placement) {
-            Button("New Terminal Tab", systemImage: "plus", action: addTab)
-                .help("New Terminal Tab")
-                .disabled(!windowController.canAddTab)
-                .accessibilityIdentifier("mac-workspace-new-tab")
-        }
-        .glassKeepVisibleWhenCompact()
-        ToolbarItem(id: "sidebar-toggle", placement: placement) {
-            Button("Toggle Sidebar", systemImage: "sidebar.leading") {
-                withAnimation { columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly }
-            }
-            .help(columnVisibility == .detailOnly ? "Show Sidebar" : "Hide Sidebar")
-            .accessibilityIdentifier("mac-workspace-sidebar-toggle")
-        }
-        .glassKeepVisibleWhenCompact()
-    }
 
     @ToolbarContentBuilder
     private func workspaceToolbar(selected: MacWorkspaceController) -> some ToolbarContent {
@@ -373,10 +366,12 @@ struct MacWorkspaceView: View {
                 .disabled(!selected.canAddPane)
                 .accessibilityIdentifier("mac-workspace-new-local-pane")
 
-                Button("Connect Host", systemImage: "network") {
-                    selected.requestSSHPane(axis: .horizontal)
+                // The library is where a machine is chosen, everywhere in the app. This used to
+                // open a picker of its own, which meant two different answers to "which host?" —
+                // one of them without the library's search, scopes, favourites or services.
+                Button("Connections", systemImage: "network") {
+                    openWindow(id: "main")
                 }
-                .disabled(!selected.canAddPane)
                 .accessibilityIdentifier("mac-workspace-connect-host")
 
                 Button(
@@ -905,7 +900,5 @@ struct MacWorkspaceLayout {
         }
     }
 }
-
-#endif
 
 #endif

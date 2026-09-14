@@ -2,6 +2,8 @@
 DerivedData/
 *.xcuserdatad/
 xcuserdata/
-.swiftpm/xcode/xcuserdata/
 .DS_Store
 *.profraw
+# Local Xcode/SwiftPM state. This repository builds from GlassPowerTools.xcodeproj,
+# so the generated package workspace is never the project of record.
+.swiftpm/
