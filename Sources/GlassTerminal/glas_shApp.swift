@@ -204,7 +204,7 @@ struct MainBootstrapView<Content: View>: View {
             didBootstrap = true
             loadPersistentState()
             #if DEBUG
-            purgeUITestCredentialsIfRequested()
+            await purgeUITestCredentialsIfRequested()
             #endif
         }
         // NOTE: We intentionally do NOT close sessions on scenePhase == .background.
@@ -221,12 +221,12 @@ struct MainBootstrapView<Content: View>: View {
     }
 
     #if DEBUG
-    private func purgeUITestCredentialsIfRequested() {
+    private func purgeUITestCredentialsIfRequested() async {
         guard ProcessInfo.processInfo.environment[
             "GLAS_UI_TEST_CREDENTIAL_CLEANUP"
         ] == "1" else { return }
         do {
-            try sessionManager.serverManager.purgeConnectionLibraryUITestFixtures()
+            try await sessionManager.serverManager.purgeConnectionLibraryUITestFixtures()
             uiTestCredentialCleanupComplete = true
         } catch {
             Logger.keychain.error(

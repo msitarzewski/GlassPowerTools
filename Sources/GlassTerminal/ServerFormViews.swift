@@ -307,12 +307,12 @@ final class TerminalServiceDraft: GlassServiceDraft {
             revealIssuesAndFocus(issues)
             throw TerminalServiceDraftError.invalid(issues.values.sorted().joined(separator: " "))
         }
-        try persist(id: endpointID.rawValue, address: address, name: serviceDisplayName(hostName: host.displayName))
+        try await persist(id: endpointID.rawValue, address: address, name: serviceDisplayName(hostName: host.displayName))
     }
 
     func rollback(endpointID: EndpointID) async {
         guard let server = serverManager.server(for: endpointID.rawValue) else { return }
-        do { try serverManager.deleteServer(server) } catch {
+        do { try await serverManager.deleteServer(server) } catch {
             Logger.servers.error("Rollback of \(endpointID.rawValue.uuidString, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
         }
     }
@@ -321,11 +321,11 @@ final class TerminalServiceDraft: GlassServiceDraft {
 
     /// Saves the standalone form: its own Host field and required Name. Returns false with
     /// `saveError` set when the server could not be saved.
-    func saveStandalone() -> Bool {
+    func saveStandalone() async -> Bool {
         let issues = standaloneIssues
         guard issues.isEmpty else { revealIssuesAndFocus(issues); return false }
         do {
-            try persist(id: editing?.id ?? UUID(), address: Self.normalizedEndpointValue(host), name: Self.normalizedEndpointValue(name))
+            try await persist(id: editing?.id ?? UUID(), address: Self.normalizedEndpointValue(host), name: Self.normalizedEndpointValue(name))
             return true
         } catch {
             Logger.servers.error("Failed to save server transactionally: \(error.localizedDescription)")
@@ -336,7 +336,7 @@ final class TerminalServiceDraft: GlassServiceDraft {
     }
 
     /// Writes the server and its password through `ServerManager`'s transactional paths.
-    private func persist(id: UUID, address: String, name: String) throws {
+    private func persist(id: UUID, address: String, name: String) async throws {
         guard let parsedPort = Int(port) else { throw TerminalServiceDraftError.invalid("Enter a port from 1 through 65535.") }
         let normalizedUsername = Self.normalizedEndpointValue(username)
         if let original = editing {
@@ -356,7 +356,7 @@ final class TerminalServiceDraft: GlassServiceDraft {
             updated.jumpHostIDs = jumpHostIDs.isEmpty ? nil : jumpHostIDs
             updated.initialTerminalColumns = usesAppDefaultTerminalSize ? nil : initialTerminalColumns
             updated.initialTerminalRows = usesAppDefaultTerminalSize ? nil : initialTerminalRows
-            try serverManager.updateServerOrThrow(updated, password: authMethod == .password ? password : nil)
+            try await serverManager.updateServerOrThrow(updated, password: authMethod == .password ? password : nil)
             requiresPasswordUpgrade = false
         } else {
             var server = ServerConfiguration(
@@ -378,7 +378,7 @@ final class TerminalServiceDraft: GlassServiceDraft {
                 initialTerminalRows: usesAppDefaultTerminalSize ? nil : initialTerminalRows
             )
             server.allowLegacyAlgorithms = allowLegacyAlgorithms
-            try serverManager.addServerOrThrow(server, password: authMethod == .password ? password : nil)
+            try await serverManager.addServerOrThrow(server, password: authMethod == .password ? password : nil)
         }
     }
 
@@ -870,7 +870,12 @@ struct ServerFormView: View {
         guard let draft else { return }
         commitPendingTag()
         if let hostContext { draft.host = hostContext.address }
-        if draft.saveStandalone() { dismiss() }
+        // `saveStandalone` reports its own failures through `draft.saveError`, so the only thing
+        // that changes by awaiting it here is that the dismissal happens once the catalog write
+        // has actually landed rather than before it.
+        Task { @MainActor in
+            if await draft.saveStandalone() { dismiss() }
+        }
     }
 
     private func commitPendingTag() {

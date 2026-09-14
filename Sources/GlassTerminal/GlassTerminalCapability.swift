@@ -100,8 +100,8 @@ public final class GlassTerminalRuntime {
     /// The host's address changed in the shell: every saved server that is a service of that
     /// host record follows it, so the machine's identity is edited once. Returns the ids updated.
     @discardableResult
-    func applyHostAddress(_ address: String?, to host: HostProfile) -> [UUID] {
-        GlassTerminalHostAddressSync.apply(address, to: host, in: sessionManager.serverManager)
+    func applyHostAddress(_ address: String?, to host: HostProfile) async -> [UUID] {
+        await GlassTerminalHostAddressSync.apply(address, to: host, in: sessionManager.serverManager)
     }
     public func requestServerInfo(id: UUID) {
         guard let server = sessionManager.serverManager.server(for: id) else { return }
@@ -202,7 +202,7 @@ public final class GlassTerminalCapability: GlassCapability {
 
     public func removeService(_ service: HostServiceLink, host: HostProfile) async throws {
         guard let server = runtime.sessionManager.serverManager.server(for: service.endpointID.rawValue) else { return }
-        try runtime.sessionManager.serverManager.deleteServer(server)
+        try await runtime.sessionManager.serverManager.deleteServer(server)
     }
 
     /// The saved server's address, for hosts that predate addresses on the host record.
@@ -231,7 +231,10 @@ public final class GlassTerminalCapability: GlassCapability {
     }
 
     public func hostAddressDidChange(host: HostProfile, address: String?) {
-        runtime.applyHostAddress(address, to: host)
+        // Same shape as the desktop's (`GlassDesktopCapability.swift:139-152`): the shell reports
+        // the change synchronously, and each following server is a catalog write.
+        let runtime = self.runtime
+        Task { @MainActor in await runtime.applyHostAddress(address, to: host) }
     }
 
     // MARK: The device's own shell (D8)
@@ -417,12 +420,12 @@ enum GlassTerminalHostAddressSync {
     /// skipped so one bad record does not stop the rest. Returns the ids updated. A cleared
     /// address (nil) leaves the servers as they are: they still need something to connect to.
     @MainActor @discardableResult
-    static func apply(_ address: String?, to host: HostProfile, in manager: ServerManager) -> [UUID] {
+    static func apply(_ address: String?, to host: HostProfile, in manager: ServerManager) async -> [UUID] {
         guard let address else { return [] }
         var applied: [UUID] = []
         for server in servers(manager.servers, following: host, address: address) {
             do {
-                try manager.updateServerOrThrow(server)
+                try await manager.updateServerOrThrow(server)
                 applied.append(server.id)
             } catch {
                 Logger.servers.error("Host address sync skipped \(server.id.uuidString, privacy: .public): \(error.localizedDescription, privacy: .public)")

@@ -244,11 +244,13 @@ struct GeneralSettingsView: View {
                     .frame(minHeight: 140)
 
                 Button("Import into Server Configs") {
-                    let result = settings.importSSHConfig(sshConfigText, serverManager: serverManager)
-                    let warnings = result.warnings.joined(separator: "\n")
-                    importResultMessage =
-                        "Imported: \(result.imported), Updated: \(result.updated), Skipped: \(result.skipped)"
-                        + (warnings.isEmpty ? "" : "\n\nWarnings:\n\(warnings)")
+                    Task { @MainActor in
+                        let result = await settings.importSSHConfig(sshConfigText, serverManager: serverManager)
+                        let warnings = result.warnings.joined(separator: "\n")
+                        importResultMessage =
+                            "Imported: \(result.imported), Updated: \(result.updated), Skipped: \(result.skipped)"
+                            + (warnings.isEmpty ? "" : "\n\nWarnings:\n\(warnings)")
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(sshConfigText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -311,12 +313,14 @@ struct GeneralSettingsView: View {
             presenting: keyPendingDeletion
         ) { key in
             Button("Delete \(key.name)", role: .destructive) {
-                do {
-                    try settingsManager.deleteSSHKey(key.id, serverManager: serverManager)
-                } catch {
-                    keyCopyMessage = "The key was not deleted because secure storage could not be updated: \(error.localizedDescription)"
+                Task { @MainActor in
+                    do {
+                        try await settingsManager.deleteSSHKey(key.id, serverManager: serverManager)
+                    } catch {
+                        keyCopyMessage = "The key was not deleted because secure storage could not be updated: \(error.localizedDescription)"
+                    }
+                    keyPendingDeletion = nil
                 }
-                keyPendingDeletion = nil
             }
             Button("Cancel", role: .cancel) {
                 keyPendingDeletion = nil

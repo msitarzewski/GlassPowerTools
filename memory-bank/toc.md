@@ -44,6 +44,10 @@ three source applications are obsolete and no longer compile.
 | [GlasSecretStore absorbed](tasks/2026-09/2026-09-13_secretstore-absorbed.md) | The package moved in-repo, and the host-trust defect that answering "should pins sync?" exposed (D23) |
 | [visionOS design pass](tasks/2026-09/2026-09-13_visionos-design-pass.md) | Native HIG on the Glass language; the two places the app was painting over the platform; how to actually get a capture |
 | [Test pollution](tasks/2026-09/2026-09-13_test-pollution.md) | UI tests wrote into the real saved-server list; where the Mac's store actually lives, and the abandoned defaults suites still to sweep |
+| [Stage 4 — live hosts](tasks/2026-09/2026-09-14_stage-4-live-hosts.md) | The first real Windows RDP session, TigerVNC 1.15.0, and the Apple Screen Sharing result that closed two Stage 4.5 items |
+| [Connections do not sync](tasks/2026-09/2026-09-14_connection-records-do-not-sync.md) | The diagnosis behind "CloudKit isn't working", three options, and the wrong first diagnosis kept in place |
+| [D26 — keys first class](tasks/2026-09/2026-09-14_d26-keys-first-class.md) | Keys outlive connections and get their own manager; device-bound means absent elsewhere; publish redacts and apply re-attaches |
+| [The remaining work](tasks/2026-09/2026-09-14_remaining-work-plan.md) | **The plan for everything left**: D26 stages 1–5, Stage 4 W3–W6, Stage 4.5, carried items, Stages 5–6, with reuse anchors and precise edits |
 | [September tasks](tasks/2026-09/README.md) | Monthly index |
 
 This project is `~/Software/glass/GlassPowerTools`. `../GlassEditorKit` was **absorbed on 2026-09-14**

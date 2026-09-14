@@ -164,3 +164,16 @@ Also: the glass default moved to `.regular` (sidebar weight) with a one-time ado
 stored state, and the three `.ultraThin` literals in `GlassLayerLegacy` now follow the default — an
 absent material key is not a user choice. A new test migrates the **real** settings still held by
 `sh.glas.app` and `app.glassdb` rather than invented fixtures.
+
+## 2026-09-14 — the remainder planned
+
+[The remaining work](2026-09-14_remaining-work-plan.md)
+
+D26 stages 1–5, Stage 4 W3–W6, Stage 4.5 items 3–8, the carried items and Stages 5–6, each with its
+reuse anchor at `file:line` and the precise edits it implies. **Nothing built.**
+
+Measured corrections: D26 needs no identity migration (`EndpointID.rawValue` is already every
+capability's record UUID); the database's `ConnectionPersistenceStore` is the seam the other two
+capabilities should adopt; stage 1 shrinks stage 2 to Keychain cleanup alone; and the abandoned test
+defaults suites are **17,905**, left as empty 42-byte plists by `removePersistentDomain` rather than
+by tests failing to clean up.

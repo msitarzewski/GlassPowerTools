@@ -300,13 +300,13 @@ class SessionManager {
         }
     }
 
-    func trustHostKey(_ challenge: HostKeyTrustChallenge, for session: TerminalSession) throws {
+    func trustHostKey(_ challenge: HostKeyTrustChallenge, for session: TerminalSession) async throws {
         switch try origin(for: session) {
         case .savedProfile(let serverID):
             guard serverManager.server(for: serverID) != nil else {
                 throw SessionOpenError.savedServerNotFound
             }
-            try serverManager.trustHostKey(challenge, for: serverID)
+            try await serverManager.trustHostKey(challenge, for: serverID)
         case .transient:
             // Quick Connect and Tailscale sessions have no saved profile, but
             // accepted endpoint trust still belongs in authoritative Keychain.
@@ -806,9 +806,15 @@ class SessionManager {
         }
     }
 
+    /// Recording a connection is best-effort metadata — `updateLastConnected` logs its own
+    /// failures and never throws — so the reconnect callback that calls this does not wait for the
+    /// catalog write. What the user sees is unchanged; only the ordering of a "last connected"
+    /// stamp against the next frame is, and nothing reads it synchronously.
     private func recordSuccessfulConnection(for session: TerminalSession) {
         if serverManager.server(for: session.server.id) != nil {
-            serverManager.updateLastConnected(session.server.id)
+            let serverManager = self.serverManager
+            let serverID = session.server.id
+            Task { @MainActor in await serverManager.updateLastConnected(serverID) }
         }
         WidgetCenter.shared.reloadAllTimelines()
     }

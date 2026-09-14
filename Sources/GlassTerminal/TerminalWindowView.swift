@@ -1074,8 +1074,11 @@ struct TerminalWindowView: View {
             rejectPendingHostKeyChallengeInStrictMode()
             return
         }
+        // The trust decision now includes a catalog write. The error handling below is unchanged:
+        // it still posts the same notification, one turn of the run loop later.
+        Task { @MainActor in
         do {
-            try sessionManager.trustHostKey(challenge, for: session)
+            try await sessionManager.trustHostKey(challenge, for: session)
             session.pendingHostKeyChallenge = nil
             reconnectSession()
         } catch {
@@ -1085,6 +1088,7 @@ struct TerminalWindowView: View {
                 message: error.localizedDescription,
                 style: .error
             )
+        }
         }
     }
 

@@ -2229,7 +2229,7 @@ struct glas_shTests {
 
     // MARK: - ServerManager Tests
 
-    @Test func hostTrustMigrationWithoutSourcesSkipsKeychainInventory() throws {
+    @Test func hostTrustMigrationWithoutSourcesSkipsKeychainInventory() async throws {
         let fixture = migrationDefaults("host-trust-empty")
         defer { fixture.defaults.removePersistentDomain(forName: fixture.name) }
         let probe = HostTrustStoreProbe()
@@ -2240,6 +2240,7 @@ struct glas_shTests {
         )
 
         manager.loadServersIfNeeded()
+        await manager.legacyHostTrustMigration?.value
 
         #expect(probe.allRecordsCount == 0)
         #expect(
@@ -2249,7 +2250,7 @@ struct glas_shTests {
         #expect(try migrationReport(from: fixture.defaults).state == .completed)
     }
 
-    @Test func serverDeletionPersistsMetadataFirstAndRestoresItOnKeychainFailure() throws {
+    @Test func serverDeletionPersistsMetadataFirstAndRestoresItOnKeychainFailure() async throws {
         let suiteName = "sh.glas.test.server-delete.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -2274,10 +2275,10 @@ struct glas_shTests {
             passwordStore: failingStore
         )
         manager.servers = [server]
-        try manager.persistServersOrThrow()
+        try await manager.persistServersOrThrow()
 
-        #expect(throws: CredentialMigrationProbeError.self) {
-            try manager.deleteServer(server)
+        await #expect(throws: CredentialMigrationProbeError.self) {
+            try await manager.deleteServer(server)
         }
         #expect(observedPersistedRemoval)
         #expect(manager.servers == [server])
@@ -2288,7 +2289,7 @@ struct glas_shTests {
     }
 
     #if DEBUG
-    @Test func uiTestFixturePurgeRemovesProfileAndSharedCredentialOnly() throws {
+    @Test func uiTestFixturePurgeRemovesProfileAndSharedCredentialOnly() async throws {
         let suiteName = "sh.glas.test.ui-fixture-purge.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -2329,7 +2330,7 @@ struct glas_shTests {
             similarlyNamedRealServer,
             similarlyNamedKeyServer,
         ]
-        try manager.persistServersOrThrow()
+        try await manager.persistServersOrThrow()
         try KeychainManager.savePassword(
             "fixture-secret",
             for: fixture,
@@ -2346,8 +2347,8 @@ struct glas_shTests {
             store: probe.store
         )
 
-        try manager.purgeConnectionLibraryUITestFixtures()
-        try manager.purgeConnectionLibraryUITestFixtures()
+        try await manager.purgeConnectionLibraryUITestFixtures()
+        try await manager.purgeConnectionLibraryUITestFixtures()
 
         let fixturePrimary = probe.key(
             account: KeychainManager.serverPasswordAccount(for: fixture.id),
@@ -2393,7 +2394,7 @@ struct glas_shTests {
     }
     #endif
 
-    @Test func serverPasswordCreateRestoresExactPriorUUIDSecretWhenMetadataReadbackFails() throws {
+    @Test func serverPasswordCreateRestoresExactPriorUUIDSecretWhenMetadataReadbackFails() async throws {
         let suiteName = "sh.glas.test.server-create-rollback.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -2415,8 +2416,8 @@ struct glas_shTests {
             }
         )
 
-        #expect(throws: ServerManagerError.persistenceReadbackMismatch) {
-            try manager.addServerOrThrow(server, password: "replacement-secret")
+        await #expect(throws: ServerManagerError.persistenceReadbackMismatch) {
+            try await manager.addServerOrThrow(server, password: "replacement-secret")
         }
         #expect(manager.servers.isEmpty)
         #expect(passwordProbe.values[server.id] == "preexisting-secret")
@@ -2424,7 +2425,7 @@ struct glas_shTests {
         #expect(try JSONDecoder().decode([ServerConfiguration].self, from: persistedData).isEmpty)
     }
 
-    @Test func serverPasswordCreateRemovesNewCrossAppRecordsWhenMetadataReadbackFails() throws {
+    @Test func serverPasswordCreateRemovesNewCrossAppRecordsWhenMetadataReadbackFails() async throws {
         let suiteName = "sh.glas.test.server-create-shared-rollback.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -2439,8 +2440,8 @@ struct glas_shTests {
             serverDataWriter: { _ in }
         )
 
-        #expect(throws: ServerManagerError.persistenceReadbackMismatch) {
-            try manager.addServerOrThrow(server, password: "must-roll-back")
+        await #expect(throws: ServerManagerError.persistenceReadbackMismatch) {
+            try await manager.addServerOrThrow(server, password: "must-roll-back")
         }
 
         let primaryKey = probe.key(
@@ -2456,7 +2457,7 @@ struct glas_shTests {
         #expect(manager.servers.isEmpty)
     }
 
-    @Test func failedEndpointEditRestoresExistingGlassDBCredentialExactly() throws {
+    @Test func failedEndpointEditRestoresExistingGlassDBCredentialExactly() async throws {
         let suiteName = "sh.glas.test.server-edit-shared-rollback.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -2486,8 +2487,8 @@ struct glas_shTests {
         )
         manager.servers = [original]
 
-        #expect(throws: ServerManagerError.persistenceReadbackMismatch) {
-            try manager.updateServerOrThrow(updated, password: "replacement-secret")
+        await #expect(throws: ServerManagerError.persistenceReadbackMismatch) {
+            try await manager.updateServerOrThrow(updated, password: "replacement-secret")
         }
 
         #expect(probe.values[primaryKey] == Data("glas-profile-secret".utf8))
@@ -2497,7 +2498,7 @@ struct glas_shTests {
         #expect(try JSONDecoder().decode([ServerConfiguration].self, from: persistedData) == [original])
     }
 
-    @Test func serverPasswordEditRestoresExactOldSecretWhenMetadataReadbackFails() throws {
+    @Test func serverPasswordEditRestoresExactOldSecretWhenMetadataReadbackFails() async throws {
         let suiteName = "sh.glas.test.server-edit-rollback.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -2522,8 +2523,8 @@ struct glas_shTests {
         )
         manager.servers = [server]
 
-        #expect(throws: ServerManagerError.persistenceReadbackMismatch) {
-            try manager.updateServerOrThrow(updatedServer, password: "new-secret")
+        await #expect(throws: ServerManagerError.persistenceReadbackMismatch) {
+            try await manager.updateServerOrThrow(updatedServer, password: "new-secret")
         }
         #expect(manager.servers == [server])
         #expect(passwordProbe.values[server.id] == "old-secret")
@@ -2531,7 +2532,7 @@ struct glas_shTests {
         #expect(try JSONDecoder().decode([ServerConfiguration].self, from: persistedData) == [server])
     }
 
-    @Test func passwordAuthChangeRestoresProfileAndSecretWhenDeletionFails() throws {
+    @Test func passwordAuthChangeRestoresProfileAndSecretWhenDeletionFails() async throws {
         let suiteName = "sh.glas.test.password-auth-rollback.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -2561,8 +2562,8 @@ struct glas_shTests {
         updatedServer.authMethod = .sshKey
         updatedServer.sshKeyID = UUID()
 
-        #expect(throws: CredentialMigrationProbeError.self) {
-            try manager.updateServerOrThrow(updatedServer)
+        await #expect(throws: CredentialMigrationProbeError.self) {
+            try await manager.updateServerOrThrow(updatedServer)
         }
         #expect(observedCommittedMetadata)
         #expect(manager.servers == [server])
@@ -2732,7 +2733,7 @@ struct glas_shTests {
         }
     }
 
-    @Test func invalidServerCatalogBlocksAddUpdateDeleteAndCredentialAccess() throws {
+    @Test func invalidServerCatalogBlocksAddUpdateDeleteAndCredentialAccess() async throws {
         let fixtures: [(String, Any)] = [
             ("malformed", Data("not-json".utf8)),
             ("oversized", Data(repeating: 0, count: ServerManager.maximumServerCatalogBytes + 1)),
@@ -2765,8 +2766,8 @@ struct glas_shTests {
             let server = migrationServer()
 
             #expect(manager.serverCatalogLoadError == .invalidServerCatalog)
-            #expect(throws: ServerManagerError.invalidServerCatalog) {
-                try manager.addServerOrThrow(server, password: "must-not-be-stored")
+            await #expect(throws: ServerManagerError.invalidServerCatalog) {
+                try await manager.addServerOrThrow(server, password: "must-not-be-stored")
             }
 
             // Exercise update and delete from a populated in-memory view to prove
@@ -2774,11 +2775,11 @@ struct glas_shTests {
             manager.servers = [server]
             var updated = server
             updated.name = "Must not persist"
-            #expect(throws: ServerManagerError.invalidServerCatalog) {
-                try manager.updateServerOrThrow(updated, password: "must-not-be-stored")
+            await #expect(throws: ServerManagerError.invalidServerCatalog) {
+                try await manager.updateServerOrThrow(updated, password: "must-not-be-stored")
             }
-            #expect(throws: ServerManagerError.invalidServerCatalog) {
-                try manager.deleteServer(server)
+            await #expect(throws: ServerManagerError.invalidServerCatalog) {
+                try await manager.deleteServer(server)
             }
 
             #expect(manager.servers == [server])
@@ -2954,7 +2955,7 @@ struct glas_shTests {
         #expect(TerminalServiceDraft.nextField(after: .sshKey, in: .sshKey) == nil)
     }
 
-    @Test func invalidPerConnectionTerminalGeometryFailsClosed() throws {
+    @Test func invalidPerConnectionTerminalGeometryFailsClosed() async throws {
         let fixture = migrationDefaults("invalid-terminal-geometry")
         defer { fixture.defaults.removePersistentDomain(forName: fixture.name) }
         var server = migrationServer()
@@ -2970,8 +2971,8 @@ struct glas_shTests {
             )
         )
 
-        #expect(throws: ServerManagerError.invalidServerCatalog) {
-            try manager.addServerOrThrow(server)
+        await #expect(throws: ServerManagerError.invalidServerCatalog) {
+            try await manager.addServerOrThrow(server)
         }
         #expect(manager.servers.isEmpty)
         let persisted = try #require(
@@ -2980,7 +2981,7 @@ struct glas_shTests {
         #expect(try JSONDecoder().decode([ServerConfiguration].self, from: persisted).isEmpty)
     }
 
-    @Test func invalidSSHKeyCatalogBlocksAddRenameDeleteAndSecretAccess() throws {
+    @Test func invalidSSHKeyCatalogBlocksAddRenameDeleteAndSecretAccess() async throws {
         let fixtures: [(String, Any)] = [
             ("malformed", Data("not-json".utf8)),
             ("oversized", Data(repeating: 0, count: SettingsManager.maximumSSHKeyCatalogBytes + 1)),
@@ -3048,8 +3049,8 @@ struct glas_shTests {
             #expect(throws: SettingsPersistenceError.self) {
                 try settings.renameSSHKeyOrThrow(existingKey.id, name: "Must not rename")
             }
-            #expect(throws: SettingsPersistenceError.self) {
-                try settings.deleteSSHKey(existingKey.id)
+            await #expect(throws: SettingsPersistenceError.self) {
+                try await settings.deleteSSHKey(existingKey.id)
             }
 
             #expect(settings.sshKeys == [existingKey])
@@ -3120,7 +3121,7 @@ struct glas_shTests {
         #expect(try JSONDecoder().decode([StoredSSHKey].self, from: persisted).isEmpty)
     }
 
-    @Test func sshKeyDeletionPersistsMetadataFirstAndRestoresSecretAndReferencesOnFailure() throws {
+    @Test func sshKeyDeletionPersistsMetadataFirstAndRestoresSecretAndReferencesOnFailure() async throws {
         let keySuiteName = "sh.glas.test.ssh-key-delete.\(UUID().uuidString)"
         let serverSuiteName = "sh.glas.test.ssh-key-server-delete.\(UUID().uuidString)"
         let keyDefaults = UserDefaults(suiteName: keySuiteName)!
@@ -3144,7 +3145,7 @@ struct glas_shTests {
         server.sshKeyID = keyID
         let serverManager = ServerManager(loadImmediately: false, defaults: serverDefaults)
         serverManager.servers = [server]
-        try serverManager.persistServersOrThrow()
+        try await serverManager.persistServersOrThrow()
         keyDefaults.set(try JSONEncoder().encode([key]), forKey: UserDefaultsKeys.sshKeys)
 
         let material = SSHKeyMaterial(
@@ -3183,8 +3184,8 @@ struct glas_shTests {
         )
         settings.sshKeys = [key]
 
-        #expect(throws: CredentialMigrationProbeError.self) {
-            try settings.deleteSSHKey(keyID, serverManager: serverManager)
+        await #expect(throws: CredentialMigrationProbeError.self) {
+            try await settings.deleteSSHKey(keyID, serverManager: serverManager)
         }
         #expect(observedMetadataRemoval)
         #expect(restoredSecret)
@@ -3252,7 +3253,7 @@ struct glas_shTests {
         #expect(restarted.sshKeyDeletionRecoveryError == nil)
     }
 
-    @Test func sshKeyDeletionRetainsActionableJournalWhenSecretRestoreReadbackDiffers() throws {
+    @Test func sshKeyDeletionRetainsActionableJournalWhenSecretRestoreReadbackDiffers() async throws {
         let suiteName = "sh.glas.test.ssh-key-delete-restore-mismatch.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -3296,7 +3297,7 @@ struct glas_shTests {
         settings.sshKeys = [key]
 
         do {
-            try settings.deleteSSHKey(key.id)
+            try await settings.deleteSSHKey(key.id)
             Issue.record("Secret restoration with mismatched readback must fail")
         } catch let error as SettingsPersistenceError {
             if case .rollbackFailed = error {
@@ -3327,7 +3328,7 @@ struct glas_shTests {
         #expect(storedMaterial?.privateKey.toData() == mismatched.privateKey.toData())
     }
 
-    @Test func sshKeyDeletionRollbackPreservesConcurrentSecretReplacement() throws {
+    @Test func sshKeyDeletionRollbackPreservesConcurrentSecretReplacement() async throws {
         let suiteName = "sh.glas.test.ssh-key-delete-concurrent-replacement.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -3377,8 +3378,8 @@ struct glas_shTests {
         )
         settings.sshKeys = [key]
 
-        #expect(throws: SettingsPersistenceError.self) {
-            try settings.deleteSSHKey(key.id)
+        await #expect(throws: SettingsPersistenceError.self) {
+            try await settings.deleteSSHKey(key.id)
         }
         #expect(restoreCount == 0)
         #expect(atomicAddAttemptCount == 1)
@@ -3389,7 +3390,7 @@ struct glas_shTests {
         #expect(journal.entries.first?.phase == .recoveryRequired)
     }
 
-    @Test func legacySecureEnclaveDeletionRollbackNeverDowngradesToImportedStorage() throws {
+    @Test func legacySecureEnclaveDeletionRollbackNeverDowngradesToImportedStorage() async throws {
         let suiteName = "sh.glas.test.ssh-key-delete-legacy-se.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -3429,8 +3430,8 @@ struct glas_shTests {
         )
         settings.sshKeys = [key]
 
-        #expect(throws: SettingsPersistenceError.self) {
-            try settings.deleteSSHKey(key.id)
+        await #expect(throws: SettingsPersistenceError.self) {
+            try await settings.deleteSSHKey(key.id)
         }
         #expect(atomicAddAttemptCount == 0)
         #expect(storedMaterial == nil)
@@ -3440,7 +3441,7 @@ struct glas_shTests {
         #expect(journal.entries.first?.phase == .recoveryRequired)
     }
 
-    @Test func legacySecureEnclaveDeletionAcceptsOnlyVerifiedHardwareBackedRecovery() throws {
+    @Test func legacySecureEnclaveDeletionAcceptsOnlyVerifiedHardwareBackedRecovery() async throws {
         let suiteName = "sh.glas.test.ssh-key-delete-legacy-se-verified.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -3482,8 +3483,8 @@ struct glas_shTests {
         )
         settings.sshKeys = [key]
 
-        #expect(throws: CredentialMigrationProbeError.self) {
-            try settings.deleteSSHKey(key.id)
+        await #expect(throws: CredentialMigrationProbeError.self) {
+            try await settings.deleteSSHKey(key.id)
         }
         #expect(provenanceVerificationCount == 1)
         #expect(atomicAddAttemptCount == 0)
@@ -3492,7 +3493,7 @@ struct glas_shTests {
         #expect(settings.sshKeyDeletionRecoveryError?.contains("restored and verified") == true)
     }
 
-    @Test func sshKeyDeletionRemovesPartialArtifactsWhenMaterialRetrievalIsNil() throws {
+    @Test func sshKeyDeletionRemovesPartialArtifactsWhenMaterialRetrievalIsNil() async throws {
         let suiteName = "sh.glas.test.ssh-key-delete-partial.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -3525,7 +3526,7 @@ struct glas_shTests {
         )
         settings.sshKeys = [key]
 
-        try settings.deleteSSHKey(key.id)
+        try await settings.deleteSSHKey(key.id)
 
         #expect(deleteCount == 1)
         #expect(!hasArtifacts)
@@ -3533,7 +3534,7 @@ struct glas_shTests {
         #expect(defaults.data(forKey: UserDefaultsKeys.sshKeyDeletionJournal) == nil)
     }
 
-    @Test func sshKeyDeletionFailureWithUnrecoverablePartialArtifactsFailsClosed() throws {
+    @Test func sshKeyDeletionFailureWithUnrecoverablePartialArtifactsFailsClosed() async throws {
         let suiteName = "sh.glas.test.ssh-key-delete-partial-failure.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -3565,8 +3566,8 @@ struct glas_shTests {
         )
         settings.sshKeys = [key]
 
-        #expect(throws: SettingsPersistenceError.self) {
-            try settings.deleteSSHKey(key.id)
+        await #expect(throws: SettingsPersistenceError.self) {
+            try await settings.deleteSSHKey(key.id)
         }
 
         #expect(!hasArtifacts)
@@ -3764,7 +3765,7 @@ struct glas_shTests {
         }
     }
 
-    @Test @MainActor func hostTrustMigrationMigratesGlobalOnlySource() throws {
+    @Test @MainActor func hostTrustMigrationMigratesGlobalOnlySource() async throws {
         let fixture = migrationDefaults("global")
         defer { fixture.defaults.removePersistentDomain(forName: fixture.name) }
         let entry = trustedHostEntry()
@@ -3780,6 +3781,7 @@ struct glas_shTests {
             hostTrustStore: probe.store
         )
         manager.loadServersIfNeeded()
+        await manager.legacyHostTrustMigration?.value
 
         #expect(manager.servers.isEmpty)
         #expect(probe.records.count == 1)
@@ -3796,7 +3798,7 @@ struct glas_shTests {
         #expect(report.verifiedCount == 1)
     }
 
-    @Test @MainActor func hostTrustMigrationCombinesAndDeduplicatesSources() throws {
+    @Test @MainActor func hostTrustMigrationCombinesAndDeduplicatesSources() async throws {
         let fixture = migrationDefaults("combined")
         defer { fixture.defaults.removePersistentDomain(forName: fixture.name) }
         let entry = trustedHostEntry()
@@ -3823,6 +3825,7 @@ struct glas_shTests {
             hostTrustStore: probe.store
         )
         manager.loadServersIfNeeded()
+        await manager.legacyHostTrustMigration?.value
 
         #expect(probe.saveCount == 1)
         #expect(probe.records.count == 1)
@@ -3837,7 +3840,7 @@ struct glas_shTests {
         #expect(report.duplicateCount == 1)
     }
 
-    @Test @MainActor func hostTrustMigrationRetainsInvalidLegacySources() throws {
+    @Test @MainActor func hostTrustMigrationRetainsInvalidLegacySources() async throws {
         let fixture = migrationDefaults("invalid")
         defer { fixture.defaults.removePersistentDomain(forName: fixture.name) }
         let invalid = TrustedHostKeyEntry(
@@ -3867,6 +3870,7 @@ struct glas_shTests {
             hostTrustStore: probe.store
         )
         manager.loadServersIfNeeded()
+        await manager.legacyHostTrustMigration?.value
 
         #expect(probe.saveCount == 0)
         #expect(fixture.defaults.data(forKey: UserDefaultsKeys.trustedHostKeys) == globalData)
@@ -3876,7 +3880,7 @@ struct glas_shTests {
         #expect(try migrationReport(from: fixture.defaults).state == .failed)
     }
 
-    @Test @MainActor func hostTrustMigrationRetainsSourcesWhenStoreFails() throws {
+    @Test @MainActor func hostTrustMigrationRetainsSourcesWhenStoreFails() async throws {
         let fixture = migrationDefaults("store-failure")
         defer { fixture.defaults.removePersistentDomain(forName: fixture.name) }
         let entry = trustedHostEntry()
@@ -3891,6 +3895,7 @@ struct glas_shTests {
             hostTrustStore: probe.store
         )
         manager.loadServersIfNeeded()
+        await manager.legacyHostTrustMigration?.value
 
         #expect(probe.saveCount == 1)
         #expect(fixture.defaults.data(forKey: UserDefaultsKeys.trustedHostKeys) == globalData)
@@ -3898,7 +3903,7 @@ struct glas_shTests {
         #expect(try migrationReport(from: fixture.defaults).state == .failed)
     }
 
-    @Test @MainActor func hostTrustMigrationRetainsSourcesOnExistingKeyConflict() throws {
+    @Test @MainActor func hostTrustMigrationRetainsSourcesOnExistingKeyConflict() async throws {
         let fixture = migrationDefaults("key-conflict")
         defer { fixture.defaults.removePersistentDomain(forName: fixture.name) }
         let legacyEntry = trustedHostEntry(key: "legacy-key")
@@ -3915,6 +3920,7 @@ struct glas_shTests {
             hostTrustStore: probe.store
         )
         manager.loadServersIfNeeded()
+        await manager.legacyHostTrustMigration?.value
 
         #expect(probe.saveCount == 0)
         #expect(fixture.defaults.data(forKey: UserDefaultsKeys.trustedHostKeys) == globalData)
@@ -3922,7 +3928,7 @@ struct glas_shTests {
         #expect(try migrationReport(from: fixture.defaults).failureCode == "conflicting-keys")
     }
 
-    @Test @MainActor func hostTrustMigrationRetainsSourcesWhenReadbackFails() throws {
+    @Test @MainActor func hostTrustMigrationRetainsSourcesWhenReadbackFails() async throws {
         let fixture = migrationDefaults("readback-failure")
         defer { fixture.defaults.removePersistentDomain(forName: fixture.name) }
         let entry = trustedHostEntry()
@@ -3937,6 +3943,7 @@ struct glas_shTests {
             hostTrustStore: probe.store
         )
         manager.loadServersIfNeeded()
+        await manager.legacyHostTrustMigration?.value
 
         #expect(probe.saveCount == 1)
         #expect(fixture.defaults.data(forKey: UserDefaultsKeys.trustedHostKeys) == globalData)
@@ -3944,7 +3951,7 @@ struct glas_shTests {
         #expect(try migrationReport(from: fixture.defaults).failureCode == "keychain-readback-mismatch")
     }
 
-    @Test @MainActor func hostTrustMigrationIsIdempotentAfterCompletion() throws {
+    @Test @MainActor func hostTrustMigrationIsIdempotentAfterCompletion() async throws {
         let fixture = migrationDefaults("idempotent")
         defer { fixture.defaults.removePersistentDomain(forName: fixture.name) }
         let entry = trustedHostEntry()
@@ -3954,19 +3961,23 @@ struct glas_shTests {
         )
         let probe = HostTrustStoreProbe()
 
-        _ = ServerManager(
+        // The migration now runs in a task the manager holds, so both managers have to be kept
+        // alive long enough to be awaited rather than discarded at the call.
+        let first = ServerManager(
             loadImmediately: true,
             defaults: fixture.defaults,
             hostTrustStore: probe.store
         )
+        await first.legacyHostTrustMigration?.value
         let firstSaveCount = probe.saveCount
         let firstReport = try migrationReport(from: fixture.defaults)
 
-        _ = ServerManager(
+        let second = ServerManager(
             loadImmediately: true,
             defaults: fixture.defaults,
             hostTrustStore: probe.store
         )
+        await second.legacyHostTrustMigration?.value
 
         #expect(firstSaveCount == 1)
         #expect(probe.saveCount == firstSaveCount)
@@ -3996,7 +4007,7 @@ struct glas_shTests {
         #expect(manager.server(for: server.id) == nil)
     }
 
-    @Test @MainActor func serverManagerToggleFavorite() {
+    @Test @MainActor func serverManagerToggleFavorite() async {
         let suiteName = "sh.glas.test.server-manager.toggle-favorite.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -4015,14 +4026,14 @@ struct glas_shTests {
         server.isFavorite = false
         manager.servers.append(server)
 
-        manager.toggleFavorite(server)
+        await manager.toggleFavorite(server)
         #expect(manager.servers.first?.isFavorite == true)
 
-        manager.toggleFavorite(manager.servers.first!)
+        await manager.toggleFavorite(manager.servers.first!)
         #expect(manager.servers.first?.isFavorite == false)
     }
 
-    @Test @MainActor func serverManagerUpdateServer() {
+    @Test @MainActor func serverManagerUpdateServer() async {
         let suiteName = "sh.glas.test.server-manager.update.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -4038,7 +4049,7 @@ struct glas_shTests {
         var updated = server
         updated.name = "Updated"
         updated.host = "updated.example.com"
-        manager.updateServer(updated)
+        await manager.updateServer(updated)
 
         #expect(manager.servers.first?.name == "Updated")
         #expect(manager.servers.first?.host == "updated.example.com")
@@ -8508,16 +8519,16 @@ struct glas_shTests {
         #expect(warnings.contains { $0.contains("Port is invalid") })
     }
 
-    @Test @MainActor func sshConfigImportSkipsUnresolvedIdentityWithoutChangingSavedProfile() throws {
+    @Test @MainActor func sshConfigImportSkipsUnresolvedIdentityWithoutChangingSavedProfile() async throws {
         let suite = "sh.glas.tests.ssh-import.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let settings = SettingsManager(loadImmediately: false, settingsDefaults: defaults)
         let manager = ServerManager(defaults: defaults)
         let original = ServerConfiguration(name: "dev", host: "original.example.com", username: "original")
-        try manager.addServerOrThrow(original)
+        try await manager.addServerOrThrow(original)
 
-        let result = settings.importSSHConfig("""
+        let result = await settings.importSSHConfig("""
         Host dev
           HostName changed.example.com
           User deploy
@@ -8532,13 +8543,13 @@ struct glas_shTests {
         #expect(manager.servers.first?.authMethod == original.authMethod)
     }
 
-    @Test @MainActor func sshConfigImportReportsPersistenceFailureWithoutPublishingProfile() throws {
+    @Test @MainActor func sshConfigImportReportsPersistenceFailureWithoutPublishingProfile() async throws {
         let suite = "sh.glas.tests.ssh-import-failure.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let settings = SettingsManager(loadImmediately: false, settingsDefaults: defaults)
         let manager = ServerManager(defaults: defaults, serverDataWriter: { _ in })
-        let result = settings.importSSHConfig("Host dev\n User deploy", serverManager: manager)
+        let result = await settings.importSSHConfig("Host dev\n User deploy", serverManager: manager)
         #expect(result.imported == 0)
         #expect(result.skipped == 1)
         #expect(result.warnings.contains { $0.contains("Could not save") })

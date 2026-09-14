@@ -46,6 +46,45 @@ struct HostTrustMigrationStore {
     )
 }
 
+/// Where the terminal's saved servers actually live.
+///
+/// Shaped after the database's `ConnectionPersistenceStore` (`ConnectionManager.swift:31-54`),
+/// which had this seam before the terminal did: load, save, and a restore for rollback. The
+/// terminal's *writes* were already injectable (`serverDataWriter`) but its *reads* went straight
+/// to `UserDefaults`, so the store could never actually be swapped — which is what D26 needs.
+///
+/// `save` is async because the catalog behind it is an actor (`HostCatalogStore`). Everything the
+/// caller relies on is unchanged by that: the readback check still happens before `save` returns,
+/// so a failed write is still a thrown error and still reaches the rollback that follows it.
+@MainActor
+struct ServerPersistenceStore {
+    /// The stored catalog's bytes, or nil when nothing has ever been written.
+    let load: () -> Data?
+    /// Whether *anything* is stored, whatever its type. `UserDefaults` returns nil from
+    /// `data(forKey:)` for a value of the wrong persisted type, and that is corruption rather than
+    /// an empty catalog — a distinction `loadServers` has always drawn and must keep drawing.
+    let hasStoredValue: () -> Bool
+    let save: (Data) async throws -> Void
+    /// Puts back exactly what was there, including "nothing". Used by the one rollback that
+    /// restores the catalog without going through an encode.
+    let restore: (Data?) async throws -> Void
+
+    static func live(defaults: UserDefaults) -> ServerPersistenceStore {
+        ServerPersistenceStore(
+            load: { defaults.data(forKey: UserDefaultsKeys.servers) },
+            hasStoredValue: { defaults.object(forKey: UserDefaultsKeys.servers) != nil },
+            save: { data in defaults.set(data, forKey: UserDefaultsKeys.servers) },
+            restore: { data in
+                if let data {
+                    defaults.set(data, forKey: UserDefaultsKeys.servers)
+                } else {
+                    defaults.removeObject(forKey: UserDefaultsKeys.servers)
+                }
+            }
+        )
+    }
+}
+
 @MainActor
 struct ServerPasswordStore {
     let retrieve: (ServerConfiguration) throws -> String
@@ -191,8 +230,15 @@ class ServerManager {
     private let credentialMigrationMetadata: CredentialMigrationMetadata
     private let defersLiveCredentialMigration: Bool
     private let passwordStore: ServerPasswordStore
-    private let serverDataWriter: (Data) -> Void
+    private let store: ServerPersistenceStore
 
+    /// The legacy host-trust migration kicked off by `loadServers`. Await it when the migration's
+    /// result is what is being observed; it is nil when no load has happened.
+    private(set) var legacyHostTrustMigration: Task<Void, Never>?
+
+    /// `serverDataWriter` predates `store` and is kept because a dozen tests drive failure through
+    /// it. When given, it replaces only the write half; reads and rollback stay where they were,
+    /// which is what those tests assume. New callers pass `store`.
     init(
         loadImmediately: Bool = true,
         defaults: UserDefaults? = nil,
@@ -200,6 +246,7 @@ class ServerManager {
         credentialMigrationStore: CredentialMigrationStore? = nil,
         credentialMigrationMetadata: CredentialMigrationMetadata = .unavailable,
         passwordStore: ServerPasswordStore? = nil,
+        store: ServerPersistenceStore? = nil,
         serverDataWriter: ((Data) -> Void)? = nil
     ) {
         self.defaults = defaults ?? SharedDefaults.defaults
@@ -210,8 +257,18 @@ class ServerManager {
         self.defersLiveCredentialMigration = credentialMigrationStore == nil && defaults == nil
         self.passwordStore = passwordStore ?? .live
         let resolvedDefaults = defaults ?? SharedDefaults.defaults
-        self.serverDataWriter = serverDataWriter ?? { data in
-            resolvedDefaults.set(data, forKey: UserDefaultsKeys.servers)
+        let liveStore = ServerPersistenceStore.live(defaults: resolvedDefaults)
+        if let store {
+            self.store = store
+        } else if let serverDataWriter {
+            self.store = ServerPersistenceStore(
+                load: liveStore.load,
+                hasStoredValue: liveStore.hasStoredValue,
+                save: { data in serverDataWriter(data) },
+                restore: liveStore.restore
+            )
+        } else {
+            self.store = liveStore
         }
         if loadImmediately {
             loadServersIfNeeded()
@@ -227,14 +284,14 @@ class ServerManager {
     func loadServers() {
         do {
             let loadedServers: [ServerConfiguration]
-            let persistedCatalogObject = defaults.object(forKey: UserDefaultsKeys.servers)
-            let persistedCatalog = defaults.data(forKey: UserDefaultsKeys.servers)
+            let hasStoredCatalog = store.hasStoredValue()
+            let persistedCatalog = store.load()
             if let data = persistedCatalog {
                 guard data.count <= Self.maximumServerCatalogBytes else {
                     throw ServerManagerError.invalidServerCatalog
                 }
                 loadedServers = try JSONDecoder().decode([ServerConfiguration].self, from: data)
-            } else if persistedCatalogObject == nil {
+            } else if !hasStoredCatalog {
                 loadedServers = []
             } else {
                 // UserDefaults returns nil from data(forKey:) for a value of the
@@ -254,7 +311,18 @@ class ServerManager {
                 Logger.keychain.error("Server credential deletion recovery did not complete: \(error.localizedDescription)")
             }
             migrateLegacyCredentialsIfNeeded(from: servers)
-            migrateLegacyHostTrustIfNeeded(from: servers)
+            // The host-trust migration writes the catalog, which is now an async store, while
+            // `loadServers` stays synchronous because `init` calls it. The task is held rather
+            // than detached so anything that needs the migration finished can wait for it —
+            // `loadServers` alone no longer guarantees it has run.
+            //
+            // D26 removes this migration entirely along with the defaults-backed catalog: it
+            // reads `sh.glas.app`'s legacy `trustedHostKeys`, and the decision is that the new
+            // build reads nothing old.
+            legacyHostTrustMigration = Task { @MainActor [weak self] in
+                guard let self else { return }
+                await self.migrateLegacyHostTrustIfNeeded(from: self.servers)
+            }
         } catch {
             Logger.servers.error("Failed to load servers: \(error)")
             // Retain both the previously verified in-memory catalog and a durable
@@ -295,50 +363,50 @@ class ServerManager {
         }
     }
 
-    func saveServers() {
+    func saveServers() async {
         do {
-            try persistServersAndVerify(servers)
+            try await persistServersAndVerify(servers)
             WidgetCenter.shared.reloadAllTimelines()
         } catch {
             Logger.servers.error("Failed to save servers: \(error)")
         }
     }
 
-    func persistServersOrThrow() throws {
-        try persistServersAndVerify(servers)
+    func persistServersOrThrow() async throws {
+        try await persistServersAndVerify(servers)
         WidgetCenter.shared.reloadAllTimelines()
     }
 
-    func addServer(_ server: ServerConfiguration) {
+    func addServer(_ server: ServerConfiguration) async {
         do {
-            try addServerOrThrow(server)
+            try await addServerOrThrow(server)
         } catch {
             Logger.servers.error("Failed to add server: \(error.localizedDescription)")
         }
     }
 
-    func updateServer(_ server: ServerConfiguration) {
+    func updateServer(_ server: ServerConfiguration) async {
         do {
-            try updateServerOrThrow(server)
+            try await updateServerOrThrow(server)
         } catch {
             Logger.servers.error("Failed to update server: \(error.localizedDescription)")
         }
     }
 
-    func addServerOrThrow(_ server: ServerConfiguration, password: String? = nil) throws {
+    func addServerOrThrow(_ server: ServerConfiguration, password: String? = nil) async throws {
         try ensureServerCatalogAvailable()
         guard !servers.contains(where: { $0.id == server.id }) else {
             throw ServerManagerError.serverAlreadyExists
         }
         let candidateServers = servers + [server]
         if let password {
-            try stagePasswordAndPersist(password, for: server, candidateServers: candidateServers)
+            try await stagePasswordAndPersist(password, for: server, candidateServers: candidateServers)
         } else {
-            try persistServerMutation(candidateServers)
+            try await persistServerMutation(candidateServers)
         }
     }
 
-    func updateServerOrThrow(_ server: ServerConfiguration, password: String? = nil) throws {
+    func updateServerOrThrow(_ server: ServerConfiguration, password: String? = nil) async throws {
         try ensureServerCatalogAvailable()
         guard let index = servers.firstIndex(where: { $0.id == server.id }) else {
             throw ServerManagerError.serverNotFound
@@ -348,14 +416,14 @@ class ServerManager {
         candidateServers[index] = server
 
         if let password {
-            try stagePasswordAndPersist(password, for: server, candidateServers: candidateServers)
+            try await stagePasswordAndPersist(password, for: server, candidateServers: candidateServers)
         } else if originalServer.authMethod == .password && server.authMethod != .password {
-            try removePasswordAndPersist(
+            try await removePasswordAndPersist(
                 for: originalServer,
                 candidateServers: candidateServers
             )
         } else {
-            try persistServerMutation(candidateServers)
+            try await persistServerMutation(candidateServers)
         }
     }
 
@@ -368,7 +436,7 @@ class ServerManager {
         servers.first { $0.id == id }
     }
 
-    func deleteServer(_ server: ServerConfiguration) throws {
+    func deleteServer(_ server: ServerConfiguration) async throws {
         try ensureServerCatalogAvailable()
         guard servers.contains(where: { $0.id == server.id }) else {
             throw ServerManagerError.serverNotFound
@@ -394,14 +462,14 @@ class ServerManager {
         }
 
         do {
-            try persistServersAndVerify(remainingServers)
+            try await persistServersAndVerify(remainingServers)
             try deletePasswordAndVerifyAbsence(for: server.id)
             journal.entries.removeAll { $0.serverID == server.id }
             try persistCredentialDeletionJournal(journal)
         } catch {
             do {
                 try passwordRollback.restore()
-                try persistServersAndVerify(originalServers)
+                try await persistServersAndVerify(originalServers)
                 journal.entries.removeAll { $0.serverID == server.id }
                 try persistCredentialDeletionJournal(journal)
             } catch {
@@ -417,7 +485,7 @@ class ServerManager {
     /// Removes the isolated UI-test fixture and its cross-app compatibility
     /// credential. The fixed documentation-only endpoint prevents this test
     /// hook from matching a real host.
-    func purgeConnectionLibraryUITestFixtures() throws {
+    func purgeConnectionLibraryUITestFixtures() async throws {
         try ensureServerCatalogAvailable()
         let fixtures = servers.filter {
             $0.name.hasPrefix(Self.connectionLibraryUITestNamePrefix)
@@ -427,7 +495,7 @@ class ServerManager {
                 && $0.authMethod == .password
         }
         for server in fixtures {
-            try deleteServer(server)
+            try await deleteServer(server)
         }
 
         let compatibilityReference = ServerConfiguration(
@@ -445,31 +513,31 @@ class ServerManager {
     static let connectionLibraryUITestUsername = "ui-test"
     #endif
 
-    func updateLastConnected(_ serverID: UUID) {
+    func updateLastConnected(_ serverID: UUID) async {
         do {
             try ensureServerCatalogAvailable()
             guard let index = servers.firstIndex(where: { $0.id == serverID }) else { return }
             var candidateServers = servers
             candidateServers[index].lastConnected = Date()
-            try persistServerMutation(candidateServers)
+            try await persistServerMutation(candidateServers)
         } catch {
             Logger.servers.error("Failed to update recent server metadata: \(error.localizedDescription)")
         }
     }
 
-    func toggleFavorite(_ server: ServerConfiguration) {
+    func toggleFavorite(_ server: ServerConfiguration) async {
         do {
             try ensureServerCatalogAvailable()
             guard let index = servers.firstIndex(where: { $0.id == server.id }) else { return }
             var candidateServers = servers
             candidateServers[index].isFavorite.toggle()
-            try persistServerMutation(candidateServers)
+            try await persistServerMutation(candidateServers)
         } catch {
             Logger.servers.error("Failed to update favorite server metadata: \(error.localizedDescription)")
         }
     }
 
-    func trustHostKey(_ challenge: HostKeyTrustChallenge, for serverID: UUID) throws {
+    func trustHostKey(_ challenge: HostKeyTrustChallenge, for serverID: UUID) async throws {
         try ensureServerCatalogAvailable()
         guard let index = servers.firstIndex(where: { $0.id == serverID }) else {
             throw ServerManagerError.serverNotFound
@@ -481,14 +549,14 @@ class ServerManager {
         try KeychainManager.replaceHostKey(with: challenge)
 
         servers[index].trustedHostKeys = nil
-        saveServers()
+        await saveServers()
     }
 
     private func stagePasswordAndPersist(
         _ password: String,
         for server: ServerConfiguration,
         candidateServers: [ServerConfiguration]
-    ) throws {
+    ) async throws {
         let originalServers = servers
         let passwordRollback = try passwordStore.prepareRollback(server)
         do {
@@ -496,11 +564,11 @@ class ServerManager {
             guard try passwordStore.retrieve(server) == password else {
                 throw ServerManagerError.credentialReadbackMismatch
             }
-            try persistServersAndVerify(candidateServers)
+            try await persistServersAndVerify(candidateServers)
         } catch {
             do {
                 try passwordRollback.restore()
-                try persistServersAndVerify(originalServers)
+                try await persistServersAndVerify(originalServers)
             } catch {
                 throw ServerManagerError.rollbackFailed
             }
@@ -513,7 +581,7 @@ class ServerManager {
     private func removePasswordAndPersist(
         for server: ServerConfiguration,
         candidateServers: [ServerConfiguration]
-    ) throws {
+    ) async throws {
         let originalServers = servers
         let passwordRollback = try passwordStore.prepareRollback(server)
         var journal = try loadCredentialDeletionJournal()
@@ -533,14 +601,14 @@ class ServerManager {
             try persistCredentialDeletionJournal(journal)
         }
         do {
-            try persistServersAndVerify(candidateServers)
+            try await persistServersAndVerify(candidateServers)
             try deletePasswordAndVerifyAbsence(for: server.id)
             journal.entries.removeAll { $0.serverID == server.id }
             try persistCredentialDeletionJournal(journal)
         } catch {
             do {
                 try passwordRollback.restore()
-                try persistServersAndVerify(originalServers)
+                try await persistServersAndVerify(originalServers)
                 journal.entries.removeAll { $0.serverID == server.id }
                 try persistCredentialDeletionJournal(journal)
             } catch {
@@ -552,14 +620,14 @@ class ServerManager {
         WidgetCenter.shared.reloadAllTimelines()
     }
 
-    private func persistServerMutation(_ candidateServers: [ServerConfiguration]) throws {
+    private func persistServerMutation(_ candidateServers: [ServerConfiguration]) async throws {
         try ensureServerCatalogAvailable()
         let originalServers = servers
         do {
-            try persistServersAndVerify(candidateServers)
+            try await persistServersAndVerify(candidateServers)
         } catch {
             do {
-                try persistServersAndVerify(originalServers)
+                try await persistServersAndVerify(originalServers)
             } catch {
                 throw ServerManagerError.rollbackFailed
             }
@@ -654,7 +722,7 @@ class ServerManager {
         WidgetCenter.shared.reloadAllTimelines()
     }
 
-    private func migrateLegacyHostTrustIfNeeded(from loadedServers: [ServerConfiguration]) {
+    private func migrateLegacyHostTrustIfNeeded(from loadedServers: [ServerConfiguration]) async {
         let previousVersion = defaults.integer(forKey: UserDefaultsKeys.hostTrustMigrationVersion)
         let globalData = defaults.data(forKey: UserDefaultsKeys.trustedHostKeys)
         let hasServerEntries = loadedServers.contains { $0.trustedHostKeys != nil }
@@ -765,7 +833,7 @@ class ServerManager {
             for index in sanitizedServers.indices {
                 sanitizedServers[index].trustedHostKeys = nil
             }
-            try commitLegacySourceRemoval(
+            try await commitLegacySourceRemoval(
                 sanitizedServers: sanitizedServers,
                 originalServers: loadedServers,
                 originalGlobalData: globalData,
@@ -806,10 +874,10 @@ class ServerManager {
         originalGlobalData: Data?,
         originalMigrationVersion: Int,
         verifiedReport: HostTrustMigrationReport
-    ) throws {
+    ) async throws {
         let originalServersData = defaults.data(forKey: UserDefaultsKeys.servers)
         do {
-            try persistServersAndVerify(sanitizedServers)
+            try await persistServersAndVerify(sanitizedServers)
             defaults.removeObject(forKey: UserDefaultsKeys.trustedHostKeys)
             guard defaults.data(forKey: UserDefaultsKeys.trustedHostKeys) == nil else {
                 throw HostTrustMigrationError.persistenceReadbackMismatch
@@ -857,15 +925,20 @@ class ServerManager {
         }
     }
 
-    private func persistServersAndVerify(_ candidateServers: [ServerConfiguration]) throws {
+    /// Writes the catalog and proves it landed.
+    ///
+    /// The readback compares *decoded* servers rather than bytes, because two encodings of the
+    /// same catalog are the same catalog and a byte comparison would fail a store that round-trips
+    /// through anything but the exact encoder used here.
+    private func persistServersAndVerify(_ candidateServers: [ServerConfiguration]) async throws {
         try ensureServerCatalogAvailable()
         try Self.validateServerCatalog(candidateServers)
         let data = try JSONEncoder().encode(candidateServers)
         guard data.count <= Self.maximumServerCatalogBytes else {
             throw ServerManagerError.invalidServerCatalog
         }
-        serverDataWriter(data)
-        guard let persistedData = defaults.data(forKey: UserDefaultsKeys.servers),
+        try await store.save(data)
+        guard let persistedData = store.load(),
               let persistedServers = try? JSONDecoder().decode([ServerConfiguration].self, from: persistedData),
               persistedServers == candidateServers else {
             throw ServerManagerError.persistenceReadbackMismatch

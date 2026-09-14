@@ -1167,3 +1167,39 @@ mutation ends in `load()`, which syncs. Checking the callers of the callers corr
 W4 (the 40-item parity sweep), W5 (spatial on the headset). The user has asked for all four parity
 gaps: desktop on Vision Pro, desktop on iPhone/iPad, remembered dividers everywhere, and SSH key
 records — the last of which the sync decision subsumes.
+
+## 2026-09-14 — the remainder planned end to end
+
+**State PLAN.** Owner: coordinating agent. Tree clean at `57bca0b`; nothing built from this plan.
+
+Authorization: *"Please create a thorough plan for the remainder of the work. Reuse is essential,
+we're working on a professional and public codebase. Be precise in your edits."*
+
+[The remaining work](tasks/2026-09/2026-09-14_remaining-work-plan.md) covers D26 stages 1–5, Stage 4
+W3–W6, Stage 4.5 items 3–8, the carried-over items, and Stages 5–6, each with the existing
+implementation it extends and the line it extends at.
+
+**Four things the survey changed, all measured rather than remembered:**
+
+1. **D26 has no identity migration.** `EndpointID.rawValue` is already each capability's record UUID
+   in all three (`GlassTerminalCapability.swift:198`, `GlassDatabaseCapability.swift:116`,
+   `GlassDesktopCapability.swift:90`). Stage 1 relocates bytes and re-keys nothing.
+2. **The database already has the seam the other two need.** `ConnectionPersistenceStore`
+   (`ConnectionManager.swift:31-54`) is an injectable load/save/restore triple with a readback check.
+   The terminal's reads bypass its own injection point (`ServerManager.swift:229-231` against the
+   `serverDataWriter` at `:196-215`); the desktop has a file-backed actor to delete outright.
+3. **Stage 1 shrinks stage 2.** Once a configuration lives on the link, a tombstone takes it along,
+   so the synced-deletion cascade has only Keychain credentials left to clean up.
+4. **The abandoned test defaults suites are 17,905, not 4,112 — and the tests are not at fault.**
+   `MacWorkspaceTests.swift:2502-2520` balances 24 fixtures against 24 `cleanup()` calls;
+   `removePersistentDomain` empties the domain and leaves a 42-byte empty plist behind. Sweeping the
+   files fixes today and changes nothing. Naming each suite after its test rather than a fresh
+   `UUID()` bounds the count — proposed, not decided.
+
+**The magic directive** (*"familiar to a Mac user, but visionOS magic to use"*) is recorded in the
+plan as binding two items: the key manager, which is the only genuinely new surface in the whole
+remainder, and Stage 4 W5. Both are designed on the headset's terms and adapted down.
+
+**Next action:** the user's go on D26 stage 1, starting with the terminal — it is the one capability
+with a second index over the same data, so its call sites surface the questions the other two will
+not.

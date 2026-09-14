@@ -81,14 +81,16 @@ struct TerminalConnectFlow: ViewModifier {
                     rejectStrictHostKeyChallenge(challenge, for: session)
                     return
                 }
-                do {
-                    try sessionManager.trustHostKey(challenge, for: session)
-                    retryPendingConnection()
-                } catch {
-                    connectionFailureMessage = error.localizedDescription
-                    report(.failed(error.localizedDescription), for: session.server.id)
-                    sessionManager.closePendingHostTrustSession(session)
-                    clearPendingTrustPrompt()
+                Task { @MainActor in
+                    do {
+                        try await sessionManager.trustHostKey(challenge, for: session)
+                        retryPendingConnection()
+                    } catch {
+                        connectionFailureMessage = error.localizedDescription
+                        report(.failed(error.localizedDescription), for: session.server.id)
+                        sessionManager.closePendingHostTrustSession(session)
+                        clearPendingTrustPrompt()
+                    }
                 }
             }
             Button("Cancel", role: .cancel) {
@@ -189,12 +191,14 @@ struct TerminalConnectFlow: ViewModifier {
             presenting: serverPendingDeletion
         ) { server in
             Button("Delete \(server.name)", role: .destructive) {
-                do {
-                    try serverManager.deleteServer(server)
-                    serverPendingDeletion = nil
-                } catch {
-                    connectionFailureMessage = "The server was not deleted because its saved credential could not be removed: \(error.localizedDescription)"
-                    serverPendingDeletion = nil
+                Task { @MainActor in
+                    do {
+                        try await serverManager.deleteServer(server)
+                        serverPendingDeletion = nil
+                    } catch {
+                        connectionFailureMessage = "The server was not deleted because its saved credential could not be removed: \(error.localizedDescription)"
+                        serverPendingDeletion = nil
+                    }
                 }
             }
             .accessibilityIdentifier("connection-library-confirm-delete-server")
@@ -744,7 +748,7 @@ struct TerminalConnectFlow: ViewModifier {
     ) async -> String? {
         if let savedServer = serverManager.server(for: server.id) {
             do {
-                try serverManager.updateServerOrThrow(savedServer, password: password)
+                try await serverManager.updateServerOrThrow(savedServer, password: password)
                 connectToServer(savedServer, purpose: pendingConnectionPurpose)
                 return nil
             } catch {

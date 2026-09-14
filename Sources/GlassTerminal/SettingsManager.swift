@@ -835,7 +835,7 @@ class SettingsManager {
         }
     }
 
-    func deleteSSHKey(_ keyID: UUID, serverManager: ServerManager? = nil) throws {
+    func deleteSSHKey(_ keyID: UUID, serverManager: ServerManager? = nil) async throws {
         try ensureSSHKeyCatalogAvailable()
         guard let keyMetadata = sshKeys.first(where: { $0.id == keyID }) else {
             throw SecretStoreError.notFound
@@ -879,7 +879,7 @@ class SettingsManager {
 
         do {
             try persistSSHKeysAndVerify(sshKeys)
-            try serverManager?.persistServersOrThrow()
+            try await serverManager?.persistServersOrThrow()
             if let index = journal.entries.firstIndex(where: { $0.key.id == keyID }) {
                 journal.entries[index].phase = .metadataRemoved
             }
@@ -891,7 +891,7 @@ class SettingsManager {
             }
             do {
                 try persistSSHKeysAndVerify(originalKeys)
-                try serverManager?.persistServersOrThrow()
+                try await serverManager?.persistServersOrThrow()
             } catch {
                 sshKeyDeletionRecoveryError = SettingsPersistenceError.rollbackFailed.localizedDescription
                 throw SettingsPersistenceError.rollbackFailed
@@ -928,7 +928,7 @@ class SettingsManager {
             }
             do {
                 try persistSSHKeysAndVerify(originalKeys)
-                try serverManager?.persistServersOrThrow()
+                try await serverManager?.persistServersOrThrow()
             } catch {
                 rollbackSucceeded = false
             }
@@ -987,7 +987,7 @@ class SettingsManager {
         material.privateKey.toUTF8String()?.hasPrefix("SECURE_ENCLAVE_P256:") == true
     }
 
-    func importSSHConfig(_ text: String, serverManager: ServerManager) -> SSHConfigImportResult {
+    func importSSHConfig(_ text: String, serverManager: ServerManager) async -> SSHConfigImportResult {
         serverManager.loadServersIfNeeded()
         let (entries, parserWarnings) = SSHConfigParser.parse(text)
         var warnings = parserWarnings
@@ -1032,7 +1032,7 @@ class SettingsManager {
                     server.authMethod = authMethod
                     server.sshKeyPath = identityFile
                     server.sshKeyID = matchedKeyID
-                    try serverManager.updateServerOrThrow(server)
+                    try await serverManager.updateServerOrThrow(server)
                     updated += 1
                 } else {
                     let server = ServerConfiguration(
@@ -1045,7 +1045,7 @@ class SettingsManager {
                         sshKeyID: matchedKeyID,
                         tags: ["imported"]
                     )
-                    try serverManager.addServerOrThrow(server)
+                    try await serverManager.addServerOrThrow(server)
                     imported += 1
                 }
             } catch {
