@@ -142,3 +142,25 @@ entries that had accumulated there were cleaned out.
 
 948 tests / 90 suites. **Open:** the glass is over-transparent and needs a look decision; the
 Tailscale panel; SSH key records over CloudKit; abandoned test defaults suites.
+
+## 2026-09-14 — Stage 4 W1: the engines moved
+
+[Stage 4 and 4.5 plan](2026-09-13_stage-4-plan.md)
+
+`Packages/RDPKit` (vendored fork, LICENSE + patch record + capability ledger intact, `Examples/`
+left behind), `Sources/VNCKit`, `Sources/GlassRDPTransport`, `Sources/GlassVNCTransport`,
+`Documentation/ThirdPartyLicenses/`, and a new root `THIRD-PARTY-NOTICES.md`.
+
+**Proven, not reasoned:** `Package.resolved` is byte-identical after the move — no new package
+entered the graph, swift-nio stays 2.102.0 and swift-nio-ssl 2.37.4. RDPKit's two `exact:` pins were
+relaxed to `from:` and the change recorded in `GLASSDT-PATCHES.md`, so a nested package no longer
+freezes NIO for the SSH and database stacks.
+
+**Tests: root package 985 / 96 (was 948 / 90), RDPKit 1014 in its own package — 1,999 total.**
+macOS, iOS Simulator and visionOS Simulator all build. ZRLE decodes real byte vectors through the
+system zlib, so the restated `linkedLibrary("z")` is verified rather than assumed.
+
+Also: the glass default moved to `.regular` (sidebar weight) with a one-time adoption for untouched
+stored state, and the three `.ultraThin` literals in `GlassLayerLegacy` now follow the default — an
+absent material key is not a user choice. A new test migrates the **real** settings still held by
+`sh.glas.app` and `app.glassdb` rather than invented fixtures.

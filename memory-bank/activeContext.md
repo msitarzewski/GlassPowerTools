@@ -1108,3 +1108,32 @@ on the Mac unaided. That closes item 2 of the Stage 3.5 device checklist and is 
 D19's transport works rather than only its merge rules.
 
 **Next action:** the glass decision, then the Tailscale panel, then Stage 4.
+
+## 2026-09-14 — the glass decision made; Stage 4 planned
+
+**State: BUILD (glass, done) → PLAN (Stage 4).** Owner: coordinating agent. Working tree has
+uncommitted changes; **nothing committed this session** — the user commits.
+
+**The glass decision is closed.** The user chose the sidebar-weight material.
+`GlassLayerState.default` is now `.regular`, and — the part that would have made it a no-op — the
+store adopts it for anyone whose stored state is byte-for-byte the *old* default, since that value
+was written by the store on first launch and never chosen. A `glass.layers.defaultRevision` stamp,
+set unconditionally on every init, makes the adoption run exactly once, so a user who later picks
+"Light" keeps it. Found by reading the consumer, not the declaration: the user's own
+`~/Library/Preferences/com.glasspowertools.plist` held `{"opacity":0,"frost":1,"material":"ultraThin"}`,
+so the default was never going to be consulted.
+
+Verified: `swift test --filter GlassLayers` **27 tests / 4 suites**, and both new tests were watched
+**failing** with the logic defeated before being trusted. macOS app **BUILD SUCCEEDED**.
+
+**Stage 4 is planned** in [the Stage 4 plan](2026-09-13_stage-4-plan.md), from a measured survey
+rather than the 2026-09-10 draft's estimates. Authorization: *"GlassDT works… feature for feature …
+please create a plan to migrate the functionality"* and *"focus on the desktop screen sharing
+features."* Key findings: glassDT's packages are **72,492 lines**, not the ~5,600 `AGENTS.md`
+records; **~41,500 lines actually ship** (27,900 is test code, 8,510 is example apps that do not
+move); the engine move adds **zero new external packages** because RDPKit's two `exact:` pins are
+already what this project resolves; and **VNC/Apple Screen Sharing moves into Stage 4** because the
+only reason it was deferred — sibling apps unable to decode a `.vnc` kind — is void.
+
+**Next action:** the user's approval of the plan, and its three open decisions. Two read-only
+surveys of glassDT are still running to add the feature-for-feature parity checklist.
