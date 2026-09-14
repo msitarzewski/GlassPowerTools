@@ -55,6 +55,34 @@ nonisolated enum UserDefaultsKeys {
 
 nonisolated enum SharedDefaults {
     static let suiteName = "group.sh.glas.shared"
+
+    /// A per-run defaults suite while a UI test is driving the app, so a test never writes into
+    /// the user's real store.
+    ///
+    /// **The catalog was isolated and this was not.** `GlassPowerToolsApp.init` gives the shell an
+    /// isolated directory under `--ui-testing`, but the terminal's servers, themes and preferences
+    /// go through `SharedDefaults` — `UserDefaults.standard` on the Mac — which had no such
+    /// treatment. Every UI run therefore appended its fixtures to the real saved-server list:
+    /// 122 entries had accumulated there by 2026-09-13, of which four were genuine. They surfaced
+    /// in Connect Saved Host, where a `probe@editable.example` is plainly not a machine anyone owns.
+    ///
+    /// Debug-only, and keyed on the same argument the shell uses, so there is one signal for
+    /// "this is a test run" rather than two that can disagree.
+    /// Computed rather than stored: `UserDefaults` is thread-safe but not `Sendable`, so a static
+    /// constant of it is rejected under strict concurrency. Resolving it per access costs an
+    /// argument scan and is only reached in a Debug test run.
+    private static var testSuite: UserDefaults? {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "--ui-testing"),
+              arguments.indices.contains(index + 1),
+              let identifier = UUID(uuidString: arguments[index + 1]) else { return nil }
+        return UserDefaults(suiteName: "\(suiteName).uitests.\(identifier.uuidString)")
+        #else
+        return nil
+        #endif
+    }
+
     #if os(macOS)
     static let legacyMacBundleIdentifier = "sh.glas.mac"
     static let legacyMacDomainMigrationSentinel = "legacyMacDomainMigrationComplete"
@@ -62,9 +90,9 @@ nonisolated enum SharedDefaults {
     // The Mac terminal must remain outside App Sandbox so it can launch the
     // user's shell and PTYs. App Group containers require sandbox membership,
     // so Mac metadata belongs in its bundle-scoped defaults domain instead.
-    static var defaults: UserDefaults { .standard }
+    static var defaults: UserDefaults { testSuite ?? .standard }
     #else
-    static var defaults: UserDefaults { UserDefaults(suiteName: suiteName)! }
+    static var defaults: UserDefaults { testSuite ?? UserDefaults(suiteName: suiteName)! }
     #endif
 
     static let schemaVersionKey = "sharedSchemaVersion"
