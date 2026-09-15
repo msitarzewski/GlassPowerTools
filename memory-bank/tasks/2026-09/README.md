@@ -192,3 +192,18 @@ SSH keys are shared, and detaching one from the key side has two consequences th
 the point of choice.
 
 Also swept 35,865 abandoned test defaults plists and 23 test host catalogs from the developer Mac.
+
+## 2026-09-14 (evening) — D27 and D28 planned from a full surface survey
+
+[D27/D28 plan](2026-09-14_d27-d28-plan.md)
+
+Every construction of a saved record enumerated across the three capabilities: **D27 has exactly two
+live targets** (Add Server incl. the Tailscale draft, and `ssh_config` import); Tailscale Quick
+Connect is transient, and the database and desktop have no link-less path.
+
+Two findings the survey produced that the design did not anticipate: **`RDPFileImporter` has zero
+references anywhere in the repository** (212 lines, moved in Stage 4 W1, never wired — the eighth
+occurrence of the defect class), and **`normalizeSelectedSSHKey` silently re-attaches the first key
+in the library** to any service still set to key auth with no key, so a naive detach would undo
+itself later. D28's index already exists ad hoc in two places and gets extracted rather than
+rewritten.

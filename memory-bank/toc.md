@@ -48,6 +48,7 @@ three source applications are obsolete and no longer compile.
 | [Connections do not sync](tasks/2026-09/2026-09-14_connection-records-do-not-sync.md) | The diagnosis behind "CloudKit isn't working", three options, and the wrong first diagnosis kept in place |
 | [D26 — keys first class](tasks/2026-09/2026-09-14_d26-keys-first-class.md) | Keys outlive connections and get their own manager; device-bound means absent elsewhere; publish redacts and apply re-attaches |
 | [The remaining work](tasks/2026-09/2026-09-14_remaining-work-plan.md) | **The plan for everything left**: D26 stages 1–5, Stage 4 W3–W6, Stage 4.5, carried items, Stages 5–6, with reuse anchors and precise edits |
+| [D27 and D28 planned](tasks/2026-09/2026-09-14_d27-d28-plan.md) | Every record-creating surface enumerated; the two live D27 targets, the unreferenced `RDPFileImporter`, and the normaliser that silently re-attaches a key |
 | [September tasks](tasks/2026-09/README.md) | Monthly index |
 
 This project is `~/Software/glass/GlassPowerTools`. `../GlassEditorKit` was **absorbed on 2026-09-14**
