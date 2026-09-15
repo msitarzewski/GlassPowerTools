@@ -143,3 +143,67 @@ None are recorded here or anywhere in the repository. The generated passwords li
 session's scratchpad at mode 600 and die with it. The `gptrdp` Windows account and the `gptvnc`
 systemd unit are test fixtures on the user's own VMs and can be removed with
 `net user gptrdp /delete` and `systemctl stop gptvnc` respectively.
+
+---
+
+## 2026-09-15 — re-proven on the merged build, with the VMs up again
+
+The user reopened the Parallels VMs. Everything below is a real execution against a real host, run
+from this checkout's `Tests/LiveDesktop` probes.
+
+### VNC against TigerVNC 1.15.0 — PASS
+
+`Xtigervnc` **1.15.0+dfsg-2build1** on Ubuntu 26.04.1 LTS, `192.0.2.6:5902`. The transient
+`gptvnc` unit from September was gone (it is transient by design), so it was recreated the same way:
+password generated locally, fed to `vncpasswd` **over stdin**, written to `~/.vnc/passwd` at mode
+600. It never appeared in a command line, a process list or this repository.
+
+```
+connected     : true
+displayCaps   : maximumMonitors=1  maximumArea=33554432
+first frame   : 1024x640  bytesPerRow=4096  after 0.21s
+pixels        : 2,621,440 bytes, nonZero=true
+RESULT: PASS
+```
+
+`maximumMonitors=1` again: VNC publishes capabilities only on ExtendedDesktopSize and never offers
+multi-monitor. The UI must keep gating on it.
+
+### RDP certificate refusal against real Windows — reproduces, same certificate
+
+`192.0.2.3:3389`, with a deliberately nonexistent account and a junk password file:
+
+```
+FAILED after 5.2s: TLS failed: server certificate identity was not authorized
+  certificate: systemTrusted=false sha256=c0:0f:af:68:…:db:93
+```
+
+Two things worth having:
+
+- **It failed at the certificate, not at authentication.** The credential was never sent, which is
+  the invariant `CertificateTrust.swift:3` states and `ConnectionPreflight.swift` enforces.
+- **The leaf SHA-256 is byte-identical to the one recorded on 2026-09-14** — same host, same
+  self-signed certificate, so this is a genuine continuity check rather than a fresh coincidence.
+
+### Windows TightVNC — the typed error still arrives
+
+`192.0.2.3:5900`, empty password: *"This server needs a VNC password."* — the typed, actionable
+error from `VNCClient.swift:132-146` rather than a generic failure. Its password was **not** changed;
+the user may be relying on it.
+
+### What is still not proven, and why
+
+**A signed-in RDP session on the merged code.** The `gptrdp` account created in September had a
+randomly generated password that lived only in that session's scratchpad and died with it, and
+Windows has no SSH here, so it cannot be re-provisioned from this side. Frames, input, source resize
+and clean disconnect over RDP therefore remain **unverified on this build** — the headline of Stage 4
+W3. It needs an account on the Windows VM, which is the user's to supply.
+
+**No RDP server exists on the Ubuntu VM** (no `xrdp`, `gnome-remote-desktop` inactive and its daemon
+absent; only 5902 listens), so the non-Windows RDP path — GNOME's RDSTLS handoff — cannot be
+exercised here either without installing one.
+
+### Left running
+
+`gptvnc` is active on the Ubuntu VM and will survive until the VM restarts.
+`systemctl --user stop gptvnc` on `192.0.2.6` stops it.
