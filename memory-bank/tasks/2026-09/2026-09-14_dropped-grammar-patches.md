@@ -74,3 +74,36 @@ there.
 that the kit's versions were patched, which is the fact that would have made this obvious. Whichever
 fix lands, the notices table gains a **patched** column, and the grammar table stops implying that a
 pinned revision equals the code that was reviewed.
+
+---
+
+## Fixed for markdown, 2026-09-14 — and the measurement defect confirmed
+
+**Markdown is vendored and patched.** `Packages/TreeSitterMarkdown` and
+`Packages/TreeSitterMarkdownInline`, at the same commit that was pinned, with the H-1 bound restored
+in the block scanner. `parser.c` is the pinned revision byte for byte — diffed, not assumed — and
+only `scanner.c` differs, where the patch names itself. The dependency is gone from the manifest
+entirely, which is what resolved the target-name collision: SwiftPM will not let a vendored target
+share a name with one a dependency declares, so vendoring half was not possible.
+
+`ScannerOverflowPenTests` now passes all four cases.
+
+**The measurement defect, now quantified.** With the target no longer aborting, the full suite
+reports **1466 tests / 153 suites at exit status 0**. Every count reported earlier in this session —
+1146, 1153, 1169 — was missing the whole `GlassEditorCoreTests` target: **320 tests and 36 suites**
+that contributed no count line because the process died before printing one, and no `✘` because an
+abort is not a recorded failure.
+
+So the numbers were not merely unverified, they were **wrong by a fifth of the suite**, and the
+method reported success throughout. Exit status is the check; the `✘` grep never was one.
+
+**SQL's M-5 patch is still missing**, and this is the second useful thing the fix proved: the
+`sql: dollar-quoted strings survive incremental reparse without a memory error` case **passes
+without the patch**. It could not run before because markdown aborted the process first. So the
+suite being green is not evidence M-5 is unnecessary — it is evidence the test does not reach it.
+Recorded in `THIRD-PARTY-NOTICES.md` rather than left implicit, because a pinned stock revision now
+reads as reviewed when it is not.
+
+**Still open:** the SQL fork. Vendoring it is a poor answer — its generated `parser.c` alone is
+41 MB, which is most of what the absorption removed — so the fix is a patched fork pinned by
+revision, which needs a repository the user owns.

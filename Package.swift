@@ -44,9 +44,6 @@ let package = Package(
                  revision: "a06c2e4415e9bc0346c6b86d401879ffb44058f7"),
         .package(url: "https://github.com/tree-sitter-grammars/tree-sitter-toml",
                  revision: "64b56832c2cffe41758f28e05c756a3a98d16f41"),
-        // One package, two grammars: markdown is block and inline, combined by injection.
-        .package(url: "https://github.com/tree-sitter-grammars/tree-sitter-markdown",
-                 revision: "a0a00f817d02412bd92c54d316f164d827b57b5c"),
         .package(url: "https://github.com/DerekStride/tree-sitter-sql",
                  revision: "851e9cb257ba7c66cc8c14214a31c44d2f1e954e"),
         // The SSH stack vendored from glas.sh, verbatim (see Stage 2 transport note).
@@ -94,7 +91,8 @@ let package = Package(
                 .product(name: "TreeSitterBash", package: "tree-sitter-bash"),
                 "TreeSitterYAML",
                 .product(name: "TreeSitterTOML", package: "tree-sitter-toml"),
-                .product(name: "TreeSitterMarkdown", package: "tree-sitter-markdown"),
+                "TreeSitterMarkdown",
+                "TreeSitterMarkdownInline",
                 .product(name: "TreeSitterSql", package: "tree-sitter-sql"),
             ],
             resources: [.copy("Grammar/Queries")]
@@ -106,6 +104,29 @@ let package = Package(
         // scanner is silently dropped and every `tree_sitter_yaml_external_scanner_*` symbol goes
         // undefined at link time. Vendored at the same pinned commit instead, with its MIT licence,
         // and in `Packages/` because it is not our code.
+        // Vendored, not pinned, because upstream's block scanner has an unbounded `memcpy` in
+        // `serialize()`: with more than 254 open blocks it overruns the fixed 1024-byte
+        // serialization buffer — an assert in debug, heap corruption in release, reachable purely
+        // by opening a deeply-nested markdown file. GlassEditorKit found this (pen finding H-1)
+        // and patched it; pinning upstream silently dropped the patch, and
+        // `ScannerOverflowPenTests` has been aborting ever since. `parser.c` is the pinned
+        // revision byte for byte; only `scanner.c` differs, and it says where and why.
+        //
+        // The inline grammar stays a pinned dependency: its scanner is unpatched and identical.
+        .target(
+            name: "TreeSitterMarkdown",
+            path: "Packages/TreeSitterMarkdown",
+            sources: ["src/parser.c", "src/scanner.c"],
+            publicHeadersPath: "include",
+            cSettings: [.headerSearchPath("src")]
+        ),
+        .target(
+            name: "TreeSitterMarkdownInline",
+            path: "Packages/TreeSitterMarkdownInline",
+            sources: ["src/parser.c", "src/scanner.c"],
+            publicHeadersPath: "include",
+            cSettings: [.headerSearchPath("src")]
+        ),
         .target(
             name: "TreeSitterYAML",
             path: "Packages/TreeSitterYAML",

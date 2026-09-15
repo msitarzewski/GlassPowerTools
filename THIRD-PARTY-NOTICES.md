@@ -13,6 +13,7 @@ Code carried in-tree under `Packages/`, with its own license file intact.
 | **RDPKit** | `steelbrain/RDPKit` 0.3.1, `2032fdbc9a300e6b78065abbaf8ed1acca14f938` | MIT, "Copyright (c) 2026 Steelbrain". `Packages/RDPKit/LICENSE` retained verbatim. Local changes recorded in `Packages/RDPKit/GLASSDT-PATCHES.md`; the implemented surface and its limits in `Packages/RDPKit/CAPABILITY-LEDGER.md`. Upstream's `Examples/` sample application was **not** carried. |
 | **Citadel** | `orlandos-nl/Citadel`, vendored via glas.sh | MIT, "Copyright (c) 2022 Orlandos". `Packages/Citadel/LICENSE` retained. |
 | **swift-nio-ssh** | `apple/swift-nio-ssh`, vendored via glas.sh | Apache License 2.0. `Packages/swift-nio-ssh/LICENSE` retained, NOTICE preserved. |
+| **TreeSitterMarkdown**, **TreeSitterMarkdownInline** | `tree-sitter-grammars/tree-sitter-markdown` @ `a0a00f817d02412bd92c54d316f164d827b57b5c` | MIT. `Packages/TreeSitterMarkdown/LICENSE` retained. **Vendored rather than depended on, and patched.** Upstream's block `serialize()` copies every open block into a fixed 1024-byte buffer with no bound: above 254 open blocks it overruns — an assert in debug, heap corruption in release — reachable purely by opening a deeply-nested markdown file. The bound is restored in `Packages/TreeSitterMarkdown/src/scanner.c`, where the patch names itself and says why. `parser.c` is the pinned revision byte for byte, and the inline grammar is unmodified. Guarded by `Tests/GlassEditorCoreTests/ScannerOverflowPenTests.swift`. |
 | **TreeSitterYAML** | `tree-sitter-grammars/tree-sitter-yaml` @ `a1c4812a73ec5e089de8e441fdea3a921e8d5079` (2026-05-22) | MIT. `Packages/TreeSitterYAML/LICENSE` retained. **Vendored rather than depended on** because upstream's SPM manifest decides whether to compile `scanner.c` with a *relative* `FileManager.fileExists(atPath:)`, which is false when the package is a dependency — the scanner is silently dropped and the external-scanner symbols go undefined at link. Same commit, same licence, built with the correct sources. |
 
 ## Tree-sitter grammars — pinned dependencies
@@ -28,13 +29,22 @@ proves each one links, parses and compiles its highlight query — that test is 
 | JSON | `tree-sitter/tree-sitter-json` | `001c28d7a29832b06b0e831ec77845553c89b56d` | MIT |
 | Bash | `tree-sitter/tree-sitter-bash` | `a06c2e4415e9bc0346c6b86d401879ffb44058f7` | MIT |
 | TOML | `tree-sitter-grammars/tree-sitter-toml` | `64b56832c2cffe41758f28e05c756a3a98d16f41` | MIT |
-| Markdown (block **and** inline, one package) | `tree-sitter-grammars/tree-sitter-markdown` | `a0a00f817d02412bd92c54d316f164d827b57b5c` | MIT |
-| SQL | `DerekStride/tree-sitter-sql` | `851e9cb257ba7c66cc8c14214a31c44d2f1e954e` | MIT |
+| Markdown | **vendored — see the table above** | | MIT |
+| SQL | `DerekStride/tree-sitter-sql` | `851e9cb257ba7c66cc8c14214a31c44d2f1e954e` | MIT — **stock upstream; a local hardening patch is currently missing, see below** |
 | YAML | see the vendored table above | | MIT |
 
 `SwiftTreeSitter` (BSD-3-Clause) and the `tree-sitter` runtime (MIT) arrive with them. The grammars
 declare `tree-sitter/swift-tree-sitter` where this project declares `ChimeHQ/SwiftTreeSitter`;
 SwiftPM resolves both to **one** package, verified in `Package.resolved`.
+
+**One hardening patch is still missing.** GlassEditorKit also patched the SQL scanner (pen finding
+M-5): upstream's `serialize()` is destructive — it frees and nils `start_tag`, losing
+dollar-quoted-string state whenever tree-sitter snapshots mid-parse — and `deserialize` overwrites
+the pointer without freeing or checking the allocation. Depending on the stock revision dropped
+that. It is a correctness and resource bug rather than a memory-safety one, and
+`ScannerOverflowPenTests` does **not** catch it, so a green suite is not evidence it is fixed.
+Vendoring SQL is a poor answer — its generated `parser.c` alone is 41 MB — so the intended fix is a
+patched fork, pinned by revision.
 
 **Highlight queries.** `Sources/GlassEditorCore/Grammar/Queries/*.scm` are each grammar's own
 `queries/highlights.scm`, taken at the pinned commit above and carried as resources. They remain
