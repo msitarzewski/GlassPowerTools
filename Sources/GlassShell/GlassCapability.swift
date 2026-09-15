@@ -179,6 +179,12 @@ public protocol GlassCapability: AnyObject {
     /// A draft loaded from an existing service, for the sheet's edit mode; nil when the
     /// capability holds nothing for it (the link is broken and the user is told so).
     func setupDraft(for service: HostServiceLink, host: HostProfile) -> (any GlassServiceDraft)?
+    /// A draft built from a record this capability parsed out of another tool's file, for the
+    /// sheet's import flow. `configuration` is the capability's own encoding, so only the
+    /// capability that produced it can read it. Nil when it cannot be decoded — the sheet then
+    /// opens empty rather than refusing, because a machine the user can finish by hand is better
+    /// than a dead end. Default: nil, for capabilities that import nothing.
+    func setupDraft(importing configuration: Data) -> (any GlassServiceDraft)?
     /// The shell removed `service` from `host`: delete whatever the capability stored for it
     /// (configuration, credentials). Default: nothing.
     func removeService(_ service: HostServiceLink, host: HostProfile) async throws
@@ -263,6 +269,7 @@ public extension GlassCapability {
     }
     func hostAddressDidChange(host: HostProfile, address: String?) {}
     func libraryPanels() -> [GlassLibraryPanel] { [] }
+    func setupDraft(importing configuration: Data) -> (any GlassServiceDraft)? { nil }
     func knownAddress(service: HostServiceLink, host: HostProfile) -> String? { nil }
     /// A capability that has not adopted the setup contract yet: the sheet shows why and Save
     /// refuses, so no half-made service can be created through it.

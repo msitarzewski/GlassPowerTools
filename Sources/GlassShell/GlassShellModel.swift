@@ -400,6 +400,25 @@ public final class GlassShellModel: GlassServiceStore {
         await load()
     }
 
+    // MARK: Importing a machine from another tool (D27)
+
+    /// A machine a capability parsed out of a file, waiting for the library to open its sheet.
+    ///
+    /// A property rather than a callback because the library owns the sheet and a capability must
+    /// not reach into a view. The library clears it once presented, so the same import is not
+    /// re-opened on every redraw.
+    public private(set) var pendingSetupPrefill: GlassShellSetupPrefill?
+
+    /// Asks the library to open the host sheet filled in from an imported file. The capability
+    /// parsed it; everything after this — the host record, the service link, the credential — is
+    /// the ordinary setup flow, which is exactly why importing gets a library entry for free.
+    public func requestSetup(prefill: GlassShellSetupPrefill) {
+        pendingSetupPrefill = prefill
+    }
+
+    /// Called by the library once the sheet is up.
+    public func clearPendingSetup() { pendingSetupPrefill = nil }
+
     /// The library's sync state, in words a person can act on.
     ///
     /// "Not set up" rather than an error when no backend is attached: a build without CloudKit, or

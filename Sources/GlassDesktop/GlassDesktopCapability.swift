@@ -44,6 +44,11 @@ public final class GlassDesktopRuntime {
     /// because the shell model owns the brokering and a capability must not hold the model.
     public var hostAccess: (@MainActor (HostProfile) -> GlassCapabilityHostAccess)?
 
+    /// How to ask the library to open its host sheet for a machine parsed out of a file. Set by
+    /// the composition root for the same reason `hostAccess` is: the library owns the sheet, and a
+    /// capability must not reach into a view.
+    public var requestSetup: (@MainActor (GlassShellSetupPrefill) -> Void)?
+
     public init(layers: GlassLayerStore? = nil, app: DesktopAppModel? = nil) {
         self.layers = layers ?? GlassLayerStore()
         self.app = app ?? DesktopAppModel()
@@ -114,6 +119,20 @@ public final class GlassDesktopCapability: GlassCapability {
     public func setupDraft(for service: HostServiceLink, host: HostProfile) -> (any GlassServiceDraft)? {
         guard let connection = runtime.connection(for: service.endpointID) else { return nil }
         return DesktopServiceDraft(editing: connection, app: runtime.app)
+    }
+
+    /// A draft from an imported `.rdp` file. The record arrives with an id of its own; `commit`
+    /// re-keys it to the shell's endpoint id (`DesktopServiceDraft.swift:211`), so an import is
+    /// identical to any other new service by the time it is saved.
+    public func setupDraft(importing configuration: Data) -> (any GlassServiceDraft)? {
+        guard let connection = try? JSONDecoder().decode(DesktopConnection.self, from: configuration) else {
+            return nil
+        }
+        return DesktopServiceDraft(editing: connection, app: runtime.app)
+    }
+
+    public func libraryToolbarItems() -> AnyView {
+        AnyView(DesktopImportCommand(runtime: runtime))
     }
 
     /// D25: the shell deletes the host record and cascades here, so this removes only what the

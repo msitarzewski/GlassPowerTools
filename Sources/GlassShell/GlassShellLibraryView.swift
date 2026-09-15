@@ -13,6 +13,8 @@ public struct GlassShellLibraryView: View {
     @State private var scope = GlassLibraryScope.allConnections
     @State private var search = ""
     @State private var setupMode: GlassShellSetupMode?
+    /// Set only when the sheet was opened by an import; cleared implicitly by the next open.
+    @State private var setupPrefill: GlassShellSetupPrefill?
     @State private var deleting: GlassShellHost?
     @State private var showSettings = false
     @Environment(\.scenePhase) private var scenePhase
@@ -60,9 +62,18 @@ public struct GlassShellLibraryView: View {
             .sidebarActions { addHostButton }
             #endif
         }
-        // One sheet for Add Host, Add a service, Edit service and Edit Host (rule 15).
+        // One sheet for Add Host, Add a service, Edit service and Edit Host (rule 15) — and for
+        // importing a machine from another tool, which is an Add Host with the fields filled in.
         .sheet(item: $setupMode) { mode in
-            GlassShellHostSetupSheet(model: model, mode: mode) { selection = $0 }
+            GlassShellHostSetupSheet(model: model, mode: mode, prefill: setupPrefill) { selection = $0 }
+        }
+        .onChange(of: model.pendingSetupPrefill?.id) { _, _ in
+            guard let prefill = model.pendingSetupPrefill else { return }
+            setupPrefill = prefill
+            setupMode = .addHost
+            // Cleared now, not on dismiss: the sheet has its own copy, and leaving it set would
+            // re-present on the next redraw.
+            model.clearPendingSetup()
         }
         .sheet(isPresented: $showSettings) {
             NavigationStack {

@@ -87,6 +87,12 @@ struct GlassPowerToolsApp: App {
         desktop.hostAccess = { [weak model] host in
             model?.hostAccess(for: host.id) ?? GlassCapabilityHostAccess(address: host.address)
         }
+        // Importing a `.rdp` file opens the library's own host sheet, filled in. The capability
+        // parses; the shell presents and saves, so an imported machine gets its host record and
+        // service link from the ordinary setup flow rather than a second path (D27).
+        desktop.requestSetup = { [weak model] prefill in
+            model?.requestSetup(prefill: prefill)
+        }
         model.registry.register(GlassDesktopCapability(runtime: desktop))
         _layers = State(initialValue: layers)
         _model = State(initialValue: model)

@@ -59,18 +59,29 @@ public final class GlassShellSetupModel {
     public private(set) var isSaving = false
     private var drafts: [HostServiceKind: any GlassServiceDraft] = [:]
 
-    public init(model: GlassShellModel, mode: GlassShellSetupMode) {
+    /// A machine parsed out of another tool's file, waiting to be looked over. Nil for every
+    /// ordinary sheet.
+    public let prefill: GlassShellSetupPrefill?
+
+    /// What the imported file asked for that this app will not do. Empty unless importing.
+    public var importNotices: [String] { prefill?.notices ?? [] }
+
+    public init(model: GlassShellModel, mode: GlassShellSetupMode,
+                prefill: GlassShellSetupPrefill? = nil) {
         self.model = model
         self.mode = mode
+        self.prefill = prefill
         let host = mode.host
-        name = host?.displayName ?? ""
-        address = host?.address ?? ""
+        name = prefill?.hostName ?? host?.displayName ?? ""
+        address = prefill?.address ?? host?.address ?? ""
         aliases = GlassTagList.normalized(host?.aliases ?? [])
         tags = GlassTagList.normalized(host?.tags ?? [])
         switch mode {
         case .addHost, .editHost:
             // The first tab that can actually be enabled; the user's order is Terminal, Database, Desktop.
-            selectedKind = Self.tabOrder.first { model.registry.capability(for: $0) != nil } ?? Self.tabOrder[0]
+            // An import already knows its kind, and it is the only reason this sheet is open.
+            selectedKind = prefill?.kind
+                ?? Self.tabOrder.first { model.registry.capability(for: $0) != nil } ?? Self.tabOrder[0]
             // Adding a machine adds a service: a machine with nothing on it is not worth a row.
             // Editing one does not, since its services are managed from the detail.
             selection = mode.isAddHost && model.registry.capability(for: selectedKind) != nil ? selectedKind : nil
@@ -199,6 +210,10 @@ public final class GlassShellSetupModel {
         if case .editService(let host, let service) = mode, service.kind == kind,
            let owner = host.member(owning: service.endpointID) {
             draft = capability.setupDraft(for: service, host: owner)
+        } else if let prefill, prefill.kind == kind {
+            // An unreadable payload opens the sheet empty rather than refusing: the user can still
+            // finish the machine by hand, which beats a dead end.
+            draft = capability.setupDraft(importing: prefill.configuration) ?? capability.makeSetupDraft()
         } else {
             draft = capability.makeSetupDraft()
         }
@@ -360,15 +375,35 @@ public struct GlassShellHostSetupSheet: View {
     @State private var confirmingDelete = false
     @Environment(\.dismiss) private var dismiss
 
-    public init(model: GlassShellModel, mode: GlassShellSetupMode, onSaved: @escaping (HostID) -> Void = { _ in }) {
+    public init(model: GlassShellModel, mode: GlassShellSetupMode,
+                prefill: GlassShellSetupPrefill? = nil,
+                onSaved: @escaping (HostID) -> Void = { _ in }) {
         self.model = model
         self.onSaved = onSaved
-        _setup = State(initialValue: GlassShellSetupModel(model: model, mode: mode))
+        // Only an Add Host sheet can carry an import: the other modes already have their machine.
+        _setup = State(initialValue: GlassShellSetupModel(model: model, mode: mode,
+                                                          prefill: mode.isAddHost ? prefill : nil))
+    }
+
+    /// What the imported file asked for that this app will not do. First in the sheet, because it
+    /// is what the user needs to know before reading the fields underneath — a resolution that was
+    /// fitted, an audio mode that is not offered, and above all that no password came across.
+    private var importNoticesSection: some View {
+        Section("Imported with changes") {
+            ForEach(setup.importNotices, id: \.self) { notice in
+                Label(notice, systemImage: "info.circle")
+                    .labelStyle(.titleAndIcon)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .accessibilityIdentifier("host-editor-import-notices")
     }
 
     public var body: some View {
         NavigationStack {
             Form {
+                if !setup.importNotices.isEmpty { importNoticesSection }
                 machineSection
                 if setup.showsServiceTabs { servicesSection }
                 if setup.showsOrganizeSection { organizeSection }
