@@ -177,3 +177,18 @@ capability's record UUID); the database's `ConnectionPersistenceStore` is the se
 capabilities should adopt; stage 1 shrinks stage 2 to Keychain cleanup alone; and the abandoned test
 defaults suites are **17,905**, left as empty 42-byte plists by `removePersistentDomain` rather than
 by tests failing to clean up.
+
+## 2026-09-14 (evening) — D26 stage 1 seam; D27 and D28
+
+[The remaining work](2026-09-14_remaining-work-plan.md) · [D27, D28](../../decisions.md)
+
+`ServerPersistenceStore` landed (`0eee30e`); the terminal's write path is async because the catalog
+is an actor. 1146 tests / 117 suites.
+
+**D27:** servers created by SSH config import and the standalone Add Server form have no host record
+and are already invisible in the library; both forms now raise the record behind the scenes.
+**D28:** credential usage is derived from the service configuration, never stored in a table — only
+SSH keys are shared, and detaching one from the key side has two consequences that must be stated at
+the point of choice.
+
+Also swept 35,865 abandoned test defaults plists and 23 test host catalogs from the developer Mac.

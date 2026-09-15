@@ -722,3 +722,84 @@ Half-converted is the only outcome worth avoiding, and there is no data to prese
 **Acceptance, and no test replaces it:** add a host with a key on the Mac, connect from the phone,
 and watch whether it prompts for host trust. That single run proves the configuration sync, the key
 record sync and D23's pin sync together.
+
+## D27 — every saved connection has a host record, created for the user rather than by them
+
+**Status: Approved** by the user, 2026-09-14: *"Your reco is good."*
+
+**The finding that forced it.** Two paths create a saved server with no host record and no service
+link, both with a fresh `UUID()`: `SettingsManager.importSSHConfig` (`SettingsManager.swift:1040-1049`)
+and the standalone Add Server form, `TerminalServiceDraft.saveStandalone`
+(`ServerFormViews.swift:324-336`), reached from `requestAddServer()` and from the Tailscale panel
+(`TerminalTailscaleView.swift:104`). Only `GlassShellSetup.swift:334` creates a link.
+
+**Those servers are already invisible**, which is why this is a live defect and not something D26
+introduces. `GlassShellLibraryView` renders `model.items` — the catalog — and nothing anywhere in
+`Sources/GlassShell` reads `serverManager.servers`. A host imported from an `ssh_config` cannot be
+seen, favourited, tagged, given a second service or synced; it is reachable only from the terminal's
+own Connect-Saved-Host surfaces. Under D26 it has nowhere to be stored at all.
+
+**The decision.** Both forms stay exactly as they are. Each creates the host record and the `.ssh`
+link **behind the scenes**, so the machine appears in the library like every other machine. The
+alternative — rerouting Add Server through the shell's host sheet — is a visible workflow change
+that buys nothing this does not.
+
+**Mechanism:** a closure on the runtime set by the composition root, the pattern
+`GlassDesktopRuntime.hostAccess` already uses (`GlassDesktopCapability.swift:45`), so the capability
+still never holds the shell model (project rule 6). The shell side is already public:
+`addHost(displayName:address:…)` and `addService(kind:displayName:endpointID:)`.
+
+**The one visible consequence, stated so it is not reported as a bug:** importing an `ssh_config`
+with twelve hosts now puts twelve machines in the library. Today they appear nowhere.
+
+**Scale, measured 2026-09-14:** `com.glasspowertools.plist` holds **one** saved server. A
+correctness fix, not a migration.
+
+## D28 — what authenticates what is derived, never stored
+
+**Status: Approved** by the user, 2026-09-14, from the scenario they set: *"juliet and oscar share
+a key and the juliet terminal using said key is deleted. oscar's terminal still uses it… we need a
+lookup table of some kind that tracks usage by auths."*
+
+**The decision: no table.** The edge already exists on the service's own configuration
+(`sshKeyID`). Once D26 stage 1 puts configurations in the catalog, "which services use key K" is one
+pass over `configurations(ofKind:)`. A stored usage table is a second copy of a truth that already
+exists and has to be kept in step through deletion, editing, sync and merge — and D25 is exactly the
+bug where deleting a thing forgot to tell the other store. A derived index cannot drift.
+
+**The user's scenario falls out of it with no cascade to write:** deleting juliet's Terminal
+removes that service's configuration, the edge goes with it, and the key reads "used by 1 · oscar ·
+Terminal". oscar is untouched because nothing ever pointed at it.
+
+**Only keys are shared. Measured 2026-09-14:**
+
+| Auth | Shape |
+|---|---|
+| SSH key | **many** services → one key. `sshKeyID` appears in six files, all the terminal's |
+| Password | keyed by service id (`KeychainManager.serverPasswordAccount(for:)`) — exactly one service |
+| RDP and database credentials | one service each |
+| Database over SSH | holds no key; borrows the host's forward from the terminal (D7) |
+
+So the surface is a **key** manager with a usage list, plus flat 1:1 inventory rows for everything
+else — considerably smaller than "track usage by auths" first sounded.
+
+**Detaching from the key side is a write, and it has consequences that must be stated at the point
+of choice:**
+
+1. **A service left with no credential cannot sign in.** The action offers the replacement inline
+   (another key, or a password) or leaves the service visibly *needs setup*. Silently broken is the
+   one outcome to refuse.
+2. **Detaching a Secure Enclave key changes where the service exists.** Device-binding is derived
+   from the credential (D26 stage 3), so removing a hardware key stops a terminal being device-bound
+   and it **starts appearing on other devices**; attaching one makes it disappear from them. This is
+   a real consequence of a key-side action and belongs in its confirmation.
+
+**The failure mode designed in from the start:** a configuration this build cannot decode is skipped
+rather than fatal. So "used by" must report *"2 services, plus 1 this build cannot read"* rather than
+silently undercounting — otherwise a key still in use reads as unused and gets deleted. A zero only
+ever proves where you looked (project rule 24). A key genuinely used by nothing says so plainly:
+that is the state after the juliet deletion and the signal that it is safe to delete.
+
+**Where it lives:** the key manager panel in the library sidebar beside Collections (D26 stage 4),
+with "used by" as host · service rows each carrying its own detach — which is the point of the
+request: *"Disconnect XYZ key from oscar's terminal"* without walking Connections › oscar › Terminal.

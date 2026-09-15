@@ -456,3 +456,82 @@ checkout measures.
 Wiring `ServerPersistenceStore` to `GlassServiceStore`, deleting `UserDefaultsKeys.servers` and its
 two legacy-migration entries (`Constants.swift:113`, `:124`), and doing the same for the database
 and the desktop, all remain.
+
+## Terminal, part 2: a gap the plan did not name — servers with no service link
+
+Found while designing the catalog-backed store, because the adapter forced the question: a
+`ServerPersistenceStore` backed by `GlassServiceStore` writes **per endpoint**, so a saved server
+with no service link has nowhere to go.
+
+**Two live paths create servers with no host record and no link**, both with a fresh `UUID()`:
+
+- `SettingsManager.importSSHConfig` (`SettingsManager.swift:1040-1049`) — every imported `Host`.
+- The standalone Add Server form, `TerminalServiceDraft.saveStandalone`
+  (`ServerFormViews.swift:324-336`), reached from `requestAddServer()` and from the Tailscale
+  panel (`TerminalTailscaleView.swift:104`).
+
+Only `GlassShellSetup.swift:334` creates a service link today.
+
+**These servers are already invisible in the library.** `GlassShellLibraryView` renders
+`model.items`, which is the catalog; nothing anywhere in `Sources/GlassShell` reads
+`serverManager.servers` (searched for the concept, not the name: `.servers`, `serverManager`, and
+the library's item source). So a host imported from an `ssh_config` cannot be seen, favourited,
+tagged, given a second service, or synced — it is reachable only from the terminal's own
+Connect-Saved-Host surfaces. That is a live inconsistency, not something D26 introduces.
+
+**Impact on real data, measured on this Mac:** `com.glasspowertools.plist` holds **1** saved server.
+So this is a correctness fix, not a migration problem — consistent with the user base being two
+people.
+
+### The decision taken
+
+**Keep both forms exactly as they are, and have them create the host record and `.ssh` link behind
+the scenes**, rather than rerouting the user through the shell's host sheet. Same UX, same number of
+steps; the difference is that the machine now appears in the library like every other one, which is
+what a person would already have expected. The alternative — making Add Server open the shell's host
+sheet — is a visible workflow change and buys nothing that this does not.
+
+**Mechanism, reusing the pattern already in the codebase:** a closure on the runtime set by the
+composition root, exactly as `GlassDesktopRuntime.hostAccess` is
+(`GlassDesktopCapability.swift:45`), so the capability still never holds the shell model (project
+rule 6). The shell side is already public: `addHost(displayName:address:…)` and
+`addService(kind:displayName:endpointID:)`.
+
+### Also found: a second kind of test residue
+
+`~/Library/Application Support/GlassPowerTools-Tests/` holds **23** abandoned catalog directories
+(172 KB). The stage-5 sweep was scoped to `UserDefaults` suites and misses this entirely — tests
+leave host catalogs behind as well as defaults domains.
+
+## Stage 5, partially done early: the test residue is swept
+
+Authorized: *"clean the old test files."* Done 2026-09-14, on this Mac only — nothing in the
+repository changed, so this is an environment cleanup, not a commit.
+
+| Removed | Count |
+|---|---|
+| Abandoned `UserDefaults` suite plists in `~/Library/Preferences` | **35,865** |
+| Abandoned host catalogs in `~/Library/Application Support/GlassPowerTools-Tests/` | 23 dirs, 172 KB |
+
+`~/Library/Preferences` went from **37,175 entries to 1,310**.
+
+**The count had nearly doubled since it was measured this morning.** It was 17,905 before today's
+work; three `swift test` runs during the D26 seam refactor added roughly eighteen thousand more
+files. That is the strongest argument yet for bounding the suite names rather than sweeping again:
+**a full test run currently costs about six thousand files in the user's Preferences folder.**
+
+**What was deliberately left:** `ai.mirrormesh.tests` (525 files). It is another project's residue
+and not ours to delete.
+
+**Verified after the sweep:** `com.glasspowertools.plist` (529 keys, 341,257 bytes),
+`sh.glas.app.plist` and `app.glassdb.plist` all intact; the real
+`~/Library/Application Support/GlassPowerTools/` still holds `GlassHostCatalog`,
+`shell-preferences.json`, `SQLDrafts` and `Desktop`; `swift test` still green.
+
+Ownership was checked before deleting rather than assumed from the name: every suite prefix was
+grepped back to the test file that creates it (`GlassLayersTests`, `WorkspaceCaptureTests`,
+`WorkspacePresetTests`, `test.MigrationDefaults`, `com.glasspowertools.tests.audit` all resolve to
+files in `Tests/`).
+
+**Still to do, and it is the part that matters:** the leak itself. Sweeping fixes today and changes
+nothing about tomorrow.

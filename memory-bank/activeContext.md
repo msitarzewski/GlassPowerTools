@@ -1203,3 +1203,36 @@ remainder, and Stage 4 W5. Both are designed on the headset's terms and adapted 
 **Next action:** the user's go on D26 stage 1, starting with the terminal — it is the one capability
 with a second index over the same data, so its call sites surface the questions the other two will
 not.
+
+## 2026-09-14 (evening) — D26 stage 1 underway; D27 and D28 approved
+
+**State BUILD.** Owner: coordinating agent. Committed through `0eee30e`.
+
+**Landed:** the terminal's `ServerPersistenceStore` seam, with the write path converted to async
+because `HostCatalogStore` is an actor. Still `UserDefaults`-backed on purpose — the step moves the
+seam, not what is behind it. **1146 tests / 117 suites** green, stable across two runs. The rollback
+contract was pinned by tests written first and watched failing.
+
+**One real behaviour change:** the legacy host-trust migration no longer completes during
+`loadServers` (which `init` calls and cannot await); it runs in a task the manager holds. D26 deletes
+that migration outright anyway.
+
+**Two decisions approved this evening:**
+
+- **D27** — every saved connection gets a host record, created *for* the user. SSH config import and
+  the standalone Add Server form currently make servers with no host and no link, and those servers
+  are already invisible in the library. Both forms stay as they are and raise the host record behind
+  the scenes.
+- **D28** — what authenticates what is **derived, never stored**. No usage table; the edge is
+  `sshKeyID` on the service's configuration. Only SSH keys are shared many-to-one; passwords, RDP
+  and database credentials are 1:1, and the database holds no key at all (D7).
+
+**Environment cleanup, not a code change:** 35,865 abandoned test defaults plists and 23 test host
+catalogs removed from this Mac; `~/Library/Preferences` went 37,175 → 1,310. The count had nearly
+doubled since morning — **a full `swift test` run costs roughly six thousand files** — so bounding
+the suite names remains the actual fix. `ai.mirrormesh.tests` was deliberately left: another
+project's residue.
+
+**Next action:** plan D27 and D28 properly before building — survey every surface that creates,
+edits, deletes or displays a saved connection or a credential, because the reverse index is only
+correct if every edge-writing path is known. Then build D26 stage 1's remaining half.
