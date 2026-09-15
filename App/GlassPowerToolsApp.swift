@@ -68,6 +68,18 @@ struct GlassPowerToolsApp: App {
         // shell routes Connect for `.ssh` services through the capability.
         let windowRecovery = GlassWindowRecoveryManager()
         let terminal = GlassTerminalRuntime(layers: layers, windowRecovery: windowRecovery)
+        // D27: Add Server and `ssh_config` import build a saved server directly rather than going
+        // through the host sheet. Without this they produce a server with no host record and no
+        // link — invisible in the library, and under D26 with nowhere to be stored at all. The
+        // shell puts the machine in the library on the capability's behalf.
+        terminal.sessionManager.serverManager.adoptHost = { [weak model] hostName, address, serviceName in
+            guard let model else { throw GlassShellError.hostNotFound(HostID()) }
+            return try await model.adoptService(kind: .ssh, hostName: hostName, address: address,
+                                                serviceName: serviceName).rawValue
+        }
+        terminal.sessionManager.serverManager.discardAdoption = { [weak model] id in
+            await model?.discardAdoption(EndpointID(rawValue: id))
+        }
         model.registry.register(GlassTerminalCapability(runtime: terminal))
         // Stage 3: the database capability. Its managers live for the process in the runtime;
         // the shell routes Connect for `.database` services through the capability, and the

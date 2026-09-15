@@ -232,6 +232,33 @@ class ServerManager {
     private let passwordStore: ServerPasswordStore
     private let store: ServerPersistenceStore
 
+    /// D27: asks the shell to put a machine in the library for a server this capability is about
+    /// to save, returning the endpoint id to save it under. Set by the composition root, because a
+    /// capability must not hold the shell model (project rule 6).
+    ///
+    /// Nil in a unit test or a preview, where creation keeps its old behaviour — a fresh `UUID()`
+    /// and no host record. That keeps the existing terminal tests meaningful instead of forcing a
+    /// shell into every one of them.
+    var adoptHost: (@MainActor (_ hostName: String, _ address: String, _ serviceName: String) async throws -> UUID)?
+
+    /// Undoes an adoption whose server then failed to save, so a half-made machine never survives.
+    var discardAdoption: (@MainActor (UUID) async -> Void)?
+
+    /// The id a newly created server should use, and the cleanup to run if saving it fails.
+    ///
+    /// Returns a plain `UUID()` when no shell is attached, which is exactly what the callers did
+    /// before D27 — so the change is "the library also learns about it", not "creation works
+    /// differently".
+    @MainActor
+    func adoptedIdentity(hostName: String, address: String,
+                         serviceName: String) async -> (id: UUID, discard: (@MainActor () async -> Void)?) {
+        guard let adoptHost, let id = try? await adoptHost(hostName, address, serviceName) else {
+            return (UUID(), nil)
+        }
+        let discardAdoption = self.discardAdoption
+        return (id, { await discardAdoption?(id) })
+    }
+
     /// The legacy host-trust migration kicked off by `loadServers`. Await it when the migration's
     /// result is what is being observed; it is nil when no load has happened.
     private(set) var legacyHostTrustMigration: Task<Void, Never>?

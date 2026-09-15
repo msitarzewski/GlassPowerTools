@@ -324,10 +324,30 @@ final class TerminalServiceDraft: GlassServiceDraft {
     func saveStandalone() async -> Bool {
         let issues = standaloneIssues
         guard issues.isEmpty else { revealIssuesAndFocus(issues); return false }
+        let address = Self.normalizedEndpointValue(host)
+        let name = Self.normalizedEndpointValue(name)
+
+        // D27: a server made here becomes a machine in the library. An edit keeps the id it
+        // already has — its host record exists — so only a new one is adopted.
+        var discardAdoption: (@MainActor () async -> Void)?
+        let id: UUID
+        if let editing {
+            id = editing.id
+        } else {
+            let adopted = await serverManager.adoptedIdentity(
+                hostName: name.isEmpty ? address : name, address: address,
+                serviceName: serviceDisplayName(hostName: name.isEmpty ? address : name))
+            id = adopted.id
+            discardAdoption = adopted.discard
+        }
+
         do {
-            try await persist(id: editing?.id ?? UUID(), address: Self.normalizedEndpointValue(host), name: Self.normalizedEndpointValue(name))
+            try await persist(id: id, address: address, name: name)
             return true
         } catch {
+            // The machine was put in the library a moment ago and its service cannot be saved;
+            // leaving the link behind would be exactly the orphan D25 exists to prevent.
+            await discardAdoption?()
             Logger.servers.error("Failed to save server transactionally: \(error.localizedDescription)")
             saveError = isEditing ? "The server changes were not saved: \(error.localizedDescription)"
                                   : "The server was not added: \(error.localizedDescription)"

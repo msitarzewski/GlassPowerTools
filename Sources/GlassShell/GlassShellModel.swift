@@ -772,6 +772,56 @@ public final class GlassShellModel: GlassServiceStore {
         if let firstFailure { throw firstFailure }
     }
 
+    // MARK: Adopting a machine a capability created (D27)
+
+    /// Finds or creates the host for `address`, links a service of `kind` to it, and returns the
+    /// endpoint id the capability must store its record under.
+    ///
+    /// D27: some ways of making a connection do not go through the host sheet — the terminal's own
+    /// Add Server form and its `ssh_config` import both build a saved server directly. Before this,
+    /// those servers had no host record and no link, which meant they never appeared in the library
+    /// at all: the library renders the catalog, and nothing in the shell reads a capability's own
+    /// store. Under D26 they would have had nowhere to be stored.
+    ///
+    /// **An existing machine is reused rather than duplicated.** Importing an `ssh_config` that
+    /// names a machine already in the library adds a service to that machine; it does not stand a
+    /// second record beside it with the same address.
+    ///
+    /// The caller owns what happens next: on failure to write its own record it must call
+    /// `discardAdoption(_:)`, exactly as the setup sheet rolls back a draft.
+    @discardableResult
+    public func adoptService(kind: HostServiceKind, hostName: String, address: String,
+                             serviceName: String) async throws -> EndpointID {
+        let trimmedAddress = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedAddress.isEmpty else { throw GlassShellError.invalidName }
+
+        let existing = records.first { record in
+            guard record.deletedAt == nil, record.id != GlassLocalHost.id,
+                  let candidate = record.address else { return false }
+            return candidate.compare(trimmedAddress, options: [.caseInsensitive, .diacriticInsensitive])
+                == .orderedSame
+        }
+        let hostID: HostID
+        if let existing {
+            hostID = canonicalID(for: existing.id)
+        } else {
+            let name = hostName.trimmingCharacters(in: .whitespacesAndNewlines)
+            hostID = try await addHost(displayName: name.isEmpty ? trimmedAddress : name,
+                                       address: trimmedAddress).id
+        }
+        return try await addService(kind: kind, displayName: serviceName, to: hostID).endpointID
+    }
+
+    /// Undoes an `adoptService` whose caller then failed to write its own record. Removing the last
+    /// service tombstones the record it was on, so a host created only for this adoption does not
+    /// survive as an empty machine.
+    public func discardAdoption(_ endpointID: EndpointID) async {
+        guard let owner = records.first(where: { record in
+            record.services.contains { $0.endpointID == endpointID }
+        }) else { return }
+        try? await removeService(endpointID, from: owner.id)
+    }
+
     /// Links a service to the host's canonical record. `endpointID` is the key the owning
     /// capability stored the service's configuration under: the setup sheet commits the
     /// capability's draft first, then records the link, so a service never exists half-made.

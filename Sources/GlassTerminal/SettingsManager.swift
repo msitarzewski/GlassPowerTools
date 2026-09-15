@@ -1035,7 +1035,13 @@ class SettingsManager {
                     try await serverManager.updateServerOrThrow(server)
                     updated += 1
                 } else {
+                    // D27: each imported `Host` becomes a machine in the library, reusing an
+                    // existing record when one already has this address rather than standing a
+                    // second one beside it.
+                    let adopted = await serverManager.adoptedIdentity(
+                        hostName: entry.alias, address: host, serviceName: "Terminal")
                     let server = ServerConfiguration(
+                        id: adopted.id,
                         name: entry.alias,
                         host: host,
                         port: port,
@@ -1045,10 +1051,16 @@ class SettingsManager {
                         sshKeyID: matchedKeyID,
                         tags: ["imported"]
                     )
-                    try await serverManager.addServerOrThrow(server)
+                    do {
+                        try await serverManager.addServerOrThrow(server)
+                    } catch {
+                        await adopted.discard?()
+                        throw error
+                    }
                     imported += 1
                 }
             } catch {
+                // One bad `Host` is a warning, not a failed import: the other eleven still land.
                 warnings.append("Could not save Host '\(entry.alias)': \(error.localizedDescription)")
                 skipped += 1
             }
