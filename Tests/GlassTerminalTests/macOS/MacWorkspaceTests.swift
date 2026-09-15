@@ -236,7 +236,18 @@ struct MacWorkspaceTests {
         #expect(try Data(contentsOf: retained) == bytes)
         let ownedDirectory = try #require(result?.staging.directory)
         result = nil
-        #expect(!FileManager.default.fileExists(atPath: ownedDirectory.path))
+        // `SFTPDropStaging` cleans up in `deinit`, and dropping the last reference does not
+        // guarantee the deallocation happens on *this* statement — an autorelease pool or the
+        // optimizer can defer it. Asserting immediately made this test fail roughly one run in
+        // four under the parallel suite while passing every time in isolation. Waiting briefly
+        // keeps exactly what the test is for — the directory does go away once nothing holds it —
+        // without depending on when.
+        var cleaned = false
+        for _ in 0..<100 where !cleaned {
+            if !FileManager.default.fileExists(atPath: ownedDirectory.path) { cleaned = true; break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(cleaned, "staging directory outlived its last reference")
         #expect(FileManager.default.fileExists(atPath: file.path))
     }
 

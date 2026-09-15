@@ -107,3 +107,52 @@ reads as reviewed when it is not.
 **Still open:** the SQL fork. Vendoring it is a poor answer — its generated `parser.c` alone is
 41 MB, which is most of what the absorption removed — so the fix is a patched fork pinned by
 revision, which needs a repository the user owns.
+
+---
+
+## SQL fixed too, 2026-09-15 — and the "41 MB" that drove the wrong recommendation
+
+**The recommendation to fork was based on a wrong measurement.** "SQL is 41 MB" was the *working
+tree* size of its generated `parser.c`. Committed, git stores it in **2.6 MB** — measured by
+committing the file to a throwaway repository — which is the same order as markdown's 1.2 MB. The
+whole argument for a fork evaporated with the number that produced it.
+
+So SQL is vendored at the pinned commit with the M-5 patch restored, exactly like markdown and YAML.
+`parser.c` is the pinned revision byte for byte; only `scanner.c` differs. The dependency is dropped
+from the manifest, which is also forced: SwiftPM will not let a vendored target share a name with
+one a dependency declares.
+
+**Upstream has not fixed it.** `origin/HEAD` still frees and nils `start_tag` inside `serialize()`,
+checked 2026-09-15 by fetching the repository, so bumping the pin was never an option.
+
+### What could not be shown, said plainly
+
+Unlike markdown — where `ScannerOverflowPenTests` aborts without the patch — **M-5 could not be
+reproduced through the app's behaviour.** Three attempts, all of which pass with the bug present:
+
+1. the existing `sql: dollar-quoted strings survive incremental reparse` smoke test;
+2. that same test under **AddressSanitizer**, which its own comment names as the real check;
+3. a new incremental-versus-full highlight comparison over a dollar-quoted document, with
+   `lastParseWasIncremental` asserted at every step so the equivalence cannot be satisfied by a
+   silent full reparse — `Tests/GlassEditorCoreTests/SQLDollarQuoteStateTests.swift`.
+
+The patch is applied because **the code is wrong**, not because a test demanded it: a `serialize()`
+that destroys the state it was asked to snapshot, and a `deserialize()` that overwrites a live
+pointer without freeing or checking it, are defects whether or not this app's edit patterns reach
+them. The new tests stay as regression cover for the equivalence, and their header records what they
+could not show, so nobody later reads them as proof the patch is load-bearing.
+
+**Both grammar patches are now restored and `THIRD-PARTY-NOTICES.md` distinguishes the two cases** —
+guarded by a test, versus applied on inspection.
+
+## A flaky test found by the same run, and fixed
+
+`incomingDropRetainsProviderFileAndCleansOwnedStaging` (`MacWorkspaceTests.swift:238`) asserted that
+a staging directory was gone on the statement after its last reference was dropped.
+`SFTPDropStaging` cleans up in `deinit`, and dropping the last reference does not guarantee the
+deallocation happens right there — an autorelease pool or the optimizer can defer it. It passed
+every time in isolation and failed in the parallel suite, which is project rule 21's warning
+exactly. Now it waits, bounded, for the directory to disappear: the same property, without the
+dependency on when.
+
+**Full suite: 1468 tests / 154 suites, exit status 0.**

@@ -14,6 +14,7 @@ Code carried in-tree under `Packages/`, with its own license file intact.
 | **Citadel** | `orlandos-nl/Citadel`, vendored via glas.sh | MIT, "Copyright (c) 2022 Orlandos". `Packages/Citadel/LICENSE` retained. |
 | **swift-nio-ssh** | `apple/swift-nio-ssh`, vendored via glas.sh | Apache License 2.0. `Packages/swift-nio-ssh/LICENSE` retained, NOTICE preserved. |
 | **TreeSitterMarkdown**, **TreeSitterMarkdownInline** | `tree-sitter-grammars/tree-sitter-markdown` @ `a0a00f817d02412bd92c54d316f164d827b57b5c` | MIT. `Packages/TreeSitterMarkdown/LICENSE` retained. **Vendored rather than depended on, and patched.** Upstream's block `serialize()` copies every open block into a fixed 1024-byte buffer with no bound: above 254 open blocks it overruns — an assert in debug, heap corruption in release — reachable purely by opening a deeply-nested markdown file. The bound is restored in `Packages/TreeSitterMarkdown/src/scanner.c`, where the patch names itself and says why. `parser.c` is the pinned revision byte for byte, and the inline grammar is unmodified. Guarded by `Tests/GlassEditorCoreTests/ScannerOverflowPenTests.swift`. |
+| **TreeSitterSql** | `DerekStride/tree-sitter-sql` @ `851e9cb257ba7c66cc8c14214a31c44d2f1e954e` | MIT. `Packages/TreeSitterSql/LICENSE` retained. **Vendored rather than depended on, and patched.** Upstream's `serialize()` frees and nils `start_tag` — it consumes the state it was asked to snapshot — and `deserialize()` overwrites the pointer without freeing it or checking the allocation (GlassEditorKit pen finding M-5). Still present on upstream's HEAD, checked 2026-09-15, so a newer pin is not the fix. `parser.c` is the pinned revision byte for byte; only `scanner.c` differs, and the patch names itself there. |
 | **TreeSitterYAML** | `tree-sitter-grammars/tree-sitter-yaml` @ `a1c4812a73ec5e089de8e441fdea3a921e8d5079` (2026-05-22) | MIT. `Packages/TreeSitterYAML/LICENSE` retained. **Vendored rather than depended on** because upstream's SPM manifest decides whether to compile `scanner.c` with a *relative* `FileManager.fileExists(atPath:)`, which is false when the package is a dependency — the scanner is silently dropped and the external-scanner symbols go undefined at link. Same commit, same licence, built with the correct sources. |
 
 ## Tree-sitter grammars — pinned dependencies
@@ -30,21 +31,22 @@ proves each one links, parses and compiles its highlight query — that test is 
 | Bash | `tree-sitter/tree-sitter-bash` | `a06c2e4415e9bc0346c6b86d401879ffb44058f7` | MIT |
 | TOML | `tree-sitter-grammars/tree-sitter-toml` | `64b56832c2cffe41758f28e05c756a3a98d16f41` | MIT |
 | Markdown | **vendored — see the table above** | | MIT |
-| SQL | `DerekStride/tree-sitter-sql` | `851e9cb257ba7c66cc8c14214a31c44d2f1e954e` | MIT — **stock upstream; a local hardening patch is currently missing, see below** |
+| SQL | **vendored — see the table above** | | MIT |
 | YAML | see the vendored table above | | MIT |
 
 `SwiftTreeSitter` (BSD-3-Clause) and the `tree-sitter` runtime (MIT) arrive with them. The grammars
 declare `tree-sitter/swift-tree-sitter` where this project declares `ChimeHQ/SwiftTreeSitter`;
 SwiftPM resolves both to **one** package, verified in `Package.resolved`.
 
-**One hardening patch is still missing.** GlassEditorKit also patched the SQL scanner (pen finding
-M-5): upstream's `serialize()` is destructive — it frees and nils `start_tag`, losing
-dollar-quoted-string state whenever tree-sitter snapshots mid-parse — and `deserialize` overwrites
-the pointer without freeing or checking the allocation. Depending on the stock revision dropped
-that. It is a correctness and resource bug rather than a memory-safety one, and
-`ScannerOverflowPenTests` does **not** catch it, so a green suite is not evidence it is fixed.
-Vendoring SQL is a poor answer — its generated `parser.c` alone is 41 MB — so the intended fix is a
-patched fork, pinned by revision.
+**What a green suite does and does not prove here.** The markdown patch is guarded:
+`ScannerOverflowPenTests` aborts without it. The SQL patch is **not**. Its pen test passes with the
+bug present, and so does an incremental-versus-full highlight comparison over a dollar-quoted
+document with the incremental path asserted — both checked on 2026-09-15, the second under
+AddressSanitizer as well. The patch is applied because the code is wrong, not because a test
+demanded it: a `serialize()` that destroys its own state, and a `deserialize()` that overwrites a
+live pointer without freeing or checking it, are defects whether or not this app's edit patterns
+reach them. `Tests/GlassEditorCoreTests/SQLDollarQuoteStateTests.swift` records the attempt and what
+it could not show.
 
 **Highlight queries.** `Sources/GlassEditorCore/Grammar/Queries/*.scm` are each grammar's own
 `queries/highlights.scm`, taken at the pinned commit above and carried as resources. They remain

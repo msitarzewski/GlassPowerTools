@@ -44,9 +44,7 @@ let package = Package(
                  revision: "a06c2e4415e9bc0346c6b86d401879ffb44058f7"),
         .package(url: "https://github.com/tree-sitter-grammars/tree-sitter-toml",
                  revision: "64b56832c2cffe41758f28e05c756a3a98d16f41"),
-        .package(url: "https://github.com/DerekStride/tree-sitter-sql",
-                 revision: "851e9cb257ba7c66cc8c14214a31c44d2f1e954e"),
-        // The SSH stack vendored from glas.sh, verbatim (see Stage 2 transport note).
+                // The SSH stack vendored from glas.sh, verbatim (see Stage 2 transport note).
         .package(path: "Packages/Citadel"),
         .package(path: "Packages/swift-nio-ssh"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.101.3"),
@@ -93,7 +91,7 @@ let package = Package(
                 .product(name: "TreeSitterTOML", package: "tree-sitter-toml"),
                 "TreeSitterMarkdown",
                 "TreeSitterMarkdownInline",
-                .product(name: "TreeSitterSql", package: "tree-sitter-sql"),
+                "TreeSitterSql",
             ],
             resources: [.copy("Grammar/Queries")]
         ),
@@ -123,6 +121,19 @@ let package = Package(
         .target(
             name: "TreeSitterMarkdownInline",
             path: "Packages/TreeSitterMarkdownInline",
+            sources: ["src/parser.c", "src/scanner.c"],
+            publicHeadersPath: "include",
+            cSettings: [.headerSearchPath("src")]
+        ),
+        // Vendored, not pinned, for the same reason as markdown: GlassEditorKit patched this
+        // scanner (pen finding M-5) and depending on the stock revision dropped the patch.
+        // Upstream's `serialize()` frees and nils `start_tag` — it consumes the state it was asked
+        // to snapshot — and `deserialize()` overwrites the pointer without freeing it or checking
+        // the allocation. Still present on upstream's HEAD, checked 2026-09-15, so a newer pin is
+        // not the fix. `parser.c` is the pinned revision byte for byte; only `scanner.c` differs.
+        .target(
+            name: "TreeSitterSql",
+            path: "Packages/TreeSitterSql",
             sources: ["src/parser.c", "src/scanner.c"],
             publicHeadersPath: "include",
             cSettings: [.headerSearchPath("src")]
