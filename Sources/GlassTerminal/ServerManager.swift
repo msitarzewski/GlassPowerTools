@@ -12,6 +12,7 @@ import WidgetKit
 import os
 import GlasSecretStore
 import GlassConnectionKit
+import GlassShell
 
 struct HostTrustMigrationReport: Codable, Equatable {
     enum State: String, Codable {
@@ -68,6 +69,51 @@ struct ServerPersistenceStore {
     /// Puts back exactly what was there, including "nothing". Used by the one rollback that
     /// restores the catalog without going through an encode.
     let restore: (Data?) async throws -> Void
+
+    /// D26: the catalog is the one store for a connection.
+    ///
+    /// Each saved server lives on its own service link, encoded by this capability and opaque to
+    /// everything else. There is no second copy and no rule about which wins, which is the whole
+    /// point of the decision.
+    ///
+    /// **Order is by name, then id, and that is deliberate.** The catalog stores configurations in
+    /// a dictionary, so there is no insertion order to preserve; sorting here makes `load` stable
+    /// across launches instead of returning whatever order the dictionary happened to iterate in.
+    /// Nothing user-visible depended on the old insertion order — every library surface sorts for
+    /// itself.
+    @MainActor
+    static func catalog(_ store: any GlassServiceStore) -> ServerPersistenceStore {
+        func servers() -> [ServerConfiguration] {
+            store.configurations(ServerConfiguration.self, ofKind: .ssh)
+                .values
+                .sorted { ($0.name, $0.id.uuidString) < ($1.name, $1.id.uuidString) }
+        }
+        func write(_ data: Data?) async throws {
+            let incoming = data.flatMap { try? JSONDecoder().decode([ServerConfiguration].self, from: $0) } ?? []
+            let wanted = Dictionary(incoming.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            let current = store.configurations(ofKind: .ssh)
+
+            // Removals first: a configuration left behind for a server that is gone is the orphan
+            // D25 exists to prevent, and writing the survivors first would widen the window.
+            for endpointID in current.keys where wanted[endpointID.rawValue] == nil {
+                try await store.setConfiguration(nil, for: endpointID)
+            }
+            for (id, server) in wanted {
+                let endpointID = EndpointID(rawValue: id)
+                let encoded = try JSONEncoder().encode(server)
+                // Unchanged records are skipped rather than rewritten: every write publishes, and
+                // republishing a record nobody edited churns the catalog for every other device.
+                guard current[endpointID] != encoded else { continue }
+                try await store.setConfiguration(encoded, for: endpointID)
+            }
+        }
+        return ServerPersistenceStore(
+            load: { try? JSONEncoder().encode(servers()) },
+            hasStoredValue: { !store.configurations(ofKind: .ssh).isEmpty },
+            save: { try await write($0) },
+            restore: { try await write($0) }
+        )
+    }
 
     static func live(defaults: UserDefaults) -> ServerPersistenceStore {
         ServerPersistenceStore(
@@ -230,7 +276,7 @@ class ServerManager {
     private let credentialMigrationMetadata: CredentialMigrationMetadata
     private let defersLiveCredentialMigration: Bool
     private let passwordStore: ServerPasswordStore
-    private let store: ServerPersistenceStore
+    private var store: ServerPersistenceStore
 
     /// D27: asks the shell to put a machine in the library for a server this capability is about
     /// to save, returning the endpoint id to save it under. Set by the composition root, because a
@@ -251,12 +297,34 @@ class ServerManager {
     /// differently".
     @MainActor
     func adoptedIdentity(hostName: String, address: String,
-                         serviceName: String) async -> (id: UUID, discard: (@MainActor () async -> Void)?) {
-        guard let adoptHost, let id = try? await adoptHost(hostName, address, serviceName) else {
-            return (UUID(), nil)
-        }
+                         serviceName: String) async throws -> (id: UUID, discard: (@MainActor () async -> Void)?) {
+        // No shell attached — a unit test or a preview — behaves exactly as this did before D27.
+        guard let adoptHost else { return (UUID(), nil) }
+        // A *failed* adoption is not the same thing, and must not be swallowed into it. Saving the
+        // server anyway would produce precisely the orphan D27 exists to remove: a connection with
+        // no machine, invisible in the library, with nowhere to be stored under D26.
+        let id = try await adoptHost(hostName, address, serviceName)
         let discardAdoption = self.discardAdoption
         return (id, { await discardAdoption?(id) })
+    }
+
+    /// Whether the **persisted** catalog still references this SSH key.
+    ///
+    /// Deliberately not a question about `servers`, which is what is in memory: this answers a
+    /// crash-recovery question about what actually survived on disk, which is why the SSH key
+    /// deletion journal asks it at startup. Nil means nothing is stored at all — ambiguous rather
+    /// than "no", and the caller treats it as such.
+    ///
+    /// It exists because the caller used to read the catalog's defaults key directly
+    /// (`SettingsManager.persistedServerMetadataReferences`), bypassing this type entirely. D26
+    /// moves the catalog into the shell's store, so a raw defaults read would simply stop finding
+    /// anything — silently answering "no key is referenced" and letting a key in use be deleted.
+    func persistedCatalogReferences(sshKeyID: UUID) throws -> Bool? {
+        guard let data = store.load() else { return nil }
+        guard let servers = try? JSONDecoder().decode([ServerConfiguration].self, from: data) else {
+            throw ServerManagerError.invalidServerCatalog
+        }
+        return servers.contains { $0.sshKeyID == sshKeyID }
     }
 
     /// The legacy host-trust migration kicked off by `loadServers`. Await it when the migration's
@@ -302,6 +370,27 @@ class ServerManager {
         }
     }
 
+    /// False only while `attach(store:)` re-reads: see the note there.
+    private var runsFirstLaunchMigrations = true
+
+    /// Points this manager at a different store, and reloads from it.
+    ///
+    /// The composition root calls this once, with the catalog-backed store (D26). It exists as a
+    /// method rather than an init parameter because the shell model does not exist yet when the
+    /// terminal runtime is built — the runtime is registered *with* the model — and inverting that
+    /// would mean the capability holding the model, which rule 6 forbids.
+    func attach(store: ServerPersistenceStore) {
+        self.store = store
+        hasLoadedServers = false
+        // Re-reading from a different store is not a first launch. The credential and host-trust
+        // migrations run once, against whatever was there at startup; re-running them here would
+        // reach the Keychain again for no reason, and in a test process with no real Keychain
+        // behind it that is a hang rather than a no-op.
+        runsFirstLaunchMigrations = false
+        loadServersIfNeeded()
+        runsFirstLaunchMigrations = true
+    }
+
     func loadServersIfNeeded() {
         guard !hasLoadedServers else { return }
         hasLoadedServers = true
@@ -337,6 +426,7 @@ class ServerManager {
             } catch {
                 Logger.keychain.error("Server credential deletion recovery did not complete: \(error.localizedDescription)")
             }
+            guard runsFirstLaunchMigrations else { return }
             migrateLegacyCredentialsIfNeeded(from: servers)
             // The host-trust migration writes the catalog, which is now an async store, while
             // `loadServers` stays synchronous because `init` calls it. The task is held rather
@@ -505,6 +595,12 @@ class ServerManager {
             throw error
         }
         servers = remainingServers
+        // D26/D27: the machine's service link goes with the server. Deleting from the terminal's
+        // own surfaces used to leave the catalog's link pointing at nothing — the same orphan D25
+        // fixed in the other direction, where deleting a machine left the capability's record. The
+        // link goes last, after the record it describes is definitely gone: a stray link is
+        // recoverable from the library, a record nothing points at is not.
+        await discardAdoption?(server.id)
         WidgetCenter.shared.reloadAllTimelines()
     }
 
@@ -965,9 +1061,15 @@ class ServerManager {
             throw ServerManagerError.invalidServerCatalog
         }
         try await store.save(data)
+        // Compared by identity rather than as an ordered list. The catalog keeps configurations in
+        // a dictionary keyed by endpoint id, so it has no insertion order to give back, and two
+        // orderings of the same servers are the same catalog. What the check still guarantees is
+        // the part that matters: every server that went in came back, unchanged, and nothing else
+        // came back with it.
         guard let persistedData = store.load(),
               let persistedServers = try? JSONDecoder().decode([ServerConfiguration].self, from: persistedData),
-              persistedServers == candidateServers else {
+              Dictionary(persistedServers.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+                == Dictionary(candidateServers.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }) else {
             throw ServerManagerError.persistenceReadbackMismatch
         }
         defaults.set(SharedDefaults.currentSchemaVersion, forKey: SharedDefaults.schemaVersionKey)

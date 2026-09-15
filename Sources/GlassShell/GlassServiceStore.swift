@@ -46,8 +46,21 @@ public extension GlassServiceStore {
         return try? JSONDecoder().decode(type, from: data)
     }
 
-    func setConfiguration<T: Encodable>(_ value: T, for endpointID: EndpointID) async throws {
-        try await setConfiguration(JSONEncoder().encode(value), for: endpointID)
+    /// Encode the capability's own type and store it.
+    ///
+    /// **The label is load-bearing.** Without it this reads
+    /// `setConfiguration<T: Encodable>(_ value: T, …)`, and `Data` is itself `Encodable` — so
+    /// passing `Data` matches the generic exactly while matching the `Data?` requirement only
+    /// through optional promotion, and Swift prefers the exact match. The body then encodes the
+    /// `Data` to a base64 JSON string, producing more `Data`, and calls itself. It recursed
+    /// forever, each turn allocating a larger blob, until the process was killed for using 90 GB —
+    /// with no crash report and no output, because an out-of-memory kill leaves neither.
+    ///
+    /// The `Data?` local below is the second guard: even under the label, it makes the requirement
+    /// the only thing this call can resolve to.
+    func setConfiguration<T: Encodable>(encoding value: T, for endpointID: EndpointID) async throws {
+        let encoded: Data? = try JSONEncoder().encode(value)
+        try await setConfiguration(encoded, for: endpointID)
     }
 
     /// Every decodable record of one kind, in no particular order. Undecodable entries are skipped.

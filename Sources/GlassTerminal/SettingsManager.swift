@@ -569,16 +569,33 @@ class SettingsManager {
         }
     }
 
+    /// Asked at startup, to reconcile a key deletion that was interrupted part-way.
+    ///
+    /// Goes through `ServerManager` rather than reading the catalog's storage directly: D26 moves
+    /// the catalog onto the service links, so a raw defaults read would find nothing and answer
+    /// "not referenced" for every key — letting a key still in use be deleted on the strength of
+    /// looking in the wrong place.
+    /// The saved-server catalog, for the one question this type has to ask it: at startup, whether
+    /// an interrupted key deletion left a key still referenced by a persisted server.
+    ///
+    /// Weak and optional because `SettingsManager` outlives nothing and owns nothing here — the
+    /// runtime creates both and hands this over. Nil in tests and previews, where the answer is
+    /// treated as ambiguous rather than "no".
+    weak var serverManager: ServerManager?
+
     private func persistedServerMetadataReferences(_ entry: SSHKeyDeletionJournal.Entry) throws -> Bool {
         guard !entry.referencedServerIDs.isEmpty else { return false }
-        guard let data = sshKeyDefaults.data(forKey: UserDefaultsKeys.servers) else {
-            // Missing server metadata is ambiguous when the prepared journal recorded references.
-            return true
-        }
-        guard let servers = try? JSONDecoder().decode([ServerConfiguration].self, from: data) else {
+        guard let serverManager else { return true }
+        do {
+            // Nil means nothing is stored, which is ambiguous when the journal recorded references
+            // — the same answer the old code gave for a missing defaults value.
+            guard let referenced = try serverManager.persistedCatalogReferences(sshKeyID: entry.key.id) else {
+                return true
+            }
+            return referenced
+        } catch {
             throw SettingsPersistenceError.readbackMismatch
         }
-        return servers.contains { $0.sshKeyID == entry.key.id }
     }
 
     private func reconcileSSHKeyDeletionJournalAtStartup() {
@@ -1038,7 +1055,7 @@ class SettingsManager {
                     // D27: each imported `Host` becomes a machine in the library, reusing an
                     // existing record when one already has this address rather than standing a
                     // second one beside it.
-                    let adopted = await serverManager.adoptedIdentity(
+                    let adopted = try await serverManager.adoptedIdentity(
                         hostName: entry.alias, address: host, serviceName: "Terminal")
                     let server = ServerConfiguration(
                         id: adopted.id,

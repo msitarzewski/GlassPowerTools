@@ -331,14 +331,20 @@ final class TerminalServiceDraft: GlassServiceDraft {
         // already has — its host record exists — so only a new one is adopted.
         var discardAdoption: (@MainActor () async -> Void)?
         let id: UUID
-        if let editing {
-            id = editing.id
-        } else {
-            let adopted = await serverManager.adoptedIdentity(
-                hostName: name.isEmpty ? address : name, address: address,
-                serviceName: serviceDisplayName(hostName: name.isEmpty ? address : name))
-            id = adopted.id
-            discardAdoption = adopted.discard
+        do {
+            if let editing {
+                id = editing.id
+            } else {
+                let adopted = try await serverManager.adoptedIdentity(
+                    hostName: name.isEmpty ? address : name, address: address,
+                    serviceName: serviceDisplayName(hostName: name.isEmpty ? address : name))
+                id = adopted.id
+                discardAdoption = adopted.discard
+            }
+        } catch {
+            Logger.servers.error("Could not add the machine to the library: \(error.localizedDescription)")
+            saveError = "The server was not added because its machine could not be created: \(error.localizedDescription)"
+            return false
         }
 
         do {

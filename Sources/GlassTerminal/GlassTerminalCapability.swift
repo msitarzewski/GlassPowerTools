@@ -72,6 +72,10 @@ public final class GlassTerminalRuntime {
         let settingsManager = SettingsManager(loadImmediately: false, layers: layers)
         sessionManager = SessionManager(loadImmediately: false)
         self.settingsManager = settingsManager
+        // The settings surface asks the catalog exactly one question — whether an interrupted SSH
+        // key deletion left a key still referenced by a persisted server — and it has to reach the
+        // catalog through its owner rather than reading storage behind its back (D26).
+        settingsManager.serverManager = sessionManager.serverManager
         windowRecoveryManager = windowRecovery ?? GlassWindowRecoveryManager()
         trustBroker = TerminalHostTrustBroker {
             settingsManager.hostKeyVerificationMode == HostKeyVerificationMode.ask.rawValue

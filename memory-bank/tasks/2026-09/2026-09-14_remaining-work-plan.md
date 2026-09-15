@@ -535,3 +535,57 @@ files in `Tests/`).
 
 **Still to do, and it is the part that matters:** the leak itself. Sweeping fixes today and changes
 nothing about tomorrow.
+
+## Terminal, part 3: the catalog is the store (2026-09-15) — done
+
+`ServerPersistenceStore.catalog(_:)` puts each saved server on its own service link. The composition
+root attaches it; `UserDefaultsKeys.servers` is no longer the production store and is out of both
+legacy migrations. Deleting a server takes its link with it, through `detachService` — link-only,
+because the capability is the one deleting and `removeService` would call straight back into the
+delete that is running.
+
+**1481 tests / 157 suites, exit status 0.**
+
+### The bug that cost the machine 90 GB
+
+`GlassServiceStore` carried both the requirement `setConfiguration(_ data: Data?, for:)` and a
+convenience `setConfiguration<T: Encodable>(_ value: T, for:)`. **`Data` is `Encodable`.** Passing
+`Data` matches the generic *exactly* while matching the requirement only through optional
+promotion, so Swift chose the generic — which encoded the `Data` to a base64 JSON string, producing
+more `Data`, and called itself. The extension's own body did this, so it recursed for **any**
+caller, not just the new one.
+
+It had no callers from the day it was written until stage 1 reached it. When it finally ran it
+allocated until the process was killed at **90 GB**.
+
+**Why it took so long to find, and this is the lesson worth keeping:** an out-of-memory kill leaves
+**no crash report, no failure line and no output** — the test process simply stopped, in about two
+seconds, looking exactly like a hang. Two whole diagnostic passes went into the locked-screen
+hypothesis first, because that *also* produces an opaque failure on this machine and was genuinely
+present. The thing that actually found it was instrumenting the call path with unbuffered stderr
+writes and watching which line never printed: the callee was never entered, which pointed at
+dispatch rather than at anything the callee did.
+
+Fixed by labelling the convenience `setConfiguration(encoding:for:)` and typing its local as `Data?`
+so the requirement is the only thing it can resolve to. `Tests/GlassShellTests/GlassServiceStoreTests.swift`
+pins both halves; each case completes in microseconds when the API is right and does not complete at
+all when it is not.
+
+**A watchdog is now the way to run a suspect test**: launch it, sample total RSS, kill above a
+ceiling. The runaway went from 4,885 MB peak to 8 MB.
+
+### Two other defects found on the way
+
+- **`adoptedIdentity` swallowed adoption failures** with `try?`, making a real failure
+  indistinguishable from "no shell attached" — and then saving the server anyway under a fresh
+  `UUID()`, which is exactly the orphan D27 exists to remove. It propagates now, and both call sites
+  report it.
+- **`attach(store:)` re-ran the first-launch migrations**, reaching the Keychain on every store
+  swap. Confined to the first load.
+
+### Tests updated rather than deleted
+
+Two legacy-migration tests asserted that a legacy `servers` blob is copied forward and that an
+unreadable one holds the migration open for a retry. Both describe machinery D26 removed, so they
+now assert the contract that exists: the blob is ignored, the settings beside it still migrate, and
+the pass completes rather than staying pending.

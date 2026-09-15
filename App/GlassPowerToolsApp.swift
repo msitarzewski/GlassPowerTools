@@ -78,8 +78,13 @@ struct GlassPowerToolsApp: App {
                                                 serviceName: serviceName).rawValue
         }
         terminal.sessionManager.serverManager.discardAdoption = { [weak model] id in
-            await model?.discardAdoption(EndpointID(rawValue: id))
+            // Link-only. The capability is the one deleting, so asking it to delete again through
+            // `removeService` would call straight back into the delete that is running.
+            await model?.detachService(EndpointID(rawValue: id))
         }
+        // D26: the catalog is the one store for a connection. The terminal's saved servers live on
+        // their own service links from here on; `UserDefaultsKeys.servers` is gone.
+        terminal.sessionManager.serverManager.attach(store: .catalog(model))
         model.registry.register(GlassTerminalCapability(runtime: terminal))
         // Stage 3: the database capability. Its managers live for the process in the runtime;
         // the shell routes Connect for `.database` services through the capability, and the

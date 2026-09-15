@@ -557,11 +557,12 @@ struct MacWorkspaceTests {
             destination: defaults
         )
 
-        let migratedData = try #require(defaults.data(forKey: UserDefaultsKeys.servers))
-        let migratedServers = try JSONDecoder().decode([ServerConfiguration].self, from: migratedData)
-        #expect(migratedServers.count == 1)
-        #expect(migratedServers[0].name == "Legacy")
-        #expect(migratedServers[0].trustedHostKeys == nil)
+        // D26: saved servers are **not** migrated any more. The catalog is the one store for a
+        // connection, and the decision was explicitly that the new build reads nothing old — so a
+        // legacy `servers` blob is left where it is rather than copied forward.
+        #expect(defaults.object(forKey: UserDefaultsKeys.servers) == nil,
+                "the legacy server catalog was copied forward; D26 says it must not be")
+        // Settings still come across: they are not connections.
         #expect(defaults.double(forKey: UserDefaultsKeys.windowOpacity) == 0.42)
         #expect(defaults.data(forKey: workspaceKey) == Data("workspace".utf8))
         #expect(defaults.object(forKey: UserDefaultsKeys.trustedHostKeys) == nil)
@@ -590,39 +591,31 @@ struct MacWorkspaceTests {
         #expect(defaults.bool(forKey: SharedDefaults.legacyMacDomainMigrationSentinel))
     }
 
-    @Test func legacyMacDefaultsMigrationRetriesAnUnreadableServerCatalog() throws {
+    /// Replaces `legacyMacDefaultsMigrationRetriesAnUnreadableServerCatalog`, which tested
+    /// machinery D26 removed: the migration used to sanitise a legacy server catalog before
+    /// copying it, and to withhold its completion sentinel so an unreadable one would be retried
+    /// on a later launch. Saved servers are not migrated at all now — the catalog is the one store
+    /// for a connection, and the new build reads nothing old — so there is nothing to retry.
+    @Test func legacyMacDefaultsMigrationIgnoresAnUnreadableServerCatalogAndStillCompletes() throws {
         let suiteName = "sh.glas.legacy-migration-tests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.removePersistentDomain(forName: suiteName)
 
         SharedDefaults.migrateLegacyMacDomainIfNeeded(
-            legacyDomain: [UserDefaultsKeys.servers: Data("not-json".utf8)],
-            destination: defaults
-        )
-
-        #expect(defaults.data(forKey: UserDefaultsKeys.servers) == nil)
-        #expect(!defaults.bool(forKey: SharedDefaults.legacyMacDomainMigrationSentinel))
-
-        let recoveredServer = ServerConfiguration(
-            name: "Recovered",
-            host: "recovered.test",
-            username: "tester"
-        )
-        SharedDefaults.migrateLegacyMacDomainIfNeeded(
             legacyDomain: [
-                UserDefaultsKeys.servers: try JSONEncoder().encode([recoveredServer])
+                UserDefaultsKeys.servers: Data("not-json".utf8),
+                UserDefaultsKeys.windowOpacity: 0.42,
             ],
             destination: defaults
         )
 
-        let migratedData = try #require(defaults.data(forKey: UserDefaultsKeys.servers))
-        let migratedServers = try JSONDecoder().decode(
-            [ServerConfiguration].self,
-            from: migratedData
-        )
-        #expect(migratedServers.map(\.name) == ["Recovered"])
-        #expect(defaults.bool(forKey: SharedDefaults.legacyMacDomainMigrationSentinel))
+        // Not copied, not sanitised, not a reason to come back: simply not this build's business.
+        #expect(defaults.object(forKey: UserDefaultsKeys.servers) == nil)
+        // The settings beside it still migrate, and the pass is finished rather than pending.
+        #expect(defaults.double(forKey: UserDefaultsKeys.windowOpacity) == 0.42)
+        #expect(defaults.bool(forKey: SharedDefaults.legacyMacDomainMigrationSentinel),
+                "an unreadable server catalog no longer holds the migration open")
     }
 
     @Test func restorationStateRoundTripsEveryPaneIntentAndSplitProperty() throws {

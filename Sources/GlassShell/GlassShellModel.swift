@@ -812,14 +812,43 @@ public final class GlassShellModel: GlassServiceStore {
         return try await addService(kind: kind, displayName: serviceName, to: hostID).endpointID
     }
 
-    /// Undoes an `adoptService` whose caller then failed to write its own record. Removing the last
-    /// service tombstones the record it was on, so a host created only for this adoption does not
-    /// survive as an empty machine.
-    public func discardAdoption(_ endpointID: EndpointID) async {
+    /// Removes a service link **without** asking the capability to clean up after it.
+    ///
+    /// The distinction from `removeService` is the whole point and is easy to get wrong. The shell
+    /// deleting a service must tell the capability (D25). A *capability* deleting its own service
+    /// must not be told to delete it again: `removeService` would call straight back into the
+    /// capability that is mid-delete, which is at best a no-op it has to defend against and at
+    /// worst a loop.
+    ///
+    /// Used for both directions of D27's cleanup: an adoption whose record then failed to save,
+    /// and a record the capability deleted from its own surfaces. Removing the last service
+    /// tombstones the record it was on, so a machine created only for that service does not
+    /// survive as an empty row.
+    public func detachService(_ endpointID: EndpointID) async {
         guard let owner = records.first(where: { record in
             record.services.contains { $0.endpointID == endpointID }
         }) else { return }
-        try? await removeService(endpointID, from: owner.id)
+        do {
+            if isLocalHost(owner.id) {
+                try await localCatalog.unpair(endpointID: endpointID, from: owner.id)
+            } else {
+                try await catalog.unpair(endpointID: endpointID, from: owner.id)
+            }
+            if preferences[host: owner.id].lastUsedEndpointID == endpointID {
+                preferences[host: owner.id].lastUsedEndpointID = nil
+                try persistPreferences()
+            }
+            await load()
+        } catch {
+            // Best effort: a link that outlives its record shows in the library as a service the
+            // capability has nothing for, which the capability already reports honestly on Connect.
+            catalogSyncStatus = .failed(error.localizedDescription)
+        }
+    }
+
+    /// Undoes an `adoptService` whose caller then failed to write its own record.
+    public func discardAdoption(_ endpointID: EndpointID) async {
+        await detachService(endpointID)
     }
 
     /// Links a service to the host's canonical record. `endpointID` is the key the owning

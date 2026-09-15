@@ -8,6 +8,11 @@
 import Foundation
 
 nonisolated enum UserDefaultsKeys {
+    /// **No longer the production store (D26).** Saved servers live on their service links in the
+    /// catalog; the composition root attaches `ServerPersistenceStore.catalog` at launch. This key
+    /// backs `ServerPersistenceStore.live`, which is what a unit test, a preview or any context
+    /// with no shell attached uses — and it is deliberately absent from both legacy migrations,
+    /// because the decision was that the new build reads nothing old.
     static let servers = "servers"
     static let autoReconnect = "autoReconnect"
     static let confirmBeforeClosing = "confirmBeforeClosing"
@@ -110,7 +115,10 @@ nonisolated enum SharedDefaults {
         #endif
         guard !standard.bool(forKey: migrationSentinel) else { return }
 
-        for key in [UserDefaultsKeys.servers, UserDefaultsKeys.sshKeys, UserDefaultsKeys.trustedHostKeys] {
+        // `servers` is not in this list any more: D26 made the catalog the one store for a
+        // connection, and the decision was explicitly that the new build reads nothing old. Keys
+        // and host-key pins still come across — they are credentials, not connections.
+        for key in [UserDefaultsKeys.sshKeys, UserDefaultsKeys.trustedHostKeys] {
             if let data = standard.data(forKey: key), defaults.data(forKey: key) == nil {
                 defaults.set(data, forKey: key)
             }
@@ -121,7 +129,7 @@ nonisolated enum SharedDefaults {
 
     #if os(macOS)
     private static let legacyMacNonSecretKeys: Set<String> = [
-        UserDefaultsKeys.servers,
+        // `servers` deliberately absent — see `migrateIfNeeded`.
         UserDefaultsKeys.sshKeys,
         UserDefaultsKeys.autoReconnect,
         UserDefaultsKeys.confirmBeforeClosing,
@@ -163,18 +171,13 @@ nonisolated enum SharedDefaults {
         guard !destination.bool(forKey: legacyMacDomainMigrationSentinel),
               let legacyDomain else { return }
 
-        var copiedEveryPendingValue = true
+        // Settings only. The saved-server branch that used to live here — sanitising a legacy
+        // catalog before copying it across — went with D26: `servers` is no longer a key this
+        // build reads, from any domain.
+        let copiedEveryPendingValue = true
         for (key, value) in legacyDomain
         where isLegacyMacNonSecretKey(key) && destination.object(forKey: key) == nil {
-            if key == UserDefaultsKeys.servers {
-                guard let sanitizedServers = sanitizedLegacyServerCatalog(value) else {
-                    copiedEveryPendingValue = false
-                    continue
-                }
-                destination.set(sanitizedServers, forKey: key)
-            } else {
-                destination.set(value, forKey: key)
-            }
+            destination.set(value, forKey: key)
         }
 
         if copiedEveryPendingValue {

@@ -161,3 +161,23 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     test fail** before trusting it, and when it still passes, the test is pointed at the wrong thing
     — not the bug at nothing.
 
+28. **`mktemp` / `NSCocoaErrorDomain Code=513` in a test means the Mac's screen is locked, not that
+    the code is broken.** The catalog and several stores write with `.completeFileProtection`, and
+    those writes fail while the screen is locked — surfacing as *"Creating a temporary file via
+    mktemp failed… errno 1"*, which reads like a permissions or sandbox fault and is neither. It
+    cost a long diagnosis on 2026-09-13 (116 failures) and again on 2026-09-15, where it first
+    looked like a hang because the failure was being swallowed. **Check it first:**
+    `ioreg -n Root -d1 -a | grep -A1 CGSSessionScreenIsLocked`. Ask the user to unlock; do not
+    change code in response to it, and do not report the run as a failure of the work under test.
+
+29. **A process killed for memory leaves no crash report, no failure line and no output.** It looks
+    exactly like a hang, and on 2026-09-15 it looked exactly like the locked-screen failure too, so
+    two diagnostic passes went the wrong way. `GlassServiceStore`'s convenience overload recursed
+    into itself — `Data` is `Encodable`, so `setConfiguration(someData,…)` matched the generic
+    exactly and the `Data?` requirement only by promotion — and ran to **90 GB**. What found it was
+    instrumenting the call path with unbuffered `FileHandle.standardError.write` and seeing that the
+    *callee was never entered*, which pointed at overload resolution rather than at anything the
+    callee did. **Run a suspect test under a memory watchdog** (launch, poll total RSS, kill above a
+    ceiling) rather than re-running it and hoping. And treat a generic overload that shadows a
+    concrete one as a defect: label it.
+
