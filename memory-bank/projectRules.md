@@ -137,3 +137,27 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     the *concept* and not the name you expect: the behaviour, the call sites, the persistence key,
     the types it would have to produce. And when reporting one, say what you searched for, so the
     next reader can see the shape of the hole rather than trusting the conclusion.
+
+25. **Verify a test run by its exit status, never by grepping for failures.** A target that aborts
+    prints no `✘` line *and* no `Test run with N tests` line, so a pipeline that greps for failures
+    and sums the counts sees a crashed target as neither — it reports success, with a plausible
+    total. `GlassEditorCoreTests` aborted from `57bca0b` until 2026-09-15 and **320 tests in 36
+    suites** were silently missing from every figure reported in between. Check `$?`, and read the
+    `Note: Some test targets reported failures:` trailer; it did appear, and was misread as being
+    about a different target. A count that cannot be wrong is worth more than a count that is
+    usually right.
+
+26. **Never `git checkout --` a file that has uncommitted work in it.** Defeating a rule to prove a
+    test bites is right; undoing that defeat with `git checkout` is not, because it reverts
+    everything else in the file too. It destroyed a finished implementation mid-session on
+    2026-09-14 and cost a full reapplication. Edit the defeat back out in place, or stash only it.
+
+27. **A test written against the wrong projection looks exactly like a passing test.** Two on
+    2026-09-15. `aSecondServiceAtTheSameAddressJoinsTheMachineAlreadyThere` asserted on
+    `catalogHosts` and passed with address reuse disabled, because `GlassShellHostGrouping` already
+    merges records that share an address into one row — the duplicate record was real and invisible.
+    The SQL scanner pen test passes with pen finding M-5 present, even under AddressSanitizer,
+    because the bug is state loss rather than a memory error. So: **defeat the logic and watch the
+    test fail** before trusting it, and when it still passes, the test is pointed at the wrong thing
+    — not the bug at nothing.
+

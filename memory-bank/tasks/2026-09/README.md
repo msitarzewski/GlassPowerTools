@@ -207,3 +207,14 @@ occurrence of the defect class), and **`normalizeSelectedSSHKey` silently re-att
 in the library** to any service still set to key auth with no key, so a naive detach would undo
 itself later. D28's index already exists ad hoc in two places and gets extracted rather than
 rewritten.
+
+## 2026-09-15 — D27 built, grammar patches restored, verification corrected
+
+[D27/D28 plan](2026-09-14_d27-d28-plan.md) · [Dropped grammar patches](2026-09-14_dropped-grammar-patches.md)
+
+`.rdp` import wired through the shell's setup sheet (`ce2b966`); D27's `adoptService` built so Add
+Server and `ssh_config` import put machines in the library (`1adbea9`); markdown and SQL scanner
+patches restored after the absorption dropped them (`ef8e843`, `fae1cca`).
+
+**1473 tests / 155 suites, exit status 0** — and every earlier count was short by the 320 tests of
+an aborting target, because a crashed target prints neither a failure line nor a count line.

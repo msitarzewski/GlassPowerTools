@@ -1236,3 +1236,61 @@ project's residue.
 **Next action:** plan D27 and D28 properly before building — survey every surface that creates,
 edits, deletes or displays a saved connection or a credential, because the reverse index is only
 correct if every edge-writing path is known. Then build D26 stage 1's remaining half.
+
+## 2026-09-15 — D27 built; two grammar patches restored; the verification method corrected
+
+**State BUILD.** Owner: coordinating agent. Committed through `1adbea9`; tree clean.
+**Full suite: 1473 tests / 155 suites, exit status 0.**
+
+### The correction that matters most
+
+**Every test count reported before today was wrong.** A test target that aborts prints no `✘` line
+*and* no `Test run with N tests` line, so verifying by grepping for failures and summing the counts
+sees a crashed target as neither. `GlassEditorCoreTests` had been aborting since `57bca0b` —
+**320 tests and 36 suites** missing from every figure (1146, 1153, 1169). **Exit status is the
+check.** The `Note: Some test targets reported failures:` trailer is the second signal; it appeared
+and was misread as being about the target then under refactor.
+
+### Two security patches were dropped and are restored
+
+`57bca0b` swapped GlassEditorKit's **vendored** grammars for pinned upstream revisions. The kit's
+sources were not stock:
+
+- **markdown (pen H-1)** — upstream's `serialize()` copies every open block into a fixed 1024-byte
+  buffer unbounded: above 254 open blocks it overruns. Heap corruption in release, **reachable by
+  opening a deeply-nested markdown file**. `ScannerOverflowPenTests` aborted on every run.
+- **SQL (pen M-5)** — `serialize()` frees and nils `start_tag`, consuming the state it was asked to
+  snapshot; `deserialize()` overwrites the pointer without freeing or checking it. Still present on
+  upstream HEAD, so a newer pin was not the fix.
+
+Both are vendored again at the pinned commits with the patches restored; `parser.c` is byte-identical
+to upstream in each, only `scanner.c` differs. **The "41 MB" that drove a fork recommendation was the
+working-tree size** — git stores SQL's parser in **2.6 MB**. `.git` is 13 MB.
+
+**M-5 could not be reproduced through behaviour** — not by the existing smoke test, not under
+AddressSanitizer, not by an incremental-versus-full highlight comparison with the incremental path
+asserted. It is patched because the code is wrong, and `THIRD-PARTY-NOTICES.md` now distinguishes
+*guarded by a test* from *applied on inspection*.
+
+### Landed this session
+
+- **`.rdp` import wired** (`ce2b966`). Its only caller had lived in `DesktopLibraryView`, the file
+  the merge deleted. Parse off-main → the shell's Add Host sheet pre-filled, notices shown → Save
+  through the ordinary flow. glassDT's parser tests ported plus four that walk the seam.
+- **D27** (`1adbea9`). `adoptService` / `discardAdoption`; Add Server and `ssh_config` import both
+  put machines in the library, reusing a record that already has the address.
+- **D26 stage 1 seam** (`0eee30e`): `ServerPersistenceStore`, write path async because the catalog
+  is an actor.
+- A flaky staging assertion fixed; 35,865 abandoned test plists and 23 test catalogs swept.
+
+### Rules earned this session
+
+1. **Never `git checkout --` a file with uncommitted work** to undo a deliberate defeat — it took
+   the prefill implementation with it. Edit the defeat back out in place.
+2. **A test written against the wrong projection looks exactly like a passing test.** Two this
+   session: `catalogHosts` hides a duplicated record because the grouping merges by address; the SQL
+   pen test passes with the bug present.
+
+**Next action:** D26 stage 1's remaining half — the catalog-backed store, `UserDefaultsKeys.servers`
+deleted with its two legacy-migration entries, and the `SettingsManager.swift:574` read of the raw
+defaults key that bypasses `ServerManager`.
