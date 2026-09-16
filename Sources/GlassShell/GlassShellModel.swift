@@ -328,6 +328,19 @@ public final class GlassShellModel: GlassServiceStore {
             let local = try await catalog.snapshot(includeDeleted: true)
             let outcome = GlassCatalogMerge.reconcile(local: local, remote: remote)
 
+            // What the incoming records take away, captured before they are applied: afterwards
+            // there is nothing left to ask. A tombstone removes every service on the record; an
+            // ordinary edit removes whichever services are no longer on it.
+            var departed: [(service: HostServiceLink, owner: HostProfile)] = []
+            let localByID = Dictionary(local.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            for profile in outcome.toApplyLocally {
+                guard let mine = localByID[profile.id], mine.deletedAt == nil else { continue }
+                let surviving = profile.deletedAt == nil ? Set(profile.services.map(\.endpointID)) : []
+                departed += mine.services
+                    .filter { !surviving.contains($0.endpointID) }
+                    .map { (service: $0, owner: mine) }
+            }
+
             for profile in outcome.toApplyLocally {
                 try await catalog.upsert(profile)
             }
@@ -339,6 +352,12 @@ public final class GlassShellModel: GlassServiceStore {
             if !outcome.toApplyLocally.isEmpty {
                 records = try await catalog.snapshot()
                 hosts = GlassShellHostGrouping.group(records)
+            }
+            if !departed.isEmpty {
+                // Deliberately not rethrown: a capability failing to delete its credential must not
+                // fail the whole sync, which has already applied correctly. `deleteHost` throws
+                // because a person is watching; nobody is watching this.
+                try? await cascadeRemoval(of: departed)
             }
             catalogSyncStatus = .synced(Date())
         } catch {
@@ -760,6 +779,22 @@ public final class GlassShellModel: GlassServiceStore {
         try persistPreferences()
         await load()
 
+        try await cascadeRemoval(of: owned)
+    }
+
+    /// Tells each capability to delete what it stored for services that have gone.
+    ///
+    /// The one implementation both deletion paths use: a host deleted **here** (`deleteHost`) and a
+    /// host deleted **on another device**, which arrives as a tombstone through the sync. D25 fixed
+    /// the first; the second went on orphaning credentials until D26 stage 2, because the merge
+    /// applied tombstones and told nobody.
+    ///
+    /// **What is left to clean is credentials.** Since stage 1 the configuration lives on the link,
+    /// so a tombstone takes it along; the Keychain entry is what has nobody else to remove it.
+    ///
+    /// A capability that throws must not strand the rest, so every one gets its turn and the first
+    /// failure is reported afterwards.
+    private func cascadeRemoval(of owned: [(service: HostServiceLink, owner: HostProfile)]) async throws {
         var firstFailure: Error?
         for entry in owned {
             do {

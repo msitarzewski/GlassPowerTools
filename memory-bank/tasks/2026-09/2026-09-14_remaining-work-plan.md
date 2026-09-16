@@ -643,3 +643,46 @@ app actually share.
 All three capabilities read and write their records on their service links. `UserDefaultsKeys.servers`,
 `glassdb.connections` and `connections.json` are no longer production stores. **Next: stage 2**, the
 synced deletion cascade, which stage 1 shrank to Keychain credentials alone.
+
+## D26 stage 2 complete — synced deletion cascades, 2026-09-15
+
+**1489 tests / 159 suites, exit status 0; the app target builds.**
+
+### Extraction, not new logic
+
+`deleteHost` already did this correctly and had since D25: capture the owned services *before* the
+records go, delete the records, then ask each capability to clean up, collecting the first failure
+so one throwing capability cannot strand the rest. That body is now `cascadeRemoval(of:)` and both
+deletion paths call it — a host deleted **here**, and a host deleted **on another device**.
+
+### What the sync had to learn
+
+`synchronizeCatalog` applied the merge outcome and told nobody. It now captures what each incoming
+record *takes away*, before applying it, from the local snapshot it already holds:
+
+- a **tombstone** removes every service on the record;
+- an **ordinary edit** removes whichever services are no longer on it.
+
+A host arriving for the first time has no local record, so nothing departed — and a rename removes
+nothing, which is the case most likely to be got wrong and has its own test.
+
+### Two deliberate differences from the local path
+
+**The cascade runs after the projection is rebuilt**, matching `deleteHost`'s order: the records go
+first, then the capabilities are asked. A stray configuration is harmless; a link to nothing is not.
+
+**A failure here is swallowed, where `deleteHost` throws.** `deleteHost` throws because a person
+pressed Delete and is waiting for an answer. Nobody is watching a background sync, and a capability
+failing to remove a credential must not fail a sync that has already applied correctly.
+
+### What the cascade is actually for now
+
+Since stage 1 the configuration lives on the service link, so a tombstone takes it along. The
+Keychain credential is what has nobody else to remove it — which is why stage 2 is small, and why
+it would have been much larger before stage 1.
+
+### Evidence
+
+Four tests drive a real `GlassShellModel` through a scripted backend with a capability that records
+every `removeService`. Defeating the cascade fails both positive tests and leaves both negative ones
+green — the shape that shows they test the cascade rather than the sync.
