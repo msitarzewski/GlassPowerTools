@@ -115,10 +115,11 @@ nonisolated enum SharedDefaults {
         #endif
         guard !standard.bool(forKey: migrationSentinel) else { return }
 
-        // `servers` is not in this list any more: D26 made the catalog the one store for a
-        // connection, and the decision was explicitly that the new build reads nothing old. Keys
-        // and host-key pins still come across — they are credentials, not connections.
-        for key in [UserDefaultsKeys.sshKeys, UserDefaultsKeys.trustedHostKeys] {
+        // Neither `servers` nor `sshKeys` is in this list any more. D26 made the catalog the one
+        // store for a connection and moved key *records* into the Keychain beside their material,
+        // and the decision was explicitly that the new build reads nothing old. Host-key pins still
+        // come across: they are still kept where they always were.
+        for key in [UserDefaultsKeys.trustedHostKeys] {
             if let data = standard.data(forKey: key), defaults.data(forKey: key) == nil {
                 defaults.set(data, forKey: key)
             }
@@ -129,8 +130,7 @@ nonisolated enum SharedDefaults {
 
     #if os(macOS)
     private static let legacyMacNonSecretKeys: Set<String> = [
-        // `servers` deliberately absent — see `migrateIfNeeded`.
-        UserDefaultsKeys.sshKeys,
+        // `servers` and `sshKeys` deliberately absent — see `migrateIfNeeded`.
         UserDefaultsKeys.autoReconnect,
         UserDefaultsKeys.confirmBeforeClosing,
         UserDefaultsKeys.saveScrollback,

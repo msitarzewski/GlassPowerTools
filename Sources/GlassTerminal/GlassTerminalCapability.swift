@@ -97,6 +97,9 @@ public final class GlassTerminalRuntime {
         adopt: @escaping @MainActor (_ hostName: String, _ address: String, _ serviceName: String) async throws -> UUID,
         discard: @escaping @MainActor (UUID) async -> Void
     ) {
+        // D26 stage 3: key records move into the Keychain, beside the material they name, so a key
+        // imported on the Mac can be named on the phone rather than arriving as a nameless secret.
+        settingsManager.attachKeychainKeyCatalog()
         let manager = sessionManager.serverManager
         manager.adoptHost = adopt
         manager.discardAdoption = discard

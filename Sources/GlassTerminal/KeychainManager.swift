@@ -599,6 +599,52 @@ enum KeychainManager {
 
     /// Deletes from both, because a key written before this split may be in either and leaving one
     /// behind is how a secret becomes unreachable but not gone.
+    // MARK: - SSH Key Records (D26)
+
+    /// Saves a key's record to the same store its material went to.
+    ///
+    /// The routing decision is made **once**, here, for both halves: `saveSSHKey` sends Secure
+    /// Enclave material to the device-bound configuration, and a record for a key that cannot leave
+    /// this device must not leave it either — a key listed on another device and guaranteed to fail
+    /// there is worse than one that is simply not listed.
+    ///
+    /// `storageKind` is the record's own statement of what it is, set when the key was created or
+    /// imported from the same prefix check that routes the material, so the two cannot disagree.
+    static func saveSSHKeyRecord(_ record: StoredSSHKey) throws {
+        try SSHKeyRecordStore.save(record, config: recordDestination(for: record))
+    }
+
+    /// Which store a record belongs in. Separated from the write so the *decision* can be tested
+    /// without a Keychain the test process is allowed to use — the production configuration carries
+    /// a real access group, which an unsigned test binary cannot write to. `isDeviceBoundKeyMaterial`
+    /// already has the same seam for the same reason.
+    static func recordDestination(for record: StoredSSHKey) -> SecretStoreConfiguration {
+        record.storageKind == .secureEnclave ? deviceBoundConfig : config
+    }
+
+    /// Every key record this device can use: the synchronized ones, plus the hardware keys that
+    /// belong to this device alone. Sorted oldest first so the library has a stable order.
+    ///
+    /// A failure reading either store is **not** swallowed into an empty list — "no keys" and "the
+    /// Keychain would not answer" are different, and only one of them is safe to show a user who is
+    /// about to decide a key is gone.
+    static func allSSHKeyRecords() throws -> [StoredSSHKey] {
+        let synchronized = try SSHKeyRecordStore.all(config: config)
+        let deviceBound = try SSHKeyRecordStore.all(config: deviceBoundConfig)
+        return (synchronized + deviceBound).sorted { $0.createdAt < $1.createdAt }
+    }
+
+    /// Removes the record from both stores, for the same reason `deleteSSHKey` does: the caller has
+    /// an id, and which store holds it depends on what kind of key it was.
+    static func deleteSSHKeyRecord(for keyID: UUID) throws {
+        var firstError: (any Error)?
+        do { try SSHKeyRecordStore.delete(keyID, config: config) } catch { firstError = error }
+        do { try SSHKeyRecordStore.delete(keyID, config: deviceBoundConfig) } catch {
+            if firstError == nil { firstError = error }
+        }
+        if let firstError { throw firstError }
+    }
+
     static func deleteSSHKey(for keyID: UUID) throws {
         var firstError: (any Error)?
         do { try SSHKeyKeychainStore.delete(for: keyID, config: config) } catch { firstError = error }

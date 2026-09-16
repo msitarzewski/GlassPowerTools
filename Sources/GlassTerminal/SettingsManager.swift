@@ -206,6 +206,9 @@ class SettingsManager {
     private let sshKeyDefaults: UserDefaults
     private let sshKeyLifecycleStore: SSHKeyLifecycleStore
     private let sshKeyCatalogWriter: (Data) -> Void
+    /// D26: where key records live. Defaults to the pre-D26 defaults store; the runtime attaches
+    /// the Keychain one in production.
+    var sshKeyCatalogStore: SSHKeyCatalogStore
     private let iCloudSettingsSyncService: ICloudSettingsSyncService
 
     init(
@@ -229,6 +232,11 @@ class SettingsManager {
         self.sshKeyCatalogWriter = sshKeyCatalogWriter ?? { data in
             resolvedSSHKeyDefaults.set(data, forKey: UserDefaultsKeys.sshKeys)
         }
+        // The pre-D26 store by default, so an injected `sshKeyDefaults` or `sshKeyCatalogWriter`
+        // still decides what happens. `attachKeychainKeyCatalog()` swaps it in production.
+        self.sshKeyCatalogStore = .defaults(resolvedSSHKeyDefaults,
+                                            maximumBytes: Self.maximumSSHKeyCatalogBytes,
+                                            writer: sshKeyCatalogWriter)
         let writerID: UUID
         if let persistedWriterID = self.settingsDefaults.string(
             forKey: UserDefaultsKeys.iCloudSettingsWriterID
@@ -456,22 +464,68 @@ class SettingsManager {
         return CFGetTypeID(number) == CFBooleanGetTypeID()
     }
 
+    /// Where the SSH key **records** live (D26).
+    ///
+    /// Two implementations, for the same reason the server and connection stores have two: the
+    /// Keychain one is production, and the defaults one keeps the existing key tests meaningful
+    /// instead of requiring a Keychain in every one of them.
+    ///
+    /// `load` returns nil for *nothing stored* and throws for *stored but unreadable*. That
+    /// distinction is load-bearing: an empty library and a library that would not open look the
+    /// same to a user about to conclude their keys are gone, and only one of them is safe to act on.
+    struct SSHKeyCatalogStore {
+        let load: () throws -> [StoredSSHKey]?
+        let save: ([StoredSSHKey]) throws -> Void
+
+        /// D26: records beside their material, routed to the same store the material went to.
+        @MainActor
+        static var keychain: SSHKeyCatalogStore {
+            SSHKeyCatalogStore(
+                load: { try KeychainManager.allSSHKeyRecords() },
+                save: { keys in
+                    let wanted = Set(keys.map(\.id))
+                    for existing in try KeychainManager.allSSHKeyRecords() where !wanted.contains(existing.id) {
+                        try KeychainManager.deleteSSHKeyRecord(for: existing.id)
+                    }
+                    for key in keys { try KeychainManager.saveSSHKeyRecord(key) }
+                }
+            )
+        }
+
+        /// The pre-D26 store. Retained for tests and for any context with no Keychain.
+        static func defaults(_ defaults: UserDefaults, maximumBytes: Int,
+                             writer: ((Data) -> Void)? = nil) -> SSHKeyCatalogStore {
+            SSHKeyCatalogStore(
+                load: {
+                    guard let data = defaults.data(forKey: UserDefaultsKeys.sshKeys) else {
+                        // A value of the wrong persisted type is corruption, not absence.
+                        guard defaults.object(forKey: UserDefaultsKeys.sshKeys) == nil else {
+                            throw SettingsPersistenceError.invalidSSHKeyCatalog
+                        }
+                        return nil
+                    }
+                    guard data.count <= maximumBytes else { throw SettingsPersistenceError.invalidSSHKeyCatalog }
+                    return try JSONDecoder().decode([StoredSSHKey].self, from: data)
+                },
+                save: { keys in
+                    let data = try JSONEncoder().encode(keys)
+                    guard data.count <= maximumBytes else { throw SettingsPersistenceError.readbackMismatch }
+                    if let writer { writer(data) } else { defaults.set(data, forKey: UserDefaultsKeys.sshKeys) }
+                }
+            )
+        }
+    }
+
+    /// D26: moves key records into the Keychain, beside the material they name, where they
+    /// synchronize with it. Called once by the runtime; tests keep the defaults store.
+    func attachKeychainKeyCatalog() {
+        sshKeyCatalogStore = .keychain
+        loadSSHKeys()
+    }
+
     func loadSSHKeys() {
         do {
-            let persistedObject = sshKeyDefaults.object(forKey: UserDefaultsKeys.sshKeys)
-            let loadedKeys: [StoredSSHKey]
-            if let data = sshKeyDefaults.data(forKey: UserDefaultsKeys.sshKeys) {
-                guard data.count <= Self.maximumSSHKeyCatalogBytes else {
-                    throw SettingsPersistenceError.invalidSSHKeyCatalog
-                }
-                loadedKeys = try JSONDecoder().decode([StoredSSHKey].self, from: data)
-            } else if persistedObject == nil {
-                loadedKeys = []
-            } else {
-                // A persisted value of the wrong type is corruption, not absence.
-                throw SettingsPersistenceError.invalidSSHKeyCatalog
-            }
-            sshKeys = loadedKeys
+            sshKeys = try sshKeyCatalogStore.load() ?? []
             sshKeyCatalogLoadError = nil
         } catch {
             Logger.settings.error("Failed to load ssh keys: \(error)")
@@ -483,25 +537,20 @@ class SettingsManager {
 
     private func persistSSHKeysAndVerify(_ candidateKeys: [StoredSSHKey]) throws {
         try ensureSSHKeyCatalogAvailable()
-        let data = try JSONEncoder().encode(candidateKeys)
-        guard data.count <= Self.maximumSSHKeyCatalogBytes else {
-            throw SettingsPersistenceError.readbackMismatch
-        }
-        sshKeyCatalogWriter(data)
-        guard let persistedData = sshKeyDefaults.data(forKey: UserDefaultsKeys.sshKeys),
-              persistedData.count <= Self.maximumSSHKeyCatalogBytes,
-              let persistedKeys = try? JSONDecoder().decode([StoredSSHKey].self, from: persistedData),
-              persistedKeys == candidateKeys else {
+        try sshKeyCatalogStore.save(candidateKeys)
+        // Compared by identity rather than as an ordered list: the Keychain keys records by id and
+        // returns them oldest first, so "the same keys" is the question, not "the same order".
+        guard let persisted = try? sshKeyCatalogStore.load(),
+              Dictionary(persisted.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+                == Dictionary(candidateKeys.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }) else {
             throw SettingsPersistenceError.readbackMismatch
         }
     }
 
     private func verifiedPersistedSSHKeyCatalog() throws -> [StoredSSHKey] {
-        guard let data = sshKeyDefaults.data(forKey: UserDefaultsKeys.sshKeys),
-              data.count <= Self.maximumSSHKeyCatalogBytes,
-              let keys = try? JSONDecoder().decode([StoredSSHKey].self, from: data) else {
-            // Missing, oversized, or malformed catalog bytes are ambiguous and
-            // must never be interpreted as a committed destructive mutation.
+        // A catalog that cannot be read is ambiguous and must never be interpreted as a committed
+        // destructive mutation — the deletion journal decides what to finish on the strength of it.
+        guard let keys = try? sshKeyCatalogStore.load() else {
             throw SettingsPersistenceError.readbackMismatch
         }
         return keys

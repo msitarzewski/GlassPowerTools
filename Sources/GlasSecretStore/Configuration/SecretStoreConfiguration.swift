@@ -94,6 +94,10 @@ public struct SecretStoreConfiguration: @unchecked Sendable {
     public var sshPasswordsService: String { "\(serviceNamePrefix).sshpasswords" }
     public var sshKeysPrivateService: String { "\(serviceNamePrefix).sshkeys.private" }
     public var sshKeysPassphraseService: String { "\(serviceNamePrefix).sshkeys.passphrase" }
+    /// The key's *record* — name, algorithm, kind, added date — beside its material rather than in
+    /// a store of its own. D26: a second store would need a merge rule and could contradict the
+    /// material it describes; here it cannot, because a key that has no material has no record.
+    public var sshKeysRecordService: String { "\(serviceNamePrefix).sshkeys.record" }
     public var sealedP256Service: String { "\(serviceNamePrefix).sshkeys.sealedp256" }
     public var sealedP256TagService: String { "\(serviceNamePrefix).sshkeys.sealedp256.tag" }
     public var sshHostTrustService: String { "\(serviceNamePrefix).ssh.hosttrust" }
@@ -119,6 +123,9 @@ public struct SecretStoreConfiguration: @unchecked Sendable {
             rdpCredentialsService,
             sshKeysPrivateService,
             sshKeysPassphraseService,
+            // The record travels with the material it names. A portable key that arrived on
+            // another device but could not be named there would be a secret with no identity.
+            sshKeysRecordService,
             // D23: a pinned host key is a *public* key — the fingerprint `ssh-keygen` prints, not a
             // secret. Trusting a machine on the Mac has to mean trusting it on the Vision Pro, or
             // the continuity requirement ends at "you still have to re-approve every host".

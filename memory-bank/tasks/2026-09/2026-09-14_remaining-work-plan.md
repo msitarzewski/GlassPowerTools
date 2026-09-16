@@ -730,3 +730,55 @@ The key **library** itself is still terminal-scoped: `SettingsManager.sshKeys` u
 `sshKeys` defaults key. Moving it to the shell — so any capability can offer a key, and the records
 ride in the Keychain beside their material — is the remaining half, and it is what stage 4's "used
 by" needs.
+
+## D26 stage 3, second half — key records move into the Keychain, 2026-09-15
+
+A key's record now lives beside its material rather than in `UserDefaultsKeys.sshKeys`.
+
+**Where it went, and why not the shell.** The plan said "a shell-owned key library". It went to
+**`GlasSecretStore`** instead, which already owns `StoredSSHKey`, the material store and the
+mobility policy. That satisfies the actual requirement — any capability can reach it, and the shell
+depends on no capability (project rule 6) — without the shell taking ownership of credential
+storage, which is not what the shell is for.
+
+**`SSHKeyRecordStore`**, beside `SSHKeyKeychainStore`. A second store would have needed its own
+merge rule and could have disagreed with the material it describes — a record for a key that is not
+there, or a key with no name. Beside the material there is nothing to reconcile, because the same
+routing decides both.
+
+**That routing is the rule**, and it lives where it already lived: `KeychainManager` sends Secure
+Enclave *material* to the device-bound configuration, and now sends a Secure Enclave *record* there
+too. A hardware key listed on a device that cannot use it is worse than one that is not listed.
+`recordDestination(for:)` is separated from the write so the decision can be tested — the production
+configuration carries a real access group and an unsigned test binary cannot write to it, which is
+why every other Keychain test builds its own. The same seam exists for `isDeviceBoundKeyMaterial`,
+for the same reason.
+
+**`sshKeysRecordService` is in `synchronizableServices`**, so a portable key's record travels with
+its material. A secret that arrived on another device but could not be named there would be a key
+with no identity.
+
+**`SettingsManager.SSHKeyCatalogStore`** is the third injectable store of this shape (servers,
+connections, now keys). The defaults-backed one stays the default so the existing key tests — which
+inject `sshKeyDefaults` and a catalog writer — keep testing what they always did; the runtime
+attaches the Keychain one in production. *Three stores of the same shape is itself a smell, noted
+rather than forced: they differ in what they key by — per-service configurations against a single
+collection — and a shared abstraction would have to pretend otherwise.*
+
+`sshKeys` is out of both legacy migrations, alongside `servers`.
+
+### Verification, honestly
+
+**The full suite could not be verified: the Mac's screen locked** (the user said they were away).
+100 tests failed, 89 carrying rule 28's signature outright and the other 11 being assertions
+downstream of a catalog write that could not happen — every one of them writes a host catalog under
+`.completeFileProtection`. The same suite was **exit status 0 at 1497 tests / 161 suites** minutes
+earlier, before the lock, and the only changes since are a pure extraction and a four-test file that
+passes. **The app target builds.** The full run should be repeated unlocked before this is treated
+as proven.
+
+### Still open in stage 3
+
+The key library is reachable by any capability *in principle* — the records are in a shared module —
+but nothing outside the terminal offers keys yet, and the deletion journal still lives in
+`SettingsManager`. Stage 4's "used by" is what makes the library worth opening.
