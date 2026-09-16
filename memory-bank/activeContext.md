@@ -1363,3 +1363,74 @@ full run unlocked.** Installed build is still **0.4.107**, which predates stages
 
 **Next action:** stage 4, the key manager panel with "used by" — a read across the catalog, which is
 what stages 1 and 3 were for. Then the two-device acceptance run, which no test replaces.
+
+## 2026-09-16 — RESUME HERE (written before compaction)
+
+**State BUILD.** Owner: coordinating agent. Tree clean at `810e8b9`. **1506 tests / 163 suites,
+exit status 0**, verified by exit status; the app target builds separately (rule 32).
+
+### Where the work actually is
+
+**D26 is built through stage 4's model layer.** Stages 1, 2, 3 and D28's "used by" are done *and
+verified*. What remains of D26 is **stage 4's panel** and **stage 5's storage cleanup**.
+
+| Piece | State |
+|---|---|
+| Stage 1 — all three capabilities keep records on their service links | done, verified |
+| Stage 2 — a machine deleted elsewhere cleans up here | done, verified |
+| Stage 3 — device-bound services never leave; key records in the Keychain | done, verified |
+| Stage 4 — `services(usingKey:)` / `usageCount(ofKey:)` | done, verified |
+| Stage 4 — the key manager **panel** | **not started** |
+| Stage 5 — storage cleanup | not started |
+
+### Start here, in this order
+
+1. **Install a current build.** `/Applications/GlassPowerTools.app` is **0.4.107**, which predates
+   all four stages. Build with `MARKETING_VERSION=0.4.<commit count>` and read the version back off
+   the bundle (rule 16).
+2. **The two-device acceptance run.** Add a host with a key on the Mac, connect from the phone
+   **without re-approving host trust**. That one run proves configuration sync, key record sync and
+   D23's pin sync together. *Everything in D26 is currently proven by unit tests and a single-device
+   app; the sentence the product is has never been run.*
+3. **The key manager panel** — the last of stage 4. A contributed `GlassLibraryPanel` beside
+   Collections (copy `GlassTerminalCapability.libraryPanels()`, which is Workgroups and is the only
+   existing consumer). Name, algorithm, fingerprint, added date, *iCloud* / *This device only*
+   badge; per key rename, copy public key, export public key, **used by**, delete naming what it
+   will unassign. It is a **read** over `services(usingKey:)` and `usageCount(ofKey:)` — the model
+   layer is done. **The magic directive applies: design it on visionOS terms first, adapt down.**
+
+### Things that will bite the next session
+
+- **The screen lock.** Rule 28. Every catalog write is `.completeFileProtection`; locked, it fails
+  as `mktemp`/`Code=513` on write and `Code=257` on read, **and most failing tests carry no
+  signature at all** — they are assertions downstream of a write that never happened. Check
+  `ioreg -n Root -d1 -a | grep -A1 CGSSessionScreenIsLocked` **before** diagnosing anything. Run
+  long suites under `caffeinate -dimsu`.
+- **`swift build` never compiles the App target** (rule 32). Build the app separately, every time.
+- **Verify by exit status, never by grepping for `✘`** (rule 25). An aborting target prints neither
+  a failure line nor a count.
+- **After replacing a protocol requirement, grep for the old name** (rule 33). A conformer that
+  still implements it keeps compiling and silently takes the default — it cost four stage 3 tests
+  that went on passing while proving nothing.
+
+### Environment left running
+
+Both Parallels VMs are configured and were up. Ubuntu `192.0.2.6`: TigerVNC on **5902**, and
+**GNOME Remote Desktop on 3389** (username `gptrdp`, password in this session's scratchpad, cert
+fingerprint `0b:7a:6e:22:…:ee:bf:c7`). Stop with `systemctl --user stop gptvnc` and
+`grdctl rdp disable && systemctl --user stop gnome-remote-desktop`. Windows `192.0.2.3`: RDP 3389
+and TightVNC 5900, neither provisioned by us — the September `gptrdp` password died with that
+session.
+
+### After D26
+
+Stage 4 W3's remainder (input, held-key release, clean disconnect — needs the session window, not a
+probe), W4's 40-item parity sweep, **W5 spatial on the headset — still the only unknown-size item in
+the plan**, W6 audit. Then Stage 4.5 (VNC-over-SSH; **sleep/wake, which our own testing table
+requires**; measured performance; RD Gateway optional). Carried: Tailscale is still a window not a
+panel, visionOS pass 1 unverified with two on-device failures, the database workspace one-line
+greedy-frame fix, remembered dividers per platform. Then Stage 5 (the editor interface) and Stage 6
+(deprecate the public repos — **not without the user's word**).
+
+**Full detail:** [the remaining work](tasks/2026-09/2026-09-14_remaining-work-plan.md), which carries
+the execution log for every stage and the surface survey behind D27/D28.
