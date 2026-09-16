@@ -207,3 +207,55 @@ exercised here either without installing one.
 
 `gptvnc` is active on the Ubuntu VM and will survive until the VM restarts.
 `systemctl --user stop gptvnc` on `192.0.2.6` stops it.
+
+### RDP against GNOME Remote Desktop 50.2 — PASS, and it is a *signed-in* session
+
+Corrects the section above, which said the non-Windows RDP path was out of reach. **It was not.**
+`gnome-remote-desktop` **50.2-0ubuntu0.1** was already installed on the scratch VM; the earlier check
+ran `which gnome-remote-desktop-daemon`, and the daemon lives in `/usr/libexec`, which is not on
+`PATH`. A negative from `which` proves only that something is not on `PATH` — project rule 24, and it
+cost a wrong conclusion reported to the user.
+
+Ubuntu 26.04.1, GNOME Shell 50.1, `192.0.2.6:3389`, self-signed TLS certificate generated on the
+VM for this test:
+
+```
+certificate   : systemTrusted=false accepted=true sha256=0b:7a:6e:22:…:bf:c7
+connected     : true
+displayCaps   : none reported
+first frame   : 1360x768  bytesPerRow=5440  after 0.41s
+pixels        : 4,177,920 bytes, nonZero=true
+RESULT: PASS
+```
+
+**Both halves of the trust rule, on one host, in one sitting:**
+
+- Unpinned, it refused — *"TLS failed: server certificate identity was not authorized"* — reporting
+  a leaf SHA-256 **byte-identical to the certificate generated on the VM minutes earlier**. That is
+  the strongest form of this check available: the expected value was known independently rather than
+  read back from the thing being tested.
+- Pinned with that fingerprint, it completed a signed-in session and decoded a 1360×768 frame.
+
+**`displayCaps: none reported`** — GNOME did not advertise MS-RDPEDISP, exactly as Windows did not.
+Two of two real RDP servers decline it, so "resize works" remains unclaimed for either.
+
+#### Getting credentials in without leaking them, and one failure that matters
+
+`grdctl rdp set-credentials` **segfaults** when stdin is not a terminal (`EXIT=139`, core dumped),
+and writing to libsecret's default collection **hangs**: the VM's *Login* keyring is locked
+(`locked=True`, confirmed through `Secret.Service`), so the write waits on an unlock prompt nobody
+can answer over SSH. The credential went into the **session** collection instead — unlocked,
+memory-only, and gone at logout, which is the right lifetime for a test credential anyway.
+libsecret lookups search every unlocked collection, so the daemon finds it.
+
+**One password was leaked into this session's transcript** on the way there: driving `grdctl` through
+`script -qec` gave it a pty, and the pty echoed the typed password back. It was immediately treated
+as burned, rotated, and never used. **A pty echoes what you send it** — that is why the working
+method feeds secrets through a file at mode 600 that the reader deletes, or through stdin to a
+process that does not echo, and never through a terminal.
+
+#### Left running
+
+`gnome-remote-desktop` is enabled and active for `michael` on the scratch VM, view-only disabled,
+listening on 3389. Its credential is in the session keyring and dies with the login.
+`grdctl rdp disable && systemctl --user stop gnome-remote-desktop` turns it off.

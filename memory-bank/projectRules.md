@@ -181,3 +181,16 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     ceiling) rather than re-running it and hoping. And treat a generic overload that shadows a
     concrete one as a defect: label it.
 
+30. **A pty echoes what you send it, so never drive a credential prompt through one.** Using
+    `script -qec` to give `grdctl` a terminal echoed the typed password straight back into the
+    session transcript on 2026-09-15; it had to be treated as burned and rotated. Feed secrets
+    through a mode-600 file the reader deletes, or through stdin to a process that does not echo.
+    And when a tool refuses stdin — `grdctl rdp set-credentials` segfaults on a non-tty — that is a
+    reason to find another door, not to reach for a terminal.
+
+31. **`which` proves only what is on `PATH`.** The scratch VM was reported to the user as having no
+    RDP server because `which gnome-remote-desktop-daemon` found nothing; it was installed all
+    along, in `/usr/libexec`. Use the package manager (`apt-cache policy`, `dpkg -l`) or the unit
+    list to ask whether software is present. This is rule 24 in a new costume, and the cost was a
+    wrong "cannot be done" told to the user.
+
