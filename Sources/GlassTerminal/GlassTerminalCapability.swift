@@ -11,6 +11,7 @@ import SwiftUI
 import OSLog
 import GlassConnectionKit
 import GlassConnectionUI
+import GlasSecretStore
 import GlassShell
 import GlassLayers
 import GlassSSHTransport
@@ -222,6 +223,18 @@ public final class GlassTerminalCapability: GlassCapability {
         guard let server = runtime.sessionManager.serverManager.server(for: service.endpointID.rawValue) else { return nil }
         return TerminalServiceDraft(editing: server, serverManager: runtime.sessionManager.serverManager,
                                     settingsManager: runtime.settingsManager)
+    }
+
+    /// A terminal is device-bound when the key it authenticates with is a Secure Enclave key:
+    /// that material cannot be copied off this Mac, so the connection cannot work anywhere else.
+    ///
+    /// Derived from the server's current `sshKeyID` every time it is asked, so switching the
+    /// service to a password — or to an imported key — makes it start synchronizing again with no
+    /// flag to clear.
+    public func isDeviceBound(_ service: HostServiceLink, host: HostProfile) -> Bool {
+        guard let server = runtime.sessionManager.serverManager.server(for: service.endpointID.rawValue),
+              server.authMethod == .sshKey, let keyID = server.sshKeyID else { return false }
+        return runtime.settingsManager.sshKeys.first { $0.id == keyID }?.storageKind == .secureEnclave
     }
 
     public func removeService(_ service: HostServiceLink, host: HostProfile) async throws {

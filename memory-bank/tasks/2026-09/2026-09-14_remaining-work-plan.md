@@ -686,3 +686,47 @@ it would have been much larger before stage 1.
 Four tests drive a real `GlassShellModel` through a scripted backend with a capability that records
 every `removeService`. Defeating the cascade fails both positive tests and leaves both negative ones
 green — the shape that shows they test the cascade rather than the sync.
+
+## D26 stage 3, first half — device-bound services stay put, 2026-09-15
+
+**1493 tests / 160 suites, exit status 0; the app target builds.**
+
+One protocol member, `GlassCapability.isDeviceBound(_:host:)`, defaulting to false, and three places
+in `synchronizeCatalog` that have to agree about the answer:
+
+- **publish redacts** — `redactingDeviceBoundServices`, applied to `toPublish`;
+- **apply re-attaches** — `reattachingDeviceBoundServices`, applied to `toApplyLocally`;
+- **stage 2 excludes** — a redacted service is absent from every record the account holds, so
+  without this it reads as *deleted elsewhere* on the next sync and stage 2 removes its credential.
+  The two stages would have quietly undone each other. A tombstone still takes it.
+
+The derivation lives in one place, `deviceBoundServices(of:)`, because those three depend on
+agreeing. The terminal answers it from the server's current `sshKeyID` → the key's
+`storageKind == .secureEnclave`, so switching a service to a password makes it start travelling with
+no flag to clear.
+
+### The test that was passing for the wrong reason
+
+`syncingTwiceKeepsTheDeviceBoundService` was written as the decisive one — the half implementation
+"passes every single-sync test and deletes the connection on the second". **It passed with the
+re-attach deleted.**
+
+Syncing twice proves nothing on its own: the account echoes the redacted record back with the *same*
+`updatedAt`, so `GlassCatalogMerge.winner` keeps the local copy on equal timestamps and applies
+nothing at all. The record has to come back **newer** — which is what happens the moment any other
+device touches that host. With one added line stamping the returning record, removing the re-attach
+now fails it.
+
+The test that caught the half implementation first time was
+`aRedactedServiceIsNotMistakenForOneDeletedElsewhere`, because a remote edit there is genuinely
+newer. Both are kept: they fail for different reasons and the pair covers the rule.
+
+**This is rule 27 again, in its sharpest form yet** — a test aimed at the right defect, passing
+because the scenario never reached the code under test.
+
+### Still to do in stage 3
+
+The key **library** itself is still terminal-scoped: `SettingsManager.sshKeys` under the terminal's
+`sshKeys` defaults key. Moving it to the shell — so any capability can offer a key, and the records
+ride in the Keychain beside their material — is the remaining half, and it is what stage 4's "used
+by" needs.

@@ -336,16 +336,21 @@ public final class GlassShellModel: GlassServiceStore {
             for profile in outcome.toApplyLocally {
                 guard let mine = localByID[profile.id], mine.deletedAt == nil else { continue }
                 let surviving = profile.deletedAt == nil ? Set(profile.services.map(\.endpointID)) : []
+                // A device-bound service is absent from every record the account holds because
+                // this device redacted it on publish. Without this it would look deleted
+                // elsewhere on the very next sync, and stage 2 would delete its credential —
+                // the two stages quietly undoing each other. A tombstone still takes it.
+                let bound = profile.deletedAt == nil ? deviceBoundServices(of: mine) : []
                 departed += mine.services
-                    .filter { !surviving.contains($0.endpointID) }
+                    .filter { !surviving.contains($0.endpointID) && !bound.contains($0.endpointID) }
                     .map { (service: $0, owner: mine) }
             }
 
-            for profile in outcome.toApplyLocally {
+            for profile in reattachingDeviceBoundServices(outcome.toApplyLocally, local: local) {
                 try await catalog.upsert(profile)
             }
             if !outcome.toPublish.isEmpty {
-                try await catalogBackend.save(outcome.toPublish)
+                try await catalogBackend.save(redactingDeviceBoundServices(outcome.toPublish))
             }
             catalogSyncToken = token
 
@@ -780,6 +785,55 @@ public final class GlassShellModel: GlassServiceStore {
         await load()
 
         try await cascadeRemoval(of: owned)
+    }
+
+    /// The services on `record` whose credential cannot leave this device (D26 stage 3).
+    ///
+    /// Asked of whichever capability owns each service, every time, because binding is derived from
+    /// the credential rather than stored. One place, because three things depend on agreeing about
+    /// it: what is published, what is re-attached, and what counts as deleted elsewhere.
+    private func deviceBoundServices(of record: HostProfile) -> Set<EndpointID> {
+        var bound: Set<EndpointID> = []
+        for service in record.services
+        where registry.capability(for: service.kind)?.isDeviceBound(service, host: record) == true {
+            bound.insert(service.endpointID)
+        }
+        return bound
+    }
+
+    /// `profiles` with every device-bound service removed, for publishing.
+    ///
+    /// **This is half of a pair and is useless — worse than useless — alone.** Redacting without
+    /// re-attaching means this device publishes a host without its hardware-key service, pulls its
+    /// own record back as the merge winner, and deletes its own local service on the *second* sync.
+    /// Nothing fails; the configuration is simply gone. See `reattachingDeviceBoundServices`.
+    private func redactingDeviceBoundServices(_ profiles: [HostProfile]) -> [HostProfile] {
+        profiles.map { profile in
+            let bound = deviceBoundServices(of: profile)
+            guard !bound.isEmpty else { return profile }
+            var redacted = profile
+            redacted.services = profile.services.filter { !bound.contains($0.endpointID) }
+            return redacted
+        }
+    }
+
+    /// `incoming` with this device's own device-bound services put back.
+    ///
+    /// The other half of the pair. A record arriving from the account cannot carry them — this
+    /// device redacted them on the way out, and no other device ever had them — so applying it
+    /// unchanged would delete them here.
+    private func reattachingDeviceBoundServices(_ incoming: [HostProfile],
+                                                local: [HostProfile]) -> [HostProfile] {
+        let localByID = Dictionary(local.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        return incoming.map { profile in
+            guard let mine = localByID[profile.id] else { return profile }
+            let bound = deviceBoundServices(of: mine)
+            guard !bound.isEmpty else { return profile }
+            let present = Set(profile.services.map(\.endpointID))
+            var restored = profile
+            restored.services += mine.services.filter { bound.contains($0.endpointID) && !present.contains($0.endpointID) }
+            return restored
+        }
     }
 
     /// Tells each capability to delete what it stored for services that have gone.

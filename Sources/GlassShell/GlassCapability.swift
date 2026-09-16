@@ -185,6 +185,20 @@ public protocol GlassCapability: AnyObject {
     /// opens empty rather than refusing, because a machine the user can finish by hand is better
     /// than a dead end. Default: nil, for capabilities that import nothing.
     func setupDraft(importing configuration: Data) -> (any GlassServiceDraft)?
+    /// Whether this service's credential **cannot leave this device** (D26 stage 3).
+    ///
+    /// A Secure Enclave key is the only one today: hardware key material cannot be copied, so a
+    /// service that authenticates with one cannot work anywhere else. Such a service is redacted
+    /// from what this device publishes and re-attached when a record comes back, so it stays here
+    /// and appears nowhere else — the user's model: *"the Terminal using a device bound key becomes
+    /// a device bound terminal and doesn't show on iPhone."*
+    ///
+    /// **Derived, never stored.** Asked again every time it matters, from whatever credential the
+    /// service currently references. A stored flag would drift the moment a terminal switched from
+    /// a hardware key to a password: it would either leak a connection that cannot work, or strand
+    /// one that can. Default: false.
+    func isDeviceBound(_ service: HostServiceLink, host: HostProfile) -> Bool
+
     /// The shell removed `service` from `host`: delete whatever the capability stored for it
     /// (configuration, credentials). Default: nothing.
     func removeService(_ service: HostServiceLink, host: HostProfile) async throws
@@ -268,6 +282,7 @@ public extension GlassCapability {
         open(service: service, host: host, report: report)
     }
     func hostAddressDidChange(host: HostProfile, address: String?) {}
+    func isDeviceBound(_ service: HostServiceLink, host: HostProfile) -> Bool { false }
     func libraryPanels() -> [GlassLibraryPanel] { [] }
     func setupDraft(importing configuration: Data) -> (any GlassServiceDraft)? { nil }
     func knownAddress(service: HostServiceLink, host: HostProfile) -> String? { nil }
