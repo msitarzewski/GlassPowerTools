@@ -194,3 +194,13 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     list to ask whether software is present. This is rule 24 in a new costume, and the cost was a
     wrong "cannot be done" told to the user.
 
+32. **A green package suite is not a building app.** `swift build` and `swift test` compile the
+    SwiftPM package; the **App target lives in the Xcode project** and neither touches it. On
+    2026-09-15 the composition root reached `GlassTerminalRuntime.sessionManager`, which is
+    `internal`, and 1481 tests passed at exit status 0 while the app could not be built at all — the
+    error surfaced only when an install was attempted. Before claiming a change works, build the
+    app: `xcodebuild -scheme GlassPowerTools -configuration Release -destination
+    'platform=macOS,arch=arm64'`. Anything a capability exposes to the composition root has to be
+    `public`, and the right shape is one public method on the runtime rather than widening access to
+    its internals.
+

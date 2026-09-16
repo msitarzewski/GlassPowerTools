@@ -1294,3 +1294,51 @@ asserted. It is patched because the code is wrong, and `THIRD-PARTY-NOTICES.md` 
 **Next action:** D26 stage 1's remaining half — the catalog-backed store, `UserDefaultsKeys.servers`
 deleted with its two legacy-migration entries, and the `SettingsManager.swift:574` read of the raw
 defaults key that bypasses `ServerManager`.
+
+## 2026-09-15 (evening) — D26 stage 1 terminal half done; live RDP and VNC proven; 0.4.107 installed
+
+**State BUILD.** Owner: coordinating agent. Committed through `4471a2e`; tree clean.
+**Package: 1481 tests / 157 suites, exit status 0.** Installed **0.4.107 (107)** on this Mac,
+version read back off the bundle.
+
+### Landed
+
+- **D26 stage 1, terminal half** (`5b6bac3`). Saved servers live on their service links.
+  `UserDefaultsKeys.servers` is no longer the production store and is out of both legacy
+  migrations. Deletion cascades to the link through `detachService` — link-only, because the
+  capability is the one deleting and `removeService` would call back into the running delete.
+- **D27** (`1adbea9`). `adoptService` / `detachService`; Add Server and `ssh_config` import put a
+  machine in the library, reusing a record that already holds the address.
+- **Stage 4 W3 live evidence** (`f5d6bec`, `e435454`). Both engines proven against real hosts on
+  **this** build rather than inherited from glassDT's ledger.
+- **`connectToLibrary`** (`4471a2e`) — one public door on the terminal runtime.
+
+### Live results, all real executions
+
+| Host | Result |
+|---|---|
+| TigerVNC 1.15.0, Ubuntu 26.04.1, `192.0.2.6:5902` | **PASS** — 1024×640 first frame in 0.21s |
+| GNOME Remote Desktop 50.2, same VM, `:3389` | **PASS, signed-in session** — 1360×768 frame in 0.41s, after refusing the certificate unpinned and reporting a leaf SHA-256 identical to the one minted on the VM minutes earlier |
+| Windows 11 Pro, `192.0.2.3:3389` | Certificate refusal reproduces; leaf byte-identical to the 2026-09-14 record. **No signed-in session** — the `gptrdp` password died with September's scratchpad and Windows has no SSH here |
+| Windows TightVNC, `:5900` | Typed error *"This server needs a VNC password"* |
+
+**Neither real RDP server advertised MS-RDPEDISP.** Two of two decline it, so "resize works" stays
+unclaimed for both.
+
+### Four rules this session paid for
+
+25 (verify by exit status — an aborting target prints no failure line *and* no count line, and
+320 tests were missing from every figure), 26 (never `git checkout --` a file with uncommitted work),
+27 (a test written against the wrong projection looks exactly like a passing test), 28 (`mktemp` /
+`Code=513` means the screen is locked), 29 (an OOM kill leaves nothing — run a suspect test under a
+memory watchdog), 30 (a pty echoes what you send it), 31 (`which` proves only what is on `PATH`).
+
+### The verification gap the install exposed
+
+`swift build` and `swift test` **do not compile the App target** — it lives in the Xcode project,
+not the SwiftPM package. The composition root reached `sessionManager`, which is `internal`, and
+both were green while the app could not build at all. **A package suite passing is not the app
+building**; an install is the only proof of that.
+
+**Next action:** D26 stage 1's remaining two capabilities — the database (`glassdb.connections`)
+and the desktop (`connections.json`).

@@ -218,3 +218,12 @@ patches restored after the absorption dropped them (`ef8e843`, `fae1cca`).
 
 **1473 tests / 155 suites, exit status 0** — and every earlier count was short by the 320 tests of
 an aborting target, because a crashed target prints neither a failure line nor a count line.
+
+## 2026-09-15 (evening) — stage 1 terminal half, live desktop proof, 0.4.107
+
+[Remaining work](2026-09-14_remaining-work-plan.md) · [Live hosts](2026-09-14_stage-4-live-hosts.md)
+
+D26 stage 1's terminal half (`5b6bac3`) and D27 (`1adbea9`) landed; a signed-in RDP session and a
+VNC session were proven against the scratch VM on this build (`f5d6bec`, `e435454`). 1481 tests /
+157 suites at exit status 0, and **0.4.107 installed** — which is what exposed that `swift build`
+never compiles the App target.
