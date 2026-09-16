@@ -47,8 +47,11 @@ private final class BindingCapability: GlassCapability {
 
     func open(service: HostServiceLink, host: HostProfile,
               report: @escaping @MainActor (GlassCapabilityOutcome) -> Void) { report(.failed("not used")) }
-    func isDeviceBound(_ service: HostServiceLink, host: HostProfile) -> Bool {
-        deviceBound.contains(service.endpointID)
+    func credential(for service: HostServiceLink, host: HostProfile) -> GlassServiceCredential {
+        // A key id per endpoint so "device-bound" and "shared" are the same answer here as in the
+        // app: binding is a property of the credential, not of the service.
+        guard deviceBound.contains(service.endpointID) else { return .ownedByService }
+        return .sharedKey(id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!, deviceBound: true)
     }
     func removeService(_ service: HostServiceLink, host: HostProfile) async throws {
         removed.append(service.endpointID)

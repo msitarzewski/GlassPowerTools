@@ -208,3 +208,12 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     `public`, and the right shape is one public method on the runtime rather than widening access to
     its internals.
 
+33. **Replacing a protocol member does not break its conformers — it silently orphans them.** Stage
+    4 replaced `GlassCapability.isDeviceBound` with `credential(for:host:)`. Every *test double*
+    still implementing `isDeviceBound` kept compiling: the old method became an ordinary method
+    nobody calls, and the type quietly picked up the new member's **default**. Four stage 3 tests
+    went from proving redaction to proving nothing, and only the full suite caught it. So: after
+    renaming or replacing a protocol requirement, **grep for the old name** and check every hit is
+    gone rather than merely compiling — a conformer that still builds is the failure mode, not the
+    reassurance.
+
