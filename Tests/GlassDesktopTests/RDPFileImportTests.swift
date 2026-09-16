@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import GlassShell
 @testable import GlassDesktop
 
 @Suite("RDP file import")
@@ -123,13 +124,17 @@ struct RDPFileImportTests {
     @MainActor @Test func reviewDoesNotSaveAndConfirmedImportSurvivesReload() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
+        // D26: the store is the catalog, not a file in this directory, so "relaunched" means a
+        // second model over the *same catalog* — which is what two launches of the app actually
+        // share. The directory now only holds managed files a record can point at.
+        let catalog = GlassInMemoryServiceStore(defaultKind: .rdp)
         let model = DesktopAppModel(storageDirectory: directory)
-        await model.load()
+        await model.attach(store: catalog)
         let draft = try parse("full address:s:localhost:3390\nusername:s:alice\ndesktopwidth:i:1600\ndesktopheight:i:900")
         #expect(model.connections.isEmpty)
         try await model.save(draft.connection, password: nil)
         let relaunched = DesktopAppModel(storageDirectory: directory)
-        await relaunched.load()
+        await relaunched.attach(store: catalog)
         #expect(relaunched.errorMessage == nil)
         #expect(relaunched.connections.count == 1)
         #expect(relaunched.connections.first?.host == "localhost")

@@ -95,6 +95,8 @@ struct GlassPowerToolsApp: App {
         database.hostAccess = { [weak model] host in
             model?.hostAccess(for: host.id) ?? GlassCapabilityHostAccess(address: host.address)
         }
+        // D26: the database's saved connections live on their service links too.
+        database.connectToLibrary(store: model)
         model.registry.register(GlassDatabaseCapability(runtime: database))
         // Stage 4: the remote desktop capability. It owns `.rdp` and serves both RDP and
         // VNC/Screen Sharing, because the protocol is a field on the saved desktop rather than a
@@ -109,6 +111,9 @@ struct GlassPowerToolsApp: App {
         desktop.requestSetup = { [weak model] prefill in
             model?.requestSetup(prefill: prefill)
         }
+        // D26: and the desktop's, which is why `connections.json` no longer exists.
+        let desktopRuntime = desktop
+        Task { @MainActor in await desktopRuntime.connectToLibrary(store: model) }
         model.registry.register(GlassDesktopCapability(runtime: desktop))
         _layers = State(initialValue: layers)
         _model = State(initialValue: model)

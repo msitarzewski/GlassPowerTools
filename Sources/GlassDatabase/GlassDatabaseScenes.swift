@@ -175,7 +175,7 @@ public struct GlassDatabaseBootstrap<Content: View>: View {
                 let password = try Self.storedPassword(for: config)
                 let sessionID = try await runtime.sessionManager.connect(
                     config: config, password: password, openForward: openForward)
-                runtime.connectionManager.updateLastConnected(connectionID)
+                await runtime.connectionManager.updateLastConnected(connectionID)
                 report?(.connected)
                 present(DatabaseWorkspaceWindowRequest.primary(sessionID: sessionID))
             } catch {

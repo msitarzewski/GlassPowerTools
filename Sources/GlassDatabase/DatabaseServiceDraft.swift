@@ -291,9 +291,9 @@ final class DatabaseServiceDraft: GlassServiceDraft {
         }
         do {
             if isEditing {
-                try connectionManager.update(config)
+                try await connectionManager.update(config)
             } else {
-                try connectionManager.add(config)
+                try await connectionManager.add(config)
             }
         } catch {
             // The record did not persist, so the credential it was written for has nothing to
@@ -311,7 +311,7 @@ final class DatabaseServiceDraft: GlassServiceDraft {
         guard let config = connectionManager.connection(for: endpointID.rawValue) else { return }
         do {
             _ = try KeychainManager.deleteCredentials(for: config)
-            try connectionManager.delete(config)
+            try await connectionManager.delete(config)
         } catch {
             Logger.connections.error(
                 "Rollback of \(endpointID.rawValue.uuidString, privacy: .public) failed: \(error.localizedDescription, privacy: .public)"

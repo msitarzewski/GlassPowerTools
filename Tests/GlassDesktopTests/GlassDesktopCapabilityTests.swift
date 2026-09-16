@@ -8,11 +8,14 @@ import GlasSecretStore
 /// A throwaway desktop model writing to its own directory, with the Keychain replaced so these
 /// tests never touch the user's real credentials — the lesson of the UI-test pollution sweep.
 @MainActor
-private func makeRuntime() throws -> (GlassDesktopRuntime, URL) {
+private func makeRuntime() async throws -> (GlassDesktopRuntime, URL) {
     let root = FileManager.default.temporaryDirectory
         .appendingPathComponent("GlassDesktopTests-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     let app = DesktopAppModel(storageDirectory: root, credentialAccess: .inMemory())
+    // D26: a model with no library attached reads and writes nothing, and says so. Tests get an
+    // in-memory catalog rather than the shell's, which is the whole point of the narrow protocol.
+    await app.attach(store: GlassInMemoryServiceStore(defaultKind: .rdp))
     return (GlassDesktopRuntime(app: app), root)
 }
 
@@ -25,8 +28,8 @@ private func host(_ name: String = "beast", address: String = "10.0.0.9") throws
 struct GlassDesktopCapabilityTests {
 
     @Test("The capability owns .rdp and serves both protocols through the record's field")
-    func servesBothProtocols() throws {
-        let (runtime, root) = try makeRuntime()
+    func servesBothProtocols() async throws {
+        let (runtime, root) = try await makeRuntime()
         defer { try? FileManager.default.removeItem(at: root) }
         let capability = GlassDesktopCapability(runtime: runtime)
         #expect(capability.kind == .rdp, "one service kind; the protocol is a field, so the catalog needs no .vnc case")
@@ -36,7 +39,7 @@ struct GlassDesktopCapabilityTests {
 
     @Test("A desktop is created complete: record and credential, under the shell's endpoint id")
     func createsAServiceComplete() async throws {
-        let (runtime, root) = try makeRuntime()
+        let (runtime, root) = try await makeRuntime()
         defer { try? FileManager.default.removeItem(at: root) }
         let capability = GlassDesktopCapability(runtime: runtime)
         let machine = try host()
@@ -61,7 +64,7 @@ struct GlassDesktopCapabilityTests {
     /// record to save it.
     @Test("Screen Sharing moves the port to 5900, and the record keeps itself canonical")
     func vncTakesItsOwnDefaults() async throws {
-        let (runtime, root) = try makeRuntime()
+        let (runtime, root) = try await makeRuntime()
         defer { try? FileManager.default.removeItem(at: root) }
         let capability = GlassDesktopCapability(runtime: runtime)
         let endpoint = EndpointID(rawValue: UUID())
@@ -87,8 +90,8 @@ struct GlassDesktopCapabilityTests {
     }
 
     @Test("A Screen Sharing user name too long for the credential block is caught in the sheet")
-    func vncUserNameLengthIsReportedBeforeCommit() throws {
-        let (runtime, root) = try makeRuntime()
+    func vncUserNameLengthIsReportedBeforeCommit() async throws {
+        let (runtime, root) = try await makeRuntime()
         defer { try? FileManager.default.removeItem(at: root) }
         let draft = try #require(GlassDesktopCapability(runtime: runtime).makeSetupDraft() as? DesktopServiceDraft)
         draft.desktopProtocol = .vnc
@@ -102,8 +105,8 @@ struct GlassDesktopCapabilityTests {
     }
 
     @Test("A deliberate port survives a protocol change")
-    func aTypedPortIsNotOverwritten() throws {
-        let (runtime, root) = try makeRuntime()
+    func aTypedPortIsNotOverwritten() async throws {
+        let (runtime, root) = try await makeRuntime()
         defer { try? FileManager.default.removeItem(at: root) }
         let draft = try #require(GlassDesktopCapability(runtime: runtime).makeSetupDraft() as? DesktopServiceDraft)
         draft.portText = "13389"
@@ -114,8 +117,8 @@ struct GlassDesktopCapabilityTests {
     }
 
     @Test("Credentials follow D18, not glassDT's device-only default")
-    func mobilityFollowsTheProjectDecision() throws {
-        let (runtime, root) = try makeRuntime()
+    func mobilityFollowsTheProjectDecision() async throws {
+        let (runtime, root) = try await makeRuntime()
         defer { try? FileManager.default.removeItem(at: root) }
         let draft = try #require(GlassDesktopCapability(runtime: runtime).makeSetupDraft() as? DesktopServiceDraft)
         #expect(draft.mobility == .iCloudKeychain)
@@ -123,7 +126,7 @@ struct GlassDesktopCapabilityTests {
 
     @Test("D25: removing the service deletes what this capability stored")
     func removeServiceDeletesTheRecord() async throws {
-        let (runtime, root) = try makeRuntime()
+        let (runtime, root) = try await makeRuntime()
         defer { try? FileManager.default.removeItem(at: root) }
         let capability = GlassDesktopCapability(runtime: runtime)
         let machine = try host()
@@ -141,7 +144,7 @@ struct GlassDesktopCapabilityTests {
 
     @Test("A link with no saved desktop behind it reports a failure rather than opening nothing")
     func openWithoutAConfigurationReportsIt() async throws {
-        let (runtime, root) = try makeRuntime()
+        let (runtime, root) = try await makeRuntime()
         defer { try? FileManager.default.removeItem(at: root) }
         let capability = GlassDesktopCapability(runtime: runtime)
         await runtime.loadIfNeeded()
@@ -157,7 +160,7 @@ struct GlassDesktopCapabilityTests {
 
     @Test("Connect does not report success merely because a window was asked for")
     func openHoldsTheReportUntilTheSessionSaysSomething() async throws {
-        let (runtime, root) = try makeRuntime()
+        let (runtime, root) = try await makeRuntime()
         defer { try? FileManager.default.removeItem(at: root) }
         let capability = GlassDesktopCapability(runtime: runtime)
         let machine = try host()
@@ -192,7 +195,7 @@ struct GlassDesktopCapabilityTests {
 
     @Test("Editing a machine's address moves its desktops with it")
     func addressChangeFollowsToTheRecords() async throws {
-        let (runtime, root) = try makeRuntime()
+        let (runtime, root) = try await makeRuntime()
         defer { try? FileManager.default.removeItem(at: root) }
         let capability = GlassDesktopCapability(runtime: runtime)
         let endpoint = EndpointID(rawValue: UUID())

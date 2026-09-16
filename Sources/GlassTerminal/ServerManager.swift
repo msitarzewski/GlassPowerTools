@@ -72,46 +72,29 @@ struct ServerPersistenceStore {
 
     /// D26: the catalog is the one store for a connection.
     ///
-    /// Each saved server lives on its own service link, encoded by this capability and opaque to
-    /// everything else. There is no second copy and no rule about which wins, which is the whole
-    /// point of the decision.
+    /// Each saved server lives on its own service link. The reconcile itself is
+    /// `GlassServiceRecords`, shared with the database and the desktop, because "make the stored
+    /// set match this list" is the same problem for all three.
     ///
-    /// **Order is by name, then id, and that is deliberate.** The catalog stores configurations in
-    /// a dictionary, so there is no insertion order to preserve; sorting here makes `load` stable
-    /// across launches instead of returning whatever order the dictionary happened to iterate in.
-    /// Nothing user-visible depended on the old insertion order — every library surface sorts for
-    /// itself.
+    /// **Order is by name, then id, and that is deliberate.** The catalog keys configurations by
+    /// endpoint id and has no insertion order to give back, so sorting here makes `load` stable
+    /// across launches instead of returning whatever order the dictionary iterated in. Nothing
+    /// user-visible depended on the old insertion order — every library surface sorts for itself.
     @MainActor
     static func catalog(_ store: any GlassServiceStore) -> ServerPersistenceStore {
-        func servers() -> [ServerConfiguration] {
-            store.configurations(ServerConfiguration.self, ofKind: .ssh)
-                .values
-                .sorted { ($0.name, $0.id.uuidString) < ($1.name, $1.id.uuidString) }
-        }
-        func write(_ data: Data?) async throws {
-            let incoming = data.flatMap { try? JSONDecoder().decode([ServerConfiguration].self, from: $0) } ?? []
-            let wanted = Dictionary(incoming.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-            let current = store.configurations(ofKind: .ssh)
-
-            // Removals first: a configuration left behind for a server that is gone is the orphan
-            // D25 exists to prevent, and writing the survivors first would widen the window.
-            for endpointID in current.keys where wanted[endpointID.rawValue] == nil {
-                try await store.setConfiguration(nil, for: endpointID)
-            }
-            for (id, server) in wanted {
-                let endpointID = EndpointID(rawValue: id)
-                let encoded = try JSONEncoder().encode(server)
-                // Unchanged records are skipped rather than rewritten: every write publishes, and
-                // republishing a record nobody edited churns the catalog for every other device.
-                guard current[endpointID] != encoded else { continue }
-                try await store.setConfiguration(encoded, for: endpointID)
-            }
+        let records = GlassServiceRecords<ServerConfiguration>(
+            store: store, kind: .ssh, id: { EndpointID(rawValue: $0.id) })
+        func decode(_ data: Data?) -> [ServerConfiguration] {
+            data.flatMap { try? JSONDecoder().decode([ServerConfiguration].self, from: $0) } ?? []
         }
         return ServerPersistenceStore(
-            load: { try? JSONEncoder().encode(servers()) },
-            hasStoredValue: { !store.configurations(ofKind: .ssh).isEmpty },
-            save: { try await write($0) },
-            restore: { try await write($0) }
+            load: {
+                try? JSONEncoder().encode(records.all().values
+                    .sorted { ($0.name, $0.id.uuidString) < ($1.name, $1.id.uuidString) })
+            },
+            hasStoredValue: { !records.isStoreEmpty },
+            save: { try await records.replaceAll(with: decode($0)) },
+            restore: { try await records.replaceAll(with: decode($0)) }
         )
     }
 

@@ -9,6 +9,7 @@
 import SwiftUI
 import Foundation
 import GlassConnectionKit
+import GlassShell
 import Observation
 import os
 
@@ -31,8 +32,32 @@ enum ConnectionPersistenceError: LocalizedError {
 
 struct ConnectionPersistenceStore: @unchecked Sendable {
     let load: () -> Data?
-    let save: (Data) throws -> Void
-    let restore: (Data?) throws -> Void
+    /// Async because the catalog behind it is an actor. The readback check still happens before
+    /// this returns, so a failed write is still a thrown error reaching the rollback below it.
+    let save: (Data) async throws -> Void
+    let restore: (Data?) async throws -> Void
+
+    /// D26: the catalog is the one store for a connection.
+    ///
+    /// The reconcile is `GlassServiceRecords`, shared with the terminal and the desktop. Ordered by
+    /// name then id so `load` is stable across launches — the catalog keys by endpoint id and has
+    /// no insertion order to return.
+    @MainActor
+    static func catalog(_ store: any GlassServiceStore) -> ConnectionPersistenceStore {
+        let records = GlassServiceRecords<DatabaseConnectionConfig>(
+            store: store, kind: .database, id: { EndpointID(rawValue: $0.id) })
+        func decode(_ data: Data?) -> [DatabaseConnectionConfig] {
+            data.flatMap { try? JSONDecoder().decode([DatabaseConnectionConfig].self, from: $0) } ?? []
+        }
+        return ConnectionPersistenceStore(
+            load: {
+                try? JSONEncoder().encode(records.all().values
+                    .sorted { ($0.name, $0.id.uuidString) < ($1.name, $1.id.uuidString) })
+            },
+            save: { try await records.replaceAll(with: decode($0)) },
+            restore: { try await records.replaceAll(with: decode($0)) }
+        )
+    }
 
     static let live = ConnectionPersistenceStore(
         load: { UserDefaults.standard.data(forKey: UserDefaultsKeys.connections) },
@@ -163,7 +188,7 @@ class ConnectionManager {
 
     private(set) var familyCatalogLoaded = false
     private var hasLoaded = false
-    private let persistenceStore: ConnectionPersistenceStore
+    private var persistenceStore: ConnectionPersistenceStore
 
     init(
         loadImmediately: Bool = true,
@@ -204,23 +229,29 @@ class ConnectionManager {
         }
     }
 
-    func save() throws {
-        try persist(connections)
+    /// Points this manager at a different store and reloads from it (D26).
+    func attach(store: ConnectionPersistenceStore) {
+        persistenceStore = store
+        load()
     }
 
-    func add(_ connection: DatabaseConnectionConfig) throws {
+    func save() async throws {
+        try await persist(connections)
+    }
+
+    func add(_ connection: DatabaseConnectionConfig) async throws {
         var candidate = connections
         candidate.append(connection)
-        try persist(candidate)
+        try await persist(candidate)
         connections = candidate
     }
 
-    func update(_ connection: DatabaseConnectionConfig) throws {
+    func update(_ connection: DatabaseConnectionConfig) async throws {
         if let index = connections.firstIndex(where: { $0.id == connection.id }) {
             let previous = connections[index]
             var candidate = connections
             candidate[index] = connection
-            try persist(candidate)
+            try await persist(candidate)
             connections = candidate
             removeUnreferencedSQLiteFile(from: previous, replacingWith: connection)
         }
@@ -239,11 +270,11 @@ class ConnectionManager {
     /// `app.glassdb`, and this app is not sandboxed on macOS, so keeping it would have written
     /// into `~/Library/Application Support/app.glassdb/` — the still-shipping glassdb's own
     /// directory, which has to keep working until parity. The shell owns catalog deletion now.
-    func delete(_ connection: DatabaseConnectionConfig) throws {
+    func delete(_ connection: DatabaseConnectionConfig) async throws {
         let credentialReceipt = try KeychainManager.deleteCredentials(for: connection)
         let candidate = connections.filter { $0.id != connection.id }
         do {
-            try persist(candidate)
+            try await persist(candidate)
         } catch {
             do {
                 try KeychainManager.restoreCredentials(credentialReceipt)
@@ -283,12 +314,12 @@ class ConnectionManager {
         }
     }
 
-    func updateLastConnected(_ connectionID: UUID) {
+    func updateLastConnected(_ connectionID: UUID) async {
         if let index = connections.firstIndex(where: { $0.id == connectionID }) {
             var candidate = connections
             candidate[index].lastConnected = Date()
             do {
-                try persist(candidate)
+                try await persist(candidate)
                 connections = candidate
             } catch {
                 credentialError = "The connection succeeded, but its recent-connection timestamp could not be saved. \(error.localizedDescription)"
@@ -296,12 +327,12 @@ class ConnectionManager {
         }
     }
 
-    func toggleFavorite(_ connection: DatabaseConnectionConfig) {
+    func toggleFavorite(_ connection: DatabaseConnectionConfig) async {
         if let index = connections.firstIndex(where: { $0.id == connection.id }) {
             var candidate = connections
             candidate[index].isFavorite.toggle()
             do {
-                try persist(candidate)
+                try await persist(candidate)
                 connections = candidate
             } catch {
                 credentialError = "The favorite change could not be saved, so it was not applied. \(error.localizedDescription)"
@@ -309,14 +340,14 @@ class ConnectionManager {
         }
     }
 
-    private func persist(_ candidate: [DatabaseConnectionConfig]) throws {
+    private func persist(_ candidate: [DatabaseConnectionConfig]) async throws {
         let data = try JSONEncoder().encode(candidate)
         let previousData = persistenceStore.load()
         do {
-            try persistenceStore.save(data)
+            try await persistenceStore.save(data)
         } catch {
             do {
-                try persistenceStore.restore(previousData)
+                try await persistenceStore.restore(previousData)
                 guard persistenceStore.load() == previousData else {
                     throw ConnectionPersistenceError.rollbackFailed
                 }

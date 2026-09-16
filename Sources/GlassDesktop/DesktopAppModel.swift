@@ -2,6 +2,7 @@ import Foundation
 import Darwin
 import Observation
 import GlassConnectionKit
+import GlassShell
 import GlassHostCatalog
 import GlasSecretStore
 
@@ -60,12 +61,14 @@ public final class DesktopAppModel {
     public var errorMessage: String?
     public let notices: DesktopNotices
     public let storageDirectory: URL
-    private let repository: DesktopRepository
+    private var repository: DesktopRepository?
     private let accessGroup: String?
     private let credentials: DesktopCredentialAccess
     private var mutationLocked = false
     private var mutationWaiters: [CheckedContinuation<Void, Never>] = []
 
+    /// `store` is the shell's catalog (D26); `storageDirectory` survives only for the managed
+    /// files a desktop record can still point at, not for the records themselves.
     public init(storageDirectory: URL? = nil, accessGroup: String? = nil,
                 repository: DesktopRepository? = nil,
                 credentialAccess: DesktopCredentialAccess? = nil, notices: DesktopNotices = .shared) {
@@ -73,16 +76,33 @@ public final class DesktopAppModel {
         let directory = storageDirectory ?? URL.applicationSupportDirectory
             .appendingPathComponent("GlassPowerTools/Desktop", isDirectory: true)
         self.storageDirectory = directory
-        self.repository = repository ?? DesktopRepository(fileURL: directory.appendingPathComponent("connections.json"))
+        // Nil until the composition root attaches the catalog: a model with no store reads and
+        // writes nothing, which is what a preview or a unit test with no shell should do.
+        self.repository = repository
         self.accessGroup = accessGroup
         self.credentials = credentialAccess ?? .live
+    }
+
+    /// The catalog-backed store, or a clear error when the composition root has not attached one.
+    /// Preferable to an optional chain at nine call sites, which would quietly read as "no
+    /// desktops" when the truth is "no library".
+    private func requireRepository() throws -> DesktopRepository {
+        guard let repository else { throw DesktopError.libraryUnavailable }
+        return repository
+    }
+
+    /// D26: points this model at the shell's catalog. Called once, by the composition root.
+    public func attach(store: any GlassServiceStore) async {
+        repository = DesktopRepository(store: store)
+        isLoaded = false
+        await load()
     }
 
     public func load() async {
         await acquireMutation()
         defer { releaseMutation() }
         do {
-            connections = try await repository.load()
+            connections = try await requireRepository().load()
             isLoaded = true
             errorMessage = nil
         } catch { errorMessage = error.localizedDescription }
@@ -111,7 +131,7 @@ public final class DesktopAppModel {
         defer { releaseMutation() }
         try Task.checkCancellation()
         var value = try connection.validated()
-        let current = try await repository.load()
+        let current = try await requireRepository().load()
         let previous = current.first { $0.id == value.id }
         if let previous {
             value.createdAt = previous.createdAt
@@ -147,7 +167,7 @@ public final class DesktopAppModel {
             try credentials.migrate(previous.credentialID.rawValue, configuration(for: previous), configuration(for: value))
         }
         do {
-            connections = try await repository.save(value, replacing: previous)
+            connections = try await requireRepository().save(value, replacing: previous)
         } catch {
             if let newCredentialID {
                 do { try credentials.delete(newCredentialID, configuration(for: value)) }
@@ -161,10 +181,10 @@ public final class DesktopAppModel {
         await acquireMutation()
         defer { releaseMutation() }
         do {
-            guard var value = try await repository.load().first(where: { $0.id == id }) else { throw DesktopError.missingConnection }
+            guard var value = try await requireRepository().load().first(where: { $0.id == id }) else { throw DesktopError.missingConnection }
             let previous = value
             value.isFavorite.toggle()
-            connections = try await repository.save(value, replacing: previous)
+            connections = try await requireRepository().save(value, replacing: previous)
         } catch { errorMessage = error.localizedDescription }
     }
 
@@ -174,7 +194,7 @@ public final class DesktopAppModel {
         do {
             // The shell removes the host record and cascades to this capability (D25); this
             // deletes only what the capability itself stored.
-            connections = try await repository.delete(connection.id)
+            connections = try await requireRepository().delete(connection.id)
             errorMessage = nil
         } catch { errorMessage = error.localizedDescription }
     }
@@ -184,7 +204,7 @@ public final class DesktopAppModel {
         defer { releaseMutation() }
         do {
             try Task.checkCancellation()
-            connections = try await repository.recordConnection(id, at: date, expectedConnection: expectedConnection)
+            connections = try await requireRepository().recordConnection(id, at: date, expectedConnection: expectedConnection)
         } catch is CancellationError {
             // A canceled attempt cannot publish delayed success history.
         } catch DesktopError.connectionChanged where expectedConnection != nil {
@@ -196,7 +216,7 @@ public final class DesktopAppModel {
                                    expectedConnection: DesktopConnection) async throws -> DesktopConnection {
         await acquireMutation()
         defer { releaseMutation() }
-        guard var value = try await repository.load().first(where: { $0.id == id }) else { throw DesktopError.missingConnection }
+        guard var value = try await requireRepository().load().first(where: { $0.id == id }) else { throw DesktopError.missingConnection }
         let expected = try expectedConnection.validated()
         guard expected.id == id, value.host == expected.host, value.port == expected.port,
               value.authentication == expected.authentication,
@@ -204,7 +224,7 @@ public final class DesktopAppModel {
         let previous = value
         value.certificateSHA256 = fingerprint
         value = try value.validated()
-        connections = try await repository.save(value, replacing: previous)
+        connections = try await requireRepository().save(value, replacing: previous)
         return value
     }
 

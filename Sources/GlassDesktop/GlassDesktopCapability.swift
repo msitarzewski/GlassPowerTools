@@ -49,6 +49,13 @@ public final class GlassDesktopRuntime {
     /// capability must not reach into a view.
     public var requestSetup: (@MainActor (GlassShellSetupPrefill) -> Void)?
 
+    /// D26: points the saved-desktop store at the shell's catalog. Called once, by the composition
+    /// root, for the same reason the terminal's and the database's are.
+    @MainActor
+    public func connectToLibrary(store: any GlassServiceStore) async {
+        await app.attach(store: store)
+    }
+
     public init(layers: GlassLayerStore? = nil, app: DesktopAppModel? = nil) {
         self.layers = layers ?? GlassLayerStore()
         self.app = app ?? DesktopAppModel()

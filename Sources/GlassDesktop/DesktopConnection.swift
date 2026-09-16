@@ -162,7 +162,7 @@ public struct DesktopConnection: Identifiable, Codable, Equatable, Sendable {
 public enum DesktopError: Error, LocalizedError, Equatable, Sendable {
     case invalidName, invalidHost, invalidPort, invalidAccount, invalidTags, invalidCertificate
     case invalidDesktop, invalidDocument, unsupportedVersion(Int), duplicateConnection, missingConnection
-    case storageTooLarge, invalidDestination, connectionChanged
+    case storageTooLarge, invalidDestination, connectionChanged, libraryUnavailable
 
     public var errorDescription: String? {
         switch self {
@@ -174,6 +174,7 @@ public enum DesktopError: Error, LocalizedError, Equatable, Sendable {
         case .invalidCertificate: "The certificate fingerprint must be a SHA-256 fingerprint."
         case .invalidDesktop: "Choose a desktop from 200 to 8192 pixels per side, with an even width and at most 16 million pixels."
         case .invalidDocument: "The saved connections file is invalid. It has been left unchanged."
+        case .libraryUnavailable: "The host library is not available yet, so desktops cannot be read or saved."
         case .unsupportedVersion(let version): "Connection file version \(version) is not supported. It has been left unchanged."
         case .duplicateConnection: "The connections file contains duplicate identities."
         case .missingConnection: "This saved connection no longer exists."

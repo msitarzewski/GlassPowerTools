@@ -50,6 +50,15 @@ public final class GlassDatabaseRuntime {
     /// Only the setup sheet needs it: `open` is handed a `GlassCapabilityHostAccess` directly.
     public var hostAccess: (@MainActor (HostProfile) -> GlassCapabilityHostAccess)?
 
+    /// D26: points the saved-connection store at the shell's catalog. Called once, by the
+    /// composition root — the only place that can see both. A method rather than an init parameter
+    /// because the shell model does not exist when this runtime is built; the runtime is
+    /// registered *with* the model.
+    @MainActor
+    public func connectToLibrary(store: any GlassServiceStore) {
+        connectionManager.attach(store: .catalog(store))
+    }
+
     public init(layers: GlassLayerStore? = nil) {
         let resolvedLayers = layers ?? GlassLayerStore()
         self.layers = resolvedLayers
@@ -131,7 +140,7 @@ public final class GlassDatabaseCapability: GlassCapability {
         guard let config = runtime.connectionManager.connection(for: service.endpointID.rawValue) else { return }
         // Order matters: the credential first, then the record. `ConnectionManager.delete`
         // already removes the credentials and any managed SQLite working copy transactionally.
-        try runtime.connectionManager.delete(config)
+        try await runtime.connectionManager.delete(config)
     }
 
     /// The saved record's address, for hosts that predate addresses on the host record. SQLite's
@@ -147,7 +156,10 @@ public final class GlassDatabaseCapability: GlassCapability {
     /// that host follows it, so the machine's identity is edited once. SQLite records are left
     /// alone — their `host` is a managed file path.
     public func hostAddressDidChange(host: HostProfile, address: String?) {
-        runtime.applyHostAddress(address, to: host)
+        // Same shape as the terminal's and the desktop's: the shell reports the change
+        // synchronously, and each following record is a catalog write.
+        let runtime = self.runtime
+        Task { @MainActor in await runtime.applyHostAddress(address, to: host) }
     }
 
     // MARK: Connect
@@ -223,12 +235,12 @@ enum GlassDatabaseHostAddressSync {
     /// so a single bad record does not stop the rest. Returns the ids updated. A cleared address
     /// leaves the records alone: they still need something to connect to.
     @MainActor @discardableResult
-    static func apply(_ address: String?, to host: HostProfile, in manager: ConnectionManager) -> [UUID] {
+    static func apply(_ address: String?, to host: HostProfile, in manager: ConnectionManager) async -> [UUID] {
         guard let address else { return [] }
         var applied: [UUID] = []
         for config in connections(manager.connections, following: host, address: address) {
             do {
-                try manager.update(config)
+                try await manager.update(config)
                 applied.append(config.id)
             } catch {
                 Logger.connections.error(
@@ -254,7 +266,7 @@ enum GlassDatabaseHostAddressSync {
 
 extension GlassDatabaseRuntime {
     @discardableResult
-    func applyHostAddress(_ address: String?, to host: HostProfile) -> [UUID] {
-        GlassDatabaseHostAddressSync.apply(address, to: host, in: connectionManager)
+    func applyHostAddress(_ address: String?, to host: HostProfile) async -> [UUID] {
+        await GlassDatabaseHostAddressSync.apply(address, to: host, in: connectionManager)
     }
 }

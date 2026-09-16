@@ -589,3 +589,57 @@ Two legacy-migration tests asserted that a legacy `servers` blob is copied forwa
 unreadable one holds the migration open for a retry. Both describe machinery D26 removed, so they
 now assert the contract that exists: the blob is ignored, the settings beside it still migrate, and
 the pass completes rather than staying pending.
+
+## D26 stage 1 complete — database and desktop, 2026-09-15
+
+**1485 tests / 158 suites, exit status 0, and the app target builds.**
+
+### The DRY move that made this small
+
+The terminal's reconcile — *make the stored set match this list* — is the same problem for all three
+capabilities, because all three key a record by the shell's endpoint id. It is now
+`GlassShell/GlassServiceRecords.swift`, written once and used three times, and the terminal's own
+copy was deleted to use it. It owns three rules in one place: **removals before writes** (a
+configuration left behind for a record that is gone is D25's orphan), **unchanged records skipped**
+(every write publishes, so rewriting churns the catalog for every other device), and **compare as
+bytes** rather than by some type's idea of equality.
+
+Proof it is genuinely shared: defeating the removal branch fails **both** the terminal's deletion
+test and the desktop's, from one edit.
+
+### Database
+
+`ConnectionPersistenceStore.catalog(_:)` beside `.live`, and the store's writes became async for
+the same reason the terminal's did — the catalog is an actor. Far smaller than the terminal: one
+`persist` funnel and four mutators rather than sixteen. `ConnectionManager.attach(store:)` and
+`GlassDatabaseRuntime.connectToLibrary(store:)` mirror the terminal's exactly.
+
+### Desktop — the file store is gone
+
+`DesktopRepository` was **rewritten, not adapted**: it was a file-backed actor with `flock`, an
+atomic rename, a size cap, a schema version *and a publication journal* —
+`pendingHostRemovals`/`pendingHostPublications`, which recorded what still had to be told to a
+separate app's catalog so a crash could not lose it. That existed because glassDT was one of three
+processes agreeing about one model. **Checked before deleting: nothing outside that file ever read
+those queues.** `connections.json` no longer exists.
+
+`validated()` now runs on the way **out** as well as in, because it is what canonicalises a VNC
+record and a record written by an older build has to reach the same shape as one written now.
+
+### A model with no library says so
+
+`DesktopAppModel`'s repository is optional and `requireRepository()` throws
+`DesktopError.libraryUnavailable`. Deliberate: *"no desktops"* and *"no catalog to read"* are
+different answers and only one is safe to act on. Nine call sites route through it rather than
+optional-chaining into a silent empty list.
+
+Four desktop tests had to attach a store — correctly, because they were asserting against a model
+that could not read anything. One reloaded from a *directory* to prove an import survives; under
+D26 "relaunched" means a second model over the **same catalog**, which is what two launches of the
+app actually share.
+
+### Stage 1 is done
+
+All three capabilities read and write their records on their service links. `UserDefaultsKeys.servers`,
+`glassdb.connections` and `connections.json` are no longer production stores. **Next: stage 2**, the
+synced deletion cascade, which stage 1 shrank to Keychain credentials alone.
