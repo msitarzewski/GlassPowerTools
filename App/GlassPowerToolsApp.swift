@@ -72,19 +72,18 @@ struct GlassPowerToolsApp: App {
         // through the host sheet. Without this they produce a server with no host record and no
         // link — invisible in the library, and under D26 with nowhere to be stored at all. The
         // shell puts the machine in the library on the capability's behalf.
-        terminal.sessionManager.serverManager.adoptHost = { [weak model] hostName, address, serviceName in
-            guard let model else { throw GlassShellError.hostNotFound(HostID()) }
-            return try await model.adoptService(kind: .ssh, hostName: hostName, address: address,
-                                                serviceName: serviceName).rawValue
-        }
-        terminal.sessionManager.serverManager.discardAdoption = { [weak model] id in
+        // D26/D27 in one call: saved servers live on their service links from here on, and the
+        // two paths that build a server directly ask the shell for a machine to hang it on.
+        terminal.connectToLibrary(
+            store: model,
+            adopt: { [weak model] hostName, address, serviceName in
+                guard let model else { throw GlassShellError.hostNotFound(HostID()) }
+                return try await model.adoptService(kind: .ssh, hostName: hostName, address: address,
+                                                    serviceName: serviceName).rawValue
+            },
             // Link-only. The capability is the one deleting, so asking it to delete again through
             // `removeService` would call straight back into the delete that is running.
-            await model?.detachService(EndpointID(rawValue: id))
-        }
-        // D26: the catalog is the one store for a connection. The terminal's saved servers live on
-        // their own service links from here on; `UserDefaultsKeys.servers` is gone.
-        terminal.sessionManager.serverManager.attach(store: .catalog(model))
+            discard: { [weak model] id in await model?.detachService(EndpointID(rawValue: id)) })
         model.registry.register(GlassTerminalCapability(runtime: terminal))
         // Stage 3: the database capability. Its managers live for the process in the runtime;
         // the shell routes Connect for `.database` services through the capability, and the

@@ -82,6 +82,26 @@ public final class GlassTerminalRuntime {
         }
     }
 
+    /// Wires the terminal's saved-server storage to the shell's catalog (D26) and its host
+    /// adoption (D27). Called once, by the composition root, which is the only place that can see
+    /// both sides.
+    ///
+    /// One method rather than exposing `sessionManager`: the runtime is this module's public face,
+    /// and the app has no business reaching through it into a manager. The App target compiles
+    /// only under `xcodebuild` — it is not part of the SwiftPM package — so an accessibility
+    /// mistake here is invisible to `swift build` and shows up at install time.
+    @MainActor
+    public func connectToLibrary(
+        store: any GlassServiceStore,
+        adopt: @escaping @MainActor (_ hostName: String, _ address: String, _ serviceName: String) async throws -> UUID,
+        discard: @escaping @MainActor (UUID) async -> Void
+    ) {
+        let manager = sessionManager.serverManager
+        manager.adoptHost = adopt
+        manager.discardAdoption = discard
+        manager.attach(store: .catalog(store))
+    }
+
     /// Connect to the saved server whose id is the shell's endpoint id. Consumed by the bootstrap.
     /// `report`, when given, receives the attempt's terminal state (the shell stamps "last
     /// connected" only on `.connected`).
