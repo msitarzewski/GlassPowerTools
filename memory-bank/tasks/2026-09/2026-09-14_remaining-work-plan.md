@@ -782,3 +782,50 @@ as proven.
 The key library is reachable by any capability *in principle* — the records are in a shared module —
 but nothing outside the terminal offers keys yet, and the deletion journal still lives in
 `SettingsManager`. Stage 4's "used by" is what makes the library worth opening.
+
+## D26 stage 4, model layer — "used by", 2026-09-15
+
+### One question, not two
+
+`isDeviceBound` was replaced by `credential(for:host:) -> GlassServiceCredential`, because *can this
+service travel* (stage 3) and *which shared credential does it reference* (D28's "used by") are the
+same question — **what authenticates this service** — reached by the same lookup. Two members would
+have walked the same path twice and let the answers disagree.
+
+```
+case ownedByService            // a password: belongs to this service and nothing else
+case sharedKey(id:deviceBound:) // a key: the thing a manager has to be able to trace
+case unreadable                // this build cannot say, and must not pretend otherwise
+```
+
+The distinction that earns the enum is **shared or not**. A password ends with the service that uses
+it. A key can authenticate a terminal on `oscar` and another on `juliet`, which is why deleting one
+must leave the key alone and why the manager has to name who is using it.
+
+`unreadable` is the failure mode designed in rather than retrofitted: a configuration written by a
+newer build is skipped rather than fatal, so without counting it a key in genuine use reads as *used
+by nothing* — and then someone deletes it.
+
+### Derived, never stored
+
+`services(usingKey:)` and `usageCount(ofKey:)` walk the catalog and ask the owning capability. No
+table. The edge already exists on each service's configuration, and a second copy would have to be
+kept in step through deletion, editing, sync and merge — D25 is the bug where deleting a thing
+forgot to tell the other store. Both readers, and stage 3's redaction, now go through one private
+`credential(for:on:)` so they cannot disagree.
+
+### Verification — blocked, not green
+
+**The Mac's screen was locked for this entire piece** (rule 28), so every test that writes a host
+catalog fails at the write. What is verified: **the app target builds**, and the three suites that
+touch no catalog pass (12 tests). `D28KeyUsageTests` — five tests including the user's own
+`juliet`/`oscar` scenario — **has never been run** and must be before this is believed.
+
+**Owed:** a full unlocked run covering stages 1–4 and the two-device acceptance list.
+
+### Still to build in stage 4
+
+The panel itself: a contributed `GlassLibraryPanel` beside Collections, listing name, algorithm,
+fingerprint, added date and an *iCloud* / *This device only* badge, with rename, copy public key,
+export public key, **used by**, and a delete that names what it will unassign. The model layer above
+is what it reads.

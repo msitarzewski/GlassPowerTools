@@ -234,10 +234,17 @@ public final class GlassTerminalCapability: GlassCapability {
     /// Derived from the server's current `sshKeyID` every time it is asked, so switching the
     /// service to a password — or to an imported key — makes it start synchronizing again with no
     /// flag to clear.
-    public func isDeviceBound(_ service: HostServiceLink, host: HostProfile) -> Bool {
-        guard let server = runtime.sessionManager.serverManager.server(for: service.endpointID.rawValue),
-              server.authMethod == .sshKey, let keyID = server.sshKeyID else { return false }
-        return runtime.settingsManager.sshKeys.first { $0.id == keyID }?.storageKind == .secureEnclave
+    public func credential(for service: HostServiceLink, host: HostProfile) -> GlassServiceCredential {
+        // No saved server behind the link is not the same as a password: this build cannot say what
+        // authenticates the service, and saying "nothing" would let a key it uses look unused.
+        guard let server = runtime.sessionManager.serverManager.server(for: service.endpointID.rawValue) else {
+            return .unreadable
+        }
+        guard server.authMethod == .sshKey, let keyID = server.sshKeyID else { return .ownedByService }
+        // A key whose record this device does not hold is a hardware key belonging to another Mac,
+        // or one that has not arrived yet. Either way it is shared, and it is not usable here.
+        let record = runtime.settingsManager.sshKeys.first { $0.id == keyID }
+        return .sharedKey(id: keyID, deviceBound: record?.storageKind == .secureEnclave)
     }
 
     public func removeService(_ service: HostServiceLink, host: HostProfile) async throws {

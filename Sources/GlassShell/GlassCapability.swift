@@ -151,6 +151,31 @@ public protocol GlassServiceDraft: AnyObject {
 
 /// A capability owns one service kind. The shell routes `connect` through it;
 /// the capability declares its own scenes statically in the app target.
+/// What authenticates one service.
+///
+/// The distinction that matters is **shared or not**. A password belongs to the service that uses
+/// it and to nothing else, so deleting that service ends the story. A key is shared: the same key
+/// can authenticate a terminal on `oscar` and another on `juliet`, which is why deleting one of
+/// them must leave the key alone, and why a key manager has to be able to say who is using it.
+public enum GlassServiceCredential: Sendable, Equatable {
+    /// Something belonging to this service alone — a password. Nothing else references it.
+    case ownedByService
+    /// A shared key, and whether that key can leave this device.
+    case sharedKey(id: UUID, deviceBound: Bool)
+    /// This build cannot read the service's configuration, so it cannot say what authenticates it.
+    ///
+    /// **Counted separately, never folded into "uses nothing".** A record written by a newer build
+    /// would otherwise make a key that is genuinely in use look unused — and then someone deletes
+    /// it. A zero only ever proves where you looked.
+    case unreadable
+
+    /// Whether this service can appear on other devices.
+    public var isDeviceBound: Bool {
+        if case .sharedKey(_, let deviceBound) = self { return deviceBound }
+        return false
+    }
+}
+
 @MainActor
 public protocol GlassCapability: AnyObject {
     var kind: HostServiceKind { get }
@@ -185,19 +210,17 @@ public protocol GlassCapability: AnyObject {
     /// opens empty rather than refusing, because a machine the user can finish by hand is better
     /// than a dead end. Default: nil, for capabilities that import nothing.
     func setupDraft(importing configuration: Data) -> (any GlassServiceDraft)?
-    /// Whether this service's credential **cannot leave this device** (D26 stage 3).
+    /// What authenticates this service, as far as anything outside the capability needs to know.
     ///
-    /// A Secure Enclave key is the only one today: hardware key material cannot be copied, so a
-    /// service that authenticates with one cannot work anywhere else. Such a service is redacted
-    /// from what this device publishes and re-attached when a record comes back, so it stays here
-    /// and appears nowhere else — the user's model: *"the Terminal using a device bound key becomes
-    /// a device bound terminal and doesn't show on iPhone."*
+    /// One question rather than two, because both answers come from the same lookup: whether the
+    /// service can travel (D26 stage 3) and which shared credential it references (D28's "used by")
+    /// are both *what is this service's credential*, and asking twice would walk the same path
+    /// twice and let the two answers disagree.
     ///
-    /// **Derived, never stored.** Asked again every time it matters, from whatever credential the
-    /// service currently references. A stored flag would drift the moment a terminal switched from
-    /// a hardware key to a password: it would either leak a connection that cannot work, or strand
-    /// one that can. Default: false.
-    func isDeviceBound(_ service: HostServiceLink, host: HostProfile) -> Bool
+    /// **Derived, never stored.** Asked again every time it matters. A stored flag would drift the
+    /// moment a terminal switched from a hardware key to a password: it would either leak a
+    /// connection that cannot work, or strand one that can. Default: `.ownedByService`.
+    func credential(for service: HostServiceLink, host: HostProfile) -> GlassServiceCredential
 
     /// The shell removed `service` from `host`: delete whatever the capability stored for it
     /// (configuration, credentials). Default: nothing.
@@ -282,7 +305,7 @@ public extension GlassCapability {
         open(service: service, host: host, report: report)
     }
     func hostAddressDidChange(host: HostProfile, address: String?) {}
-    func isDeviceBound(_ service: HostServiceLink, host: HostProfile) -> Bool { false }
+    func credential(for service: HostServiceLink, host: HostProfile) -> GlassServiceCredential { .ownedByService }
     func libraryPanels() -> [GlassLibraryPanel] { [] }
     func setupDraft(importing configuration: Data) -> (any GlassServiceDraft)? { nil }
     func knownAddress(service: HostServiceLink, host: HostProfile) -> String? { nil }

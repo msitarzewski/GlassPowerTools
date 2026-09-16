@@ -787,6 +787,52 @@ public final class GlassShellModel: GlassServiceStore {
         try await cascadeRemoval(of: owned)
     }
 
+    // MARK: What uses a key (D28)
+
+    /// Every service that authenticates with `keyID`, with the machine it belongs to.
+    ///
+    /// **Derived, never stored.** The edge already exists on each service's own configuration, so a
+    /// usage table would be a second copy of an existing truth that has to be kept in step through
+    /// deletion, editing, sync and merge — and D25 is the bug where deleting a thing forgot to tell
+    /// the other store. A derived index cannot drift.
+    ///
+    /// This is what makes deleting a key safe: the manager can name what it is about to unassign.
+    public func services(usingKey keyID: UUID) -> [(host: HostProfile, service: HostServiceLink)] {
+        var found: [(host: HostProfile, service: HostServiceLink)] = []
+        for record in records where record.deletedAt == nil {
+            for service in record.services {
+                guard case .sharedKey(let id, _) = credential(for: service, on: record), id == keyID else { continue }
+                found.append((host: record, service: service))
+            }
+        }
+        return found
+    }
+
+    /// How many services use `keyID`, and how many this build could not read.
+    ///
+    /// The second number is not decoration. A configuration written by a newer build is skipped
+    /// rather than fatal, so without counting it a key in genuine use can read as *used by nothing*
+    /// — and then somebody deletes it. A zero only ever proves where you looked.
+    public func usageCount(ofKey keyID: UUID) -> (readable: Int, unreadable: Int) {
+        var readable = 0
+        var unreadable = 0
+        for record in records where record.deletedAt == nil {
+            for service in record.services {
+                switch credential(for: service, on: record) {
+                case .sharedKey(let id, _) where id == keyID: readable += 1
+                case .unreadable: unreadable += 1
+                default: continue
+                }
+            }
+        }
+        return (readable, unreadable)
+    }
+
+    /// The one place that asks a capability what authenticates a service.
+    private func credential(for service: HostServiceLink, on record: HostProfile) -> GlassServiceCredential {
+        registry.capability(for: service.kind)?.credential(for: service, host: record) ?? .ownedByService
+    }
+
     /// The services on `record` whose credential cannot leave this device (D26 stage 3).
     ///
     /// Asked of whichever capability owns each service, every time, because binding is derived from
@@ -795,7 +841,7 @@ public final class GlassShellModel: GlassServiceStore {
     private func deviceBoundServices(of record: HostProfile) -> Set<EndpointID> {
         var bound: Set<EndpointID> = []
         for service in record.services
-        where registry.capability(for: service.kind)?.isDeviceBound(service, host: record) == true {
+        where credential(for: service, on: record).isDeviceBound {
             bound.insert(service.endpointID)
         }
         return bound
