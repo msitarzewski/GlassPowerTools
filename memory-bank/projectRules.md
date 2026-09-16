@@ -164,7 +164,11 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
 28. **`mktemp` / `NSCocoaErrorDomain Code=513` in a test means the Mac's screen is locked, not that
     the code is broken.** The catalog and several stores write with `.completeFileProtection`, and
     those writes fail while the screen is locked — surfacing as *"Creating a temporary file via
-    mktemp failed… errno 1"*, which reads like a permissions or sandbox fault and is neither. It
+    mktemp failed… errno 1"* **and** as `NSCocoaErrorDomain Code=257 "Operation not permitted"` on a
+    *read*. Both read like a permissions or sandbox fault and neither is. **Most of the failures
+    will not carry the signature at all:** on 2026-09-15 a locked screen produced 100 failures, 89
+    with it and 11 that were simply assertions downstream of a catalog write that never happened.
+    Count them — if every failing test writes protected storage, that is the answer. It
     cost a long diagnosis on 2026-09-13 (116 failures) and again on 2026-09-15, where it first
     looked like a hang because the failure was being swallowed. **Check it first:**
     `ioreg -n Root -d1 -a | grep -A1 CGSSessionScreenIsLocked`. Ask the user to unlock; do not
