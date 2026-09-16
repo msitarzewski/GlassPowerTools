@@ -1364,7 +1364,7 @@ full run unlocked.** Installed build is still **0.4.107**, which predates stages
 **Next action:** stage 4, the key manager panel with "used by" — a read across the catalog, which is
 what stages 1 and 3 were for. Then the two-device acceptance run, which no test replaces.
 
-## 2026-09-16 — RESUME HERE (written before compaction)
+## 2026-09-16 — resume notes (SUPERSEDED — see the RESUME HERE block at the end of this file)
 
 **State BUILD.** Owner: coordinating agent. Tree clean at `810e8b9`. **1506 tests / 163 suites,
 exit status 0**, verified by exit status; the app target builds separately (rule 32).
@@ -1434,3 +1434,83 @@ greedy-frame fix, remembered dividers per platform. Then Stage 5 (the editor int
 
 **Full detail:** [the remaining work](tasks/2026-09/2026-09-14_remaining-work-plan.md), which carries
 the execution log for every stage and the surface survey behind D27/D28.
+
+## 2026-09-16 (later) — RESUME HERE
+
+**State BUILD.** Tree clean at `2358d08`, commit count **119**.
+**1509 tests / 164 suites, exit status 0.** The app target builds on macOS, iOS and visionOS.
+
+### Installed right now
+
+| Platform | Version | How verified |
+|---|---|---|
+| macOS `/Applications/GlassPowerTools.app` | **0.4.119 (119)** | read off the bundle |
+| iPhone 17 Pro Max `00000000-0000000000000A02` | **0.4.119 (119)** | read off the device |
+| Vision Pro `00000000-0000000000000A01` | **not installed** | built and signed; the headset is paired but timed out — it was asleep |
+
+**Finish the Vision Pro install first.** The app is already built at
+`<scratchpad>/dd-xros/Build/Products/Release-xros/GlassPowerTools.app`; wake the headset and
+`xcrun devicectl device install app --device 00000000-0000000000000A01 <path>`, then read the
+version back (rule 16). If the scratchpad is gone, rebuild with
+`-destination 'platform=visionOS,id=00000000-0000000000000A01'`.
+
+### Where D26 stands
+
+Stages 1, 2, 3 and stage 4's **model layer** are built and verified. Remaining: **stage 4's key
+manager panel** and **stage 5's storage cleanup**.
+
+### Do these next, in order
+
+1. **Vision Pro install** (above).
+2. **The two-device acceptance run.** Add a host with a key on the Mac, connect from the phone
+   **without re-approving host trust** — that single run proves configuration sync, key record sync
+   and D23's pin sync together. Then: delete the connection and confirm the key survives; generate a
+   Secure Enclave key and confirm that terminal does **not** appear on the phone while the database
+   on the same host still does; sync twice with it in place. **D26 has never been run across two
+   devices. Everything is proven by unit tests and a single-device app.**
+3. **The key manager panel** — the last of stage 4. A contributed `GlassLibraryPanel` beside
+   Collections; copy `GlassTerminalCapability.libraryPanels()` (Workgroups), the only existing
+   consumer. Name, algorithm, fingerprint, added date, *iCloud* / *This device only* badge; per key
+   rename, copy/export public key, **used by**, and a delete naming what it will unassign. It is a
+   **read** over `model.services(usingKey:)` and `model.usageCount(ofKey:)`, which are done and
+   tested. **The magic directive applies: design it on visionOS terms first, adapt down.**
+
+### What just bit, and will again
+
+- **A test double more permissive than production certified a broken build.** `GlassInMemoryServiceStore`
+  stores a configuration for any endpoint id; the real model requires a service link. 1506 tests
+  passed while adding a service was impossible — the user saw *"That service is no longer on the
+  host."* on the first install. **Fixed** (link first, then the record) and covered by
+  `Tests/GlassTerminalTests/D26SetupSheetSaveTests.swift`, which drives the real model. When a
+  capability's storage is involved, test against `GlassShellModel`, not the double.
+- **Platform-conditional code is invisible to a macOS build.** An iOS-only `#if` branch in
+  `TerminalConnectFlow` had never been compiled by any check that had run. Build all three before
+  believing a refactor is done.
+- Rules earned this session and worth re-reading before touching anything: **25** (verify by exit
+  status), **28** (the screen lock, which fails reads too and leaves most failures unsigned), **32**
+  (`swift build` never compiles the App target), **33** (replacing a protocol requirement silently
+  orphans conformers).
+- Run long suites under `caffeinate -dimsu`. Check
+  `ioreg -n Root -d1 -a | grep -A1 CGSSessionScreenIsLocked` **before** diagnosing any file failure.
+
+### Environment left running
+
+Ubuntu `192.0.2.6`: TigerVNC on **5902**, **GNOME Remote Desktop on 3389** — username `gptrdp`,
+password in this session's scratchpad (`grd.pw`), certificate fingerprint `0b:7a:6e:22:…:ee:bf:c7`.
+Stop with `systemctl --user stop gptvnc` and
+`grdctl rdp disable && systemctl --user stop gnome-remote-desktop`.
+Windows `192.0.2.3`: RDP 3389 and TightVNC 5900, **neither provisioned by us** — September's
+`gptrdp` password died with that session, so a signed-in Windows RDP session is still unproven.
+
+### After D26
+
+Stage 4 W3's remainder (input, held-key release, clean disconnect — needs the session window, not a
+probe; both VMs are configured), W4's 40-item parity sweep, **W5 spatial on the headset — still the
+only unknown-size item in the plan**, W6 audit. Then Stage 4.5 (VNC-over-SSH; **sleep/wake, required
+by our own testing table**; measured performance; RD Gateway optional). Carried: Tailscale is still
+a window not a panel; visionOS design pass 1 unverified with two on-device failures; the database
+workspace one-line greedy-frame fix; remembered dividers per platform. Then Stage 5 (the editor
+interface) and Stage 6 (deprecate the public repos — **not without the user's word**).
+
+**Full detail:** [the remaining work](tasks/2026-09/2026-09-14_remaining-work-plan.md) — it carries
+the execution log for every D26 stage and the surface survey behind D27/D28.
