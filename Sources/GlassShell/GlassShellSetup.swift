@@ -335,7 +335,17 @@ public final class GlassShellSetupModel {
         }
     }
 
-    /// Commits every enabled draft in kind order: the capability first, then the link. On a
+    /// Commits every enabled draft in kind order: **the link first, then the capability's record.**
+    ///
+    /// That order is D26's, and it was the other way round until 2026-09-16. A capability's record
+    /// is now written *onto* its service link, so committing a draft before the link exists throws
+    /// `serviceNotFound` — "That service is no longer on the host" — and adding a service through
+    /// this sheet failed outright. Every unit test missed it: they drive capabilities through
+    /// `GlassInMemoryServiceStore`, which accepts a configuration for any endpoint, while the real
+    /// model requires a link to hang it on. Only the running app could show it, and it did.
+    ///
+    /// A link with no record behind it is the recoverable half — the capability reports it plainly
+    /// on Connect and the sheet can finish it — which is why it is the half that exists first. On a
     /// failure everything this call created is undone before the error propagates.
     private func commitEnabledServices(on hostID: HostID, record: HostProfile) async throws {
         var created: [(HostServiceKind, EndpointID)] = []
@@ -344,19 +354,17 @@ public final class GlassShellSetupModel {
             guard let draft = draft(for: kind) else { continue }
             let endpointID = EndpointID()
             do {
-                try await draft.commit(endpointID: endpointID, host: record, address: address)
-                created.append((kind, endpointID))
                 try await model.addService(kind: kind, displayName: draft.serviceDisplayName(hostName: record.displayName),
                                            endpointID: endpointID, to: hostID)
+                created.append((kind, endpointID))
+                try await draft.commit(endpointID: endpointID, host: record, address: address)
             } catch {
-                for (kind, endpointID) in created.reversed() {
-                    if model.services(for: hostID).contains(where: { $0.endpointID == endpointID }) {
-                        try? await model.removeService(endpointID, from: hostID)   // asks the capability too
-                    } else {
-                        await self.draft(for: kind)?.rollback(endpointID: endpointID)
-                    }
+                // `removeService` unlinks and then asks the capability to delete whatever it did
+                // manage to store, which covers a draft that committed partially.
+                for (_, endpointID) in created.reversed() {
+                    try? await model.removeService(endpointID, from: hostID)
                 }
-                if !created.contains(where: { $0.1 == endpointID }) { await draft.rollback(endpointID: endpointID) }
+                await draft.rollback(endpointID: endpointID)
                 throw error
             }
         }

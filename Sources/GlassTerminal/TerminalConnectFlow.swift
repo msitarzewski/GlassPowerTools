@@ -156,7 +156,7 @@ struct TerminalConnectFlow: ViewModifier {
                             return "This saved connection is no longer available."
                         }
                         do {
-                            try serverManager.updateServerOrThrow(current, password: password)
+                            try await serverManager.updateServerOrThrow(current, password: password)
                             workgroupPasswordWasSaved = true
                             return nil
                         } catch {
