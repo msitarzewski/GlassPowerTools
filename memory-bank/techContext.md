@@ -220,3 +220,36 @@ and `files.user-selected.read-only`, which glas.sh's macOS entitlements never ha
 the Mac local terminal (`zsh: can't set tty pgrp: operation not permitted`) and would have blocked
 the SSH agent socket, `~/.ssh` reads and file-promise drags. The file is now byte-identical to
 glas.sh's: App Group, Keychain group, iCloud KVS, hardened runtime on, no sandbox.
+
+---
+
+## Current dependency state, 2026-09-15
+
+The "Dependencies to consolidate" section above is the pre-merge survey and is kept as the record of
+what was found. This is where things actually are.
+
+**No sibling package remains a dependency.** GlasSecretStore, GlassConnectionKit and GlassEditorKit
+were absorbed; `../glas.sh`, `../glassdb`, `../glassDT` and those three are historical records.
+
+**Three tree-sitter grammars are vendored rather than pinned, each for a stated reason** —
+`THIRD-PARTY-NOTICES.md` carries the detail:
+
+| Grammar | Why vendored |
+|---|---|
+| YAML | Upstream's manifest decides whether to compile `scanner.c` with a *relative* `fileExists`, false when it is a dependency, so the external scanner is silently dropped and its symbols go undefined at link |
+| Markdown (block and inline) | Upstream's block `serialize()` copies every open block into a fixed 1024-byte buffer unbounded — heap corruption reachable by opening a deeply-nested markdown file. The bound is restored in our copy |
+| SQL | Upstream's `serialize()` frees and nils `start_tag`, consuming the state it was asked to snapshot, and `deserialize` overwrites the pointer without freeing or checking it. Still present on upstream HEAD |
+
+Both markdown and SQL were **pinned** for a day and the patches were lost with the switch; the
+markdown one was aborting a whole test target for that day without anyone noticing, because a
+crashed target prints no failure line and no count (rule 25). Bash, TOML and JSON are stock and
+pinned.
+
+**`.git` is 13 MB.** SQL's generated `parser.c` is 41 MB in the working tree and **2.6 MB**
+committed, which is the measurement that reversed a recommendation to fork rather than vendor.
+
+**D26 storage, as built:** a capability's records live on their service links in the host catalog —
+`UserDefaultsKeys.servers`, `glassdb.connections` and `connections.json` are no longer production
+stores. SSH key *records* live in the Keychain beside their material
+(`sshKeysRecordService`, synchronizable), routed to the device-bound configuration when the key is
+Secure Enclave.

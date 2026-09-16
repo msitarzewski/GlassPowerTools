@@ -492,3 +492,40 @@ from the previous day** while being told about the day's changes. And a regex me
 user-visible strings spanned unbalanced quotes in comments and rewrote **105 occurrences across 64
 files**, including an enum's raw values and provenance comments; 18 files were restored from git and
 the rest repaired by hand. Explicit edits, or a constant, would have been faster than either.
+
+---
+
+# 2026-09-15 — D26 stages 1 to 3 built
+
+## Verified by running
+
+| Claim | Evidence |
+|---|---|
+| Package suite green | **1497 tests / 161 suites, exit status 0**, measured after the key-record move. Verified by exit status, never by grepping for failures (rule 25) |
+| The app builds | `xcodebuild -scheme GlassPowerTools -configuration Release`, macOS arm64. Checked separately every time, because `swift build` never compiles the App target (rule 32) |
+| Installed and launched | **0.4.107 (107)** at `/Applications/GlassPowerTools.app`, version read back off the bundle (rule 16) |
+| VNC against a real server | TigerVNC **1.15.0**, Ubuntu 26.04.1, `192.0.2.6:5902` — 1024×640 first frame in 0.21s, non-zero pixels |
+| RDP against a real server, signed in | GNOME Remote Desktop **50.2**, same VM — refused unpinned, reporting a leaf SHA-256 identical to the certificate minted on that VM minutes earlier; pinned, a 1360×768 frame in 0.41s |
+| RDP certificate refusal against Windows | Windows 11 Pro, `192.0.2.3:3389` — leaf byte-identical to the 2026-09-14 record, and it fails at the certificate before any credential is sent |
+
+## Compiled but not verified by running
+
+- **D26 stage 3's second half.** The final full-suite run could not complete: the Mac's screen locked
+  (rule 28). The app target builds and the new suites pass; the last complete run before the lock
+  was green. **Repeat the full run unlocked before treating it as proven.**
+- **Neither real RDP server advertised MS-RDPEDISP.** Two of two decline it, so *resize works* is
+  unclaimed for both — not a failure, a limit on what may be said.
+
+## Still needs two devices, and no test replaces it
+
+The D26 acceptance run, unchanged since it was written: add a host with a key on the Mac, connect
+from the phone **without re-approving host trust**. That one run proves configuration sync, key
+record sync and D23's pin sync together. Then: delete the connection and confirm the key survives;
+attach it to a second host from a third device; generate a Secure Enclave key and confirm that
+terminal does **not** appear on the phone while the database on the same host still does; and sync
+twice with it in place.
+
+## Not verified on hardware
+
+Input, held-key release and clean disconnect over RDP — they need the session window, not a probe.
+Both VMs are configured and were left running.

@@ -1342,3 +1342,24 @@ building**; an install is the only proof of that.
 
 **Next action:** D26 stage 1's remaining two capabilities — the database (`glassdb.connections`)
 and the desktop (`connections.json`).
+
+## 2026-09-15 (late) — D26 stages 1–3 built; stage 4 next
+
+**State BUILD.** Owner: coordinating agent. Committed through `0e1ce68`; tree clean.
+
+**Done:** stage 1 (all three capabilities keep their records on their service links), stage 2 (a
+machine deleted on another device cleans up here), stage 3 (device-bound services never leave this
+device, and key records live in the Keychain beside their material).
+
+**The three pieces of stage 3 that have to agree**, and the one that was not in the plan: publish
+redacts, apply re-attaches, and **stage 2 excludes** — without the third, a redacted service reads
+as *deleted elsewhere* on the next sync and stage 2 deletes its credential. The two stages would
+have quietly undone each other.
+
+**Verification owed.** The last full run could not complete: the screen locked (rule 28, now
+extended — it fails reads as `Code=257` too, and most failures carry no signature at all). Last
+complete run was **1497 tests / 161 suites, exit status 0**; the app target builds. **Repeat the
+full run unlocked.** Installed build is still **0.4.107**, which predates stages 1–3.
+
+**Next action:** stage 4, the key manager panel with "used by" — a read across the catalog, which is
+what stages 1 and 3 were for. Then the two-device acceptance run, which no test replaces.
