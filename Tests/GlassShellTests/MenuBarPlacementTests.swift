@@ -94,7 +94,8 @@ struct MenuBarPlacementTests {
                 publishers.insert(file.lastPathComponent)
             }
         }
-        #expect(publishers == ["GlassShellLibraryView.swift", "MacWorkspaceView.swift", "DatabaseWorkspaceView.swift"],
+        #expect(publishers == ["GlassShellLibraryView.swift", "MacWorkspaceView.swift",
+                               "DatabaseWorkspaceView.swift", "GlassEditorWorkspaceView.swift"],
                 "The windows publishing \\.glassNewItem changed: \(publishers.sorted()).")
     }
 

@@ -14,6 +14,7 @@ import GlassConnectionKit
 import GlassTerminal
 import GlassDatabase
 import GlassDesktop
+import GlassEditor
 
 @main
 struct GlassPowerToolsApp: App {
@@ -23,6 +24,7 @@ struct GlassPowerToolsApp: App {
     @State private var database: GlassDatabaseRuntime
     @State private var desktop: GlassDesktopRuntime
     @State private var windowRecovery: GlassWindowRecoveryManager
+    @State private var editor: GlassEditorRuntime
     #if os(macOS)
     @NSApplicationDelegateAdaptor(MacTerminalAppDelegate.self) private var appDelegate
     #else
@@ -118,12 +120,17 @@ struct GlassPowerToolsApp: App {
         let desktopRuntime = desktop
         Task { @MainActor in await desktopRuntime.connectToLibrary(store: model) }
         model.registry.register(GlassDesktopCapability(runtime: desktop))
+        // Stage 5: the editor. Not a capability — a file is not a service on a machine — so it is
+        // registered nowhere and simply owns its own window. What makes it part of the product is
+        // that a project names a *host*, which is the catalog's identity (see `GlassEditorProject`).
+        let editor = GlassEditorRuntime(layers: layers)
         _layers = State(initialValue: layers)
         _model = State(initialValue: model)
         _terminal = State(initialValue: terminal)
         _database = State(initialValue: database)
         _desktop = State(initialValue: desktop)
         _windowRecovery = State(initialValue: windowRecovery)
+        _editor = State(initialValue: editor)
     }
 
     /// The library window. On macOS it carries glas.sh's Connections window sizing
@@ -179,6 +186,7 @@ struct GlassPowerToolsApp: App {
         GlassTerminalScenes(runtime: terminal)
         GlassDatabaseScenes(runtime: database)
         GlassDesktopScenes(runtime: desktop)
+        GlassEditorScenes(runtime: editor)
         #if os(macOS)
         Settings {
             GlassShellSettingsView(model: model)

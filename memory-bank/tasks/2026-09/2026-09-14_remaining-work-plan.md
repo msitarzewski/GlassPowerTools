@@ -961,3 +961,56 @@ worked. The user's direction ended it: *"there is no LEGACY… we don't need the
 the first version, the data on that Mac is test data, and four records are cheaper to re-enter than
 a migration is to carry. See **rule 36**, which also retires the stage 5 item about deleting legacy
 keys on first launch: nothing reads them.
+
+## Stage 5, first take — the editor as a surface, 2026-09-16
+
+Built in one pass at the user's direction: *"Take a shot at planning and one-shotting the Edit
+module… all platforms, best in class features, and Apple magic functionality."*
+
+**What was already there, and is not rebuilt.** `GlassEditorCore` and `GlassEditorUI` are a complete
+editing engine — text storage, undo with coalescing, tree-sitter highlighting, a find engine,
+encoding and line-ending detection, atomic saves, and remote conflict detection — and have been in
+production behind the SQL editor, the record editor and the SFTP remote editor since the absorption.
+`GlassEditorModel` holds a document; `GlassEditorView` draws it on AppKit and UIKit. **The new module
+is the workspace around that**, which is the part the engine deliberately does not do: where a
+document came from, what it is called, whether it has been saved.
+
+`Sources/GlassEditor/`:
+
+| File | What it is |
+|---|---|
+| `GlassEditorDocument` | one open file: open, save, save-as, language from the extension |
+| `GlassEditorWorkspace` | the open set, recents, find state, projects — no SwiftUI, so it is testable |
+| `GlassEditorProject` | a folder **on a machine**, its lazily-read tree, and how it is reached |
+| `GlassMachineIdentity` | whether a host record *is* this machine, decided by SSH host key |
+| `GlassEditorWorkspaceView` | sidebar of projects and documents, editor, find bar, status bar |
+| `GlassEditorScenes` | the window, the runtime, and the File/Text menu items |
+
+**The project idea is the answer to the user's question.** *"I'm on my Mac in the Editor, move to
+Vision Pro where juliet is an SSH connection — make the association between the two somehow?"* A
+project is `(hostID, path)` rather than a URL, so it is the same project on both devices and travels
+on the existing D19 catalog sync; each device decides the transport. **Identity is the SSH host key,
+never a name or an address**: a hostname is ambiguous, a Tailscale address moves, and only the
+machine holding a key's private half can present it. `reach(...)` returns *this machine*, *over SSH*
+or *unreachable* — and never guesses, because a Vision Pro publishes no host keys at all and absence
+of evidence must not read as evidence of absence.
+
+**What works now:** open a file or a folder, a tree that reads a directory only when it is expanded,
+tabs with an unsaved marker, find and replace with regex and case options, go to line, a status bar
+with position, language, line endings and a warning when a large file drops out of highlighting,
+drag and drop onto the window, recents bounded at 20, ⇧⌘E for a window, ⌥⌘F and ⌥⌘L for find and go
+to line, and ⌘N meaning **New Document** while the editor is focused — the shell's contextual New
+picked the window up with no extra wiring, which is the menu-bar work from this morning paying off.
+
+**23 tests**, the two load-bearing ones being that a file opened and saved unchanged is
+byte-identical (CRLF fixture, because the platform default is LF and a naive save rewrites every
+line) and that closing a dirty document refuses rather than discarding. 1,554 tests overall, exit 0;
+macOS, iOS and visionOS all build; 0.4.128 installed on the Mac and the Editor window verified open
+with its own menu.
+
+**The next piece, and it is the whole of the remote half:** `GlassEditorDirectoryReader` is a
+protocol with one implementation (the local file system). The SFTP one is the work — and it needs a
+broker, because rule 6 forbids the editor importing the terminal. The shape is
+`GlassCapabilityHostAccess`'s: the shell asks whichever capability owns `.ssh` for a directory
+listing and a file's bytes, and the editor never learns who served it. Until that exists, a project
+on another machine shows its badge and cannot be browsed.

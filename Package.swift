@@ -18,6 +18,7 @@ let package = Package(
         .library(name: "GlassHostCatalog", targets: ["GlassHostCatalog"]),
         .library(name: "GlassEditorCore", targets: ["GlassEditorCore"]),
         .library(name: "GlassEditorUI", targets: ["GlassEditorUI"]),
+        .library(name: "GlassEditor", targets: ["GlassEditor"]),
         .library(name: "GlassShell", targets: ["GlassShell"]),
         .library(name: "GlassLayers", targets: ["GlassLayers"]),
         .library(name: "GlassSSHTransport", targets: ["GlassSSHTransport"]),
@@ -147,6 +148,13 @@ let package = Package(
             cSettings: [.headerSearchPath("src")]
         ),
         .target(name: "GlassEditorUI", dependencies: ["GlassEditorCore"]),
+        // Stage 5: the editor as a surface of its own. The engine is `GlassEditorCore` /
+        // `GlassEditorUI`, already in production behind the SQL, record and SFTP editors; this
+        // target is the workspace around it — documents, tabs, saving, recents and the window.
+        .target(name: "GlassEditor",
+                dependencies: ["GlassEditorCore", "GlassEditorUI", "GlassConnectionUI",
+                               "GlassLayers", "GlassShell", "GlasSecretStore",
+                               "GlassConnectionKit"]),
         .target(
             name: "GlassLayers",
             dependencies: [
@@ -280,6 +288,7 @@ let package = Package(
         .testTarget(name: "GlassEditorCoreTests", dependencies: ["GlassEditorCore"],
                     resources: [.copy("Fixtures")]),
         .testTarget(name: "GlassEditorUITests", dependencies: ["GlassEditorUI"]),
+        .testTarget(name: "GlassEditorTests", dependencies: ["GlassEditor"]),
         .testTarget(name: "GlassLayersTests", dependencies: ["GlassLayers"]),
         .testTarget(
             name: "GlassDatabaseTests",
