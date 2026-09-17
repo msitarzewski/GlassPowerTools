@@ -316,6 +316,19 @@ public struct GlassShellLibraryView: View {
     /// at the trailing edge. The name truncates first. When the column cannot fit the actions
     /// inline they collapse into one overflow menu beside Connect, so nothing ever clips at the
     /// trailing edge (the 900-pt minimum window showed the trash button cut off, 2026-09-11).
+    /// Whether this link has no capability record behind it. Built-in local services have nothing
+    /// stored by design (D8) and are never "unconfigured".
+    private func isUnconfigured(_ service: HostServiceLink, host: GlassShellHost) -> Bool {
+        !host.isBuiltIn(service.endpointID) && model.configuration(for: service.endpointID) == nil
+    }
+
+    private func subtitle(for service: HostServiceLink, isBuiltIn: Bool) -> String {
+        let kind = GlassServicePresentation.displayName(for: service.kind)
+        if isBuiltIn { return "\(kind) · Built in" }
+        if model.configuration(for: service.endpointID) == nil { return "\(kind) · Not set up" }
+        return kind
+    }
+
     private func serviceRow(_ service: HostServiceLink, host: GlassShellHost) -> some View {
         let suffix = Self.identifierSuffix(for: service, in: host)
         let isBuiltIn = host.isBuiltIn(service.endpointID)
@@ -325,9 +338,15 @@ public struct GlassShellLibraryView: View {
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 2) {
                 Text(service.displayName).lineLimit(1).truncationMode(.tail)
-                Text(isBuiltIn ? "\(GlassServicePresentation.displayName(for: service.kind)) · Built in"
-                     : GlassServicePresentation.displayName(for: service.kind))
-                    .font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+                // **A link with nothing behind it says so here.** Until now the only way to find
+                // out was to press Connect and be told "has no saved configuration" — which is how
+                // a machine ends up with two Terminals that look identical, one of them dead: the
+                // 2026-09-16 persistence defect emptied configurations without removing their
+                // links, and re-adding the service created a second link beside the corpse.
+                Text(subtitle(for: service, isBuiltIn: isBuiltIn))
+                    .font(.footnote)
+                    .foregroundStyle(isUnconfigured(service, host: host) ? .orange : .secondary)
+                    .lineLimit(1)
             }
         }
         .layoutPriority(0)
