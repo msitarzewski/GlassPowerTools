@@ -85,6 +85,9 @@ struct GlassPowerToolsApp: App {
             // `removeService` would call straight back into the delete that is running.
             discard: { [weak model] id in await model?.detachService(EndpointID(rawValue: id)) })
         model.registry.register(GlassTerminalCapability(runtime: terminal))
+        // D26 stage 4: the key manager is a library panel, and the terminal is what holds SSH key
+        // material. The shell presents; the capability keeps the lifecycle it already owns.
+        model.attachKeyStore(terminal.keyStore())
         // Stage 3: the database capability. Its managers live for the process in the runtime;
         // the shell routes Connect for `.database` services through the capability, and the
         // tunnel a service asks for is brokered back to whichever capability owns `.ssh` (D7).
@@ -145,6 +148,12 @@ struct GlassPowerToolsApp: App {
         return group
             .defaultSize(width: 1180, height: 720)
             .windowResizability(.contentMinSize)
+            // File ▸ New, owned once by the shell and aimed by whichever window is focused: a SQL
+            // document in a database workspace, a terminal window in a terminal workspace, a host
+            // here. Attached to this scene because the shell has no scene of its own, and because
+            // exactly one scope may replace a command placement — two replacements are not merged,
+            // they silently delete each other (see `GlassShellFileCommands`).
+            .commands { GlassShellFileCommands() }
         #else
         return group
         #endif

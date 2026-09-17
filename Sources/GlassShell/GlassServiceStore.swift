@@ -33,9 +33,24 @@ public protocol GlassServiceStore: AnyObject {
     /// Every configured service of one kind. Capabilities that keep an in-memory index — the
     /// terminal's saved-server list, for instance — build it from this rather than a second store.
     func configurations(ofKind kind: HostServiceKind) -> [EndpointID: Data]
+
+    /// Whether the catalog behind this store has actually been read yet.
+    ///
+    /// **Empty and unread are different answers, and telling them apart is what this is for.**
+    /// The composition root attaches the store while building the app; the catalog is read from
+    /// disk later, from the library's `.task`. In between, `configurations(ofKind:)` returns
+    /// nothing — and a capability that takes that at face value concludes the user has no saved
+    /// connections, then reconciles the catalog to match and deletes every one of them. That is
+    /// exactly what happened: a machine kept its service link and lost the configuration behind
+    /// it, and the sheet said "This terminal has no saved configuration behind it."
+    var isCatalogLoaded: Bool { get }
 }
 
 public extension GlassServiceStore {
+    /// A store with nothing behind it but memory is readable as soon as it exists. Only a store
+    /// over a file the app has yet to read has to say otherwise, and `GlassShellModel` does.
+    var isCatalogLoaded: Bool { true }
+
     /// Decode straight to the capability's own type, returning nil rather than throwing when the
     /// record was written by a build that knew a different shape.
     ///

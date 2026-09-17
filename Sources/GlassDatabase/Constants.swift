@@ -808,18 +808,26 @@ struct DatabaseCommands: Commands {
             }
             .keyboardShortcut("k", modifiers: .command)
         }
-        // File owns the SQL document lifecycle per the macOS HIG. Replacing
-        // .newItem removes the system-generated "New Connections Window ⌘N"
-        // for the primary WindowGroup, which otherwise captures ⌘N before the
-        // Query menu can see it.
-        CommandGroup(replacing: .newItem) {
+        // File owns the SQL document lifecycle per the macOS HIG.
+        //
+        // **Added after, never replacing.** This group used to replace `.newItem`, to remove the
+        // system-generated "New Connections Window ⌘N" that would otherwise capture ⌘N. In the
+        // merged app the terminal's workspace commands replace that placement too — and SwiftUI
+        // keeps one of two replacements, so replacing here silently deleted the whole terminal
+        // File group from the menu bar (verified in the running app, 2026-09-16: ⌘T reached
+        // nothing). The terminal's group is now the single replacement, which still removes the
+        // generated item, and these are appended to it.
+        CommandGroup(after: .newItem) {
+            // No ⌘N here: ⌘N is the shell's one contextual New, and the workspace publishes
+            // `\.glassNewItem` so that when a database workspace is focused ⌘N *is* this item
+            // (`DatabaseWorkspaceView.swift`). Unbound here, it stays reachable from any window.
             Button("New SQL Document") { workspaceActions?.newQueryTab() }
-                .keyboardShortcut("n", modifiers: .command)
                 .disabled(workspaceActions == nil)
             Button("New Connections Window") { openWindow(id: "main") }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
-        }
-        CommandGroup(after: .newItem) {
+
+            Divider()
+
             Button("Open SQL Document…") { workspaceActions?.openDocument() }
                 .keyboardShortcut("o", modifiers: .command)
                 .disabled(workspaceActions == nil)

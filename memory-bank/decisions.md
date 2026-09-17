@@ -803,3 +803,45 @@ that is the state after the juliet deletion and the signal that it is safe to de
 **Where it lives:** the key manager panel in the library sidebar beside Collections (D26 stage 4),
 with "used by" as host · service rows each carrying its own detach — which is the point of the
 request: *"Disconnect XYZ key from oscar's terminal"* without walking Connections › oscar › Terminal.
+
+## D29 — Uninstalling is a feature, not a support article
+
+**Status: Proposed, 2026-09-16.** The user's words while clearing three dead apps off the Mac by
+hand: *"make uninstalling as easy as installing. :)"*
+
+**Why it earns its place in this product rather than a README.** Removing the three source apps
+today meant walking eight locations — the bundle, a preferences plist, a sandbox container, saved
+window state, caches, HTTP storage, a shared App Group container and the Keychain — and knowing
+which of them the *surviving* app still reads. Two of those are shared: deleting
+`group.sh.glas.shared` or the `sh.glas.shared` Keychain group would have taken Glass Power Tools'
+own hosts and credentials with them. Nobody should have to know that, and no support article makes
+it safe, because the answer differs by what else is installed. The app knows.
+
+**What it does.** Settings ▸ a plain **Uninstall Glass Power Tools…**, which:
+
+1. **Says what it will remove, counted, before anything happens.** *"4 machines, 7 services, 2 SSH
+   keys, 31 saved passwords, 1,729 preference entries, 4 MB of query history."* The same read the
+   key manager already does for "used by" — nothing new has to be invented to count it.
+2. **Asks what to do with credentials separately**, because they are the one thing that is not
+   ours to assume about: *keep them in the Keychain* (they synchronize, and another device may
+   still be using them) or *destroy them here*. Secure Enclave material is named as destroyed
+   either way — it cannot leave the device, so it dies with the install.
+3. **Offers an export first**, the same document the library already writes, so "uninstall" and
+   "start clean" stop being the same irreversible act.
+4. **Removes, then reports what it could not remove and why** — a file the sandbox refuses, a
+   Keychain item another app's access group holds. Never a silent partial success.
+5. **Quits and moves its own bundle to the Trash**, which is where "as easy as installing" actually
+   lands: the user does not then go hunting in `~/Library`.
+
+**What it must never do:** touch another app's container, delete a Keychain item outside this app's
+access group, or remove the shared App Group container while any sibling still declares it. The
+uninstall is scoped to what this app created.
+
+**How it gets tested:** against a real `GlassShellModel` over a temporary directory — the inventory
+count matches what was created, the credential choice is honoured in both directions, and a second
+app's container in the same fixture is still there afterwards. The one part no unit test can prove
+is moving the bundle to the Trash; that is a device check.
+
+**Not approved, not scheduled.** It belongs after D26 stage 5 (storage cleanup), which is the same
+knowledge pointed the other way: stage 5 works out what this app writes and where, and an uninstall
+is that list executed.

@@ -99,6 +99,10 @@ public final class DesktopAppModel {
     }
 
     public func load() async {
+        // Not readable yet means *unknown*, not empty (D26): the composition root attaches the
+        // store while the app is being built, and the catalog is read later. Loading anyway
+        // replaces the saved desktops with nothing, and the next write makes that permanent.
+        guard repository?.isCatalogLoaded ?? true else { return }
         await acquireMutation()
         defer { releaseMutation() }
         do {

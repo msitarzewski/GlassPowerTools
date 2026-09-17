@@ -40,6 +40,10 @@ public struct GlassServiceRecords<Record: Codable> {
     /// decoding": a record that fails to decode still counts as something being there.
     public var isStoreEmpty: Bool { store.configurations(ofKind: kind).isEmpty }
 
+    /// Whether the catalog has been read yet. A capability must not mistake "not read" for
+    /// "nothing saved" — see `replaceAll(with:)`.
+    public var isCatalogLoaded: Bool { store.isCatalogLoaded }
+
     /// Makes the stored set match `records`.
     ///
     /// Three rules, in this order and for reasons:
@@ -51,7 +55,13 @@ public struct GlassServiceRecords<Record: Codable> {
     ///   record nobody edited churns the catalog for every other device on the account.
     /// - **Encode once per record**, compared as bytes against what is stored, so "changed" means
     ///   the stored bytes differ rather than some type's idea of equality.
+    /// - **Refused before the catalog has been read.** This reconcile deletes whatever is stored
+    ///   and missing from `records`, so running it against a list built from an unread catalog
+    ///   deletes everything the user has. It is the one call in D26 that can destroy data by doing
+    ///   exactly what it was asked, which is why the guard lives here, at the door all three
+    ///   capabilities go through, rather than in each of them.
     public func replaceAll(with records: [Record]) async throws {
+        guard store.isCatalogLoaded else { throw GlassServiceRecordsError.catalogNotRead }
         let wanted = Dictionary(records.map { (identify($0), $0) }, uniquingKeysWith: { first, _ in first })
         let current = store.configurations(ofKind: kind)
 
@@ -62,6 +72,19 @@ public struct GlassServiceRecords<Record: Codable> {
             let encoded = try JSONEncoder().encode(record)
             guard current[endpointID] != encoded else { continue }
             try await store.setConfiguration(encoded, for: endpointID)
+        }
+    }
+}
+
+public enum GlassServiceRecordsError: LocalizedError, Equatable {
+    /// A write arrived before the catalog was read. Refusing is the point: the alternative is a
+    /// reconcile against an empty list, which deletes every saved connection of that kind.
+    case catalogNotRead
+
+    public var errorDescription: String? {
+        switch self {
+        case .catalogNotRead:
+            "The connection library has not finished loading. Nothing was changed; try again in a moment."
         }
     }
 }

@@ -11,17 +11,28 @@ public struct GlassLibraryResults<ID: Hashable & Sendable, Row: View>: View {
     @FocusState private var searchFocused: Bool
     private let onActivate: (ID) -> Void
     private let row: (GlassLibraryItem<ID>) -> Row
+    /// The library's own actions, offered on a right-click, long-press or pinch-and-hold in the
+    /// empty part of the list. Rows carry their own menu; this is the one place that had none, and
+    /// "add a machine" is the thing you want when you are looking at the list rather than at a row.
+    private let backgroundActions: () -> AnyView
+    /// Pull to refresh. The library already knows how to pull, merge and publish — this is the
+    /// user asking it to, instead of waiting for a launch or a push that may never arrive.
+    private let onRefresh: (() async -> Void)?
 
     /// Supply already scoped/filtered items from GlassLibraryProjection.
     public init(items: [GlassLibraryItem<ID>], title: String, selection: Binding<ID?>,
                 searchText: Binding<String>, onActivate: @escaping (ID) -> Void,
-                @ViewBuilder row: @escaping (GlassLibraryItem<ID>) -> Row) {
+                @ViewBuilder row: @escaping (GlassLibraryItem<ID>) -> Row,
+                backgroundActions: @escaping () -> AnyView = { AnyView(EmptyView()) },
+                onRefresh: (() async -> Void)? = nil) {
         self.items = items
         self.title = title
         _selection = selection
         _searchText = searchText
         self.onActivate = onActivate
         self.row = row
+        self.backgroundActions = backgroundActions
+        self.onRefresh = onRefresh
     }
 
     public var body: some View {
@@ -59,6 +70,26 @@ public struct GlassLibraryResults<ID: Hashable & Sendable, Row: View>: View {
                 }
             }
         }
+        // The first row must not open underneath the toolbar. Two causes, both cheap to rule out:
+        // the column's scroll view starts flush with the window top under a transparent title bar,
+        // and a restored scroll offset can leave the list mid-scroll on open. The anchor pins the
+        // list to its top on appearance; the margin keeps the first row clear of the toolbar's
+        // edge rather than tucked against it (reported 2026-09-16: "opening the new window covers
+        // the local placeholder and I have to scroll to see it fully").
+        // A menu for the list itself. `forSelectionType` hands back an empty set when the click
+        // landed on the background rather than on a row, which is exactly the case that had no
+        // menu — a row already offers Connect, Edit, Favorite and Delete through its own
+        // `.contextMenu`, and those keep answering for clicks on a row.
+        .contextMenu(forSelectionType: ID.self) { targets in
+            if targets.isEmpty { backgroundActions() }
+        }
+        // Touch and gaze pull the list down to sync; the Mac has no such gesture, and
+        // `refreshable` is simply inert there rather than needing an `#if`.
+        .refreshable { await onRefresh?() }
+        .defaultScrollAnchor(.top)
+        #if os(macOS)
+        .contentMargins(.top, 10, for: .scrollContent)
+        #endif
         .navigationTitle(title)
         // The list does not paint a surface of its own: the window's layered glass is the surface,
         // and the list sits on it. This is what makes the results column match the sidebar instead

@@ -21,16 +21,38 @@ struct MacWorkspaceFocusedActions {
 @MainActor
 struct MacNewWorkspaceTabAction {
     let isEnabled: Bool
+    /// What the focused tab is connected to, for naming the ⇧⌘T item after the machine — "New Tab
+    /// on oscar" rather than a description of the mechanism. Nil when the focused tab has nothing to
+    /// repeat: an empty tab has no connection to carry over, and the item says so by being absent.
+    let currentConnectionName: String?
     private let action: () -> Void
+    private let repeatAction: () -> Void
 
-    init(isEnabled: Bool, _ action: @escaping () -> Void) {
+    init(isEnabled: Bool, currentConnectionName: String? = nil,
+         _ action: @escaping () -> Void,
+         repeatingCurrentConnection repeatAction: @escaping () -> Void = {}) {
         self.isEnabled = isEnabled
+        self.currentConnectionName = currentConnectionName
         self.action = action
+        self.repeatAction = repeatAction
+    }
+
+    var canRepeatCurrentConnection: Bool { isEnabled && currentConnectionName != nil }
+
+    /// "New Tab on oscar" — the title carries the machine, so the menu says what will happen.
+    var repeatTitle: String {
+        currentConnectionName.map { "New Tab on \($0)" } ?? "New Tab with Same Connection"
     }
 
     func callAsFunction() {
         guard isEnabled else { return }
         action()
+    }
+
+    /// A second tab on whatever the focused one is running, with no chooser in between.
+    func repeatingCurrentConnection() {
+        guard canRepeatCurrentConnection else { return }
+        repeatAction()
     }
 }
 
@@ -129,13 +151,24 @@ struct MacWorkspaceCommands: Commands {
             }
             .keyboardShortcut("k", modifiers: .command)
         }
-        CommandGroup(replacing: .newItem) {
+        // The terminal's File items, **added after** the shell's New group and never replacing it.
+        //
+        // Two scenes replacing the same placement is not a merge — SwiftUI keeps one of them, and
+        // on 2026-09-16 the one it kept was the database's: `New Terminal Window`, `New Terminal
+        // Tab` and `Connect Saved Host…` were absent from the shipped menu bar (read back out of
+        // the running app through the accessibility API, not inferred). ⌘T did nothing, which is
+        // exactly what the user reported. `GlassShellFileCommands` is the single owner of the
+        // placement now, and every capability appends to it.
+        CommandGroup(after: .newItem) {
+            // No ⌘N here: ⌘N is the shell's one contextual New, and this window publishes
+            // `\.glassNewItem` so that when a terminal workspace is focused ⌘N *is* this item
+            // (`MacWorkspaceView.swift`). Keeping it in the menu unbound leaves it discoverable
+            // from any window, including the library.
             Button("New Terminal Window") {
                 openWindow(id: "workspace", value: MacWorkspaceLaunchRequest())
             }
-            .keyboardShortcut("n", modifiers: .command)
 
-            Button("New Workspace Tab") {
+            Button("New Terminal Tab") {
                 if let newWorkspaceTabAction {
                     newWorkspaceTabAction()
                 } else {
@@ -148,6 +181,15 @@ struct MacWorkspaceCommands: Commands {
             .keyboardShortcut("t", modifiers: .command)
             .disabled(newWorkspaceTabAction?.isEnabled == false)
 
+            // ⇧⌘T: another tab on the machine this one is already on, with no chooser. The whole
+            // point is that it asks nothing — the pane intent is copied, so the new tab connects
+            // through the same saved server, credentials and trust the focused tab used.
+            Button(newWorkspaceTabAction?.repeatTitle ?? "New Tab with Same Connection") {
+                newWorkspaceTabAction?.repeatingCurrentConnection()
+            }
+            .keyboardShortcut("t", modifiers: [.command, .shift])
+            .disabled(newWorkspaceTabAction?.canRepeatCurrentConnection != true)
+
             Button("Connect Saved Host…") {
                 actions?.requestSSHPane(.horizontal)
             }
@@ -155,20 +197,30 @@ struct MacWorkspaceCommands: Commands {
             .disabled(actions?.canAddPane != true)
         }
 
-        // Replace the native Close command instead of registering a second
-        // Cmd-W shortcut that could still close the whole workspace window.
-        CommandGroup(replacing: .saveItem) {
-            Button(closeWorkspaceTabAction == nil ? "Close Window" : "Close Tab") {
+        // **Close Tab, in a placement that exists.**
+        //
+        // This was `CommandGroup(replacing: .saveItem)`, which produced nothing at all: `.saveItem`
+        // is the document group — Save, Duplicate, Rename, Revert — and an app with no documents
+        // has none, so there was nothing to replace and the item never reached the menu bar. Read
+        // back from the running app on 2026-09-16: no Close Tab anywhere in it, and ⌘W was
+        // AppKit's own Close, which shuts the whole workspace window with every tab in it.
+        //
+        // `after: .newItem` is a region that does materialise (the database's items land there).
+        // Two items can carry ⌘W because AppKit skips a disabled item when matching a key
+        // equivalent: with a terminal workspace focused this one is enabled and closes the tab,
+        // and with anything else focused it is disabled and the standard Close below it answers.
+        // That is why the "Close Window" fallback is gone — it existed to stand in for the very
+        // item it was shadowing.
+        CommandGroup(after: .newItem) {
+            Divider()
+            Button("Close Tab") {
                 guard let window = NSApp.keyWindow,
                       window.attachedSheet == nil,
                       window.sheetParent == nil else { return }
-                if let closeWorkspaceTabAction {
-                    closeWorkspaceTabAction()
-                } else {
-                    window.performClose(nil)
-                }
+                closeWorkspaceTabAction?()
             }
             .keyboardShortcut("w", modifiers: .command)
+            .disabled(closeWorkspaceTabAction == nil)
         }
 
         CommandMenu("Terminal") {

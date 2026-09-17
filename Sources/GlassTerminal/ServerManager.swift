@@ -69,6 +69,10 @@ struct ServerPersistenceStore {
     /// Puts back exactly what was there, including "nothing". Used by the one rollback that
     /// restores the catalog without going through an encode.
     let restore: (Data?) async throws -> Void
+    /// Whether the store can actually be read yet. `UserDefaults` always can; the catalog cannot
+    /// until the shell has read it from disk, and reading it early returns "no saved servers" —
+    /// which the next write then makes true. See `GlassServiceStore.isCatalogLoaded`.
+    var isReadable: () -> Bool = { true }
 
     /// D26: the catalog is the one store for a connection.
     ///
@@ -94,7 +98,8 @@ struct ServerPersistenceStore {
             },
             hasStoredValue: { !records.isStoreEmpty },
             save: { try await records.replaceAll(with: decode($0)) },
-            restore: { try await records.replaceAll(with: decode($0)) }
+            restore: { try await records.replaceAll(with: decode($0)) },
+            isReadable: { records.isCatalogLoaded }
         )
     }
 
@@ -365,6 +370,11 @@ class ServerManager {
     func attach(store: ServerPersistenceStore) {
         self.store = store
         hasLoadedServers = false
+        // The composition root attaches before the shell has read the catalog, so this may be a
+        // no-op — `loadServersIfNeeded` refuses to read a store that cannot answer yet, and the
+        // shell calls back through `GlassCapability.catalogDidLoad()` when it can. Reading here
+        // anyway is what emptied the saved-server list at every launch.
+
         // Re-reading from a different store is not a first launch. The credential and host-trust
         // migrations run once, against whatever was there at startup; re-running them here would
         // reach the Keychain again for no reason, and in a test process with no real Keychain
@@ -375,7 +385,7 @@ class ServerManager {
     }
 
     func loadServersIfNeeded() {
-        guard !hasLoadedServers else { return }
+        guard !hasLoadedServers, store.isReadable() else { return }
         hasLoadedServers = true
         loadServers()
     }

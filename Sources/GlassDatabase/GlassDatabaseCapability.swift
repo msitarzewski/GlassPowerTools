@@ -192,6 +192,12 @@ public final class GlassDatabaseCapability: GlassCapability {
 
     // MARK: Shell hooks
 
+    /// D26: read the saved connections now that the catalog can answer. Idempotent — `load()`
+    /// refuses a store that is not readable yet, and this is called after every catalog load.
+    public func catalogDidLoad() {
+        runtime.connectionManager.load()
+    }
+
     /// Query is a tool rather than a service: it rides this database's connection, credentials
     /// and session, exactly as Files rides the terminal's. Offered only once the service has a
     /// saved connection behind it.

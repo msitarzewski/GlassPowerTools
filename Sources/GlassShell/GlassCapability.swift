@@ -250,6 +250,15 @@ public protocol GlassCapability: AnyObject {
     /// Controls the capability adds to the library toolbar (e.g. a quick-connect). Default: none.
     func libraryToolbarItems() -> AnyView
 
+    /// The catalog has been read from disk and is answering honestly.
+    ///
+    /// A capability that keeps an in-memory index of its own records — the terminal's saved-server
+    /// list — builds it here rather than when the store is attached. The composition root attaches
+    /// while the app is still being constructed, and at that moment every read answers "nothing",
+    /// which is indistinguishable from an empty library. Called after every `load()`, so it must be
+    /// idempotent. Default: nothing to do.
+    func catalogDidLoad()
+
     /// Surfaces the capability contributes to the library's sidebar, beside Collections.
     ///
     /// For things that span the whole fleet rather than belonging to one machine — Workgroups,
@@ -307,6 +316,7 @@ public extension GlassCapability {
     func hostAddressDidChange(host: HostProfile, address: String?) {}
     func credential(for service: HostServiceLink, host: HostProfile) -> GlassServiceCredential { .ownedByService }
     func libraryPanels() -> [GlassLibraryPanel] { [] }
+    func catalogDidLoad() {}
     func setupDraft(importing configuration: Data) -> (any GlassServiceDraft)? { nil }
     func knownAddress(service: HostServiceLink, host: HostProfile) -> String? { nil }
     /// A capability that has not adopted the setup contract yet: the sheet shows why and Save

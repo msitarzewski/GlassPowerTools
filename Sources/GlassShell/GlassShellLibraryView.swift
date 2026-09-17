@@ -57,7 +57,20 @@ public struct GlassShellLibraryView: View {
             } presentationAnchor: {
                 alertAnchor
             }
-            .libraryPanels(model.registry.registered.flatMap { $0.libraryPanels() })
+            // The shell's own panels lead, then each capability's. Keys are the shell's because a
+            // key crosses capabilities: it can sign in to a terminal on one machine and a database
+            // on another, and only something that sees the whole library can say what deleting one
+            // would unassign (D26 stage 4).
+            .libraryPanels(model.libraryPanels() + model.registry.registered.flatMap { $0.libraryPanels() })
+            // Right-click, long-press or pinch-and-hold anywhere in the list — including the empty
+            // space below the machines, which is where you are looking when what you want is a new
+            // one. The same button the toolbar's + is.
+            .listActions { addHostButton }
+            // Pull down to sync. `load()` is the whole cycle — read the catalog, pull the account,
+            // merge, publish what this device has that the account does not — so the gesture asks
+            // for exactly what a launch asks for, at the moment the user wants it rather than the
+            // moment a push happens to arrive.
+            .refreshAction { await model.load() }
             #if os(macOS)
             .sidebarActions { addHostButton }
             #endif
@@ -84,6 +97,8 @@ public struct GlassShellLibraryView: View {
             .frame(width: 760, height: 560)
             #endif
         }
+        // ⌘N in the library means a new machine.
+        .focusedSceneValue(\.glassNewItem, GlassNewItemAction(title: "New Host") { setupMode = .addHost })
         .task { if !model.isLoaded { await model.load() } }
         .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await model.load() } } }
         #if os(macOS)
@@ -94,8 +109,11 @@ public struct GlassShellLibraryView: View {
     }
 
     private var addHostButton: some View {
+        // ⌘N is not bound here. The library publishes `\.glassNewItem`, so while this window is
+        // focused the shell's one File ▸ New item *is* "New Host" and carries the key. A second
+        // ⌘N on the button would make which one fires depend on where the focus happens to be
+        // inside the window.
         Button("Add Host", systemImage: "plus") { setupMode = .addHost }
-            .keyboardShortcut("n", modifiers: .command)
             .accessibilityIdentifier("connection-library-add-host")
     }
 

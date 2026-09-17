@@ -56,6 +56,13 @@ public final class GlassDesktopRuntime {
         await app.attach(store: store)
     }
 
+    /// D26: read the saved desktops now that the catalog can answer. A `Task` because loading is
+    /// async and the hook is not; `load()` is idempotent and refuses an unread store.
+    public func catalogDidLoad() {
+        let app = self.app
+        Task { @MainActor in await app.load() }
+    }
+
     public init(layers: GlassLayerStore? = nil, app: DesktopAppModel? = nil) {
         self.layers = layers ?? GlassLayerStore()
         self.app = app ?? DesktopAppModel()

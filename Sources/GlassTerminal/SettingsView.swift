@@ -24,11 +24,6 @@ struct GeneralSettingsView: View {
     @Environment(SettingsManager.self) private var settingsManager
     @Environment(SessionManager.self) private var sessionManager
     private var serverManager: ServerManager { sessionManager.serverManager }
-    @State private var showingAddSSHKey = false
-    @State private var showingGenerateSecureEnclaveKey = false
-    @State private var editingSSHKey: StoredSSHKey?
-    @State private var keyPendingDeletion: StoredSSHKey?
-    @State private var keyCopyMessage: String?
     @State private var sshConfigText: String = ""
     @State private var importResultMessage: String?
     @State private var tailscaleAuthMethod: TailscaleAuthMethod = .apiKey
@@ -178,65 +173,20 @@ struct GeneralSettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            // **Moved to the library, under Keys** (D26 stage 4). A key is workspace-level: it
+            // can authenticate a terminal on one machine and a database on another, so it is
+            // managed where every machine and service can be seen at once — which is also the
+            // only place that can say what deleting one would unassign. This line stays because
+            // this is where the manager used to be.
             Section("SSH Keys") {
-                if settings.sshKeys.isEmpty {
-                    Text("No SSH keys added yet.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(settings.sshKeys) { key in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(key.name)
-                                Text(key.keyTypeBadge)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Button("Copy Public Key") {
-                                copyPublicKey(for: key)
-                            }
-                            .buttonStyle(.bordered)
-                            .accessibilityLabel("Copy public key for \(key.name)")
-
-                            Menu {
-                                Button {
-                                    editingSSHKey = key
-                                } label: {
-                                    Label("Rename", systemImage: "pencil")
-                                }
-
-                                Button(role: .destructive) {
-                                    keyPendingDeletion = key
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                            } label: {
-                                Image(systemName: "ellipsis.circle")
-                                    .font(.title3)
-                            }
-                            .buttonStyle(.bordered)
-                            .accessibilityLabel("More actions for \(key.name)")
-                        }
-                    }
-                }
-
-                Button {
-                    showingAddSSHKey = true
-                } label: {
-                    Label("Add SSH Key", systemImage: "plus.circle.fill")
-                }
-                .buttonStyle(.borderedProminent)
-
-                Button {
-                    showingGenerateSecureEnclaveKey = true
-                } label: {
-                    Label("Generate Secure Enclave Key", systemImage: "lock.shield")
-                }
-                .buttonStyle(.bordered)
+                LabeledContent("Keys", value: "\(settings.sshKeys.count)")
+                Text("SSH keys are managed in the library, under Keys, where each one shows its fingerprint, whether it can leave this device, and which services use it.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Import SSH Config") {
-                Text("Imports explicit Host entries. Match, Include, wildcard defaults, and unsupported options are reported for review. IdentityFile must match an SSH key already imported here.")
+                Text("Imports explicit Host entries. Match, Include, wildcard defaults, and unsupported options are reported for review. IdentityFile must match a key already in the library's Keys panel.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 TextEditor(text: $sshConfigText)
@@ -274,79 +224,6 @@ struct GeneralSettingsView: View {
         .onDisappear {
             clearTailscaleCredentialInputs()
         }
-        .sheet(isPresented: $showingAddSSHKey) {
-            AddSSHKeyView()
-                .environment(settingsManager)
-        }
-        .sheet(isPresented: $showingGenerateSecureEnclaveKey) {
-            GenerateSecureEnclaveSSHKeyView()
-                .environment(settingsManager)
-        }
-        .sheet(item: $editingSSHKey) { key in
-            RenameSSHKeyView(key: key)
-                .environment(settingsManager)
-        }
-        .alert(
-            "SSH Public Key",
-            isPresented: Binding(
-                get: { keyCopyMessage != nil },
-                set: { isPresented in
-                    if !isPresented { keyCopyMessage = nil }
-                }
-            )
-        ) {
-            Button("OK", role: .cancel) {
-                keyCopyMessage = nil
-            }
-        } message: {
-            Text(keyCopyMessage ?? "")
-        }
-        .confirmationDialog(
-            "Delete SSH Key?",
-            isPresented: Binding(
-                get: { keyPendingDeletion != nil },
-                set: { isPresented in
-                    if !isPresented { keyPendingDeletion = nil }
-                }
-            ),
-            titleVisibility: .visible,
-            presenting: keyPendingDeletion
-        ) { key in
-            Button("Delete \(key.name)", role: .destructive) {
-                Task { @MainActor in
-                    do {
-                        try await settingsManager.deleteSSHKey(key.id, serverManager: serverManager)
-                    } catch {
-                        keyCopyMessage = "The key was not deleted because secure storage could not be updated: \(error.localizedDescription)"
-                    }
-                    keyPendingDeletion = nil
-                }
-            }
-            Button("Cancel", role: .cancel) {
-                keyPendingDeletion = nil
-            }
-        } message: { key in
-            Text("This removes '\(key.name)' from secure storage and unassigns it from any servers currently using it.")
-        }
-    }
-
-    private func copyPublicKey(for key: StoredSSHKey) {
-        do {
-            let value = try settingsManager.openSSHPublicKey(for: key.id)
-            copyToClipboard(value)
-            keyCopyMessage = "Copied public key for '\(key.name)'."
-        } catch {
-            keyCopyMessage = "Failed to export public key for '\(key.name)': \(error.localizedDescription)"
-        }
-    }
-
-    private func copyToClipboard(_ value: String) {
-        #if canImport(UIKit)
-        UIPasteboard.general.string = value
-        #elseif canImport(AppKit)
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(value, forType: .string)
-        #endif
     }
 
     private func loadTailscaleCredentialState() async {

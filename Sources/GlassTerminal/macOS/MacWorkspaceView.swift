@@ -1,6 +1,7 @@
 #if os(macOS)
 import AppKit
 import GlassConnectionUI
+import GlassShell
 import Observation
 import GlassTerminalEmulator
 import SwiftUI
@@ -224,11 +225,18 @@ struct MacWorkspaceView: View {
                 overviewPresented: showingOverview
             )
         }
+        // ⌘N, while a terminal workspace is focused, means a new terminal window. The shell owns
+        // the one File ▸ New item and each window says what it makes (`GlassShellFileCommands`).
+        .focusedSceneValue(\.glassNewItem, GlassNewItemAction(title: "New Terminal Window") {
+            openWindow(id: "workspace", value: MacWorkspaceLaunchRequest())
+        })
         .focusedSceneValue(
             \.macNewWorkspaceTabAction,
             MacNewWorkspaceTabAction(
                 isEnabled: windowController.canAddTab,
-                addTab
+                currentConnectionName: repeatableConnectionName,
+                addTab,
+                repeatingCurrentConnection: addTabRepeatingCurrentConnection
             )
         )
         .focusedSceneValue(\.macCommandCenterEntries, [
@@ -423,6 +431,40 @@ struct MacWorkspaceView: View {
 
     private func addTab() {
         windowController.addTab()
+    }
+
+    /// What ⇧⌘T repeats: the intent the focused tab's focused pane is running.
+    ///
+    /// The *intent*, not the session — a pane intent already carries everything a tab needs to
+    /// start the same thing again (the saved server for SSH, the shell and directory for local),
+    /// and starting from it is what makes the new tab ask nothing. An empty tab has no intent,
+    /// so there is nothing to repeat and the command is offered as disabled rather than guessing.
+    private var repeatableIntent: MacWorkspacePaneIntent? {
+        windowController.selectedTab.focusedPane?.intent
+    }
+
+    /// The machine the focused tab is on, for the menu item's title.
+    private var repeatableConnectionName: String? {
+        guard let intent = repeatableIntent else { return nil }
+        switch intent.kind {
+        case .local:
+            return intent.label ?? "This Mac"
+        case .ssh:
+            guard let serverID = intent.serverID,
+                  let server = sessionManager.serverManager.servers.first(where: { $0.id == serverID })
+            else { return nil }
+            return intent.label ?? server.name
+        }
+    }
+
+    private func addTabRepeatingCurrentConnection() {
+        guard var intent = repeatableIntent else { return }
+        // Cleared deliberately: the index identifies a pane inside a *restored workgroup layout*,
+        // and this tab is a new one the user asked for, not a restoration of that slot.
+        intent.sourceSessionIndex = nil
+        windowController.addTab(
+            MacWorkspaceTabRequest(startsEmpty: false, initialPaneIntent: intent)
+        )
     }
 
     private func closeTab(_ workspaceID: UUID) {

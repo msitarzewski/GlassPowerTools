@@ -217,3 +217,54 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     gone rather than merely compiling — a conformer that still builds is the failure mode, not the
     reassurance.
 
+
+34. **Exactly one scope may replace a `CommandGroup` placement, and the menu bar has to be read
+    back from the running app.** `CommandGroup(replacing:)` does not merge: when two scenes replace
+    the same placement SwiftUI keeps one and the other is simply absent — no warning, no failure,
+    and nothing visible except a shortcut that reaches nothing. The database's File group and the
+    terminal workspace's both replaced `.newItem`, so the shipped build had no *New Terminal
+    Window*, no *New Workspace Tab* (⌘T did nothing, which is how the user found it), no *Connect
+    Saved Host…* and no *Close Tab*. `CommandMenu` contributions are unaffected, which is why the
+    Terminal and Query menus looked fine and hid the problem. So: the shell owns every replaced
+    placement (`GlassShellFileCommands`), capabilities contribute with `after:`, a key shared
+    between capabilities is a stub the focused window aims through a focused value, and
+    `Tests/GlassShellTests/MenuBarPlacementTests.swift` records who may replace what. Verify a menu
+    change by reading the real menu bar —
+    `osascript -e 'tell application "System Events" to tell process "GlassPowerTools" to get name of
+    menu items of menu 1 of menu bar item "File" of menu bar 1'` — never from the source, which is
+    exactly where this defect looks correct.
+
+35. **"Not read yet" and "empty" must never be the same answer.** D26 made the catalog the one
+    store for a connection. The composition root attaches that store in `App.init`; the catalog is
+    read from disk later, in the library's `.task`. In between, `configurations(ofKind:)` answered
+    *nothing* — so `ServerManager.attach` built an empty saved-server list, and the next write
+    reconciled the catalog to match it and **deleted every terminal and desktop configuration the
+    user had**. The machine and its service link survived, which is why it read as "settings reset
+    each time" rather than as data loss: the sheet said *"This terminal has no saved configuration
+    behind it."* So: `GlassServiceStore.isCatalogLoaded` is the distinction, `GlassServiceRecords`
+    refuses to reconcile without it (one guard at the door all three capabilities share), and
+    `GlassCapability.catalogDidLoad()` is how a capability learns it may now build its index. Any
+    reconcile that deletes what is missing from a list needs to know where the list came from.
+
+36. **There is no legacy. Do not write migration code.** 2026-09-16, the user's words: *"there is no
+    LEGACY. We're building the first version of this. There is no reason to import old previous
+    version settings. There are no users, we don't need the baggage for that… they shouldn't be
+    changing so drastically at this point to require code specifically dedicated to morphing
+    preferences."* A recovery pass that refilled emptied service links from the pre-D26
+    `UserDefaults` copy was written, tested and then **deleted** for exactly this reason. The data
+    on this Mac is the user's *test* data; re-entering four records costs minutes, and shipping a
+    migration to save them costs a permanent seam in the product. Fix the defect that lost the data
+    and let the test data be re-entered. This also retires the stage 5 plan item about first-launch
+    removal of legacy keys: nothing reads them, so nothing has to delete them either.
+
+37. **The product is named "Glass Power Tools", with the spaces.** Three names, and only one of them
+    is `CFBundleDisplayName`: macOS Finder and the Dock show the **bundle's file name**, the
+    left-most menu title is **`CFBundleName`**, and iOS's home screen is the display name.
+    `INFOPLIST_KEY_CFBundleName` does not exist — Xcode accepts the setting and ignores it, because
+    the generated plist hardcodes `CFBundleName = $(PRODUCT_NAME)` (verified 2026-09-16 by building
+    with it set and reading the plist back). So the app target sets
+    `PRODUCT_NAME = "Glass Power Tools"`, the bundle is `Glass Power Tools.app` on every platform,
+    and the bundle identifier stays `com.glasspowertools` — the App Group, the Keychain group and
+    every existing record are keyed on the identifier, never on the name. Install to
+    `/Applications/Glass Power Tools.app`, and note the process is now `Glass Power Tools`:
+    `pgrep -x GlassPowerTools` matches nothing.

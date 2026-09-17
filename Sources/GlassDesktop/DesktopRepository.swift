@@ -29,6 +29,10 @@ public struct DesktopRepository {
         records = GlassServiceRecords(store: store, kind: .rdp, id: \.id)
     }
 
+    /// Whether the catalog has been read. Until it has, `load()` would answer "no saved desktops"
+    /// for a library that is merely not open yet.
+    public var isCatalogLoaded: Bool { records.isCatalogLoaded }
+
     /// Every saved desktop, ordered by name then id so the list is stable across launches — the
     /// catalog keys by endpoint id and has no insertion order to give back.
     ///

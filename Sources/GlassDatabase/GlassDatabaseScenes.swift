@@ -179,7 +179,9 @@ public struct GlassDatabaseBootstrap<Content: View>: View {
                 report?(.connected)
                 present(DatabaseWorkspaceWindowRequest.primary(sessionID: sessionID))
             } catch {
-                let message = error.localizedDescription
+                // Plain words and the fix, not the errno: a database that only listens on its own
+                // machine used to arrive as "NIOCore.IOError error 1".
+                let message = DatabaseConnectionFailure.message(for: error, config: config)
                 failureMessage = message
                 report?(.failed(message))
             }

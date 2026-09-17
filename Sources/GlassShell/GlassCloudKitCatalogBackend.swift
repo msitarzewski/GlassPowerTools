@@ -138,7 +138,4 @@ public struct GlassCloudKitCatalogBackend: GlassCatalogSyncBackend {
     }
 }
 
-private extension Logger {
-    static let catalogSync = Logger(subsystem: "com.glasspowertools", category: "catalog-sync")
-}
 #endif

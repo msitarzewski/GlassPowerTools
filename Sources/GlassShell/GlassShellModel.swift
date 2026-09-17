@@ -1,5 +1,6 @@
 import GlassLayers
 import Foundation
+import OSLog
 import Observation
 import GlassConnectionKit
 import GlassHostCatalog
@@ -210,9 +211,14 @@ public final class GlassShellModel: GlassServiceStore {
             migratePreferencesToCanonicalHosts()
             isLoaded = true
             errorMessage = nil
+            // Only now can a capability read its own records honestly: until `isLoaded`, every
+            // configuration read answers "nothing". Capabilities that keep an in-memory index
+            // build it here. See `GlassCapability.catalogDidLoad()`.
+            notifyCapabilitiesCatalogLoaded()
             await adoptKnownAddresses()
         } catch {
             isLoaded = true
+            notifyCapabilitiesCatalogLoaded()
             if hasSharedContainer, Self.isPermissionDenied(error) {
                 // The container resolves but the sandbox refuses it: the App Group entitlement is
                 // not granted by this build's provisioning profile. Degrade to the private
@@ -225,6 +231,12 @@ public final class GlassShellModel: GlassServiceStore {
             }
             errorMessage = "The host library could not be read: \(GlassShellError.message(for: error))"
         }
+    }
+
+    /// Told after every load, including a failed one: a capability that cannot read its records
+    /// has to learn that too, rather than sitting on an empty list it believes is the truth.
+    private func notifyCapabilitiesCatalogLoaded() {
+        for capability in registry.registered { capability.catalogDidLoad() }
     }
 
     // MARK: The device's own host (D8)
@@ -346,11 +358,31 @@ public final class GlassShellModel: GlassServiceStore {
                     .map { (service: $0, owner: mine) }
             }
 
-            for profile in reattachingDeviceBoundServices(outcome.toApplyLocally, local: local) {
-                try await catalog.upsert(profile)
+            Logger.catalogSync.info(
+                """
+                Sync: \(local.count, privacy: .public) local, \(remote.count, privacy: .public) incoming, \
+                \(outcome.toApplyLocally.count, privacy: .public) to apply, \
+                \(outcome.toPublish.count, privacy: .public) to publish
+                """)
+            // **`merge`, not `upsert`.** `upsert` is the local-edit path: it refuses a tombstone by
+            // design — editing a deleted machine is a mistake — and it restamps `updatedAt` and
+            // `lastWriterID` as though this device authored the record. Both are wrong for an
+            // incoming one. On 2026-09-16 a single machine deleted on two devices made every
+            // subsequent sync throw here, and because the publish sits below this line, that device
+            // silently stopped publishing altogether: a database added on the Mac never reached the
+            // phone. `merge` is the API for incoming records and always was — deletion precedence,
+            // revision time and writer id, tested in the catalog's own suite.
+            do {
+                try await catalog.merge(reattachingDeviceBoundServices(outcome.toApplyLocally, local: local))
+            } catch {
+                // Applying and publishing are two directions, not one transaction. Incoming
+                // records this device cannot take must not cost it the ability to send its own.
+                Logger.catalogSync.error(
+                    "Sync: could not apply incoming records: \(String(describing: error), privacy: .public)")
             }
             if !outcome.toPublish.isEmpty {
                 try await catalogBackend.save(redactingDeviceBoundServices(outcome.toPublish))
+                Logger.catalogSync.info("Sync: published \(outcome.toPublish.count, privacy: .public) record(s)")
             }
             catalogSyncToken = token
 
@@ -368,6 +400,12 @@ public final class GlassShellModel: GlassServiceStore {
         } catch {
             // Signed out of iCloud, restricted, or offline: all normal, none the user's mistake,
             // and none worth an alert. The library on this device is complete without the others.
+            //
+            // **Logged, though.** Not alerting is a judgement about the user's attention; saying
+            // nothing anywhere is a hole. A sync that failed here published nothing, and on
+            // 2026-09-16 that was invisible: a database added on the Mac never reached the phone,
+            // and the only evidence was a status line nobody was looking at.
+            Logger.catalogSync.error("Sync failed: \(String(describing: error), privacy: .public)")
             catalogSyncStatus = .failed(error.localizedDescription)
         }
     }
@@ -391,6 +429,10 @@ public final class GlassShellModel: GlassServiceStore {
     public func configuration(for endpointID: EndpointID) -> Data? {
         link(for: endpointID)?.link.configuration
     }
+
+    /// D26: the catalog has been read from disk. Until it has, every read here answers "nothing",
+    /// which is indistinguishable from an empty library — see `GlassServiceStore.isCatalogLoaded`.
+    public var isCatalogLoaded: Bool { isLoaded }
 
     public func configurations(ofKind kind: HostServiceKind) -> [EndpointID: Data] {
         var found: [EndpointID: Data] = [:]
@@ -786,6 +828,22 @@ public final class GlassShellModel: GlassServiceStore {
 
         try await cascadeRemoval(of: owned)
     }
+
+    // MARK: Keys (D26 stage 4)
+
+    /// Whoever holds SSH key material, so the library can offer a key manager.
+    ///
+    /// Attached by the composition root rather than constructed here, exactly as the catalog
+    /// backend is: the shell must work with no key store at all (the manager simply is not in the
+    /// sidebar), and nothing in the shell may reach into a capability to find one.
+    public private(set) var keyStore: (any GlassKeyStore)?
+
+    /// Selection and presentation for the key manager's two columns. Held here rather than in
+    /// either column, because they are two columns of one split view and a `@State` in one cannot
+    /// be read by the other — the arrangement Workgroups uses for the same reason.
+    public let keyPanel = GlassKeyManagerModel()
+
+    public func attachKeyStore(_ store: any GlassKeyStore) { keyStore = store }
 
     // MARK: What uses a key (D28)
 
@@ -1213,4 +1271,10 @@ public final class GlassShellModel: GlassServiceStore {
         guard !preferencesReadOnly else { throw GlassShellError.preferencesReadOnly }
         try preferencesStore.save(preferences)
     }
+}
+
+/// The catalog sync's log. Module-wide rather than private to the CloudKit backend: the model's
+/// own reconcile is where a failure actually stops a publish, and that is what went unrecorded.
+extension Logger {
+    static let catalogSync = Logger(subsystem: "com.glasspowertools", category: "catalog-sync")
 }

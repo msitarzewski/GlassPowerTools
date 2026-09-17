@@ -829,3 +829,135 @@ The panel itself: a contributed `GlassLibraryPanel` beside Collections, listing 
 fingerprint, added date and an *iCloud* / *This device only* badge, with rename, copy public key,
 export public key, **used by**, and a delete that names what it will unassign. The model layer above
 is what it reads.
+
+## The menu bar: three apps that each owned File, 2026-09-16
+
+Reported by the user against the installed 0.4.119: *"Command-T doesn't work for a new tab/session."*
+
+### What was actually wrong
+
+`CommandGroup(replacing:)` does not merge. When two scenes replace the same placement SwiftUI keeps
+one and the other is **absent** — no warning, no failure, nothing to see at runtime except a
+shortcut that reaches nothing. The database's File group and the terminal workspace's both replaced
+`.newItem`; the database's scene is registered later and won.
+
+Read out of the running app rather than inferred (`osascript` → System Events → menu bar):
+
+```
+File → New SQL Document, New Connections Window, Open SQL Document…,
+       Close Active Tab, Save SQL Document…, Close, Close All
+```
+
+Every terminal item was gone: **New Terminal Window**, **New Workspace Tab (⌘T)**, **Connect Saved
+Host… (⌥⌘T)** — and the `replacing: .saveItem` group too, so ⌘W closed the window instead of the
+tab. `CommandMenu` contributions (Terminal, Query, Library) were unaffected, which is why only the
+File menu was hollow.
+
+### The shape of the fix, which is the user's
+
+⌘N is a **stub the focused window aims**, rather than a key one capability owns:
+
+| Focused window | ⌘N |
+|---|---|
+| Database workspace | New SQL Document |
+| Terminal workspace | New Terminal Window |
+| Connections library | New Host |
+| anything else | *New*, disabled |
+
+`GlassNewItemAction` carries the title *and* the action, published with
+`.focusedSceneValue(\.glassNewItem, …)`, so the menu always names what ⌘N will make. One scope —
+`GlassShellFileCommands`, attached by the composition root — replaces `.newItem`; every capability
+appends with `after:` and keeps its item **unbound**, so it stays reachable from any window. The
+library's Add Host button gave up its own ⌘N for the same reason.
+
+### ⇧⌘T — another tab on the same machine
+
+`MacNewWorkspaceTabAction` gained `repeatingCurrentConnection()` and a title naming the machine —
+**"New Tab on oscar"**. It copies the focused pane's **intent**, not its session: a
+`MacWorkspacePaneIntent` already carries the saved server for SSH and the shell and directory for
+local, so the new tab connects through the same server, credentials and host trust with no chooser.
+`sourceSessionIndex` is cleared — it identifies a pane inside a restored workgroup layout, and this
+is a new tab, not a restoration.
+
+### The test class that had no test
+
+`Tests/GlassShellTests/MenuBarPlacementTests.swift` reads the sources, because nothing else can see
+this defect: no unit test can instantiate a `Commands` tree and ask what the menu bar became, and
+the loss happens when SwiftUI merges scenes in a running app. Four checks: one replacer per
+placement (recorded with the platform that makes visionOS's `PlatformTerminalCommands` exclusive),
+one owner for ⌘N, one owner per platform for ⌘T, and the set of windows publishing `\.glassNewItem`.
+Proven to bite by putting the database back to `replacing:` — it fails on exactly the shipped
+defect.
+
+## D26 stage 4, the panel — 2026-09-16
+
+`Sources/GlassShell/GlassKeyManagerPanel.swift`, contributed through `GlassShellModel.libraryPanels()`
+and joined at `GlassShellLibraryView.swift` — the shell's panels lead, then each capability's.
+
+**The surface moved; the lifecycle stayed.** `GlassKeyStore` (in the shell) is what the manager
+needs — the keys, the public key, delete, and the three sheets as views. `GlassTerminalKeyStore`
+forwards every one to `SettingsManager`, which owns passphrase inspection, Secure Enclave
+generation, the record that travels with the material, and a **journalled** delete that rolls the
+key and its servers back together. Re-implementing that for a new surface would have been a rewrite
+of the one part of the system where a rewrite is least affordable. The sheets come across as
+`AnyView` for the same reason `GlassCapability` already hands the library whole views.
+
+The Settings section is replaced by one line pointing at the library; `AddSSHKeyView`,
+`GenerateSecureEnclaveSSHKeyView` and `RenameSSHKeyView` are unchanged and now presented from the
+panel. The nested Add SSH Key sheet inside the server form (rule 15) is untouched, and so is the UI
+test that drives it.
+
+**Fingerprints.** `StoredSSHKey` has no fingerprint field, so it is derived from the public key.
+`OpenSSHPublicKeyLine` (GlasSecretStore) parses the `authorized_keys` line and hands the blob to
+`PinnedSSHHostKey.sha256Fingerprint(for:)`; `SSHPublicKeys.sha256Fingerprint(for material:)` now
+goes through it too, so a key cannot present one fingerprint in the transport and another in the
+library. Checked against `ssh-keygen -lf`'s own output for a throwaway ed25519 key, and against the
+comment being excluded — two exports of one key must not look like two keys.
+
+**Verified:** 14 new tests pass (9 panel, 5 fingerprint), package and all three app targets build at
+0.4.120. `attachingAKeyStoreOffersThePanelWithItsCount` proven to bite by defeating
+`libraryPanels()`.
+
+**Owed:** the panel has never been *seen*. The line that joins it to the sidebar is a view, and no
+unit test can reach it — install and look. The two-device acceptance run is still owed and still
+the only thing that proves D26's sentence.
+
+## The reset that was data loss — 2026-09-16
+
+*"Why are my connection settings reset each time?"* The machine stayed in the library, the SSH key
+stayed in the key list, and Edit Terminal on oscar said **"This terminal has no saved configuration
+behind it. Remove the service and add it again."**
+
+**Cause.** `App.init` calls `terminal.connectToLibrary(store: model)`, and `ServerManager.attach`
+read the store immediately — but `GlassShellModel.load()` runs later, from the library view's
+`.task`. `configurations(ofKind:)` on an unloaded model returns nothing, and nothing is
+indistinguishable from an empty library. So every launch built an empty saved-server list, and the
+next write — adding a machine, stamping "last connected" — called
+`GlassServiceRecords.replaceAll(with: [])`, whose contract is to delete what is missing. The
+capability deleted the user's configurations while trying to load them. The desktop attached through
+an unawaited `Task` and lost the same race; the database attached the same way and survived only
+because its `loadIfNeeded()` happened to run later.
+
+**Fix**, one gate at the shared door rather than three:
+
+- `GlassServiceStore.isCatalogLoaded` — the honest distinction. Defaulted `true` for in-memory
+  stores; `GlassShellModel` returns `isLoaded`.
+- `GlassServiceRecords.replaceAll` **throws `catalogNotRead`** rather than reconciling. This is the
+  one call in D26 that can destroy data by doing exactly what it was asked.
+- `GlassCapability.catalogDidLoad()`, called after every `GlassShellModel.load()` including a failed
+  one. The terminal rebuilds its saved-server list there, the database reloads, the desktop reloads.
+- `ServerManager.loadServersIfNeeded` and `ConnectionManager.load` refuse an unreadable store
+  instead of reading it as empty; `DesktopAppModel.load` does the same.
+
+**Proven, then fixed.** `Tests/GlassTerminalTests/D26RelaunchTests.swift` drives two real
+`GlassShellModel`s over one directory — a relaunch. Before the fix: 0 servers read back, and adding
+a second machine deleted the first machine's terminal. After: both pass. 1529 tests, exit status 0.
+Installed as 0.4.121.
+
+**Recovery was written and then deleted, deliberately.** The pre-D26 `servers` key and the
+desktop's `connections.json` both still held the erased records, and a one-time pass that refilled
+only empty links — never overwriting, never resurrecting a deleted record, guarded by four tests —
+worked. The user's direction ended it: *"there is no LEGACY… we don't need the baggage."* This is
+the first version, the data on that Mac is test data, and four records are cheaper to re-enter than
+a migration is to carry. See **rule 36**, which also retires the stage 5 item about deleting legacy
+keys on first launch: nothing reads them.

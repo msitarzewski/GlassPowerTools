@@ -8,6 +8,7 @@
 
 import SwiftUI
 import GlassLayers
+import GlassShell
 import GlassDBKit
 import UniformTypeIdentifiers
 import GlassConnectionUI
@@ -274,6 +275,11 @@ struct DatabaseWorkspaceView: View {
         .databaseWorkspaceWindowChrome()
         #if os(macOS)
         .focusedSceneValue(\.macCommandCenterEntries, commandCenterDestinations)
+        // ⌘N, while a database workspace is focused, means a new SQL document. The shell owns the
+        // one File ▸ New item and each window says what it makes (`GlassShellFileCommands`).
+        .focusedSceneValue(\.glassNewItem, GlassNewItemAction(title: "New SQL Document") {
+            openQueryDocument()
+        })
         #endif
         .databaseCommandWTarget(
             priority: .workspace,
@@ -294,6 +300,20 @@ struct DatabaseWorkspaceView: View {
         .databaseSidebarChrome()
         .focusedSceneValue(\.databaseWorkspaceCommandActions, workspaceCommandActions)
         .toolbar {
+            // **The way back.** `showConnections()` already existed and was reachable only from
+            // failure states — a closed session, a reconnect card. On a phone the workspace
+            // *replaces* the library rather than being pushed onto it, so a user who opened a
+            // database had no way back to their machines at all (reported 2026-09-16: "there's no
+            // way to go back from the databases list"). Leading, where a back control belongs.
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    showConnections()
+                } label: {
+                    Label("Connections", systemImage: "chevron.backward")
+                }
+                .help("Back to Connections")
+                .accessibilityIdentifier("database-workspace-connections")
+            }
             #if !os(macOS)
             ToolbarItem(placement: databaseSidebarToolbarPlacement) {
                 Button {

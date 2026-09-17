@@ -1435,7 +1435,7 @@ greedy-frame fix, remembered dividers per platform. Then Stage 5 (the editor int
 **Full detail:** [the remaining work](tasks/2026-09/2026-09-14_remaining-work-plan.md), which carries
 the execution log for every stage and the surface survey behind D27/D28.
 
-## 2026-09-16 (later) — RESUME HERE
+## 2026-09-16 (later) — resume notes (SUPERSEDED — see the RESUME HERE block at the end of this file)
 
 **State BUILD.** Tree clean at `2358d08`, commit count **119**.
 **1509 tests / 164 suites, exit status 0.** The app target builds on macOS, iOS and visionOS.
@@ -1514,3 +1514,85 @@ interface) and Stage 6 (deprecate the public repos — **not without the user's 
 
 **Full detail:** [the remaining work](tasks/2026-09/2026-09-14_remaining-work-plan.md) — it carries
 the execution log for every D26 stage and the surface survey behind D27/D28.
+
+## 2026-09-16 (evening) — RESUME HERE
+
+**State BUILD.** Owner: coordinating agent. **Uncommitted** — 12 files modified, 8 new. The user has
+not asked for a commit.
+**1527 tests / 167 suites, exit status 0** (the one "known issue" is the editor's pre-recorded ReDoS
+finding, not a new failure). Package builds; the app target builds on **macOS, iOS and visionOS** at
+0.4.120.
+
+### What this session did, and why it interrupted D26
+
+The user reported against the installed 0.4.119: *"Command-T doesn't work for a new tab/session."*
+
+**The terminal had no File menu at all.** Two scenes replaced `CommandGroup(.newItem)` — the
+database's and the terminal workspace's — and SwiftUI keeps one. Read out of the running app with
+System Events, the File menu was entirely the database's: no *New Terminal Window*, no ⌘T, no
+⌥⌘T *Connect Saved Host…*, and the `replacing: .saveItem` group gone too, so **⌘W closed the window
+instead of the tab**. This is now **rule 34**.
+
+Fixed the way the user asked for: **⌘N is a stub the focused window aims** —
+`GlassNewItemAction` carries the title and the action through `\.glassNewItem`, so ⌘N is *New SQL
+Document* in a database workspace, *New Terminal Window* in a terminal workspace, *New Host* in the
+library, and a disabled *New* elsewhere. `GlassShellFileCommands` is the one scope that replaces the
+placement; capabilities append with `after:` and keep their items unbound.
+**⇧⌘T is new**: "New Tab on oscar", copying the focused pane's intent so it connects with no chooser.
+
+**D26 stage 4's panel is built.** `GlassKeyManagerPanel` in the shell, contributed through
+`GlassShellModel.libraryPanels()` and joined at `GlassShellLibraryView`. `GlassKeyStore` is the
+contract; `GlassTerminalKeyStore` forwards every call to `SettingsManager`, so the journalled delete
+and the import/generate/rename sheets are reused rather than rewritten. Settings' SSH Keys section is
+now one line pointing at the library. Fingerprints come from `OpenSSHPublicKeyLine` (GlasSecretStore),
+checked against `ssh-keygen -lf`, and the transport's own fingerprint now goes through it too.
+
+### Do these next, in order
+
+1. **Install 0.4.120 and look.** *The app was running with the user's live oscar session all session,
+   so nothing was installed.* Quit it first, then install and **read the menu bar back**
+   (rule 34's `osascript` line) to confirm ⌘T, ⇧⌘T and — still unproven — that ⌘W is *Close Tab*
+   again. Then open the library and confirm the **Keys** panel is actually in the sidebar: that line
+   is a view, no unit test reaches it, and a missing join is this project's most repeated defect.
+2. **The Vision Pro install**, still owed from the last session. The 0.4.119 build is at
+   `<scratchpad>/dd-xros/Build/Products/Release-xros/GlassPowerTools.app`; a 0.4.120 visionOS build
+   is at `$TMPDIR/dd-xros-check`. The headset refused the last attempt with
+   `CoreDeviceError 10003` — *the device has not been unlocked recently*. It has to be worn and
+   unlocked.
+3. **The two-device acceptance run.** Still never done, still the only thing that proves D26's
+   sentence. Add a host with a key on the Mac, connect from the phone **without re-approving host
+   trust**; delete the connection and confirm the key survives; generate a Secure Enclave key and
+   confirm that terminal does *not* appear on the phone while the database on the same host still
+   does; sync twice with it in place.
+4. **D26 stage 5**, storage cleanup — the last of D26.
+
+### Open question for the user
+
+Nothing blocking. One decision was made and is easy to reverse: *New Terminal Window* and *New SQL
+Document* keep their menu items but no longer carry their own ⌘N, because ⌘N is now the contextual
+one. If either should keep a dedicated key, it is a one-line change.
+
+### Environment
+
+Unchanged from the previous block: Ubuntu `192.0.2.6` (TigerVNC 5902, GNOME RD 3389, `gptrdp`),
+Windows `192.0.2.3` unprovisioned. Rules that bit today: **34** (new), 25, 32.
+
+## 2026-09-16 (evening) — every device on 0.4.123
+
+The user cleared the old `glas*` builds off the iPhone — *"No more glas* apps on my iphone at all"*
+— and clarified the intent the same evening: *"Oh, you can install on iPhone. I just wanted to make
+sure that it was clean."* A clean slate, not an exclusion. **Stale builds are the hazard, not the
+phone**: a phone on the pre-fix build kept republishing erased configurations through the catalog
+sync, which is why fixing the Mac alone did not hold.
+
+Rule to carry: **every device is on the current build or on nothing.**
+
+Installed now, each read back off the bundle or the device: **macOS
+`/Applications/Glass Power Tools.app` 0.4.123**, **iPhone `00000000-0000000000000A02` 0.4.123**,
+**Vision Pro `00000000-0000000000000A01` 0.4.123**. The headset had
+been sitting on **0.4.92 (build 95)** — pre-D26, and therefore a live copy of the defect that erased
+configurations and republished the erasure through the catalog sync. It was the last device that
+could have re-opened the loop; it is now current.
+
+**Any two of the three serve for the D26 acceptance run**, which is still owed and is the only
+thing that proves the catalog travels.

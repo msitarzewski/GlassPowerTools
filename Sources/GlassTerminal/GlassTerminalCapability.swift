@@ -333,6 +333,14 @@ public final class GlassTerminalCapability: GlassCapability {
         }
     }
 
+    /// D26: build the saved-server list now that the catalog can answer. `loadServersIfNeeded`
+    /// is idempotent and refuses a store that is not readable yet, so calling it on every load is
+    /// safe and calling it *only* at attach time was the bug — the list came back empty and the
+    /// next write reconciled the catalog to match it.
+    public func catalogDidLoad() {
+        runtime.sessionManager.serverManager.loadServersIfNeeded()
+    }
+
     public func libraryToolbarItems() -> AnyView {
         AnyView(GlassTerminalLibraryToolbar(runtime: runtime))
     }

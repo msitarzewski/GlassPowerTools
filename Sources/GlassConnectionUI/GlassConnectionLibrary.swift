@@ -16,6 +16,14 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
     private let detail: (ID?) -> Detail
     private var toolbarActions: () -> AnyView = { AnyView(EmptyView()) }
     private var sidebarActions: () -> AnyView = { AnyView(EmptyView()) }
+    /// The library's own actions, for a context menu in the empty part of the results list.
+    /// Separate from `sidebarActions` because that one is a macOS toolbar region and this has to
+    /// reach every platform — a right-click on the Mac, a long-press on touch, a pinch-and-hold
+    /// in the headset all arrive at the same menu.
+    private var listActions: () -> AnyView = { AnyView(EmptyView()) }
+    /// What a pull-to-refresh runs. Nil leaves the gesture off entirely rather than offering one
+    /// that does nothing.
+    private var refreshAction: (() async -> Void)?
     private var presentationAnchor: () -> AnyView = { AnyView(EmptyView()) }
     /// Surfaces that are not lists of hosts — Workgroups, Network — in sidebar order.
     private var panels: [GlassLibraryPanel] = []
@@ -142,6 +150,20 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
     public func sidebarActions<Actions: View>(@ViewBuilder _ actions: @escaping () -> Actions) -> Self {
         var copy = self
         copy.sidebarActions = { AnyView(actions()) }
+        return copy
+    }
+
+    /// Actions for a context menu in the empty part of the results list, on every platform.
+    public func listActions<Actions: View>(@ViewBuilder _ actions: @escaping () -> Actions) -> Self {
+        var copy = self
+        copy.listActions = { AnyView(actions()) }
+        return copy
+    }
+
+    /// Pull the list down to refresh the library.
+    public func refreshAction(_ action: @escaping () async -> Void) -> Self {
+        var copy = self
+        copy.refreshAction = action
         return copy
     }
 
@@ -298,7 +320,8 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
     private var results: some View {
         GlassLibraryResults(items: visibleItems, title: projection.title(for: scope),
                             selection: $selection, searchText: $searchText,
-                            onActivate: onActivate, row: row)
+                            onActivate: onActivate, row: row,
+                            backgroundActions: listActions, onRefresh: refreshAction)
     }
 
     #if os(visionOS)

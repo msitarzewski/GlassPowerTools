@@ -36,6 +36,10 @@ struct ConnectionPersistenceStore: @unchecked Sendable {
     /// this returns, so a failed write is still a thrown error reaching the rollback below it.
     let save: (Data) async throws -> Void
     let restore: (Data?) async throws -> Void
+    /// Whether the store can be read yet. `UserDefaults` always can; the catalog cannot until the
+    /// shell has read it, and reading early answers "no saved connections" — which the next write
+    /// then makes true. See `GlassServiceStore.isCatalogLoaded`.
+    var isReadable: () -> Bool = { true }
 
     /// D26: the catalog is the one store for a connection.
     ///
@@ -55,7 +59,8 @@ struct ConnectionPersistenceStore: @unchecked Sendable {
                     .sorted { ($0.name, $0.id.uuidString) < ($1.name, $1.id.uuidString) })
             },
             save: { try await records.replaceAll(with: decode($0)) },
-            restore: { try await records.replaceAll(with: decode($0)) }
+            restore: { try await records.replaceAll(with: decode($0)) },
+            isReadable: { records.isCatalogLoaded }
         )
     }
 
@@ -213,6 +218,10 @@ class ConnectionManager {
     }
 
     func load() {
+        // Not readable yet means *unknown*, not empty: leave the list alone rather than replacing
+        // it with nothing the next write would make permanent. `GlassCapability.catalogDidLoad()`
+        // brings us back when the catalog can answer.
+        guard persistenceStore.isReadable() else { return }
         familyCatalogLoaded = false
         guard let data = persistenceStore.load() else {
             connections = []
@@ -229,7 +238,8 @@ class ConnectionManager {
         }
     }
 
-    /// Points this manager at a different store and reloads from it (D26).
+    /// Points this manager at a different store and reloads from it (D26). The reload is a no-op
+    /// while the catalog is unread; the shell calls back through `catalogDidLoad()`.
     func attach(store: ConnectionPersistenceStore) {
         persistenceStore = store
         load()

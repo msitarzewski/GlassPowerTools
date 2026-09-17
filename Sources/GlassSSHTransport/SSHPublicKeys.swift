@@ -91,14 +91,16 @@ public enum SSHPublicKeys {
     }
 
     /// `SHA256:…` fingerprint in OpenSSH's presentation (unpadded base64).
+    ///
+    /// Reads the derived line through `OpenSSHPublicKeyLine`, the same parser the key manager's
+    /// display fingerprint goes through, so a key cannot present one fingerprint here and another
+    /// in the library.
     public static func sha256Fingerprint(for material: SSHKeyMaterial) throws -> String {
         let line = try openSSHLine(for: material)
-        let fields = line.split(separator: " ")
-        guard fields.count >= 2, let blob = Data(base64Encoded: String(fields[1])) else {
+        guard let fingerprint = OpenSSHPublicKeyLine.sha256Fingerprint(in: line) else {
             throw SSHTransportError.invalidPrivateKey("The derived public key could not be encoded.")
         }
-        let digest = Data(SHA256.hash(data: blob)).base64EncodedString()
-        return "SHA256:" + digest.trimmingCharacters(in: CharacterSet(charactersIn: "="))
+        return fingerprint
     }
 
     static func publicKey(for material: SSHKeyMaterial) throws -> NIOSSHPublicKey {
