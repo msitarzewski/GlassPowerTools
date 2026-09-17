@@ -104,3 +104,27 @@ and its notice apply.
 No protocol certification, patent clearance or interoperability guarantee is implied by any license
 above. In particular, the RDP engine is a fork of an independent implementation and is not
 Microsoft-certified; see `Packages/RDPKit/CAPABILITY-LEDGER.md` for what it actually implements.
+
+## tree-sitter grammars added 2026-09-16
+
+Five languages, so the editor can colour what is actually on the machines this app connects to.
+All MIT, all unmodified; each grammar's own `queries/highlights.scm` is vendored beside it under
+`Sources/GlassEditorCore/Grammar/Queries/`.
+
+| Grammar | How it is consumed | Why |
+|---|---|---|
+| `tree-sitter/tree-sitter-go` | pinned dependency | no external scanner; upstream's manifest is enough |
+| `tree-sitter/tree-sitter-c` | pinned dependency | no external scanner |
+| `tree-sitter/tree-sitter-python` | **vendored**, `Packages/TreeSitterPython` | upstream's manifest compiles `parser.c` and not `scanner.c`; Python's scanner is the indentation stack, so the grammar does not link without it |
+| `tree-sitter/tree-sitter-javascript` | **vendored**, `Packages/TreeSitterJavaScript` | same defect; its scanner does automatic semicolon insertion and template literals |
+| `tree-sitter/tree-sitter-rust` | **vendored**, `Packages/TreeSitterRust` | same defect; its scanner does raw strings and nested block comments |
+| `tree-sitter/tree-sitter-php` | **vendored**, `Packages/TreeSitterPHP` | same defect; its scanner handles heredocs and the `<?php` boundary. The vendored copy keeps upstream's `php/src` + `common/` shape, because `scanner.c` includes `../../common/scanner.h` |
+
+The vendored copies differ from upstream in exactly one way: a `Package.swift` target that compiles
+both `src/parser.c` and `src/scanner.c`. This is the same reason YAML, SQL and markdown are already
+vendored (see above) — a manifest that omits the external scanner, not a change to the grammar.
+
+**Swift is deliberately absent.** `alex-pinkus/tree-sitter-swift` publishes no generated `parser.c`
+at its tags; generating one here produced a **20.6 MB** C file. That is the weight this project shed
+when it stopped carrying 55 MB of generated grammars, for the one language its user edits in Xcode
+rather than over SSH. Revisit if upstream ships a release artifact with the parser in it.

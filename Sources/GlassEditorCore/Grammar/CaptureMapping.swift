@@ -113,6 +113,19 @@ public enum CaptureMapping: Sendable {
         "operator": .operator,                  // bash, sql, toml
         "punctuation.bracket": .punctuation,    // sql, toml, yaml
         "punctuation.delimiter": .punctuation,  // markdown, markdown-inline, sql, toml, yaml
+        // C's query uses the bare `@delimiter` for the same thing `@punctuation.delimiter` marks
+        // elsewhere — semicolons, commas, the arrow in a field expression (c-highlights.scm).
+        "delimiter": .punctuation,              // c
+        // A class or struct being *constructed* or defined. Painted as a type, which is what it
+        // names and what every theme in this app already colours: `Foo()` in Python, `new Foo()` in
+        // JavaScript, a tuple struct's name in Rust.
+        "constructor": .type,                   // python, javascript, rust
+        // PHP marks `<?php` and `?>` as `@tag` — the boundary between markup and code, which reads
+        // as punctuation rather than as a keyword.
+        "tag": .punctuation,                    // php
+        // A namespace. `@module.builtin` reduces to `@module` through the dotted fallback, so one
+        // entry covers both.
+        "module": .type,                        // php
         "punctuation.special": .punctuation,    // markdown (heading/list markers), yaml
 
         // --- Embedded / markup --------------------------------------------------
@@ -135,7 +148,11 @@ public enum CaptureMapping: Sendable {
         switch language {
         case .sql: return sqlOverrides
         case .toml: return tomlOverrides
-        case .json, .bash, .yaml, .markdown, .plaintext: return [:]
+        // The five added in 2026-09 use nvim's conventional capture names, which `universal`
+        // already maps — no grammar-specific meaning shift to undo, unlike TOML's `@type`.
+        case .json, .bash, .yaml, .markdown, .python, .javascript, .go, .rust, .c, .php,
+             .plaintext:
+            return [:]
         }
     }
 

@@ -82,6 +82,61 @@ struct GrammarModuleTests {
     ```
     """
 
+    static let python = """
+    # greet
+    def greet(name: str) -> str:
+        count = 1
+        return f"hello {name}"
+    """
+
+    static let javascript = """
+    // greet
+    const count = 1;
+    function greet(name) {
+        return `hello ${name}`;
+    }
+    """
+
+    static let go = """
+    // greet
+    package main
+
+    import "fmt"
+
+    func greet(name string) string {
+        count := 1
+        return fmt.Sprintf("hello %s %d", name, count)
+    }
+    """
+
+    static let rust = """
+    // greet
+    fn greet(name: &str) -> String {
+        let count: u32 = 1;
+        format!("hello {name} {count}")
+    }
+    """
+
+    static let c = """
+    // greet
+    #include <stdio.h>
+
+    int greet(const char *name) {
+        int count = 1;
+        printf("hello %s %d", name, count);
+        return 0;
+    }
+    """
+
+    static let php = """
+    <?php
+    // greet
+    function greet(string $name): string {
+        $count = 1;
+        return "hello $name $count";
+    }
+    """
+
     static func snippet(for language: LanguageID) -> String {
         switch language {
         case .sql: return sql
@@ -90,6 +145,12 @@ struct GrammarModuleTests {
         case .yaml: return yaml
         case .toml: return toml
         case .markdown: return markdown
+        case .python: return python
+        case .javascript: return javascript
+        case .go: return go
+        case .rust: return rust
+        case .c: return c
+        case .php: return php
         case .plaintext: return "just words\nno grammar here"
         }
     }
@@ -106,6 +167,19 @@ struct GrammarModuleTests {
         case .yaml: return [.comment, .property, .string, .number, .boolean, .punctuation]
         case .toml: return [.comment, .property, .string, .number, .boolean, .operator, .punctuation]
         case .markdown: return [.markupHeading, .markupCode, .markupLink, .punctuation]
+        // The five added 2026-09-16. Each fixture is written to exercise the roles a theme
+        // actually keys on — a query that compiles and colours nothing is the failure being
+        // guarded against, and "it parsed" would not catch it.
+        case .python: return [.keyword, .function, .string, .comment, .number]
+        case .javascript: return [.keyword, .function, .string, .comment, .number]
+        case .go: return [.keyword, .function, .string, .comment, .number]
+        // Rust's upstream query paints integer, float *and* boolean literals alike as
+        // `@constant.builtin` (rust-highlights.scm:150-152), so there is no `.number` to require.
+        // Overriding the capture to `.number` would colour `true` as a number, which is worse than
+        // colouring `1` as a constant.
+        case .rust: return [.keyword, .function, .string, .comment, .constant]
+        case .c: return [.keyword, .function, .string, .comment, .number]
+        case .php: return [.keyword, .function, .string, .comment, .number]
         case .plaintext: return [.plain]
         }
     }

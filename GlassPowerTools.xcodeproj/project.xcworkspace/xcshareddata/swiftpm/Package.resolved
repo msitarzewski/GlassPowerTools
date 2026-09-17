@@ -198,27 +198,29 @@
       }
     },
     {
+      "identity" : "tree-sitter-c",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tree-sitter/tree-sitter-c",
+      "state" : {
+        "revision" : "b780e47fc780ddc8da13afa35a3f4ed5c157823d",
+        "version" : "0.24.2"
+      }
+    },
+    {
+      "identity" : "tree-sitter-go",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/tree-sitter/tree-sitter-go",
+      "state" : {
+        "revision" : "1547678a9da59885853f5f5cc8a99cc203fa2e2c",
+        "version" : "0.25.0"
+      }
+    },
+    {
       "identity" : "tree-sitter-json",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/tree-sitter/tree-sitter-json",
       "state" : {
         "revision" : "001c28d7a29832b06b0e831ec77845553c89b56d"
-      }
-    },
-    {
-      "identity" : "tree-sitter-markdown",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/tree-sitter-grammars/tree-sitter-markdown",
-      "state" : {
-        "revision" : "a0a00f817d02412bd92c54d316f164d827b57b5c"
-      }
-    },
-    {
-      "identity" : "tree-sitter-sql",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/DerekStride/tree-sitter-sql",
-      "state" : {
-        "revision" : "851e9cb257ba7c66cc8c14214a31c44d2f1e954e"
       }
     },
     {

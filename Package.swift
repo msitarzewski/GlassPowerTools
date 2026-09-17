@@ -45,6 +45,19 @@ let package = Package(
                  revision: "a06c2e4415e9bc0346c6b86d401879ffb44058f7"),
         .package(url: "https://github.com/tree-sitter-grammars/tree-sitter-toml",
                  revision: "64b56832c2cffe41758f28e05c756a3a98d16f41"),
+        // 2026-09-16: the languages people actually keep on the machines this app connects to.
+        //
+        // **Swift is deliberately absent.** `alex-pinkus/tree-sitter-swift` ships no generated
+        // `parser.c` at its tags — consuming it means running `tree-sitter generate`, and the
+        // result measured here is a **20.6 MB** C file. Vendoring that for one language is the
+        // exact weight this project shed when it stopped carrying 55 MB of generated grammars, and
+        // Swift is the one language its user edits in Xcode rather than over SSH. Revisit if
+        // upstream publishes a release artifact with the parser in it.
+        // The editor could highlight a compose file and a schema and not one line of Swift, Python,
+        // Go, Rust, C or TypeScript — which is most of what is on oscar and juliet. Resolved from
+        // tags first and then pinned to the exact commits below, so a grammar cannot move under us.
+        .package(url: "https://github.com/tree-sitter/tree-sitter-go", from: "0.21.0"),
+        .package(url: "https://github.com/tree-sitter/tree-sitter-c", from: "0.21.0"),
                 // The SSH stack vendored from glas.sh, verbatim (see Stage 2 transport note).
         .package(path: "Packages/Citadel"),
         .package(path: "Packages/swift-nio-ssh"),
@@ -93,6 +106,12 @@ let package = Package(
                 "TreeSitterMarkdown",
                 "TreeSitterMarkdownInline",
                 "TreeSitterSql",
+                "TreeSitterPython",
+                "TreeSitterPHP",
+                "TreeSitterJavaScript",
+                .product(name: "TreeSitterGo", package: "tree-sitter-go"),
+                "TreeSitterRust",
+                .product(name: "TreeSitterC", package: "tree-sitter-c"),
             ],
             resources: [.copy("Grammar/Queries")]
         ),
@@ -132,6 +151,47 @@ let package = Package(
         // to snapshot — and `deserialize()` overwrites the pointer without freeing it or checking
         // the allocation. Still present on upstream's HEAD, checked 2026-09-15, so a newer pin is
         // not the fix. `parser.c` is the pinned revision byte for byte; only `scanner.c` differs.
+        // Vendored for the same reason YAML is: upstream's manifest compiles `src/parser.c` and
+        // **not** `src/scanner.c`, so linking it fails on the external scanner's symbols
+        // (`tree_sitter_javascript_external_scanner_create`, …). JavaScript has an external scanner
+        // for automatic semicolon insertion and template literals, so the grammar is unusable
+        // without it. 2.8 MB, MIT, unmodified — the whole diff from upstream is a manifest that
+        // compiles both files.
+        // Python and Rust are vendored for the same reason JavaScript is: an external scanner
+        // upstream's manifest does not compile. Python's scanner does the indentation stack, Rust's
+        // does raw strings and nested block comments — neither grammar links without it. Go and C
+        // have no external scanner and stay ordinary pinned dependencies.
+        // PHP keeps its scanner's shared header in `common/`, and `php/src/scanner.c` includes it
+        // as `../../common/scanner.h` — so the vendored copy preserves that shape rather than
+        // flattening it, which is the smaller lie.
+        .target(
+            name: "TreeSitterPHP",
+            path: "Packages/TreeSitterPHP",
+            sources: ["php/src/parser.c", "php/src/scanner.c"],
+            publicHeadersPath: "include",
+            cSettings: [.headerSearchPath("php/src")]
+        ),
+        .target(
+            name: "TreeSitterPython",
+            path: "Packages/TreeSitterPython",
+            sources: ["src/parser.c", "src/scanner.c"],
+            publicHeadersPath: "include",
+            cSettings: [.headerSearchPath("src")]
+        ),
+        .target(
+            name: "TreeSitterRust",
+            path: "Packages/TreeSitterRust",
+            sources: ["src/parser.c", "src/scanner.c"],
+            publicHeadersPath: "include",
+            cSettings: [.headerSearchPath("src")]
+        ),
+        .target(
+            name: "TreeSitterJavaScript",
+            path: "Packages/TreeSitterJavaScript",
+            sources: ["src/parser.c", "src/scanner.c"],
+            publicHeadersPath: "include",
+            cSettings: [.headerSearchPath("src")]
+        ),
         .target(
             name: "TreeSitterSql",
             path: "Packages/TreeSitterSql",

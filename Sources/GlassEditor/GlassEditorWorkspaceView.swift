@@ -434,6 +434,12 @@ public struct GlassEditorWorkspaceView: View {
         case .yaml: "YAML"
         case .toml: "TOML"
         case .markdown: "Markdown"
+        case .python: "Python"
+        case .javascript: "JavaScript"
+        case .go: "Go"
+        case .rust: "Rust"
+        case .c: "C"
+        case .php: "PHP"
         case .plaintext: "Plain Text"
         }
     }
@@ -444,6 +450,7 @@ public struct GlassEditorWorkspaceView: View {
         case .json, .toml, .yaml: "curlybraces"
         case .bash: "terminal"
         case .markdown: "text.alignleft"
+        case .python, .javascript, .go, .rust, .c, .php: "chevron.left.forwardslash.chevron.right"
         case .plaintext: "doc.text"
         }
     }

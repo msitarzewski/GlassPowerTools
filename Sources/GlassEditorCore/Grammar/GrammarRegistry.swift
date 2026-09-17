@@ -2,7 +2,13 @@ import Foundation
 import SwiftTreeSitter
 
 import TreeSitterBash
+import TreeSitterC
+import TreeSitterGo
+import TreeSitterJavaScript
 import TreeSitterJSON
+import TreeSitterPHP
+import TreeSitterPython
+import TreeSitterRust
 import TreeSitterMarkdown
 import TreeSitterMarkdownInline
 import TreeSitterSql
@@ -126,6 +132,12 @@ public final class GrammarRegistry {
         case .yaml: return Language(tree_sitter_yaml())
         case .toml: return Language(tree_sitter_toml())
         case .markdown: return Language(tree_sitter_markdown())
+        case .python: return Language(tree_sitter_python())
+        case .javascript: return Language(tree_sitter_javascript())
+        case .go: return Language(tree_sitter_go())
+        case .rust: return Language(tree_sitter_rust())
+        case .c: return Language(tree_sitter_c())
+        case .php: return Language(tree_sitter_php())
         case .plaintext: return nil
         }
     }
@@ -146,6 +158,12 @@ public final class GrammarRegistry {
         case .yaml: return "yaml-highlights"
         case .toml: return "toml-highlights"
         case .markdown: return "markdown-highlights"
+        case .python: return "python-highlights"
+        case .javascript: return "javascript-highlights"
+        case .go: return "go-highlights"
+        case .rust: return "rust-highlights"
+        case .c: return "c-highlights"
+        case .php: return "php-highlights"
         case .plaintext: return nil
         }
     }
