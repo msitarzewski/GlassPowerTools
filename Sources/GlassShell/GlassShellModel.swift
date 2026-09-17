@@ -233,6 +233,23 @@ public final class GlassShellModel: GlassServiceStore {
         }
     }
 
+    /// The library's list: the catalog's machines, with the device's own at the head.
+    ///
+    /// **One place, because the local host is not in the catalog.** It lives in its own store (D8)
+    /// and is *inserted* into the projection, so any code that rebuilds `hosts` from
+    /// `GlassShellHostGrouping.group(records)` alone silently drops it. That is exactly what
+    /// happened on 2026-09-16: the sync's post-apply rebuild had been unreachable while a tombstone
+    /// was throwing before it, and the moment the sync started working again, "This Mac"
+    /// disappeared from the library.
+    private func rebuildProjection() {
+        var grouped = GlassShellHostGrouping.group(records)
+        if let localRecord {
+            grouped.insert(GlassShellHost(local: localRecord, builtInServices: registry.builtInLocalServices),
+                           at: 0)
+        }
+        hosts = grouped
+    }
+
     /// Told after every load, including a failed one: a capability that cannot read its records
     /// has to learn that too, rather than sitting on an empty list it believes is the truth.
     private func notifyCapabilitiesCatalogLoaded() {
@@ -262,7 +279,7 @@ public final class GlassShellModel: GlassServiceStore {
             let current = (try await localCatalog.snapshot()).first { $0.id == GlassLocalHost.id } ?? record
             localRecord = current
             localHostProblem = nil
-            hosts.insert(GlassShellHost(local: current, builtInServices: registry.builtInLocalServices), at: 0)
+            rebuildProjection()
         } catch {
             // The library is still usable without it, so this is reported rather than thrown:
             // silence would be the honest-status failure, an alert on every activation would be
@@ -388,7 +405,7 @@ public final class GlassShellModel: GlassServiceStore {
 
             if !outcome.toApplyLocally.isEmpty {
                 records = try await catalog.snapshot()
-                hosts = GlassShellHostGrouping.group(records)
+                rebuildProjection()
             }
             if !departed.isEmpty {
                 // Deliberately not rethrown: a capability failing to delete its credential must not

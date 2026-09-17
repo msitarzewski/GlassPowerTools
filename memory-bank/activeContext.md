@@ -1597,7 +1597,7 @@ could have re-opened the loop; it is now current.
 **Any two of the three serve for the D26 acceptance run**, which is still owed and is the only
 thing that proves the catalog travels.
 
-## 2026-09-16 (night) — 0.4.130, and where the editor stands
+## 2026-09-16 (night) — 0.4.130 (SUPERSEDED — see the RESUME HERE block at the end)
 
 **Installed:** macOS **0.4.130**, iPhone **0.4.130** (both read back). Vision Pro is built at
 `$TMPDIR/dd-xros-130/Build/Products/Release-xros/Glass Power Tools.app` and refused with
@@ -1630,3 +1630,76 @@ conform. Two to three weeks, not an afternoon.
 
 **Still owed from before all of this:** the D26 two-device acceptance run, and the test hygiene —
 1,519 keychain items and the preference-file sprawl from suites using the real Mac as scratch space.
+
+## 2026-09-16 (late) — RESUME HERE
+
+**State BUILD.** Owner: coordinating agent. **1,563 tests / exit status 0.** macOS, iOS and visionOS
+all build.
+
+### Installed
+
+| Platform | Version |
+|---|---|
+| macOS `/Applications/Glass Power Tools.app` | **0.4.132** |
+| iPhone `00000000-0000000000000A02` | **0.4.131** — one behind; needs the local-host fix |
+| Vision Pro `00000000-0000000000000A01` | **0.4.123** — locked at every later attempt |
+
+The process is now `Glass Power Tools` (rule 37): **`pgrep -x GlassPowerTools` matches nothing**, and
+the bundle installs to `/Applications/Glass Power Tools.app`.
+
+### What today was
+
+Four defects found by *using* the app, not by testing it — and the two hardest were in the
+projection rather than the data, with the records on disk correct the whole time (rule 38).
+
+1. **Settings were being deleted by the code that loaded them.** An unread catalog answered
+   "nothing", a capability believed it, and the next write reconciled the catalog to match.
+   `isCatalogLoaded` + `GlassServiceRecords.replaceAll` refusing + `catalogDidLoad()`.
+2. **One deleted machine stopped this device publishing, permanently.** The sync applied incoming
+   records with `upsert` — the local-edit path, which refuses a tombstone — and the publish sits
+   below that loop. `merge(_:)` was always the right API. The sync now logs its counts and its
+   failures; the silence is what made it cost a day.
+3. **The terminal had no File menu.** Two scenes replaced `CommandGroup(.newItem)`. The shell owns
+   the placement now, with one New item the focused window aims (rule 34).
+4. **"This Mac" vanished** the moment the sync started working — see rule 38.
+
+Plus: D26 stage 4's key manager panel, stage 5's editor, twelve highlighted languages, the product
+renamed *Glass Power Tools* everywhere (rule 37), pull-to-refresh and a background context menu in
+the library, a way back to Connections from a database workspace, and a connect failure that names
+the machine and suggests the tunnel.
+
+### Do these next, in order
+
+1. **Put 0.4.132 on the phone**, and the Vision Pro when it is unlocked. Every device current or
+   empty (the memory `no-glass-apps-on-the-iphone` records why).
+2. **The editor's remote half** — the whole of stage 5's remaining value, laid out step by step in
+   [the remaining work](tasks/2026-09/2026-09-14_remaining-work-plan.md) under *"Stage 5 — what is
+   left, in order"*. The user asked for exactly this: right-click a folder in the SFTP browser →
+   **Open in Editor** → a tree over that remote folder, with the project tracked as `(hostID, path)`
+   so it follows him between devices.
+3. **The editor has no entry point on iOS or visionOS.** Contribute it as a library panel beside
+   SSH Keys.
+4. **The D26 two-device acceptance run**, still never done, and now easy: two devices are current
+   and the catalog demonstrably syncs.
+5. **Test hygiene.** 1,519 keychain items (`test.SSHHostTrust.*`, `test.KeychainOps.*`) and the
+   preference-file sprawl, from suites using the real Mac as scratch space. Bounded names or a test
+   keychain. Nothing in the app is wrong; the tests are rude.
+
+### Things that will bite
+
+- **Rules earned today: 34** (one owner per command placement; read the menu bar out of the running
+  app), **35** ("not read yet" and "empty" are different answers), **36** (there is no legacy — do
+  not write migration code), **37** (the product's name, and `INFOPLIST_KEY_CFBundleName` is
+  accepted and ignored), **38** (the projection is not the data; a fix can make a latent defect
+  reachable).
+- `swift build` never compiles the App target (rule 32). Build all three platforms before believing
+  a refactor is done — an iOS-only `#if` branch is invisible to a macOS build.
+- The screen lock still fails catalog writes with no signature (rule 28). `caffeinate -dimsu`.
+- Reading the app's own log is now the fastest diagnosis available:
+  `log show --last 5m --predicate 'subsystem == "com.glasspowertools"' --info`.
+
+### Environment
+
+Ubuntu `192.0.2.6`: TigerVNC 5902, GNOME RD 3389, user `gptrdp`. Windows `192.0.2.3`
+unprovisioned. oscar `192.0.2.10`: SSH open, **MySQL on 3306 is not reachable from outside** —
+it needs the service's SSH tunnel switched on, which is what the new connect error now says.

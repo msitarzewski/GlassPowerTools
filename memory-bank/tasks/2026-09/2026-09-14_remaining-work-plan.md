@@ -1014,3 +1014,66 @@ broker, because rule 6 forbids the editor importing the terminal. The shape is
 `GlassCapabilityHostAccess`'s: the shell asks whichever capability owns `.ssh` for a directory
 listing and a file's bytes, and the editor never learns who served it. Until that exists, a project
 on another machine shows its badge and cannot be browsed.
+
+## The evening of 2026-09-16 — grammars, and two things that vanished
+
+### Twelve languages, and the integration that came free
+
+Six added (Python, JavaScript, Go, Rust, C, PHP) to the six config formats that were there. **The
+SFTP remote editor picks its grammar with `LanguageID.forFileExtension`**, so a `.py` or `.php` file
+opened on a server through the Files browser now colours with no further change — the point the user
+made when he said *"don't forget the other integrations."*
+
+Three of the six had to be vendored (`Packages/TreeSitterPython`, `TreeSitterJavaScript`,
+`TreeSitterRust`, `TreeSitterPHP`) for the reason YAML already was: upstream's SPM manifest compiles
+`parser.c` and not `scanner.c`, so the grammar will not link against its own external scanner. The
+vendored copies differ from upstream by one manifest. Go and C have no scanner and stay pinned.
+
+**Swift was refused deliberately**: upstream ships no generated `parser.c`, and generating one here
+produced a **20.6 MB** C file — the weight this project shed when it stopped carrying 55 MB of
+grammars, for the one language its user edits in Xcode.
+
+Two existing tests found everything: the capture-mapping suite named each unmapped capture
+(`@delimiter`, `@constructor`, `@tag`, `@module`), and the grammar suite caught that Rust paints
+integers, floats and booleans alike as `@constant.builtin`, so requiring `.number` of it would have
+demanded something upstream does not emit.
+
+### Duplicate services — residue, not a new defect
+
+oscar showed two Terminals and two Desktops, identical, one of each dead: the morning's persistence
+defect emptied configurations without removing their links, and re-adding a service created a second
+link beside the corpse. **The row now says "Terminal · Not set up" in orange** when nothing is behind
+the link, so the dead one is identifiable and removable. Built-in local services are never marked —
+they store nothing by design and the warning would be permanent on the one host nobody can repair.
+
+### "This Mac" disappeared — caused by the sync fix
+
+See **rule 38**. `synchronizeCatalog`'s post-apply rebuild had never run while the tombstone was
+throwing above it; the moment the sync was repaired it ran and dropped the local host, which is
+inserted into the projection rather than living in the catalog. `rebuildProjection()` is now the one
+composer. Proven by defeating it: the test fails with *"This Mac disappeared when the sync applied a
+record."*
+
+## Stage 5 — what is left, in order
+
+1. **The remote directory reader.** `GlassEditorDirectoryReader` has one implementation. Until
+   there is a second, a project on another machine draws an empty tree and the editor is local-only
+   — which removes the only reason it belongs in this app. Cheapest correct shape is the one the
+   database already uses for tunnels: **the composition root hands the editor a closure the terminal
+   implements**, so neither module imports the other. The real work is sessions: opening a project
+   later means connecting to that host on demand rather than borrowing a browser window's session.
+2. **Persisting projects.** `projects` is in-memory and dies with the window. Local persistence is
+   small; making them *sync* means carrying them in the catalog, which is a schema addition to
+   `HostProfile` — deliberate work, because every device decodes that record.
+3. **"Open in Editor"** in the SFTP browser's context menu — three lines once (1) exists.
+4. Project-wide search by running `rg --json` on the far machine.
+5. Git status in the tree from `git status --porcelain=v2`.
+6. **Server-side LSP**: run the language server on the remote host over an SSH exec channel and
+   speak LSP across its stdio. The engine's `CompletionProvider`, `DiagnosticsProvider` and
+   `StatementBoundaryProvider` are already the seam — nothing needs re-architecting, something needs
+   to conform. Two to three weeks, and it is the differentiator no iPad editor can match.
+
+**The editor has no entry point on iOS or visionOS.** macOS has ⇧⌘E and File ▸ New Editor Window;
+the other platforms have the scene and nothing that opens it. The fix is to contribute the editor as
+a **library panel** beside SSH Keys and Workgroups — the results column is the document and project
+list, the detail column is the text, which is the shape the panel mechanism already gives.

@@ -268,3 +268,15 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     every existing record are keyed on the identifier, never on the name. Install to
     `/Applications/Glass Power Tools.app`, and note the process is now `Glass Power Tools`:
     `pgrep -x GlassPowerTools` matches nothing.
+
+38. **The projection is not the data, and a fix can make a latent defect reachable.** Twice on
+    2026-09-16 something "disappeared" and the records on disk were correct the whole time. The
+    second was created by fixing the first: `synchronizeCatalog` rebuilds the library's list from
+    `GlassShellHostGrouping.group(records)` after applying incoming records, and **the device's own
+    host is not in the catalog** — it lives in its own store (D8) and is *inserted* into the list.
+    That rebuild had been unreachable for as long as a tombstone was throwing above it; the moment
+    the sync worked again, "This Mac" vanished from the library. So: `rebuildProjection()` is the
+    one composer, used by every path that refreshes `hosts`, and when something vanishes, **look at
+    what draws the list before going looking for lost data.** A repair that unblocks code which has
+    never run is a change in behaviour, and the newly reachable lines deserve the same suspicion as
+    new ones.
