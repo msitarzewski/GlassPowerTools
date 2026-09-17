@@ -1596,3 +1596,37 @@ could have re-opened the loop; it is now current.
 
 **Any two of the three serve for the D26 acceptance run**, which is still owed and is the only
 thing that proves the catalog travels.
+
+## 2026-09-16 (night) — 0.4.130, and where the editor stands
+
+**Installed:** macOS **0.4.130**, iPhone **0.4.130** (both read back). Vision Pro is built at
+`$TMPDIR/dd-xros-130/Build/Products/Release-xros/Glass Power Tools.app` and refused with
+`CoreDeviceError 10003` — locked again after the 0.4.123 install went through.
+
+**1,557 tests, exit status 0.** Three commits today: the persistence and menu-bar work
+(`c67bb62`), stage 5's editor (`65ca7bd`), six grammars (`4247347`).
+
+### Stage 5 as it actually stands
+
+Built: documents, tabs, save/save-as with byte-identical round trips, find and replace, go to line,
+recents, drag and drop, a project tree over a local folder, and a window whose ⌘N means New Document.
+Twelve languages now colour — the six original config formats plus Python, JavaScript, Go, Rust, C
+and PHP — and because the SFTP remote editor picks its grammar the same way, files opened on a
+server through the Files browser colour too.
+
+**Not built, and it is the half that matters:** `GlassEditorDirectoryReader` has one implementation,
+the local file system. A project on another machine shows its badge and cannot be browsed. The SFTP
+reader needs a broker — rule 6 forbids the editor importing the terminal — shaped like
+`GlassCapabilityHostAccess`: the shell asks whichever capability owns `.ssh` for a directory listing
+and a file's bytes, and the editor never learns who served it.
+
+**After that, in the order argued from the market:** project-wide search by running `rg --json` on
+the far machine; git status in the tree from `git status --porcelain=v2`; then **server-side LSP**,
+which is the differentiator — run the language server *on the remote host* over an SSH exec channel
+and speak LSP across its stdio, so an iPad gets completions and diagnostics from the machine that
+has the toolchain. The engine's `CompletionProvider`, `DiagnosticsProvider` and
+`StatementBoundaryProvider` are already the seam; nothing needs re-architecting, something needs to
+conform. Two to three weeks, not an afternoon.
+
+**Still owed from before all of this:** the D26 two-device acceptance run, and the test hygiene —
+1,519 keychain items and the preference-file sprawl from suites using the real Mac as scratch space.
