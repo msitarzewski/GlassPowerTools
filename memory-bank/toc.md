@@ -49,6 +49,8 @@ three source applications are obsolete and no longer compile.
 | [D26 — keys first class](tasks/2026-09/2026-09-14_d26-keys-first-class.md) | Keys outlive connections and get their own manager; device-bound means absent elsewhere; publish redacts and apply re-attaches |
 | [The remaining work](tasks/2026-09/2026-09-14_remaining-work-plan.md) | **The plan for everything left**: D26 stages 1–5, Stage 4 W3–W6, Stage 4.5, carried items, Stages 5–6, with reuse anchors and precise edits |
 | [D27 and D28 planned](tasks/2026-09/2026-09-14_d27-d28-plan.md) | Every record-creating surface enumerated; the two live D27 targets, the unreferenced `RDPFileImporter`, and the normaliser that silently re-attaches a key |
+| [Stage 5.2 — the editor and the family](tasks/2026-09/2026-09-16_editor-stage-5.2-plan.md) | The editor's seven corrections: the database's tree and tabs as the template, the library's toolbar, Projects as a Workgroups-style panel, and the remote reader last |
+| [The editor, round two](tasks/2026-09/2026-09-17_editor-round-two.md) | Seven corrections from the 0.4.143 test pass: the whole tab clickable, the rule through the strip, the gear into Settings, Open that takes a folder, ⌘W on the tab, a remembered frame, language in the footer |
 | [September tasks](tasks/2026-09/README.md) | Monthly index |
 
 This project is `~/Software/glass/GlassPowerTools`. `../GlassEditorKit` was **absorbed on 2026-09-14**

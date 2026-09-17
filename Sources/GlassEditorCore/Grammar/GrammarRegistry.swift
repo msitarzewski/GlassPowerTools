@@ -12,6 +12,8 @@ import TreeSitterRust
 import TreeSitterMarkdown
 import TreeSitterMarkdownInline
 import TreeSitterSql
+import TreeSitterSwift
+import TreeSitterXML
 import TreeSitterTOML
 import TreeSitterYAML
 
@@ -138,6 +140,8 @@ public final class GrammarRegistry {
         case .rust: return Language(tree_sitter_rust())
         case .c: return Language(tree_sitter_c())
         case .php: return Language(tree_sitter_php())
+        case .swift: return Language(tree_sitter_swift())
+        case .xml: return Language(tree_sitter_xml())
         case .plaintext: return nil
         }
     }
@@ -164,6 +168,8 @@ public final class GrammarRegistry {
         case .rust: return "rust-highlights"
         case .c: return "c-highlights"
         case .php: return "php-highlights"
+        case .swift: return "swift-highlights"
+        case .xml: return "xml-highlights"
         case .plaintext: return nil
         }
     }

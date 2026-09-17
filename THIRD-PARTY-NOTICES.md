@@ -124,7 +124,14 @@ The vendored copies differ from upstream in exactly one way: a `Package.swift` t
 both `src/parser.c` and `src/scanner.c`. This is the same reason YAML, SQL and markdown are already
 vendored (see above) — a manifest that omits the external scanner, not a change to the grammar.
 
-**Swift is deliberately absent.** `alex-pinkus/tree-sitter-swift` publishes no generated `parser.c`
-at its tags; generating one here produced a **20.6 MB** C file. That is the weight this project shed
-when it stopped carrying 55 MB of generated grammars, for the one language its user edits in Xcode
-rather than over SSH. Revisit if upstream ships a release artifact with the parser in it.
+## tree-sitter grammars added 2026-09-17
+
+| Grammar | How | Why |
+|---|---|---|
+| `alex-pinkus/tree-sitter-swift` @ `00bbb0a2550f8bc0023a2a4992922d51ae045626` | **vendored**, `Packages/TreeSitterSwift` | MIT, `LICENSE` retained. Upstream publishes **no generated `parser.c`** — it generates at install time — so `src/parser.c` here is `tree-sitter generate` output from that revision, **20 MB**. The `grammar.json` it came from is upstream's, unmodified; `scanner.c` is upstream's byte for byte. |
+| `tree-sitter-grammars/tree-sitter-xml` @ `5000ae8f22d11fbe93939b05c1e37cf21117162d` | **vendored**, `Packages/TreeSitterXML` | MIT, `LICENSE` retained. Ships a generated `parser.c`. Only the XML grammar is taken, not the DTD one beside it, so `scanner.c`'s `#include "../../common/scanner.h"` is repointed to `../common/scanner.h` — the sibling directory in this package. The header itself is unmodified and the patch names itself in place. |
+
+**The 20 MB, said plainly.** Swift was left out on 2026-09-16 for exactly that weight, and the user
+reversed the decision on 2026-09-17 having been shown the number: it is the language this project is
+written in, and the SQL grammar already vendored beside it is **41.6 MB**. Revisit if upstream ever
+ships a release artifact with the parser in it.

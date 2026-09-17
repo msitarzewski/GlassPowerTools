@@ -529,3 +529,37 @@ twice with it in place.
 
 Input, held-key release and clean disconnect over RDP — they need the session window, not a probe.
 Both VMs are configured and were left running.
+
+# 2026-09-17 — the editor after a morning of use
+
+## Verified by running
+
+| Claim | Evidence |
+|---|---|
+| Package suite green | **1,578 tests, exit status 0**, measured by exit status (rule 25). Run unlocked — a locked screen reports 104 false failures, every one of them a test that writes `.completeFileProtection` storage (rule 28) |
+| All three platforms build | `xcodebuild` Release for `platform=macOS`, `generic/platform=iOS`, `generic/platform=visionOS`. Checked after **every** change that touched a view this session, because three separate breaks were invisible to the macOS build |
+| Installed and launched | **0.4.158** at `/Applications/Glass Power Tools.app`, version read back off the bundle (rule 16). iPhone `00008150` at **0.4.143**, also read back off the device |
+| ⌘W, ⌘O and ⌘N are contextual and single-owner | Read out of the **running app's menu bar**: `Close ⌘W enabled`, `Open File… ⌘O`, `Open SQL Document… ⇧⌘O`, `Open Project… ⌥⌘O`. ⌘W verified by use: closes a terminal tab and leaves the window; closes an editor window with no tabs |
+| Swift and XML highlight | `GrammarModuleTests` colours a real fixture in each; `GrammarCoverageTests` compiles every query against its grammar; `CaptureMappingTests` caught six unmapped captures before they shipped as grey text |
+| The desktop's record survives a relaunch | `D26DesktopRelaunchTests`, against a real `GlassShellModel` and a catalog file. One of the three fails without its fix — checked by reverting it |
+| A second editor window is empty | `GlassEditorWindowIsolationTests`; preferences stay shared, documents do not |
+
+## Compiled but not verified by running
+
+- **The light-theme switch while the app is running.** Verified from a capture that Light mode
+  renders correctly at launch; a system change mid-session takes the same path but was not watched.
+- **iPhone and Vision Pro carry none of the editor work.** The phone is at 0.4.143 (before rounds
+  two to four) and the headset at 0.4.123. Neither has an editor entry point at all — it is a Mac
+  surface until stage C contributes the library panel.
+
+## Known and unfixed
+
+- **The line-number strip reaches into the title bar.** `NSRulerView` spans its scroll view and is
+  not inset by the scroll view's content insets. Three fixes at three different links in that chain
+  all missed, and the app's own geometry could not be measured: the unified log stopped answering
+  for this process and the sandbox container is closed to the shell. The fix worth making is to stop
+  using the ruler and draw the gutter beside the text, where it can only occupy the text's bounds.
+  Line numbers can be turned off in Settings ▸ Editor meanwhile.
+- **Projects are not persisted.** Closing an editor window loses its project; stage C.
+- Still owed from before: the D26 two-device acceptance run, and the test hygiene — 1,519 keychain
+  items and the preference-file sprawl.

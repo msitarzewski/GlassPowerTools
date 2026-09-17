@@ -67,6 +67,9 @@ public enum CaptureMapping: Sendable {
     /// - `spell` / `nospell`: spell-check hints, also excluded by ``isHighlighting(_:)``.
     public static let intentionallyPlainCaptures: Set<String> = [
         "none",
+        // XML's character data — the text between the tags. It is the document's content and it
+        // reads as content; painting it would leave nothing on the page uncoloured.
+        "markup",
         "spell",
         "nospell",
     ]
@@ -137,6 +140,21 @@ public enum CaptureMapping: Sendable {
         "text.uri": .markupLink,                // markdown, markdown-inline
         "text.reference": .markupLink,          // markdown, markdown-inline
 
+        // --- Added 2026-09-17 with the Swift and XML grammars ---------------------
+        // Swift uses it for the wildcard pattern — the `_` that stands in for a name
+        // (`swift-highlights.scm:286`). It is a keyword-ish placeholder, not a character, and
+        // nothing else in the shipped queries uses the capture.
+        "character.special": .keyword,
+        // XML's `(ERROR)` node, painted deliberately by the grammar's own query rather than
+        // arrived at through the parser's error recovery.
+        "error": .error,
+        // Character data between tags: the document's actual text, which should read as text.
+        "markup": .plain,
+        // CDATA: the delimiters mark a section, the body inside it is raw.
+        "markup.heading": .markupHeading,
+        "markup.raw": .markupCode,
+        "markup.link": .markupLink,
+
         // --- Deliberate .plain --------------------------------------------------
         "none": .plain,                         // markdown (see intentionallyPlainCaptures)
         "spell": .plain,                        // sql
@@ -150,8 +168,9 @@ public enum CaptureMapping: Sendable {
         case .toml: return tomlOverrides
         // The five added in 2026-09 use nvim's conventional capture names, which `universal`
         // already maps — no grammar-specific meaning shift to undo, unlike TOML's `@type`.
+        case .xml: return xmlOverrides
         case .json, .bash, .yaml, .markdown, .python, .javascript, .go, .rust, .c, .php,
-             .plaintext:
+             .swift, .plaintext:
             return [:]
         }
     }
@@ -164,6 +183,17 @@ public enum CaptureMapping: Sendable {
     /// both simpler and more consistent: every TOML key is a `.property`.
     private static let tomlOverrides: [String: TokenRole] = [
         "type": .property,
+    ]
+
+    /// XML paints element names with `@tag` and attribute names with `@tag.attribute`
+    /// (`queries/xml/highlights.scm`). `@tag` is punctuation in the universal table — it is what
+    /// HTML-ish grammars use for `<` and `>` — so left alone every element name in a document would
+    /// come out as bracket-coloured punctuation. In a markup language the element name is the
+    /// closest thing there is to a keyword, and the attribute name is a property.
+    private static let xmlOverrides: [String: TokenRole] = [
+        "tag": .keyword,
+        "tag.attribute": .property,
+        "tag.delimiter": .punctuation,
     ]
 
     /// SQL reads these captures differently from the general convention.

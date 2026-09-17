@@ -40,6 +40,42 @@ struct GrammarCoverageTests {
         #expect(loaded.highlightQuery == nil)
     }
 
+    /// The two added 2026-09-17, and the files a developer on this platform actually opens.
+    @Test func swiftAndXMLClaimTheExtensionsTheyShould() {
+        #expect(LanguageID.forFileExtension("swift") == .swift)
+        #expect(LanguageID.forFileExtension("xml") == .xml)
+        #expect(LanguageID.forFileExtension("plist") == .xml)
+        #expect(LanguageID.forFileExtension("entitlements") == .xml)
+        #expect(LanguageID.forFileExtension("xcscheme") == .xml)
+        #expect(LanguageID.forFileExtension("svg") == .xml)
+    }
+
+    /// A file whose name says nothing. `Makefile`, `deploy`, a plist with no extension — half a
+    /// developer's tree — and the editor called all of it plain text.
+    @Test func contentNamesTheLanguageWhenTheFileNameDoesNot() {
+        #expect(LanguageID.forContent("#!/usr/bin/env python3\nprint(1)\n") == .python)
+        #expect(LanguageID.forContent("#!/bin/bash\necho hi\n") == .bash)
+        #expect(LanguageID.forContent("#!/usr/bin/env node\nconsole.log(1)\n") == .javascript)
+        #expect(LanguageID.forContent("<?xml version=\"1.0\"?><plist/>") == .xml)
+        #expect(LanguageID.forContent("{\"a\": 1}") == .json)
+
+        // An interpreter with no grammar here is still a script, and the shell grammar reads it
+        // better than nothing does.
+        #expect(LanguageID.forContent("#!/usr/bin/env ruby\nputs 1\n") == .bash)
+    }
+
+    /// **Nothing conclusive means plaintext.** A wrong grammar colours worse than none, and the
+    /// tempting guesses — a leading brace, a word that looks like a keyword — are exactly the ones
+    /// that are wrong on somebody's file.
+    @Test func ambiguousContentStaysPlaintext() {
+        #expect(LanguageID.forContent("just some words\nand more of them") == .plaintext)
+        // A brace that is not JSON: a Swift dictionary literal, a CSS rule, a Go struct.
+        #expect(LanguageID.forContent("{ this is not json }") == .plaintext)
+        #expect(LanguageID.forContent("") == .plaintext)
+        // A `#` comment is not a shebang.
+        #expect(LanguageID.forContent("# a heading\n\nsome prose") == .plaintext)
+    }
+
     /// The extensions that decide which grammar a file opens under. Getting `.go` or `.rs` wrong
     /// means a correct grammar that is never chosen.
     @Test func fileExtensionsMapToTheLanguagesTheyName() {

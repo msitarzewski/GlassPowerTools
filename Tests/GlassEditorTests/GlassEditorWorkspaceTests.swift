@@ -187,16 +187,83 @@ struct GlassEditorWorkspaceTests {
     @Test func recentsAreNewestFirstDedupedAndBounded() throws {
         let root = try makeRoot(); defer { try? FileManager.default.removeItem(at: root) }
         let workspace = makeWorkspace()
-        for index in 0..<(GlassEditorWorkspace.recentsLimit + 5) {
+        for index in 0..<(GlassEditorPreferences.recentsLimit + 5) {
             workspace.open(try write("x", named: "file\(index).txt", in: root))
         }
-        #expect(workspace.recents.count == GlassEditorWorkspace.recentsLimit,
+        #expect(workspace.preferences.recents.count == GlassEditorPreferences.recentsLimit,
                 "the recents list is unbounded")
-        #expect(workspace.recents.first?.lastPathComponent == "file24.txt", "recents are not newest first")
+        #expect(workspace.preferences.recents.first?.lastPathComponent == "file24.txt", "recents are not newest first")
 
         // Re-opening an old one moves it to the front rather than adding a second entry.
         let again = try write("x", named: "file24.txt", in: root)
         workspace.open(again)
-        #expect(workspace.recents.filter { $0.lastPathComponent == "file24.txt" }.count == 1)
+        #expect(workspace.preferences.recents.filter { $0.lastPathComponent == "file24.txt" }.count == 1)
+    }
+}
+
+@MainActor
+@Suite("A window's documents are its own")
+struct GlassEditorWindowIsolationTests {
+
+    private func makeRuntime() -> GlassEditorRuntime {
+        GlassEditorRuntime(defaults: UserDefaults(suiteName: "editor.windows.\(UUID().uuidString)")!)
+    }
+
+    private func makeFile(_ name: String) throws -> URL {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("EditorWindows-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let url = root.appendingPathComponent(name)
+        try Data("hello\n".utf8).write(to: url)
+        return url
+    }
+
+    /// The report, as a test: ⇧⌘E on a window with documents open produced a window with **the
+    /// same documents** in it, because the editor kept one workspace for the whole app. A window
+    /// full of tabs is what a Mac editor is; two windows sharing one set is a panel pretending to
+    /// be a window.
+    @Test func aSecondWindowStartsEmpty() throws {
+        let runtime = makeRuntime()
+        let file = try makeFile("first.txt")
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+
+        let first = runtime.workspace(for: UUID())
+        #expect(first.open(file) != nil)
+        #expect(first.documents.count == 1)
+
+        let second = runtime.workspace(for: UUID())
+        #expect(second.documents.isEmpty, "a new window opened onto another window's documents")
+    }
+
+    /// Preferences are the other half of the split: they are true of the editor, not of a window,
+    /// so text size set in one is set in both.
+    @Test func preferencesAreSharedBetweenWindows() throws {
+        let runtime = makeRuntime()
+        let first = runtime.workspace(for: UUID())
+        let second = runtime.workspace(for: UUID())
+
+        first.preferences.fontSize = 18
+        #expect(second.preferences.fontSize == 18)
+        #expect(first.preferences === second.preferences)
+    }
+
+    /// A file opened from the menu bar goes to the window in front, and only makes a window when
+    /// there is none — the defect that put a second window beside the empty one ⇧⌘E had just made.
+    @Test func openingAFileUsesTheWindowInFront() throws {
+        let runtime = makeRuntime()
+        let file = try makeFile("second.txt")
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+
+        // No windows yet: opening has to make one, and says so by returning its id.
+        let created = runtime.open(file)
+        let id = try #require(created, "with no window open, a window has to be created for the file")
+        #expect(runtime.workspace(for: id).documents.count == 1)
+
+        // With that window in front, a second file joins it rather than opening another window.
+        runtime.noteFrontmost(id)
+        let another = try makeFile("third.txt")
+        defer { try? FileManager.default.removeItem(at: another.deletingLastPathComponent()) }
+        #expect(runtime.open(another) == nil, "a second window was opened for a file")
+        #expect(runtime.workspace(for: id).documents.count == 2)
     }
 }

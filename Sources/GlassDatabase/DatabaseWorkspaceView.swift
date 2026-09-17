@@ -281,10 +281,10 @@ struct DatabaseWorkspaceView: View {
             openQueryDocument()
         })
         #endif
-        .databaseCommandWTarget(
-            priority: .workspace,
-            isEnabled: true
-        ) {
+        // ⌘W closes the active tab, not the workspace window with every tab in it. The
+        // interception that makes this possible moved to the shell on 2026-09-16
+        // (`GlassCloseCommandRouter`), because every window needs it and only this one had it.
+        .glassCloseCommandTarget(priority: .workspace) {
             closeFocusedEditor()
         }
         .overlay {
@@ -292,6 +292,7 @@ struct DatabaseWorkspaceView: View {
         }
         .navigationTitle(detailTitle)
         #if os(macOS)
+        .navigationSubtitle(detailSubtitle)
         // The passive AppKit material supplies frost. Do not paint a second
         // SwiftUI toolbar background over it or change toolbar visibility.
         .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
@@ -824,65 +825,23 @@ struct DatabaseWorkspaceView: View {
         .accessibilityLabel("Workspace location")
     }
 
+    /// The strip itself now lives in `GlassConnectionUI` (`GlassWorkspaceTabBar`), because the
+    /// editor needed the same one and two copies of a tab bar agree only until the next change to
+    /// either. What stays here is what was always local: which destinations are open, what they
+    /// are called, and what selecting or closing one does.
     private var workspaceTabBar: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 6) {
-                ForEach(tabState.tabs, id: \.self) { destination in
-                    let isSelected = tabState.previewed == nil && destination == tabState.selected
-                    HStack(spacing: 2) {
-                        Button {
-                            openWorkspace(destination)
-                        } label: {
-                            Label(workspaceTitle(for: destination), systemImage: destination.systemImage)
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                                .frame(maxWidth: 200)
-                                .font(.caption)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                        }
-                        .buttonStyle(.plain)
-                        .databaseWorkspaceTabControlTarget()
-                        .accessibilityLabel(workspaceHelpText(for: destination))
-                        .accessibilityAddTraits(isSelected ? .isSelected : [])
-
-                        if destination.isClosable {
-                            Button {
-                                requestCloseWorkspace(destination)
-                            } label: {
-                                Image(systemName: "xmark")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .buttonStyle(.borderless)
-                            .databaseWorkspaceTabControlTarget()
-                            .accessibilityLabel("Close \(workspaceHelpText(for: destination))")
-                        }
-                    }
-                    .padding(.horizontal, 4)
-                    .background(
-                        isSelected ? AnyShapeStyle(.regularMaterial) : AnyShapeStyle(Color.clear),
-                        in: Capsule()
-                    )
-                    .help(workspaceHelpText(for: destination))
-                    .contextMenu {
-                        if destination.isClosable {
-                            Button("Close Tab", systemImage: "xmark") {
-                                requestCloseWorkspace(destination)
-                            }
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-        }
-        .scrollIndicators(.hidden)
-        .databaseLookScrollEnabled()
-        // Keep tab-strip material inside the content safe area; it must not
-        // extend upward and cover the independent titlebar frost.
-        .background(.regularMaterial, ignoresSafeAreaEdges: [])
-        .accessibilityLabel("Open database workspaces")
+        GlassWorkspaceTabBar(
+            tabs: tabState.tabs.map { destination in
+                GlassWorkspaceTabItem(id: destination,
+                                      title: workspaceTitle(for: destination),
+                                      symbolName: destination.systemImage,
+                                      isClosable: destination.isClosable,
+                                      help: workspaceHelpText(for: destination))
+            },
+            selection: tabState.previewed == nil ? tabState.selected : nil,
+            accessibilityLabel: "Open database workspaces",
+            onSelect: { openWorkspace($0) },
+            onClose: { requestCloseWorkspace($0) })
     }
 
     @ViewBuilder
@@ -978,16 +937,37 @@ struct DatabaseWorkspaceView: View {
         }
     }
 
+    /// **The thing you are looking at**, with where it lives underneath — the shape the terminal
+    /// established (*"Terminal on oscar"* over `michael@192.0.2.10:22`) and the editor now
+    /// follows too. A table's name was previously glued to its database with a middle dot, which
+    /// put two different facts on one line and truncated the useful one first.
     private var detailTitle: String {
         switch tabState.displayed {
         case .connection:
             return session?.connectionConfig.name ?? "Overview"
-        case .table(let database, let table):
-            return "\(database) · \(table)"
+        case .table(_, let table):
+            return table
         case .database(let database):
             return database
         case .query(let id):
             return queryDocuments[id]?.title ?? "Untitled SQL"
+        }
+    }
+
+    /// The connection, and the database when the surface belongs to one.
+    private var detailSubtitle: String {
+        let connection = session?.connectionConfig.name ?? ""
+        switch tabState.displayed {
+        case .connection:
+            guard let config = session?.connectionConfig else { return "" }
+            let host = config.host.isEmpty ? "" : config.host
+            return config.port > 0 && !host.isEmpty ? "\(config.username)@\(host):\(config.port)" : host
+        case .table(let database, _):
+            return connection.isEmpty ? database : "\(connection) · \(database)"
+        case .database:
+            return connection
+        case .query:
+            return connection
         }
     }
 

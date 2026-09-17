@@ -76,6 +76,75 @@ struct GlassEditorProjectTests {
         #expect(workspace.message?.contains("not a folder") == true)
     }
 
+    // MARK: The keyboard, and where "here" is
+
+    /// Expansion lives on the model, which is what lets a key open a folder. It reads the folder
+    /// the first time and not again.
+    @Test func expandingAFolderReadsItOnceAndTheModelRemembers() throws {
+        let root = try makeTree(); defer { try? FileManager.default.removeItem(at: root) }
+        let workspace = GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.project.\(UUID().uuidString)")!)
+        let project = try #require(workspace.openProject(root))
+        let node = try #require(workspace.projectRoots[project.id])
+        let sources = try #require((node.children ?? []).first { $0.name == "Sources" })
+
+        #expect(!workspace.isExpanded(sources.id))
+        workspace.setExpanded(true, for: sources.id)
+        #expect(workspace.isExpanded(sources.id))
+        #expect((sources.children ?? []).map(\.name) == ["Deep", "main.swift"])
+
+        workspace.setExpanded(false, for: sources.id)
+        #expect(!workspace.isExpanded(sources.id))
+        #expect(sources.children != nil, "collapsing threw away what had been read")
+    }
+
+    /// A file's folder is its **parent** — picking a file and asking for something new should put
+    /// it beside that file, which is what every file browser means by "here".
+    @Test func theCurrentFolderFollowsTheSelection() throws {
+        let root = try makeTree(); defer { try? FileManager.default.removeItem(at: root) }
+        let workspace = GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.project.\(UUID().uuidString)")!)
+        let project = try #require(workspace.openProject(root))
+        let node = try #require(workspace.projectRoots[project.id])
+        let sources = try #require((node.children ?? []).first { $0.name == "Sources" })
+        let readme = try #require((node.children ?? []).first { $0.name == "README.md" })
+
+        // Nothing selected, one project open: the root is where you are.
+        #expect(workspace.currentFolder == node.path)
+
+        workspace.sidebarSelection = .node(sources.id)
+        #expect(workspace.currentFolder == sources.path)
+
+        workspace.sidebarSelection = .node(readme.id)
+        #expect(workspace.currentFolder == node.path, "a file's folder is its parent")
+    }
+
+    /// Selecting a document keeps the detail pane in step — one selection, not two that can differ.
+    @Test func selectingADocumentSelectsIt() throws {
+        let root = try makeTree(); defer { try? FileManager.default.removeItem(at: root) }
+        let workspace = GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.project.\(UUID().uuidString)")!)
+        let document = try #require(workspace.open(root.appendingPathComponent("README.md")))
+        workspace.sidebarSelection = .document(document.id)
+        #expect(workspace.selection == document.id)
+        #expect(workspace.selectedDocument?.id == document.id)
+    }
+
+    /// Closing a project takes its nodes out of the expansion set and the selection. Otherwise a
+    /// session of opening and closing projects grows both without bound, holding ids for folders
+    /// that are not on screen and cannot be reached.
+    @Test func closingAProjectForgetsItsNodes() throws {
+        let root = try makeTree(); defer { try? FileManager.default.removeItem(at: root) }
+        let workspace = GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.project.\(UUID().uuidString)")!)
+        let project = try #require(workspace.openProject(root))
+        let node = try #require(workspace.projectRoots[project.id])
+        let sources = try #require((node.children ?? []).first { $0.name == "Sources" })
+        workspace.setExpanded(true, for: sources.id)
+        workspace.sidebarSelection = .node(sources.id)
+
+        workspace.closeProject(project.id)
+        #expect(workspace.expandedNodes.isEmpty)
+        #expect(workspace.sidebarSelection == nil)
+        #expect(workspace.node(sources.id) == nil)
+    }
+
     // MARK: Machine identity
 
     /// One shared host key is proof: only the machine holding the private half can present it.

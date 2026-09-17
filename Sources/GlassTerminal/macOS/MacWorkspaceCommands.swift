@@ -197,31 +197,15 @@ struct MacWorkspaceCommands: Commands {
             .disabled(actions?.canAddPane != true)
         }
 
-        // **Close Tab, in a placement that exists.**
+        // **Close Tab is not declared here any more, and ⌘W is not declared here at all.**
         //
-        // This was `CommandGroup(replacing: .saveItem)`, which produced nothing at all: `.saveItem`
-        // is the document group — Save, Duplicate, Rename, Revert — and an app with no documents
-        // has none, so there was nothing to replace and the item never reached the menu bar. Read
-        // back from the running app on 2026-09-16: no Close Tab anywhere in it, and ⌘W was
-        // AppKit's own Close, which shuts the whole workspace window with every tab in it.
-        //
-        // `after: .newItem` is a region that does materialise (the database's items land there).
-        // Two items can carry ⌘W because AppKit skips a disabled item when matching a key
-        // equivalent: with a terminal workspace focused this one is enabled and closes the tab,
-        // and with anything else focused it is disabled and the standard Close below it answers.
-        // That is why the "Close Window" fallback is gone — it existed to stand in for the very
-        // item it was shadowing.
-        CommandGroup(after: .newItem) {
-            Divider()
-            Button("Close Tab") {
-                guard let window = NSApp.keyWindow,
-                      window.attachedSheet == nil,
-                      window.sheetParent == nil else { return }
-                closeWorkspaceTabAction?()
-            }
-            .keyboardShortcut("w", modifiers: .command)
-            .disabled(closeWorkspaceTabAction == nil)
-        }
+        // It was, with the reasoning that AppKit skips a disabled item when matching a key
+        // equivalent, so the standard Close below would answer when no terminal workspace was
+        // focused. Read back out of the running app on 2026-09-16, that is not what happened:
+        // File ▸ Close had **no key equivalent at all** — declaring ⌘W here took it off the
+        // standard item — "Close Tab" held ⌘W and was disabled, and ⌘W closed nothing anywhere in
+        // the app. The shell owns one File ▸ Close item now and this workspace publishes
+        // `\.glassCloseItem` to aim it (MacWorkspaceView), the same shape as ⌘N.
 
         CommandMenu("Terminal") {
             Button("Increase Font Size") { fontActions?.increase() }

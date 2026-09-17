@@ -124,6 +124,9 @@ struct GlassPowerToolsApp: App {
         // registered nowhere and simply owns its own window. What makes it part of the product is
         // that a project names a *host*, which is the catalog's identity (see `GlassEditorProject`).
         let editor = GlassEditorRuntime(layers: layers)
+        // Its preferences still belong in the one settings surface, so the page is registered here
+        // — the composition root is the only place that knows about both the shell and the editor.
+        model.registry.registerSettingsPage(editor.settingsPage)
         _layers = State(initialValue: layers)
         _model = State(initialValue: model)
         _terminal = State(initialValue: terminal)

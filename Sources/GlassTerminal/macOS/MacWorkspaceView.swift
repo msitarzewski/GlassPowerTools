@@ -260,6 +260,14 @@ struct MacWorkspaceView: View {
             \.macCloseWorkspaceTabAction,
             MacCloseWorkspaceTabAction { requestCloseSelectedTab() }
         )
+        // ⌘W, while a terminal workspace is focused, closes the tab rather than the window with
+        // every tab in it — the behaviour the menu item used to carry, now registered with the
+        // shell's close router rather than declared as a second ⌘W that took the key off Close.
+        .glassCloseCommandTarget(priority: .workspace) {
+            guard let window = NSApp.keyWindow, window.attachedSheet == nil,
+                  window.sheetParent == nil else { return }
+            requestCloseSelectedTab()
+        }
         .sheet(item: $workgroupEditorContext) { context in
             WorkgroupEditorView(context: context, servers: sessionManager.serverManager.servers) { preset in
                 settingsManager.addLayoutPreset(preset)

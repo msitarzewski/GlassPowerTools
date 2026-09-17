@@ -84,6 +84,42 @@ struct MenuBarPlacementTests {
                 "⌘N is declared in \(files.sorted()). It belongs to the shell's one File ▸ New item; a window says what it makes by publishing \\.glassNewItem.")
     }
 
+    /// **Nothing declares ⌘W in SwiftUI**, and that is the fix, not an omission.
+    ///
+    /// AppKit's own File ▸ Close owns that key. A declared ⌘W beside it does not add a second
+    /// candidate: read out of the running app on 2026-09-16, one placement had the declared item
+    /// dropped entirely, and another had Close silently stripped of its key while the only item
+    /// holding ⌘W was disabled — so ⌘W closed nothing anywhere in the app. What a window closes on
+    /// ⌘W is registered with `GlassCloseCommandRouter` instead, which intercepts the Close item
+    /// itself. Re-declaring the shortcut here would break it again, invisibly.
+    @Test func nothingDeclaresCommandWInSwiftUI() throws {
+        var files: [String] = []
+        for file in try swiftSources() {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            guard text.contains(#"keyboardShortcut("w", modifiers: .command)"#) else { continue }
+            files.append(file.lastPathComponent)
+        }
+        #expect(files.isEmpty,
+                "⌘W is declared in \(files.sorted()). AppKit's File ▸ Close owns that key equivalent; declaring it either takes the key off Close or is dropped outright, and either way ⌘W stops working somewhere. Register the action with glassCloseCommandTarget(priority:) instead.")
+    }
+
+    /// ⌘O has one owner, for the reason ⌘T and ⌘W each taught once.
+    ///
+    /// Opening *a file* is the general act and belongs to the editor, whose command runs its own
+    /// panel and so works from any window. The database's Open SQL Document… is the specific one
+    /// and sits on ⇧⌘O. Two items on one key equivalent do not give the focused window a choice:
+    /// one of them is dropped, silently, and which one is not something the source says.
+    @Test func commandOHasASingleOwner() throws {
+        var files: [String] = []
+        for file in try swiftSources() {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            guard text.contains(#"keyboardShortcut("o", modifiers: .command)"#) else { continue }
+            files.append(file.lastPathComponent)
+        }
+        #expect(files == ["GlassEditorScenes.swift"],
+                "⌘O is declared in \(files.sorted()). It opens a file; a capability's own Open belongs on a modified key.")
+    }
+
     /// Every window that can answer "what does New make here?" publishes the focused value. A
     /// window that stops publishing does not fail anything at runtime — ⌘N just goes grey.
     @Test func eachWorkspacePublishesWhatNewMakes() throws {

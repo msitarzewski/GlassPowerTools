@@ -40,6 +40,15 @@ public final class GlassEditorAppKitEngine: GlassEditorEngine {
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
         scrollView.borderType = .noBorder
+        // **The window's title bar is not this view's to inset for.**
+        //
+        // A scroll view in a window with a full-size content view adds a content inset the height
+        // of the title bar, and insets its *document* by it — but not its ruler, which keeps
+        // spanning the whole scroll view. So the line-number strip carried on up past the tabs and
+        // sat beside the traffic lights (reported twice, 2026-09-17). Here the scroll view is
+        // already placed by SwiftUI, below the tab strip, in a column that starts where it should:
+        // there is nothing left for AppKit to compensate for, and its compensation is the artifact.
+        scrollView.automaticallyAdjustsContentInsets = false
 
         textView.delegate = coordinator
         textView.isEditable = model.configuration.isEditable

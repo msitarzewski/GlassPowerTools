@@ -200,8 +200,15 @@ public final class GlassShellModel: GlassServiceStore {
             try await seedForUITestingIfRequested()
             #endif
             records = try await catalog.snapshot()
-            hosts = GlassShellHostGrouping.group(records)
+            // The device's own host is read **before** the library is published, not after.
+            // Publishing `group(records)` here first showed a library with no "This Mac" in it and
+            // then inserted the row a moment later, and a row inserted into a list that has already
+            // been laid out keeps the height it was first measured at — which is how the local row
+            // ended up 24pt tall with its Connect button sliced off at the separator, while every
+            // other row was 51pt (measured out of the running app, 2026-09-16). One projection,
+            // published once, complete.
             await loadLocalHost()
+            rebuildProjection()
             // D19: pull the library from the user's other devices before showing it. Deliberately
             // awaited rather than fired and forgotten — a host added on the Vision Pro should be
             // present when the Mac's library first appears, not arrive a moment later and move

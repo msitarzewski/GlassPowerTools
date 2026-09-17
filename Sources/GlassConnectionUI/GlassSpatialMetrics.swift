@@ -46,6 +46,13 @@ public enum GlassSpatialMetrics {
     /// A section header in a spatial sidebar. `.caption` uppercase is a desktop convention that
     /// disappears at reading distance.
     public static var sectionHeaderFont: Font { isSpatial ? .headline : .subheadline }
+
+    /// The height of a window's footer bar, wherever one appears.
+    ///
+    /// One number, because two footers side by side at different heights read as a mistake before
+    /// anyone works out why — reported 2026-09-17 of the editor's sidebar and status bars, which
+    /// had grown their own paddings independently.
+    public static var footerHeight: CGFloat { isSpatial ? 52 : 28 }
 }
 
 public extension View {

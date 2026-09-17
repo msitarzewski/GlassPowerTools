@@ -137,6 +137,29 @@ struct GrammarModuleTests {
     }
     """
 
+    static let swiftSource = """
+    // greet
+    import Foundation
+
+    struct Greeter {
+        let count = 1
+        func greet(_ name: String) -> String {
+            "hello \\(name) \\(count)"
+        }
+    }
+    """
+
+    static let xml = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!-- greet -->
+    <plist version="1.0">
+        <dict>
+            <key>CFBundleName</key>
+            <string>Glass Power Tools</string>
+        </dict>
+    </plist>
+    """
+
     static func snippet(for language: LanguageID) -> String {
         switch language {
         case .sql: return sql
@@ -151,6 +174,8 @@ struct GrammarModuleTests {
         case .rust: return rust
         case .c: return c
         case .php: return php
+        case .swift: return swiftSource
+        case .xml: return xml
         case .plaintext: return "just words\nno grammar here"
         }
     }
@@ -180,6 +205,12 @@ struct GrammarModuleTests {
         case .rust: return [.keyword, .function, .string, .comment, .constant]
         case .c: return [.keyword, .function, .string, .comment, .number]
         case .php: return [.keyword, .function, .string, .comment, .number]
+        // Added 2026-09-17. Swift is the language this project is written in; XML is every plist,
+        // scheme and entitlements file on the platform.
+        case .swift: return [.keyword, .function, .string, .comment, .type]
+        // An element name is the closest thing markup has to a keyword, an attribute name is a
+        // property, and the value is a string — the three a reader actually needs apart.
+        case .xml: return [.keyword, .property, .string, .comment]
         case .plaintext: return [.plain]
         }
     }

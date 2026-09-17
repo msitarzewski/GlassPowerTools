@@ -42,9 +42,17 @@ public struct GlassEditorProject: Identifiable, Codable, Hashable, Sendable {
                 displayName: String? = nil, openedAt: Date = Date()) {
         self.id = id
         self.hostID = hostID
-        self.path = path
-        self.displayName = displayName ?? (path as NSString).lastPathComponent
+        // No trailing slash, ever. `URL.path` on a directory keeps one, and a root spelled
+        // "/work/thing/" is not a prefix of "/work/thing/main.swift" by any string comparison —
+        // which is how "is this file in this project?" gets the wrong answer.
+        self.path = Self.normalized(path)
+        self.displayName = displayName ?? (Self.normalized(path) as NSString).lastPathComponent
         self.openedAt = openedAt
+    }
+
+    public static func normalized(_ path: String) -> String {
+        guard path.count > 1, path.hasSuffix("/") else { return path }
+        return String(path.reversed().drop { $0 == "/" }.reversed())
     }
 
     /// A project rooted at a local folder on this device.
@@ -148,7 +156,15 @@ public struct GlassEditorLocalDirectoryReader: GlassEditorDirectoryReader {
     public init() {}
 
     public func contents(ofDirectory path: String) throws -> [GlassEditorProjectNode] {
-        let url = URL(filePath: path, directoryHint: .isDirectory)
+        // **A child's path is its parent's path plus its name — built here, not read back.**
+        //
+        // `contentsOfDirectory` answers in whatever spelling the platform prefers: ask it about
+        // `/var/folders/…/T/thing` and it returns `/private/var/folders/…/T/thing/README.md`. Both
+        // are the same file and neither is wrong, but a tree whose children do not share their
+        // parent's prefix cannot answer "which folder is this file in?", and the answer to that is
+        // where a new file goes. So the parent's own spelling is carried down the tree.
+        let base = GlassEditorProject.normalized(path)
+        let url = URL(filePath: base, directoryHint: .isDirectory)
         let entries = try FileManager.default.contentsOfDirectory(
             at: url, includingPropertiesForKeys: [.isDirectoryKey], options: [])
         return entries
@@ -156,7 +172,7 @@ public struct GlassEditorLocalDirectoryReader: GlassEditorDirectoryReader {
             .map { entry in
                 let isDirectory = (try? entry.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
                 return GlassEditorProjectNode(name: entry.lastPathComponent,
-                                              path: entry.path(percentEncoded: false),
+                                              path: base + "/" + entry.lastPathComponent,
                                               isDirectory: isDirectory)
             }
             // Folders first, then by name, case-insensitively — the order every file browser on

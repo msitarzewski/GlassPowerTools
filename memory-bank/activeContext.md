@@ -1640,8 +1640,8 @@ all build.
 
 | Platform | Version |
 |---|---|
-| macOS `/Applications/Glass Power Tools.app` | **0.4.132** |
-| iPhone `00000000-0000000000000A02` | **0.4.131** — one behind; needs the local-host fix |
+| macOS `/Applications/Glass Power Tools.app` | **0.4.153** — the editor with one workspace per window, rounds two to four |
+| iPhone `00000000-0000000000000A02` | **0.4.143** — installed 2026-09-17, version read back off the device |
 | Vision Pro `00000000-0000000000000A01` | **0.4.123** — locked at every later attempt |
 
 The process is now `Glass Power Tools` (rule 37): **`pgrep -x GlassPowerTools` matches nothing**, and
@@ -1703,3 +1703,60 @@ the machine and suggests the tunnel.
 Ubuntu `192.0.2.6`: TigerVNC 5902, GNOME RD 3389, user `gptrdp`. Windows `192.0.2.3`
 unprovisioned. oscar `192.0.2.10`: SSH open, **MySQL on 3306 is not reachable from outside** —
 it needs the service's SSH tunnel switched on, which is what the new connect error now says.
+
+## 2026-09-17 — RESUME HERE (supersedes the 2026-09-16 block above)
+
+**State BUILD.** Owner: coordinating agent. **1,578 tests / exit status 0**, run unlocked. macOS,
+iOS and visionOS all build.
+
+### Installed
+
+| Platform | Version |
+|---|---|
+| macOS `/Applications/Glass Power Tools.app` | **0.4.158** |
+| iPhone `00000000-0000000000000A02` | **0.4.143** — before the editor's rounds two to four |
+| Vision Pro `00000000-0000000000000A01` | **0.4.123** — far behind; not attempted since 2026-09-16 |
+
+### What today was
+
+The user tested and reported; nearly everything here was found by **using** the app, and several
+were design errors of mine rather than slips:
+
+1. **One workspace per window.** The editor kept one for the whole app, so ⇧⌘E gave a window with
+   the same documents in it. Split into `GlassEditorPreferences` (shared: text size, line numbers,
+   wrapping, recents) and `GlassEditorWorkspace` (per window: documents, projects, selection, find),
+   with a value-based `WindowGroup`.
+2. **A desktop configuration read as lost** and the user deleted the service. The record was in the
+   catalog; `catalogDidLoad()` defers the read, and the edit sheet asked the model rather than the
+   catalog. It asks the catalog now (D26: the catalog *is* the record).
+3. **The editor rendered the first document forever** with several open — `GlassEditorView` had no
+   view identity, and the engine observes its model rather than being pushed values.
+4. **⌘O joined ⌘T, ⌘N and ⌘W** as a key two items claimed. Four now, each with a guard.
+5. Swift and XML grammars vendored; SQL probed and found correct, so left alone.
+6. The header, footers, fonts, tabs, title/subtitle and Open behaviour, across four rounds.
+
+### Do these next, in order
+
+1. **The gutter.** The line-number strip reaches into the title bar. Stop using `NSRulerView` and
+   draw the gutter beside the text. Three patches at three links in that chain missed, and the app's
+   own geometry cannot be measured from this shell — the unified log stopped answering for the
+   process and the sandbox container is closed. Do not attempt a fourth patch; change the shape.
+2. **The phone and the headset.** 0.4.143 and 0.4.123. Every device current or empty.
+3. **Stage C — Projects as a library panel**, with persistence and sync. It also gives the editor an
+   entry point on iOS and visionOS, which it still has none of.
+4. **Stage D — the editor's remote half**, which is still the largest piece of stage 5.
+5. **The D26 two-device acceptance run**, and the test hygiene.
+
+### Things that will bite
+
+- **Rule 32 three times in one refactor.** `homeDirectoryForCurrentUser`, `navigationSubtitle` and
+  `controlActiveState` are all macOS-only; a type-check timeout appeared on iOS and visionOS first,
+  because they carry a settings sheet the Mac does not. Build all three, every time.
+- **Rule 28 costs twenty minutes if you forget it.** A locked screen fails every
+  `.completeFileProtection` write; `ioreg -n Root -d1 -a | grep -A1 CGSSessionScreenIsLocked`
+  settles it in one line. It was consulted last, after disk space and `TMPDIR`.
+- **The type checker gives up on this view's `body`** and reports it as a timeout. Three modifiers
+  hold what used to be inline: `MacEditorWindowBehaviour`, `GlassEditorWindowLifecycle`,
+  `GlassEditorDialogs`.
+- Reading the running app's **menu bar** through System Events is still the fastest way to see what
+  the menu bar actually became. Reading the app's **log** is not currently available to the shell.

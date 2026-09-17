@@ -425,9 +425,20 @@ public final class GlassCapabilityRegistry {
         registeredKinds.compactMap { capabilities[$0] }
     }
 
-    /// Every capability's settings pages, in kind order.
+    /// Pages from something that is not a capability. The editor is the case: a file is not a
+    /// service on a machine, so it has no `HostServiceKind` and cannot register as one — but its
+    /// preferences belong in the same settings surface as everything else, because a second place
+    /// to put a preference is how two of them start disagreeing.
+    private var standalonePages: [GlassCapabilitySettingsPage] = []
+
+    public func registerSettingsPage(_ page: GlassCapabilitySettingsPage) {
+        standalonePages.removeAll { $0.id == page.id }
+        standalonePages.append(page)
+    }
+
+    /// Every capability's settings pages, in kind order, then any standalone ones.
     public var settingsPages: [GlassCapabilitySettingsPage] {
-        registered.flatMap(\.settingsPages)
+        registered.flatMap(\.settingsPages) + standalonePages
     }
 
     /// Every capability's built-in local services (D8), in kind order, with any capability that

@@ -227,3 +227,58 @@ D26 stage 1's terminal half (`5b6bac3`) and D27 (`1adbea9`) landed; a signed-in 
 VNC session were proven against the scratch VM on this build (`f5d6bec`, `e435454`). 1481 tests /
 157 suites at exit status 0, and **0.4.107 installed** — which is what exposed that `swift build`
 never compiles the App target.
+
+## 2026-09-16 — four defects found by use, the editor as a surface, 0.4.132
+
+[Remaining work](2026-09-14_remaining-work-plan.md) · [Active context](../../activeContext.md)
+
+Settings stopped being deleted by the code that loaded them (`isCatalogLoaded`, and
+`GlassServiceRecords.replaceAll` refusing an unread catalog); one tombstone stopped blocking this
+device's publishing forever (`merge` where the sync had used `upsert`); the File menu came back with
+one owner for `CommandGroup(.newItem)` and a ⌘N the focused window aims (rule 34); and "This Mac"
+stopped vanishing the moment the sync began applying records (rule 38). Plus D26 stage 4's key
+manager panel, stage 5's editor as its own surface, six more highlighted languages, the rename to
+*Glass Power Tools* (rule 37), pull-to-refresh, and a connect failure that names the machine.
+
+`c67bb62`, `65ca7bd`, `4247347`, `161013e`, `01e9d98`, `0b3cd0a`. **1,563 tests, exit status 0.**
+**0.4.132** on the Mac; the phone is at 0.4.131 and the Vision Pro at 0.4.123.
+
+## 2026-09-16 (late) — the editor reviewed against the family, and planned
+
+[Stage 5.2 plan](2026-09-16_editor-stage-5.2-plan.md)
+
+Seven corrections from using the shipped editor: the project tree should be the database's tree, the
+`+` belongs left of the title and should only make a document, search should be a field, line
+numbers show through the footer, the open list should be the database's tabs, a gear is missing, and
+**Projects should be Workgroups** — a library panel with a list, a detail and an Open in its
+bottom-right, synchronizing like everything else. Planned in four stages, A to D, with the remote
+directory reader last because it turns the reader protocol async.
+
+## 2026-09-17 — the editor, four rounds of use; Swift and XML; a desktop record that read as lost
+
+[Stage 5.2 plan](2026-09-16_editor-stage-5.2-plan.md) · [The editor, round two](2026-09-17_editor-round-two.md)
+
+A morning of the user testing and reporting, and the work is almost all defects **found by use**:
+
+**Grammars.** Swift vendored with a generated 20 MB `parser.c` (upstream ships none) beside a SQL
+grammar that was already 41.6 MB, and XML with `.plist`, `.entitlements`, `.xcscheme`, `.storyboard`
+and `.svg`. SQL was probed and found correct — 379 of 379 units covered — so nothing was changed
+there on a guess.
+
+**The editor, rounds one to four.** The header on the library's pattern, the footer on a bar, the
+database's tab strip extracted to `GlassWorkspaceTabBar` and shared, the tree at the list's font
+with the keyboard reaching it, a gear that opens Settings, ⌘+/⌘−, `NSOpenPanel` before any window,
+language in the footer with content sniffing, the light theme honoured, and **one workspace per
+window** — the editor had kept one for the whole app, so every window showed the same documents.
+
+**Two defects that cost a service.** A desktop configuration read as lost because `catalogDidLoad()`
+defers the read and the edit sheet asked the *model* rather than the catalog; the user deleted a
+working service over it. And `GlassEditorView` had no view identity, so with several files open the
+editor kept rendering the first one.
+
+**Four shortcuts, four collisions.** ⌘T, ⌘N, ⌘W and now ⌘O: declaring a key another item already
+owns does not offer the focused window a choice — one item is dropped, silently. Each has a guard in
+`MenuBarPlacementTests` now.
+
+**1,578 tests, exit status 0.** macOS **0.4.158**, iPhone 0.4.143, Vision Pro 0.4.123. Three
+platform-specific breaks in one refactor, none visible to a macOS build (rule 32).

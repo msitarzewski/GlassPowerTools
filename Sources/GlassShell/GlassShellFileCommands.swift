@@ -10,6 +10,11 @@
 //  disappeared from the shipped build. So exactly one scope replaces the placement, and it is the
 //  one that belongs to no capability. Capabilities contribute with `CommandGroup(after: .newItem)`.
 //
+//  **⌘W is not here, and the reason is worth keeping.** It was, briefly: an item exactly like ⌘N's,
+//  aimed by the focused window. It never reached the menu bar — AppKit's own File ▸ Close owns that
+//  key, and read back out of the running app the shell's item was simply absent in every placement
+//  tried. ⌘W is owned in `GlassCloseCommand.swift` instead, by intercepting the Close item itself.
+//
 //  **Why ⌘N is a stub.** ⌘N means *new* — of whatever you are looking at. In a database workspace
 //  that is a SQL document; in a terminal workspace, a terminal window; in the library, a host. One
 //  key, one item, and the focused window decides both its title and what it does, so the menu
@@ -19,6 +24,9 @@
 //
 
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 /// What ⌘N makes in the focused window.
 ///
@@ -43,6 +51,7 @@ public struct GlassNewItemAction {
 private struct GlassNewItemActionKey: FocusedValueKey {
     typealias Value = GlassNewItemAction
 }
+
 
 public extension FocusedValues {
     var glassNewItem: GlassNewItemAction? {

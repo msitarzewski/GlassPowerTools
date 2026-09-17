@@ -280,3 +280,29 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     what draws the list before going looking for lost data.** A repair that unblocks code which has
     never run is a change in behaviour, and the newly reachable lines deserve the same suspicion as
     new ones.
+
+39. **A key equivalent has exactly one owner, and the loser is silent.** ⌘T, ⌘N, ⌘W and ⌘O have each
+    cost a defect: declaring a shortcut another item already carries does **not** give the focused
+    window a choice between them. One item is dropped from the menu bar, or the standard item is
+    stripped of its key and a disabled item keeps it — and which happens is not something the source
+    says. AppKit's own File ▸ Close cannot be out-declared at all: a `Commands` item with ⌘W never
+    reaches the menu bar, in any placement, so what a window closes is **registered**
+    (`GlassCloseCommandRouter`) rather than declared. `MenuBarPlacementTests` holds one guard per
+    key; add one when a new shortcut appears, and read the result out of the running app's menu bar,
+    because nothing else shows it.
+
+40. **A view that observes its model needs an identity per model.** `GlassEditorView` renders
+    whatever `GlassEditorModel` it is handed, and the engine deliberately observes that model rather
+    than being pushed values through `updateNSView` — so handing the view a *different* model never
+    reached the text view already on screen. With five files open the editor kept rendering the
+    first one, and every test passed throughout, because the model was always right. `.id(document.id)`
+    is the fix. The general form: when a representable's content comes from an object rather than
+    from its arguments, SwiftUI has nothing to diff, and identity is the only thing that tells it to
+    build a new one.
+
+41. **A window owns its documents.** The editor kept one workspace for the whole app, so a second
+    window was a second view of the same open files — a panel pretending to be a window. What is
+    true of the *editor* (text size, wrapping, line numbers, recents) is shared, in
+    `GlassEditorPreferences`; what a *window* is (documents, projects, selection, find) belongs to
+    one `GlassEditorWorkspace` per window, keyed by a window id through a value-based `WindowGroup`.
+    Ask which of the two a new piece of state is before adding it to either.

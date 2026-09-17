@@ -17,6 +17,10 @@ public enum LanguageID: String, Sendable, Hashable, Codable, CaseIterable {
     case rust
     case c
     case php
+    // 2026-09-17: the language this project is written in, and the one every Apple plist and
+    // scheme file is. Swift's grammar has to be generated — see the package manifest.
+    case swift
+    case xml
     case plaintext
 
     /// Best-effort mapping from a file extension. Unknown extensions are
@@ -38,7 +42,49 @@ public enum LanguageID: String, Sendable, Hashable, Codable, CaseIterable {
         case "rs": return .rust
         case "c", "h": return .c
         case "php", "phtml": return .php
+        case "swift": return .swift
+        // `.plist`, `.xcscheme`, `.entitlements` and `.storyboard` are all XML, and a developer on
+        // this platform opens them constantly. `.svg` and `.xib` likewise.
+        case "xml", "plist", "svg", "xib", "storyboard", "xcscheme", "entitlements", "xsd", "xsl",
+             "xslt", "rss", "atom", "pom": return .xml
         default: return .plaintext
         }
+    }
+
+    /// The language a file's **first bytes** give away, for a file whose name does not say.
+    ///
+    /// `Makefile`, `Dockerfile`, a shell script called `deploy`, a `.env`, a plist with no
+    /// extension — a developer's tree is full of files with no extension or a misleading one, and
+    /// an editor that calls all of them plain text is wrong about the common case. Only the
+    /// evidence that is actually conclusive counts here: an interpreter line names its own
+    /// language, an XML prolog is XML, and a document that starts with a brace and parses as JSON
+    /// is JSON. Anything less certain stays plaintext, because a wrong grammar colours worse than
+    /// none.
+    public static func forContent(_ content: String) -> LanguageID {
+        let head = content.prefix(4096)
+        let trimmed = head.drop { $0 == "\u{FEFF}" }.drop { $0.isWhitespace }
+
+        if trimmed.hasPrefix("#!") {
+            let line = trimmed.prefix { !$0.isNewline }.lowercased()
+            if line.contains("python") { return .python }
+            if line.contains("node") || line.contains("deno") || line.contains("bun") { return .javascript }
+            if line.contains("php") { return .php }
+            if line.contains("swift") { return .swift }
+            if line.contains("bash") || line.contains("zsh") || line.contains("/sh")
+                || line.hasSuffix(" sh") { return .bash }
+            // An interpreter this build has no grammar for. Still not plaintext-by-accident: it is
+            // a script, and the shell grammar reads a script better than nothing does.
+            return .bash
+        }
+        if trimmed.hasPrefix("<?xml") || trimmed.hasPrefix("<!DOCTYPE") { return .xml }
+        if trimmed.hasPrefix("{") || trimmed.hasPrefix("[") {
+            // Parsed, not guessed: a Swift dictionary literal and a JSON object look alike at the
+            // first character and nowhere else.
+            if let data = content.data(using: .utf8),
+               (try? JSONSerialization.jsonObject(with: data)) != nil {
+                return .json
+            }
+        }
+        return .plaintext
     }
 }

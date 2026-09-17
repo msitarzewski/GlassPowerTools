@@ -49,8 +49,16 @@ public final class GlassEditorDocument: Identifiable {
                                         lineEndings: LineEndingDetector.detect(in: decoded.content),
                                         origin: .local(url))
         // The language comes from the extension by way of the origin, which is why the origin is
-        // set before the model is built rather than assigned after.
-        return GlassEditorDocument(model: GlassEditorModel(snapshot: snapshot), url: url)
+        // set before the model is built rather than assigned after. When the name says nothing —
+        // `Makefile`, `deploy`, a plist with no extension — the content is asked instead, which is
+        // the difference between an editor that colours a developer's tree and one that colours the
+        // half of it that happens to be named conveniently.
+        let model = GlassEditorModel(snapshot: snapshot)
+        if model.language == .plaintext {
+            let sniffed = LanguageID.forContent(decoded.content)
+            if sniffed != .plaintext { model.language = sniffed }
+        }
+        return GlassEditorDocument(model: model, url: url)
     }
 
     /// A new, empty document that exists only in memory until it is saved.

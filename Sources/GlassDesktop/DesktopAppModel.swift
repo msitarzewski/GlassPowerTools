@@ -112,6 +112,14 @@ public final class DesktopAppModel {
         } catch { errorMessage = error.localizedDescription }
     }
 
+    /// The saved desktop for an endpoint — from memory when it has been read, and from the catalog
+    /// when it has not. `load()` is deferred to a `Task` by `catalogDidLoad()`, so there is a window
+    /// just after launch where `connections` is empty and the catalog is not.
+    public func storedConnection(for id: EndpointID) -> DesktopConnection? {
+        if let held = connections.first(where: { $0.id == id }) { return held }
+        return repository?.record(for: id)
+    }
+
     public func configuration(for connection: DesktopConnection) -> SecretStoreConfiguration {
         SecretStoreConfiguration(serviceNamePrefix: "sh.glas", accessGroup: accessGroup,
                                  useDataProtectionKeychain: true, mobilityPolicy: connection.mobility)

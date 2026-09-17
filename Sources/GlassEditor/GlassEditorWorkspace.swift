@@ -14,13 +14,32 @@ import Observation
 import GlassEditorCore
 import GlassEditorUI
 
+/// What the sidebar has selected. Documents and tree nodes share one selection because the list
+/// they live in has one.
+public enum GlassEditorSidebarSelection: Hashable, Sendable {
+    case document(UUID)
+    case node(UUID)
+}
+
 @MainActor @Observable
 public final class GlassEditorWorkspace {
     /// Open documents, in the order they were opened — the order the tab list shows.
     public private(set) var documents: [GlassEditorDocument] = []
     public var selection: GlassEditorDocument.ID?
-    /// Files opened before, newest first. Survives launches.
-    public private(set) var recents: [URL] = []
+    /// What is selected in the sidebar — a document **or** a file or folder in a project tree.
+    ///
+    /// One value rather than two, so "a file is selected" and "a document is selected" cannot both
+    /// be true and disagree. Selecting a document row keeps `selection` in step, because the detail
+    /// pane reads that.
+    public var sidebarSelection: GlassEditorSidebarSelection? {
+        didSet {
+            if case .document(let id) = sidebarSelection { selection = id }
+        }
+    }
+    /// Folders the user has opened, by node id. Tracked here rather than left to `OutlineGroup`
+    /// because the keyboard has to be able to open and close them, and because a folder is read
+    /// from disk the first time it opens — a decision, not a drawing detail.
+    public private(set) var expandedNodes: Set<UUID> = []
     /// Open projects — a folder on a machine (see `GlassEditorProject`). Kept beside the documents
     /// rather than owning them: a file can be opened without a project, and every file in a
     /// project is still an ordinary document.
@@ -38,16 +57,28 @@ public final class GlassEditorWorkspace {
     public var findIsCaseSensitive = false
     public var findUsesRegularExpression = false
 
-    /// Recents are bounded because an unbounded list is a slow leak that nobody notices until it
-    /// is a thousand entries long — the same defect this project already found in its preferences.
-    static let recentsLimit = 20
-    static let recentsDefaultsKey = "com.glasspowertools.editor.recents"
+    /// Shared with every other window: text size, line numbers, wrapping, recents.
+    public let preferences: GlassEditorPreferences
 
-    private let defaults: UserDefaults
+    /// Set when a **file** is opened with no project in this window: the sidebar is a project's
+    /// tree, and a tree of nothing beside one open file is a column of empty space. Opening a
+    /// project clears it again.
+    public private(set) var prefersCollapsedSidebar = false
 
-    public init(defaults: UserDefaults = .standard) {
-        self.defaults = defaults
-        recents = Self.loadRecents(from: defaults)
+    public init(preferences: GlassEditorPreferences? = nil, defaults: UserDefaults = .standard) {
+        self.preferences = preferences ?? GlassEditorPreferences(defaults: defaults)
+    }
+
+    /// Applies the shared appearance to every document this window holds. Called by the view when a
+    /// preference changes, because the preferences are a value the window observes rather than an
+    /// owner that reaches back into it.
+    public func applyAppearance() {
+        for document in documents { apply(to: document) }
+    }
+
+    private func apply(to document: GlassEditorDocument) {
+        document.model.configuration = preferences.configuration(basedOn: document.model.configuration)
+        document.model.theme = preferences.theme
     }
 
     // MARK: The open set
@@ -78,9 +109,11 @@ public final class GlassEditorWorkspace {
         }
         do {
             let document = try GlassEditorDocument.open(standardized)
+            apply(to: document)
             documents.append(document)
             selection = document.id
-            noteRecent(standardized)
+            preferences.noteRecent(standardized)
+            if projects.isEmpty { prefersCollapsedSidebar = true }
             return document
         } catch {
             message = "\(standardized.lastPathComponent) could not be opened: \(error.localizedDescription)"
@@ -91,6 +124,7 @@ public final class GlassEditorWorkspace {
     @discardableResult
     public func newDocument(language: LanguageID = .plaintext) -> GlassEditorDocument {
         let document = GlassEditorDocument.untitled(named: untitledName(), language: language)
+        apply(to: document)
         documents.append(document)
         selection = document.id
         return document
@@ -126,7 +160,7 @@ public final class GlassEditorWorkspace {
         guard let document = documents.first(where: { $0.id == id }) else { return }
         do {
             try document.save(to: url)
-            noteRecent(url)
+            preferences.noteRecent(url)
         } catch {
             message = "\(document.displayName) could not be saved: \(error.localizedDescription)"
         }
@@ -191,11 +225,16 @@ public final class GlassEditorWorkspace {
             message = "\(standardized.lastPathComponent) is not a folder."
             return nil
         }
-        if let existing = projects.first(where: { $0.path == standardized.path(percentEncoded: false) }) {
+        // Compared in the same spelling the project is stored in. `URL.path` on a directory keeps
+        // its trailing slash, so comparing it against a stored path that has none matched nothing
+        // and opened the same folder as a second project every time.
+        let wanted = GlassEditorProject.normalized(standardized.path(percentEncoded: false))
+        if let existing = projects.first(where: { $0.path == wanted }) {
             return existing
         }
         let project = GlassEditorProject.local(standardized)
         projects.append(project)
+        prefersCollapsedSidebar = false
         let root = GlassEditorProjectNode(name: project.displayName, path: project.path, isDirectory: true)
         root.loadChildrenIfNeeded(using: reader)
         projectRoots[project.id] = root
@@ -203,10 +242,86 @@ public final class GlassEditorWorkspace {
         return project
     }
 
+    // MARK: The tree, and where "here" is
+
+    /// The node with this id, anywhere in any open project. Only loaded folders are searched: a
+    /// folder nobody has opened has no children to find.
+    public func node(_ id: UUID) -> GlassEditorProjectNode? {
+        func search(_ node: GlassEditorProjectNode) -> GlassEditorProjectNode? {
+            if node.id == id { return node }
+            for child in node.children ?? [] {
+                if let found = search(child) { return found }
+            }
+            return nil
+        }
+        for root in projectRoots.values {
+            if let found = search(root) { return found }
+        }
+        return nil
+    }
+
+    public func isExpanded(_ id: UUID) -> Bool { expandedNodes.contains(id) }
+
+    /// Opens or closes a folder, reading it the first time it opens.
+    public func setExpanded(_ expanded: Bool, for id: UUID,
+                            reader: GlassEditorDirectoryReader = GlassEditorLocalDirectoryReader()) {
+        guard let node = node(id), node.isDirectory else { return }
+        if expanded {
+            expandedNodes.insert(id)
+            node.loadChildrenIfNeeded(using: reader)
+        } else {
+            expandedNodes.remove(id)
+        }
+    }
+
+    /// The folder the user is in: the selected folder, the **parent** of the selected file, or the
+    /// root when exactly one project is open and nothing is selected.
+    ///
+    /// Choosing a file and asking for something new should put it beside that file — what every
+    /// file browser on this platform means by "here". With no projects open at all this is nil, and
+    /// New means an untitled document with no home, which is still worth having.
+    public var currentFolder: String? {
+        if case .node(let id) = sidebarSelection, let node = node(id) {
+            return node.isDirectory ? node.path : (node.path as NSString).deletingLastPathComponent
+        }
+        if projects.count == 1, let only = projects.first, let root = projectRoots[only.id] {
+            return root.path
+        }
+        return nil
+    }
+
+    /// Every project at once — what closing the window means. Projects are a view of a folder,
+    /// not work in progress: there is nothing to lose by letting go of them, which is why they need
+    /// no separate Close command (2026-09-17).
+    public func closeAllProjects() {
+        for project in projects { closeProject(project.id) }
+    }
+
     public func closeProject(_ id: GlassEditorProject.ID) {
+        if let root = projectRoots[id] { forget(root) }
         projects.removeAll { $0.id == id }
         projectRoots[id] = nil
         projectReach[id] = nil
+    }
+
+    /// Drops a closed project's nodes out of the expansion set and the selection, so neither grows
+    /// without bound across a session of opening and closing projects.
+    private func forget(_ root: GlassEditorProjectNode) {
+        func walk(_ node: GlassEditorProjectNode) {
+            expandedNodes.remove(node.id)
+            if case .node(node.id) = sidebarSelection { sidebarSelection = nil }
+            for child in node.children ?? [] { walk(child) }
+        }
+        walk(root)
+    }
+
+    /// What the user calls this project. The folder's own name is the default, not a rule.
+    public func rename(_ id: GlassEditorProject.ID, to name: String) {
+        guard let index = projects.firstIndex(where: { $0.id == id }) else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        projects[index].displayName = trimmed.isEmpty
+            ? (projects[index].path as NSString).lastPathComponent
+            : trimmed
     }
 
     /// Re-reads a project's tree from disk — after a build, a checkout, anything that happened
@@ -219,27 +334,6 @@ public final class GlassEditorWorkspace {
     }
 
     // MARK: Recents
-
-    func noteRecent(_ url: URL) {
-        let standardized = url.standardizedFileURL
-        recents.removeAll { $0.standardizedFileURL == standardized }
-        recents.insert(standardized, at: 0)
-        if recents.count > Self.recentsLimit { recents.removeLast(recents.count - Self.recentsLimit) }
-        defaults.set(recents.map(\.absoluteString), forKey: Self.recentsDefaultsKey)
-    }
-
-    public func clearRecents() {
-        recents = []
-        defaults.removeObject(forKey: Self.recentsDefaultsKey)
-    }
-
-    private static func loadRecents(from defaults: UserDefaults) -> [URL] {
-        let stored = defaults.stringArray(forKey: recentsDefaultsKey) ?? []
-        // A file that has since been deleted or moved is dropped on read rather than offered and
-        // then failing — a recents list that lies is worse than a short one.
-        return stored.compactMap(URL.init(string:))
-            .filter { FileManager.default.fileExists(atPath: $0.path) }
-    }
 
     /// "Untitled", then "Untitled 2" — never two documents with the same name in one window.
     private func untitledName() -> String {

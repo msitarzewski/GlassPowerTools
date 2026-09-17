@@ -105,9 +105,12 @@ public final class GlassDesktopRuntime {
         await app.load()
     }
 
-    /// The saved desktop behind a shell endpoint, if there is one.
+    /// The saved desktop behind a shell endpoint, if there is one — **asked of the catalog** when
+    /// the in-memory list has not been read yet. Editing a service in the first moments after
+    /// launch used to find nothing and report the link as broken, which is what a saved desktop
+    /// looks like when it has been lost.
     func connection(for id: EndpointID) -> DesktopConnection? {
-        app.connections.first { $0.id == id }
+        app.storedConnection(for: id)
     }
 }
 

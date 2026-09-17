@@ -106,6 +106,8 @@ let package = Package(
                 "TreeSitterMarkdown",
                 "TreeSitterMarkdownInline",
                 "TreeSitterSql",
+                "TreeSitterSwift",
+                "TreeSitterXML",
                 "TreeSitterPython",
                 "TreeSitterPHP",
                 "TreeSitterJavaScript",
@@ -195,6 +197,24 @@ let package = Package(
         .target(
             name: "TreeSitterSql",
             path: "Packages/TreeSitterSql",
+            sources: ["src/parser.c", "src/scanner.c"],
+            publicHeadersPath: "include",
+            cSettings: [.headerSearchPath("src")]
+        ),
+        // Swift's grammar ships no generated parser — upstream generates it at install time — so
+        // `parser.c` here is `tree-sitter generate` output from the pinned checkout, 20 MB of
+        // tables. That is the price of colouring the language this project is written in, and it
+        // is smaller than the SQL grammar already vendored beside it.
+        .target(
+            name: "TreeSitterSwift",
+            path: "Packages/TreeSitterSwift",
+            sources: ["src/parser.c", "src/scanner.c"],
+            publicHeadersPath: "include",
+            cSettings: [.headerSearchPath("src")]
+        ),
+        .target(
+            name: "TreeSitterXML",
+            path: "Packages/TreeSitterXML",
             sources: ["src/parser.c", "src/scanner.c"],
             publicHeadersPath: "include",
             cSettings: [.headerSearchPath("src")]

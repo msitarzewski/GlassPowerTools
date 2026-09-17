@@ -45,6 +45,16 @@ public struct DesktopRepository {
             .sorted { ($0.name, $0.id.rawValue.uuidString) < ($1.name, $1.id.rawValue.uuidString) }
     }
 
+    /// One saved desktop, straight out of the catalog.
+    ///
+    /// The catalog is the record (D26), so this asks it rather than asking whoever happens to have
+    /// read it. That is the difference between "this service has nothing behind it" and "nobody has
+    /// looked yet", and the second must never be shown as the first — the user acts on what the app
+    /// says, and on 2026-09-17 what it said was wrong enough that they deleted a working service.
+    public func record(for id: EndpointID) -> DesktopConnection? {
+        try? records.all()[id]?.validated()
+    }
+
     public func save(_ connection: DesktopConnection) async throws -> [DesktopConnection] {
         try await persist(connection, expected: nil, compare: false)
     }
