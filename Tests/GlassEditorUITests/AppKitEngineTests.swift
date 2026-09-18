@@ -390,18 +390,48 @@ struct AppKitEngineTests {
         #expect(clipped.last!.number < 10)
     }
 
-    @Test("the gutter is installed only when the configuration asks for it")
-    func gutterInstallation() async {
+    /// The shape, not the numbers: a gutter that is a *sibling* of the scroll
+    /// view can only occupy what the container gives it, where an `NSRulerView`
+    /// spans its whole scroll view and is not inset by the scroll view's content
+    /// insets — which is how the strip of numbers reached the title bar.
+    @Test("the gutter is a view beside the text, not a ruler spanning the scroll view")
+    func gutterIsBesideTheText() throws {
+        let engine = makeEngine("x")
+        let gutter = try #require(engine.gutter)
+
+        #expect(engine.scrollView.verticalRulerView == nil)
+        #expect(engine.scrollView.rulersVisible == false)
+        #expect(gutter.superview === engine.containerView)
+        #expect(engine.scrollView.superview === engine.containerView)
+
+        engine.containerView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+        engine.containerView.layoutSubtreeIfNeeded()
+
+        // Vertically the scroll view's band exactly, horizontally the leading
+        // 44 points, and the text starts where the gutter ends.
+        #expect(gutter.frame.minY == engine.scrollView.frame.minY)
+        #expect(gutter.frame.maxY == engine.scrollView.frame.maxY)
+        #expect(gutter.frame.minX == 0)
+        #expect(gutter.frame.width == EditorMetrics.gutterWidth)
+        #expect(engine.scrollView.frame.minX == EditorMetrics.gutterWidth)
+    }
+
+    @Test("turning line numbers off collapses the gutter instead of tearing it down")
+    func gutterVisibility() async {
         var configuration = GlassEditorConfiguration()
         configuration.showsLineNumbers = false
         let engine = makeEngine("x", configuration: configuration)
-        #expect(engine.gutter == nil)
+        engine.containerView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
+        engine.containerView.layoutSubtreeIfNeeded()
+        #expect(engine.gutter?.isHidden == true)
+        #expect(engine.gutter?.frame.width == 0)
 
         configuration.showsLineNumbers = true
         engine.configuration = configuration
         await settle()
-        #expect(engine.gutter != nil)
-        #expect(engine.gutter?.ruleThickness == EditorMetrics.gutterWidth)
+        engine.containerView.layoutSubtreeIfNeeded()
+        #expect(engine.gutter?.isHidden == false)
+        #expect(engine.gutter?.frame.width == EditorMetrics.gutterWidth)
         // The shipped metric: gutter + container inset == 56.
         #expect(EditorMetrics.gutteredLeadingInset == 56)
     }

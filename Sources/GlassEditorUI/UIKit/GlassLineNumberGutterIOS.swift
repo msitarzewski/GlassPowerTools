@@ -47,38 +47,16 @@ public final class GlassLineNumberGutterIOS: UIView {
     public override func draw(_ rect: CGRect) {
         guard let textView, let layoutManager = textView.textLayoutManager else { return }
 
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: AttributedAssembly.gutterFont(configuration: model.configuration),
-            .foregroundColor: AttributedAssembly.gutterNumberColor(
-                theme: model.theme,
-                surface: model.surfaceCondition,
-                configuration: model.configuration
-            ),
-        ]
-
         // Layout-fragment frames are in the text view's content coordinates; the
         // gutter draws in its own bounds. The scroll offset and the container's
-        // top inset are the whole difference between the two.
-        let offsetY = textView.contentOffset.y - textView.textContainerInset.top
-        let visible = offsetY...(offsetY + bounds.height)
-
-        let labels = GutterLineNumbers.labels(
-            in: layoutManager,
-            verticalRange: visible,
-            lineCount: model.lineCount
-        ) { [model] utf16Offset in
-            model.lineIndex(forUTF16Offset: utf16Offset)
-        }
-
-        for label in labels {
-            let text = "\(label.number)" as NSString
-            let size = text.size(withAttributes: attributes)
-            let origin = CGPoint(
-                x: bounds.width - size.width - EditorMetrics.gutterNumberTrailingGap,
-                y: label.frame.minY - offsetY
-            )
-            text.draw(at: origin, withAttributes: attributes)
-        }
+        // top inset are the whole difference between the two. Everything after
+        // that number is shared with the AppKit gutter.
+        GutterLineNumbers.draw(
+            in: bounds,
+            offsetY: textView.contentOffset.y - textView.textContainerInset.top,
+            layoutManager: layoutManager,
+            model: model
+        )
     }
 
     /// Repaints when the document, theme or surface has moved underneath us.

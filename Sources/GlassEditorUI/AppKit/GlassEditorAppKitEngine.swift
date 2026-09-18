@@ -18,10 +18,16 @@ public final class GlassEditorAppKitEngine: GlassEditorEngine {
     /// object a SwiftUI `GlassEditorView` binds to.
     public let model: GlassEditorModel
 
+    /// The view to install. Holds the gutter and the scroll view side by side,
+    /// exactly as `GlassEditorUIKitEngine.containerView` holds the gutter and
+    /// the text view.
+    public let containerView: NSView
     public let textView: GlassTextView
     public let scrollView: NSScrollView
     public let coordinator: GlassEditorNSCoordinator
     public private(set) var gutter: GlassLineNumberGutter?
+
+    private var gutterWidthConstraint: NSLayoutConstraint?
 
     // MARK: - Construction
 
@@ -29,6 +35,7 @@ public final class GlassEditorAppKitEngine: GlassEditorEngine {
         self.model = model
         self.textView = GlassTextView.makeTextKit2()
         self.scrollView = NSScrollView()
+        self.containerView = NSView()
         self.coordinator = GlassEditorNSCoordinator(model: model)
 
         // The scroll view draws no background for the same reason the text view
@@ -40,14 +47,12 @@ public final class GlassEditorAppKitEngine: GlassEditorEngine {
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
         scrollView.borderType = .noBorder
-        // **The window's title bar is not this view's to inset for.**
-        //
-        // A scroll view in a window with a full-size content view adds a content inset the height
-        // of the title bar, and insets its *document* by it — but not its ruler, which keeps
-        // spanning the whole scroll view. So the line-number strip carried on up past the tabs and
-        // sat beside the traffic lights (reported twice, 2026-09-17). Here the scroll view is
-        // already placed by SwiftUI, below the tab strip, in a column that starts where it should:
-        // there is nothing left for AppKit to compensate for, and its compensation is the artifact.
+        // **The window's title bar is not this view's to inset for.** SwiftUI
+        // already places this view below the tab strip, in a column that starts
+        // where it should, so an automatic inset the height of a title bar is a
+        // second correction for something already corrected. The gutter reads
+        // whatever inset does end up here (`verticalOffset`), so this setting
+        // decides where the text sits and nothing else.
         scrollView.automaticallyAdjustsContentInsets = false
 
         textView.delegate = coordinator
@@ -65,7 +70,7 @@ public final class GlassEditorAppKitEngine: GlassEditorEngine {
         scrollView.documentView = textView
         coordinator.textView = textView
 
-        installGutterIfNeeded()
+        installViews()
         applyThemeToCanvas()
         loadInitialContent()
         textView.assertUsingTextKit2()
@@ -177,19 +182,46 @@ public final class GlassEditorAppKitEngine: GlassEditorEngine {
         )
     }
 
-    private func installGutterIfNeeded() {
-        guard model.configuration.showsLineNumbers else {
-            scrollView.rulersVisible = false
-            gutter = nil
-            coordinator.gutter = nil
-            return
-        }
-        let ruler = GlassLineNumberGutter(scrollView: scrollView, textView: textView, model: model)
-        scrollView.verticalRulerView = ruler
-        scrollView.hasVerticalRuler = true
-        scrollView.rulersVisible = true
-        gutter = ruler
-        coordinator.gutter = ruler
+    /// Lays the gutter out beside the scroll view. The mirror of
+    /// `GlassEditorUIKitEngine.installViews()`, and for the same reason: a
+    /// gutter that is a sibling of the text can only occupy the space its
+    /// container gives it, where a ruler spans its whole scroll view.
+    ///
+    /// Turning line numbers off collapses the width to zero and hides the view
+    /// rather than tearing it down, so the transition is one constant and the
+    /// gutter keeps its scroll observation.
+    private func installViews() {
+        let gutterView = GlassLineNumberGutter(
+            scrollView: scrollView, textView: textView, model: model
+        )
+        gutterView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+
+        containerView.addSubview(gutterView)
+        containerView.addSubview(scrollView)
+
+        let width = gutterView.widthAnchor.constraint(
+            equalToConstant: model.configuration.showsLineNumbers ? EditorMetrics.gutterWidth : 0
+        )
+        gutterWidthConstraint = width
+        gutterView.isHidden = !model.configuration.showsLineNumbers
+
+        NSLayoutConstraint.activate([
+            gutterView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+            // Pinned to the scroll view rather than to the container, so that a
+            // consumer which insets the scroll view insets the numbers with it.
+            gutterView.topAnchor.constraint(equalTo: scrollView.topAnchor),
+            gutterView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
+            width,
+
+            scrollView.leadingAnchor.constraint(equalTo: gutterView.trailingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            scrollView.topAnchor.constraint(equalTo: containerView.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
+        ])
+
+        gutter = gutterView
+        coordinator.gutter = gutterView
     }
 
     private func applyThemeToCanvas() {
@@ -241,7 +273,10 @@ public final class GlassEditorAppKitEngine: GlassEditorEngine {
             )
         }
         if previous.showsLineNumbers != current.showsLineNumbers {
-            installGutterIfNeeded()
+            gutterWidthConstraint?.constant =
+                current.showsLineNumbers ? EditorMetrics.gutterWidth : 0
+            gutter?.isHidden = !current.showsLineNumbers
+            containerView.needsLayout = true
         }
         coordinator.configurationDidChange(on: textView)
         // Any field that changes how a glyph is inked must force a re-resolve —

@@ -40,11 +40,14 @@ private struct PlatformEditor: NSViewRepresentable {
         GlassEditorAppKitEngine(model: model)
     }
 
-    func makeNSView(context: Context) -> NSScrollView {
-        context.coordinator.scrollView
+    func makeNSView(context: Context) -> NSView {
+        // The container, not the scroll view: the gutter is a sibling of the
+        // scroll view inside it, so SwiftUI places both at once and the numbers
+        // cannot occupy anything the text does not.
+        context.coordinator.containerView
     }
 
-    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+    func updateNSView(_ containerView: NSView, context: Context) {
         // Nothing to push. The engine observes the model directly (see
         // GlassEditorAppKitEngine's model-observation block), so theme,
         // surface, configuration, highlights and content all reach the view the

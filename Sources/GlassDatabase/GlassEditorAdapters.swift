@@ -314,7 +314,7 @@ private struct SQLEditorRepresentable: NSViewRepresentable {
         SQLEditorBridgeCoordinator(engine: GlassEditorAppKitEngine(model: model))
     }
 
-    func makeNSView(context: Context) -> NSScrollView {
+    func makeNSView(context: Context) -> NSView {
         context.coordinator.armObservation(of: model)
         if let controller {
             let engine = context.coordinator.engine
@@ -341,7 +341,10 @@ private struct SQLEditorRepresentable: NSViewRepresentable {
         if let textViewIdentifier {
             textView.setAccessibilityIdentifier(textViewIdentifier)
         }
-        return scrollView
+        // The engine's container, which carries the line-number gutter beside
+        // the scroll view; the SQL editor gets the same gutter the file editor
+        // does, and both are placed by their SwiftUI parent.
+        return context.coordinator.engine.containerView
     }
 
     /// Tab accepts the top completion when the editor has focus and the
@@ -373,7 +376,7 @@ private struct SQLEditorRepresentable: NSViewRepresentable {
     }
 
     static func dismantleNSView(
-        _ nsView: NSScrollView,
+        _ nsView: NSView,
         coordinator: SQLEditorBridgeCoordinator<GlassEditorAppKitEngine>
     ) {
         if let monitor = coordinator.tabKeyMonitor {
@@ -384,7 +387,7 @@ private struct SQLEditorRepresentable: NSViewRepresentable {
 
     // Update passes refresh closures, focus, and editability ONLY — never
     // content. Inbound content flows exclusively through SQLEditorController.
-    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+    func updateNSView(_ containerView: NSView, context: Context) {
         context.coordinator.onTextChange = onModelTextChange
         context.coordinator.onSelectionChange = onModelSelectionChange
         context.coordinator.onTabComplete = onTabComplete

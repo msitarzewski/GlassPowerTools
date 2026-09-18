@@ -50,6 +50,60 @@ public enum GutterLineNumbers {
         }
     }
 
+    /// Draws the visible line numbers into the current graphics context.
+    ///
+    /// Both backends put the gutter in a view *beside* the text, so both draw
+    /// the same numbers in the same place and the only per-platform value is
+    /// `offsetY`: the distance between the layout manager's coordinates and the
+    /// gutter's own. On UIKit that is `contentOffset.y - textContainerInset.top`;
+    /// on AppKit, the clip view's scrolled origin less the text container origin
+    /// and the scroll view's top content inset. Everything downstream of that
+    /// number — right alignment, the trailing gap, top alignment with the first
+    /// visual line of a wrapped logical line — is the same sum on both, and is
+    /// therefore written once.
+    ///
+    /// - Parameters:
+    ///   - bounds: the gutter view's own bounds. Its width right-aligns the
+    ///     numbers; its height is the visible band.
+    ///   - offsetY: layout-space y of the gutter's top edge.
+    public static func draw(
+        in bounds: CGRect,
+        offsetY: CGFloat,
+        layoutManager: NSTextLayoutManager,
+        model: GlassEditorModel
+    ) {
+        guard bounds.height > 0 else { return }
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: AttributedAssembly.gutterFont(configuration: model.configuration),
+            .foregroundColor: AttributedAssembly.gutterNumberColor(
+                theme: model.theme,
+                surface: model.surfaceCondition,
+                configuration: model.configuration
+            ),
+        ]
+
+        let visible = labels(
+            in: layoutManager,
+            verticalRange: offsetY...(offsetY + bounds.height),
+            lineCount: model.lineCount
+        ) { utf16Offset in
+            model.lineIndex(forUTF16Offset: utf16Offset)
+        }
+
+        for label in visible {
+            let text = "\(label.number)" as NSString
+            let size = text.size(withAttributes: attributes)
+            // Right-aligned against the gutter's trailing edge, and top-aligned
+            // with the first visual line of the logical line — a wrapped line's
+            // number sits beside its first row, not centred over all of them.
+            let origin = CGPoint(
+                x: bounds.width - size.width - EditorMetrics.gutterNumberTrailingGap,
+                y: label.frame.minY - offsetY
+            )
+            text.draw(at: origin, withAttributes: attributes)
+        }
+    }
+
     /// Labels for the logical lines laid out in `verticalRange`.
     ///
     /// - Parameters:
