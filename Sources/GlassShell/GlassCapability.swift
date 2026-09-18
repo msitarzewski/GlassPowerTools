@@ -90,7 +90,57 @@ public protocol GlassHostPortForward: AnyObject, Sendable {
     func close() async
 }
 
+/// A live listing of one machine's folders, over whatever connection the capability that owns SSH
+/// already knows how to make.
+///
+/// The shape of `GlassHostPortForward`, for the same reason: a capability that needs another
+/// machine's *files* — the editor, opening a project on a server — must not learn to make an SSH
+/// connection, resolve a credential or judge a host key. It borrows the one capability that does.
+public protocol GlassHostDirectoryLister: AnyObject, Sendable {
+    /// One folder's entries, with the server's `.` and `..` already removed.
+    func list(_ path: String) async throws -> [GlassHostDirectoryEntry]
+    /// The whole file.
+    func read(_ path: String) async throws -> Data
+    /// Writes the file back, **only if it is still what the caller last saw**, and answers with
+    /// what was actually committed. `nil` expects nothing, which is what a new file is.
+    @discardableResult
+    func write(_ data: Data, to path: String, expecting: GlassHostFileStamp?) async throws -> GlassHostFileStamp?
+    /// Size and modification time, or nil when they could not be read. **Nil means "not
+    /// observed", never "unchanged"** — the difference a conflict check is built on.
+    func stat(_ path: String) async throws -> GlassHostFileStamp?
+    /// The path a relative one is resolved against — the account's home directory, usually.
+    func realPath(_ path: String) async throws -> String
+    /// Drops the connection. Calling it more than once is harmless.
+    func close() async
+}
+
+/// What a file looked like when it was last looked at. Every field optional, because servers
+/// genuinely omit them and an absent field must not read as a zero.
+public struct GlassHostFileStamp: Sendable, Hashable {
+    public var size: UInt64?
+    public var modifiedAt: Date?
+
+    public init(size: UInt64? = nil, modifiedAt: Date? = nil) {
+        self.size = size
+        self.modifiedAt = modifiedAt
+    }
+}
+
+public struct GlassHostDirectoryEntry: Sendable, Hashable {
+    public var name: String
+    public var isDirectory: Bool
+
+    public init(name: String, isDirectory: Bool) {
+        self.name = name
+        self.isDirectory = isDirectory
+    }
+}
+
 public enum GlassPortForwardError: Error, LocalizedError {
+    /// The file changed between the check and the commit. Nothing was written.
+    case targetChanged(String)
+    /// The write was sent and the machine did not say whether it landed.
+    case commitOutcomeUnknown(String)
     /// The host has no SSH service, no capability owns `.ssh`, or the host is this device.
     case unavailable
     case invalidPort(Int)
@@ -106,6 +156,10 @@ public enum GlassPortForwardError: Error, LocalizedError {
             "\(port) is not a usable TCP port."
         case .hostNotTrusted(let name):
             "The SSH host key for \(name) has not been trusted on this device. Connect its Terminal service once to review the fingerprint, then try again."
+        case .targetChanged(let name):
+            "\(name) changed while it was being saved, so nothing was written. Save again to see what it looks like now."
+        case .commitOutcomeUnknown(let name):
+            "The connection dropped while \(name) was being saved, and the machine did not say whether it landed. Re-open it to see which version is there."
         }
     }
 }
@@ -271,6 +325,10 @@ public protocol GlassCapability: AnyObject {
     /// capability's own kind. `host` is the catalog record that owns the service. Default: none.
     func serviceDetailActions(service: HostServiceLink, host: HostProfile) -> AnyView
 
+    /// Opens a listing of the machine's folders over this capability's own connection, so another
+    /// capability can read its files without owning any SSH configuration. Default: unavailable.
+    func openDirectoryLister(host: HostProfile) async throws -> any GlassHostDirectoryLister
+
     /// Peer rows the capability contributes to the host detail below its services: tools that a
     /// configured service makes available rather than services of their own. The terminal offers
     /// Files (SFTP) when the server supports it; Stage 5's editor joins here.
@@ -326,6 +384,10 @@ public extension GlassCapability {
     func removeService(_ service: HostServiceLink, host: HostProfile) async throws {}
     func openPortForward(host: HostProfile, toHost remoteHost: String,
                          port: Int) async throws -> any GlassHostPortForward {
+        throw GlassPortForwardError.unavailable
+    }
+    /// Opens a listing of this machine's folders. Default: this capability has no way to.
+    func openDirectoryLister(host: HostProfile) async throws -> any GlassHostDirectoryLister {
         throw GlassPortForwardError.unavailable
     }
     func resolveHostTrust(host: HostProfile) async -> GlassHostTrustOutcome { .unavailable }
@@ -439,6 +501,23 @@ public final class GlassCapabilityRegistry {
     /// Every capability's settings pages, in kind order, then any standalone ones.
     public var settingsPages: [GlassCapabilitySettingsPage] {
         registered.flatMap(\.settingsPages) + standalonePages
+    }
+
+    /// Library panels from something that is not a capability, registered the same way and for
+    /// the same reason as the pages above. Projects are the case: a project is a folder on a
+    /// machine and the editor is not a service, but the list of them spans the whole fleet
+    /// exactly as Workgroups and Keys do — and on iOS and visionOS it is the only way into the
+    /// editor at all.
+    private var standalonePanels: [GlassLibraryPanel] = []
+
+    public func registerLibraryPanel(_ panel: GlassLibraryPanel) {
+        standalonePanels.removeAll { $0.id == panel.id }
+        standalonePanels.append(panel)
+    }
+
+    /// Every capability's library panels, in kind order, then any standalone ones.
+    public var libraryPanels: [GlassLibraryPanel] {
+        registered.flatMap { $0.libraryPanels() } + standalonePanels
     }
 
     /// Every capability's built-in local services (D8), in kind order, with any capability that

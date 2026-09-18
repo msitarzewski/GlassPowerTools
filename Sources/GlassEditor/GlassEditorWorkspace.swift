@@ -48,6 +48,12 @@ public final class GlassEditorWorkspace {
     public private(set) var projectRoots: [GlassEditorProject.ID: GlassEditorProjectNode] = [:]
     /// How each project is reached from this device, decided once when it opens.
     public private(set) var projectReach: [GlassEditorProject.ID: GlassEditorProjectReach] = [:]
+    /// How each project's machine is reached — the file system for a project on this device, an
+    /// SFTP session for one on another machine. Settled when the project opens, for the same reason
+    /// `projectReach` is: neither the folder nor the device moves while the project is open, so
+    /// deciding it at every draw would be deciding the same thing repeatedly and giving a view a
+    /// choice it has no business making.
+    private var projectAccess: [GlassEditorProject.ID: any GlassEditorFileAccess] = [:]
     /// What went wrong, for the one alert this surface has.
     public var message: String?
     /// Whether the find bar is showing, and what it is looking for.
@@ -95,30 +101,96 @@ public final class GlassEditorWorkspace {
     /// Re-opening a file that is already open must never produce a second copy: two editors over
     /// one file is a way to lose work, and it is the first thing a user does by accident.
     @discardableResult
-    public func open(_ url: URL) -> GlassEditorDocument? {
-        let standardized = url.standardizedFileURL
-        if let existing = documents.first(where: { $0.url?.standardizedFileURL == standardized }) {
+    public func open(_ url: URL) async -> GlassEditorDocument? {
+        await open(path: url.standardizedFileURL.path(percentEncoded: false))
+    }
+
+    /// Opens a file on whichever machine its project is on.
+    ///
+    /// **One method for both**, because after "which machine" there is no second difference: the
+    /// same duplicate check, the same encoding work, the same recents list, the same tab. The
+    /// machine decides which `GlassEditorFileAccess` the bytes travel through and nothing else.
+    @discardableResult
+    public func open(path rawPath: String) async -> GlassEditorDocument? {
+        let path = GlassEditorProject.normalized(rawPath)
+        let owner = project(owning: path)
+        return await open(path: path,
+                          through: owner.flatMap { projectAccess[$0.id] } ?? GlassEditorLocalFileAccess(),
+                          machine: owner.flatMap { machineName(of: $0.id) })
+    }
+
+    /// Opens a file with the machine named explicitly — a file on a server with no project around
+    /// it, which is what **Edit** in the Files browser opens.
+    ///
+    /// The access is remembered against the document, because there is no project to look it up
+    /// from later and saving has to go back the way the file came. Without that, a file opened
+    /// this way would be read over SSH and written to a path on this Mac.
+    @discardableResult
+    public func open(path rawPath: String,
+                     through access: any GlassEditorFileAccess,
+                     machine: String?) async -> GlassEditorDocument? {
+        let path = GlassEditorProject.normalized(rawPath)
+        if let existing = documents.first(where: { $0.path == path && $0.machine == machine }) {
             selection = existing.id
             return existing
         }
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: standardized.path, isDirectory: &isDirectory),
-              !isDirectory.boolValue else {
-            message = GlassEditorWorkspaceError.notAFile(standardized.lastPathComponent).localizedDescription
-            return nil
+
+        // Only this device's file system can be asked this, and only this device's needs to be:
+        // a folder on a server fails the read below, which is where its reason comes from.
+        if machine == nil {
+            var isDirectory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
+                  !isDirectory.boolValue else {
+                message = GlassEditorWorkspaceError
+                    .notAFile((path as NSString).lastPathComponent).localizedDescription
+                return nil
+            }
         }
         do {
-            let document = try GlassEditorDocument.open(standardized)
+            let document = try await GlassEditorDocument.open(path: path, through: access,
+                                                             machine: machine)
             apply(to: document)
             documents.append(document)
+            if machine != nil { documentAccess[document.id] = access }
             selection = document.id
-            preferences.noteRecent(standardized)
+            // Recents are this device's list of files it can reopen. A file on another machine is
+            // reopened through its project, so putting it here would offer a path that resolves to
+            // nothing the next time the app starts.
+            if machine == nil { preferences.noteRecent(URL(filePath: path)) }
             if projects.isEmpty { prefersCollapsedSidebar = true }
             return document
         } catch {
-            message = "\(standardized.lastPathComponent) could not be opened: \(error.localizedDescription)"
+            message = "\((path as NSString).lastPathComponent) could not be opened: \(error.localizedDescription)"
             return nil
         }
+    }
+
+    /// The project a path belongs to, by the prefix its root shares with it.
+    func project(owning path: String) -> GlassEditorProject? {
+        projects.first { path == $0.path || path.hasPrefix($0.path + "/") }
+    }
+
+    /// The machine a project is on, when it is not this one.
+    func machineName(of id: GlassEditorProject.ID) -> String? {
+        switch projectReach[id] {
+        case .overSSH(let host), .unreachable(let host): host
+        case .thisMachine, nil: nil
+        }
+    }
+
+    /// Where a standalone document's bytes travel, when no project answers for it.
+    private var documentAccess: [GlassEditorDocument.ID: any GlassEditorFileAccess] = [:]
+
+    /// How a document's bytes travel: the one it was opened with, or its project's, or this
+    /// device's file system. In that order, because a file opened on its own has no project and
+    /// falling through to the local disk would write it to the wrong machine.
+    public func access(for document: GlassEditorDocument) -> any GlassEditorFileAccess {
+        if let access = documentAccess[document.id] { return access }
+        guard let path = document.path, let owner = project(owning: path),
+              let access = projectAccess[owner.id] else {
+            return GlassEditorLocalFileAccess()
+        }
+        return access
     }
 
     @discardableResult
@@ -136,6 +208,7 @@ public final class GlassEditorWorkspace {
     public func close(_ id: GlassEditorDocument.ID, force: Bool = false) -> Bool {
         guard let index = documents.firstIndex(where: { $0.id == id }) else { return true }
         if documents[index].isDirty, !force { return false }
+        documentAccess[id] = nil
         documents.remove(at: index)
         if selection == id {
             // The neighbour, not the first: closing a tab should leave you where you were looking.
@@ -146,20 +219,78 @@ public final class GlassEditorWorkspace {
 
     // MARK: Saving
 
-    /// Saves one document. A document with no location reports that rather than inventing one.
-    public func save(_ id: GlassEditorDocument.ID) {
+    /// A save that stopped to ask, because the file changed underneath the editor.
+    ///
+    /// Held here rather than on the document so the window has exactly one of them to present: two
+    /// documents conflicting at once is two questions in a queue, not two dialogs on top of
+    /// each other.
+    public private(set) var pendingConflict: GlassEditorConflict?
+
+    /// Saves one document, on whichever machine it lives.
+    ///
+    /// **The check is the same on both.** A local file changes underneath an editor too — a
+    /// checkout, a build, another editor — and the tier-1 stat comparison that catches it costs
+    /// one `stat` call. Saving over a change without asking is the one failure an editor cannot
+    /// come back from, so it is asked about wherever the file is.
+    public func save(_ id: GlassEditorDocument.ID) async {
         guard let document = documents.first(where: { $0.id == id }) else { return }
+        await saveChecking(document)
+    }
+
+    private func saveChecking(_ document: GlassEditorDocument) async {
+        let access = access(for: document)
+        let check = await document.checkBeforeSaving(through: access)
+        switch check.state {
+        case .noConflict:
+            await write(document, through: access, expecting: check.observed)
+        case .remoteChangedLocalClean, .remoteChangedLocalDirty, .indeterminate:
+            pendingConflict = GlassEditorConflict(documentID: document.id,
+                                                  name: document.displayName,
+                                                  machine: document.machine,
+                                                  state: check.state,
+                                                  observed: check.observed)
+        }
+    }
+
+    /// Goes ahead with a save the user was asked about.
+    public func resolveConflict(_ resolution: ConflictResolution) async {
+        guard let conflict = pendingConflict,
+              let document = documents.first(where: { $0.id == conflict.documentID }) else {
+            pendingConflict = nil
+            return
+        }
+        let access = access(for: document)
+        let authorized = conflict.observed
+        pendingConflict = nil
+        switch resolution {
+        case .overwriteRemote:
+            // Replacing what was on screen when the question was asked, not whatever is there by
+            // the time it is answered.
+            await write(document, through: access, expecting: authorized)
+        case .discardLocalAndReload:
+            do { try await document.reload(through: access) } catch {
+                message = "\(document.displayName) could not be re-read: \(error.localizedDescription)"
+            }
+        case .saveLocalCopy, .keepEditing:
+            // Nothing is written. "Save a copy" needs a file panel, which is the view's to raise.
+            break
+        }
+    }
+
+    private func write(_ document: GlassEditorDocument,
+                       through access: any GlassEditorFileAccess,
+                       expecting: RemoteStat?) async {
         do {
-            try document.save()
+            try await document.save(through: access, expecting: expecting)
         } catch {
             message = "\(document.displayName) could not be saved: \(error.localizedDescription)"
         }
     }
 
-    public func save(_ id: GlassEditorDocument.ID, to url: URL) {
+    public func save(_ id: GlassEditorDocument.ID, to url: URL) async {
         guard let document = documents.first(where: { $0.id == id }) else { return }
         do {
-            try document.save(to: url)
+            try await document.save(to: url)
             preferences.noteRecent(url)
         } catch {
             message = "\(document.displayName) could not be saved: \(error.localizedDescription)"
@@ -167,11 +298,14 @@ public final class GlassEditorWorkspace {
     }
 
     /// Saves everything that has a location and is dirty. Reports the ones it could not.
-    public func saveAll() {
+    public func saveAll() async {
         var failures: [String] = []
         for document in documents where document.isDirty {
             guard document.url != nil else { continue }
-            do { try document.save() } catch { failures.append(document.displayName) }
+            let access = access(for: document)
+            do { try await document.save(through: access) } catch {
+                failures.append(document.displayName)
+            }
         }
         if !failures.isEmpty {
             message = "These documents could not be saved: \(failures.joined(separator: ", "))."
@@ -217,7 +351,7 @@ public final class GlassEditorWorkspace {
     /// an SSH connection is a property of where the folder is and where you are, and neither moves
     /// while the project is open.
     @discardableResult
-    public func openProject(_ url: URL, reader: GlassEditorDirectoryReader = GlassEditorLocalDirectoryReader()) -> GlassEditorProject? {
+    public func openProject(_ url: URL, access: any GlassEditorFileAccess = GlassEditorLocalFileAccess()) -> GlassEditorProject? {
         let standardized = url.standardizedFileURL
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: standardized.path, isDirectory: &isDirectory),
@@ -236,9 +370,38 @@ public final class GlassEditorWorkspace {
         projects.append(project)
         prefersCollapsedSidebar = false
         let root = GlassEditorProjectNode(name: project.displayName, path: project.path, isDirectory: true)
-        root.loadChildrenIfNeeded(using: reader)
+        projectAccess[project.id] = access
+        root.beginLoadingChildrenIfNeeded(using: access)
         projectRoots[project.id] = root
         projectReach[project.id] = .thisMachine
+        return project
+    }
+
+    /// Opens a project that already exists — a folder on another machine, or one from the library.
+    ///
+    /// The local entry point above asks the file system whether the folder is there; here the
+    /// **reader** is the only thing that can answer that, so it is not asked twice. A folder that
+    /// has gone, or a machine that is not answering, arrives as the root's `loadError` and is shown
+    /// on the row rather than swallowed.
+    @discardableResult
+    public func openProject(_ project: GlassEditorProject,
+                            access: any GlassEditorFileAccess,
+                            reach: GlassEditorProjectReach) -> GlassEditorProject {
+        // The same folder on the same machine is one project. Both halves matter: `/srv/app` on
+        // two machines is two projects, and the path alone would merge them.
+        if let existing = projects.first(where: {
+            $0.path == project.path && $0.hostID == project.hostID
+        }) {
+            return existing
+        }
+        projects.append(project)
+        prefersCollapsedSidebar = false
+        let root = GlassEditorProjectNode(name: project.displayName, path: project.path,
+                                          isDirectory: true)
+        projectAccess[project.id] = access
+        root.beginLoadingChildrenIfNeeded(using: access)
+        projectRoots[project.id] = root
+        projectReach[project.id] = reach
         return project
     }
 
@@ -262,16 +425,42 @@ public final class GlassEditorWorkspace {
 
     public func isExpanded(_ id: UUID) -> Bool { expandedNodes.contains(id) }
 
-    /// Opens or closes a folder, reading it the first time it opens.
-    public func setExpanded(_ expanded: Bool, for id: UUID,
-                            reader: GlassEditorDirectoryReader = GlassEditorLocalDirectoryReader()) {
+    /// Opens or closes a folder, reading it the first time it opens through whichever reader its
+    /// project was opened with.
+    public func setExpanded(_ expanded: Bool, for id: UUID) {
         guard let node = node(id), node.isDirectory else { return }
         if expanded {
             expandedNodes.insert(id)
-            node.loadChildrenIfNeeded(using: reader)
+            node.beginLoadingChildrenIfNeeded(using: access(for: node))
         } else {
             expandedNodes.remove(id)
         }
+    }
+
+    /// The machine a node is on when that machine is not this one, as a name to say out loud.
+    /// Nil for a file on this device, which is the ordinary case and needs no sentence.
+    public func machineOf(_ node: GlassEditorProjectNode) -> String? {
+        let owner = projects.first {
+            node.path == $0.path || node.path.hasPrefix($0.path + "/")
+        }
+        guard let owner, let reach = projectReach[owner.id] else { return nil }
+        switch reach {
+        case .thisMachine: return nil
+        case .overSSH(let host), .unreachable(let host): return host
+        }
+    }
+
+    /// The reader for the project this node belongs to, found by the path prefix its project root
+    /// shares with it — which holds because a child's path is built from its parent's. Falls back
+    /// to this device's file system, which is what a node with no project is.
+    public func access(for node: GlassEditorProjectNode) -> any GlassEditorFileAccess {
+        let owner = projects.first {
+            node.path == $0.path || node.path.hasPrefix($0.path + "/")
+        }
+        guard let owner, let access = projectAccess[owner.id] else {
+            return GlassEditorLocalFileAccess()
+        }
+        return access
     }
 
     /// The folder the user is in: the selected folder, the **parent** of the selected file, or the
@@ -301,6 +490,11 @@ public final class GlassEditorWorkspace {
         if let root = projectRoots[id] { forget(root) }
         projects.removeAll { $0.id == id }
         projectRoots[id] = nil
+        // Closing the project is what ends the connection it opened. A local reader's close does
+        // nothing, so there is no branch here.
+        if let access = projectAccess.removeValue(forKey: id) {
+            Task { await access.close() }
+        }
         projectReach[id] = nil
     }
 
@@ -326,11 +520,10 @@ public final class GlassEditorWorkspace {
 
     /// Re-reads a project's tree from disk — after a build, a checkout, anything that happened
     /// outside the editor.
-    public func refreshProject(_ id: GlassEditorProject.ID,
-                               reader: GlassEditorDirectoryReader = GlassEditorLocalDirectoryReader()) {
+    public func refreshProject(_ id: GlassEditorProject.ID) {
         guard let root = projectRoots[id] else { return }
         root.invalidate()
-        root.loadChildrenIfNeeded(using: reader)
+        root.beginLoadingChildrenIfNeeded(using: projectAccess[id] ?? GlassEditorLocalFileAccess())
     }
 
     // MARK: Recents

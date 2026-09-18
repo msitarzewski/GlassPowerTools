@@ -204,7 +204,11 @@ public struct GlassDatabaseBootstrap<Content: View>: View {
     private func present(_ request: DatabaseWorkspaceWindowRequest) {
         let windowID = runtime.sessionManager.registerWorkspace(request)
         #if os(iOS)
-        if UIDevice.current.userInterfaceIdiom == .phone {
+        // `GlassWindowPresentation` rather than the idiom: the question is whether this device can
+        // open a second window, and an iPad with multiwindow switched off answers no while still
+        // being an iPad. One answer, shared with the desktop and the editor, which each had to
+        // learn it the hard way.
+        if !GlassWindowPresentation.canOpenWindows {
             router.showWorkspace(request)
             return
         }

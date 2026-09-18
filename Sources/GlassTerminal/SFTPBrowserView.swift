@@ -107,7 +107,7 @@ nonisolated private enum SFTPLocalUploadSource: Sendable {
 
 nonisolated private struct SFTPRemoteCommitGuardFailure: Error, Sendable {}
 
-nonisolated private struct SFTPUploadResult: Sendable {
+nonisolated struct SFTPUploadResult: Sendable {
     let cleanupWarning: Bool
     let committedStat: RemoteStat?
     let committedDigest: ContentDigest
@@ -466,6 +466,8 @@ struct SFTPBrowserView: View {
     @Environment(SessionManager.self) private var sessionManager
     @Environment(SettingsManager.self) private var settingsManager
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.glassOpenFolderAsProject) private var openFolderAsProject
+    @Environment(\.glassOpenFileInEditor) private var openFileInEditor
 
     @State private var sftpClient: SFTPClient?
     @State private var sessionLifetime: SFTPBrowserSessionLifetime?
@@ -1750,6 +1752,14 @@ struct SFTPBrowserView: View {
                     Button("Open") {
                         Task { await handleEntryTap(entry) }
                     }
+                    // Only when something can actually open one. A folder on a machine becomes a
+                    // project named `(host, path)`, which is why it then follows the user between
+                    // devices — see `GlassEditorProject`.
+                    if let openFolderAsProject, let session {
+                        Button("Open in Editor") {
+                            openFolderAsProject(session.server.id, entry.id)
+                        }
+                    }
                 } else {
                     Button("Edit") {
                         beginRemoteEdit(entry)
@@ -2416,7 +2426,19 @@ struct SFTPBrowserView: View {
         )
     }
 
+    /// **Edit opens the editor.** Every entry point into editing a remote file comes through
+    /// here — the toolbar, the row button, the context menu, the detail pane — so there is one
+    /// place that decides where a file opens rather than four that have to agree.
+    ///
+    /// The sheet below it is the editor this app had before it had a workspace: no tabs, no
+    /// project tree, no gutter, and its own vocabulary for "this file changed underneath you". It
+    /// stays only as the answer to "what if nothing can take the file", and goes when the new path
+    /// has been proven against a real server.
     private func beginRemoteEdit(_ entry: SFTPBrowserEntry) {
+        if let openFileInEditor, let session {
+            openFileInEditor(session.server.id, entry.id)
+            return
+        }
         guard transferTask == nil, operationInProgress == nil else { return }
         transferTask = Task {
             await openRemoteEditor(entry)
@@ -4348,7 +4370,7 @@ struct SFTPBrowserView: View {
     }
 
     @concurrent
-    private static func readVerifiedRemoteObservation(
+    static func readVerifiedRemoteObservation(
         client: SFTPClient,
         path: String,
         maximumBytes: UInt64
@@ -4423,7 +4445,7 @@ struct SFTPBrowserView: View {
     }
 
     @concurrent
-    private static func uploadRemoteEditorBytes(
+    static func uploadRemoteEditorBytes(
         _ data: Data,
         client: SFTPClient,
         serverID: UUID,

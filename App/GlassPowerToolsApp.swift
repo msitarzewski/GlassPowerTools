@@ -15,6 +15,7 @@ import GlassTerminal
 import GlassDatabase
 import GlassDesktop
 import GlassEditor
+import GlassEditorCore
 
 @main
 struct GlassPowerToolsApp: App {
@@ -127,6 +128,115 @@ struct GlassPowerToolsApp: App {
         // Its preferences still belong in the one settings surface, so the page is registered here
         // — the composition root is the only place that knows about both the shell and the editor.
         model.registry.registerSettingsPage(editor.settingsPage)
+        // Stage C: Projects in the library, the same way. Answering "is that machine this one?"
+        // needs the catalog, which the editor deliberately does not hold, so the answer is supplied
+        // from here. Pinned host keys are not consulted yet: the catalog's own local record (D8) is
+        // what "this machine" means today, and the key comparison becomes load-bearing when the
+        // remote reader can actually open a folder over SSH.
+        let projectsPanel = GlassEditorProjectsPanelModel()
+        let library = model
+        model.registry.registerLibraryPanel(
+            editor.libraryPanel(panel: projectsPanel) { project in
+                guard let hostID = project.hostID else { return .thisMachine }
+                guard let host = library.host(hostID) else {
+                    return .unreachable(host: project.displayName)
+                }
+                return GlassMachineIdentity.reach(
+                    hostName: host.displayName,
+                    isLocalHostRecord: host.isLocal,
+                    remoteFingerprints: [],
+                    hasTerminalService: host.services.contains(where: { (service: HostServiceLink) in
+                        service.kind == .ssh
+                    })
+                )
+            }
+        )
+        // Stage D: how the editor reads a folder on another machine. It borrows the capability
+        // that owns SSH, exactly as the database borrows it for a tunnel — the editor makes no
+        // connection, resolves no credential and judges no host key.
+        let registry = model.registry
+        editor.remoteAccess = { @MainActor hostID in
+            guard let record = library.record(hostID),
+                  let capability = registry.capability(for: .ssh) else {
+                throw GlassPortForwardError.unavailable
+            }
+            let lister = try await capability.openDirectoryLister(host: record)
+            return GlassEditorRemoteFileAccess { path in
+                try await lister.list(path).map {
+                    GlassEditorDirectoryEntry(name: $0.name, isDirectory: $0.isDirectory)
+                }
+            } read: { path in
+                try await lister.read(path)
+            } write: { data, path, expecting in
+                let committed = try await lister.write(
+                    data, to: path,
+                    expecting: expecting.map {
+                        GlassHostFileStamp(
+                            size: $0.size,
+                            modifiedAt: $0.modificationSeconds.map {
+                                Date(timeIntervalSince1970: TimeInterval($0))
+                            }
+                        )
+                    }
+                )
+                return committed.map {
+                    RemoteStat(
+                        size: $0.size,
+                        modificationSeconds: $0.modifiedAt.map {
+                            Int64($0.timeIntervalSince1970.rounded(.down))
+                        }
+                    )
+                }
+            } stat: { path in
+                try await lister.stat(path).map {
+                    RemoteStat(
+                        size: $0.size,
+                        modificationSeconds: $0.modifiedAt.map { Int64($0.timeIntervalSince1970.rounded(.down)) },
+                        modificationNanoseconds: $0.modifiedAt.map {
+                            let seconds = $0.timeIntervalSince1970
+                            return Int64((seconds - seconds.rounded(.down)) * 1_000_000_000)
+                        }
+                    )
+                }
+            } onClose: {
+                await lister.close()
+            }
+        }
+        // "Open in Editor" on a folder in the Files browser — the other direction of the same
+        // seam. The terminal knows the server the browser is connected through; the catalog turns
+        // that into the machine's id, which is what makes the project the *same* project on
+        // another device.
+        let editorRuntime = editor
+        terminal.openFolderAsProject = { @MainActor serverID, path in
+            let hostID = library.host(owningEndpoint: EndpointID(rawValue: serverID))?.id
+            let project = GlassEditorProject(hostID: hostID, path: path)
+            let reach: GlassEditorProjectReach = hostID == nil
+                ? .thisMachine
+                : .overSSH(host: library.host(owningEndpoint: EndpointID(rawValue: serverID))?
+                    .displayName ?? project.displayName)
+            // The returned id is a window that has to be *shown*; dropping it left the project
+            // opened into a workspace nothing was displaying.
+            if let windowID = editorRuntime.openProject(project, reach: reach) {
+                editorRuntime.present(windowID)
+            }
+        }
+        // "Edit" on a file in the Files browser opens it in the editor, as a tab, and saves back
+        // over the same connection through the verified commit.
+        terminal.openFileInEditor = { @MainActor serverID, path in
+            guard let host = library.host(owningEndpoint: EndpointID(rawValue: serverID)) else { return }
+            if let windowID = editorRuntime.open(path: path, on: host.id,
+                                                 machine: host.displayName) {
+                editorRuntime.present(windowID)
+            }
+        }
+        // The project list travels with everything else. Attached rather than required: without an
+        // account the list is a local one and nothing else changes.
+        let projects = editor.projects
+        Task { @MainActor in
+            await projects.startSynchronizing(
+                with: GlassSettingsSyncService(projectStore: GlassUbiquitousSettingsStore())
+            )
+        }
         _layers = State(initialValue: layers)
         _model = State(initialValue: model)
         _terminal = State(initialValue: terminal)
@@ -144,7 +254,9 @@ struct GlassPowerToolsApp: App {
             GlassTerminalBootstrap(runtime: terminal) {
                 GlassDatabaseBootstrap(runtime: database) {
                     GlassDesktopBootstrap(runtime: desktop) {
-                        GlassShellLibraryView(model: model)
+                        GlassEditorBootstrap(runtime: editor) {
+                            GlassShellLibraryView(model: model)
+                        }
                     }
                 }
             }

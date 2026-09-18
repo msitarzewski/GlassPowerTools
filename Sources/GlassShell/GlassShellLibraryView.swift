@@ -61,7 +61,7 @@ public struct GlassShellLibraryView: View {
             // key crosses capabilities: it can sign in to a terminal on one machine and a database
             // on another, and only something that sees the whole library can say what deleting one
             // would unassign (D26 stage 4).
-            .libraryPanels(model.libraryPanels() + model.registry.registered.flatMap { $0.libraryPanels() })
+            .libraryPanels(model.libraryPanels() + model.registry.libraryPanels)
             // Right-click, long-press or pinch-and-hold anywhere in the list — including the empty
             // space below the machines, which is where you are looking when what you want is a new
             // one. The same button the toolbar's + is.

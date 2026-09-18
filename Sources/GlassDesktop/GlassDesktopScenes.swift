@@ -85,6 +85,15 @@ public struct GlassDesktopBootstrap<Content: View>: View {
     private let content: Content
     @Environment(\.openWindow) private var openWindow
     @State private var failure: String?
+    /// The session to show **in place**, on a device with no second window to put it in.
+    ///
+    /// The *connection*, not an endpoint id: `glassDT` presented the resolved connection and this
+    /// does the same. Handing the cover an id would make it resolve the desktop a second time, and
+    /// that second lookup is the one that failed earlier today — `catalogDidLoad()` defers the
+    /// read, so a view asking the model in the first moments after launch finds nothing and says
+    /// the configuration is missing. The capability has already resolved it before enqueuing;
+    /// carrying the answer is both simpler and the only version that cannot disagree with itself.
+    @State private var activeDesktop: DesktopConnection?
 
     public init(runtime: GlassDesktopRuntime, @ViewBuilder content: () -> Content) {
         self.runtime = runtime
@@ -92,7 +101,7 @@ public struct GlassDesktopBootstrap<Content: View>: View {
     }
 
     public var body: some View {
-        content
+        base
             .task { await runtime.loadIfNeeded() }
             .onChange(of: runtime.requestSerial) { _, _ in drain() }
             .alert("Desktop", isPresented: Binding(get: { failure != nil },
@@ -103,6 +112,36 @@ public struct GlassDesktopBootstrap<Content: View>: View {
             }
     }
 
+    @ViewBuilder
+    private var base: some View {
+        #if canImport(UIKit) && !os(visionOS)
+        content
+            .fullScreenCover(item: $activeDesktop) { connection in
+                NavigationStack {
+                    DesktopSessionView(
+                        connection: connection,
+                        app: runtime.app,
+                        onOutcome: { runtime.reportOutcome($0, for: connection.id) },
+                        onClose: { activeDesktop = nil }
+                    )
+                    .toolbar {
+                        // A chevron, so the machine's name is the only wording in the bar —
+                        // `glassDT`'s decision, kept.
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Connections", systemImage: "chevron.backward") {
+                                activeDesktop = nil
+                            }
+                            .labelStyle(.iconOnly)
+                        }
+                    }
+                }
+                .glassLayers(runtime.layers)
+            }
+        #else
+        content
+        #endif
+    }
+
     private func drain() {
         for request in runtime.takeRequests() {
             switch request {
@@ -110,10 +149,25 @@ public struct GlassDesktopBootstrap<Content: View>: View {
                 // The window is what connects, so the outcome is reported from there. Saying
                 // `.connected` here would report a session that has not been attempted yet.
                 runtime.holdReport(report, for: connectionID)
-                openWindow(id: "desktop-session", value: connectionID.rawValue)
+                // **`openWindow` does nothing on an iPhone**, so asking it to open the session was
+                // answering the user's tap by doing nothing at all — no window, no error (reported
+                // 2026-09-17: *"desktop isn't opening in iPhone. Nothing happens."*). Where there
+                // is no second window, the session covers the library, which is what a window is
+                // on a phone anyway.
+                if GlassWindowPresentation.canOpenWindows {
+                    openWindow(id: "desktop-session", value: connectionID.rawValue)
+                } else if let connection = runtime.connection(for: connectionID) {
+                    activeDesktop = connection
+                } else {
+                    // The capability checked this before enqueuing, so reaching here means the
+                    // record went away in between. Said out loud rather than presenting nothing,
+                    // which is the failure this whole change is about.
+                    failure = "That desktop's configuration could not be read. Edit the service in the library to set it up again."
+                }
             case let .showFailure(message):
                 failure = message
             }
         }
     }
 }
+

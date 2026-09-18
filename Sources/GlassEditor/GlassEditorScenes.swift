@@ -11,6 +11,10 @@
 //
 
 import SwiftUI
+import GlassConnectionKit
+#if canImport(UIKit)
+import UIKit
+#endif
 #if os(macOS)
 import AppKit
 #endif
@@ -37,6 +41,9 @@ public final class GlassEditorRuntime {
     /// is rather than in whichever window happens to be first in a dictionary.
     private(set) var frontmostWorkspaceID: UUID?
     public let preferences: GlassEditorPreferences
+    /// Every project this person has, on any device — the list that outlives a window, and the
+    /// editor's entry point in the library. See `GlassEditorProjectLibrary`.
+    public let projects: GlassEditorProjectLibrary
     public let layers: GlassLayerStore
     private let defaults: UserDefaults
 
@@ -44,6 +51,7 @@ public final class GlassEditorRuntime {
         self.layers = layers ?? GlassLayerStore()
         self.defaults = defaults
         self.preferences = GlassEditorPreferences(defaults: defaults)
+        self.projects = GlassEditorProjectLibrary(defaults: defaults)
     }
 
     /// The workspace for a window, made the first time that window asks for it.
@@ -54,15 +62,31 @@ public final class GlassEditorRuntime {
         return workspace
     }
 
-    /// The window in front, or the only one, or none.
+    /// Windows that are actually on screen.
+    ///
+    /// **Not the same set as `workspaces`.** A workspace is made the first time a window *asks*
+    /// for one, which is a side effect of SwiftUI rendering — so a workspace can exist with no
+    /// window in front of it, and asking `workspaces` whether a window is open answers about the
+    /// wrong thing. A file opened then went into a workspace nobody was looking at, and the second
+    /// Edit after closing the editor appeared to do nothing at all.
+    private var liveWindows: Set<UUID> = []
+
+    /// The window in front, or the only one, or none — counting only windows that exist.
     public var frontmostWorkspace: GlassEditorWorkspace? {
-        if let id = frontmostWorkspaceID, let workspace = workspaces[id] { return workspace }
-        return workspaces.count == 1 ? workspaces.values.first : nil
+        if let id = frontmostWorkspaceID, liveWindows.contains(id), let workspace = workspaces[id] {
+            return workspace
+        }
+        guard liveWindows.count == 1, let only = liveWindows.first else { return nil }
+        return workspaces[only]
     }
 
-    func noteFrontmost(_ id: UUID) { frontmostWorkspaceID = id }
+    func noteFrontmost(_ id: UUID) {
+        liveWindows.insert(id)
+        frontmostWorkspaceID = id
+    }
 
     func forget(_ id: UUID) {
+        liveWindows.remove(id)
         workspaces[id] = nil
         if frontmostWorkspaceID == id { frontmostWorkspaceID = nil }
     }
@@ -74,40 +98,166 @@ public final class GlassEditorRuntime {
     /// Returns nil when an existing window took it, so the caller knows not to open one.
     @discardableResult
     public func open(_ url: URL) -> UUID? {
-        if let workspace = frontmostWorkspace {
-            workspace.open(url)
-            return nil
-        }
-        let id = UUID()
-        workspace(for: id).open(url)
+        // The window is decided now and the read happens after it: reading is asynchronous for the
+        // same reason a listing is, and a window that appeared only once the bytes arrived would
+        // look like a click that did nothing.
+        let id = frontmostWindowID ?? UUID()
+        let workspace = workspace(for: id)
+        Task { await workspace.open(url) }
         return id
+    }
+
+    /// The window a file should land in: the one in front, or none when there is no window at all.
+    private var frontmostWindowID: UUID? {
+        if let id = frontmostWorkspaceID, liveWindows.contains(id) { return id }
+        return liveWindows.count == 1 ? liveWindows.first : nil
+    }
+
+    /// Opens one file on another machine — **Edit** in the Files browser, with no project around
+    /// it. Returns a window to show, or nil when an existing one took it.
+    @discardableResult
+    public func open(path: String, on hostID: HostID, machine: String) -> UUID? {
+        guard let remoteAccess else { return nil }
+        let windowID = frontmostWindowID ?? UUID()
+        let workspace = workspace(for: windowID)
+        Task { @MainActor in
+            do {
+                let access = try await remoteAccess(hostID)
+                await workspace.open(path: path, through: access, machine: machine)
+            } catch {
+                workspace.message = error.localizedDescription
+            }
+        }
+        return windowID
     }
 
     /// The same, for a folder opened as a project.
     @discardableResult
     public func openProject(_ url: URL) -> UUID? {
-        if let workspace = frontmostWorkspace {
-            workspace.openProject(url)
-            return nil
-        }
-        let id = UUID()
-        workspace(for: id).openProject(url)
-        return id
+        let window = frontmostWindowID ?? UUID()
+        let opened = workspace(for: window).openProject(url)
+        // Opening a folder is what puts it in the library, so the two cannot disagree about what a
+        // project is: there is one way in.
+        if let opened { projects.remember(opened) }
+        return window
     }
 
-    /// How many editor windows are on screen.
+    /// How a machine other than this one is reached, supplied by whatever owns SSH.
     ///
-    /// The File menu needs to know whether to open one: a freshly made, empty editor window is
-    /// exactly where the file the user just chose should appear, and opening a second one beside it
-    /// leaves them with two windows and one document (reported 2026-09-17). Counted by the windows
-    /// themselves, because SwiftUI will not say what scenes are open.
-    public private(set) var openWindowCount = 0
+    /// The editor does not import the terminal: SFTP belongs to the capability that owns the
+    /// connection, the trust prompt and the session. Nil means this build has no way to reach
+    /// another machine, and a remote project says so rather than failing quietly.
+    public var remoteAccess: ((HostID) async throws -> any GlassEditorFileAccess)?
 
-    func noteWindowOpened() { openWindowCount += 1 }
-    func noteWindowClosed() { openWindowCount = max(0, openWindowCount - 1) }
+    /// Opens a project already in the library, wherever it lives.
+    ///
+    /// Returns the id of a window to open, or nil when an existing window took it — or when the
+    /// project could not be opened at all, in which case the workspace carries the reason.
+    @discardableResult
+    public func openProject(_ project: GlassEditorProject, reach: GlassEditorProjectReach) -> UUID? {
+        projects.remember(project)
+        if case .thisMachine = reach {
+            return openProject(URL(filePath: project.path, directoryHint: .isDirectory))
+        }
+        guard let hostID = project.hostID, let remoteAccess else { return nil }
+        // The window comes first and fills in, because connecting is not instant and an editor
+        // that appears only once the SSH handshake finishes looks like a click that did nothing.
+        let windowID = frontmostWindowID ?? UUID()
+        let workspace = workspace(for: windowID)
+        Task { @MainActor in
+            do {
+                let access = try await remoteAccess(hostID)
+                workspace.openProject(project, access: access, reach: reach)
+            } catch {
+                workspace.message = error.localizedDescription
+            }
+        }
+        return windowID
+    }
 
-    /// Whether a window is already showing this workspace — every window is a view of the same one.
-    public var hasOpenWindow: Bool { openWindowCount > 0 }
+    /// A window something has asked to be shown, and the count that makes a repeat request
+    /// visible even when it names the same window.
+    ///
+    /// Requested rather than opened directly, because **not every platform can open a window.**
+    /// An iPhone has one scene: `openWindow` there does nothing at all, silently, so a Projects
+    /// panel that called it would list projects and refuse to open any of them. The bootstrap
+    /// below decides — a window where windows exist, a full-screen presentation where they do not.
+    public private(set) var requestedWindowID: UUID?
+    public private(set) var presentationSerial = 0
+
+    /// Asks for a window. Nil is a request for a new, empty one.
+    public func present(_ id: UUID?) {
+        requestedWindowID = id ?? UUID()
+        presentationSerial += 1
+    }
+
+    /// Clears the request once something has shown it.
+    public func clearPresentation() {
+        requestedWindowID = nil
+    }
+
+    /// How many editor windows are on screen. Counted by the windows themselves, because SwiftUI
+    /// will not say what scenes are open.
+    public var openWindowCount: Int { liveWindows.count }
+
+    public var hasOpenWindow: Bool { !liveWindows.isEmpty }
+}
+
+/// Wraps the library so the editor can be presented on a platform with no second window.
+///
+/// The three other capabilities each have one of these (`GlassTerminalBootstrap`,
+/// `GlassDatabaseBootstrap`, `GlassDesktopBootstrap`) and for the same reason: a capability's
+/// surface has to arrive *somewhere*, and where depends on the platform rather than on the
+/// capability. `supportsMultipleScenes` is the runtime answer rather than an `#if`, because the
+/// difference is iPhone against iPad and both are `os(iOS)`.
+public struct GlassEditorBootstrap<Content: View>: View {
+    private let runtime: GlassEditorRuntime
+    private let content: Content
+    @Environment(\.openWindow) private var openWindow
+
+    public init(runtime: GlassEditorRuntime, @ViewBuilder content: () -> Content) {
+        self.runtime = runtime
+        self.content = content()
+    }
+
+    public var body: some View {
+        base
+            .onChange(of: runtime.presentationSerial) { _, _ in
+                guard Self.canOpenWindows, let id = runtime.requestedWindowID else { return }
+                openWindow(id: GlassEditorRuntime.windowID, value: id)
+                runtime.clearPresentation()
+            }
+    }
+
+    @ViewBuilder
+    private var base: some View {
+        #if os(iOS)
+        content
+            .fullScreenCover(isPresented: Binding(
+                get: { !Self.canOpenWindows && runtime.requestedWindowID != nil },
+                set: { if !$0 { runtime.clearPresentation() } }
+            )) {
+                if let id = runtime.requestedWindowID {
+                    NavigationStack {
+                        GlassEditorWorkspaceView(workspace: runtime.workspace(for: id), windowID: id)
+                            .toolbar {
+                                ToolbarItem(placement: .cancellationAction) {
+                                    Button("Done") { runtime.clearPresentation() }
+                                }
+                            }
+                    }
+                    .environment(runtime)
+                    .glassLayers(runtime.layers)
+                }
+            }
+        #else
+        content
+        #endif
+    }
+
+    /// Whether this device has more than one scene to put a window in. Shared with every other
+    /// capability that opens windows, because they all have to ask it.
+    static var canOpenWindows: Bool { GlassWindowPresentation.canOpenWindows }
 }
 
 public struct GlassEditorScenes: Scene {

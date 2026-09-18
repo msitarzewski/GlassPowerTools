@@ -66,6 +66,14 @@ public struct GlassEditorWorkspaceView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .toolbar { toolbar }
+            // **No sidebar without a project.** The sidebar is the project's file tree and holds
+            // nothing else — open documents are tabs. With no project open, the control offered to
+            // reveal a column that could only ever be blank, so the control goes too: a toggle
+            // whose only outcome is an empty stripe is a promise the window cannot keep.
+            //
+            // Nobody is stranded by it. Opening a project is File ▸ Open Project… (⌥⌘O) and a
+            // button on the empty document view, neither of which is in the sidebar.
+            .toolbar(removing: workspace.projects.isEmpty ? .sidebarToggle : nil)
         }
         // **The text follows the system's appearance.** `GlassEditorModel` defaults to the dark
         // theme and nothing ever changed it, so in Light mode the window's chrome went light and the
@@ -81,13 +89,14 @@ public struct GlassEditorWorkspaceView: View {
         // that works in the headset and on an iPad too.
         .dropDestination(for: URL.self) { urls, _ in
             var opened = false
-            for url in urls where workspace.open(url) != nil { opened = true }
+            for url in urls { Task { await workspace.open(url) } }
+            opened = !urls.isEmpty
             return opened
         }
         .fileImporter(isPresented: $isImporting, allowedContentTypes: [.text, .sourceCode, .plainText, .json, .yaml, .data],
                       allowsMultipleSelection: true) { result in
             switch result {
-            case .success(let urls): for url in urls { workspace.open(url) }
+            case .success(let urls): for url in urls { Task { await workspace.open(url) } }
             case .failure(let error): workspace.message = error.localizedDescription
             }
         }
@@ -105,7 +114,7 @@ public struct GlassEditorWorkspaceView: View {
             if case .success(let url) = result, let document = exportingDocument {
                 // `fileExporter` has already written the bytes; adopting the location is what makes
                 // the next ⌘S go to the file the user just chose rather than asking again.
-                workspace.save(document.id, to: url)
+                Task { await workspace.save(document.id, to: url) }
             }
             exportingDocument = nil
         }
@@ -271,7 +280,9 @@ public struct GlassEditorWorkspaceView: View {
         if node.isDirectory {
             workspace.setExpanded(!workspace.isExpanded(node.id), for: node.id)
         } else {
-            workspace.open(URL(filePath: node.path))
+            // By path, not by URL: the file may be on another machine, and the workspace resolves
+            // which one from the project the path belongs to.
+            Task { await workspace.open(path: node.path) }
         }
     }
 
@@ -473,7 +484,7 @@ public struct GlassEditorWorkspaceView: View {
     private func saveSelected() {
         guard let document = workspace.selectedDocument else { return }
         if document.hasNeverBeenSaved { exportingDocument = document }
-        else { workspace.save(document.id) }
+        else { Task { await workspace.save(document.id) } }
     }
 
     private func requestClose(_ document: GlassEditorDocument) {
@@ -561,12 +572,29 @@ private struct GlassEditorDialogs: ViewModifier {
             } message: {
             Text(workspace.message ?? "")
             }
+            // A save that stopped to ask. The choices are `ConflictResolution`'s, which is the
+            // same set the SFTP editor offers — one vocabulary for "the file changed underneath
+            // you", wherever the file is.
+            .confirmationDialog("The file has changed", isPresented: Binding(
+            get: { workspace.pendingConflict != nil },
+            set: { if !$0 { Task { await workspace.resolveConflict(.keepEditing) } } }),
+            titleVisibility: .visible, presenting: workspace.pendingConflict) { conflict in
+            Button("Save Anyway", role: .destructive) {
+            Task { await workspace.resolveConflict(.overwriteRemote) }
+            }
+            Button("Discard My Changes and Reload", role: .destructive) {
+            Task { await workspace.resolveConflict(.discardLocalAndReload) }
+            }
+            Button("Keep Editing", role: .cancel) { Task { await workspace.resolveConflict(.keepEditing) } }
+            } message: { conflict in
+            Text(conflict.explanation)
+            }
             .confirmationDialog("Close without saving?", isPresented: Binding(
             get: { closeCandidate != nil }, set: { if !$0 { closeCandidate = nil } }),
             titleVisibility: .visible, presenting: closeCandidate) { document in
             Button("Save", role: .none) {
             if document.hasNeverBeenSaved { exportingDocument = document }
-            else { workspace.save(document.id); workspace.close(document.id, force: true) }
+            else { Task { await workspace.save(document.id); workspace.close(document.id, force: true) } }
             closeCandidate = nil
             }
             Button("Discard Changes", role: .destructive) {
@@ -658,7 +686,14 @@ private struct GlassEditorWindowLifecycle: ViewModifier {
             // A window that opens onto an existing project shows the tree; a new, empty one does
             // not, and neither does one showing a single file.
             .onAppear {
-                if !workspace.projects.isEmpty { columnVisibility = .all }
+                columnVisibility = workspace.projects.isEmpty ? .detailOnly : .all
+            }
+            // The column follows the projects: it arrives with the first one and leaves with the
+            // last. Closing the only project used to leave the tree open and empty, which is the
+            // same blank stripe from the other direction.
+            .onChange(of: workspace.projects.count) { previous, count in
+                if count == 0 { columnVisibility = .detailOnly }
+                else if previous == 0 { columnVisibility = .all }
             }
     }
 }
@@ -771,11 +806,24 @@ private struct GlassEditorTreeRows: View {
         // running app: clicking a row left the list with no selection at all. The database's rows
         // have always been an `HStack` ending in a `Spacer`, which is also where the trailing fact
         // about a row goes.
-        HStack(spacing: 0) {
+        HStack(spacing: 6) {
             // The list's own font, as the schema browser's table rows use — `rowSubtitleFont` is
             // `.caption` on a Mac, which made a file tree read like a footnote.
             Label(node.name, systemImage: symbol)
             Spacer(minLength: 0)
+            // Trailing, where a fact about a row goes. A folder on this device is read before the
+            // frame draws and neither of these is ever seen; a folder on another machine is a
+            // listing crossing a network, and an empty triangle would read as an empty folder.
+            if node.isLoading {
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityLabel("Reading \(node.name)")
+            } else if let loadError = node.loadError {
+                Image(systemName: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
+                    .help(loadError)
+                    .accessibilityLabel("\(node.name) could not be read: \(loadError)")
+            }
         }
             .frame(maxWidth: .infinity, alignment: .leading)
             .glassSpatialRowMetrics()
@@ -796,6 +844,9 @@ private struct GlassEditorTreeRows: View {
                     Button("Refresh") {
                         node.invalidate()
                         workspace.setExpanded(true, for: node.id)
+                        // A folder that was already open stays in the expansion set, so
+                        // `setExpanded` has nothing to do and would not re-read it.
+                        node.beginLoadingChildrenIfNeeded(using: workspace.access(for: node))
                     }
                 }
             }

@@ -33,13 +33,25 @@ struct GlassEditorProjectTests {
     }
 
     // MARK: The tree
+    /// Waits for a folder's contents to arrive.
+    ///
+    /// The reader is async now, because a remote listing crosses a network — so a tree fills in
+    /// after the call that asked for it rather than during. Bounded, so a reader that never
+    /// answers fails the assertion instead of hanging the suite.
+    @discardableResult
+    private func settle(_ node: GlassEditorProjectNode, turns: Int = 200) async -> GlassEditorProjectNode {
+        for _ in 0..<turns where node.children == nil { await Task.yield() }
+        return node
+    }
 
-    @Test func aProjectReadsItsRootFoldersFirstAndSkipsMachinery() throws {
+
+    @Test func aProjectReadsItsRootFoldersFirstAndSkipsMachinery() async throws {
         let root = try makeTree(); defer { try? FileManager.default.removeItem(at: root) }
         let workspace = GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.project.\(UUID().uuidString)")!)
 
         let project = try #require(workspace.openProject(root))
         let node = try #require(workspace.projectRoots[project.id])
+        await settle(node)
         let names = (node.children ?? []).map(\.name)
 
         #expect(names == ["Sources", "README.md"], "got \(names)")
@@ -48,15 +60,16 @@ struct GlassEditorProjectTests {
 
     /// A checkout can hold a hundred thousand files. Reading them all to draw a sidebar is how an
     /// editor earns a beachball, so a folder is read when it is opened and not before.
-    @Test func foldersAreReadOnlyWhenTheyAreExpanded() throws {
+    @Test func foldersAreReadOnlyWhenTheyAreExpanded() async throws {
         let root = try makeTree(); defer { try? FileManager.default.removeItem(at: root) }
         let workspace = GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.project.\(UUID().uuidString)")!)
         let project = try #require(workspace.openProject(root))
         let node = try #require(workspace.projectRoots[project.id])
+        await settle(node)
         let sources = try #require((node.children ?? []).first { $0.name == "Sources" })
 
         #expect(sources.children == nil, "a folder was read before it was expanded")
-        sources.loadChildrenIfNeeded(using: GlassEditorLocalDirectoryReader())
+        await sources.loadChildrenIfNeeded(using: GlassEditorLocalFileAccess())
         #expect((sources.children ?? []).map(\.name) == ["Deep", "main.swift"])
     }
 
@@ -80,16 +93,18 @@ struct GlassEditorProjectTests {
 
     /// Expansion lives on the model, which is what lets a key open a folder. It reads the folder
     /// the first time and not again.
-    @Test func expandingAFolderReadsItOnceAndTheModelRemembers() throws {
+    @Test func expandingAFolderReadsItOnceAndTheModelRemembers() async throws {
         let root = try makeTree(); defer { try? FileManager.default.removeItem(at: root) }
         let workspace = GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.project.\(UUID().uuidString)")!)
         let project = try #require(workspace.openProject(root))
         let node = try #require(workspace.projectRoots[project.id])
+        await settle(node)
         let sources = try #require((node.children ?? []).first { $0.name == "Sources" })
 
         #expect(!workspace.isExpanded(sources.id))
         workspace.setExpanded(true, for: sources.id)
         #expect(workspace.isExpanded(sources.id))
+        await settle(sources)
         #expect((sources.children ?? []).map(\.name) == ["Deep", "main.swift"])
 
         workspace.setExpanded(false, for: sources.id)
@@ -99,11 +114,12 @@ struct GlassEditorProjectTests {
 
     /// A file's folder is its **parent** — picking a file and asking for something new should put
     /// it beside that file, which is what every file browser means by "here".
-    @Test func theCurrentFolderFollowsTheSelection() throws {
+    @Test func theCurrentFolderFollowsTheSelection() async throws {
         let root = try makeTree(); defer { try? FileManager.default.removeItem(at: root) }
         let workspace = GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.project.\(UUID().uuidString)")!)
         let project = try #require(workspace.openProject(root))
         let node = try #require(workspace.projectRoots[project.id])
+        await settle(node)
         let sources = try #require((node.children ?? []).first { $0.name == "Sources" })
         let readme = try #require((node.children ?? []).first { $0.name == "README.md" })
 
@@ -118,10 +134,11 @@ struct GlassEditorProjectTests {
     }
 
     /// Selecting a document keeps the detail pane in step — one selection, not two that can differ.
-    @Test func selectingADocumentSelectsIt() throws {
+    @Test func selectingADocumentSelectsIt() async throws {
         let root = try makeTree(); defer { try? FileManager.default.removeItem(at: root) }
         let workspace = GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.project.\(UUID().uuidString)")!)
-        let document = try #require(workspace.open(root.appendingPathComponent("README.md")))
+        let opened1 = await workspace.open(root.appendingPathComponent("README.md"))
+        let document = try #require(opened1)
         workspace.sidebarSelection = .document(document.id)
         #expect(workspace.selection == document.id)
         #expect(workspace.selectedDocument?.id == document.id)
@@ -130,11 +147,12 @@ struct GlassEditorProjectTests {
     /// Closing a project takes its nodes out of the expansion set and the selection. Otherwise a
     /// session of opening and closing projects grows both without bound, holding ids for folders
     /// that are not on screen and cannot be reached.
-    @Test func closingAProjectForgetsItsNodes() throws {
+    @Test func closingAProjectForgetsItsNodes() async throws {
         let root = try makeTree(); defer { try? FileManager.default.removeItem(at: root) }
         let workspace = GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.project.\(UUID().uuidString)")!)
         let project = try #require(workspace.openProject(root))
         let node = try #require(workspace.projectRoots[project.id])
+        await settle(node)
         let sources = try #require((node.children ?? []).first { $0.name == "Sources" })
         workspace.setExpanded(true, for: sources.id)
         workspace.sidebarSelection = .node(sources.id)

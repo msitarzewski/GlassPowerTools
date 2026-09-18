@@ -29,20 +29,41 @@ public final class GlassEditorDocument: Identifiable {
     public let model: GlassEditorModel
     /// Where it is saved, or nil for a document that has never been written.
     public private(set) var url: URL?
+    /// The machine it is on, when that machine is not this one. Nil is the ordinary local case.
+    public private(set) var machine: String?
     /// The name a user gave an unsaved document, so it is not "Untitled" forever.
     private let untitledName: String
 
-    public init(model: GlassEditorModel, url: URL?, untitledName: String = "Untitled") {
+    /// What the file looked like when it was read, and the baseline every save compares against.
+    ///
+    /// **Kept for a local file as well as a remote one.** A file on this disk changes underneath
+    /// the editor too — a checkout, a build, another editor — and an editor that notices only when
+    /// the file is on a server is an editor that quietly overwrote your rebase. The type is called
+    /// `RemoteDocumentSession` because it was written for the SFTP editor; it holds a size, a
+    /// modification time and a digest, which mean the same thing on both machines.
+    public private(set) var session: RemoteDocumentSession?
+
+    public init(model: GlassEditorModel, url: URL?, untitledName: String = "Untitled",
+                machine: String? = nil, session: RemoteDocumentSession? = nil) {
         self.model = model
         self.url = url
         self.untitledName = untitledName
+        self.machine = machine
+        self.session = session
     }
 
     // MARK: Opening
 
     /// Reads a file and prepares it for editing, keeping its encoding and line endings.
-    public static func open(_ url: URL) throws -> GlassEditorDocument {
-        let data = try Data(contentsOf: url)
+    ///
+    /// **One path for both machines.** Where the bytes came from is the argument; everything after
+    /// it — the encoding, the line endings, the language, the baseline a later save compares
+    /// against — is the same work, and doing it twice would mean doing the second one worse.
+    public static func open(path: String,
+                            through access: any GlassEditorFileAccess,
+                            machine: String? = nil) async throws -> GlassEditorDocument {
+        let data = try await access.read(path)
+        let url = URL(filePath: path)
         let decoded = try EncodingDetector.decode(data)
         let snapshot = DocumentSnapshot(content: decoded.content,
                                         encoding: decoded.encoding,
@@ -58,7 +79,19 @@ public final class GlassEditorDocument: Identifiable {
             let sniffed = LanguageID.forContent(decoded.content)
             if sniffed != .plaintext { model.language = sniffed }
         }
-        return GlassEditorDocument(model: model, url: url)
+        // The digest is free here: the bytes are already in hand, and it is what makes the
+        // conflict check exact rather than a guess about a coarse modification time.
+        let session = RemoteDocumentSession(
+            ref: RemoteDocumentRef(connectionID: UUID(), host: machine ?? "", path: path),
+            openedStat: (try? await access.stat(path)) ?? RemoteStat(),
+            openedDigest: access.digest(of: data)
+        )
+        return GlassEditorDocument(model: model, url: url, machine: machine, session: session)
+    }
+
+    /// The local convenience, unchanged for every caller that has a `URL` and means this device.
+    public static func open(_ url: URL) async throws -> GlassEditorDocument {
+        try await open(path: url.path(percentEncoded: false), through: GlassEditorLocalFileAccess())
     }
 
     /// A new, empty document that exists only in memory until it is saved.
@@ -76,9 +109,22 @@ public final class GlassEditorDocument: Identifiable {
 
     public var displayName: String { url?.lastPathComponent ?? untitledName }
 
-    /// The folder a user recognises, shown under the name. Nil while unsaved.
+    /// Where the file is on its machine, in the one spelling everything compares against.
+    public var path: String? { url?.path(percentEncoded: false) }
+
+    /// The folder a user recognises, shown under the name, with the machine when it is not this
+    /// one — because `/srv/app` on two machines is two different files and the path alone does not
+    /// say which you are editing. Nil while unsaved.
     public var locationDescription: String? {
-        url?.deletingLastPathComponent().path(percentEncoded: false)
+        // Normalized, because `deletingLastPathComponent` leaves a trailing separator and
+        // "/srv/app/" is not the same string as the project root it is meant to match — the
+        // duplicate-project defect, in a different place.
+        guard let raw = url?.deletingLastPathComponent().path(percentEncoded: false) else {
+            return nil
+        }
+        let folder = GlassEditorProject.normalized(raw)
+        guard let machine, !machine.isEmpty else { return folder }
+        return "\(machine) · \(folder)"
     }
 
     public var isDirty: Bool { model.isDirty }
@@ -93,26 +139,103 @@ public final class GlassEditorDocument: Identifiable {
 
     // MARK: Saving
 
+    /// What the file on the machine looks like now, against what it looked like when it was
+    /// opened. Asked before every save, on both machines.
+    ///
+    /// A failed stat returns `.indeterminate` rather than `.noConflict`: not having looked is not
+    /// the same as having looked and seen no change, and `ConflictDetector` is built around
+    /// exactly that distinction.
+    public func conflictState(through access: any GlassEditorFileAccess) async -> ConflictState {
+        await checkBeforeSaving(through: access).state
+    }
+
+    /// What the machine says about the file right now, **and what it looked like while saying it**.
+    ///
+    /// The second half is what the write then expects. Expecting the *opened* stat instead would
+    /// refuse every save that followed a harmless change: a build touches the file, the digest
+    /// proves nothing was altered, the user is not asked — and then the write refuses anyway,
+    /// because the timestamp moved. The observation the decision was made against is the one the
+    /// decision authorises.
+    public func checkBeforeSaving(through access: any GlassEditorFileAccess) async -> GlassEditorSaveCheck {
+        guard let session, let path = url?.path(percentEncoded: false) else {
+            return GlassEditorSaveCheck(state: .noConflict, observed: nil)
+        }
+        let currentStat = try? await access.stat(path)
+        let cheap = ConflictDetector.classify(session: session,
+                                              currentStat: currentStat,
+                                              currentDigest: nil,
+                                              localDirty: model.isDirty)
+        // Tier 1 said nothing has changed, which is the common case and the whole reason it is
+        // asked first: saving does not cost a download.
+        guard cheap != .noConflict else {
+            return GlassEditorSaveCheck(state: .noConflict, observed: currentStat)
+        }
+
+        // It said something *might* have. Tier 2 is what turns that into an answer — and it has to
+        // be asked, because with unsaved edits and no digest the detector reports `.indeterminate`
+        // rather than guess, which would put a question in front of the user every time a build
+        // touched a file it did not change.
+        guard let currentDigest = (try? await access.read(path)).flatMap({ access.digest(of: $0) })
+        else { return GlassEditorSaveCheck(state: cheap, observed: currentStat) }
+        let settled = ConflictDetector.classify(session: session,
+                                                currentStat: currentStat,
+                                                currentDigest: currentDigest,
+                                                localDirty: model.isDirty)
+        return GlassEditorSaveCheck(state: settled, observed: currentStat)
+    }
+
     /// Writes the document where it already lives. Throws for one that has never been saved —
     /// choosing a location is the workspace's job, because it needs a file panel.
-    public func save() throws {
+    public func save(through access: any GlassEditorFileAccess,
+                     expecting: RemoteStat? = nil) async throws {
         guard let url else { throw GlassEditorWorkspaceError.needsLocation }
-        try write(to: url)
+        try await write(to: url, through: access, expecting: expecting)
     }
 
     /// Writes to a new location and adopts it, so the document's name, language and future saves
-    /// all follow the file the user chose.
-    public func save(to newURL: URL) throws {
-        try write(to: newURL)
+    /// all follow the file the user chose. Local by definition: the panel that chose it is this
+    /// device's.
+    public func save(to newURL: URL) async throws {
+        let access = GlassEditorLocalFileAccess()
+        // A new location expects nothing: whatever is there is being replaced deliberately.
+        try await write(to: newURL, through: access, expecting: nil)
         url = newURL
+        machine = nil
         setLanguage(LanguageID.forFileExtension(newURL.pathExtension))
     }
 
-    private func write(to url: URL) throws {
+    private func write(to url: URL, through access: any GlassEditorFileAccess,
+                       expecting: RemoteStat?) async throws {
         // The line endings the file arrived with, not this platform's: an editor that silently
         // rewrites every line terminator produces a diff of the whole file on the first save.
         let content = LineEndingDetector.normalize(model.text, to: model.snapshot.lineEndings)
-        try AtomicSaver.save(content, encoding: model.snapshot.encoding, to: url)
+        let data = try EncodingDetector.encode(content, as: model.snapshot.encoding)
+        let path = url.path(percentEncoded: false)
+        // What the file was when this document last looked, so the write refuses to land on a
+        // version nobody has seen. A document with no session — a brand-new file — expects
+        // nothing, which is exactly right.
+        let committed = try await access.write(data, to: path, expecting: expecting)
+        // The baseline becomes what was just written, as the machine described it. Without this
+        // the very next check would compare against the pre-save identity and report our own
+        // write as somebody else's.
+        if let session {
+            self.session = session.updatingAfterSave(
+                stat: committed ?? RemoteStat(),
+                digest: access.digest(of: data)
+            )
+        }
+        model.markClean()
+    }
+
+    /// Throws away local edits and takes the file as it is on the machine now.
+    public func reload(through access: any GlassEditorFileAccess) async throws {
+        guard let url else { throw GlassEditorWorkspaceError.needsLocation }
+        let fresh = try await Self.open(path: url.path(percentEncoded: false),
+                                        through: access, machine: machine)
+        // Into the model that is already on screen, so the window, its tab and its scroll
+        // position all survive a reload — replacing the document would be a different tab.
+        try model.replaceAllContent(with: fresh.model.text)
+        session = fresh.session
         model.markClean()
     }
 }

@@ -576,6 +576,15 @@ public final class GlassShellModel: GlassServiceStore {
         hosts.first { $0.id == id } ?? hosts.first { $0.contains(id) }
     }
 
+    /// The machine one of whose services is this endpoint.
+    ///
+    /// The way back from a capability's own record to the catalog's: a capability knows its
+    /// service's id and nothing about hosts, so this is how "which machine is this connection to?"
+    /// is answered without the capability holding a second copy of the answer (D26).
+    public func host(owningEndpoint endpointID: EndpointID) -> GlassShellHost? {
+        hosts.first { $0.services.contains { $0.endpointID == endpointID } }
+    }
+
     /// The stored record with this id, if any — the device's own included, though it is not in
     /// `records`, which is the shared catalog as stored.
     public func record(_ id: HostID) -> HostProfile? {

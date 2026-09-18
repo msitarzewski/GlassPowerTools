@@ -13,6 +13,7 @@ import GlassConnectionKit
 import GlassConnectionUI
 import GlasSecretStore
 import GlassShell
+import GlassEditorCore
 import GlassLayers
 import GlassSSHTransport
 
@@ -66,6 +67,13 @@ public final class GlassTerminalRuntime {
     /// D14: the second source the terminal's trust prompt can be driven from, for callers that
     /// have no `TerminalSession` — a borrowed port forward, or a setup-time trust resolution.
     let trustBroker: TerminalHostTrustBroker
+
+    /// What "Open in Editor" does to a folder in the Files browser. Set by the composition root;
+    /// nil means nothing can open a project here and the menu item is not offered.
+    public var openFolderAsProject: GlassOpenFolderAsProject?
+
+    /// What "Edit" does to a file in the Files browser: opens it in the editor, as a tab.
+    public var openFileInEditor: GlassOpenFileInEditor?
 
     public init(layers: GlassLayerStore? = nil, windowRecovery: GlassWindowRecoveryManager? = nil) {
         let layers = layers ?? GlassLayerStore()
@@ -457,6 +465,8 @@ public struct GlassTerminalBootstrap<Content: View>: View {
             if let context = router.sftpContext,
                runtime.sessionManager.session(for: context.sessionID) != nil {
                 SFTPBrowserView(sessionID: context.sessionID, initialPath: context.initialPath)
+                    .environment(\.glassOpenFolderAsProject, runtime.openFolderAsProject)
+                    .environment(\.glassOpenFileInEditor, runtime.openFileInEditor)
             } else {
                 SFTPBrowserNotFoundView(context: router.sftpContext)
             }
@@ -524,7 +534,188 @@ private final class GlassTerminalPortForward: GlassHostPortForward {
     }
 }
 
+/// An SFTP session held open for as long as a project is.
+///
+/// The transport is owned here rather than borrowed from a live terminal session, so opening a
+/// project does not require the user to have a terminal window up — and closing the project drops
+/// exactly what opening it made.
+/// Internal rather than private so the live test can build one over a real SFTP session and
+/// exercise the same object the app uses.
+final class GlassTerminalDirectoryLister: GlassHostDirectoryLister {
+    private let sftp: any SFTPSession
+    /// The same client the Files browser uses, so the verified commit below is *the* verified
+    /// commit rather than a second one written to look like it.
+    private let client: SFTPClient
+    private let transport: SSHTransport?
+    private let owner: UUID
+    private let serverID: UUID
+
+    init(sftp: any SFTPSession, client: SFTPClient, transport: SSHTransport?, owner: UUID,
+         serverID: UUID) {
+        self.sftp = sftp
+        self.client = client
+        self.transport = transport
+        self.owner = owner
+        self.serverID = serverID
+    }
+
+    func list(_ path: String) async throws -> [GlassHostDirectoryEntry] {
+        try await sftp.list(path).map {
+            GlassHostDirectoryEntry(name: $0.name, isDirectory: $0.attributes.isDirectory)
+        }
+    }
+
+    /// Reads the whole file, in the chunks SFTP actually delivers: a read is answered with *at
+    /// most* what was asked for, so a short answer means "less this time", not "end of file" —
+    /// only a zero-length answer means that. Reading until the size is reached and then stopping
+    /// would truncate any file whose size changed between the stat and the read.
+    func read(_ path: String) async throws -> Data {
+        let handle = try await sftp.open(path, mode: .read, permissions: nil)
+        defer { Task { try? await handle.close() } }
+        var data = Data()
+        var offset: UInt64 = 0
+        while true {
+            try Task.checkCancellation()
+            let chunk = try await handle.read(from: offset, length: 32_768)
+            if chunk.isEmpty { break }
+            data.append(chunk)
+            offset += UInt64(chunk.count)
+            guard data.count <= Self.fileByteCeiling else {
+                throw GlassPortForwardError.unavailable
+            }
+        }
+        return data
+    }
+
+    /// Writes the file back through the Files browser's verified commit.
+    ///
+    /// **Not a second implementation of saving.** That path stages the bytes locally, uploads them
+    /// while checking continuously that the destination has not moved underneath, publishes only
+    /// after verifying what landed, carries the original file's permissions and timestamps onto
+    /// the replacement, and reports an ambiguous commit as ambiguous rather than as success or
+    /// failure. A hand-rolled temporary-file-and-rename here would have looked equivalent and been
+    /// none of those things — the first version of this method was exactly that, and it dropped a
+    /// file's executable bit on every save.
+    ///
+    /// `expecting` is what the editor last saw. The commit refuses to land on anything else,
+    /// which closes the window between the editor asking "has this changed?" and the bytes
+    /// arriving.
+    @discardableResult
+    func write(_ data: Data, to path: String, expecting: GlassHostFileStamp?) async throws -> GlassHostFileStamp? {
+        // What the destination is *now*, read the way the commit wants it: attributes and a digest
+        // of the bytes, which is what lets it verify rather than hope.
+        let current = try await SFTPBrowserView.readVerifiedRemoteObservation(
+            client: client, path: path, maximumBytes: UInt64(Self.fileByteCeiling)
+        )
+        if let expecting, !Self.matches(expecting, current.stat) {
+            throw GlassPortForwardError.targetChanged((path as NSString).lastPathComponent)
+        }
+        let result = try await SFTPBrowserView.uploadRemoteEditorBytes(
+            data,
+            client: client,
+            serverID: serverID,
+            remoteDirectory: (path as NSString).deletingLastPathComponent,
+            filename: (path as NSString).lastPathComponent,
+            targetPath: path,
+            expectedRemote: current,
+            maximumBytes: UInt64(Self.fileByteCeiling)
+        )
+        guard let committed = result.committedStat else {
+            // The bytes went and the machine did not describe what it ended up with. Saying
+            // "saved" would be a guess in the direction that loses work.
+            throw GlassPortForwardError.commitOutcomeUnknown((path as NSString).lastPathComponent)
+        }
+        return GlassHostFileStamp(
+            size: committed.size,
+            modifiedAt: committed.modificationSeconds.map {
+                Date(timeIntervalSince1970: TimeInterval($0))
+            }
+        )
+    }
+
+    /// Whether the destination is still the file the editor last saw. A field counts only when
+    /// both sides carry it — a server that omits one proves nothing by omitting it.
+    private static func matches(_ expecting: GlassHostFileStamp, _ now: RemoteStat) -> Bool {
+        if let a = expecting.size, let b = now.size, a != b { return false }
+        if let a = expecting.modifiedAt, let b = now.modificationSeconds,
+           Int64(a.timeIntervalSince1970.rounded(.down)) != b { return false }
+        return true
+    }
+
+    func stat(_ path: String) async throws -> GlassHostFileStamp? {
+        guard let attributes = try? await sftp.attributes(at: path, followSymlinks: true) else {
+            return nil
+        }
+        guard attributes.size != nil || attributes.modificationTime != nil else { return nil }
+        return GlassHostFileStamp(size: attributes.size, modifiedAt: attributes.modificationTime)
+    }
+
+    /// A file the editor will hold entirely in memory and syntax-highlight. Past this it is not a
+    /// document, and saying so beats reading 400 MB into a text view.
+    private static let fileByteCeiling = 64 * 1024 * 1024
+
+    func realPath(_ path: String) async throws -> String {
+        try await sftp.realPath(path)
+    }
+
+    func close() async {
+        try? await sftp.close()
+        await transport?.release(owner: owner)
+    }
+}
+
 extension GlassTerminalCapability {
+    /// Opens an SFTP listing of `host`'s folders, using the host's saved SSH service — its
+    /// credentials, its jump chain and its already-established host-key trust.
+    ///
+    /// The same borrow as `openPortForward`, and the same D14 rule: an unknown or changed host key
+    /// surfaces the terminal's own fingerprint prompt rather than being refused or, worse, trusted
+    /// silently. Opening a project is a foreground action; the user pressed Open and is waiting.
+    public func openDirectoryLister(host: HostProfile) async throws -> any GlassHostDirectoryLister {
+        guard let link = host.services.first(where: { $0.kind == .ssh }),
+              let server = runtime.sessionManager.serverManager.server(for: link.endpointID.rawValue)
+        else { throw GlassPortForwardError.unavailable }
+
+        let preparation = try runtime.sessionManager.prepareConnection(for: server)
+        var materials: [UUID: SessionAuthenticationMaterial] = [
+            preparation.authentication.target.serverID: preparation.authentication.target.material
+        ]
+        for hop in preparation.authentication.jumpHosts { materials[hop.serverID] = hop.material }
+
+        let route = SSHConnection.makeRoute(for: server, jumpHostChain: preparation.jumpHostChain)
+        let transport = SSHTransport(
+            route: route,
+            credentials: PreparedCredentialResolver(materials: materials),
+            trustStore: SecretStoreHostTrustStore(configuration: KeychainManager.hostTrustConfig),
+            trustDecider: BrokeredHostTrustDecider(broker: runtime.trustBroker)
+        )
+        let owner = UUID()
+        _ = await transport.acquire(owner: owner)
+        do {
+            try await transport.connect()
+            let sftp = try await transport.openSFTP()
+            let extensions = await sftp.serverExtensions
+            return GlassTerminalDirectoryLister(
+                sftp: sftp,
+                client: SFTPClient(session: sftp, extensions: extensions),
+                transport: transport,
+                owner: owner,
+                serverID: server.id
+            )
+        } catch let error as SSHTransportError {
+            await transport.release(owner: owner)
+            switch error {
+            case .hostTrustRequired, .hostTrustRejected:
+                throw GlassPortForwardError.hostNotTrusted(name: server.host)
+            default:
+                throw error
+            }
+        } catch {
+            await transport.release(owner: owner)
+            throw error
+        }
+    }
+
     /// Opens a `-L` forward from this device to `remoteHost:port` **as seen from `host`**, using
     /// the host's saved SSH service — its credentials, its jump chain and its already-established
     /// host-key trust. This is what lets the database capability reach a server bound to the
