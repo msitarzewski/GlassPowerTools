@@ -150,7 +150,48 @@ public final class GlassEditorProjectLibrary {
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         payload = Self.load(from: defaults)
+        #if DEBUG
+        seedForUITestingIfRequested()
+        #endif
     }
+
+    #if DEBUG
+    /// Makes a project the UI test can open, **inside the app's own container**.
+    ///
+    /// `--ui-testing --ui-testing-seed-project` creates a small folder in Documents and records it.
+    /// The same shape as the shell's `--ui-testing-seed-hosts`, and for a sharper reason: a phone
+    /// has no way into the editor except a project, and choosing one means the system file picker,
+    /// which a test cannot drive. Seeding it from the host instead does not work — the simulator's
+    /// data container is given a new identifier when the app is reinstalled, so a path written
+    /// before the install points at a directory that no longer exists. That is not a hypothetical;
+    /// it cost an evening, and the app was right to refuse to open it.
+    ///
+    /// Only alongside `--ui-testing`, and only when the list is empty.
+    private func seedForUITestingIfRequested() {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard arguments.contains("--ui-testing"),
+              arguments.contains("--ui-testing-seed-project"),
+              let documents = try? FileManager.default.url(for: .documentDirectory, in: .userDomainMask,
+                                                           appropriateFor: nil, create: true)
+        else { return }
+        // **Replaced, not added to.** `UserDefaults` survives a reinstall while the container that
+        // gave the project its path does not, so a list left from an earlier run points at a
+        // directory that is gone — and a guard of "only seed when empty" then seeds nothing and
+        // leaves the dead record in place. The app is right to refuse to open it; a test fixture
+        // has no business asking it to.
+        for record in payload.records where !record.isDeleted { forget(record.id) }
+        let root = documents.appendingPathComponent("DemoProject", isDirectory: true)
+        let sources = root.appendingPathComponent("Sources", isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
+            try Data("# Demo\n\nA project for checking the editor.\n".utf8)
+                .write(to: root.appendingPathComponent("README.md"))
+            try Data("let greeting = \"hello\"\nprint(greeting)\n".utf8)
+                .write(to: sources.appendingPathComponent("main.swift"))
+        } catch { return }
+        remember(GlassEditorProject.local(root))
+    }
+    #endif
 
     // MARK: Reading
 

@@ -32,7 +32,15 @@ public final class GlassEditorProjectsPanelModel {
     var renaming: GlassEditorProject?
     var renamedTo: String = ""
     var pendingRemoval: GlassEditorProject?
+    /// Something to say about the list — a folder chooser that failed.
     var message: String?
+    /// Something to say about the selected project, raised by an action in its detail.
+    ///
+    /// **Two, because one would be shown in the wrong place.** The alert was attached to the
+    /// results column alone, and on a phone that column is not in the hierarchy once the detail
+    /// has been pushed — so Open on a folder that had gone set a message nobody ever saw and the
+    /// tap did nothing at all. Each column says what happened in it.
+    var detailMessage: String?
 
     public init() {}
 }
@@ -159,6 +167,19 @@ public struct GlassEditorProjectsPanel: View {
 
     @ViewBuilder
     private var detail: some View {
+        detailContent
+            .alert("Projects", isPresented: Binding(
+                get: { panel.detailMessage != nil },
+                set: { if !$0 { panel.detailMessage = nil } })
+            ) {
+                Button("OK", role: .cancel) { panel.detailMessage = nil }
+            } message: {
+                Text(panel.detailMessage ?? "")
+            }
+    }
+
+    @ViewBuilder
+    private var detailContent: some View {
         if let project = selectedProject {
             let reach = reach(project)
             GlassLibraryDetail(title: project.displayName, content: {
@@ -239,7 +260,7 @@ public struct GlassEditorProjectsPanel: View {
     private func open(_ project: GlassEditorProject) {
         let reach = reach(project)
         guard canOpen(reach) else {
-            panel.message = availability(reach)
+            panel.detailMessage = availability(reach)
             return
         }
         // Only a folder on this device can be checked from here; a remote one is the reader's to
@@ -248,7 +269,7 @@ public struct GlassEditorProjectsPanel: View {
             var isDirectory: ObjCBool = false
             guard FileManager.default.fileExists(atPath: project.path, isDirectory: &isDirectory),
                   isDirectory.boolValue else {
-                panel.message = "There is no folder at \(project.path) any more. Remove the project, or put the folder back."
+                panel.detailMessage = "There is no folder at \(project.path) any more. Remove the project, or put the folder back."
                 return
             }
         }
@@ -343,6 +364,7 @@ public extension GlassEditorRuntime {
             title: "Projects",
             symbolName: "folder",
             count: projects.projects.isEmpty ? nil : projects.projects.count,
+            hasSelection: { model.selection != nil },
             results: {
                 GlassEditorProjectsPanel(presentation: .results, runtime: runtime,
                                          panel: model, reach: reach)

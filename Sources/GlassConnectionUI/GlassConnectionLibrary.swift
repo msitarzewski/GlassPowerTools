@@ -315,6 +315,11 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
         .onChange(of: compactPath) { _, path in
             if path.last != .detail { selection = nil }
         }
+        // A panel's own selection is the push nobody else can make for it.
+        .onChange(of: openPanel?.hasSelection ?? false) { _, selected in
+            guard selected, compactPath.last != .detail else { return }
+            compactPath.append(.detail)
+        }
     }
 
     private var results: some View {

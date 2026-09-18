@@ -457,6 +457,7 @@ public extension GlassShellModel {
                 title: "SSH Keys",
                 symbolName: "key",
                 count: keyStore?.keys.count,
+                hasSelection: { panel.selection != nil },
                 results: { GlassKeyManagerPanel(presentation: .results, model: model, panel: panel) },
                 detail: { GlassKeyManagerPanel(presentation: .detail, model: model, panel: panel) })
         ]

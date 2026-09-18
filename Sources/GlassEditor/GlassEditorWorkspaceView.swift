@@ -29,6 +29,11 @@ public struct GlassEditorWorkspaceView: View {
     // A new editor window has no project in it, so it opens with the tree out of the way; opening
     // a project brings it back (`GlassEditorWindowLifecycle`).
     @State private var columnVisibility: NavigationSplitViewVisibility = .detailOnly
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// The project's files, over the document, on a phone.
+    @State private var isShowingFiles = false
+    #endif
     @State private var isImporting = false
     @State private var isImportingProject = false
     @State private var exportingDocument: GlassEditorDocument?
@@ -65,25 +70,17 @@ public struct GlassEditorWorkspaceView: View {
 
     public var body: some View {
         GlassLayeredWindow {
-            NavigationSplitView(columnVisibility: $columnVisibility) {
-                sidebar
-                    .navigationSplitViewColumnWidth(min: GlassLibraryColumnLayout.navigationMinimum,
-                                                    ideal: GlassLibraryColumnLayout.navigationIdeal,
-                                                    max: GlassLibraryColumnLayout.navigationMaximum)
-                    .glassLibraryColumnAutosave("com.glasspowertools.editor.columns")
-            } detail: {
-                GlassLayeredPanel(role: .embedded) { detail }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            .toolbar { toolbar }
-            // **No sidebar without a project.** The sidebar is the project's file tree and holds
-            // nothing else — open documents are tabs. With no project open, the control offered to
-            // reveal a column that could only ever be blank, so the control goes too: a toggle
-            // whose only outcome is an empty stripe is a promise the window cannot keep.
-            //
-            // Nobody is stranded by it. Opening a project is File ▸ Open Project… (⌥⌘O) and a
-            // button on the empty document view, neither of which is in the sidebar.
-            .toolbar(removing: workspace.projects.isEmpty ? .sidebarToggle : nil)
+            #if os(iOS)
+            // **A phone is not a narrow Mac.** `NavigationSplitView` collapses on a compact width
+            // into a single stack showing its *sidebar* first — so an editor opened on a file
+            // arrived as an empty list under a navigation bar carrying the file's name: the title
+            // was there and the document was one push away, behind a column with nothing in it
+            // (reported 2026-09-17). The library has always branched here
+            // (`GlassConnectionLibrary.body`); the editor never did.
+            if horizontalSizeClass == .compact { compactLayout } else { splitLayout }
+            #else
+            splitLayout
+            #endif
         }
         // **The text follows the system's appearance.** `GlassEditorModel` defaults to the dark
         // theme and nothing ever changed it, so in Light mode the window's chrome went light and the
@@ -166,6 +163,70 @@ public struct GlassEditorWorkspaceView: View {
             resetFontSize: { workspace.preferences.resetFontSize() },
             find: { workspace.findIsPresented = true },
             goToLine: { goToLineText = ""; isGoingToLine = true })
+    }
+    #endif
+
+    /// Two columns, for a Mac, an iPad and a headset.
+    @ViewBuilder
+    private var splitLayout: some View {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            sidebar
+                .navigationSplitViewColumnWidth(min: GlassLibraryColumnLayout.navigationMinimum,
+                                                ideal: GlassLibraryColumnLayout.navigationIdeal,
+                                                max: GlassLibraryColumnLayout.navigationMaximum)
+                .glassLibraryColumnAutosave("com.glasspowertools.editor.columns")
+        } detail: {
+            GlassLayeredPanel(role: .embedded) { detail }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .toolbar { toolbar }
+        // **No sidebar without a project.** The sidebar is the project's file tree and holds
+        // nothing else — open documents are tabs. With no project open, the control offered to
+        // reveal a column that could only ever be blank, so the control goes too: a toggle whose
+        // only outcome is an empty stripe is a promise the window cannot keep.
+        //
+        // Nobody is stranded by it. Opening a project is File ▸ Open Project… (⌥⌘O) and a button
+        // on the empty document view, neither of which is in the sidebar.
+        .toolbar(removing: workspace.projects.isEmpty ? .sidebarToggle : nil)
+    }
+
+    #if os(iOS)
+    /// One thing at a time, for a phone: the document, and the project's files a tap away.
+    ///
+    /// The file tree is a sheet rather than a column, because a column on a 390-point screen is
+    /// the whole screen — which is what the split view's collapse turned it into. It dismisses
+    /// itself when a file is chosen, because choosing one is why it was opened.
+    @ViewBuilder
+    private var compactLayout: some View {
+        NavigationStack {
+            GlassLayeredPanel(role: .embedded) { detail }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .toolbar { toolbar }
+                .toolbar { filesToolbarItem }
+        }
+        .sheet(isPresented: $isShowingFiles) {
+            NavigationStack {
+                sidebar
+                    .navigationTitle(workspace.projects.first?.displayName ?? "Files")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Done") { isShowingFiles = false }
+                        }
+                    }
+            }
+        }
+        .onChange(of: workspace.selection) { _, _ in isShowingFiles = false }
+    }
+
+    @ToolbarContentBuilder
+    private var filesToolbarItem: some ToolbarContent {
+        if !workspace.projects.isEmpty {
+            ToolbarItem(placement: .primaryAction) {
+                Button("Files", systemImage: "sidebar.leading") { isShowingFiles = true }
+                    .accessibilityIdentifier("editor-files")
+            }
+        }
     }
     #endif
 
@@ -853,7 +914,21 @@ private struct GlassEditorTreeRows: View {
             // clicking a row moved AppKit's own selection but never reached the model, so Return
             // did nothing and the current folder stayed wherever the keyboard had last left it.
             // The database's schema browser has always done both (`SchemaBrowserView.tableRow`).
-            .onTapGesture { workspace.sidebarSelection = .node(node.id) }
+            // **One tap opens on a touch screen; on a Mac it takes two.**
+            //
+            // A double click is a mouse idiom and there is nothing to double-tap on a phone, so
+            // the only gesture the tree had was selection — a file could be chosen and never
+            // opened, on the one platform where the tree is the *only* way to open anything. The
+            // file list did exactly what it was told and looked like an editor that does nothing.
+            //
+            // A folder is left to its disclosure triangle on both: opening it is what the triangle
+            // is for, and a tap that both selects and toggles fights itself.
+            .onTapGesture {
+                workspace.sidebarSelection = .node(node.id)
+                #if !os(macOS)
+                if !node.isDirectory { open(node) }
+                #endif
+            }
             #if os(macOS)
             .simultaneousGesture(TapGesture(count: 2).onEnded { open(node) })
             #endif

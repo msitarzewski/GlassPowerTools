@@ -220,12 +220,26 @@ public struct GlassEditorBootstrap<Content: View>: View {
         self.content = content()
     }
 
+    /// The window to show in place, held here rather than read back out of the runtime through a
+    /// computed `Binding`.
+    ///
+    /// A binding's getter is a closure, so it does not run while the body is being evaluated and
+    /// registers no dependency on what it reads. The presentation therefore never arrived: the
+    /// runtime's request changed, and nothing in this view had asked to be told. `@State` set from
+    /// an `onChange` is the shape the desktop's session uses, and it works because the change is
+    /// observed where SwiftUI can see it.
+    @State private var presented: GlassEditorWindowPresentation?
+
     public var body: some View {
         base
             .onChange(of: runtime.presentationSerial) { _, _ in
-                guard Self.canOpenWindows, let id = runtime.requestedWindowID else { return }
-                openWindow(id: GlassEditorRuntime.windowID, value: id)
-                runtime.clearPresentation()
+                guard let id = runtime.requestedWindowID else { return }
+                if Self.canOpenWindows {
+                    openWindow(id: GlassEditorRuntime.windowID, value: id)
+                    runtime.clearPresentation()
+                } else {
+                    presented = GlassEditorWindowPresentation(id: id)
+                }
             }
     }
 
@@ -233,11 +247,9 @@ public struct GlassEditorBootstrap<Content: View>: View {
     private var base: some View {
         #if os(iOS)
         content
-            .fullScreenCover(isPresented: Binding(
-                get: { !Self.canOpenWindows && runtime.requestedWindowID != nil },
-                set: { if !$0 { runtime.clearPresentation() } }
-            )) {
-                if let id = runtime.requestedWindowID {
+            .fullScreenCover(item: $presented, onDismiss: { runtime.clearPresentation() }) { window in
+                let id = window.id
+                if true {
                     // **No `NavigationStack` around it.** The editor is a `NavigationSplitView`,
                     // and one nested inside a navigation stack draws its toolbar and none of its
                     // content on an iPhone — a black screen under a working navigation bar. Done
@@ -245,7 +257,7 @@ public struct GlassEditorBootstrap<Content: View>: View {
                     GlassEditorWorkspaceView(
                         workspace: runtime.workspace(for: id), windowID: id,
                         dismissal: GlassEditorDismissal(title: "Connections") {
-                            runtime.clearPresentation()
+                            presented = nil
                         }
                     )
                         .environment(runtime)
@@ -260,6 +272,12 @@ public struct GlassEditorBootstrap<Content: View>: View {
     /// Whether this device has more than one scene to put a window in. Shared with every other
     /// capability that opens windows, because they all have to ask it.
     static var canOpenWindows: Bool { GlassWindowPresentation.canOpenWindows }
+}
+
+/// One editor window on its way to a full-screen presentation.
+public struct GlassEditorWindowPresentation: Identifiable, Hashable, Sendable {
+    public let id: UUID
+    public init(id: UUID) { self.id = id }
 }
 
 public struct GlassEditorScenes: Scene {

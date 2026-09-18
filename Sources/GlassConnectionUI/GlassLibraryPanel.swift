@@ -26,9 +26,11 @@ public struct GlassLibraryPanel: Identifiable {
     public let count: Int?
     private let resultsBuilder: () -> AnyView
     private let detailBuilder: () -> AnyView
+    private let selectionCheck: (() -> Bool)?
 
     public init(id: String, sectionTitle: String, title: String, symbolName: String,
                 count: Int? = nil,
+                hasSelection: (() -> Bool)? = nil,
                 @ViewBuilder results: @escaping () -> some View,
                 @ViewBuilder detail: @escaping () -> some View) {
         self.id = id
@@ -36,11 +38,25 @@ public struct GlassLibraryPanel: Identifiable {
         self.title = title
         self.symbolName = symbolName
         self.count = count
+        self.selectionCheck = hasSelection
         let results = results
         let detail = detail
         resultsBuilder = { AnyView(results()) }
         detailBuilder = { AnyView(detail()) }
     }
+
+    /// Whether the panel has something selected, and therefore a detail worth showing.
+    ///
+    /// **A compact stack cannot see a panel's selection.** The library pushes its own detail when
+    /// `selection` changes, but a panel owns its selection privately — so on an iPhone, choosing a
+    /// row in a panel set a selection nobody pushed for and the detail was simply unreachable.
+    /// Every panel had it: SSH Keys could be listed and never opened, and a project could not be
+    /// opened at all, which is most of "the editor doesn't work on the phone".
+    ///
+    /// Read inside a view body, so the panel's own `@Observable` model registers the dependency
+    /// and the push happens when the selection actually changes. A panel that does not supply the
+    /// check keeps the old behaviour rather than pushing an empty detail.
+    public var hasSelection: Bool { selectionCheck?() ?? false }
 
     public func results() -> AnyView { resultsBuilder() }
     public func detail() -> AnyView { detailBuilder() }
