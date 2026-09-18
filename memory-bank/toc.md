@@ -54,6 +54,7 @@ three source applications are obsolete and no longer compile.
 | [The gutter, Projects, and the editor's remote half](tasks/2026-09/2026-09-17_gutter-and-stage-c.md) | The gutter stops being an `NSRulerView`; Projects become a persisted, synced library panel and the editor's entry point on iOS and visionOS; stages C and D, one file-access seam for both machines, the verified remote write proven against a real server, and three windows that opened nothing on an iPhone |
 | [The terminal configuration the Mac deleted](tasks/2026-09/2026-09-17_terminal-configuration-loss.md) | A service that synced without its settings: `replaceAll` reconciling the catalog to a stale in-memory list, why the desktop was unaffected, and the error message whose only working action was the destructive one |
 | [The editor on a phone](tasks/2026-09/2026-09-17_editor-on-a-phone.md) | Four iPhone-only defects behind one report, none in the editor's text view, and the simulator walkthrough that found them — including the fixture traps that cost an evening |
+| [Finding your way around on iOS](tasks/2026-09/2026-09-18_ios-navigation-plan.md) | **The plan**: opening a folder lands on its files, file browsing stops being modal, one header that says where you are (SFTP included), and a session switcher for a phone that has no way between open connections — plus everything carried |
 | [September tasks](tasks/2026-09/README.md) | Monthly index |
 
 This project is `~/Software/glass/GlassPowerTools`. `../GlassEditorKit` was **absorbed on 2026-09-14**

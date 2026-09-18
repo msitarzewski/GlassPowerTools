@@ -1912,3 +1912,23 @@ every step.
   seeded from the host is stale by the next run.
 - Result bundles frequently arrive unfinalised; write screenshots to the runner's temporary
   directory as well as attaching them.
+
+## 2026-09-18 (later) — the plan for iOS navigation
+
+The editor works on a phone; **finding your way around does not**. Planned in
+[finding your way around on iOS](tasks/2026-09/2026-09-18_ios-navigation-plan.md), nothing built:
+
+1. Opening a folder lands on its **files**, not on the editor's empty state with the tree behind a
+   toggle. Opening a file still goes to the editor.
+2. The file and folder views stop being **modals** — one navigation stack, pushes, the whole
+   interface, mirroring `SFTPBrowserView`.
+3. **One header for both browsers**: the folder's name large, the full path beneath it across the
+   width without the folder repeated, truncated from the *front*. `SFTPBrowserView` currently sets
+   `.navigationTitle(currentPath)`, which is the whole path as a title.
+4. **A session switcher.** A phone has no route between open connections at all: every session is
+   full-screen in the primary scene, so a terminal, a desktop and a database cannot be reached from
+   one another. Contributed `openSessions()` per capability, a Sessions control in each session's
+   chrome, a list first and the app-switcher carousel second.
+
+Everything carried is in section E of that note — the Mac install, the headset, the desktop's
+missing UI test, `replaceAll`, D26, test hygiene.

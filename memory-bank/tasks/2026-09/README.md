@@ -331,3 +331,13 @@ double click. The editor now opens a project and renders a document on a phone, 
 
 Also the fixture traps that cost the evening, and `--ui-testing-seed-project`, which is what makes
 the editor testable on a phone at all. **1,623 tests, exit status 0.** iPhone on **0.4.171**.
+
+## 2026-09-18 — [finding your way around on iOS](2026-09-18_ios-navigation-plan.md)
+
+Planned, not built. Opening a folder should land on the directory list rather than an empty editor;
+the file and folder views stop being modals and use the whole interface as the SFTP browser does;
+one header shows the folder's name large with the path beneath it, truncated from the front, in
+both browsers. And the piece with no implementation at all: **a phone has no way to move between
+open sessions** — a terminal, a desktop and a database cannot be reached from one another. The plan
+stages that as a contributed list of open sessions, a control in each session's chrome, and then
+the carousel.
