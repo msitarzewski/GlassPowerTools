@@ -324,3 +324,19 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     capability that answers a user action with `openWindow` must ask it first and present in place
     when the answer is no — otherwise the tap does nothing at all, with no window, no error and no
     log line to find it by.
+
+44. **A capability's in-memory list is a cache of the catalog, and the catalog changes underneath
+    it.** `GlassServiceRecords.replaceAll` reconciles the catalog to the list it is handed, which
+    means every stored configuration of that kind that the caller does not know about is deleted.
+    It guards "the catalog was never read" and cannot guard "the catalog was read, and then D19
+    delivered another device's changes" — so **re-read on every `catalogDidLoad()`, not once**. The
+    terminal read once and its next save deleted a configuration the iPhone had written; the
+    desktop and the database re-read and were unaffected (2026-09-17). If a capability keeps a
+    list, `catalogDidLoad()` must refresh it, and a guard named `…IfNeeded` is the wrong one to
+    call from there.
+
+45. **Every action an error message offers must work.** *"Edit the service to set it up, or remove
+    it"* was shown for a service link with no configuration, and `setupDraft(for:host:)` answered
+    nil for exactly that case — so Edit opened nothing and the only working action was the
+    destructive one. A message that names two ways out, one of which is a dead end, is an
+    instruction to destroy data. When writing the sentence, try both.

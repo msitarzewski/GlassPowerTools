@@ -607,3 +607,25 @@ Both VMs are configured and were left running.
 - **The Vision Pro is at 0.4.123** and refuses a build while locked.
 - **The desktop has no UI test** and cannot have one until a desktop *configuration* can be seeded.
 - The route through the UI for remote editing — Edit → a tab → save — is unproven by a test.
+
+# 2026-09-17 (night) — the terminal configuration the Mac deleted
+
+## Verified by running
+
+| Claim | Evidence |
+|---|---|
+| A stale list destroys another device's record | `aStaleListDeletesAnotherDevicesConfiguration` — passes with the re-read, and on the old once-only path fails with *"a save on this device deleted a configuration another device had written"* |
+| A service arriving after the first load is found | `aServiceThatArrivesAfterTheFirstLoadIsStillFound`, which fails if pointed back at `loadServersIfNeeded` |
+| An unconfigured link can be set up rather than only deleted | `aServiceWithNoConfigurationCanStillBeSetUp`, and the older contract test updated to the new answer with its reason |
+| Recovery works end to end | Re-entering the service on the Mac synced to the iPhone — user-confirmed |
+| Installed | **0.4.170** on the Mac and iPhone `00008150`, read back off each |
+
+## Known and unfixed
+
+- **The lost configuration is not recoverable.** The fix prevents recurrence; the reconcile had
+  already deleted it. Re-entry was the recovery.
+- **`replaceAll` remains a whole-kind reconcile from one device's list.** Freshness is now every
+  capability's duty rather than a property of the primitive.
+- **`configurations(ofKind:)` skips undecodable records silently** — the same report would be
+  produced by a shape mismatch between builds, with nothing logged.
+- The Mac's catalog cannot be inspected from the shell: TCC refuses the Group Container.

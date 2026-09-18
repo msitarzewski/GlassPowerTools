@@ -309,3 +309,15 @@ merge and the knowledge was not written where anyone would find it. It is now �
 
 **1,620 tests, exit status 0**, plus 7 live. macOS and iPhone on **0.4.167**; the Vision Pro is
 still locked at 0.4.123.
+
+## 2026-09-17 (night) — [the terminal configuration the Mac deleted](2026-09-17_terminal-configuration-loss.md)
+
+A terminal service set up on the iPhone reached the Mac without its settings, while a desktop added
+in the same sitting worked. The sync delivered it; the Mac then **deleted** it — `replaceAll`
+reconciles the catalog to the caller's list, and the terminal read its list once and ignored every
+later catalog load. The desktop and the database re-read and were unaffected.
+
+Also: the failure told the user to *"Edit the service to set it up, or remove it"* while Edit
+answered nil for exactly that case, leaving the destructive action as the only one that worked.
+
+**1,623 tests, exit status 0.** macOS and iPhone on **0.4.170**. Rules 44 and 45.

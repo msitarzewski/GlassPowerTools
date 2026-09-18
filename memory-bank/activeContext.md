@@ -1834,3 +1834,45 @@ on that VM and has no SSH key; `michael` with `~/.ssh/scratch_vm` is the SSH one
   is what an `ssh` service opens.
 - The Mac app is **not sandboxed** (no `com.apple.security.app-sandbox`), which is why a project
   reopens from a stored path with no security-scoped bookmark. Do not assume that on iOS.
+
+## 2026-09-17 (night) — RESUME HERE (supersedes the afternoon block)
+
+**State DOCS.** **1,623 tests / exit status 0**, plus 7 live against `192.0.2.6`. macOS, iOS and
+visionOS all build. macOS and iPhone on **0.4.170**; the Vision Pro is still locked at 0.4.123.
+
+### What tonight was
+
+Two reports, both from using the app on the phone, and both the same shape as the morning's: a
+thing that works on one platform and silently does nothing on another.
+
+1. **The SFTP editor on the iPhone.** Edit opened a black screen and the browser came back as
+   *"source session is no longer active"*. The editor was presented from **behind** the browser's
+   sheet, which dismissed it — and destroying the browser closes the SSH session it owns, as that
+   class's own comment says. It is a **child** of the browser now, like the editor it replaced.
+   The black screen was a `NavigationSplitView` nested in a `NavigationStack`.
+2. **A terminal service that synced without its settings**, while the desktop added in the same
+   sitting was fine. The Mac had **deleted** the phone's configuration: `replaceAll` reconciles the
+   catalog to the caller's list, and the terminal read its list once and ignored every later
+   catalog load. Full write-up:
+   [the terminal configuration the Mac deleted](tasks/2026-09/2026-09-17_terminal-configuration-loss.md).
+
+### Do these next, in order
+
+1. **Decide what to do about `replaceAll`.** Freshness is now every capability's duty; the
+   primitive still lets a stale caller delete another device's work. A per-record write, or a
+   reconcile that refuses to delete records it has never seen, makes the class impossible.
+2. **A UI-test seed for desktop configurations.** The desktop still has no UI test and cannot have
+   one; that gap is what let "nothing happens on the iPhone" reach a phone.
+3. **The Vision Pro**, on an unlock. Still 0.4.123.
+4. **The D26 two-device acceptance run** — which would have caught tonight's defect, and is still
+   the thing this project keeps owing itself.
+5. Test hygiene: 1,519 keychain items and the preference sprawl.
+
+### Things that will bite
+
+- **Rules 42–45** are all from today: read the obsolete apps, one answer to "can this device open a
+  window", a capability's list is a cache the catalog changes underneath, and every action an error
+  offers must work.
+- **The Mac's catalog cannot be read from this shell.** TCC refuses the Group Container, so a sync
+  question has to be answered from the app's behaviour or from a test, not by looking at the file.
+- Rule 28 still costs twenty minutes if forgotten, though auto-lock is now off on this Mac.
