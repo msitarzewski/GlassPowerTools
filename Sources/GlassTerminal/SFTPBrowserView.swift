@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import GlassShell
 import GlassLayers
 import NIOCore
 import GlassSSHTransport
@@ -468,6 +469,7 @@ struct SFTPBrowserView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.glassOpenFolderAsProject) private var openFolderAsProject
     @Environment(\.glassOpenFileInEditor) private var openFileInEditor
+    @Environment(\.glassEditorFileScreen) private var editorFileScreen
 
     @State private var sftpClient: SFTPClient?
     @State private var sessionLifetime: SFTPBrowserSessionLifetime?
@@ -524,6 +526,8 @@ struct SFTPBrowserView: View {
     @State private var fileInfoPermissionsExpanded = true
     @State private var fileInfoRawExpanded = false
     @State private var remoteEditorDocument: SFTPRemoteEditorDocument?
+    /// A file being edited in the editor, presented **by this view** so this view survives it.
+    @State private var editedRemoteFile: SFTPRemoteEditRequest?
     @State private var showingBatchDeleteConfirmation = false
     @State private var isReceivingFileDrop = false
     #if os(macOS)
@@ -686,6 +690,11 @@ struct SFTPBrowserView: View {
         .sheet(item: $remoteOperationRequest) { request in
             remoteDestinationSheet(for: request)
         }
+        #if canImport(UIKit) && !os(visionOS)
+        .fullScreenCover(item: $editedRemoteFile) { request in
+            editorFileScreen?(request.serverID, request.path) { editedRemoteFile = nil }
+        }
+        #endif
         .sheet(item: $remoteEditorDocument) { document in
             SFTPRemoteEditorView(
                 document: document,
@@ -2435,9 +2444,20 @@ struct SFTPBrowserView: View {
     /// stays only as the answer to "what if nothing can take the file", and goes when the new path
     /// has been proven against a real server.
     private func beginRemoteEdit(_ entry: SFTPBrowserEntry) {
-        if let openFileInEditor, let session {
-            openFileInEditor(session.server.id, entry.id)
-            return
+        if let session {
+            // A window where windows exist, and the browser's own child where they do not. The
+            // second case is not a detail: a presentation raised from behind this sheet dismisses
+            // it, and dismissing it destroys this view and closes the session it owns — the
+            // browser came back as "source session is no longer active" (reported 2026-09-17).
+            if GlassWindowPresentation.canOpenWindows, let openFileInEditor {
+                openFileInEditor(session.server.id, entry.id)
+                return
+            }
+            if editorFileScreen != nil {
+                editedRemoteFile = SFTPRemoteEditRequest(serverID: session.server.id,
+                                                         path: entry.id)
+                return
+            }
         }
         guard transferTask == nil, operationInProgress == nil else { return }
         transferTask = Task {

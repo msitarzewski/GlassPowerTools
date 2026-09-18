@@ -48,9 +48,19 @@ public struct GlassEditorWorkspaceView: View {
     /// forward, so a file opened from the menu bar lands where the user is looking.
     private let windowID: UUID
 
-    public init(workspace: GlassEditorWorkspace, windowID: UUID = UUID()) {
+    /// How to leave, on a platform where this is a presentation rather than a window.
+    ///
+    /// Nil on a Mac, where a window is closed by closing it. Not a `NavigationStack` wrapped
+    /// around this view: a `NavigationSplitView` inside a `NavigationStack` draws its toolbar and
+    /// none of its content on an iPhone — a black screen under a working navigation bar, which is
+    /// exactly what it did.
+    private let dismissal: GlassEditorDismissal?
+
+    public init(workspace: GlassEditorWorkspace, windowID: UUID = UUID(),
+                dismissal: GlassEditorDismissal? = nil) {
         self.workspace = workspace
         self.windowID = windowID
+        self.dismissal = dismissal
     }
 
     public var body: some View {
@@ -452,6 +462,15 @@ public struct GlassEditorWorkspaceView: View {
         // its own actions at `.navigation` (`GlassConnectionLibrary`, itself following glassdb's Add
         // Connection), and the editor putting everything in `.primaryAction` is most of why it read
         // as a different application.
+        if let dismissal {
+            ToolbarItem(placement: .cancellationAction) {
+                // A chevron naming where it goes back to, so the file's name is the only other
+                // wording in the bar — the desktop session's decision, taken from glassDT, and
+                // the same one applies here.
+                Button(dismissal.title, systemImage: "chevron.backward", action: dismissal.action)
+                    .labelStyle(.iconOnly)
+            }
+        }
         ToolbarItem(placement: .navigation) {
             Button("New Document", systemImage: "plus") { workspace.newDocument() }
                 .help("New Document")

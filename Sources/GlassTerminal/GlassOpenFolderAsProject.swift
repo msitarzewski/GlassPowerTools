@@ -25,12 +25,25 @@ public typealias GlassOpenFolderAsProject = @MainActor (_ serverID: UUID, _ path
 /// vocabulary for "this file changed underneath you". There is one editor now.
 public typealias GlassOpenFileInEditor = @MainActor (_ serverID: UUID, _ path: String) -> Void
 
+/// Builds the editor for one file, for the browser to present **itself**.
+///
+/// Where a window is possible the browser asks for one and stays where it is. Where it is not, the
+/// editor has to be a child of the browser rather than a presentation raised from behind it:
+/// dismissing the browser's sheet destroys the browser, and destroying the browser closes the SSH
+/// session it owns. Returning `nil` means nothing can build one, and Edit falls back.
+public typealias GlassEditorFileScreen = @MainActor (_ serverID: UUID, _ path: String,
+                                                     _ onDone: @escaping @MainActor () -> Void) -> AnyView?
+
 private struct GlassOpenFolderAsProjectKey: EnvironmentKey {
     static let defaultValue: GlassOpenFolderAsProject? = nil
 }
 
 private struct GlassOpenFileInEditorKey: EnvironmentKey {
     static let defaultValue: GlassOpenFileInEditor? = nil
+}
+
+private struct GlassEditorFileScreenKey: EnvironmentKey {
+    static let defaultValue: GlassEditorFileScreen? = nil
 }
 
 public extension EnvironmentValues {
@@ -47,4 +60,16 @@ public extension EnvironmentValues {
         get { self[GlassOpenFileInEditorKey.self] }
         set { self[GlassOpenFileInEditorKey.self] = newValue }
     }
+
+    var glassEditorFileScreen: GlassEditorFileScreen? {
+        get { self[GlassEditorFileScreenKey.self] }
+        set { self[GlassEditorFileScreenKey.self] = newValue }
+    }
+}
+
+/// One file on its way to the editor, presented by the browser that found it.
+struct SFTPRemoteEditRequest: Identifiable, Hashable {
+    let serverID: UUID
+    let path: String
+    var id: String { "\(serverID.uuidString):\(path)" }
 }

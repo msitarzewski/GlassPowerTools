@@ -238,16 +238,18 @@ public struct GlassEditorBootstrap<Content: View>: View {
                 set: { if !$0 { runtime.clearPresentation() } }
             )) {
                 if let id = runtime.requestedWindowID {
-                    NavigationStack {
-                        GlassEditorWorkspaceView(workspace: runtime.workspace(for: id), windowID: id)
-                            .toolbar {
-                                ToolbarItem(placement: .cancellationAction) {
-                                    Button("Done") { runtime.clearPresentation() }
-                                }
-                            }
-                    }
-                    .environment(runtime)
-                    .glassLayers(runtime.layers)
+                    // **No `NavigationStack` around it.** The editor is a `NavigationSplitView`,
+                    // and one nested inside a navigation stack draws its toolbar and none of its
+                    // content on an iPhone — a black screen under a working navigation bar. Done
+                    // is the view's own toolbar item instead.
+                    GlassEditorWorkspaceView(
+                        workspace: runtime.workspace(for: id), windowID: id,
+                        dismissal: GlassEditorDismissal(title: "Connections") {
+                            runtime.clearPresentation()
+                        }
+                    )
+                        .environment(runtime)
+                        .glassLayers(runtime.layers)
                 }
             }
         #else

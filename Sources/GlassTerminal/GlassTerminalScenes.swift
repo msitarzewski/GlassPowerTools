@@ -62,6 +62,7 @@ public struct GlassTerminalScenes: Scene {
                     .environment(settingsManager)
                     .environment(\.glassOpenFolderAsProject, runtime.openFolderAsProject)
                     .environment(\.glassOpenFileInEditor, runtime.openFileInEditor)
+                    .environment(\.glassEditorFileScreen, runtime.editorFileScreen)
                 .glassLayers(runtime.layers)
             } else {
                 SFTPBrowserNotFoundView(context: context)
@@ -130,6 +131,7 @@ public struct GlassTerminalScenes: Scene {
                     .environment(settingsManager)
                     .environment(\.glassOpenFolderAsProject, runtime.openFolderAsProject)
                     .environment(\.glassOpenFileInEditor, runtime.openFileInEditor)
+                    .environment(\.glassEditorFileScreen, runtime.editorFileScreen)
                 .glassLayers(runtime.layers)
                     .trackWindowPresence(key: "sftp-\(context.sessionID.uuidString)", recovery: windowRecoveryManager)
             } else {

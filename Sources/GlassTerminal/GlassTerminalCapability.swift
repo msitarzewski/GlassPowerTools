@@ -75,6 +75,9 @@ public final class GlassTerminalRuntime {
     /// What "Edit" does to a file in the Files browser: opens it in the editor, as a tab.
     public var openFileInEditor: GlassOpenFileInEditor?
 
+    /// The editor as a view, for a device where the browser has to present it itself.
+    public var editorFileScreen: GlassEditorFileScreen?
+
     public init(layers: GlassLayerStore? = nil, windowRecovery: GlassWindowRecoveryManager? = nil) {
         let layers = layers ?? GlassLayerStore()
         self.layers = layers
@@ -231,7 +234,20 @@ public final class GlassTerminalCapability: GlassCapability {
     }
 
     public func setupDraft(for service: HostServiceLink, host: HostProfile) -> (any GlassServiceDraft)? {
-        guard let server = runtime.sessionManager.serverManager.server(for: service.endpointID.rawValue) else { return nil }
+        guard let server = runtime.sessionManager.serverManager.server(for: service.endpointID.rawValue) else {
+            // **A link this device has no configuration for is still editable.**
+            //
+            // The service exists in the library because it synced; its settings are not here. The
+            // failure the user gets says "Edit the service to set it up, or remove it", and until
+            // now Edit was a dead end for exactly the case the sentence describes — the sheet had
+            // no draft to show, so the only offered action that worked was the destructive one.
+            //
+            // A *new* draft, not an empty editor: `commit(endpointID:host:address:)` persists
+            // under the endpoint id it is given, so setting it up here fills this link rather than
+            // leaving it and making a second service beside it.
+            return TerminalServiceDraft(serverManager: runtime.sessionManager.serverManager,
+                                        settingsManager: runtime.settingsManager)
+        }
         return TerminalServiceDraft(editing: server, serverManager: runtime.sessionManager.serverManager,
                                     settingsManager: runtime.settingsManager)
     }
@@ -346,7 +362,7 @@ public final class GlassTerminalCapability: GlassCapability {
     /// safe and calling it *only* at attach time was the bug — the list came back empty and the
     /// next write reconciled the catalog to match it.
     public func catalogDidLoad() {
-        runtime.sessionManager.serverManager.loadServersIfNeeded()
+        runtime.sessionManager.serverManager.reloadFromStore()
     }
 
     public func libraryToolbarItems() -> AnyView {
@@ -467,6 +483,7 @@ public struct GlassTerminalBootstrap<Content: View>: View {
                 SFTPBrowserView(sessionID: context.sessionID, initialPath: context.initialPath)
                     .environment(\.glassOpenFolderAsProject, runtime.openFolderAsProject)
                     .environment(\.glassOpenFileInEditor, runtime.openFileInEditor)
+                    .environment(\.glassEditorFileScreen, runtime.editorFileScreen)
             } else {
                 SFTPBrowserNotFoundView(context: router.sftpContext)
             }

@@ -229,6 +229,17 @@ struct GlassPowerToolsApp: App {
                 editorRuntime.present(windowID)
             }
         }
+        // And the same file as a *view*, for a phone: the browser presents the editor itself so
+        // that presenting it does not dismiss the browser and close the session underneath.
+        terminal.editorFileScreen = { @MainActor serverID, path, onDone in
+            guard let host = library.host(owningEndpoint: EndpointID(rawValue: serverID)) else {
+                return nil
+            }
+            return AnyView(
+                GlassEditorRemoteFileScreen(runtime: editorRuntime, hostID: host.id,
+                                            machine: host.displayName, path: path, onDone: onDone)
+            )
+        }
         // The project list travels with everything else. Attached rather than required: without an
         // account the list is a local one and nothing else changes.
         let projects = editor.projects
