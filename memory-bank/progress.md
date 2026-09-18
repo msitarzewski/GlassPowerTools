@@ -563,3 +563,47 @@ Both VMs are configured and were left running.
 - **Projects are not persisted.** Closing an editor window loses its project; stage C.
 - Still owed from before: the D26 two-device acceptance run, and the test hygiene — 1,519 keychain
   items and the preference-file sprawl.
+
+# 2026-09-17 (afternoon) — the gutter's shape, and Projects in the library
+
+## Verified by running
+
+| Claim | Evidence |
+|---|---|
+| Package suite green | **1,592 tests, exit status 0**, measured by exit status (rule 25), screen unlocked |
+| All three platforms build | `xcodebuild` Release for `platform=macOS`, `generic/platform=iOS`, `generic/platform=visionOS`, after the gutter change and again after the panel |
+| Installed and launched | **0.4.160** at `/Applications/Glass Power Tools.app` and on iPhone `00008150`, both read back off the installed bundle (rule 16) |
+| The gutter is a sibling, not a ruler | `gutterIsBesideTheText`: subview of the container, no ruler on the scroll view, and after layout its frame matches the scroll view's band. **Proven to bite** — pinning it 28 points higher fails it, and that edit was reverted |
+| Line numbers off collapse rather than tear down | `gutterVisibility`: hidden and zero-width off, 44 points on |
+| The project list survives its window and merges honestly | 13 tests: tombstones survive a stale device, a later edit beats a tombstone, merge is order-independent, one folder twice is one project, one path on two machines is two, unreadable storage is an empty list |
+
+## Compiled but not verified by running
+
+- **The gutter's appearance.** Its frame is asserted; whether the strip stops at the tabs can only
+  be seen. The app's own geometry is not measurable from this shell.
+- **Projects syncing between two devices.** The payload, the merge and the local store are tested;
+  the transport is the shell's proven one, but this list has never crossed a real account.
+- **The Projects panel on iOS and visionOS.** Both platforms build with it and it is their only
+  route into the editor; only the Mac has been run.
+
+## Known and unfixed
+
+- **The Vision Pro is at 0.4.123** and refuses a build while locked.
+- **Stage D — the remote reader.** A project on another machine lists and says why it cannot open.
+- Still owed: the D26 two-device acceptance run, and the test hygiene.
+
+# 2026-09-17 (evening) — verified unlocked
+
+| Claim | Evidence |
+|---|---|
+| Package suite green | **1,620 tests, exit status 0**, measured by exit status with the screen unlocked. A locked screen reports these as permission and mktemp failures (rule 28) and did so once today |
+| The editor's remote half against a real server | **7 live tests** against `192.0.2.6` — listing, whole-file read past the 32 KiB window, stat, save, **mode preserved**, a changed file refused, no staging litter. They fail on a 30-second timeout against a dead address, so they are not passing by not running |
+| All three platforms build | `xcodebuild` Release for macOS, iOS and visionOS, after every change |
+| Installed | **0.4.167** on the Mac and iPhone `00008150`, read back off each |
+| The desktop opens on a real iPhone | Confirmed by the user at 0.4.166; 0.4.167 reshapes the same fix to match glassDT's original |
+
+## Known and unfixed
+
+- **The Vision Pro is at 0.4.123** and refuses a build while locked.
+- **The desktop has no UI test** and cannot have one until a desktop *configuration* can be seeded.
+- The route through the UI for remote editing — Edit → a tab → save — is unproven by a test.

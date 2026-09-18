@@ -51,6 +51,7 @@ three source applications are obsolete and no longer compile.
 | [D27 and D28 planned](tasks/2026-09/2026-09-14_d27-d28-plan.md) | Every record-creating surface enumerated; the two live D27 targets, the unreferenced `RDPFileImporter`, and the normaliser that silently re-attaches a key |
 | [Stage 5.2 — the editor and the family](tasks/2026-09/2026-09-16_editor-stage-5.2-plan.md) | The editor's seven corrections: the database's tree and tabs as the template, the library's toolbar, Projects as a Workgroups-style panel, and the remote reader last |
 | [The editor, round two](tasks/2026-09/2026-09-17_editor-round-two.md) | Seven corrections from the 0.4.143 test pass: the whole tab clickable, the rule through the strip, the gear into Settings, Open that takes a folder, ⌘W on the tab, a remembered frame, language in the footer |
+| [The gutter, Projects, and the editor's remote half](tasks/2026-09/2026-09-17_gutter-and-stage-c.md) | The gutter stops being an `NSRulerView`; Projects become a persisted, synced library panel and the editor's entry point on iOS and visionOS; stages C and D, one file-access seam for both machines, the verified remote write proven against a real server, and three windows that opened nothing on an iPhone |
 | [September tasks](tasks/2026-09/README.md) | Monthly index |
 
 This project is `~/Software/glass/GlassPowerTools`. `../GlassEditorKit` was **absorbed on 2026-09-14**

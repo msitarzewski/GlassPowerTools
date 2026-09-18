@@ -1760,3 +1760,77 @@ were design errors of mine rather than slips:
   `GlassEditorDialogs`.
 - Reading the running app's **menu bar** through System Events is still the fastest way to see what
   the menu bar actually became. Reading the app's **log** is not currently available to the shell.
+
+## 2026-09-17 (afternoon) — RESUME HERE (supersedes the block above)
+
+**State BUILD.** Owner: coordinating agent. **1,620 tests / exit status 0** (re-run unlocked), plus **7 live tests against `192.0.2.6`**, green. macOS, iOS and
+visionOS all build. Plan and detail:
+[the gutter and stage C](tasks/2026-09/2026-09-17_gutter-and-stage-c.md).
+
+### Installed
+
+| Platform | Version |
+|---|---|
+| macOS | **0.4.167** |
+| iPhone `00008150` | **0.4.167** — desktop on the phone confirmed working by the user at 0.4.166 |
+| Vision Pro `00008112` | 0.4.123 — paired but **locked**; unlock it and the same build installs |
+
+### What changed
+
+1. **The gutter is no longer an `NSRulerView`.** It is an `NSView` beside the scroll view inside
+   `GlassEditorAppKitEngine.containerView`, mirroring the UIKit backend that always had the right
+   shape. The drawing moved into `GutterLineNumbers.draw(in:offsetY:…)` and is now written once for
+   both platforms; the only per-platform value is `offsetY`. **Wants a look** — no test here can
+   say whether it stops at the tabs, only that its frame matches the scroll view's band.
+2. **Stage C, first half.** Projects are persisted and synced (`GlassEditorProjectLibrary` over
+   `GlassSettingsSyncService`) and contributed to the library as a panel through the new
+   `registerLibraryPanel`, the twin of `registerSettingsPage`. **It is the editor's first entry
+   point on iOS and visionOS.**
+
+### Stage D, the tree half — also built
+
+The reader seam is **async** now, because an SFTP listing is. A remote project's tree lists over the
+host's own SSH service, borrowed through `GlassHostDirectoryLister` — the shape of
+`GlassHostPortForward`, D14 trust prompt included — and *Open in Editor* on a folder in the Files
+browser is what makes one. Closing the project closes the connection.
+
+**Its files open, edit and save**, through the same methods a local file uses. The reader became
+`GlassEditorFileAccess` — list, read, write, stat, close — one object per project, and
+`GlassEditorDocument` takes it as an argument instead of reaching for `FileManager`. **Local files
+gained conflict detection as a consequence**: `RemoteDocumentSession` and `ConflictDetector` hold a
+size, a time and a digest, which mean the same thing on a disk, so a file changed by a checkout or
+a build now stops the save and asks exactly as a remote one does.
+
+**Nothing in stage D has met a real server** — the Ubuntu VM at `192.0.2.6` is where it gets its
+first real listing and its first real save.
+
+### Do these next, in order
+
+1. **Look at it.** The gutter; the Projects panel beside Keys; *Open in Editor* on a folder;
+   **Edit on a file** — it now opens a tab in the real editor instead of the old sheet. The
+   transport under it is proven against the VM; the route through the UI is not.
+2. **Delete `SFTPRemoteEditorView`** once that click has been made — it is still there as the
+   fallback for "nothing can take the file", and is the last of the two editors.
+3. **A UI-test seed for desktop configurations.** The desktop has no UI test and cannot have one:
+   `--ui-testing-seed-hosts` makes services without a capability record, and a desktop with no
+   record cannot open. That gap is what let "nothing happens on the iPhone" ship.
+4. **The Vision Pro**, on an unlock.
+5. **The D26 two-device run**, and the test hygiene.
+
+### Running the live tests
+
+    GPT_SSH_TEST_HOST=192.0.2.6 GPT_SSH_TEST_USER=michael \
+    GPT_SSH_TEST_KEY_PATH=$HOME/.ssh/scratch_vm swift test --filter LiveRemoteEditing
+
+Unconfigured they print **NOT RUN** rather than passing quietly. `gptrdp` is the *desktop* account
+on that VM and has no SSH key; `michael` with `~/.ssh/scratch_vm` is the SSH one.
+
+### Things that will bite
+
+- Everything in the previous block still holds: rule 32 (build all three, every time), rule 28 (a
+  locked screen fails every protected write), and the editor `body` type-check timeout held back by
+  three extracted modifiers.
+- **`HostServiceKind` is `rdp, ssh, database`** — there is no `.terminal` case, though the terminal
+  is what an `ssh` service opens.
+- The Mac app is **not sandboxed** (no `com.apple.security.app-sandbox`), which is why a project
+  reopens from a stored path with no security-scoped bookmark. Do not assume that on iOS.

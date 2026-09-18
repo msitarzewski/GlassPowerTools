@@ -306,3 +306,21 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     `GlassEditorPreferences`; what a *window* is (documents, projects, selection, find) belongs to
     one `GlassEditorWorkspace` per window, keyed by a window id through a value-based `WindowGroup`.
     Ask which of the two a new piece of state is before adding it to either.
+
+42. **The obsolete apps are a record to read, and they already solved this.** `../glas.sh`,
+    `../glassdb` and `../glassDT` do not compile and are not dependencies, which is exactly why it
+    is tempting to skip them and reason from first principles instead. Three defects in one day
+    came from doing that: **`openWindow` does nothing on an iPhone**, silently, and glassDT had
+    handled it at `App/glassDTApp.swift:107-143` — a `fullScreenCover` holding the *resolved*
+    connection, dismissed by a chevron so the machine's name is the only wording in the bar. The
+    merged app reintroduced the bug in the desktop's session and twice in the editor. Before
+    designing a surface these apps had, open the file. A guess that happens to work is still a
+    guess, and it will not carry the decisions the original made for reasons it wrote down.
+
+43. **One answer to "can this device open a window".** `GlassWindowPresentation.canOpenWindows`,
+    which requires `supportsMultipleScenes` **and** a non-phone idiom. Two signals because they
+    fail in opposite directions: the first also catches an iPad with multiwindow switched off, the
+    second is the half already proven in production by the database's iPhone routing. Any
+    capability that answers a user action with `openWindow` must ask it first and present in place
+    when the answer is no — otherwise the tap does nothing at all, with no window, no error and no
+    log line to find it by.

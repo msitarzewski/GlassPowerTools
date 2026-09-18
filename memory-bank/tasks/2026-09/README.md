@@ -282,3 +282,30 @@ owns does not offer the focused window a choice — one item is dropped, silentl
 
 **1,578 tests, exit status 0.** macOS **0.4.158**, iPhone 0.4.143, Vision Pro 0.4.123. Three
 platform-specific breaks in one refactor, none visible to a macOS build (rule 32).
+
+## 2026-09-17 (afternoon) — [the gutter and stage C](2026-09-17_gutter-and-stage-c.md)
+
+The line-number strip stops being an `NSRulerView` and becomes the sibling view the UIKit backend
+always had, so it can only occupy the space its container gives it; the drawing both gutters shared
+in duplicate is now written once. Projects become a persisted, synced library panel over the
+existing sync service and the existing panel seam — and the editor's first entry point on iOS and
+visionOS.
+
+**1,592 tests, exit status 0.** macOS and iPhone both **0.4.160**; the Vision Pro is locked and
+still at 0.4.123. The gutter's appearance is the one thing no test here can report.
+
+## 2026-09-17 (later) — [the editor's remote half, and windows that opened nothing](2026-09-17_gutter-and-stage-c.md)
+
+Stage D in both halves: a remote project's tree lists over the host's own SSH service, and its
+files open, edit and save through **the same methods a local file uses** — one
+`GlassEditorFileAccess` per project, so there is no second document path to keep in step. Local
+files gained conflict detection as a consequence. The remote write goes through the Files browser's
+verified commit rather than a second one that resembled it, and is proven against `192.0.2.6`:
+mode preserved, a changed file refused, nothing left behind.
+
+Then three surfaces that answered a tap by doing nothing, because **`openWindow` is a no-op on an
+iPhone**: the desktop's session and the editor, twice. The database had known since before the
+merge and the knowledge was not written where anyone would find it. It is now — rules 42 and 43.
+
+**1,620 tests, exit status 0**, plus 7 live. macOS and iPhone on **0.4.167**; the Vision Pro is
+still locked at 0.4.123.
