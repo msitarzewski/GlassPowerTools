@@ -629,3 +629,25 @@ Both VMs are configured and were left running.
 - **`configurations(ofKind:)` skips undecodable records silently** — the same report would be
   produced by a shape mismatch between builds, with nothing logged.
 - The Mac's catalog cannot be inspected from the shell: TCC refuses the Group Container.
+
+# 2026-09-18 — the editor on a phone
+
+## Verified by running
+
+| Claim | Evidence |
+|---|---|
+| A document opens and renders on an iPhone | `README.md` on an iPhone 17 Pro simulator: content, line numbers, Markdown highlighting, footer `Line 1, Column 1 · Markdown · LF`. Photographed |
+| A project opens on a phone | The editor's compact layout, its own empty state, and the Files sheet listing `Sources` and `README.md`. Photographed |
+| A panel's detail is reachable on a phone | The project detail with Open/Rename/Remove, pushed. Photographed before and after |
+| A failing action says why | The alert *"There is no folder at … any more"*, which the same refusal used to raise invisibly. Photographed |
+| Package suite | **1,623 tests, exit status 0** |
+| All three platforms build | `xcodebuild` Release for macOS, iOS and visionOS |
+| Installed | **0.4.171** on iPhone `00008150`, read back off the device |
+
+## Known and unfixed
+
+- **The Mac is still on 0.4.170** — 0.4.171 is built and waiting for the app to be quit.
+- **Only the editor has been driven on a phone.** The terminal, the database and the desktop have
+  the same shape and nobody has watched any of them; the desktop still has no UI test at all and
+  cannot have one until a configuration can be seeded.
+- The Vision Pro is still at 0.4.123.

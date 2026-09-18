@@ -340,3 +340,20 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     nil for exactly that case — so Edit opened nothing and the only working action was the
     destructive one. A message that names two ways out, one of which is a dead end, is an
     instruction to destroy data. When writing the sentence, try both.
+
+46. **Drive the phone, do not reason about it.** Four iPhone defects in one evening, every one a
+    surface that silently did nothing, and not one of them visible from a Mac build or a unit test:
+    `openWindow` is a no-op on an iPhone; a `NavigationSplitView` collapses to its *sidebar* on a
+    compact width; a contributed panel's detail is never pushed because the library cannot see the
+    panel's selection; and a double-click gesture has no touch equivalent, so a file list could
+    select a file and never open one. The app had 1,623 unit tests and a single iPhone UI test that
+    checked it launched. `UITests/EditorOnIPhoneUITests.swift` is the pattern: seed, walk, and
+    photograph every step.
+
+47. **A simulator fixture must live inside the app.** The data container is given a new identifier
+    when the app is reinstalled, while `UserDefaults` survives — so anything that records an
+    absolute path from the host is stale by the next run, and a seeding guard of "only when empty"
+    then seeds nothing and leaves the dead record in place. `--ui-testing-seed-project` makes the
+    fixture in the app's own container and replaces what was there. Write screenshots to the
+    runner's `NSTemporaryDirectory()` as well as attaching them: result bundles arrive unfinalised
+    often enough that an attachment alone is not evidence.

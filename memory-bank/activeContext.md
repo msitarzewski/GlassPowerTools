@@ -1876,3 +1876,39 @@ thing that works on one platform and silently does nothing on another.
 - **The Mac's catalog cannot be read from this shell.** TCC refuses the Group Container, so a sync
   question has to be answered from the app's behaviour or from a test, not by looking at the file.
 - Rule 28 still costs twenty minutes if forgotten, though auto-lock is now off on this Mac.
+
+## 2026-09-18 — RESUME HERE (supersedes the night block above)
+
+**State DOCS.** **1,623 tests / exit status 0**, 7 live against `192.0.2.6`, all three platforms
+build. iPhone on **0.4.171**; the Mac is built at 0.4.171 and waiting for the app to be quit; the
+Vision Pro is still locked at 0.4.123.
+
+### What the night was
+
+One report — *"the editor doesn't actually work at all. The file title shows but no content"* —
+and **four iPhone-only defects behind it**, none in the editor's text view:
+[the editor on a phone](tasks/2026-09/2026-09-17_editor-on-a-phone.md).
+
+The editor now opens a project, lists its files and renders a document on a phone, photographed at
+every step.
+
+### Do these next, in order
+
+1. **Drive the other three capabilities on a phone.** The terminal, the database and the desktop
+   have never been watched there, and tonight's four defects were all invisible to a Mac build and
+   to 1,623 unit tests. `UITests/EditorOnIPhoneUITests.swift` is the pattern.
+2. **A seed for desktop configurations**, so that capability can have a UI test at all.
+3. **`replaceAll` remains a whole-kind reconcile** driven by one device's list — freshness is now
+   every capability's duty rather than a property of the call.
+4. **The Vision Pro**, on an unlock, and the D26 two-device run.
+
+### Things that will bite
+
+- **Rules 42–47**, all earned on 2026-09-17: read the obsolete apps; one answer to "can this device
+  open a window"; a capability's list is a cache the catalog changes underneath; every action an
+  error offers must work; drive the phone rather than reasoning about it; and a simulator fixture
+  must live inside the app.
+- The simulator's data container is renamed on reinstall while `UserDefaults` survives. Anything
+  seeded from the host is stale by the next run.
+- Result bundles frequently arrive unfinalised; write screenshots to the runner's temporary
+  directory as well as attaching them.

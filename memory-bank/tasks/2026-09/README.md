@@ -321,3 +321,13 @@ Also: the failure told the user to *"Edit the service to set it up, or remove it
 answered nil for exactly that case, leaving the destructive action as the only one that worked.
 
 **1,623 tests, exit status 0.** macOS and iPhone on **0.4.170**. Rules 44 and 45.
+
+## 2026-09-18 — [the editor on a phone](2026-09-17_editor-on-a-phone.md)
+
+Four iPhone-only defects behind a single report, none of them in the editor's text view: a split
+view that collapses to its sidebar on a compact width, a panel detail nothing could push, an error
+shown in a column the phone was not displaying, and a file list whose only way to open a file was a
+double click. The editor now opens a project and renders a document on a phone, photographed.
+
+Also the fixture traps that cost the evening, and `--ui-testing-seed-project`, which is what makes
+the editor testable on a phone at all. **1,623 tests, exit status 0.** iPhone on **0.4.171**.
