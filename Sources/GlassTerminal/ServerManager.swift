@@ -390,6 +390,23 @@ class ServerManager {
         loadServers()
     }
 
+    /// Re-reads the saved servers because the catalog changed underneath them.
+    ///
+    /// **Not `loadServersIfNeeded`.** That one reads once and refuses every call after, which is
+    /// right for "the store can answer now" and wrong for "the store says something different
+    /// now". The catalog says something different every time D19 delivers another device's
+    /// changes, so a terminal service added on the phone arrived on the Mac as a service link with
+    /// no configuration behind it — the library offered Connect and the connect reported that the
+    /// service had never been set up (reported 2026-09-17).
+    ///
+    /// The desktop and the database have always re-read here; the terminal was the one capability
+    /// that did not, which is why a desktop added on the phone worked and a terminal did not.
+    func reloadFromStore() {
+        guard store.isReadable() else { return }
+        hasLoadedServers = true
+        loadServers()
+    }
+
     func loadServers() {
         do {
             let loadedServers: [ServerConfiguration]

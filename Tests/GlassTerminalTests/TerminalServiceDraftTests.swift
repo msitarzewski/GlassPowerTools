@@ -124,7 +124,7 @@ struct TerminalServiceDraftTests {
         #expect(servers.servers.isEmpty)
     }
 
-    @Test("The capability hands the shell a fresh draft, a loaded one for a saved server, and none for a bare link")
+    @Test("The capability hands the shell a fresh draft, a loaded one for a saved server, and a settable one for a bare link")
     func capabilityContract() throws {
         let runtime = GlassTerminalRuntime()
         let capability = GlassTerminalCapability(runtime: runtime)
@@ -132,6 +132,17 @@ struct TerminalServiceDraftTests {
         #expect(fresh.kind == .ssh && fresh is TerminalServiceDraft)
         let host = try HostProfile(displayName: "h", address: "h.example")
         let link = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "t")
-        #expect(capability.setupDraft(for: link, host: host) == nil, "no saved server behind the link")
+
+        // A link with no saved server behind it used to answer nil, and the sheet had nothing to
+        // show. That is the state another device's sync leaves when the service arrives and its
+        // configuration does not — and the failure the user is given says "Edit the service to set
+        // it up, or remove it". Answering nil made Edit a dead end for the one case the sentence
+        // is about, leaving the destructive action as the only one that worked.
+        let draft = try #require(capability.setupDraft(for: link, host: host),
+                                 "Edit offered no way to set up a service the app said to edit")
+        #expect(draft is TerminalServiceDraft)
+        // A *new* draft rather than an editor over nothing: commit binds to the endpoint it is
+        // given, so setting it up fills this link instead of making a second service beside it.
+        #expect((draft as? TerminalServiceDraft)?.editing == nil)
     }
 }
