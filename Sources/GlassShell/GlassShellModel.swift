@@ -77,6 +77,17 @@ public final class GlassShellModel: GlassServiceStore {
     public static let sharedContainerIdentifier = "group.sh.glas.shared"
     public static let catalogRelativePath = "GlassHostCatalog/hosts.json"
 
+    /// A host the library should show the next time it is looked at, and then forget.
+    ///
+    /// **Where a capability hands you back to.** Leaving a database on a phone returned to the
+    /// top of the connection list, which is not where the user came from — they came from *that
+    /// machine*, and its other services are the reason they are going back (reported
+    /// 2026-09-19). Every capability that replaces the library on a phone wants this; the
+    /// database is the first to use it.
+    public var hostToShow: HostID?
+
+    public func showHost(_ id: HostID) { hostToShow = id }
+
     /// The library's hosts: catalog records that describe the same machine, consolidated
     /// (see `GlassShellHostGrouping`). Never written back as one record before Stage 6.
     public private(set) var hosts: [GlassShellHost] = []

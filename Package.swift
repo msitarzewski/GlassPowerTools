@@ -45,6 +45,11 @@ let package = Package(
                  revision: "a06c2e4415e9bc0346c6b86d401879ffb44058f7"),
         .package(url: "https://github.com/tree-sitter-grammars/tree-sitter-toml",
                  revision: "64b56832c2cffe41758f28e05c756a3a98d16f41"),
+        // 2026-09-19: HTML, asked for while editing files on a server. A dependency rather than a
+        // vendored copy — upstream ships an SPM manifest that compiles both `parser.c` and
+        // `scanner.c` unconditionally, which is the thing YAML's manifest gets wrong.
+        .package(url: "https://github.com/tree-sitter/tree-sitter-html",
+                 revision: "73a3947324f6efddf9e17c0ea58d454843590cc0"),
         // 2026-09-16: the languages people actually keep on the machines this app connects to.
         //
         // **Swift is deliberately absent.** `alex-pinkus/tree-sitter-swift` ships no generated
@@ -114,6 +119,7 @@ let package = Package(
                 .product(name: "TreeSitterGo", package: "tree-sitter-go"),
                 "TreeSitterRust",
                 .product(name: "TreeSitterC", package: "tree-sitter-c"),
+                .product(name: "TreeSitterHTML", package: "tree-sitter-html"),
             ],
             resources: [.copy("Grammar/Queries")]
         ),

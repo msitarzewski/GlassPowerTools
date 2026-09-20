@@ -190,6 +190,13 @@ public final class GlassEditorProjectLibrary {
                 .write(to: sources.appendingPathComponent("main.swift"))
         } catch { return }
         remember(GlassEditorProject.local(root))
+        // A second project whose folder is **not** there, only when asked for. Reported
+        // 2026-09-18: a project that refuses to open leaves an alert, and the next project's Open
+        // did nothing at all — which needs two projects and a failure to reproduce.
+        if arguments.contains("--ui-testing-seed-missing-project") {
+            remember(GlassEditorProject.local(documents.appendingPathComponent("GoneProject",
+                                                                               isDirectory: true)))
+        }
     }
     #endif
 
@@ -222,14 +229,29 @@ public final class GlassEditorProjectLibrary {
         return stored
     }
 
-    /// Renames a project without moving it: the folder is unchanged, only what it is called here.
-    public func rename(_ id: GlassEditorProject.ID, to name: String, at date: Date = Date()) {
+    /// Changes one live project's record. Every edit to a stored project goes through here, so
+    /// there is one place that stamps `modifiedAt` and one that upserts — the rename and the text
+    /// overrides are the same act with a different field.
+    public func modify(_ id: GlassEditorProject.ID, at date: Date = Date(),
+                       _ change: (inout GlassEditorProject) -> Void) {
         guard var record = payload.records.first(where: { $0.id == id }), !record.isDeleted else { return }
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        record.project.displayName = trimmed
+        change(&record.project)
         record.modifiedAt = date
         upsert(record)
+    }
+
+    /// Renames a project without moving it: the folder is unchanged, only what it is called here.
+    public func rename(_ id: GlassEditorProject.ID, to name: String, at date: Date = Date()) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        modify(id, at: date) { $0.displayName = trimmed }
+    }
+
+    /// What this project says about the text. Empty is stored as nil, so a project that has
+    /// stopped disagreeing follows the app's defaults again rather than pinning today's values.
+    public func setTextOverrides(_ overrides: GlassEditorTextOverrides,
+                                 for id: GlassEditorProject.ID, at date: Date = Date()) {
+        modify(id, at: date) { $0.textOverrides = overrides.isEmpty ? nil : overrides }
     }
 
     /// Removes a project from the list. A tombstone rather than a deletion, so a device that is

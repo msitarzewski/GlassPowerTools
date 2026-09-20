@@ -56,6 +56,30 @@ public final class GlassEditorModel {
     /// Behavior configuration, injected as a value (projectRules.md, API Design).
     public var configuration: GlassEditorConfiguration
 
+    /// A request for the on-screen keyboard — **the phone's only.**
+    ///
+    /// The model is the API and a SwiftUI consumer never holds the engine, so an instruction to
+    /// the text view travels the way every other one does: as observable state the backend is
+    /// watching. The terminal has had this control since glas.sh (`keyboard.chevron.compact.down`
+    /// in its input accessory) and an editor needs it more — on a phone the keyboard is half the
+    /// window, and reading a file with it up is reading a third of a file.
+    ///
+    /// A serial, not just a flag: asking twice for the same thing has to reach the view twice,
+    /// because the user may have dismissed it with the system's own gesture in between. AppKit
+    /// ignores this entirely.
+    public private(set) var keyboardRequest = KeyboardRequest()
+
+    public struct KeyboardRequest: Equatable, Sendable {
+        public var wantsKeyboard = false
+        public var serial = 0
+    }
+
+    /// Asks for the keyboard, or asks for it to go away.
+    public func requestKeyboard(_ wanted: Bool) {
+        keyboardRequest = KeyboardRequest(wantsKeyboard: wanted,
+                                          serial: keyboardRequest.serial &+ 1)
+    }
+
     /// The facts established at open, carried so save can stay honest.
     public private(set) var snapshot: DocumentSnapshot
 

@@ -160,6 +160,20 @@ struct GrammarModuleTests {
     </plist>
     """
 
+    /// Added 2026-09-19. A page with the four things a reader needs apart: element names,
+    /// attributes with quoted values, a comment, and a script whose contents are not prose.
+    static let html = """
+    <!DOCTYPE html>
+    <!-- a page -->
+    <html lang="en">
+      <head><title>Glass</title></head>
+      <body class="page">
+        <a href="https://example.com">A link</a>
+        <script>const answer = 42;</script>
+      </body>
+    </html>
+    """
+
     static func snippet(for language: LanguageID) -> String {
         switch language {
         case .sql: return sql
@@ -176,6 +190,7 @@ struct GrammarModuleTests {
         case .php: return php
         case .swift: return swiftSource
         case .xml: return xml
+        case .html: return html
         case .plaintext: return "just words\nno grammar here"
         }
     }
@@ -211,6 +226,9 @@ struct GrammarModuleTests {
         // An element name is the closest thing markup has to a keyword, an attribute name is a
         // property, and the value is a string — the three a reader actually needs apart.
         case .xml: return [.keyword, .property, .string, .comment]
+        // The same three as XML, plus the embedded run that keeps `<script>` from reading as
+        // paragraph text.
+        case .html: return [.keyword, .attribute, .string, .comment, .embedded]
         case .plaintext: return [.plain]
         }
     }

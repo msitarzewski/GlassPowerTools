@@ -142,6 +142,43 @@ public final class GlassEditorRuntime {
         return window
     }
 
+    // MARK: A window's project and the durable list
+
+    /// Whether a project a window has open is actually **in** the list.
+    ///
+    /// Not every route through the editor puts it there: opening a folder from the Files browser
+    /// and opening one from the library both go through `openProject`, which remembers it — but
+    /// `Open Project…` in an editor window opens the folder straight into the workspace, and the
+    /// folder is then a project you can work in and cannot find again (reported 2026-09-18).
+    /// A window that notices offers to keep it rather than doing it silently: the list is the
+    /// user's, and it syncs to their other devices.
+    public func isRemembered(_ project: GlassEditorProject) -> Bool {
+        projects.project(at: project.path, on: project.hostID) != nil
+    }
+
+    /// Keeps it — the act behind that offer.
+    @discardableResult
+    public func remember(_ project: GlassEditorProject) -> GlassEditorProject {
+        projects.remember(project)
+    }
+
+    /// One project's name, changed in the window and in the list together. The sheet used to
+    /// rename only the window's copy, so the new name was gone at the next launch.
+    public func rename(_ id: GlassEditorProject.ID, to name: String,
+                       in workspace: GlassEditorWorkspace) {
+        workspace.rename(id, to: name)
+        projects.rename(id, to: name)
+    }
+
+    /// One project's text settings, likewise: the open window follows immediately, the list keeps
+    /// it and carries it to the other devices.
+    public func setTextOverrides(_ overrides: GlassEditorTextOverrides,
+                                 forProject id: GlassEditorProject.ID,
+                                 in workspace: GlassEditorWorkspace) {
+        workspace.setTextOverrides(overrides, forProject: id)
+        projects.setTextOverrides(overrides, for: id)
+    }
+
     /// How a machine other than this one is reached, supplied by whatever owns SSH.
     ///
     /// The editor does not import the terminal: SFTP belongs to the capability that owns the

@@ -140,6 +140,13 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
                         if horizontalSizeClass == .compact { compactPath = [.results] }
                         #endif
                     }
+                    // **One element, not three.** The row is a label, a spacer and a count, and
+                    // an identifier on the `HStack` reached every child: on iOS 27.2 the first
+                    // match for the panel's own identifier was the row's *image*, which is not
+                    // hittable, so a tap on it did nothing. VoiceOver had the same row three
+                    // times for the same reason. Combined, it is one control that says its name
+                    // and how many things are in it.
+                    .accessibilityElement(children: .combine)
                     .accessibilityAddTraits(openPanelID == panel.id ? .isSelected : [])
                     .accessibilityIdentifier("glass-library-panel-\(panel.id)")
                 }
@@ -313,11 +320,19 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
             }
         }
         .onChange(of: compactPath) { _, path in
-            if path.last != .detail { selection = nil }
+            if path.last != .detail {
+                selection = nil
+                // The panel's selection is cleared with the stack's, so choosing the *same* row
+                // again is a change again — otherwise going back and re-opening one project does
+                // nothing for the rest of the session.
+                openPanel?.clearSelection()
+            }
         }
-        // A panel's own selection is the push nobody else can make for it.
-        .onChange(of: openPanel?.hasSelection ?? false) { _, selected in
-            guard selected, compactPath.last != .detail else { return }
+        // A panel's own selection is the push nobody else can make for it. Watching the *item*
+        // rather than "is something selected": as a Bool this went true once and never changed
+        // again, so every selection after the first was swallowed.
+        .onChange(of: openPanel?.selectedItem) { _, item in
+            guard item != nil, compactPath.last != .detail else { return }
             compactPath.append(.detail)
         }
     }

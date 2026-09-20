@@ -101,6 +101,15 @@ struct GlassPowerToolsApp: App {
         database.hostAccess = { [weak model] host in
             model?.hostAccess(for: host.id) ?? GlassCapabilityHostAccess(address: host.address)
         }
+        // Leaving a database goes back to **the machine it is on**, not to the top of the list.
+        // The catalog is what turns a connection's endpoint into a host, and the database does
+        // not hold the catalog — so the answer is supplied from here, like `hostAccess` above.
+        database.showHostForConnection = { [weak model] connectionID in
+            guard let model,
+                  let host = model.host(owningEndpoint: EndpointID(rawValue: connectionID))
+            else { return }
+            model.showHost(host.id)
+        }
         // D26: the database's saved connections live on their service links too.
         database.connectToLibrary(store: model)
         model.registry.register(GlassDatabaseCapability(runtime: database))

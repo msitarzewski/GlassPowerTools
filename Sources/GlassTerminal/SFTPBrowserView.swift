@@ -8,6 +8,7 @@
 import SwiftUI
 import GlassShell
 import GlassLayers
+import GlassConnectionUI
 import NIOCore
 import GlassSSHTransport
 import NIOFoundationCompat
@@ -570,7 +571,11 @@ struct SFTPBrowserView: View {
     var body: some View {
         NavigationStack {
             content
-                .navigationTitle(currentPath)
+                // **The folder's name, with the path beneath it.** The title used to be
+                // `currentPath` — the whole path as a title, which reads as a string of text
+                // rather than a place (reported 2026-09-18). The editor's file list shows the
+                // same header, because both are browsers over the same kind of thing.
+                .glassPathHeader(currentPath)
                 .searchable(text: $filterText, prompt: "Filter files...")
                 .terminalTextInputDefaults()
                 .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -1032,6 +1037,10 @@ struct SFTPBrowserView: View {
             #endif
         }
         .listStyle(.plain)
+        // **The list paints no surface of its own.** A `List` and a `Table` both fill themselves
+        // with the system's content background, which sat opaque over the window's glass — the
+        // browser looked like a different application beside the library (2026-09-18).
+        .scrollContentBackground(.hidden)
         .refreshable {
             await loadDirectory()
         }

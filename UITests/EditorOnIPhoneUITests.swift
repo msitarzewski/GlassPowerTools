@@ -63,19 +63,87 @@ final class EditorOnIPhoneUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 4)
         shoot(app, "03-editor")
 
-        // The editor must be showing the project, not an empty column with the title above it.
-        let files = app.buttons["editor-files"].firstMatch
-        XCTAssertTrue(files.waitForExistence(timeout: 10),
-                      "the editor did not present its own layout")
-        files.tap()
-        Thread.sleep(forTimeInterval: 2)
-        shoot(app, "04-files-sheet")
-
-        // The file tree should be reachable, and a file openable.
+        // **The project's files are the screen it lands on**, not the editor's empty state with
+        // the list behind a toggle (reported 2026-09-18). The toggle is gone with the sheet it
+        // opened, so its absence is part of the claim.
         let readme = app.staticTexts["README.md"].firstMatch
-        XCTAssertTrue(readme.waitForExistence(timeout: 10), "the project's files are not listed")
+        XCTAssertTrue(readme.waitForExistence(timeout: 15),
+                      "opening the project did not land on its files")
+        XCTAssertFalse(app.buttons["editor-files"].exists,
+                       "the Files toggle is still there, so the file list is still hidden behind it")
+        shoot(app, "04-project-files")
+
+        // The header says where you are: the folder large, the path to it beneath.
+        let header = app.descendants(matching: .any).matching(identifier: "glass-path-header").firstMatch
+        XCTAssertTrue(header.exists, "the folder screen has no header saying where it is")
+
+        // A folder is a push, and the back button is the way out — the Files browser's navigation.
+        let sources = app.staticTexts["Sources"].firstMatch
+        XCTAssertTrue(sources.waitForExistence(timeout: 10), "the project's folder is not listed")
+        sources.tap()
+        let nested = app.staticTexts["main.swift"].firstMatch
+        XCTAssertTrue(nested.waitForExistence(timeout: 10),
+                      "tapping a folder did not open it")
+        shoot(app, "05-folder-pushed")
+
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(readme.waitForExistence(timeout: 10), "the back button did not return to the project")
+
+        // And a file is a push onto the editor, with the file in it.
         readme.tap()
         Thread.sleep(forTimeInterval: 3)
-        shoot(app, "05-file-open")
+        shoot(app, "06-file-open")
+        XCTAssertTrue(app.buttons["editor-save"].waitForExistence(timeout: 10),
+                      "choosing a file did not open the editor")
+    }
+}
+
+extension EditorOnIPhoneUITests {
+    /// **A refusal must not swallow the next click.**
+    ///
+    /// Reported 2026-09-18: *"I tried to connect to a Mac desktop project (for fun) and was given
+    /// an appropriate error. Then I tried to open another project and it just absorbed the click."*
+    /// Reproduced here with a project whose folder is gone, which raises the same alert on the
+    /// same screen without needing a host.
+    func testAProjectThatRefusesToOpenDoesNotBlockTheNextOne() throws {
+        continueAfterFailure = true
+        let app = XCUIApplication()
+        app.launchArguments += ["--ui-testing", UUID().uuidString,
+                                "--ui-testing-seed-project", "--ui-testing-seed-missing-project"]
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+
+        let projects = app.descendants(matching: .any)
+            .matching(identifier: "glass-library-panel-editor-projects").firstMatch
+        XCTAssertTrue(projects.waitForExistence(timeout: 15), "the Projects panel is not in the library")
+        projects.tap()
+
+        // The one that cannot open.
+        let gone = app.staticTexts["GoneProject"].firstMatch
+        XCTAssertTrue(gone.waitForExistence(timeout: 10), "the missing-folder project is not listed")
+        gone.tap()
+        let open = app.buttons["project-open"].firstMatch
+        XCTAssertTrue(open.waitForExistence(timeout: 15), "the project's detail never appeared")
+        open.tap()
+
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 10), "a project with no folder must say so")
+        shoot(app, "10-refusal")
+        alert.buttons["OK"].firstMatch.tap()
+        XCTAssertTrue(alert.waitForNonExistence(timeout: 10), "the alert stays on screen")
+
+        // Back to the list, and open the one that works.
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let demo = app.staticTexts["DemoProject"].firstMatch
+        XCTAssertTrue(demo.waitForExistence(timeout: 10), "the working project is not listed")
+        demo.tap()
+        let openAgain = app.buttons["project-open"].firstMatch
+        XCTAssertTrue(openAgain.waitForExistence(timeout: 15))
+        openAgain.tap()
+        Thread.sleep(forTimeInterval: 4)
+        shoot(app, "11-after-refusal")
+
+        XCTAssertTrue(app.staticTexts["README.md"].firstMatch.waitForExistence(timeout: 15),
+                      "the click after a refusal was absorbed: the editor never opened")
     }
 }

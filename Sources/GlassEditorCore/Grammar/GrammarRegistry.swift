@@ -4,6 +4,7 @@ import SwiftTreeSitter
 import TreeSitterBash
 import TreeSitterC
 import TreeSitterGo
+import TreeSitterHTML
 import TreeSitterJavaScript
 import TreeSitterJSON
 import TreeSitterPHP
@@ -142,6 +143,7 @@ public final class GrammarRegistry {
         case .php: return Language(tree_sitter_php())
         case .swift: return Language(tree_sitter_swift())
         case .xml: return Language(tree_sitter_xml())
+        case .html: return Language(tree_sitter_html())
         case .plaintext: return nil
         }
     }
@@ -170,6 +172,7 @@ public final class GrammarRegistry {
         case .php: return "php-highlights"
         case .swift: return "swift-highlights"
         case .xml: return "xml-highlights"
+        case .html: return "html-highlights"
         case .plaintext: return nil
         }
     }

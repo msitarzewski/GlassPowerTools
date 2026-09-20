@@ -617,6 +617,49 @@ final class GlassTerminalUITests: XCTestCase {
         XCTAssertTrue(element("edit-server-username").waitForNonExistence(timeout: 10))
     }
 
+    /// The Files browser's header, against the real server.
+    ///
+    /// It used to set `.navigationTitle(currentPath)` — the whole path as a title, which reads as
+    /// a string of text rather than a place (reported 2026-09-18). It now shows the shared header
+    /// the editor's file list shows: the folder's name, and the path that leads to it beneath.
+    /// Proven here rather than in a unit test because the splitting is the easy half; that the
+    /// header arrives, over a real listing, is the half that has been wrong before.
+    func testFilesBrowserHeaderNamesTheFolder() throws {
+        let fixture = try fixture()
+        app = launch()
+
+        try addHost(named: "scratch", address: fixture.host, terminal: fixture)
+        openDetail(of: "scratch")
+
+        // Files is a tool on the service, not a service of its own: `host-tool-open-files-<id>`.
+        let files = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'host-tool-open-files-'")).firstMatch
+        XCTAssertTrue(files.waitForExistence(timeout: 15), "the service offers no Files tool")
+        press(files)
+        acceptTrustPromptIfShown()
+
+        let header = app.descendants(matching: .any)
+            .matching(identifier: "glass-path-header").firstMatch
+        guard header.waitForExistence(timeout: 45) else {
+            dumpTree("no-sftp-header")
+            if let failure = connectionFailureText() { XCTFail("connection failed: \(failure)") }
+            else { XCTFail("the Files browser never showed its header") }
+            return
+        }
+        // The browser opens in the account's home directory, so the header names the account and
+        // the path beneath it is what leads there — never the folder repeated.
+        let label = header.label
+        XCTAssertTrue(label.contains(fixture.user),
+                      "the header does not name the folder it is in: '\(label)'")
+        XCTAssertFalse(label.hasPrefix("/"),
+                       "the header is still leading with the whole path: '\(label)'")
+        #if os(macOS)
+        captureOwnWindow(app.windows.matching(NSPredicate(format: "title CONTAINS[c] %@", fixture.user)).firstMatch,
+                         app: app, name: "terminal-30-sftp-header")
+        #endif
+        snap("30-sftp-header")
+    }
+
     func testConnectsToRealHostThroughTheShell() throws {
         let fixture = try fixture()
         app = launch()

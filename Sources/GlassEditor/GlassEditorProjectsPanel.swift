@@ -363,8 +363,12 @@ public extension GlassEditorRuntime {
             sectionTitle: "Projects",
             title: "Projects",
             symbolName: "folder",
-            count: projects.projects.isEmpty ? nil : projects.projects.count,
-            hasSelection: { model.selection != nil },
+            // `runtime`, not `self`: the count is asked for every time the sidebar row draws, so
+            // the expression outlives this call. Stored, it said 5 with four projects in the list
+            // (`GlassLibraryPanel.count`).
+            count: runtime.projects.projects.isEmpty ? nil : runtime.projects.projects.count,
+            selection: { model.selection },
+            clearSelection: { model.selection = nil },
             results: {
                 GlassEditorProjectsPanel(presentation: .results, runtime: runtime,
                                          panel: model, reach: reach)

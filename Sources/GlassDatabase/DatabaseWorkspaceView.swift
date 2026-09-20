@@ -199,6 +199,8 @@ enum DatabaseWorkspaceConnectionsRoute: Equatable {
 struct DatabaseWorkspaceView: View {
     let sessionID: UUID
 
+    /// Optional: the scenes inject it, and a preview or a test may not.
+    @Environment(GlassDatabaseRuntime.self) private var runtime: GlassDatabaseRuntime?
     @Environment(DatabaseSessionManager.self) private var sessionManager
     @Environment(SettingsManager.self) private var settingsManager
     @Environment(\.openWindow) private var openWindow
@@ -247,29 +249,23 @@ struct DatabaseWorkspaceView: View {
         }))
     }
 
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// The phone's stack: databases, the tables inside one, and the detail of what was chosen.
+    ///
+    /// **`NavigationPath`, not `[DatabaseCompactRoute]`.** A typed path accepts only its own
+    /// type, and the schema browser pushes a destination of its own for a database's tables
+    /// (`SchemaBrowserView.compactDatabaseList`) — against a typed path those links silently do
+    /// nothing, which is precisely what "now the databases can't be clicked" was (2026-09-19).
+    @State private var compactPath = NavigationPath()
+    /// The depth the detail sits at, or nil when it is not on the stack. A `NavigationPath` will
+    /// not say what is in it, and "is the detail already showing" has to be answered before
+    /// pushing a second one.
+    @State private var detailDepth: Int?
+    #endif
+
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            SchemaBrowserView(
-                sessionID: sessionID,
-                selection: tabState.displayed,
-                onSelectionChanged: { newSelection in
-                    previewWorkspace(newSelection)
-                },
-                onOpenSelection: { newSelection in
-                    if case .query(let id) = newSelection {
-                        openQueryDocument(QueryDocumentTab(id: id))
-                    } else {
-                        openWorkspace(newSelection)
-                    }
-                }
-            )
-            .databaseSidebarColumnWidth()
-            .databaseWorkspaceSidebarMaterial()
-            .glassLibraryColumnAutosave("com.glasspowertools.database.columns")
-        } detail: {
-            detailSurface
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
+        layout
         .databaseWorkspaceWindowBackground()
         .onPreferenceChange(SQLRunAvailabilityKey.self) { tableRunAvailability = $0 }
         .databaseWorkspaceWindowChrome()
@@ -300,86 +296,6 @@ struct DatabaseWorkspaceView: View {
         #endif
         .databaseSidebarChrome()
         .focusedSceneValue(\.databaseWorkspaceCommandActions, workspaceCommandActions)
-        .toolbar {
-            // **The way back.** `showConnections()` already existed and was reachable only from
-            // failure states — a closed session, a reconnect card. On a phone the workspace
-            // *replaces* the library rather than being pushed onto it, so a user who opened a
-            // database had no way back to their machines at all (reported 2026-09-16: "there's no
-            // way to go back from the databases list"). Leading, where a back control belongs.
-            ToolbarItem(placement: .navigation) {
-                Button {
-                    showConnections()
-                } label: {
-                    Label("Connections", systemImage: "chevron.backward")
-                }
-                .help("Back to Connections")
-                .accessibilityIdentifier("database-workspace-connections")
-            }
-            #if !os(macOS)
-            ToolbarItem(placement: databaseSidebarToolbarPlacement) {
-                Button {
-                    withAnimation {
-                        columnVisibility = columnVisibility == .detailOnly
-                            ? .automatic : .detailOnly
-                    }
-                } label: {
-                    Label("Toggle Sidebar",
-                          systemImage: columnVisibility == .detailOnly
-                              ? "sidebar.left" : "sidebar.leading")
-                }
-            }
-            #endif
-            #if os(macOS)
-            ToolbarItem {
-                Text(detailTitle)
-                    .font(.headline)
-                    .lineLimit(1)
-                    .help("Current workspace: \(detailTitle)")
-                    .accessibilityLabel("Current workspace: \(detailTitle)")
-            }
-            .sharedBackgroundVisibility(.hidden)
-            #endif
-            #if !os(macOS)
-            ToolbarItemGroup(placement: databaseToolbarPlacement) {
-                Button {
-                    openQueryDocument()
-                } label: {
-                    Label("SQL Editor", systemImage: "chevron.left.forwardslash.chevron.right")
-                }
-                .help("Show the SQL editor")
-                .accessibilityLabel("SQL Editor")
-                .accessibilityHint("Opens the connected SQL query editor")
-
-                if tabState.displayed.usesOverviewRefreshAction {
-                    Button {
-                        overviewRefreshTrigger &+= 1
-                    } label: {
-                        Label("Refresh Overview", systemImage: "arrow.clockwise")
-                    }
-                    .help("Reload the active overview")
-                    .accessibilityLabel("Refresh Overview")
-                    .accessibilityHint("Reloads the active connection or database overview")
-                }
-
-                Button {
-                    #if os(iOS)
-                    if UIDevice.current.userInterfaceIdiom == .phone {
-                        iOSRouter.showSettings()
-                    } else {
-                        openWindow(id: "settings")
-                    }
-                    #else
-                    openWindow(id: "settings")
-                    #endif
-                } label: {
-                    Label("Settings", systemImage: "gearshape")
-                }
-                .help("Open Settings")
-                .accessibilityLabel("Settings")
-                .accessibilityHint("Opens settings")
-            }
-            #endif
-        }
         .task(id: sessionID) {
             await monitorConnectionState()
         }
@@ -659,7 +575,16 @@ struct DatabaseWorkspaceView: View {
         .shadow(color: .black.opacity(0.22), radius: 32, y: 14)
     }
 
+    /// Back to **the machine this database is on**, not to the top of the list.
+    ///
+    /// The list is not where the user came from: they came from that host, and its other
+    /// services are usually the reason they are going back (reported 2026-09-19). Asking the
+    /// library to select the host is enough — it shows the detail for a selection change by
+    /// itself, on a phone by pushing and on a Mac because the column is already there.
     private func showConnections() {
+        if let showHost = runtime?.showHostForConnection, let id = session?.connectionConfig.id {
+            showHost(id)
+        }
         #if os(iOS)
         let route = DatabaseWorkspaceConnectionsRoute.resolve(
             isPhone: UIDevice.current.userInterfaceIdiom == .phone
@@ -740,6 +665,232 @@ struct DatabaseWorkspaceView: View {
     }
 
     // MARK: - Detail Surface
+
+    /// **A phone is not a narrow Mac.** `NavigationSplitView` collapses on a compact width into a
+    /// single stack showing its *sidebar*, so on an iPhone this workspace was the schema browser
+    /// and nothing else: Browse Data, the SQL editor and every table selected a destination in a
+    /// column that was never on screen. Reported 2026-09-19 — *"Browse data in the Database on
+    /// iOS absorbs the click, too"* — and it is the same defect the editor had on 2026-09-17,
+    /// still here because nobody had driven the database on a phone (rule 46).
+    @ViewBuilder
+    private var layout: some View {
+        #if os(iOS)
+        if horizontalSizeClass == .compact { compactLayout } else { splitLayout }
+        #else
+        splitLayout
+        #endif
+    }
+
+    private var splitLayout: some View {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            schemaBrowser
+                .databaseSidebarColumnWidth()
+                .databaseWorkspaceSidebarMaterial()
+                .glassLibraryColumnAutosave("com.glasspowertools.database.columns")
+        } detail: {
+            detailSurface
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .toolbar { workspaceToolbar }
+    }
+
+    #if os(iOS)
+    /// One thing at a time: the schema, and what you chose from it. The same shape the editor
+    /// uses on a phone — a stack, pushes, and the back button.
+    private var compactLayout: some View {
+        NavigationStack(path: $compactPath) {
+            schemaBrowser
+                .toolbar { workspaceToolbar }
+                .navigationDestination(for: DatabaseCompactRoute.self) { _ in
+                    detailSurface
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .navigationTitle(detailTitle)
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar { workspaceToolbar }
+                }
+        }
+        // Going back is the only way the detail leaves the stack, and the back button is the
+        // system's — so the depth is what says it has gone.
+        .onChange(of: compactPath.count) { _, count in
+            if let depth = detailDepth, count < depth { detailDepth = nil }
+        }
+    }
+
+    /// Shows whatever the workspace has selected, on a phone. Called by every route that chooses
+    /// something — a tap, a double tap, the SQL Editor button — so no surface has to remember.
+    private func showDetailOnCompact() {
+        guard horizontalSizeClass == .compact, detailDepth == nil else { return }
+        compactPath.append(DatabaseCompactRoute.detail)
+        detailDepth = compactPath.count
+    }
+    #endif
+
+    /// Every control this workspace contributes, in one place so both layouts can attach it.
+    ///
+    /// **Attached inside the navigation container, never outside it.** A `.toolbar` on a view that
+    /// *contains* a `NavigationStack` does not reach the screens inside it — which on a phone
+    /// would have taken the back control away entirely, and the back control is the report that
+    /// started this (2026-09-19: *"there's also no back button to get from Databases back to the
+    /// previous connection list"*).
+    @ToolbarContentBuilder
+    private var workspaceToolbar: some ToolbarContent {
+        // **The way back.** `showConnections()` already existed and was reachable only from
+        // failure states — a closed session, a reconnect card. On a phone the workspace
+        // *replaces* the library rather than being pushed onto it, so a user who opened a
+        // database had no way back to their machines at all (reported 2026-09-16: "there's no
+        // way to go back from the databases list"). Leading, where a back control belongs.
+        // On a phone this is the first screen's control only: a pushed detail has the
+        // stack's own back button, and two back controls pointing at different places is a
+        // puzzle rather than a convenience.
+        if !isPushed {
+            // `.topBarLeading` on iOS, not `.navigation`: in a collapsed split view the item
+            // simply did not appear, which is what "no back button" was (photographed 2026-09-19).
+            ToolbarItem(placement: backPlacement) {
+                Button {
+                    showConnections()
+                } label: {
+                    Label("Connections", systemImage: "chevron.backward")
+                }
+                .help("Back to Connections")
+                .accessibilityIdentifier("database-workspace-connections")
+            }
+        }
+        #if !os(macOS)
+        // **No sidebar toggle where there is no sidebar.** On a compact width the schema is
+        // the screen and the detail is a push; a control that reveals a column neither of
+        // them has is a control for nothing.
+        if !isCompact {
+            ToolbarItem(placement: databaseSidebarToolbarPlacement) {
+                Button {
+                    withAnimation {
+                        columnVisibility = columnVisibility == .detailOnly
+                            ? .automatic : .detailOnly
+                    }
+                } label: {
+                    Label("Toggle Sidebar",
+                          systemImage: columnVisibility == .detailOnly
+                              ? "sidebar.left" : "sidebar.leading")
+                }
+            }
+        }
+        #endif
+        #if os(macOS)
+        ToolbarItem {
+            Text(detailTitle)
+                .font(.headline)
+                .lineLimit(1)
+                .help("Current workspace: \(detailTitle)")
+                .accessibilityLabel("Current workspace: \(detailTitle)")
+        }
+        .sharedBackgroundVisibility(.hidden)
+        #endif
+        #if !os(macOS)
+        // **Not a bottom bar on a phone.** The schema browser's filter field is a floating
+        // bottom search on iOS 26 and later, and a `.bottomBar` group lands in the same place:
+        // the search field, the buttons and the list rows behind them were three things in one
+        // strip (photographed 2026-09-19). On a compact width the SQL editor goes to the top bar
+        // beside Refresh, and the rest into the overflow menu that is already there.
+        ToolbarItemGroup(placement: isCompact ? .topBarTrailing : databaseToolbarPlacement) {
+            Button {
+                openQueryDocument()
+                // The editor lives in the detail, and on a phone the detail is a push. This
+                // button was as absorbed as Browse Data was.
+                #if os(iOS)
+                showDetailOnCompact()
+                #endif
+            } label: {
+                Label("SQL Editor", systemImage: "chevron.left.forwardslash.chevron.right")
+            }
+            .help("Show the SQL editor")
+            .accessibilityLabel("SQL Editor")
+            .accessibilityHint("Opens the connected SQL query editor")
+
+        }
+        ToolbarItemGroup(placement: isCompact ? .secondaryAction : databaseToolbarPlacement) {
+            if tabState.displayed.usesOverviewRefreshAction {
+                Button {
+                    overviewRefreshTrigger &+= 1
+                } label: {
+                    Label("Refresh Overview", systemImage: "arrow.clockwise")
+                }
+                .help("Reload the active overview")
+                .accessibilityLabel("Refresh Overview")
+                .accessibilityHint("Reloads the active connection or database overview")
+            }
+
+            Button {
+                #if os(iOS)
+                if UIDevice.current.userInterfaceIdiom == .phone {
+                    iOSRouter.showSettings()
+                } else {
+                    openWindow(id: "settings")
+                }
+                #else
+                openWindow(id: "settings")
+                #endif
+            } label: {
+                Label("Settings", systemImage: "gearshape")
+            }
+            .help("Open Settings")
+            .accessibilityLabel("Settings")
+            .accessibilityHint("Opens settings")
+        }
+        #endif
+    }
+
+    /// Where the back control goes. `.navigation` is right on a Mac; on iOS it is dropped in a
+    /// collapsed split view, and the leading edge of the bar is where a phone expects it.
+    private var backPlacement: ToolbarItemPlacement {
+        #if os(iOS)
+        .topBarLeading
+        #else
+        .navigation
+        #endif
+    }
+
+    /// True only on a phone-width layout; false everywhere else, so the toolbar reads the same on
+    /// a Mac and in the headset.
+    private var isCompact: Bool {
+        #if os(iOS)
+        horizontalSizeClass == .compact
+        #else
+        false
+        #endif
+    }
+
+    /// True when the compact stack is showing a pushed detail.
+    private var isPushed: Bool {
+        #if os(iOS)
+        detailDepth != nil
+        #else
+        false
+        #endif
+    }
+
+    private var schemaBrowser: some View {
+        SchemaBrowserView(
+            sessionID: sessionID,
+            selection: tabState.displayed,
+            onSelectionChanged: { newSelection in
+                previewWorkspace(newSelection)
+                // On a phone a single tap is the only gesture there is, so it opens what it
+                // chose — the tab is still a preview, and the next tap replaces it.
+                #if os(iOS)
+                showDetailOnCompact()
+                #endif
+            },
+            onOpenSelection: { newSelection in
+                if case .query(let id) = newSelection {
+                    openQueryDocument(QueryDocumentTab(id: id))
+                } else {
+                    openWorkspace(newSelection)
+                }
+                #if os(iOS)
+                showDetailOnCompact()
+                #endif
+            }
+        )
+    }
 
     private var detailSurface: some View {
         VStack(spacing: 0) {
@@ -1001,7 +1152,13 @@ struct DatabaseWorkspaceView: View {
             canSave: sqlDocument(for: tabState.displayed)?.text.isEmpty == false,
             canUseQueryLibrary: activeQueryDocumentID != nil,
             canCloseTab: tabState.previewed != nil || canCloseWorkspace(tabState.selected),
-            newQueryTab: { openQueryDocument() },
+            newQueryTab: {
+                openQueryDocument()
+                // ⌘T from a hardware keyboard on an iPad or a phone, and the same push it needs.
+                #if os(iOS)
+                showDetailOnCompact()
+                #endif
+            },
             closeTab: { closeFocusedEditor() },
             openDocument: { showingSQLImporter = true },
             saveDocument: { exportActiveQueryDocument() },
@@ -1314,3 +1471,13 @@ struct WorkspaceBreadcrumb: Equatable {
         }
     }
 }
+
+#if os(iOS)
+/// Where a phone can be in a database workspace: at the schema, or at what it opened.
+///
+/// One case, not one per destination: which table or query is showing is `tabState`'s to say, and
+/// two places holding that would eventually disagree.
+enum DatabaseCompactRoute: Hashable {
+    case detail
+}
+#endif

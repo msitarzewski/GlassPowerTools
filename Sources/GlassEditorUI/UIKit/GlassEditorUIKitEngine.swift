@@ -50,6 +50,8 @@ public final class GlassEditorUIKitEngine: GlassEditorEngine {
         observeModelRevision()
         observeModelAppearance()
         observeModelConfiguration()
+        observeKeyboardRequests()
+        installKeyboardAccessory()
     }
 
     // MARK: - Model observation
@@ -76,6 +78,50 @@ public final class GlassEditorUIKitEngine: GlassEditorEngine {
                 self.observeModelAppearance()
             }
         }
+    }
+
+    /// The one instruction that travels the other way: show the keyboard, or put it away.
+    ///
+    /// A serial rather than a flag, so asking twice reaches the view twice — the user may have
+    /// swiped the keyboard away themselves in between, and a control that works only every other
+    /// press is worse than none (rule 45: every action a control offers must work).
+    private func observeKeyboardRequests() {
+        withObservationTracking { [weak self] in
+            _ = self?.model.keyboardRequest
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if self.model.keyboardRequest.wantsKeyboard {
+                    self.textView.becomeFirstResponder()
+                } else {
+                    self.textView.resignFirstResponder()
+                }
+                self.observeKeyboardRequests()
+            }
+        }
+    }
+
+    /// A bar above the keyboard with one control on it: put the keyboard away.
+    ///
+    /// The same glyph and the same words the terminal's accessory uses
+    /// (`SwiftTermHostView`), because they are the same act on the same platform. Nothing else
+    /// goes here yet — an editor's accessory is a good place for tab and cursor keys, and that is
+    /// a separate piece of work rather than a thing to guess at now.
+    private func installKeyboardAccessory() {
+        #if os(iOS)
+        let bar = UIToolbar()
+        bar.sizeToFit()
+        bar.items = [
+            UIBarButtonItem(systemItem: .flexibleSpace),
+            UIBarButtonItem(image: UIImage(systemName: "keyboard.chevron.compact.down"),
+                            primaryAction: UIAction { [weak self] _ in
+                                self?.model.requestKeyboard(false)
+                            })
+        ]
+        bar.items?.last?.accessibilityLabel = "Hide Keyboard"
+        bar.items?.last?.accessibilityIdentifier = "editor-hide-keyboard"
+        textView.inputAccessoryView = bar
+        #endif
     }
 
     private func observeModelConfiguration() {

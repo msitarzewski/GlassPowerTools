@@ -18,6 +18,9 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
+#if os(iOS)
+import UIKit
+#endif
 import GlassEditorCore
 import GlassEditorUI
 import GlassConnectionUI
@@ -31,8 +34,10 @@ public struct GlassEditorWorkspaceView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility = .detailOnly
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    /// The project's files, over the document, on a phone.
-    @State private var isShowingFiles = false
+    /// Where the phone is: the folders it has been pushed through, and the document when one is
+    /// open. Empty means the root — the project's own folder, or the document in a window that
+    /// has no project.
+    @State private var compactPath: [GlassEditorCompactRoute] = []
     #endif
     @State private var isImporting = false
     @State private var isImportingProject = false
@@ -45,9 +50,18 @@ public struct GlassEditorWorkspaceView: View {
     @Environment(\.colorScheme) private var colorScheme
     // Optional: the scene injects it, and a preview or a test may not.
     @Environment(GlassEditorRuntime.self) private var runtime: GlassEditorRuntime?
-    // Not macOS-only, so it can be handed to the dialogs modifier unconditionally; the Mac opens
-    // the app's Settings scene through `SettingsLink` instead and never reads it.
+    /// **This file's** text settings, from the gear in the toolbar — on every platform now. The
+    /// Mac's gear used to be a `SettingsLink` to the app's Settings window, which is a keystroke
+    /// away at ⌘, and did not need a toolbar button; what a window's toolbar is good for is the
+    /// thing in that window (2026-09-18).
     @State private var isShowingSettings = false
+    #if os(iOS)
+    /// Whether the software keyboard is up, so the control in the status bar can say which way it
+    /// goes. Read from the system's own notifications rather than from a flag this view sets: the
+    /// keyboard also goes away by a swipe, by a hardware keyboard appearing, and by the app going
+    /// to the background, and a button that disagrees with the screen is worse than no button.
+    @State private var keyboardIsUp = false
+    #endif
 
     /// This window's id, which is also its workspace's. The runtime is told when the window comes
     /// forward, so a file opened from the menu bar lands where the user is looking.
@@ -87,6 +101,12 @@ public struct GlassEditorWorkspaceView: View {
         // text sat in a dark rectangle in the middle of it. The engine is right not to read the
         // environment itself — a model is not a view — so the view tells it, on appearance and on
         // every change after.
+        // **Editing a file is committing to it.** The provisional tab stops being provisional the
+        // moment there is something in it worth losing — which is the rule every editor with this
+        // pattern uses, and the reason a preview can be replaced without a prompt.
+        .onChange(of: workspace.selectedDocument?.isDirty ?? false) { _, isDirty in
+            if isDirty, let id = workspace.selection { workspace.makePermanent(id) }
+        }
         .modifier(GlassEditorWindowLifecycle(workspace: workspace,
                                              runtime: runtime,
                                              windowID: windowID,
@@ -179,7 +199,7 @@ public struct GlassEditorWorkspaceView: View {
             GlassLayeredPanel(role: .embedded) { detail }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .toolbar { toolbar }
+        .toolbar { toolbarContent(includingDismissal: true) }
         // **No sidebar without a project.** The sidebar is the project's file tree and holds
         // nothing else — open documents are tabs. With no project open, the control offered to
         // reveal a column that could only ever be blank, so the control goes too: a toggle whose
@@ -191,42 +211,108 @@ public struct GlassEditorWorkspaceView: View {
     }
 
     #if os(iOS)
-    /// One thing at a time, for a phone: the document, and the project's files a tap away.
+    /// One thing at a time, for a phone: the folder you are in, and what you choose from it.
     ///
-    /// The file tree is a sheet rather than a column, because a column on a 390-point screen is
-    /// the whole screen — which is what the split view's collapse turned it into. It dismisses
-    /// itself when a file is chosen, because choosing one is why it was opened.
+    /// **Opening a folder lands on its files.** It used to land on the editor's empty state —
+    /// *"Choose a file from the project to start editing"* — with the file list behind a toolbar
+    /// toggle, so the one thing the user had just asked for was the one thing not on screen
+    /// (reported 2026-09-18). Opening a *file* still goes straight to the editor, because there
+    /// the file is what was chosen; a window with no project has no folder to show.
+    ///
+    /// **Nothing here is a modal.** The tree was a sheet over a document that was itself a
+    /// full-screen cover: two dismissals to think about, and neither surface reading as a place
+    /// you *are*. One stack, pushes, and the back button — the navigation `SFTPBrowserView`
+    /// already has, which is the browser this one is compared to.
+    ///
+    /// The `Files` toolbar button goes with the sheet. A control to reveal something that is no
+    /// longer hidden is a control for nothing.
     @ViewBuilder
     private var compactLayout: some View {
-        NavigationStack {
-            GlassLayeredPanel(role: .embedded) { detail }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .toolbar { toolbar }
-                .toolbar { filesToolbarItem }
-        }
-        .sheet(isPresented: $isShowingFiles) {
-            NavigationStack {
-                sidebar
-                    .navigationTitle(workspace.projects.first?.displayName ?? "Files")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Done") { isShowingFiles = false }
-                        }
+        NavigationStack(path: $compactPath) {
+            compactRoot
+                .navigationDestination(for: GlassEditorCompactRoute.self) { route in
+                    switch route {
+                    case .folder(let id): compactFolder(id)
+                    case .document: documentScreen
                     }
-            }
+                }
         }
-        .onChange(of: workspace.selection) { _, _ in isShowingFiles = false }
+        // A document opened from anywhere — the tree, a drop, the menu bar, the remote screen's
+        // own `task` — is a push, so one rule covers all of them rather than each caller
+        // remembering to navigate.
+        .onChange(of: workspace.selection) { _, selection in showDocument(ifOpen: selection) }
+        .task { showDocument(ifOpen: workspace.selection) }
     }
 
-    @ToolbarContentBuilder
-    private var filesToolbarItem: some ToolbarContent {
-        if !workspace.projects.isEmpty {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Files", systemImage: "sidebar.leading") { isShowingFiles = true }
-                    .accessibilityIdentifier("editor-files")
-            }
+    /// The project's own folder, or the document when this window has no project — which is what
+    /// the Files browser's Edit opens.
+    @ViewBuilder
+    private var compactRoot: some View {
+        if let project = workspace.projects.first, let root = workspace.projectRoots[project.id] {
+            compactFolder(root)
+        } else {
+            documentScreen
         }
+    }
+
+    @ViewBuilder
+    private func compactFolder(_ id: UUID) -> some View {
+        if let node = workspace.node(id) {
+            compactFolder(node)
+        } else {
+            // The project was closed while this screen was on the stack. Say so rather than
+            // showing an empty list that looks like an empty folder.
+            ContentUnavailableView("Folder Unavailable", systemImage: "folder.badge.questionmark",
+                                   description: Text("Its project is no longer open."))
+        }
+    }
+
+    private func compactFolder(_ node: GlassEditorProjectNode) -> some View {
+        GlassEditorFolderList(workspace: workspace, folder: node, filter: filter,
+                              open: { openFromFolderList($0, asPreview: false) },
+                              preview: { openFromFolderList($0, asPreview: true) })
+            // The shared header, the same one the Files browser shows: this folder's name, and
+            // the path to it beneath. `~` for home, because a header is not the place to read
+            // someone's user name back to them.
+            .glassPathHeader(abbreviated(node.path))
+            .safeAreaInset(edge: .bottom, spacing: 0) { projectFooter }
+            .searchable(text: $filter, prompt: "Filter")
+            // The dismissal chevron belongs to the first screen only; every screen after it has
+            // the stack's own back button, and two back controls in one bar is a puzzle.
+            .toolbar { toolbarContent(includingDismissal: compactPath.isEmpty) }
+            .task {
+                // Reads the folder the first time it is opened, through whichever reader its
+                // project was opened with — the same call the disclosure triangle makes.
+                workspace.setExpanded(true, for: node.id)
+                // Where you are is what "here" means to New and to the project footer.
+                workspace.sidebarSelection = .node(node.id)
+            }
+    }
+
+    private var documentScreen: some View {
+        GlassLayeredPanel(role: .embedded) { detail }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .toolbar { toolbarContent(includingDismissal: compactPath.isEmpty) }
+    }
+
+    /// Choosing a file from the list: select it, open it, and push the editor.
+    ///
+    /// The push is here as well as in `onChange` because opening a file that is **already open**
+    /// leaves `selection` where it was, and a tap that changes nothing would be a tap that does
+    /// nothing. Both routes are guarded, so neither can push twice.
+    private func openFromFolderList(_ node: GlassEditorProjectNode, asPreview: Bool) {
+        workspace.sidebarSelection = .node(node.id)
+        Task {
+            guard await workspace.open(path: node.path, asPreview: asPreview) != nil else { return }
+            showDocument(ifOpen: workspace.selection)
+        }
+    }
+
+    private func showDocument(ifOpen selection: GlassEditorDocument.ID?) {
+        // With no project the document is the root; there is nothing to push it onto.
+        guard selection != nil, !workspace.projects.isEmpty,
+              compactPath.last != .document else { return }
+        compactPath.append(.document)
     }
     #endif
 
@@ -238,7 +324,7 @@ public struct GlassEditorWorkspaceView: View {
                 Section {
                     if let root = workspace.projectRoots[project.id] {
                         GlassEditorTreeRows(workspace: workspace, nodes: root.children ?? [],
-                                            filter: filter, open: activate)
+                                            filter: filter, open: activate, preview: preview)
                     }
                 }
                 // No header. The project's name and where it is are in the **title bar** now, and
@@ -248,35 +334,7 @@ public struct GlassEditorWorkspaceView: View {
             }
         }
         .scrollContentBackground(.hidden)
-        // **The project's own controls, at the foot of its own column.** Refresh was buried in a
-        // "…" menu on the section header, and the gear in the toolbar is the *app's* settings —
-        // this one is the project's, which is a different thing and belongs beside its tree.
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if let project = workspace.projects.first {
-                VStack(spacing: 0) {
-                    Divider()
-                    HStack(spacing: 8) {
-                        Button("Project Settings", systemImage: "gearshape") {
-                            settingsProject = project
-                        }
-                        .accessibilityIdentifier("editor-project-settings")
-                        Spacer(minLength: 0)
-                        Button("Refresh", systemImage: "arrow.clockwise") {
-                            workspace.refreshProject(project.id)
-                        }
-                        .accessibilityIdentifier("editor-project-refresh")
-                    }
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.borderless)
-                    .padding(.horizontal, 12)
-                    .frame(height: GlassSpatialMetrics.footerHeight)
-                }
-                // **No material.** The sidebar is glass and paints nothing of its own; a `.bar`
-                // across its foot was an opaque strip sitting in a translucent column, and it
-                // announced itself as a different surface. The divider is the separation.
-                
-            }
-        }
+        .safeAreaInset(edge: .bottom, spacing: 0) { projectFooter }
         // A field, not a button. The connections list and the schema browser both filter their
         // list from a real search field (`GlassLibraryResults`, `SchemaBrowserView`); the editor
         // had a magnifying-glass button that toggled the find bar, which is a different act
@@ -305,6 +363,42 @@ public struct GlassEditorWorkspaceView: View {
         }
     }
 
+    /// **The project's own controls, at the foot of its own list.** Refresh was buried in a "…"
+    /// menu on the section header, and the gear in the toolbar is the *app's* settings — this one
+    /// is the project's, which is a different thing and belongs beside its files.
+    ///
+    /// Shown under the tree on a Mac, an iPad and in the headset, and under every folder screen on
+    /// a phone — one footer, wherever the project's files are.
+    @ViewBuilder
+    private var projectFooter: some View {
+        if let project = workspace.projects.first {
+            VStack(spacing: 0) {
+                Divider()
+                HStack(spacing: 8) {
+                    Button("Project Settings", systemImage: "gearshape") {
+                        settingsProject = project
+                    }
+                    .accessibilityIdentifier("editor-project-settings")
+                    Spacer(minLength: 0)
+                    Button("Refresh", systemImage: "arrow.clockwise") {
+                        workspace.refreshProject(project.id)
+                    }
+                    .accessibilityIdentifier("editor-project-refresh")
+                }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderless)
+                .padding(.horizontal, 12)
+                .frame(height: GlassSpatialMetrics.footerHeight)
+            }
+            // **A surface, after all.** This footer painted nothing, on the reasoning that the
+            // sidebar is glass and a divider is separation enough. A divider separates; it does
+            // not *cover* — the file list scrolled through the footer and a filename sat behind
+            // the gear (photographed 2026-09-18). `.bar` is what the editor's own status line
+            // uses, one window across.
+            .background(.bar)
+        }
+    }
+
     /// What sits under the file's name in the title bar: the project and where it is, the way the
     /// terminal puts `michael@192.0.2.10:22` under "Terminal on oscar". A file opened on its own
     /// says where it is instead — the folder is the useful fact either way.
@@ -316,13 +410,11 @@ public struct GlassEditorWorkspaceView: View {
         return abbreviated(url.deletingLastPathComponent().path(percentEncoded: false))
     }
 
-    /// `~` for home, because a title bar is not the place to read someone's user name back to them.
+    /// `~` for home, because a title bar is not the place to read someone's user name back to
+    /// them. The Files browser's header wants the same spelling, so the rule lives in
+    /// `GlassPathLocation` and both ask it.
     private func abbreviated(_ path: String) -> String {
-        // `NSHomeDirectory()`, not `homeDirectoryForCurrentUser` — the latter is macOS-only, and a
-        // macOS build says nothing about that (rule 32).
-        let home = NSHomeDirectory()
-        guard path.hasPrefix(home) else { return path }
-        return "~" + path.dropFirst(home.count - 1)
+        GlassPathLocation.abbreviatingHome(path)
     }
 
     /// Case-insensitive, per level — the way the schema browser filters databases and the tables
@@ -347,6 +439,8 @@ public struct GlassEditorWorkspaceView: View {
         }
     }
 
+    /// Opening a file **deliberately** — a double click, Return, ⌘↓, Open in the context menu.
+    /// The file is kept (`GlassEditorWorkspace.previewDocumentID`).
     private func activate(_ node: GlassEditorProjectNode) {
         if node.isDirectory {
             workspace.setExpanded(!workspace.isExpanded(node.id), for: node.id)
@@ -355,6 +449,13 @@ public struct GlassEditorWorkspaceView: View {
             // which one from the project the path belongs to.
             Task { await workspace.open(path: node.path) }
         }
+    }
+
+    /// One click: show it, provisionally. The next single click takes the same tab, so reading
+    /// down a folder leaves one tab behind rather than twenty.
+    private func preview(_ node: GlassEditorProjectNode) {
+        guard !node.isDirectory else { return }
+        Task { await workspace.open(path: node.path, asPreview: true) }
     }
 
 
@@ -373,6 +474,7 @@ public struct GlassEditorWorkspaceView: View {
                             GlassWorkspaceTabItem(id: document.id,
                                                   title: document.isDirty ? "\(document.displayName) •" : document.displayName,
                                                   symbolName: symbolName(for: document.model.language),
+                                                  isProvisional: workspace.isPreview(document.id),
                                                   help: document.locationDescription ?? document.displayName)
                         },
                         selection: workspace.selection,
@@ -412,18 +514,28 @@ public struct GlassEditorWorkspaceView: View {
                 }
                 .background(.bar)
             }
+        } else if let project = workspace.projects.first {
+            // **A folder is open, so say what is in it.** Three ways to open something, shown to
+            // someone who has just opened something, is the wrong offer (2026-09-18) — the agent
+            // files, the readme, what builds it, and what you were last editing here are the
+            // right one (`GlassEditorProjectOverview`).
+            GlassEditorProjectOverview(workspace: workspace, project: project) { path in
+                // A click here is a single click like any other: the file arrives in the
+                // provisional tab and the next one takes its place.
+                Task { await workspace.open(path: path, asPreview: true) }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .navigationTitle(project.displayName)
+            #if os(macOS)
+            .navigationSubtitle(abbreviated(project.path))
+            #endif
         } else {
-            // **A freshly opened project puts its name in the title, full size.** The project is
-            // what you have open at that moment; once a file is open the file's name is, and the
-            // project moves to the subtitle beneath it. Same window, two states, and the big text
-            // always names the thing you are looking at.
+            // An editor with nothing in it — what ⇧⌘E and File ▸ New Editor make. Here the three
+            // ways in are the only thing to offer, and they are the whole point of the window.
             ContentUnavailableView {
-                Label(workspace.projects.first?.displayName ?? "No Document",
-                      systemImage: workspace.projects.isEmpty ? "text.page" : "folder")
+                Label("No Document", systemImage: "text.page")
             } description: {
-                Text(workspace.projects.isEmpty
-                     ? "Open a file, drop one on this window, or start something new."
-                     : "Choose a file from the project to start editing.")
+                Text("Open a file, drop one on this window, or start something new.")
             } actions: {
                 Button("Open Project…") { isImportingProject = true }
                 Button("Open File…") { isImporting = true }
@@ -434,10 +546,7 @@ public struct GlassEditorWorkspaceView: View {
             .frame(maxWidth: 560)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             #endif
-            .navigationTitle(workspace.projects.first?.displayName ?? "Editor")
-            #if os(macOS)
-            .navigationSubtitle(workspace.projects.first.map { abbreviated($0.path) } ?? "")
-            #endif
+            .navigationTitle("Editor")
         }
     }
 
@@ -507,7 +616,30 @@ public struct GlassEditorWorkspaceView: View {
             if document.isDirty {
                 Text("Edited").font(.caption).foregroundStyle(.secondary)
             }
+            #if os(iOS)
+            // **Hide and show the keyboard**, as the terminal has always been able to. On a phone
+            // the keyboard is half the window, and reading a file with it up is reading a third
+            // of a file. The other half of this control is the bar above the keyboard itself
+            // (`GlassEditorUIKitEngine.installKeyboardAccessory`).
+            Button {
+                document.model.requestKeyboard(!keyboardIsUp)
+            } label: {
+                Image(systemName: keyboardIsUp ? "keyboard.chevron.compact.down" : "keyboard")
+                    .font(.caption)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(keyboardIsUp ? "Hide Keyboard" : "Show Keyboard")
+            .accessibilityIdentifier("editor-keyboard-toggle")
+            #endif
         }
+        #if os(iOS)
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            keyboardIsUp = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            keyboardIsUp = false
+        }
+        #endif
         .padding(.horizontal, GlassSpatialMetrics.isSpatial ? 24 : 14)
         // The same height as the sidebar's footer beside it — two bars at two heights in one
         // window reads as a mistake before anyone works out why.
@@ -517,13 +649,15 @@ public struct GlassEditorWorkspaceView: View {
 
     // MARK: Toolbar
 
+    /// `includingDismissal` is false on a screen that already has the navigation stack's back
+    /// button — its own chevron would be a second way back, pointing somewhere else.
     @ToolbarContentBuilder
-    private var toolbar: some ToolbarContent {
+    private func toolbarContent(includingDismissal: Bool) -> some ToolbarContent {
         // **Leading the content region, past the divider — left of the title.** The library puts
         // its own actions at `.navigation` (`GlassConnectionLibrary`, itself following glassdb's Add
         // Connection), and the editor putting everything in `.primaryAction` is most of why it read
         // as a different application.
-        if let dismissal {
+        if let dismissal, includingDismissal {
             ToolbarItem(placement: .cancellationAction) {
                 // A chevron naming where it goes back to, so the file's name is the only other
                 // wording in the bar — the desktop session's decision, taken from glassDT, and
@@ -537,20 +671,26 @@ public struct GlassEditorWorkspaceView: View {
                 .help("New Document")
                 .accessibilityIdentifier("editor-new")
         }
-        // The gear opens **Settings**, where every other preference in this app lives. It used to
-        // drop a menu of toggles, which put the editor's preferences in one window's toolbar and
-        // nowhere else — and grew a second language picker beside the footer's, which is how two
-        // controls for one fact start disagreeing.
-        ToolbarItem(placement: .primaryAction) {
-            #if os(macOS)
-            SettingsLink {
-                Label("Editor Settings", systemImage: "gearshape")
+        // **A folder you can work in and cannot find again.** `Open Project…` opens straight into
+        // the workspace, so the folder never reached the Projects list — offered here rather than
+        // done silently, because that list is the user's and it syncs (`GlassSuggestionButton`).
+        if let project = workspace.projects.first, let runtime, !runtime.isRemembered(project) {
+            ToolbarItem(placement: .primaryAction) {
+                GlassSuggestionButton("Save as Project",
+                                      help: "Keep \(project.displayName) in Projects, on this device and your others.") {
+                    runtime.remember(project)
+                }
+                .accessibilityIdentifier("editor-save-as-project")
             }
-            .accessibilityIdentifier("editor-settings")
-            #else
-            Button("Editor Settings", systemImage: "gearshape") { isShowingSettings = true }
+        }
+        // The gear is **this file's** text settings: size, line numbers, wrapping, each of which
+        // can disagree with its project and with the app. The project's own are at the foot of the
+        // file list, and the app's defaults are in Settings ▸ Editor at ⌘, — three scopes, and the
+        // one in this window's toolbar belongs to what this window is showing.
+        ToolbarItem(placement: .primaryAction) {
+            Button("Text Settings", systemImage: "gearshape") { isShowingSettings = true }
+                .help("Text settings for this file")
                 .accessibilityIdentifier("editor-settings")
-            #endif
         }
         ToolbarItem(placement: .primaryAction) {
             Button("Save", systemImage: "arrow.down.document") { saveSelected() }
@@ -612,6 +752,7 @@ public struct GlassEditorWorkspaceView: View {
         case .php: "PHP"
         case .swift: "Swift"
         case .xml: "XML"
+        case .html: "HTML"
         case .plaintext: "Plain Text"
         }
     }
@@ -624,6 +765,7 @@ public struct GlassEditorWorkspaceView: View {
         case .markdown: "text.alignleft"
         case .python, .javascript, .go, .rust, .c, .php, .swift: "chevron.left.forwardslash.chevron.right"
         case .xml: "chevron.left.slash.chevron.right"
+        case .html: "chevron.left.slash.chevron.right"
         case .plaintext: "doc.text"
         }
     }
@@ -685,19 +827,9 @@ private struct GlassEditorDialogs: ViewModifier {
             } message: { document in
             Text("\(document.displayName) has changes that have not been saved.")
             }
-            #if !os(macOS)
             .sheet(isPresented: $isShowingSettings) {
-            NavigationStack {
-            GlassEditorSettingsView(preferences: workspace.preferences)
-            .navigationTitle("Editor")
-            .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-            Button("Done") { isShowingSettings = false }
+            GlassEditorFileSettingsSheet(workspace: workspace, isPresented: $isShowingSettings)
             }
-            }
-            }
-            }
-            #endif
             .sheet(item: $settingsProject) { project in
             GlassEditorProjectSettingsView(workspace: workspace, project: project)
             }
@@ -840,6 +972,77 @@ private struct GlassEditorWindowFrameMemory: NSViewRepresentable {
 }
 #endif
 
+#if os(iOS)
+/// Where a phone can be inside a project: in a folder, or in the document it opened from one.
+enum GlassEditorCompactRoute: Hashable {
+    case folder(UUID)
+    case document
+}
+
+/// One folder's contents, as a screen — the phone's answer to the tree.
+///
+/// A tree with disclosure triangles is a Mac and headset idiom: it needs a pointer and width, and
+/// on a 390-point screen the tree *was* the screen. Here a folder is a push and the back button is
+/// the way out, which is what the Files browser does on the same device and what the user asked
+/// for: *"rely on the back button and tapping the folder in the list view or tree view"*.
+struct GlassEditorFolderList: View {
+    let workspace: GlassEditorWorkspace
+    let folder: GlassEditorProjectNode
+    let filter: String
+    /// A double tap: the file is kept.
+    let open: (GlassEditorProjectNode) -> Void
+    /// A single tap: the file is shown in the provisional tab.
+    let preview: (GlassEditorProjectNode) -> Void
+
+    private var query: String { filter.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// Case-insensitive, this level only — the same rule the tree filters each level by.
+    private var visible: [GlassEditorProjectNode] {
+        let children = folder.children ?? []
+        guard !query.isEmpty else { return children }
+        return children.filter { $0.name.localizedCaseInsensitiveContains(query) }
+    }
+
+    var body: some View {
+        List {
+            ForEach(visible) { node in
+                if node.isDirectory {
+                    // A link, not a tap handler: it carries the chevron that says a row leads
+                    // somewhere, and the stack does the pushing.
+                    NavigationLink(value: GlassEditorCompactRoute.folder(node.id)) {
+                        GlassEditorFileRow(workspace: workspace, node: node,
+                                           symbol: "folder", open: open)
+                    }
+                } else {
+                    GlassEditorFileRow(workspace: workspace, node: node, symbol: "doc", open: open)
+                        .onTapGesture { preview(node) }
+                        .simultaneousGesture(TapGesture(count: 2).onEnded { open(node) })
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .overlay { if visible.isEmpty { emptyState } }
+    }
+
+    /// An empty list is four different facts, and a blank screen says none of them.
+    @ViewBuilder
+    private var emptyState: some View {
+        if folder.isLoading {
+            ProgressView("Reading \(folder.name)")
+        } else if let loadError = folder.loadError {
+            ContentUnavailableView("Cannot Read \(folder.name)",
+                                   systemImage: "exclamationmark.triangle",
+                                   description: Text(loadError))
+        } else if query.isEmpty {
+            ContentUnavailableView("Empty Folder", systemImage: "folder",
+                                   description: Text("There is nothing in \(folder.name)."))
+        } else {
+            ContentUnavailableView.search(text: filter)
+        }
+    }
+}
+#endif
+
 /// One level of a project tree, and the level under it.
 ///
 /// Built the way the database's schema browser builds databases and tables
@@ -851,7 +1054,10 @@ private struct GlassEditorTreeRows: View {
     let workspace: GlassEditorWorkspace
     let nodes: [GlassEditorProjectNode]
     let filter: String
+    /// Opening it for good — a double click.
     let open: (GlassEditorProjectNode) -> Void
+    /// Showing it provisionally — one click.
+    let preview: (GlassEditorProjectNode) -> Void
 
     private var visible: [GlassEditorProjectNode] {
         let query = filter.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -866,7 +1072,7 @@ private struct GlassEditorTreeRows: View {
                     get: { workspace.isExpanded(node.id) },
                     set: { workspace.setExpanded($0, for: node.id) })) {
                     GlassEditorTreeRows(workspace: workspace, nodes: node.children ?? [],
-                                        filter: filter, open: open)
+                                        filter: filter, open: open, preview: preview)
                 } label: {
                     row(node, symbol: "folder")
                 }
@@ -879,6 +1085,45 @@ private struct GlassEditorTreeRows: View {
     }
 
     private func row(_ node: GlassEditorProjectNode, symbol: String) -> some View {
+        GlassEditorFileRow(workspace: workspace, node: node, symbol: symbol, open: open)
+            // **Single click selects, double click opens** — and the single click has to be said
+            // out loud. Verified in the running app: with only the double-click gesture attached,
+            // clicking a row moved AppKit's own selection but never reached the model, so Return
+            // did nothing and the current folder stayed wherever the keyboard had last left it.
+            // The database's schema browser has always done both (`SchemaBrowserView.tableRow`).
+            // **One tap opens on a touch screen; on a Mac it takes two.**
+            //
+            // A double click is a mouse idiom and there is nothing to double-tap on a phone, so
+            // the only gesture the tree had was selection — a file could be chosen and never
+            // opened, on the one platform where the tree is the *only* way to open anything. The
+            // file list did exactly what it was told and looked like an editor that does nothing.
+            //
+            // A folder is left to its disclosure triangle on both: opening it is what the triangle
+            // is for, and a tap that both selects and toggles fights itself.
+            //
+            // **And one click now previews, on both.** The file opens in the provisional tab and
+            // the next single click takes that same tab; a double click keeps it. That is what
+            // Xcode and VS Code do, and it is why reading through a folder does not end with
+            // twenty tabs (`GlassEditorWorkspace.previewDocumentID`).
+            .onTapGesture {
+                workspace.sidebarSelection = .node(node.id)
+                preview(node)
+            }
+            .simultaneousGesture(TapGesture(count: 2).onEnded { open(node) })
+    }
+}
+
+/// What a file or folder looks like in a list — in the tree, and on a phone's folder screen.
+///
+/// The two lists navigate differently (a tree selects and expands in place; a phone pushes), so
+/// the gestures stay with the list. What a row *is* lives here, once.
+private struct GlassEditorFileRow: View {
+    let workspace: GlassEditorWorkspace
+    let node: GlassEditorProjectNode
+    let symbol: String
+    let open: (GlassEditorProjectNode) -> Void
+
+    var body: some View {
         // **The row is as wide as the column, not as wide as the filename.**
         //
         // A bare `Label` is only as wide as its text, and `contentShape` shapes what is there — so a
@@ -905,46 +1150,25 @@ private struct GlassEditorTreeRows: View {
                     .accessibilityLabel("\(node.name) could not be read: \(loadError)")
             }
         }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .glassSpatialRowMetrics()
-            .glassGazeHighlight()
-            .contentShape(Rectangle())
-            // **Single click selects, double click opens** — and the single click has to be said
-            // out loud. Verified in the running app: with only the double-click gesture attached,
-            // clicking a row moved AppKit's own selection but never reached the model, so Return
-            // did nothing and the current folder stayed wherever the keyboard had last left it.
-            // The database's schema browser has always done both (`SchemaBrowserView.tableRow`).
-            // **One tap opens on a touch screen; on a Mac it takes two.**
-            //
-            // A double click is a mouse idiom and there is nothing to double-tap on a phone, so
-            // the only gesture the tree had was selection — a file could be chosen and never
-            // opened, on the one platform where the tree is the *only* way to open anything. The
-            // file list did exactly what it was told and looked like an editor that does nothing.
-            //
-            // A folder is left to its disclosure triangle on both: opening it is what the triangle
-            // is for, and a tap that both selects and toggles fights itself.
-            .onTapGesture {
-                workspace.sidebarSelection = .node(node.id)
-                #if !os(macOS)
-                if !node.isDirectory { open(node) }
-                #endif
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassSpatialRowMetrics()
+        .glassGazeHighlight()
+        .contentShape(Rectangle())
+        .contextMenu {
+            Button(node.isDirectory ? "Open Folder" : "Open") { open(node) }
+            if node.isDirectory {
+                Button("Refresh") { refresh() }
             }
-            #if os(macOS)
-            .simultaneousGesture(TapGesture(count: 2).onEnded { open(node) })
-            #endif
-            .contextMenu {
-                Button(node.isDirectory ? "Open Folder" : "Open") { open(node) }
-                if node.isDirectory {
-                    Button("Refresh") {
-                        node.invalidate()
-                        workspace.setExpanded(true, for: node.id)
-                        // A folder that was already open stays in the expansion set, so
-                        // `setExpanded` has nothing to do and would not re-read it.
-                        node.beginLoadingChildrenIfNeeded(using: workspace.access(for: node))
-                    }
-                }
-            }
-            .accessibilityIdentifier("editor-file-\(node.name)")
+        }
+        .accessibilityIdentifier("editor-file-\(node.name)")
+    }
+
+    private func refresh() {
+        node.invalidate()
+        workspace.setExpanded(true, for: node.id)
+        // A folder that was already open stays in the expansion set, so `setExpanded` has nothing
+        // to do and would not re-read it — the node is asked directly as well.
+        node.beginLoadingChildrenIfNeeded(using: workspace.access(for: node))
     }
 }
 

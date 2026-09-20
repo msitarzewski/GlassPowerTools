@@ -23,15 +23,20 @@ public struct GlassWorkspaceTabItem<ID: Hashable>: Identifiable {
     public let symbolName: String
     /// A permanent tab — an overview, a connection — has no close button and refuses ⌘W.
     public let isClosable: Bool
+    /// Opened provisionally by a single click, and replaced by the next one. Drawn in italics,
+    /// which is what every editor with this pattern does and what makes the difference legible
+    /// without a second glyph in the strip.
+    public let isProvisional: Bool
     /// What the tooltip and the accessibility label say; the title when nil.
     public let help: String?
 
     public init(id: ID, title: String, symbolName: String, isClosable: Bool = true,
-                help: String? = nil) {
+                isProvisional: Bool = false, help: String? = nil) {
         self.id = id
         self.title = title
         self.symbolName = symbolName
         self.isClosable = isClosable
+        self.isProvisional = isProvisional
         self.help = help
     }
 
@@ -74,7 +79,7 @@ public struct GlassWorkspaceTabBar<ID: Hashable>: View {
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                                 .frame(maxWidth: 200)
-                                .font(.caption)
+                                .font(tab.isProvisional ? .caption.italic() : .caption)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 6)
                                 .frame(maxHeight: .infinity)
@@ -82,7 +87,7 @@ public struct GlassWorkspaceTabBar<ID: Hashable>: View {
                         }
                         .buttonStyle(.plain)
                         .glassWorkspaceTabControlTarget()
-                        .accessibilityLabel(tab.helpText)
+                        .accessibilityLabel(tab.isProvisional ? "\(tab.helpText), previewing" : tab.helpText)
                         .accessibilityAddTraits(isSelected ? .isSelected : [])
 
                         if tab.isClosable {

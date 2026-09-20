@@ -456,8 +456,11 @@ public extension GlassShellModel {
                 sectionTitle: "Keys",
                 title: "SSH Keys",
                 symbolName: "key",
-                count: keyStore?.keys.count,
-                hasSelection: { panel.selection != nil },
+                // `model`, not `self`: the count is asked for every time the row draws, so the
+                // expression outlives this call (`GlassLibraryPanel.count`).
+                count: model.keyStore?.keys.count,
+                selection: { panel.selection },
+                clearSelection: { panel.selection = nil },
                 results: { GlassKeyManagerPanel(presentation: .results, model: model, panel: panel) },
                 detail: { GlassKeyManagerPanel(presentation: .detail, model: model, panel: panel) })
         ]

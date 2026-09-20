@@ -259,19 +259,32 @@ extension View {
     }
 
     /// Appearance-aware backing for headers that remain fixed while database
-    /// rows scroll beneath them. This intentionally strengthens intermediate
-    /// values while still disappearing when both workspace controls are 0%.
+    /// rows scroll beneath them.
+    ///
+    /// **A material underneath, always.** This used to disappear entirely when the workspace's
+    /// opacity was 0, on the reasoning that a transparent window should be transparent
+    /// everywhere. What that produced was a column header and a row-number gutter with the
+    /// *data* scrolling through them — `#` and `content` written over cell text, illegible
+    /// (photographed on an iPhone, 2026-09-19). Pinned chrome is not decoration: it is the thing
+    /// that says which column you are reading, and it has to occlude what slides behind it.
+    ///
+    /// `.ultraThinMaterial` is the answer rather than a fixed colour floor, because it stays
+    /// *translucent* — the window is still glass, exactly as it is on the Mac — while being
+    /// opaque enough to read against. At full opacity the tint above it covers the material
+    /// completely, so nothing changes at the end of the scale anyone has been looking at.
     @ViewBuilder
     func databaseCanvasPinnedSurface(opacity: Double, blur: Double) -> some View {
         let appearance = DatabaseGlassAppearance(opacity: opacity, blur: blur)
-        #if os(visionOS)
         background {
             ZStack {
+                Rectangle().fill(.ultraThinMaterial)
+                #if os(visionOS)
                 if appearance.compositesBlur {
                     Rectangle()
                         .fill(.ultraThinMaterial)
                         .opacity(appearance.pinnedBlurAlpha)
                 }
+                #endif
                 Rectangle()
                     .fill(DatabaseCanvasPalette.background)
                     .opacity(appearance.pinnedSurfaceAlpha)
@@ -279,9 +292,6 @@ extension View {
             .allowsHitTesting(false)
             .accessibilityHidden(true)
         }
-        #else
-        background(DatabaseCanvasPalette.background.opacity(appearance.pinnedSurfaceAlpha))
-        #endif
     }
 }
 

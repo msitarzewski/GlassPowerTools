@@ -169,6 +169,7 @@ public enum CaptureMapping: Sendable {
         // The five added in 2026-09 use nvim's conventional capture names, which `universal`
         // already maps — no grammar-specific meaning shift to undo, unlike TOML's `@type`.
         case .xml: return xmlOverrides
+        case .html: return htmlOverrides
         case .json, .bash, .yaml, .markdown, .python, .javascript, .go, .rust, .c, .php,
              .swift, .plaintext:
             return [:]
@@ -194,6 +195,15 @@ public enum CaptureMapping: Sendable {
         "tag": .keyword,
         "tag.attribute": .property,
         "tag.delimiter": .punctuation,
+    ]
+
+    /// HTML has XML's problem for the same reason: `(tag_name) @tag`, and `@tag` is punctuation in
+    /// the universal table because PHP uses it for `<?php`. An element name is the nearest thing
+    /// markup has to a keyword. `@tag.error` — an end tag whose name does not match — is a real
+    /// mistake in the document and reads as one rather than falling back to `tag`.
+    private static let htmlOverrides: [String: TokenRole] = [
+        "tag": .keyword,
+        "tag.error": .error,
     ]
 
     /// SQL reads these captures differently from the general convention.

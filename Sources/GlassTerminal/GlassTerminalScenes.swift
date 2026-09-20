@@ -55,18 +55,25 @@ public struct GlassTerminalScenes: Scene {
         .defaultSize(width: 1180, height: 760)
         .defaultLaunchBehavior(.suppressed)
         .commands { MacWorkspaceCommands(sessionManager: sessionManager) }
+        // **Glass, like every other window.** The browser was the one window painting an opaque
+        // surface of its own: `.glassLayers` gave it the *state* and nothing painted it, because
+        // painting is `GlassLayeredWindow`'s job and this scene never wrapped its content in one
+        // (reported 2026-09-18, beside a translucent library window).
         WindowGroup(id: "sftp", for: SFTPBrowserContext.self) { $context in
-            if let context, sessionManager.session(for: context.sessionID) != nil {
-                SFTPBrowserView(sessionID: context.sessionID, initialPath: context.initialPath)
-                    .environment(sessionManager)
-                    .environment(settingsManager)
-                    .environment(\.glassOpenFolderAsProject, runtime.openFolderAsProject)
-                    .environment(\.glassOpenFileInEditor, runtime.openFileInEditor)
-                    .environment(\.glassEditorFileScreen, runtime.editorFileScreen)
-                .glassLayers(runtime.layers)
-            } else {
-                SFTPBrowserNotFoundView(context: context)
+            GlassLayeredWindow {
+                if let context, sessionManager.session(for: context.sessionID) != nil {
+                    SFTPBrowserView(sessionID: context.sessionID, initialPath: context.initialPath)
+                        .environment(sessionManager)
+                        .environment(settingsManager)
+                        .environment(\.glassOpenFolderAsProject, runtime.openFolderAsProject)
+                        .environment(\.glassOpenFileInEditor, runtime.openFileInEditor)
+                        .environment(\.glassEditorFileScreen, runtime.editorFileScreen)
+                    .glassLayers(runtime.layers)
+                } else {
+                    SFTPBrowserNotFoundView(context: context)
+                }
             }
+            .glassLayers(runtime.layers)
         }
         .defaultSize(width: 820, height: 620)
         #if DEBUG
@@ -124,20 +131,25 @@ public struct GlassTerminalScenes: Scene {
         .defaultSize(width: 1000, height: 800)
         .restorationBehavior(.disabled)
         #endif
+        // Glass here too, for the same reason as the Mac's: `.windowStyle(.plain)` means the
+        // scene paints nothing at all of its own.
         WindowGroup(id: "sftp", for: SFTPBrowserContext.self) { $context in
-            if let context, sessionManager.session(for: context.sessionID) != nil {
-                SFTPBrowserView(sessionID: context.sessionID, initialPath: context.initialPath)
-                    .environment(sessionManager)
-                    .environment(settingsManager)
-                    .environment(\.glassOpenFolderAsProject, runtime.openFolderAsProject)
-                    .environment(\.glassOpenFileInEditor, runtime.openFileInEditor)
-                    .environment(\.glassEditorFileScreen, runtime.editorFileScreen)
-                .glassLayers(runtime.layers)
-                    .trackWindowPresence(key: "sftp-\(context.sessionID.uuidString)", recovery: windowRecoveryManager)
-            } else {
-                SFTPBrowserNotFoundView(context: context)
-                    .trackWindowPresence(key: "sftp-missing", recovery: windowRecoveryManager)
+            GlassLayeredWindow {
+                if let context, sessionManager.session(for: context.sessionID) != nil {
+                    SFTPBrowserView(sessionID: context.sessionID, initialPath: context.initialPath)
+                        .environment(sessionManager)
+                        .environment(settingsManager)
+                        .environment(\.glassOpenFolderAsProject, runtime.openFolderAsProject)
+                        .environment(\.glassOpenFileInEditor, runtime.openFileInEditor)
+                        .environment(\.glassEditorFileScreen, runtime.editorFileScreen)
+                    .glassLayers(runtime.layers)
+                        .trackWindowPresence(key: "sftp-\(context.sessionID.uuidString)", recovery: windowRecoveryManager)
+                } else {
+                    SFTPBrowserNotFoundView(context: context)
+                        .trackWindowPresence(key: "sftp-missing", recovery: windowRecoveryManager)
+                }
             }
+            .glassLayers(runtime.layers)
         }
         .windowStyle(.plain)
         .defaultSize(width: 700, height: 500)

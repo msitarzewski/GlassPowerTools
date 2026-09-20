@@ -21,6 +21,11 @@ public enum LanguageID: String, Sendable, Hashable, Codable, CaseIterable {
     // scheme file is. Swift's grammar has to be generated — see the package manifest.
     case swift
     case xml
+    // 2026-09-19: the other markup language, and the one a person editing a file on a server is
+    // most likely to be looking at. Tags, attributes and entities are XML's shape; a real HTML
+    // grammar also gets unquoted attributes, void elements and raw `<script>`/`<style>` right,
+    // none of which the XML grammar will parse.
+    case html
     case plaintext
 
     /// Best-effort mapping from a file extension. Unknown extensions are
@@ -47,6 +52,11 @@ public enum LanguageID: String, Sendable, Hashable, Codable, CaseIterable {
         // this platform opens them constantly. `.svg` and `.xib` likewise.
         case "xml", "plist", "svg", "xib", "storyboard", "xcscheme", "entitlements", "xsd", "xsl",
              "xslt", "rss", "atom", "pom": return .xml
+        // `.xhtml` is served as XML but written as HTML, and the HTML grammar reads it; the
+        // template extensions are HTML with another language's tags sprinkled through them, which
+        // colours far better than plain grey. `.php` stays with PHP, which already knows HTML.
+        case "html", "htm", "xhtml", "vue", "svelte", "hbs", "handlebars", "ejs", "njk",
+             "html.erb": return .html
         default: return .plaintext
         }
     }
@@ -76,6 +86,10 @@ public enum LanguageID: String, Sendable, Hashable, Codable, CaseIterable {
             // a script, and the shell grammar reads a script better than nothing does.
             return .bash
         }
+        // `<!DOCTYPE html>` is the one doctype that is not XML, and it is by far the most common
+        // first line in the set. Checked before the XML prolog for that reason.
+        let opening = trimmed.prefix(64).lowercased()
+        if opening.hasPrefix("<!doctype html") || opening.hasPrefix("<html") { return .html }
         if trimmed.hasPrefix("<?xml") || trimmed.hasPrefix("<!DOCTYPE") { return .xml }
         if trimmed.hasPrefix("{") || trimmed.hasPrefix("[") {
             // Parsed, not guessed: a Swift dictionary literal and a JSON object look alike at the

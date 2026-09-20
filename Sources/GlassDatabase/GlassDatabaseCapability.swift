@@ -25,6 +25,13 @@ public final class GlassDatabaseRuntime {
     let sessionManager: DatabaseSessionManager
     let settingsManager: SettingsManager
 
+    /// How to send the user back to the machine a connection belongs to, by its endpoint id.
+    ///
+    /// Supplied by the composition root, because answering "which host owns this connection?"
+    /// needs the catalog and the database deliberately does not hold it — the same seam the
+    /// editor's `openFolderAsProject` uses in the other direction.
+    public var showHostForConnection: (@MainActor (UUID) -> Void)?
+
     /// Everything the shell and the module's own surfaces can ask the database to do. One
     /// queue, consumed by the scenes in stage 3, so opening a workspace — and the failure
     /// alert when it cannot be opened — exists in exactly one place.

@@ -34,6 +34,12 @@ public final class GlassEditorDocument: Identifiable {
     /// The name a user gave an unsaved document, so it is not "Untitled" forever.
     private let untitledName: String
 
+    /// What *this file* says about the text, over whatever its project and the app say
+    /// (`GlassEditorTextOverrides`). **Held while the document is open and not stored**: it is the
+    /// answer to "this one file is different", and a file is different for as long as you are
+    /// looking at it. The durable levels are the project's and the app's.
+    public var textOverrides = GlassEditorTextOverrides()
+
     /// What the file looked like when it was read, and the baseline every save compares against.
     ///
     /// **Kept for a local file as well as a remote one.** A file on this disk changes underneath

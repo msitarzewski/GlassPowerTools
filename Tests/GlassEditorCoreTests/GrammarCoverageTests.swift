@@ -50,6 +50,25 @@ struct GrammarCoverageTests {
         #expect(LanguageID.forFileExtension("svg") == .xml)
     }
 
+    /// Added 2026-09-19, and the one markup language that is **not** XML.
+    @Test func htmlTakesItsOwnExtensionsAndDoctype() {
+        #expect(LanguageID.forFileExtension("html") == .html)
+        #expect(LanguageID.forFileExtension("htm") == .html)
+        #expect(LanguageID.forFileExtension("vue") == .html)
+        // Templates are HTML with someone else's tags in them, which colours far better as HTML.
+        #expect(LanguageID.forFileExtension("hbs") == .html)
+        // And these stay where they were: `.php` knows HTML already, `.svg` is XML.
+        #expect(LanguageID.forFileExtension("php") == .php)
+        #expect(LanguageID.forFileExtension("svg") == .xml)
+
+        // `<!DOCTYPE html>` is the one doctype that is not XML, and it has to win over the XML
+        // prolog rule that reads every `<!DOCTYPE` as XML.
+        #expect(LanguageID.forContent("<!DOCTYPE html>\n<html><body>hi</body></html>") == .html)
+        #expect(LanguageID.forContent("<!doctype HTML>\n<html></html>") == .html)
+        #expect(LanguageID.forContent("<html lang=\"en\"></html>") == .html)
+        #expect(LanguageID.forContent("<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\">") == .xml)
+    }
+
     /// A file whose name says nothing. `Makefile`, `deploy`, a plist with no extension — half a
     /// developer's tree — and the editor called all of it plain text.
     @Test func contentNamesTheLanguageWhenTheFileNameDoesNot() {

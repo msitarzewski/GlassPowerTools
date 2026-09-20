@@ -567,7 +567,11 @@ struct VisionTerminalWorkgroupView: View {
             Button {
                 showConnections()
             } label: {
-                Label("Connections", systemImage: "sidebar.left")
+                // **A back arrow, not a sidebar toggle.** There is no sidebar here: the terminal
+                // takes the whole screen and this control goes *back* to the library, which is
+                // what a chevron says and what `sidebar.left` promised it would not do
+                // (reported 2026-09-19). The session keeps running either way.
+                Label("Connections", systemImage: "chevron.backward")
             }
             .accessibilityIdentifier("terminal-workgroup-connections")
         }

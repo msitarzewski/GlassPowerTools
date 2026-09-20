@@ -37,11 +37,18 @@ public struct GlassEditorProject: Identifiable, Codable, Hashable, Sendable {
     /// What the user called it; defaults to the folder's own name.
     public var displayName: String
     public var openedAt: Date
+    /// What this project says about the text, where it disagrees with the app's defaults. Nil is
+    /// the ordinary case: it follows Settings ▸ Editor and changes when that does
+    /// (`GlassEditorTextOverrides`). Travels with the record, so a project reads the same on the
+    /// phone.
+    public var textOverrides: GlassEditorTextOverrides?
 
     public init(id: UUID = UUID(), hostID: HostID? = nil, path: String,
-                displayName: String? = nil, openedAt: Date = Date()) {
+                displayName: String? = nil, openedAt: Date = Date(),
+                textOverrides: GlassEditorTextOverrides? = nil) {
         self.id = id
         self.hostID = hostID
+        self.textOverrides = textOverrides
         // No trailing slash, ever. `URL.path` on a directory keeps one, and a root spelled
         // "/work/thing/" is not a prefix of "/work/thing/main.swift" by any string comparison —
         // which is how "is this file in this project?" gets the wrong answer.

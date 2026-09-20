@@ -75,6 +75,15 @@ public struct GlassShellLibraryView: View {
             .sidebarActions { addHostButton }
             #endif
         }
+        // A capability asking to be sent back to the machine it belongs to. Selecting the host
+        // is all it takes: on a compact width the library pushes the detail for a selection
+        // change on its own, and on a Mac the detail column is already showing.
+        .onChange(of: model.hostToShow) { _, wanted in
+            guard let wanted else { return }
+            scope = .allConnections
+            selection = wanted
+            model.hostToShow = nil
+        }
         // One sheet for Add Host, Add a service, Edit service and Edit Host (rule 15) — and for
         // importing a machine from another tool, which is an Add Host with the fields filled in.
         .sheet(item: $setupMode) { mode in

@@ -83,8 +83,82 @@ public final class GlassEditorWorkspace {
     }
 
     private func apply(to document: GlassEditorDocument) {
-        document.model.configuration = preferences.configuration(basedOn: document.model.configuration)
+        // **File over project over global.** One funnel, so no surface can apply the levels in a
+        // different order than another (`GlassEditorTextOverrides`).
+        let global = preferences.configuration(basedOn: document.model.configuration)
+        document.model.configuration = GlassEditorTextOverrides.resolve(
+            global: global,
+            project: projectOverrides(for: document),
+            file: document.textOverrides)
         document.model.theme = preferences.theme
+    }
+
+    /// The overrides of the project this document belongs to, if it belongs to one.
+    func projectOverrides(for document: GlassEditorDocument) -> GlassEditorTextOverrides? {
+        guard let path = document.path else { return nil }
+        return project(owning: path)?.textOverrides
+    }
+
+    /// What the file inherits when it says nothing of its own — what a settings row calls
+    /// "Default", and where that default comes from.
+    public func inheritedConfiguration(for document: GlassEditorDocument) -> GlassEditorConfiguration {
+        GlassEditorTextOverrides.resolve(
+            global: preferences.configuration(basedOn: document.model.configuration),
+            project: projectOverrides(for: document),
+            file: nil)
+    }
+
+    /// Sets this file's overrides. Not stored: a document holds them while it is open.
+    public func setTextOverrides(_ overrides: GlassEditorTextOverrides,
+                                 for document: GlassEditorDocument) {
+        document.textOverrides = overrides
+        apply(to: document)
+    }
+
+    /// Sets a project's overrides on this window's copy. The library is updated by the runtime,
+    /// which owns the durable list — this keeps the open window in step immediately.
+    public func setTextOverrides(_ overrides: GlassEditorTextOverrides,
+                                 forProject id: GlassEditorProject.ID) {
+        guard let index = projects.firstIndex(where: { $0.id == id }) else { return }
+        projects[index].textOverrides = overrides.isEmpty ? nil : overrides
+        applyAppearance()
+    }
+
+    // MARK: The preview tab
+
+    /// The document opened by a single click, if there is one.
+    ///
+    /// **The pattern every editor uses**, and the one a user coming from Xcode or VS Code already
+    /// has in their hands: clicking a file in the list opens it *provisionally* — one slot, reused
+    /// by the next single click, so walking a folder does not leave twenty tabs behind. The file
+    /// stays the moment you commit to it: a double click, a keystroke that opens it deliberately,
+    /// an edit, or a save.
+    ///
+    /// One id rather than a flag on each document, because "two documents are both the preview" is
+    /// a state that must not be representable.
+    public private(set) var previewDocumentID: GlassEditorDocument.ID?
+
+    public func isPreview(_ id: GlassEditorDocument.ID) -> Bool { previewDocumentID == id }
+
+    /// Keeps the document — the other half of the pattern. Idempotent, and called from everywhere
+    /// that counts as committing to a file.
+    public func makePermanent(_ id: GlassEditorDocument.ID) {
+        if previewDocumentID == id { previewDocumentID = nil }
+    }
+
+    /// Empties the preview slot for a new occupant, and says where the old one sat so the new tab
+    /// takes its place rather than appearing at the end — the tab must not move while you are
+    /// clicking down a list.
+    ///
+    /// An **edited** preview is not evicted: editing is what makes a file worth keeping, so it is
+    /// promoted and the new document is appended beside it.
+    private func vacatePreviewSlot() -> Int? {
+        guard let id = previewDocumentID,
+              let index = documents.firstIndex(where: { $0.id == id }) else { return nil }
+        previewDocumentID = nil
+        guard !documents[index].isDirty else { return nil }
+        _ = close(id, force: true)
+        return min(index, documents.count)
     }
 
     // MARK: The open set
@@ -101,8 +175,8 @@ public final class GlassEditorWorkspace {
     /// Re-opening a file that is already open must never produce a second copy: two editors over
     /// one file is a way to lose work, and it is the first thing a user does by accident.
     @discardableResult
-    public func open(_ url: URL) async -> GlassEditorDocument? {
-        await open(path: url.standardizedFileURL.path(percentEncoded: false))
+    public func open(_ url: URL, asPreview: Bool = false) async -> GlassEditorDocument? {
+        await open(path: url.standardizedFileURL.path(percentEncoded: false), asPreview: asPreview)
     }
 
     /// Opens a file on whichever machine its project is on.
@@ -111,12 +185,13 @@ public final class GlassEditorWorkspace {
     /// same duplicate check, the same encoding work, the same recents list, the same tab. The
     /// machine decides which `GlassEditorFileAccess` the bytes travel through and nothing else.
     @discardableResult
-    public func open(path rawPath: String) async -> GlassEditorDocument? {
+    public func open(path rawPath: String, asPreview: Bool = false) async -> GlassEditorDocument? {
         let path = GlassEditorProject.normalized(rawPath)
         let owner = project(owning: path)
         return await open(path: path,
                           through: owner.flatMap { projectAccess[$0.id] } ?? GlassEditorLocalFileAccess(),
-                          machine: owner.flatMap { machineName(of: $0.id) })
+                          machine: owner.flatMap { machineName(of: $0.id) },
+                          asPreview: asPreview)
     }
 
     /// Opens a file with the machine named explicitly — a file on a server with no project around
@@ -128,10 +203,14 @@ public final class GlassEditorWorkspace {
     @discardableResult
     public func open(path rawPath: String,
                      through access: any GlassEditorFileAccess,
-                     machine: String?) async -> GlassEditorDocument? {
+                     machine: String?,
+                     asPreview: Bool = false) async -> GlassEditorDocument? {
         let path = GlassEditorProject.normalized(rawPath)
         if let existing = documents.first(where: { $0.path == path && $0.machine == machine }) {
             selection = existing.id
+            // Opening it deliberately keeps it; a single click on a file already previewing
+            // leaves it exactly where it is.
+            if !asPreview { makePermanent(existing.id) }
             return existing
         }
 
@@ -150,7 +229,14 @@ public final class GlassEditorWorkspace {
             let document = try await GlassEditorDocument.open(path: path, through: access,
                                                              machine: machine)
             apply(to: document)
-            documents.append(document)
+            // Into the preview's place when there is one, so the tab does not jump while a user
+            // clicks down a file list.
+            if asPreview, let slot = vacatePreviewSlot() {
+                documents.insert(document, at: slot)
+            } else {
+                documents.append(document)
+            }
+            if asPreview { previewDocumentID = document.id }
             if machine != nil { documentAccess[document.id] = access }
             selection = document.id
             // Recents are this device's list of files it can reopen. A file on another machine is
@@ -209,6 +295,7 @@ public final class GlassEditorWorkspace {
         guard let index = documents.firstIndex(where: { $0.id == id }) else { return true }
         if documents[index].isDirty, !force { return false }
         documentAccess[id] = nil
+        if previewDocumentID == id { previewDocumentID = nil }
         documents.remove(at: index)
         if selection == id {
             // The neighbour, not the first: closing a tab should leave you where you were looking.
@@ -234,6 +321,8 @@ public final class GlassEditorWorkspace {
     /// come back from, so it is asked about wherever the file is.
     public func save(_ id: GlassEditorDocument.ID) async {
         guard let document = documents.first(where: { $0.id == id }) else { return }
+        // Saving a file is committing to it, whatever opened it.
+        makePermanent(id)
         await saveChecking(document)
     }
 

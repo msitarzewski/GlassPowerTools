@@ -1555,7 +1555,9 @@ struct DataTabView: View {
         columnMeta.lazy.filter { !stagedColumnLayout.hidden.contains($0.name) }.count
     }
 
-    private var usesCompactRecordList: Bool {
+    /// A phone gets the small pager — row count, page, two chevrons — rather than the full one
+    /// with its page-size control and jump field. The **grid** is the same everywhere.
+    private var usesCompactPager: Bool {
         #if os(iOS)
         horizontalSizeClass == .compact
         #else
@@ -1732,9 +1734,14 @@ struct DataTabView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if result.columns.isEmpty {
                     statementCompletedView(result)
-                } else if usesCompactRecordList {
-                    compactRecordList(result)
                 } else {
+                    // **The grid, on every platform.** A phone used to get a list of cards —
+                    // "Row 1", then four fields down the page — which is a different way of
+                    // reading a table rather than a smaller one: no column alignment, no
+                    // comparison down a column, and only the first four columns at all. The grid
+                    // already scrolls in both directions, which is exactly what a narrow screen
+                    // needs (reported 2026-09-19: *"I appreciate the idea of the card view for
+                    // rows, but it's not right. Let's use the table view we already have"*).
                     dataGrid(result)
                 }
             } else {
@@ -1744,7 +1751,7 @@ struct DataTabView: View {
             // Pager bar at bottom
             if let result {
                 Divider()
-                if usesCompactRecordList {
+                if usesCompactPager {
                     compactPager(result)
                 } else {
                     fullPager(result)
@@ -2293,76 +2300,9 @@ struct DataTabView: View {
         }
     }
 
-    @ViewBuilder
-    private func compactRecordList(_ result: QueryResult) -> some View {
-        #if os(iOS)
-        let visibleColumns = Array(gridVisibleColumnIndices(for: result).prefix(4))
-        List(selection: $selectedRowIndices) {
-            ForEach(displayedRowIndices(in: result), id: \.self) { rowIndex in
-                let row = result.rows[rowIndex]
-                let displayedRowNumber = (currentPage - 1) * pageSize + rowIndex + 1
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Row \(displayedRowNumber)")
-                            .font(.headline.monospacedDigit())
-                        Spacer()
-                        if selectedRowIndices.contains(rowIndex) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.tint)
-                                .accessibilityHidden(true)
-                        }
-                    }
-                    ForEach(visibleColumns, id: \.self) { columnIndex in
-                        let value = columnIndex < row.count ? row[columnIndex] : .null
-                        LabeledContent(result.columns[columnIndex].name) {
-                            Text(value.displayString)
-                                .font(.system(.subheadline, design: .monospaced))
-                                .foregroundStyle(value.isNull ? .tertiary : .primary)
-                                .lineLimit(2)
-                                .multilineTextAlignment(.trailing)
-                        }
-                        .accessibilityIdentifier("db-grid-cell-\(displayedRowNumber)-\(result.columns[columnIndex].name)")
-                    }
-                }
-                .padding(.vertical, 4)
-                .contentShape(Rectangle())
-                .accessibilityIdentifier("db-grid-row-\(displayedRowNumber)")
-                .tag(rowIndex)
-                .onTapGesture {
-                    if editMode?.wrappedValue != .active {
-                        openEditor(for: rowIndex)
-                    }
-                }
-                .contextMenu {
-                    if isTableContext {
-                        Button("Edit Row", systemImage: "pencil") {
-                            openEditor(for: rowIndex)
-                        }
-                        .accessibilityIdentifier("db-row-menu-edit")
-                    }
-                    Button("Copy Row", systemImage: "doc.on.doc") {
-                        selectedRowIndices = [rowIndex]
-                        copySelectedRange()
-                    }
-                    followReferenceMenu(for: rowIndex)
-                    if isTableContext {
-                        Divider()
-                        Button("Delete Row…", systemImage: "trash", role: .destructive) {
-                            requestDeleteRow(rowIndex)
-                        }
-                        .accessibilityIdentifier("db-row-menu-delete")
-                    }
-                }
-                .accessibilityHint(isTableContext
-                    ? "Tap to edit. Use Edit mode to select rows for export."
-                    : "Use Edit mode to select rows for export.")
-            }
-        }
-        .listStyle(.insetGrouped)
-        #else
-        dataGrid(result)
-        #endif
-    }
+    // The compact record list — a card per row, four columns of it — lived here until
+    // 2026-09-19. It was a different way of reading a table rather than a smaller one, and the
+    // grid it replaced scrolls in both directions perfectly well on a phone.
 
     // MARK: - Data Grid
 
@@ -2375,7 +2315,7 @@ struct DataTabView: View {
         .scrollIndicators(.automatic)
         .accessibilityLabel("SQL result controls")
         #elseif os(iOS)
-        if usesCompactRecordList {
+        if usesCompactPager {
             compactGridControls
         } else {
             ScrollView(.horizontal) {
