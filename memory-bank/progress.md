@@ -561,6 +561,22 @@ Both VMs are configured and were left running.
 | Desktop | **RDP to `oscar`**: a GNOME login at 1,320 × 2,318, "Connected", with the Esc/Tab/Keyboard bar |
 | Terminal | Driven in the same pass; no defects reported |
 
+## Seen on the new 27.2 simulators, 2026-09-20
+
+The Xcode 27.2 update brought runtimes the project had never run on. **0.4.189 installed and
+launched on both**, from a booted simulator rather than reasoned about:
+
+| | |
+|---|---|
+| **iPad Pro 13-inch (M5), iPadOS 27.2** | Launches into the two-column library, "This iPad" as the local host (D8), the Select a Host empty state, and the toolbar's import/add/settings group. Nothing from this week's compact work leaked into the regular-width layout |
+| **Apple Vision Pro, visionOS 27.2** | **The first sighting of the headset build since 0.4.123, three weeks ago.** It launches, the ornaments are where they should be — the scope rail on the left, import/add/settings below — and "This Apple Vision Pro" is the local host. The window reads as a **flat grey plate** rather than glass, which is the visionOS design debt already recorded, now visible again on a current runtime |
+| **iPhone Duo** | Still no runtime supports the device type, so still no simulator |
+
+The window's own painting is not the cause of the grey: `GlassLayerState.default` is opacity 0 and
+`GlassLayerBackground`'s frost is `EmptyView()` on visionOS, so it paints nothing. Where the plate
+comes from is the question the design pass has to answer, and it wants the user's eye on hardware
+(`visionos-design-direction`).
+
 ## Known and unfixed
 
 - **No UI test reaches a database or desktop surface at all.** Both are gated on live fixtures,
