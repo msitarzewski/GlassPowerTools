@@ -2468,8 +2468,13 @@ case is still there for a caller that can genuinely tell the two apart; the conn
 
 ## 2026-09-20 (0.4.189) — the pager, both directions
 
-**1,668 tests / exit status 0**, three Release builds. **0.4.189 on the iPhone; the Mac is on
-0.4.187** and its quit still times out — an open modal sheet is what does that.
+**1,668 tests / exit status 0**, three Release builds. **0.4.189 on the Mac and the iPhone.**
+
+The Mac's install arrived late and by accident: the quit AppleEvent that timed out at 0.4.188 was
+still waiting on a modal sheet, and when the sheet went away the queued command ran and copied
+whatever was in the build directory — which by then was **0.4.189**. Worth knowing that a
+backgrounded install copies the directory's state at the moment it runs, not at the moment it was
+asked for.
 
 *"The SQL query increments fine, doesn't decrement with the pager."* The asymmetry was the tell:
 nothing about Previous differs from Next, so what differed was **state left behind by the first
