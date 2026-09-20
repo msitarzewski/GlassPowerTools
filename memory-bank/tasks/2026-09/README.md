@@ -368,3 +368,11 @@ results grid all followed.
 Also a regression of mine, caught by the user in one round: a **typed** navigation path silently
 refuses another view's destinations, and the schema browser had been navigating correctly on a
 phone since glassdb. Rules 48, 49 and 50. **1,664 tests, exit status 0.**
+
+## 2026-09-20 — [iPhone Duo](2026-09-20_iphone-duo.md)
+
+Planned, nothing built. The first phone that can show two of a machine's services at once, which
+is this product's whole idea. Three things to act on: `canOpenWindows` refuses `.phone` and the
+Duo is one; the editor's and database's new compact stacks do not survive a size-class change
+mid-session, which a hinge now causes and an iPad can already test; and the Files browser accepts
+a drop only on macOS, on a device whose headline gesture is dragging between two apps.

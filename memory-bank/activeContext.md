@@ -2407,3 +2407,22 @@ The device type ships with Xcode 27.2 —
 three installed runtimes support it** (26.5, 27.0, 27.2/24B5084k all list it as unsupported), so
 a device cannot be created. Getting one means downloading the current iOS simulator runtime
 (`xcodebuild -downloadPlatform iOS`), which is several gigabytes and is the user's call.
+
+## 2026-09-20 — the Duo, read as a use case
+
+Planned, nothing built: [iPhone Duo](tasks/2026-09/2026-09-20_iphone-duo.md). It ships
+**23 October**. Three things to act on, and one question answered.
+
+1. **`canOpenWindows` may refuse it.** The gate is `supportsMultipleScenes && idiom != .phone`
+   (rule 43). The Duo is an iPhone by idiom and shows two apps side by side. Ask the system, not
+   the idiom — **after** verifying on the device, because guessing is what rule 43 was written
+   about.
+2. **The size class changes on a hinge, mid-session.** The library has handled that since before
+   the merge; the editor's and the database's brand-new compact stacks do not. Testable on an
+   **iPad** today by moving a Split View divider, which is the test to write before 23 October.
+3. **`SFTPBrowserView`'s drop target is `#if os(macOS)`**, on a device whose headline gesture is
+   dragging a file from one app into another.
+
+**Transparency on iPhone stays as it is.** Split View is tiled, not overlapping, so a translucent
+window still shows wallpaper. Rule 50 — nothing may need opacity to be legible — is the part that
+matters, and it is already in force.
