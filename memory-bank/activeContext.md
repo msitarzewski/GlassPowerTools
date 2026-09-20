@@ -2495,3 +2495,46 @@ Three changes, and the third is the point:
 3. **`isAutoQuery` is deleted.** With the guards gone nothing read it, and a flag that is only
    ever written is worse than none — it reads like a fact and is not one. The document knows who
    wrote the text; that is asked where it matters instead of cached.
+
+
+## 2026-09-20 (end of day) — RESUME HERE (supersedes every block above)
+
+**State DOCS.** **1,668 tests / exit status 0**, Release builds for macOS, iOS and visionOS.
+**0.4.189 on the Mac and the iPhone**, both read back off the installed bundle. Everything is
+committed; the tree is clean.
+
+**What is true now.** All four capabilities have been driven on a phone and work: the terminal
+and the desktop by the user (RDP to `oscar` at 1,320 × 2,318), the editor and the database here.
+0.4.189 also launches on the new **iPadOS 27.2** and **visionOS 27.2** simulators — the headset's
+first sighting since 0.4.123, where it still reads as a flat grey plate.
+
+### Next, in order
+
+1. **D1 and D2 — the session switcher.** Sections D1–D3 of
+   [the navigation plan](tasks/2026-09/2026-09-18_ios-navigation-plan.md). Every capability now
+   works on a phone; **moving between them is the gap**, and leaving a terminal still only clears
+   `router.terminalWorkgroupID` with the way back hidden in a panel nobody would open.
+2. **The exec seam — "run a command on this machine, and say when it is done".** Owned by the
+   terminal, which already has the session. It unlocks **four** things at once: `git status` in
+   the editor's project overview, project-wide `rg` search, server-side LSP (the Stage 5
+   differentiator), and later the Watch (D30). Nothing else on this list buys as much.
+3. **The size class changing mid-session.** The iPhone Duo ships **23 October** and unfolding
+   does exactly this; `GlassConnectionLibrary` handles it and the editor's and database's new
+   compact stacks do not. **Testable today on the booted iPad** by moving a Split View divider —
+   no Duo required. See [iPhone Duo](tasks/2026-09/2026-09-20_iphone-duo.md).
+4. **A seeded database or desktop configuration.** Neither capability can have a UI test at all
+   today, which is exactly how a regression of mine reached the user on 2026-09-19.
+5. **The visionOS design pass**, now that a 27.2 simulator exists — and the headset itself, still
+   on 0.4.123.
+6. Carried, worst first: `replaceAll` is still a whole-kind reconcile; the D26 two-device run has
+   never been done; dragging a file **out** of the Files browser is still macOS-only; test
+   hygiene (1,519 keychain items); `SFTPRemoteEditorView` is still there as the second editor.
+
+### Things that will bite
+
+- Rules **42–52**. 48 and 52 are the two from this week that generalise: find out whether a view
+  already navigates before wrapping it, and fence the API rather than the capability.
+- A **backgrounded install copies the build directory's state when it runs**, not when it was
+  asked for (2026-09-20: a queued 0.4.188 install put 0.4.189 on the Mac).
+- A simulator test runner never receives `TEST_RUNNER_*`, so every live-fixture UI test is
+  macOS-only.

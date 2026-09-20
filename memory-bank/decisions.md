@@ -845,3 +845,32 @@ is moving the bundle to the Trash; that is a device check.
 **Not approved, not scheduled.** It belongs after D26 stage 5 (storage cleanup), which is the same
 knowledge pointed the other way: stage 5 works out what this app writes and where, and an uninstall
 is that list executed.
+
+## D30 — watchOS stays out until someone else is using this — Approved 2026-09-20
+
+**Status:** Approved by the user, 2026-09-20: *"Let's come back to watch once someone other than
+me is using this thing."* `AGENTS.md` has excluded Apple TV and watchOS since the merge was
+decided; this reaffirms it with a condition attached rather than leaving it a flat no.
+
+**The use cases, ranked, so the next look starts from them rather than from scratch.** They were
+worked out on 2026-09-20 and they are real:
+
+1. **"Your deploy finished."** Start something long on a host, put the phone away, and the wrist
+   taps when the prompt comes back, with the exit code and the last lines. Nothing else in this
+   product is more worth leaving a desk for.
+2. **Snippets on the wrist.** The terminal already keeps a snippet library; the Watch picks from
+   it and confirms. The command was composed earlier on a real keyboard, which is what makes a
+   one-tap fleet remote defensible.
+3. **A transfer on the Smart Stack.** `SFTPTransferActivityStore` already tracks progress. This
+   one needs **no new seam at all** and is the cheapest magic available.
+4. **"Is it up?" as a complication**, and **trust prompts as approvals** — a changed host key is
+   exactly the kind of decision that should interrupt you anywhere. **No key material ever goes
+   to the Watch**; it approves presence, never identity (D18/D23).
+
+**What it must never be:** a terminal, a database browser, or anything whose answer is text you
+have to scan. The screen is wrong for it and a bad one costs more than none.
+
+**The prerequisite is not watchOS.** Three of the four want *"run a command on this machine and
+tell me when it is done"* — the same seam the editor needs for `git status`, project-wide `rg`
+search and server-side LSP (Stage 5). Build that for the platforms with users first; the Watch is
+then its fourth consumer and a small app.
