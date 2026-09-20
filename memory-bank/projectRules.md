@@ -388,3 +388,14 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     else (2026-09-19). On a Mac the nesting drew a box inside a box and nobody noticed for weeks.
     The same shape as rule 48 one level up: when a contributor already provides structure, the host
     must not impose its own.
+
+52. **`#if os(macOS)` is not a capability.** The Files browser refused a dropped file everywhere
+    but a Mac — not because receiving one is a Mac idea, but because the code happened to live in
+    a file fenced with `#if os(macOS)`. iPadOS has had cross-application drag and drop for years,
+    and the iPhone Duo brings it to a phone in October; the app had been turning it down on a
+    device that could do it since the browser was written. Five `⌘`-shortcut fences were the same
+    thing: an iPad with a keyboard has ⌘A and Escape.
+    Fence the **API** — `NSFilePromiseReceiver`, `NSPasteboard`, `NSViewRepresentable` — and let
+    the *capability* be offered everywhere. A drop target nothing can reach costs nothing and
+    starts working the day the system allows it, with no build. Where a capability genuinely has
+    to be asked about at runtime, it gets one answer in one place (rule 43).

@@ -1044,7 +1044,14 @@ struct SFTPBrowserView: View {
         .refreshable {
             await loadDirectory()
         }
-        #if os(macOS)
+        // **Every platform offers this target.** It was `#if os(macOS)`, which asked the wrong
+        // question: receiving a file from another application is not a Mac idea. iPadOS has had
+        // cross-application drag and drop for years — and real windows now — so this app has
+        // been refusing drops on a device that could make them since the browser was written.
+        // The iPhone Duo brings the same gesture to a phone in October.
+        //
+        // A target nothing can reach costs nothing: on an iPhone today no other app can hand it
+        // a file, and the day one can, this works without a build.
         .onDrop(of: SFTPIncomingDrop.acceptedTypes, isTargeted: $isReceivingFileDrop) { providers in
             beginIncomingFileDrop(providers)
         }
@@ -1057,7 +1064,6 @@ struct SFTPBrowserView: View {
                     .accessibilityHidden(true)
             }
         }
-        #endif
     }
 
     #if os(macOS)
@@ -1543,12 +1549,11 @@ struct SFTPBrowserView: View {
             }
         }
         .padding(.leading, CGFloat(entry.depth) * 18)
-        #if os(macOS)
+        // A folder row takes a drop too, on every platform, for the same reason the list does.
         .onDrop(of: isDirectory(entry) ? SFTPIncomingDrop.acceptedTypes : [], isTargeted: nil) { providers in
             guard isDirectory(entry) else { return false }
             return beginIncomingFileDrop(providers, destination: entry.id)
         }
-        #endif
     }
 
     @ViewBuilder
@@ -2185,7 +2190,6 @@ struct SFTPBrowserView: View {
         sftpClient != nil && transferTask == nil && operationInProgress == nil
     }
 
-    #if os(macOS)
     private func beginIncomingFileDrop(_ providers: [NSItemProvider], destination: String? = nil) -> Bool {
         isReceivingFileDrop = false
         guard canAcceptFileDrop, let incoming = SFTPIncomingDrop(providers: providers) else { return false }
@@ -2209,7 +2213,6 @@ struct SFTPBrowserView: View {
         }
         return true
     }
-    #endif
 
     // MARK: - Toolbar
 
@@ -2244,9 +2247,8 @@ struct SFTPBrowserView: View {
                     } label: {
                         Label("Select All", systemImage: "checkmark.circle")
                     }
-                    #if os(macOS)
+                    // ⌘A on an iPad with a keyboard means the same thing it means on a Mac.
                     .keyboardShortcut("a", modifiers: .command)
-                    #endif
 
                     if !selectedFilenames.isEmpty {
                         Button {
@@ -2254,9 +2256,7 @@ struct SFTPBrowserView: View {
                         } label: {
                             Label("Deselect All", systemImage: "circle")
                         }
-                        #if os(macOS)
                         .keyboardShortcut("a", modifiers: [.command, .shift])
-                        #endif
                     }
 
                     Divider()

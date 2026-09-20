@@ -51,12 +51,19 @@ the root with an open document one push away and nobody pushing it** — the sam
 **This is testable today, with no Duo:** an iPad in Split View changes horizontal size class when
 the divider moves. That is the test to write before 23 October.
 
-### 3. Drag and drop is the headline gesture, and the browser only accepts it on a Mac
+### 3. Drag and drop is the headline gesture — half of it is done (2026-09-20)
 
-`SFTPBrowserView`'s drop target is inside `#if os(macOS)`. Apple's own example of what the inner
-display is for is dragging a file from one app into another. A file dragged from Files into the
-Files browser — and a remote file dragged *out* of it — is a real feature on a device that makes
-the gesture obvious, and it is missing on the platform that will want it.
+**Dropping a file into the browser now works on every platform.** `SFTPIncomingDrop` moved out of
+the macOS-only file it happened to live in; the AppKit fast path (`NSFilePromiseReceiver`, the
+drag pasteboard) stays fenced, and the `NSItemProvider` path — which AppKit already falls back to
+— is what every other platform uses. This was not a Duo feature: **an iPad could always make the
+drag and this app refused it.** Five `⌘`-shortcut fences went with it, for the same reason.
+Rule 52.
+
+**Dragging a file *out* is still macOS-only** and is a bigger piece: `SFTPFilePromiseDragSource`
+is an `NSViewRepresentable`, and the iOS equivalent has to download the remote file to hand over
+an item provider. Worth doing before October — dragging a log out of a server and into Mail is
+the Duo's own example, with a server on the other side.
 
 ## And the question it answers
 

@@ -511,10 +511,9 @@ struct AIAssistantView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Done") { dismiss() }
-                        #if os(macOS)
+                        // A hardware keyboard is not a Mac: Escape reaches an iPad, and the Duo.
                         .keyboardShortcut(.cancelAction)
                         .help("Close the AI SQL Assistant")
-                        #endif
                 }
             }
         }

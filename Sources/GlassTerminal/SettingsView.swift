@@ -1579,9 +1579,8 @@ struct AddSSHKeyView: View {
                         name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                             || privateKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     )
-                    #if os(macOS)
+                    // Return saves the sheet wherever there is a keyboard to press it on.
                     .keyboardShortcut(.defaultAction)
-                    #endif
                 }
             }
         }

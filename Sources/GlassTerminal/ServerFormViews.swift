@@ -986,9 +986,8 @@ private struct ServerFormContent: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(mode.confirmationTitle) { save() }
                         .disabled(!issues.isEmpty)
-                        #if os(macOS)
+                        // Return saves the sheet wherever there is a keyboard to press it on.
                         .keyboardShortcut(.defaultAction)
-                        #endif
                 }
             }
             .alert("Save Failed", isPresented: Binding(

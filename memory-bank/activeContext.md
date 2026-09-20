@@ -2426,3 +2426,17 @@ Planned, nothing built: [iPhone Duo](tasks/2026-09/2026-09-20_iphone-duo.md). It
 **Transparency on iPhone stays as it is.** Split View is tiled, not overlapping, so a translucent
 window still shows wallpaper. Rule 50 — nothing may need opacity to be legible — is the part that
 matters, and it is already in force.
+
+## 2026-09-20 (0.4.187) — a drop the app had been refusing for months
+
+**1,667 tests / exit status 0**, three Release builds, **0.4.187 on the Mac and the iPhone**.
+
+`#if os(macOS)` around the Files browser's drop target was a platform check standing in for a
+capability, and it was **already wrong before the Duo**: iPadOS has had cross-application drag and
+drop for years, and this app turned it down. `SFTPIncomingDrop` is cross-platform now — the
+AppKit fast path stays fenced by name, the `NSItemProvider` path serves everyone else — and five
+`⌘`-shortcut fences went with it, because an iPad with a keyboard has ⌘A and Escape. **Rule 52.**
+
+Still macOS-only, and deliberately: dragging a file **out** of the browser. It is an
+`NSViewRepresentable` over file promises, and the iOS equivalent must download the remote file to
+hand over an item provider. Recorded in the Duo note as worth doing before October.
