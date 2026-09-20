@@ -198,9 +198,12 @@ final class DatabaseServiceDraft: GlassServiceDraft {
         if Self.normalized(username).isEmpty {
             issues[.username] = "Enter the database username."
         }
-        if password.isEmpty, !isEditing {
-            issues[.password] = "Enter the database password."
-        }
+        // **No password is a real configuration.** MySQL's `auth_socket`, PostgreSQL's `trust`
+        // and `peer`, a tunnelled local instance, a user genuinely created without one — all
+        // connect with an empty password, and refusing to save the service made this app unable
+        // to reach servers that work everywhere else (reported 2026-09-20). A wrong password is
+        // the server's to reject, at connect time, where it can say so accurately; a form cannot
+        // know. Username stays required because there is nothing to send without one.
         if Int(port).map({ (1...65_535).contains($0) }) != true {
             issues[.port] = "Enter a port from 1 through 65535."
         }

@@ -2440,3 +2440,28 @@ AppKit fast path stays fenced by name, the `NSItemProvider` path serves everyone
 Still macOS-only, and deliberately: dragging a file **out** of the browser. It is an
 `NSViewRepresentable` over file promises, and the iOS equivalent must download the remote file to
 hand over an item provider. Recorded in the Duo note as worth doing before October.
+
+## 2026-09-20 (0.4.188) — a number on the wrong line, and a password that is not required
+
+**1,668 tests / exit status 0**, three Release builds. **0.4.188 on the iPhone; the Mac is on
+0.4.187** — the quit AppleEvent timed out, which is what an open modal sheet does, so that install
+is waiting.
+
+**The gutter's last number sat a line too low.** Measured rather than guessed: with
+`.ensuresExtraLineFragment`, TextKit 2 lays the document's final empty line out **inside** the
+last paragraph's fragment — `"one line\n"` is *one* fragment, 32 points tall, holding two
+16-point line fragments, the second with a zero-length range. The trailing label was placed at the
+fragment's `maxY`, which is one line below where the caret actually is. It is placed at the extra
+line fragment's own top now, and `AppKitEngineTests` asserts the second number sits exactly one
+line below the first, with the line height taken from the layout rather than assumed.
+
+**A database password is no longer required.** `auth_socket`, `trust`, `peer`, a tunnelled local
+instance, a user created without one — all connect with nothing to send, and the form refused to
+save the service at all. Two halves: the draft no longer raises the issue, **and** the connect
+path no longer throws `credentialMissing` when the keychain holds nothing, which would have made
+a service that saves and then refuses to connect. Whether an empty password is accepted is the
+server's to say, and it says so accurately.
+
+One consequence recorded honestly: a *stranded* credential — one the keychain lost — now reads as
+the server's own authentication rejection rather than as "no saved password was found". The error
+case is still there for a caller that can genuinely tell the two apart; the connect path cannot.

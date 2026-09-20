@@ -119,14 +119,16 @@ struct DatabaseRequiredFields: View {
     @ViewBuilder
     private var passwordField: some View {
         LabeledContent {
+            // Blank is a legitimate answer on a new service as well as an edit: `auth_socket`,
+            // `trust`, and any user created without one.
             SecureField("Password", text: $draft.password,
-                        prompt: Text(draft.isEditing ? "Leave blank to keep saved password" : "Password"))
+                        prompt: Text(draft.isEditing ? "Leave blank to keep saved password" : "Optional"))
                 .textContentType(.init(rawValue: ""))
                 .focused($focusedField, equals: .password)
                 .databaseTextFieldPresentation()
                 .accessibilityIdentifier("\(identifierPrefix)-password")
         } label: {
-            DatabaseRequiredFieldLabel(title: "Password", isRequired: !draft.isEditing)
+            DatabaseRequiredFieldLabel(title: "Password", isRequired: false)
         }
         DatabaseValidationMessage(message: draft.message(for: .password, in: issues),
                                   identifier: "\(identifierPrefix)-password-validation")

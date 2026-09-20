@@ -217,6 +217,40 @@ struct AppKitEngineTests {
 
     // MARK: - Gutter
 
+    /// **A number has to sit beside its line, not merely exist.**
+    ///
+    /// Reported 2026-09-20 with a screenshot: one line of text and a caret on the empty line
+    /// below it, and the gutter reading 1 … 2 with the 2 a whole line too low. Asked for
+    /// `.ensuresExtraLineFragment`, TextKit 2 lays the final empty line out *inside* the last
+    /// paragraph's fragment — `"…\n"` is one fragment, two line fragments, 32 points tall — so
+    /// the trailing number was placed at the fragment's bottom rather than at the empty line.
+    @Test("the trailing empty line's number sits on that line, not below the fragment")
+    func gutterPlacesTheTrailingNumberOnItsOwnLine() throws {
+        let engine = makeEngine("Moving to a new place, open to pretty much anything.\n")
+        layOut(engine, width: 600)
+        let layoutManager = try #require(engine.textView.textLayoutManager)
+
+        let labels = GutterLineNumbers.labels(
+            in: layoutManager, verticalRange: nil, lineCount: engine.model.lineCount
+        ) { engine.model.lineIndex(forUTF16Offset: $0) }
+
+        #expect(labels.map(\.number) == [1, 2])
+        let first = try #require(labels.first)
+        let second = try #require(labels.last)
+        // The line's own height, taken from the layout rather than assumed.
+        var lineHeight: CGFloat = 0
+        layoutManager.enumerateTextLayoutFragments(
+            from: layoutManager.textContentManager?.documentRange.location,
+            options: [.ensuresLayout, .ensuresExtraLineFragment]
+        ) { fragment in
+            lineHeight = fragment.textLineFragments.first?.typographicBounds.height ?? 0
+            return false
+        }
+        #expect(lineHeight > 0)
+        #expect(second.frame.minY == first.frame.minY + lineHeight,
+                "the second number belongs one line down, where the caret is — not one line below that")
+    }
+
     @Test("the gutter numbers 100 logical lines 1...100")
     func gutterNumbersHundredLines() {
         let content = (1...100).map { "line \($0)" }.joined(separator: "\n")

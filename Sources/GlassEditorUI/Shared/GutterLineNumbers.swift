@@ -129,6 +129,9 @@ public enum GutterLineNumbers {
         var labels: [Label] = []
         var lastFragmentFrame: CGRect?
         var lastLineHeight: CGFloat?
+        /// Where the document's final empty line was actually laid out, when TextKit put it
+        /// *inside* the last fragment rather than after it. See below.
+        var extraLineTop: CGFloat?
         var stoppedEarly = false
 
         layoutManager.enumerateTextLayoutFragments(
@@ -140,6 +143,18 @@ public enum GutterLineNumbers {
             let frame = fragment.layoutFragmentFrame
             lastFragmentFrame = frame
             lastLineHeight = fragment.textLineFragments.last?.typographicBounds.height
+            // **The extra line fragment belongs to the fragment above it.** Asked for
+            // `.ensuresExtraLineFragment`, TextKit 2 lays the final empty line out as a
+            // zero-length line fragment *within* the last paragraph's fragment — so for
+            // `"one line\n"` there is one fragment, 32 points tall, holding two 16-point lines.
+            // Placing the trailing number at the fragment's `maxY` therefore put it a whole line
+            // below the caret it was supposed to sit beside (photographed 2026-09-20).
+            if fragment.textLineFragments.count > 1,
+               let extra = fragment.textLineFragments.last, extra.characterRange.length == 0 {
+                extraLineTop = frame.minY + extra.typographicBounds.minY
+            } else {
+                extraLineTop = nil
+            }
 
             if let verticalRange {
                 if frame.maxY < verticalRange.lowerBound { return true }
@@ -158,6 +173,7 @@ public enum GutterLineNumbers {
             lineCount: lineCount,
             lastFragmentFrame: lastFragmentFrame,
             lastLineHeight: lastLineHeight,
+            extraLineTop: extraLineTop,
             stoppedEarly: stoppedEarly,
             verticalRange: verticalRange
         )
@@ -190,6 +206,7 @@ public enum GutterLineNumbers {
         lineCount: Int,
         lastFragmentFrame: CGRect?,
         lastLineHeight: CGFloat?,
+        extraLineTop: CGFloat?,
         stoppedEarly: Bool,
         verticalRange: ClosedRange<CGFloat>?
     ) {
@@ -200,8 +217,11 @@ public enum GutterLineNumbers {
         else { return }
 
         let height = lastLineHeight ?? lastFrame.height
+        // Where TextKit actually put the empty line when it put it inside the fragment above;
+        // otherwise directly after that fragment, which is where a caret would sit.
+        let top = extraLineTop ?? lastFrame.maxY
         let frame = CGRect(
-            x: lastFrame.minX, y: lastFrame.maxY, width: lastFrame.width, height: height
+            x: lastFrame.minX, y: top, width: lastFrame.width, height: height
         )
         if let verticalRange {
             guard frame.maxY >= verticalRange.lowerBound,

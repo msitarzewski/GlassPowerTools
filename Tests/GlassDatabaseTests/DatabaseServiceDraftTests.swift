@@ -77,8 +77,15 @@ struct DatabaseServiceDraftTests {
         #expect(draft.issues(address: "db.example.test")[.username] != nil)
         draft.username = "reader"
 
+        // **A blank password saves.** `auth_socket`, `trust`, `peer`, a tunnelled local
+        // instance, a user created without one — all of them connect with nothing to send, and
+        // refusing the service made this app unable to reach servers that work everywhere else
+        // (reported 2026-09-20). Whether the password is right is the server's to say, at
+        // connect time, where it can say so accurately.
         draft.password = ""
-        #expect(draft.issues(address: "db.example.test")[.password] != nil)
+        #expect(draft.issues(address: "db.example.test")[.password] == nil)
+        #expect(draft.validate(address: "db.example.test").isEmpty,
+                "a service with no password is a service that saves")
     }
 
     @Test("A draft carries no address of its own: the host's is what gets validated")

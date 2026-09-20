@@ -680,7 +680,7 @@ Both VMs are configured and were left running.
 | HTML parses and colours | `GrammarModuleTests` requires keyword, attribute, string, comment **and** embedded from a real page fixture — a query that compiles and colours nothing is the failure being guarded against |
 | The keyboard can be asked for twice | `GlassEditorKeyboardRequestTests`; the serial is why a second Show works |
 | Package suite | **1,663 tests, exit status 0** |
-| Installed | **0.4.187** on the Mac (`/Applications`, read back off the installed bundle)  and on iPhone `00008150`, both read back off the installed bundle. The Vision Pro is still **0.4.123** |
+| Installed | **0.4.188** on the iPhone; the Mac is on **0.4.187**, waiting for the app to be quit (`/Applications`, read back off the installed bundle)  and on iPhone `00008150`, both read back off the installed bundle. The Vision Pro is still **0.4.123** |
 
 ## Known and unfixed
 

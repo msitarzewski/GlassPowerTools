@@ -1002,7 +1002,14 @@ class DatabaseSessionManager {
             do {
                 databasePassword = try KeychainManager.retrievePassword(for: config)
             } catch SecretStoreError.notFound {
-                throw SessionError.credentialMissing(config.name)
+                // **Nothing stored means no password, and that is a real configuration.**
+                // `auth_socket`, `trust`, `peer` and any user created without one connect with
+                // an empty password, and a service saved that way stores no keychain item at
+                // all — so refusing here made the app unable to reach servers that work
+                // everywhere else (2026-09-20). Whether the server accepts it is the server's
+                // to say, and it says so accurately; a stranded credential now reads as that
+                // server's own rejection rather than as this sentence.
+                databasePassword = ""
             }
         } else {
             databasePassword = ""
@@ -1055,8 +1062,10 @@ class DatabaseSessionManager {
             case .invalidConfiguration(let message):
                 return message
             case .credentialMissing(let name):
-                return "No saved password was found for \(name). Open the service and enter it again. "
-                    + "Connecting without one would send an empty password, which some servers accept."
+                // Kept for a caller that can genuinely tell a *missing* credential from a
+                // deliberately absent one; the connect path no longer guesses that from the
+                // keychain alone.
+                return "No saved password was found for \(name). Open the service and enter it again."
             }
         }
     }
