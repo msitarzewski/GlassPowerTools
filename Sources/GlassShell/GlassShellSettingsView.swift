@@ -53,19 +53,26 @@ public struct GlassShellSettingsView: View {
         GlassSettingsSections(selection: $page,
                               options: GlassShellSettingsSelection.options(capabilityPages: capabilityPages),
                               title: title, pickerIdentifier: "settings-sections") { selection in
-            Form {
+            // **A contributed page owns its own container.** The shell's own pages are
+            // `Section`s and need a `Form` around them; a capability's page is already one —
+            // and a `Form` inside a `Form` collapses on iOS into a single clipped row, which is
+            // what Settings ▸ Terminal was on a phone: the word "Theme", cut in half, and
+            // nothing else (photographed 2026-09-19). On a Mac the nesting merely drew a box
+            // inside a box, so it survived there unnoticed.
+            Group {
                 switch selection {
-                case .shell(.general): general
-                case .shell(.appearance): GlassLayerControls()
-                case .shell(.privacy): privacy
-                case .shell(.about): about
+                case .shell(let page):
+                    Form { shellPage(page) }
+                        .formStyle(.grouped)
                 case .capability(let id):
                     if let page = capabilityPages.first(where: { $0.id == id }) {
                         page.makeView().accessibilityIdentifier("settings-page-\(id)")
+                    } else {
+                        ContentUnavailableView("Settings Unavailable", systemImage: "gearshape",
+                                               description: Text("This page belongs to a capability that is not loaded."))
                     }
                 }
             }
-            .formStyle(.grouped)
             #if os(iOS)
             // A compact iPhone pushes each page onto the sheet's stack, and the presenter's Done
             // button stays behind on the root. A modal must be dismissable from wherever the user
@@ -83,6 +90,17 @@ public struct GlassShellSettingsView: View {
         #if os(macOS)
         .frame(minWidth: 520, minHeight: 380)
         #endif
+    }
+
+    /// The shell's own four. Each is a set of `Section`s, so the caller supplies the `Form`.
+    @ViewBuilder
+    private func shellPage(_ page: GlassShellSettingsPage) -> some View {
+        switch page {
+        case .general: general
+        case .appearance: GlassLayerControls()
+        case .privacy: privacy
+        case .about: about
+        }
     }
 
     private var general: some View {

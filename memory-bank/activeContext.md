@@ -2353,3 +2353,27 @@ reaches its children) and **50** (pinned chrome must occlude whatever the transp
   simulators break again after an Xcode update, start there.
 - **A simulator runner never sees `TEST_RUNNER_*`**, so every live-fixture UI test is macOS-only.
 - Rules 42–50, and rule 46 above all: the phone is where the defects are.
+
+
+## 2026-09-19 (0.4.185) — Settings on a phone, and two capabilities cleared
+
+**State DOCS.** **1,664 tests / exit status 0**, three Release builds, **0.4.185 on the Mac and
+the iPhone**.
+
+**The terminal and the desktop have now been driven on a phone, by the user, and both work.** RDP
+to `oscar` rendered a GNOME login at 1,320 × 2,318 with the Esc/Tab/Keyboard bar, reported
+"Connected", and the terminal came through the same pass. That closes the oldest item on the
+carried list — rule 46's debt is paid for three of the four capabilities, and only the editor's
+own phone pass predates it.
+
+**Settings ▸ Terminal was one clipped row.** `GlassShellSettingsView` wrapped every page in a
+`Form`: right for the shell's own four, which are sets of `Section`s, and wrong for a capability's,
+which is already a `Form`. Nested Forms collapse on iOS. A capability page is handed through
+untouched now, and the shell's four get the `Form` they need — **rule 51**.
+
+### Do these next, in order
+
+1. **D1 and D2 — the session switcher.** Everything else on the phone works; moving *between*
+   the things that work is what is left.
+2. **A seeded database or desktop configuration**, so either can have a UI test at all.
+3. Section E of the navigation plan: the **Vision Pro** (still 0.4.123), `replaceAll`, D26.

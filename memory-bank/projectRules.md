@@ -381,3 +381,10 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     column you are reading may not. `.ultraThinMaterial` under the tint keeps it translucent and
     legible, and disappears under the tint at full opacity, so the opaque end is unchanged.
 
+51. **A contributed page owns its own container.** The shell's settings surface wrapped every page
+    in a `Form`, which is right for its own four — they are sets of `Section`s — and wrong for a
+    capability's, which is already a `Form`. A `Form` inside a `Form` **collapses on iOS** into one
+    clipped row: Settings ▸ Terminal on a phone was the word "Theme", cut in half, and nothing
+    else (2026-09-19). On a Mac the nesting drew a box inside a box and nobody noticed for weeks.
+    The same shape as rule 48 one level up: when a contributor already provides structure, the host
+    must not impose its own.

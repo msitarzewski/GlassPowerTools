@@ -552,6 +552,15 @@ Both VMs are configured and were left running.
   two to four) and the headset at 0.4.123. Neither has an editor entry point at all — it is a Mac
   surface until stage C contributes the library panel.
 
+## Driven on a phone, by the user, 2026-09-19
+
+| Capability | Evidence |
+|---|---|
+| Editor | The full walkthrough, twice, photographed at every step, plus two UI tests on iOS 27.2 |
+| Database | Schema → tables → detail, the SQL editor, the grid and its pinned chrome. Three defects and one regression found and fixed |
+| Desktop | **RDP to `oscar`**: a GNOME login at 1,320 × 2,318, "Connected", with the Esc/Tab/Keyboard bar |
+| Terminal | Driven in the same pass; no defects reported |
+
 ## Known and unfixed
 
 - **No UI test reaches a database or desktop surface at all.** Both are gated on live fixtures,
@@ -671,7 +680,7 @@ Both VMs are configured and were left running.
 | HTML parses and colours | `GrammarModuleTests` requires keyword, attribute, string, comment **and** embedded from a real page fixture — a query that compiles and colours nothing is the failure being guarded against |
 | The keyboard can be asked for twice | `GlassEditorKeyboardRequestTests`; the serial is why a second Show works |
 | Package suite | **1,663 tests, exit status 0** |
-| Installed | **0.4.184** on the Mac (`/Applications`, read back off the installed bundle)  and on iPhone `00008150`, both read back off the installed bundle. The Vision Pro is still **0.4.123** |
+| Installed | **0.4.185** on the Mac (`/Applications`, read back off the installed bundle)  and on iPhone `00008150`, both read back off the installed bundle. The Vision Pro is still **0.4.123** |
 
 ## Known and unfixed
 
