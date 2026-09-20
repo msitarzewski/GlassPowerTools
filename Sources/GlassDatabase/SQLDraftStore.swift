@@ -27,6 +27,20 @@ struct SQLDraftRecord: Codable, Hashable, Sendable {
     var selectionLength: Int
     var createdAt: Date
     var updatedAt: Date
+    /// Whether this text was **typed**, or is the browsing query the app generated.
+    ///
+    /// A table's SQL pane usually holds generated SQL — `SELECT … LIMIT 100 OFFSET 0` — which the
+    /// grid rewrites on every page, filter and sort. `TableDetailView` refuses to overwrite a
+    /// draft it believes the user edited, and a restored draft used to come back as an edit
+    /// *always*: `QueryDocumentTab(text:)` leaves `savedText` empty, so `hasUnsavedChanges` was
+    /// true for the rest of the session. The visible symptom was the pager working while the SQL
+    /// above it still said `OFFSET 0` (reported 2026-09-19).
+    ///
+    /// Decoding a file written before this field treats the draft as generated, because that is
+    /// what a table's draft nearly always is; the cost of being wrong is one typed query replaced
+    /// by the generated one at the next load, and the cost of the other default is the defect
+    /// staying for every table already browsed.
+    var isUnsavedEdit = false
 
     /// The selection clamped to `sql`'s UTF-16 length, which is what `NSRange` indexes.
     var clampedSelection: NSRange {
@@ -65,6 +79,24 @@ struct SQLDraftFile: Codable, Sendable {
 /// connection keeps the launch cost at zero and makes eviction a `removeItem`. The read/write
 /// shape follows the shell's own file stores (`GlassShellModel.swift:127`,
 /// `GlassShellPreferencesStore`), which is where file-backed state in this product already lives.
+extension SQLDraftRecord {
+    /// **A default value is not a default on decode.** The synthesized decoder requires every
+    /// key, so adding `isUnsavedEdit` with `= false` made every draft file written before it
+    /// fail to decode — every stored draft on the machine, gone, from a field meant to fix a
+    /// cosmetic staleness. Caught by the test that decodes an older file, which is the only
+    /// reason it is not in a release.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        selection = try container.decode(WorkspaceSelection.self, forKey: .selection)
+        sql = try container.decode(String.self, forKey: .sql)
+        selectionLocation = try container.decode(Int.self, forKey: .selectionLocation)
+        selectionLength = try container.decode(Int.self, forKey: .selectionLength)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        isUnsavedEdit = try container.decodeIfPresent(Bool.self, forKey: .isUnsavedEdit) ?? false
+    }
+}
+
 @MainActor
 final class SQLDraftStore {
     static let shared = SQLDraftStore()
@@ -137,19 +169,26 @@ final class SQLDraftStore {
 
     /// Upserts one editor's text. Whitespace-only SQL removes the record instead of storing it,
     /// so an untouched ⌘N tab never reaches the disk.
-    func record(sql: String, selection: WorkspaceSelection, selectedRange: NSRange, connectionID: UUID, now: Date = Date()) {
+    func record(sql: String, selection: WorkspaceSelection, selectedRange: NSRange,
+                connectionID: UUID, isUnsavedEdit: Bool = false, now: Date = Date()) {
         guard !sql.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             remove(selection: selection, connectionID: connectionID)
             return
         }
         var stored = file(for: connectionID)
         var textChanged = true
+        var editedChanged = false
         if let index = stored.drafts.firstIndex(where: { $0.selection == selection }) {
             textChanged = stored.drafts[index].sql != sql
-            guard textChanged
+            // The flag alone is a change worth storing: the generated query is written and then
+            // marked saved in the same pass, and the second write is the one that says it is a
+            // baseline rather than an edit.
+            editedChanged = stored.drafts[index].isUnsavedEdit != isUnsavedEdit
+            guard textChanged || editedChanged
                 || stored.drafts[index].selectionLocation != selectedRange.location
                 || stored.drafts[index].selectionLength != selectedRange.length else { return }
             stored.drafts[index].sql = sql
+            stored.drafts[index].isUnsavedEdit = isUnsavedEdit
             stored.drafts[index].selectionLocation = selectedRange.location
             stored.drafts[index].selectionLength = selectedRange.length
             if textChanged { stored.drafts[index].updatedAt = now }
@@ -160,12 +199,13 @@ final class SQLDraftStore {
                 selectionLocation: selectedRange.location,
                 selectionLength: selectedRange.length,
                 createdAt: now,
-                updatedAt: now
+                updatedAt: now,
+                isUnsavedEdit: isUnsavedEdit
             ))
         }
         stored.drafts = Self.pruned(stored.drafts, keeping: selection)
         files[connectionID] = stored
-        if textChanged {
+        if textChanged || editedChanged {
             markDirty(connectionID)
         } else {
             caretDirty.insert(connectionID)

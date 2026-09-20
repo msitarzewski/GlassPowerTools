@@ -2377,3 +2377,33 @@ untouched now, and the shell's four get the `Form` they need — **rule 51**.
    the things that work is what is left.
 2. **A seeded database or desktop configuration**, so either can have a UI test at all.
 3. Section E of the navigation plan: the **Vision Pro** (still 0.4.123), `replaceAll`, D26.
+
+## 2026-09-20 (0.4.186) — the SQL that stopped keeping up, and the Duo
+
+**State DOCS.** **1,667 tests / exit status 0**, three Release builds, **0.4.186 on the Mac and
+the iPhone**.
+
+**The pager moved the rows and the SQL above them still said `OFFSET 0`.** A table's SQL pane
+holds the *generated* browsing query, which the grid rewrites on every page, filter and sort —
+but only while it believes the user has not typed there. A **restored** draft came back as an
+edit every time: `QueryDocumentTab(text:)` leaves `savedText` empty, so `hasUnsavedChanges` was
+true for the rest of the session and the grid never rewrote its own query again. Not a phone bug
+at all; it needed only a draft that had been stored once.
+
+`SQLDraftRecord` carries `isUnsavedEdit` now — recorded from the document, which already knows —
+and a restored baseline comes back rewritable while a restored edit stays protected.
+
+**And the test caught something far worse than the bug.** `var isUnsavedEdit = false` with a
+synthesized `Codable` makes the key **required on decode**: every draft file written before the
+field would have failed to decode, and every stored draft on the machine would have been lost by
+a change meant to fix a cosmetic staleness. A `decodeIfPresent` initialiser in an extension fixes
+it (the extension keeps the memberwise init). Worth remembering: **a default value is not a
+default on decode.**
+
+### iPhone Duo
+
+The device type ships with Xcode 27.2 —
+`com.apple.CoreSimulator.SimDeviceType.iPhone-Duo`, minimum runtime **27.1** — but **none of the
+three installed runtimes support it** (26.5, 27.0, 27.2/24B5084k all list it as unsupported), so
+a device cannot be created. Getting one means downloading the current iOS simulator runtime
+(`xcodebuild -downloadPlatform iOS`), which is several gigabytes and is the user's call.

@@ -373,4 +373,67 @@ struct SQLDraftStoreTests {
         #expect(state.selected == .connection)
         #expect(state.displayed == .connection)
     }
+
+    // MARK: Typed, or generated
+
+    /// The pager moved the rows and the SQL above them still said `OFFSET 0` (reported
+    /// 2026-09-19). A table's draft is nearly always the *generated* browsing query, and the grid
+    /// rewrites it on every page — but only while it believes the user has not typed there. A
+    /// restored draft came back as an edit every time, because `QueryDocumentTab(text:)` leaves
+    /// `savedText` empty, so after one restore the grid never rewrote its own SQL again.
+    @Test("A generated draft comes back rewritable, and a typed one comes back protected")
+    func restoringRemembersWhetherItWasTyped() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let connection = UUID()
+        let browsed = WorkspaceSelection.table(database: "shop", table: "orders")
+        let edited = WorkspaceSelection.table(database: "shop", table: "customers")
+
+        let first = makeStore(directory)
+        first.record(sql: "SELECT * FROM orders LIMIT 100 OFFSET 0", selection: browsed,
+                     selectedRange: range(0), connectionID: connection, isUnsavedEdit: false)
+        first.record(sql: "SELECT name FROM customers WHERE id = 7", selection: edited,
+                     selectedRange: range(0), connectionID: connection, isUnsavedEdit: true)
+        first.flush()
+
+        let drafts = makeStore(directory).drafts(for: connection)
+        let restoredBrowse = try #require(drafts.first { $0.selection == browsed })
+        let restoredEdit = try #require(drafts.first { $0.selection == edited })
+        #expect(!restoredBrowse.isUnsavedEdit, "the grid must be free to rewrite its own query")
+        #expect(restoredEdit.isUnsavedEdit, "and must never overwrite something someone typed")
+    }
+
+    /// The flag changes without the text changing — the generated query is written and then
+    /// marked saved in the same pass — so a guard that only watches the text would drop it.
+    @Test("Marking a draft saved is a change the store keeps")
+    func theFlagAloneIsWorthStoring() throws {
+        let directory = temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let connection = UUID()
+        let selection = WorkspaceSelection.table(database: "shop", table: "orders")
+        let sql = "SELECT * FROM orders LIMIT 100 OFFSET 0"
+
+        let store = makeStore(directory)
+        store.record(sql: sql, selection: selection, selectedRange: range(0),
+                     connectionID: connection, isUnsavedEdit: true)
+        store.record(sql: sql, selection: selection, selectedRange: range(0),
+                     connectionID: connection, isUnsavedEdit: false)
+        store.flush()
+
+        let restored = try #require(makeStore(directory).drafts(for: connection).first)
+        #expect(!restored.isUnsavedEdit)
+    }
+
+    /// A file written before the field existed. Its drafts are treated as generated, which is
+    /// what a table's draft nearly always is.
+    @Test("A draft stored by an earlier build reads as generated rather than typed")
+    func anOlderFileDecodesAsABaseline() throws {
+        let record = try JSONDecoder().decode(SQLDraftRecord.self, from: Data("""
+        {"selection":{"table":{"database":"shop","table":"orders"}},"sql":"SELECT 1",
+         "selectionLocation":0,"selectionLength":0,
+         "createdAt":0,"updatedAt":0}
+        """.utf8))
+        #expect(!record.isUnsavedEdit)
+    }
+
 }

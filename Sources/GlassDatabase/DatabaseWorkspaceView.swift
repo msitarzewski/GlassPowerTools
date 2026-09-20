@@ -423,13 +423,17 @@ struct DatabaseWorkspaceView: View {
                 queryDocuments[id] = QueryDocumentTab(
                     id: id,
                     text: record.sql,
+                    isSaved: !record.isUnsavedEdit,
                     selectedRange: record.clampedSelection
                 )
                 restoredTabs.append(record.selection)
             case .table:
                 guard tableSQLDrafts[record.selection] == nil else { continue }
+                // `isSaved` is what keeps the grid able to rewrite its own query: a restored
+                // *baseline* may be replaced by the next page, and a restored *edit* may not.
                 tableSQLDrafts[record.selection] = QueryDocumentTab(
                     text: record.sql,
+                    isSaved: !record.isUnsavedEdit,
                     selectedRange: record.clampedSelection
                 )
             case .connection, .database:
@@ -451,7 +455,10 @@ struct DatabaseWorkspaceView: View {
             sql: document.text,
             selection: destination,
             selectedRange: document.selectedRange,
-            connectionID: draftConnectionID
+            connectionID: draftConnectionID,
+            // The document already knows: text that differs from what was marked saved was
+            // typed, and everything else is the generated browsing query.
+            isUnsavedEdit: document.hasUnsavedChanges
         )
     }
 
