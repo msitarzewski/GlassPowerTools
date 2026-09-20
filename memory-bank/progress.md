@@ -554,6 +554,12 @@ Both VMs are configured and were left running.
 
 ## Known and unfixed
 
+- **No UI test reaches a database or desktop surface at all.** Both are gated on live fixtures,
+  and a simulator runner does not receive `TEST_RUNNER_*`. A seeded configuration is the fix.
+- **The database's compact layout is unproven by test.** Built 2026-09-19 and reasoned from the
+  editor's identical defect; no UI test can reach it, because the database fixtures are gated on
+  environment a simulator runner never receives.
+
 - **The line-number strip reaches into the title bar.** `NSRulerView` spans its scroll view and is
   not inset by the scroll view's content insets. Three fixes at three different links in that chain
   all missed, and the app's own geometry could not be measured: the unified log stopped answering
@@ -644,8 +650,35 @@ Both VMs are configured and were left running.
 | All three platforms build | `xcodebuild` Release for macOS, iOS and visionOS |
 | Installed | **0.4.171** on iPhone `00008150`, read back off the device |
 
+## Finding your way around on iOS — A, B and C, 2026-09-18
+
+| Claim | Evidence |
+|---|---|
+| Opening a project on a phone lands on its **files** | `EditorOnIPhoneUITests`, iPhone 17 Pro simulator, screenshot `04-project-files`. The `Files` toggle's absence is asserted in the same test |
+| A folder is a push; back returns | Screenshots `05-folder-pushed`, then `README.md` found again after the back button |
+| Choosing a file opens the editor with its text | Screenshot `06-file-open` |
+| The header names the folder, path beneath, truncated from the front | Nine unit tests on `GlassPathLocation`, and photographed on the editor's folder screens |
+| **The same header in the Files browser** | **NOT RUN.** `GlassTerminalUITests.testFilesBrowserHeaderNamesTheFolder` is written and gated; macOS UI automation cannot start on this machine at present ("Timed out while enabling automation mode", reproduced with `LaunchSmokeUITests`) |
+| Package suite | **1,632 tests, exit status 0** |
+| All three platforms build | `xcodebuild` Release for macOS, iOS and visionOS, after every change |
+| A panel's sidebar count follows its list | Two tests, both seen **red** against a stored count and green against the closure. Reported from the running app: Projects said 5 with four listed |
+| Text settings cascade file over project over global | Seven tests on `GlassEditorTextOverrides`, including the decode of a project record written before the field existed |
+| A project's overrides and name reach the durable list | `GlassEditorProjectKeepingTests`; the rename test seen **red** against the old path |
+| A project root's landmarks are found by name | Five tests, including a folder of 3D models that correctly has nothing to say |
+| One click previews, commitment keeps | Seven tests: the tab is reused, the slot's index is held, an edited preview is promoted rather than evicted, saving keeps it, closing empties the slot |
+| A panel's second selection pushes its detail | Three unit tests, **and** `EditorOnIPhoneUITests.testAProjectThatRefusesToOpenDoesNotBlockTheNextOne` on an iPhone 17 Pro simulator — seen **red** against the old `hasSelection: Bool` and green against `selectedItem` |
+| A panel's sidebar row is one accessibility element | Both iPhone tests failed on iOS 27.2 by matching the row's image; they pass with `.accessibilityElement(children: .combine)` |
+| HTML parses and colours | `GrammarModuleTests` requires keyword, attribute, string, comment **and** embedded from a real page fixture — a query that compiles and colours nothing is the failure being guarded against |
+| The keyboard can be asked for twice | `GlassEditorKeyboardRequestTests`; the serial is why a second Show works |
+| Package suite | **1,663 tests, exit status 0** |
+| Installed | **0.4.184** on the Mac (`/Applications`, read back off the installed bundle)  and on iPhone `00008150`, both read back off the installed bundle. The Vision Pro is still **0.4.123** |
+
 ## Known and unfixed
 
+- **The Files browser's header has never been looked at** over a real listing — only the component
+  it shares with the editor has, and only there.
+- **macOS UI automation is down on this machine**, so no macOS surface can be driven or
+  photographed until it is working again.
 - **The Mac is still on 0.4.170** — 0.4.171 is built and waiting for the app to be quit.
 - **Only the editor has been driven on a phone.** The terminal, the database and the desktop have
   the same shape and nobody has watched any of them; the desktop still has no UI test at all and

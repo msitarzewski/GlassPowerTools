@@ -341,3 +341,30 @@ both browsers. And the piece with no implementation at all: **a phone has no way
 open sessions** — a terminal, a desktop and a database cannot be reached from one another. The plan
 stages that as a contributed list of open sessions, a control in each session's chrome, and then
 the carousel.
+
+## 2026-09-18 — [A, B and C built](2026-09-18_ios-navigation-plan.md#built--a-b-and-c-2026-09-18)
+
+The phone's editor is a navigation stack now: opening a project lands on its **files**, a folder is
+a push, the document is a push, and the sheet and its `Files` toggle are gone. Both file browsers
+share one header — `GlassConnectionUI.GlassPathHeader`, the folder's name with the path beneath it
+truncated from the front — so `SFTPBrowserView` stops titling itself with the whole path.
+
+The first run photographed two of its own defects: the name shown twice, and `~F/Documents` from an
+abbreviation that kept one character too many. Both fixed, the second by moving the rule into
+`GlassPathLocation.abbreviatingHome` where both browsers share it.
+
+**1,632 tests, exit status 0.** Three Release builds. The Files browser's header over a real
+listing is **NOT RUN** — macOS UI automation cannot start on this machine at present.
+
+## 2026-09-19 — [the iOS round, day two](2026-09-19_ios-round-two.md)
+
+**0.4.177 → 0.4.184**, every one installed on the Mac and the iPhone. The provisional tab (one
+click shows, commitment keeps), HTML as the sixteenth grammar, a keyboard that hides and comes
+back — and then the database, which turned out to have the editor's disease: a
+`NavigationSplitView` collapsing to its sidebar, so Browse Data, the SQL editor and every table
+chose a destination in a column that was never on screen. Its back button, its footer and its
+results grid all followed.
+
+Also a regression of mine, caught by the user in one round: a **typed** navigation path silently
+refuses another view's destinations, and the schema browser had been navigating correctly on a
+phone since glassdb. Rules 48, 49 and 50. **1,664 tests, exit status 0.**

@@ -357,3 +357,27 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     fixture in the app's own container and replaces what was there. Write screenshots to the
     runner's `NSTemporaryDirectory()` as well as attaching them: result bundles arrive unfinalised
     often enough that an attachment alone is not evidence.
+
+48. **Before wrapping a view in a navigation container, find out whether it already navigates.**
+    `DatabaseWorkspaceView` got a compact `NavigationStack(path:)` typed `[DatabaseCompactRoute]`
+    on 2026-09-19. The schema browser inside it has pushed its own `CompactSchemaDatabaseDestination`
+    for a database's tables since glassdb — and **a typed path accepts only its own type**, so every
+    one of those links silently did nothing: *"now the databases can't be clicked"*, reported within
+    the hour by the only person driving a phone. `NavigationPath` takes both, at the cost of not
+    being able to ask what is in it. The working half of a screen is the half to leave alone.
+
+49. **An accessibility identifier on a container reaches its children.** Both iPhone UI tests
+    began failing on iOS 27.2 because `app.descendants(matching: .any).matching(identifier:)`
+    resolved a library panel row's *image* — not hittable, so the tap did nothing and the test
+    failed before reaching what it tested. VoiceOver had the same row three times over. Which
+    child the query picks changes between OS versions, so the fix is not a better query:
+    `.accessibilityElement(children: .combine)` makes the row one control that says its name and
+    its count.
+
+50. **Pinned chrome must occlude, whatever the transparency setting says.** The grid's column
+    header and row-number gutter painted nothing at 0% window opacity, on the stated reasoning
+    that a transparent window should be transparent everywhere — so the data scrolled through
+    them and `#` sat on top of cell text. A canvas may honour 0%; chrome that tells you which
+    column you are reading may not. `.ultraThinMaterial` under the tint keeps it translucent and
+    legible, and disappears under the tint at full opacity, so the opaque end is unchanged.
+

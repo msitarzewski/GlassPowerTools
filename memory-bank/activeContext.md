@@ -1932,3 +1932,424 @@ The editor works on a phone; **finding your way around does not**. Planned in
 
 Everything carried is in section E of that note — the Mac install, the headset, the desktop's
 missing UI test, `replaceAll`, D26, test hygiene.
+
+## 2026-09-18 (build) — A, B and C are in — RESUME HERE
+
+**State DOCS.** **1,632 tests / exit status 0** (nine new for the path header), Release builds for
+macOS, iOS and visionOS, and the iPhone walkthrough driven twice with screenshots. Nothing is
+committed. **0.4.173 is installed on the Mac and on the iPhone**, both read back off the installed
+bundle, and carries all of A, B and C. The Mac app was quit for the install and relaunched, so
+whatever was open in it at the time is gone. The Vision Pro is still on 0.4.123.
+
+**0.4.173 supersedes it**: a library panel's count was a *stored* number, so removing a project
+left the sidebar saying 5 with four in the list (reported 2026-09-18 with a screenshot).
+`GlassLibraryPanel.count` is an `@autoclosure` asked for every draw now — the same shape
+`hasSelection` already had, and it covers Workgroups and SSH Keys too. A panel a capability
+rebuilds each body got a fresh count for free; a **standalone** panel is registered once and kept,
+which is why only Projects showed it. Two tests, both seen red against a stored count.
+
+**Versions are passed on the command line, not stored:** `MARKETING_VERSION=0.4.N
+CURRENT_PROJECT_VERSION=N`. The project file says 0.1.0, so a build made without them cannot be
+told apart from any other once it is installed.
+
+### What landed
+
+Sections A, B and C of
+[finding your way around on iOS](tasks/2026-09/2026-09-18_ios-navigation-plan.md), together as
+planned, with the build record appended to that note:
+
+- **Opening a project lands on its files.** The phone's editor is a `NavigationStack` over
+  `GlassEditorCompactRoute` — a folder screen as the root, a folder as a push, the document as a
+  push. A window with no project (Edit in the Files browser) still opens on the document.
+- **No modals.** The tree's sheet and the `Files` toggle are both gone.
+- **One header, `GlassConnectionUI.GlassPathHeader`** — folder name large, the path beneath it
+  across the width without the folder repeated, truncated from the front. `SFTPBrowserView` no
+  longer titles itself with `currentPath`.
+
+The first run photographed two defects of its own: the name appeared twice (navigation bar and
+header), so the title is macOS-only now; and `~F/Documents` — the editor's private `abbreviated`
+kept one character of home too many, so that rule moved into `GlassPathLocation.abbreviatingHome`
+where both browsers use it and two tests cover it.
+
+### Do these next, in order
+
+1. **D1 and D2** — `openSessions()` per capability and the Sessions control. That is the dead end:
+   a phone still has no route between a terminal, a desktop and a database.
+2. **Look at the Files browser's header on a real listing.**
+   `GlassTerminalUITests.testFilesBrowserHeaderNamesTheFolder` was written for exactly this and is
+   **NOT RUN**: macOS UI automation on this machine currently fails to start for *every* test
+   ("Timed out while enabling automation mode", reproduced with `LaunchSmokeUITests`), and the
+   simulator's runner never received `TEST_RUNNER_GPT_SSH_TEST_*`, so it skipped.
+3. **Install 0.4.171 to the Mac** when the app is quit, and look at the Mac's own surfaces.
+4. Everything in section E of the plan note: the headset, the desktop's seed, `replaceAll`, D26.
+
+### Things that will bite
+
+- **macOS UI automation is down.** Before blaming a test, run `LaunchSmokeUITests` — if that
+  cannot start either, it is the machine, not the change.
+- The simulator's runner does not see `TEST_RUNNER_*` environment on this toolchain; the live
+  fixtures have only ever been driven from macOS, where the runner inherits the shell's.
+- Rules 42–47 all still apply, rule 46 most of all: the terminal, database and desktop have still
+  never been driven on a phone.
+
+## 2026-09-18 (afternoon) — three scopes, glass in the Files browser, and a suggestion
+
+**State DOCS.** **1,645 tests / exit status 0**; Release builds for all three. **0.4.174 installed
+on the Mac**; the iPhone is still on **0.4.173** — it reported `unavailable` to `devicectl` when
+the install was attempted (`CoreDeviceError 4016`, no power assertion), so 0.4.174 is built and
+waiting at `/tmp/gpt-ios-174/Build/Products/Release-iphoneos`.
+
+### What landed
+
+1. **The Files browser is glass.** The `sftp` scene gave its content `.glassLayers` — the layer
+   *state* — and nothing painted it, because painting is `GlassLayeredWindow`'s job and that scene
+   never wrapped its content in one. Both scenes (macOS, visionOS) do now, and the file `List`/
+   `Table` gave up its opaque `scrollContentBackground`.
+2. **Text settings cascade file over project over global** (`GlassEditorTextOverrides`, one pure
+   `resolve`, seven tests). Each level stores only what it *changes*, so raising the app's default
+   still moves everything that never disagreed.
+   - **Toolbar gear → this file's**, on every platform. The Mac's `SettingsLink` is gone from the
+     toolbar: app settings are a keystroke away at ⌘,.
+   - **File-list footer gear → this project's**, which travel in the synced record.
+   - Settings ▸ Editor keeps the defaults, unchanged.
+   - "Default" is a real third state, so the pickers are three-way rather than switches — and each
+     footer names what it is following.
+3. **A project you can work in and cannot find again.** `Open Project…` opens the folder straight
+   into the workspace and never reaches the Projects list. The window now *offers*:
+   `GlassSuggestionButton` (a lightbulb, in `GlassConnectionUI`, deliberately reusable) → **Save as
+   Project**. Offered rather than done, because the list is the user's and it syncs.
+4. **Renaming a project reached only the window's copy** and was gone at the next launch. It goes
+   through `GlassEditorRuntime.rename`, which writes both. Proven by a test seen red.
+
+### Do these next, in order
+
+1. **Install 0.4.174 on the phone** when it is reachable again.
+2. **Look at the Files browser on the Mac** — the transparency and the header are both unverified
+   by eye; macOS UI automation still cannot start.
+3. **D1 and D2** — the session switcher. Still the dead end on a phone.
+4. Section E of the plan note: the headset, the desktop's seed, `replaceAll`, D26.
+
+### Things that will bite
+
+- **A file's overrides are not stored.** They last while the document is open, by design; the
+  durable levels are the project's and the app's. If that is wrong, the place to change it is
+  `GlassEditorDocument.textOverrides`.
+- `GlassEditorProject` gained an optional field. Records written before it decode fine — there is a
+  test — but anything that *re-encodes* a record on an older build would drop it.
+
+## 2026-09-18 (0.4.175) — what an open project says about itself
+
+**State DOCS.** **1,650 tests / exit status 0**, three Release builds, **0.4.175 installed on the
+Mac and the iPhone** (the phone came back from `unavailable`, so it skipped 174).
+
+Three reports from the running app, all from looking at it:
+
+1. **The file list's footer painted nothing**, so filenames scrolled behind the gear. It had a
+   deliberate comment saying a divider was separation enough — a divider separates, it does not
+   *cover*. `.bar`, the same surface the status line uses.
+2. **Two Done buttons in Project Settings.** A toolbar item and a bottom bar, and a sheet on the
+   Mac draws both. The bar is the one every platform draws, so the toolbar item went.
+3. **A window with a project open offered three ways to open something.** It shows the project
+   now (`GlassEditorProjectOverview`): agent instructions (`AGENTS.md`, `CLAUDE.md`, …), what to
+   read first, what builds it, whether it is a git repository, and what was recently edited *in
+   that project*. Open Project… / Open File… / New Document belong to the **empty** editor that
+   ⇧⌘E makes, and are only there now.
+
+Every fact in the overview comes from the listing the tree already loaded and the recents the app
+already keeps, so it costs no reads. **`git status` is deliberately absent**: the editor reaches a
+project through `GlassEditorFileAccess`, which lists, reads, writes and stats and cannot run a
+command — a status that worked only for local folders would vanish over SSH. Doing it properly
+means a "run a command on this machine" seam owned by the terminal, which is a real piece of work
+and is not started.
+
+### Do these next, in order
+
+1. **D1 and D2** — the session switcher. Still the dead end on a phone.
+2. **The Files browser's header and transparency on a Mac**, by eye; macOS UI automation still
+   cannot start ("Timed out while enabling automation mode", any test).
+3. Section E of the plan note: the headset, the desktop's seed, `replaceAll`, D26.
+
+## 2026-09-19 (0.4.177) — the provisional tab
+
+**State DOCS.** **1,657 tests / exit status 0**, three Release builds, **0.4.177 on the Mac and
+the iPhone**.
+
+The pattern every editor uses, asked for by name: **one click shows a file provisionally; the next
+single click takes the same tab; committing to it keeps it.** `GlassEditorWorkspace` holds one
+`previewDocumentID` — one id rather than a flag per document, so "two documents are both the
+preview" cannot be represented.
+
+- **Commitment** is a double click, a deliberate open (Return, ⌘↓, the context menu, Edit in the
+  Files browser), an **edit**, or a save. All four route through `makePermanent`.
+- **An edited preview is never evicted** — it is promoted and the new file opens beside it, which
+  is what makes replacing a preview safe without a prompt.
+- The new tab **takes the old one's index**, so the strip does not shuffle while someone clicks
+  down a list.
+- The provisional tab is drawn in *italics* (`GlassWorkspaceTabItem.isProvisional`, shared with the
+  database's strip), and VoiceOver says "previewing".
+
+Seven tests. Also from the same sitting: the project overview is centred in the pane, both axes
+(`minHeight`, so a long one still scrolls).
+
+### Do these next, in order
+
+1. **D1 and D2** — the session switcher, still the phone's dead end.
+2. **The Files browser's header and transparency on a Mac**, by eye. macOS UI automation still
+   cannot start.
+3. Section E of the plan note: the headset, the desktop's seed, `replaceAll`, D26.
+
+## 2026-09-19 (0.4.178) — three answers, two of them defects
+
+**State DOCS.** **1,660 tests / exit status 0**, Release builds for all three, **0.4.178 on the
+Mac and the iPhone**.
+
+### The toolchain moved under us
+
+**Xcode updated to 27.2 (27B5019j)** overnight, and two things broke that are nothing to do with
+this code:
+
+- Every build failed with *"cannot execute tool 'metal' due to missing Metal Toolchain"* (SwiftTerm
+  has a `.metal` shader). Fixed here with `xcodebuild -downloadComponent MetalToolchain` — 839 MB.
+- **The simulator is gone**: `/Library/Developer/PrivateFrameworks/CoreSimulator.framework` does
+  not exist, so `xcodebuild test` on a simulator cannot load `IDESimulatorFoundation`. That needs
+  **`sudo xcodebuild -runFirstLaunch`**, which this session cannot run — the user has to. Until
+  then there is **no iPhone UI testing**, and that is the pass that has been finding the defects.
+  Yesterday's "macOS UI automation cannot start" was very probably the same update, mid-flight.
+
+### The three reports
+
+1. **Leaving a terminal does not end the session.** `showConnections()` only sets
+   `router.terminalWorkgroupID = nil`; `closeWorkgroupOnce()` runs when the *last tab* is closed,
+   never on leaving. The session stays live and is reachable again through the library's
+   **Workgroups** panel (`resumableWorkgroupID`), which is not obvious — see the next item. The
+   control's icon was `sidebar.left` on a screen with no sidebar; it is `chevron.backward` now,
+   matching the database's, which already got this right.
+2. **"It just absorbed the click" is a real defect, and not the error's fault.** A contributed
+   panel told the compact stack `hasSelection: Bool`. It went true on the first selection and
+   **stayed** true, so every later selection changed nothing the stack was watching: after going
+   back once, no project's detail could ever be pushed again. `GlassLibraryPanel` now reports
+   `selectedItem: AnyHashable?` and a `clearSelection()` the stack calls when the detail pops.
+   Reproduced first in `EditorOnIPhoneUITests.testAProjectThatRefusesToOpenDoesNotBlockTheNextOne`
+   (which failed exactly where the user said it would), and covered by three unit tests.
+3. **The session switcher is planned and unbuilt** — section D of the iOS navigation plan. Item 1
+   is the argument for it: the session is alive and the way back is a panel nobody would think to
+   open.
+
+### Do these next, in order
+
+1. **`sudo xcodebuild -runFirstLaunch`** — the user's to run. Without it there is no simulator.
+2. **Re-run `testAProjectThatRefusesToOpenDoesNotBlockTheNextOne`** once the simulator is back; it
+   is written and currently cannot run.
+3. **D1 and D2** — the session switcher.
+
+## 2026-09-19 (0.4.179) — a keyboard you can put away, and HTML
+
+**State DOCS.** **1,663 tests / exit status 0**, three Release builds, **0.4.179 on the Mac and
+the iPhone**.
+
+1. **The keyboard hides and comes back, as the terminal's does.** `GlassEditorModel.requestKeyboard`
+   carries the ask — the model is the API and a SwiftUI consumer never holds the engine, so the
+   instruction travels as observable state the UIKit backend watches. A **serial, not a flag**:
+   the user can swipe the keyboard away between two presses of Show, and a control that works
+   every other time is worse than none (rule 45). Two surfaces: a bar above the keyboard with the
+   terminal's own `keyboard.chevron.compact.down`, and a toggle at the end of the editor's status
+   bar whose icon follows the *system's* notifications rather than a flag this app sets.
+2. **HTML is the sixteenth grammar.** A pinned dependency, not a vendored copy — upstream's
+   manifest compiles `parser.c` and `scanner.c` unconditionally, which is the thing YAML's gets
+   wrong. `tree-sitter/tree-sitter-html` at `73a3947`. Its `@tag` needed the same override XML
+   needed (an element name is markup's keyword, and `@tag` means punctuation in the universal
+   table because PHP uses it for `<?php`), and `<script>`/`<style>` bodies read as embedded code
+   rather than prose. `.html .htm .xhtml .vue .svelte .hbs .ejs .njk` claim it; `<!DOCTYPE html>`
+   is sniffed **before** the XML prolog rule, because it is the one doctype that is not XML.
+
+### Do these next, in order
+
+1. **`sudo xcodebuild -runFirstLaunch`** — still the user's to run; without it there is no
+   simulator, and `testAProjectThatRefusesToOpenDoesNotBlockTheNextOne` cannot run.
+2. **D1 and D2** — the session switcher.
+3. An **injection pass** would make `<script>` actually JavaScript and `<style>` actually CSS;
+   today they are one honest colour. Not started, and the grammar work above is what it needs.
+
+## 2026-09-19 (0.4.180) — the simulator is back, and it found one more
+
+**State DOCS.** **1,663 tests / exit status 0**, three Release builds, **0.4.180 on the Mac and
+the iPhone**. The user ran `sudo xcodebuild -runFirstLaunch`; there are fresh simulators on iOS
+26.5, 27.0 and **27.2**.
+
+**Both iPhone UI tests pass**, including
+`testAProjectThatRefusesToOpenDoesNotBlockTheNextOne` — the reproduction of "it just absorbed the
+click". **Seen red against the old `hasSelection: Bool`** and green against `selectedItem`, on a
+phone, which is the verification that was owed.
+
+Getting there found one more defect, and the tests found it rather than a person:
+
+**A library panel's sidebar row was three accessibility elements.** The identifier sat on an
+`HStack`, so on **iOS 27.2** the first match for `glass-library-panel-editor-projects` was the
+row's *image* — not hittable, so the tap did nothing and both tests failed before they reached
+what they were testing. VoiceOver had the same row three times for the same reason. One
+`.accessibilityElement(children: .combine)` makes it one control that says its name and its count.
+Worth noting as a pattern: **an identifier on a container reaches its children**, and which child
+XCUITest picks changes between OS versions.
+
+### Do these next, in order
+
+1. **D1 and D2** — the session switcher. Nothing else is in front of it now.
+2. Drive the **terminal, database and desktop** on a phone (rule 46) — still never done, and the
+   simulator is working again today.
+3. Section E of the plan note: the headset (still 0.4.123), the desktop's seed, `replaceAll`, D26.
+
+## 2026-09-19 (0.4.181) — the database had the editor's disease
+
+**State DOCS.** **1,663 tests / exit status 0**, three Release builds, **0.4.181 on the Mac and
+the iPhone**. Three reports, one cause and two consequences.
+
+**`DatabaseWorkspaceView` is a `NavigationSplitView`**, and on a compact width SwiftUI collapses
+one of those into a single stack showing its **sidebar**. So on a phone the workspace *was* the
+schema browser: Browse Data, a table, the SQL Editor button — every one of them selected a
+destination in a column that was never on screen. Exactly the defect the editor had on
+2026-09-17, still here because nobody had driven the database on a phone (rule 46, and it was
+item 2 of the plan's carried list).
+
+1. **"Browse data absorbs the click."** There is a compact layout now — a `NavigationStack` whose
+   root is the schema and whose push is the detail, the same shape the editor uses. Every route
+   that chooses something pushes: a tap, a double tap, the SQL Editor button, ⌘T.
+2. **"No back button to get from Databases back to the connection list."** The control existed
+   (added 2026-09-16) at `ToolbarItemPlacement.navigation`, which iOS drops in a collapsed split
+   view. It is `.topBarLeading` on iOS now — and, just as important, the toolbar is attached
+   **inside** each navigation container: a `.toolbar` on a view that *contains* a
+   `NavigationStack` does not reach the screens inside it, which would have removed every control
+   the moment the compact layout landed.
+3. **"Our footer is confused."** The schema browser's filter is a floating bottom search on iOS 26
+   and later, and the workspace's `.bottomBar` group landed in the same strip — search field,
+   buttons and list rows all in one place, photographed. On a compact width the SQL editor moves
+   to the top bar beside Refresh and the rest into the overflow menu that is already there; the
+   bottom belongs to the search field.
+
+**Also:** *is there a whole SQL surface for iOS?* Yes — `QueryEditorView`, `TableDetailView`,
+`DatabaseDetailView` and `ConnectionOverviewView` are all cross-platform and always have been.
+Only the route to them was missing.
+
+### Not proven on a phone
+
+No UI test covers any of this: the database tests are gated on `GPT_DB_TEST_*`, and **a simulator
+runner does not receive `TEST_RUNNER_*` environment** on this toolchain, so they skip. A seeded
+database configuration — the same gap the desktop has — is what would fix that, and it needs
+credentials the fixture cannot carry. The user is testing it live.
+
+### Do these next, in order
+
+1. **Drive the terminal and the desktop on a phone.** The database had this defect for three days
+   and the phone's own report found it; those two have still never been watched there.
+2. **D1 and D2** — the session switcher.
+3. A **seed for database and desktop configurations**, so those two can have UI tests at all.
+
+## 2026-09-19 (0.4.182) — the regression I caused, and where Back should go
+
+**State DOCS.** **1,664 tests / exit status 0**, three Release builds, **0.4.182 on the Mac and
+the iPhone**.
+
+**I broke the database list and the phone caught it in one round.** My compact stack used a
+*typed* path — `NavigationStack(path: $compactPath)` over `[DatabaseCompactRoute]`. The schema
+browser has had its own compact navigation since glassdb (`compactDatabaseList` pushes a
+`CompactSchemaDatabaseDestination` for a database's tables), and **a typed path accepts only its
+own type**, so those links silently did nothing: "now the databases can't be clicked". It is a
+`NavigationPath` now, with the detail's depth tracked separately because a `NavigationPath` will
+not say what is in it.
+
+**The lesson, and it is a new one:** before wrapping a view in a `NavigationStack`, find out
+whether it already navigates. The schema browser was doing the right thing on a phone long before
+this; the workspace around it was not, and the fix has to leave the working half alone.
+
+**Back goes to the machine now, not to the top of the list.** `GlassShellModel.hostToShow` is the
+seam — a capability asks for a host, the library selects it, and the library pushes its detail for
+a selection change on its own. The catalog answers "which host owns this endpoint?" in the
+composition root, because the database does not hold the catalog. Every capability that replaces
+the library on a phone wants this; the database is the first to use it, and the terminal and the
+editor should follow.
+
+### Still not proven on a phone
+
+No UI test reaches any database surface: the fixtures are gated on `GPT_DB_TEST_*`, and a
+simulator runner does not receive `TEST_RUNNER_*`. **That gap is now load-bearing** — it is why a
+regression reached the user instead of a test. A seeded database configuration is the fix and is
+the next thing worth building after the switcher.
+
+## 2026-09-19 (0.4.183) — one grid, everywhere
+
+**State DOCS.** **1,664 tests / exit status 0**, three Release builds, **0.4.183 on the Mac and
+the iPhone**.
+
+A phone showed query results as a **card per row** — "Row 1", then four fields down the page. It
+was a different way of reading a table rather than a smaller one: no column alignment, nothing to
+compare down a column, and only the first four columns at all. *"I appreciate the idea of the card
+view for rows, but it's not right. Let's use the table view we already have."*
+
+`dataGrid` is used on every platform now. It already scrolls in both directions, which is exactly
+what a narrow screen needs, and both surfaces carried the same `db-grid-row-*`/`db-grid-cell-*`
+identifiers so the database UI tests are unaffected. The **pager** and the **control bar** keep
+their compact forms — those are about controls fitting a phone, not about how a table is read —
+and `usesCompactRecordList` is renamed `usesCompactPager` to say so. `compactRecordList` is
+deleted rather than left behind a flag.
+
+## 2026-09-19 (0.4.184) — pinned chrome has to occlude
+
+**State DOCS.** **1,664 tests / exit status 0**, three Release builds, **0.4.184 on the Mac and
+the iPhone**.
+
+The grid's **column header and row-number gutter painted nothing** when the workspace's opacity
+was 0, and the data scrolled straight through them: `#` and `content` written over cell text,
+illegible (photographed on the phone). The old comment said it disappeared at 0% on purpose —
+*"preserving the exact transparent and opaque endpoints selected by the user"* — which is the
+right instinct for a canvas and the wrong one for chrome that has to say **which column you are
+reading**.
+
+`databaseCanvasPinnedSurface` now lays `.ultraThinMaterial` under the tint on every platform. A
+material rather than a colour floor, because it stays translucent — the window is still glass,
+which is what "still transparent like the Mac version" asks for — and at full opacity the tint
+covers it completely, so nothing changes at the end of the scale that already looked right.
+
+**Verified by eye only.** The alpha maths is unchanged, so no test moved; whether a header is
+legible over scrolling text is a thing to look at.
+
+
+## 2026-09-19 (end of day) — RESUME HERE (supersedes every block above)
+
+**State DOCS.** **1,664 tests / exit status 0**. Release builds for macOS, iOS and visionOS.
+**0.4.184 installed on the Mac and the iPhone**, both read back off the installed bundle; the
+Vision Pro is still on **0.4.123**. Everything through 0.4.184 is committed.
+
+**The day, in one page:** [the iOS round, day two](tasks/2026-09/2026-09-19_ios-round-two.md).
+Eight releases, seven reported defects, one of them a regression of mine. New rules **48** (find
+out whether a view already navigates before wrapping it), **49** (an identifier on a container
+reaches its children) and **50** (pinned chrome must occlude whatever the transparency says).
+
+### What is true now
+
+- The **editor** works on a phone: a folder opens on its files, folders push, one click previews
+  a file and commitment keeps it, the keyboard hides and comes back, and text settings cascade
+  **file over project over global**.
+- The **database** works on a phone as of today: the schema pushes tables, a table pushes the
+  detail, Back goes to *the machine*, the grid is the real grid and its pinned chrome occludes.
+- **HTML** is the sixteenth grammar.
+- The **terminal** and the **desktop** have still never been driven on a phone.
+
+### Do these next, in order
+
+1. **D1 and D2 — the session switcher.** Nothing is in front of it. The terminal question that
+   opened the day is its argument: leaving an SSH session only clears
+   `router.terminalWorkgroupID`, so the session stays live and the only way back is the
+   Workgroups panel, which nobody would think to open.
+2. **Drive the terminal and the desktop on a phone.** The database cost three defects and a
+   regression for want of this.
+3. **A seeded database or desktop configuration**, so either can have a UI test at all. This is
+   what let a regression of mine reach the user instead of a test.
+4. Section E of the navigation plan: the **Vision Pro** (three weeks behind), `replaceAll`, the
+   D26 two-device run, test hygiene.
+
+### Things that will bite
+
+- **`sudo xcodebuild -runFirstLaunch` was needed** after Xcode 27.2, and the Metal toolchain had
+  to be downloaded. Both are recorded in [technical context](techContext.md); if builds or
+  simulators break again after an Xcode update, start there.
+- **A simulator runner never sees `TEST_RUNNER_*`**, so every live-fixture UI test is macOS-only.
+- Rules 42–50, and rule 46 above all: the phone is where the defects are.

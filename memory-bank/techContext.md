@@ -245,6 +245,12 @@ markdown one was aborting a whole test target for that day without anyone notici
 crashed target prints no failure line and no count (rule 25). Bash, TOML and JSON are stock and
 pinned.
 
+**Sixteen grammars as of 2026-09-19.** HTML is the newest, **pinned** at
+`tree-sitter/tree-sitter-html@73a3947324f6efddf9e17c0ea58d454843590cc0`: upstream's manifest
+compiles `parser.c` and `scanner.c` unconditionally, which is exactly the thing YAML's gets wrong,
+so it can be a dependency rather than a copy. Swift, XML, Rust, JavaScript, PHP and Python remain
+vendored because their manifests cannot be consumed at the pinned commit.
+
 **`.git` is 13 MB.** SQL's generated `parser.c` is 41 MB in the working tree and **2.6 MB**
 committed, which is the measurement that reversed a recommendation to fork rather than vendor.
 
@@ -253,3 +259,28 @@ committed, which is the measurement that reversed a recommendation to fork rathe
 stores. SSH key *records* live in the Keychain beside their material
 (`sshKeysRecordService`, synchronizable), routed to the device-bound configuration when the key is
 Secure Enclave.
+
+
+## Toolchain, 2026-09-19 — Xcode 27.2 and what it broke
+
+**Xcode 27.2 (27B5019j)** replaced 27.0 overnight, and two things stopped working that have
+nothing to do with this code:
+
+- **Every build failed** with `cannot execute tool 'metal' due to missing Metal Toolchain`.
+  SwiftTerm ships a `.metal` shader, so this is not optional for any target that links it.
+  `xcodebuild -downloadComponent MetalToolchain` fixes it — 839 MB, and it takes a few minutes.
+- **The simulator disappeared.** `/Library/Developer/PrivateFrameworks/CoreSimulator.framework`
+  did not exist, so `xcodebuild test` on any simulator failed to load `IDESimulatorFoundation`
+  and `xcrun simctl` listed nothing. The fix needs admin: **`sudo xcodebuild -runFirstLaunch`**.
+  Without it there is no iPhone UI testing at all, which is where this project's defects are
+  found (rule 46).
+
+The 2026-09-18 report that "macOS UI automation cannot start" — *Timed out while enabling
+automation mode*, on every test including the launch smoke test — was almost certainly the same
+update in flight, and did not recur afterwards.
+
+**A simulator test runner does not receive `TEST_RUNNER_*` environment on this toolchain.** The
+live fixtures (`GPT_SSH_TEST_*`, `GPT_DB_TEST_*`) are read with `ProcessInfo.processInfo.environment`
+in the runner, which on macOS inherits the shell's. Every live UI test is therefore **macOS-only
+in practice**, and the database and desktop have no phone-side coverage at all until a
+configuration can be seeded the way `--ui-testing-seed-project` seeds one for the editor.

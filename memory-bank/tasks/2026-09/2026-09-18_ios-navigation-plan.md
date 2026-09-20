@@ -154,3 +154,49 @@ switcher ships before any of them are written.
 4. **The desktop configuration seed**, then drive the terminal, database and desktop on a phone
    the way the editor was driven. Expect defects; four came out of the first surface watched.
 5. The carried items, worst first: `replaceAll`, then the Vision Pro, then D26.
+
+---
+
+# Built — A, B and C, 2026-09-18
+
+**State:** BUILD complete for sections A, B and C; D is untouched. **1,632 tests / exit status 0**
+(1,623 before, plus nine for the header), Release builds for macOS, iOS and visionOS, and the
+iPhone walkthrough driven twice with a screenshot at every step.
+
+## What changed
+
+| File | Change |
+|---|---|
+| `Sources/GlassConnectionUI/GlassPathHeader.swift` | **New.** `GlassPathLocation` splits a path into the folder and what leads to it; `GlassPathHeader` draws them; `glassPathHeader(_:)` attaches the header. `GlassPathLocation.abbreviatingHome` is the one `~` rule |
+| `Sources/GlassTerminal/SFTPBrowserView.swift` | `.navigationTitle(currentPath)` → `.glassPathHeader(currentPath)` |
+| `Sources/GlassEditor/GlassEditorWorkspaceView.swift` | The compact layout is a `NavigationStack` over `GlassEditorCompactRoute`; `GlassEditorFolderList` is the phone's list; `GlassEditorFileRow` is the row both lists share; `projectFooter` extracted so both show it; `toolbar` became `toolbarContent(includingDismissal:)` |
+| `UITests/EditorOnIPhoneUITests.swift` | Walks the new route: lands on the files, no `Files` toggle, header present, a folder pushes, back returns, a file opens the editor |
+| `UITests/GlassTerminalUITests.swift` | `testFilesBrowserHeaderNamesTheFolder` — the same header over a real listing on `192.0.2.6` |
+
+## The two defects the first run photographed
+
+1. **The name was said twice** — the navigation bar's inline title sat half an inch above a header
+   showing the same word. The header keeps `.navigationTitle` on **macOS only**, where a window
+   needs one and the title bar is a different surface.
+2. **`~F/Documents`.** The editor's private `abbreviated(_:)` dropped `home.count - 1` characters,
+   keeping home's last character instead of the separator after it. It is now
+   `GlassPathLocation.abbreviatingHome`, shared with the Files browser and covered by two tests —
+   one of which also refuses `/Users/michaela` as "inside" `/Users/ann`.
+
+## What is proven, and what is not
+
+| Claim | Evidence |
+|---|---|
+| Opening a project lands on its files | `EditorOnIPhoneUITests`, iPhone 17 Pro simulator, screenshot `04-project-files` |
+| The `Files` toggle is gone | The same test asserts its absence |
+| A folder pushes; back returns | Screenshot `05-folder-pushed`, then `README.md` found again |
+| A file opens the editor with its text | Screenshot `06-file-open` |
+| The header names the folder, path beneath, front-truncated | Nine unit tests, and photographed on the editor's folder screens |
+| **The header in the Files browser** | **NOT RUN.** `testFilesBrowserHeaderNamesTheFolder` exists and is gated on `GPT_SSH_TEST_*`. macOS UI automation on this machine currently fails to start for *every* test — "Timed out while enabling automation mode", reproduced with `LaunchSmokeUITests` — and the simulator runner does not receive `TEST_RUNNER_GPT_SSH_TEST_*`, so it skips |
+| Anything on a Mac screen | Not looked at. The Mac is still on 0.4.170 with the app running |
+
+## Next
+
+D1 and D2 — the session list and the Sessions control — are the dead end and are next. Everything
+in section E still stands, plus: the Files browser's header wants one look on a real listing, and
+macOS UI automation wants a reason.
