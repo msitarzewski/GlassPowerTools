@@ -1325,7 +1325,6 @@ struct DataTabView: View {
     @State private var addingNewRow = false
     @State private var editorHeight: CGFloat = 120
     @State private var editorHeightDragStart: CGFloat?
-    @State private var isAutoQuery = true
     @State private var showAIAssistant = false
     @State private var showExporter = false
     @State private var exportFormat: GridExportFormat = .csv
@@ -1633,10 +1632,14 @@ struct DataTabView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .padding(.horizontal, 12)
                 .padding(.top, 12)
-                .onChange(of: queryText) {
-                    // User edited the query — disable auto-query sync
-                    if !isLoading { isAutoQuery = false }
-                }
+                // **There is no "auto query" flag any more.** There was: a change to the text
+                // while `isLoading` was false was taken to mean a person had typed, and the
+                // pager then refused to act for the rest of the session — one page forward was
+                // enough to set it, which is why the SQL incremented and never decremented
+                // (reported 2026-09-20). It was a guess about who wrote the text, and the
+                // document already knows: the generated query is marked saved in the same pass
+                // that writes it (`loadData`), and typing is not. That fact is read where it is
+                // needed rather than cached in a flag nothing kept correct.
                 .task(id: "\(sessionID).\(database)") {
                     guard isTableContext, let connection = session?.connection else { return }
                     tableSurfaceIdentifiers = (try? await SchemaCompletionIdentifiers.load(
@@ -1701,7 +1704,6 @@ struct DataTabView: View {
                         offersAISuggestion: errorIsQueryFailure,
                         onUseSuggestedSQL: { suggestedSQL in
                             queryText = suggestedSQL
-                            isAutoQuery = false
                             errorMessage = nil
                             errorIsQueryFailure = false
                         },
@@ -2014,7 +2016,6 @@ struct DataTabView: View {
             claimStagedForeignKeyFilters()
             await loadData()
         } else {
-            isAutoQuery = false
             filterApplicationMode = .displayOnly
             reconcileFreeformResult()
         }
@@ -2032,7 +2033,10 @@ struct DataTabView: View {
     }
 
     private func handleCurrentPageChange() {
-        guard isAutoQuery else { return }
+        // **Paging always fetches the page.** It is the app's own action, not an edit, so it
+        // cannot be gated on whether the editor holds a user's query: a chevron that silently
+        // does nothing is the thing rule 45 forbids. Whether the *text* follows the page is
+        // decided inside `loadData`, which refuses to overwrite something someone typed.
         Task { await loadData() }
     }
 
@@ -2040,7 +2044,6 @@ struct DataTabView: View {
         if !pageSizeFocused {
             pageSizeDraft = String(pageSize)
         }
-        guard isAutoQuery else { return }
         persistGridQueryState()
         currentPage = 1
         Task { await loadData() }
@@ -3741,7 +3744,6 @@ struct DataTabView: View {
     private func loadData() async {
         guard let connection = session?.connection else { return }
         let preservedIdentity = selectedRowIdentity()
-        isAutoQuery = tableDraft?.wrappedValue.hasUnsavedChanges != true
         isLoading = true
         errorMessage = nil
         errorIsQueryFailure = false

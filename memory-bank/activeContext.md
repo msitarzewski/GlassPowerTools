@@ -2465,3 +2465,28 @@ server's to say, and it says so accurately.
 One consequence recorded honestly: a *stranded* credential — one the keychain lost — now reads as
 the server's own authentication rejection rather than as "no saved password was found". The error
 case is still there for a caller that can genuinely tell the two apart; the connect path cannot.
+
+## 2026-09-20 (0.4.189) — the pager, both directions
+
+**1,668 tests / exit status 0**, three Release builds. **0.4.189 on the iPhone; the Mac is on
+0.4.187** and its quit still times out — an open modal sheet is what does that.
+
+*"The SQL query increments fine, doesn't decrement with the pager."* The asymmetry was the tell:
+nothing about Previous differs from Next, so what differed was **state left behind by the first
+press**.
+
+`isAutoQuery` was set false by `onChange(of: queryText) { if !isLoading { … } }` — "the text
+changed and we are not loading, so a person must have typed it". A guess, and a wrong one:
+`loadData` writes the generated query itself, and `onChange` is delivered on the *next* update,
+by which time the load has often finished and `isLoading` is false again. So the first page
+change disabled auto-query, and `handleCurrentPageChange`'s `guard isAutoQuery` then made **every
+later press do nothing at all** — the chevron rule 45 forbids.
+
+Three changes, and the third is the point:
+
+1. Paging always fetches the page. It is the app's own action, not an edit.
+2. Whether the *text* follows is decided inside `loadData`, which already refuses to overwrite
+   something someone typed (`QueryDocumentTab.hasUnsavedChanges`, 0.4.186).
+3. **`isAutoQuery` is deleted.** With the guards gone nothing read it, and a flag that is only
+   ever written is worse than none — it reads like a fact and is not one. The document knows who
+   wrote the text; that is asked where it matters instead of cached.
