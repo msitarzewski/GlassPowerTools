@@ -200,3 +200,48 @@ iPhone walkthrough driven twice with a screenshot at every step.
 D1 and D2 — the session list and the Sessions control — are the dead end and are next. Everything
 in section E still stands, plus: the Files browser's header wants one look on a real listing, and
 macOS UI automation wants a reason.
+
+---
+
+# D1 and D2 — the seam surveyed, 2026-09-20
+
+**State PLAN, nothing built yet.** Before writing `openSessions()`, the question the plan left
+open was answered by reading the code: *where does each capability's session actually live on a
+phone, and who can bring it forward?* The four answers are not the same, and one of them changes
+what the switcher can honestly offer.
+
+| Capability | Where the session lives on iPhone | Survives leaving? | What `activate` can call |
+|---|---|---|---|
+| Terminal | `IOSAppRouter.terminalWorkgroupID` swaps the library root (`GlassTerminalCapability.swift:467`) | **Yes** — `showConnections()` only clears the id; the session stays live in `SessionManager` | needs one new `Request` case |
+| Database | `DatabaseIOSRouter.workspaceRequest` swaps the root (`GlassDatabaseScenes.swift:136`) | **Yes** — `showConnections()` clears the request, not the session | **`Request.openQueryEditor(sessionID:)` already does exactly this** |
+| Editor | `runtime.requestWindow(id:)` → `fullScreenCover` (`GlassEditorScenes.swift:272`) | **Yes** — workspaces are held by id in `GlassEditorRuntime` | already there |
+| Desktop | `@State activeDesktop` → `fullScreenCover` (`GlassDesktopScenes.swift:118`) | **No** | nothing to activate |
+
+## The desktop has no session to switch to, and that is the honest answer
+
+`DesktopSessionView.swift:244` is `.onDisappear { alerts = …; session.close() }`. On a phone,
+leaving a desktop **ends** it — there is no backgrounded RDP or VNC session for a switcher to
+return to. So `GlassDesktopCapability` takes the protocol's default `[]` rather than inventing a
+row, and the switcher never offers a machine it cannot actually go back to.
+
+Whether a desktop session *should* survive being left is a separate decision with a real cost
+behind it (a live RDP stream on cellular), and it is not taken here. Recorded so the empty list
+reads as a finding rather than an omission.
+
+## Two design consequences, both toward less machinery
+
+1. **No router moves.** `IOSAppRouter` and `DatabaseIOSRouter` are `@State` inside their
+   bootstraps, so a capability object cannot reach them — which first looked like a reason to
+   move both onto their runtimes. It is not: every capability already has a request queue its
+   bootstrap drains, and that is the path every other cross-capability call in this app takes.
+   The database needs **no new case at all**. Moving the routers would have been a refactor of
+   two working files to reach something already reachable.
+2. **The list is built inside `body`, never cached.** `openSessions()` reads each runtime's
+   observed state (`SessionManager.sessions`, the editor's `workspaces`), so an `@Observable`
+   wrapper holding a snapshot would reproduce the stale sidebar count of 2026-09-18 exactly —
+   a stored answer to a question whose inputs keep changing. The switcher calls the registry
+   during body evaluation so SwiftUI records the dependency.
+
+Also settled: the editor contributes through a `registerSessionProvider` escape hatch, the same
+one `registerSettingsPage` and `registerLibraryPanel` already exist for, because a file is not a
+service and the editor is not a `GlassCapability`.

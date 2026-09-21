@@ -2538,3 +2538,22 @@ first sighting since 0.4.123, where it still reads as a flat grey plate.
   asked for (2026-09-20: a queued 0.4.188 install put 0.4.189 on the Mac).
 - A simulator test runner never receives `TEST_RUNNER_*`, so every live-fixture UI test is
   macOS-only.
+
+## 2026-09-21 — D1/D2 surveyed, state PLAN
+
+Session start: tree clean at `d184ce8`, everything in the block above still true. Read the seam
+before writing it, and recorded the result in
+[the navigation plan](tasks/2026-09/2026-09-18_ios-navigation-plan.md#d1-and-d2--the-seam-surveyed-2026-09-20).
+
+Three things that change the shape of the work:
+
+- **The desktop contributes nothing, honestly.** `DesktopSessionView` closes its session in
+  `onDisappear`, so a phone has no backgrounded desktop to switch back to. It takes the
+  protocol's default `[]`; whether that lifetime should change is a separate decision, not taken.
+- **No router moves.** Both iOS routers are `@State` in their bootstraps, but every capability
+  already has a request queue the bootstrap drains — and the database's
+  `openQueryEditor(sessionID:)` *is* "bring this session forward" already.
+- **The switcher's list is built in `body`.** Caching it would be the 2026-09-18 stale count again.
+
+Next action: build D1 (`GlassOpenSession`, `openSessions()`, the registry aggregate) and D2 (the
+**Sessions** control in each session's chrome, iOS only).
