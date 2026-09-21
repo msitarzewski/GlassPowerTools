@@ -3,6 +3,7 @@
 import AppKit
 import Observation
 import GlassTerminalEmulator
+import GlassShell
 import SwiftUI
 
 /// Discovery only: windows remain the sole owners of their sessions and tabs.
@@ -146,32 +147,10 @@ enum MacTerminalOverviewNavigation {
     }
 }
 
-struct MacTerminalOverviewGrid {
-    let columns: Int
-    let cardWidth: CGFloat
-
-    init(count: Int, size: CGSize, preferredWidth: Double? = nil) {
-        let width = max(1, size.width - 12)
-        if let preferredWidth, preferredWidth.isFinite {
-            let preferred = min(720, max(220, preferredWidth))
-            columns = max(1, min(max(1, count), Int((width + 18) / (preferred + 18))))
-            cardWidth = min(preferred, max(1, (width - CGFloat(columns - 1) * 18) / CGFloat(columns)))
-            return
-        }
-        let maximumColumns = max(1, min(max(1, count), Int((width + 18) / 238)))
-        var chosen = maximumColumns
-        for columns in 1...maximumColumns {
-            let cardWidth = min(520, max(1, (width - CGFloat(columns - 1) * 18) / CGFloat(columns)))
-            let rows = max(1, Int(ceil(Double(count) / Double(columns))))
-            if CGFloat(rows) * (cardWidth / 1.6 + 72) + CGFloat(rows - 1) * 18 <= size.height - 12 {
-                chosen = columns
-                break
-            }
-        }
-        columns = chosen
-        cardWidth = min(520, max(1, (width - CGFloat(chosen - 1) * 18) / CGFloat(chosen)))
-    }
-}
+/// The overview's layout is `GlassShell.GlassGalleryLayout` now — the same question the session
+/// gallery asks, so there is one solver and one set of tests for it rather than two. Kept as a
+/// name here because this file reads better with it and the call sites did not need churning.
+typealias MacTerminalOverviewGrid = GlassGalleryLayout
 
 /// Only fresh output can attract attention. Old output is baselined on enable;
 /// manual browsing consumes activity during a short grace period.

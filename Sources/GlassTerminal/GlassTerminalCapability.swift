@@ -16,6 +16,7 @@ import GlassShell
 import GlassEditorCore
 import GlassLayers
 import GlassSSHTransport
+import GlassTerminalEmulator
 
 /// What the shell asked the terminal to open.
 public enum GlassTerminalOpenPurpose: Sendable { case terminal, sftp }
@@ -245,9 +246,26 @@ public final class GlassTerminalCapability: GlassCapability {
                 subtitle: live.count == 1 ? live[0].state.displayName : "\(live.count) terminals",
                 symbolName: symbolName,
                 activate: { [runtime] in runtime.enqueue(.showWorkgroup(workgroupID: workgroup.id)) },
-                close: { manager.closeWorkgroup(workgroup.id) }
+                close: { manager.closeWorkgroup(workgroup.id) },
+                // The card shows the terminal the workgroup has selected — the one you would be
+                // looking at if you went back to it. Drawn by the emulator, which has been able
+                // to do this since glas.sh's overview; nothing new was needed.
+                snapshot: {
+                    let shown = workgroup.selectedSessionID.flatMap { manager.session(for: $0) } ?? live[0]
+                    return Self.preview(of: shown)
+                }
             )
         }
+    }
+
+    /// A still of a terminal, in whatever image type this platform uses. 800px wide is the
+    /// overview's own figure (`VisionTerminalWorkgroupView`), kept so both look the same.
+    private static func preview(of session: TerminalSession) -> Image? {
+        #if os(macOS)
+        session.terminalHostModel.previewImage(maxPixelWidth: 800).map(Image.init(nsImage:))
+        #else
+        session.terminalHostModel.previewImage(maxPixelWidth: 800).map(Image.init(uiImage:))
+        #endif
     }
 
     /// The id this capability gives a workgroup in the switcher. A terminal's own chrome uses it

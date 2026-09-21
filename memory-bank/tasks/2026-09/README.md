@@ -393,3 +393,21 @@ the idiom is `.unspecified` and an iPhone answers "yes, windows" (rule 55).
 A third was caught by the tests instead of a device: `openSessions()` declared only in a protocol
 extension is statically dispatched, so the registry called the default for every capability and
 the switcher would have been permanently empty (rule 53).
+
+## 2026-09-21 — [the gallery](2026-09-18_ios-navigation-plan.md#built--d3-stage-2-the-gallery-2026-09-21)
+
+D3 stage 2: the switcher opens on cards, with the list a toggle away. Built **on** the terminal
+overview that has existed since glas.sh rather than beside it — the layout solver moved into
+`GlassShell` and `MacTerminalOverview` now asks that one, its tests came out of a macOS fence and
+run everywhere, and `snapshot` returned to `GlassOpenSession` because
+`SwiftTermHostModel.previewImage` had always been able to draw a terminal.
+
+That reuse was the user's correction, not a discovery: the switcher's *seam* had been surveyed
+and its *presentation* had not, so a list was written from scratch while a grid, a carousel, live
+previews and a tested solver sat in the product. Rule 57, and a standing inventory in
+`systemPatterns.md`.
+
+Two defects on the way: `previewImage` was fenced to `os(visionOS)` though every API in it is
+ordinary UIKit, so a terminal could not draw itself on a phone (rule 52); and the gallery crashed
+the app on open, because a degenerate first-pass `GeometryReader` size drove a `GridItem` maximum
+below SwiftUI's minimum. **1,690 tests, exit 0.**

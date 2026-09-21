@@ -21,7 +21,7 @@ import SwiftUI
 ///
 /// Deliberately not a `HostServiceKind`: the editor contributes here and a file is not a service
 /// on a machine. The symbol and the subtitle say what a row is; nothing needs to switch on it.
-public struct GlassOpenSession: Identifiable, Sendable {
+public struct GlassOpenSession: Identifiable {
     /// Unique across every capability, so a session's own chrome can exclude itself by id.
     /// Prefix it with the contributor ("terminal:", "database:", "editor:") — two capabilities
     /// numbering their sessions from the same UUID space is not something to rely on.
@@ -35,16 +35,26 @@ public struct GlassOpenSession: Identifiable, Sendable {
     public let activate: @MainActor @Sendable () -> Void
     /// End it. The switcher's swipe action; never offered for the session being viewed.
     public let close: @MainActor @Sendable () -> Void
+    /// What the session looks like right now, when the capability can cheaply draw it.
+    ///
+    /// **Optional by design, and genuinely optional in practice.** The terminal has rendered
+    /// itself since glas.sh (`SwiftTermHostModel.previewImage(maxPixelWidth:)`); the editor and
+    /// the database have nothing to photograph, and a card with a name and a symbol on it is
+    /// useful where a card waiting for a screenshot would not be. Asked at draw time, never
+    /// stored — a picture of a terminal is stale the moment it is taken.
+    public let snapshot: (@MainActor () -> Image?)?
 
     public init(id: String, title: String, subtitle: String? = nil, symbolName: String,
                 activate: @escaping @MainActor @Sendable () -> Void,
-                close: @escaping @MainActor @Sendable () -> Void) {
+                close: @escaping @MainActor @Sendable () -> Void,
+                snapshot: (@MainActor () -> Image?)? = nil) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
         self.symbolName = symbolName
         self.activate = activate
         self.close = close
+        self.snapshot = snapshot
     }
 }
 
@@ -173,9 +183,41 @@ public struct GlassSessionSwitcher: View {
         self.activate = activate
     }
 
+    /// Cards or rows, remembered. The product already has this choice for a workgroup's
+    /// terminals (`LayoutPreset.OpeningView`), so the switcher offers the same one rather than
+    /// inventing a third vocabulary — and defaults to the gallery, because seeing which terminal
+    /// is which is the reason to have it.
+    @AppStorage("com.glasspowertools.sessions.gallery") private var showsGallery = true
+
     public var body: some View {
         let sessions = registry.openSessions(excluding: currentSessionID)
         NavigationStack {
+            Group {
+                if showsGallery, !sessions.isEmpty {
+                    GlassSessionGallery(sessions: sessions, activate: activate)
+                } else {
+                    list(sessions)
+                }
+            }
+            .navigationTitle("Sessions")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Picker("Presentation", selection: $showsGallery) {
+                        Label("Gallery", systemImage: "square.grid.2x2").tag(true)
+                        Label("List", systemImage: "list.bullet").tag(false)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelStyle(.iconOnly)
+                    .accessibilityIdentifier("sessions-presentation")
+                }
+            }
+        }
+    }
+
+    private func list(_ sessions: [GlassOpenSession]) -> some View {
             List {
                 ForEach(sessions) { session in
                     Button {
@@ -218,12 +260,5 @@ public struct GlassSessionSwitcher: View {
                                            description: Text("Connections you open stay here until you close them."))
                 }
             }
-            .navigationTitle("Sessions")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
-        }
     }
 }

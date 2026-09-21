@@ -2587,3 +2587,34 @@ and re-running was the whole fix. Rule 56.
 3. D3 stage 2, the carousel, now that the seam under it exists and is driven.
 4. The terminal's and the database's rows have never been seen with a live session — they need
    a seeded configuration, which is also what the desktop needs for any UI test at all.
+
+## 2026-09-21 — D3 stage 2, the gallery, and the reuse failure behind it
+
+**The gallery is built and driven on a phone** (screenshots `12-gallery`, `12b-list`). Detail in
+[the navigation plan](tasks/2026-09/2026-09-18_ios-navigation-plan.md#built--d3-stage-2-the-gallery-2026-09-21).
+
+**The user's correction, which matters more than the feature.** The session switcher's *seam* was
+surveyed carefully and its *presentation* was not surveyed at all — so a list was written from
+scratch and `snapshot` was dropped as unsupportable, while the product already shipped a grid, a
+carousel, live previews, a card-width slider, arrow-key navigation, an attention rule and a
+**tested** layout solver. The user had to point at it. Rule 57, and a standing reuse inventory now
+lives in [system patterns](systemPatterns.md#reuse-inventory-session-presentation-2026-09-21) —
+**add to it rather than re-deriving it.**
+
+Consequences already paid: the solver moved into `GlassShell` and the Mac overview uses it through
+a typealias; its tests moved out of a macOS fence and run everywhere; `previewImage` was unfenced
+from `os(visionOS)` to `canImport(UIKit)`, because a terminal could not draw itself on a phone.
+
+**One defect the phone caught that no unit test would have:** the gallery crashed the app on open.
+`GeometryReader`'s first pass inside a sheet gives a degenerate size, `cardWidth` collapsed to 1,
+and `LazyVGrid` traps on a `GridItem` whose maximum is under 10. Clamped in the solver so the Mac
+overview is covered too; four degenerate sizes are regression tests.
+
+### Next
+
+1. **The exec seam** — still the thing four features wait on.
+2. **One card treatment.** There are four (`MacTerminalOverview`, `overviewCard`, the workgroups
+   detail grid, `GlassSessionCard`). `GlassSessionCard` should absorb the others.
+3. **The carousel**, the third `OpeningView` mode, following the spatial one.
+4. A seeded database/desktop configuration: the terminal's and database's rows, and a real
+   terminal snapshot in a card, have never been seen with a live session.

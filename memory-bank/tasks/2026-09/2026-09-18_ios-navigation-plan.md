@@ -367,3 +367,46 @@ the editor and database fall back to a name and an icon as designed.
 **Do not re-derive the grid maths.** `MacTerminalOverviewGrid` already solves "how many columns
 fit, at what card width, so the rows fit the height", it is tested, and a second copy would be
 the third place in this product that answers one question (rule 43).
+
+---
+
+# Built — D3 stage 2, the gallery, 2026-09-21
+
+Built **on** the existing overview rather than beside it, which is the point of the inventory
+above. What is new is small; what moved is the useful part.
+
+| File | Change |
+|---|---|
+| `Sources/GlassShell/GlassSessionGallery.swift` | **New.** `GlassGalleryLayout` (the solver, **moved** from `MacTerminalOverviewGrid`), `GlassSessionCard`, `GlassSessionGallery` |
+| `Sources/GlassTerminal/macOS/MacTerminalOverview.swift` | Its solver deleted; `typealias MacTerminalOverviewGrid = GlassGalleryLayout` so the Mac overview asks the one implementation |
+| `Tests/GlassShellTests/GlassGalleryLayoutTests.swift` | **New**, but the two solver tests inside it **moved** out of `MacWorkspaceTests` (macOS-fenced) and now run on every platform, plus the card contract and the degenerate sizes |
+| `Sources/GlassShell/GlassOpenSession.swift` | `snapshot` restored — it was left out of stage 1 on the false grounds that nothing could supply one; the switcher gained a Gallery ⇄ List picker, remembered |
+| `Sources/GlassTerminal/GlassTerminalCapability.swift` | Supplies the snapshot: the workgroup's selected terminal, at 800px, the overview's own figure |
+| `Sources/GlassTerminalEmulator/SwiftTermHostView.swift` | `previewImage` unfenced from `os(visionOS)` to `canImport(UIKit)` |
+
+## Three things this turned up
+
+1. **A terminal could not draw itself on a phone.** `previewImage` was fenced `#if os(visionOS)`
+   although every call in it — `UIGraphicsImageRenderer`, `layer.render(in:)` — is ordinary
+   UIKit. The fence was around the *feature that wanted it first* (the spatial overview), not the
+   API. Rule 52, again, and it would have left the gallery with nothing to show on the device it
+   was built for.
+2. **The gallery crashed the app the first time it opened.** `GeometryReader` reports a
+   degenerate size on its first pass inside a sheet, `cardWidth` collapsed to 1, and a
+   `GridItem(.flexible(maximum: 1))` is below SwiftUI's own default minimum of 10 — `LazyVGrid`
+   traps in `HVGrid.minorGeometry`. Read out of the crash report rather than guessed. Fixed in
+   the solver (`minimumCardWidth`), so the Mac overview is covered by the same clamp, with four
+   degenerate sizes as regression tests.
+3. **Four card treatments now exist** and should become one. See the drift note in
+   `systemPatterns.md`.
+
+## What is proven
+
+| Claim | Evidence |
+|---|---|
+| The gallery opens, shows one card per other session, and the list is still reachable | `EditorOnIPhoneUITests.testTheSessionSwitcherReachesTheOtherEditor`, iPhone 17 Pro simulator, screenshots `12-gallery` and `12b-list`; tapping through still arrives |
+| The solver answers sanely for sizes a real screen gives it | `GlassGalleryLayoutTests`, including the four degenerate sizes that crashed it |
+| A session with no picture of itself is still a session, and a snapshot is asked for rather than stored | `GlassSessionCardContractTests` |
+| The Mac overview still lays out as it did | Its two tests, unchanged in content, now running on every platform |
+| **The carousel** | **NOT BUILT.** `OpeningView` has three modes and this is two of them. The spatial carousel in `VisionTerminalWorkgroupView` is the model to follow when it is wanted |
+| **A real terminal snapshot on a phone** | **NOT SEEN.** The gallery's picture path needs a live SSH session, which no simulator test can have. The fallback path is what the screenshots show |

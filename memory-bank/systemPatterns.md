@@ -56,3 +56,28 @@ arrives with a Mac-shaped surface is adapted, not enshrined.
   become the boundary by default.
 - One capability at a time reaches parity, with the source application still building until it does.
 - A capability's protocol engine never gains a dependency on the shell.
+
+## Reuse inventory: session presentation (2026-09-21)
+
+Written after building a session list from scratch while a grid, a carousel, live previews and a
+**tested** layout solver were already in the product. The inventory below is what a reuse check
+should have produced before any of that was written. Rule 57.
+
+| Behaviour | Owner today | Reachable from | Notes |
+|---|---|---|---|
+| **Terminal still image** | `SwiftTermHostModel.previewImage(maxPixelWidth:)`, `Sources/GlassTerminalEmulator/SwiftTermHostView.swift:575` (NSImage) and `:601` (UIImage) | Anywhere — `GlassTerminalEmulator` is a base module | Cross-platform already. This is D4's snapshot |
+| **Gallery layout solver** | `GlassGalleryLayout`, `Sources/GlassShell/GlassSessionGallery.swift` | Anywhere | **Moved here 2026-09-21** from `MacTerminalOverviewGrid`. `MacTerminalOverview` uses it through a typealias; its tests moved to `GlassShellTests` and now run on every platform |
+| **Grid ⇄ carousel overview, card-width slider, arrow-key navigation** | `MacTerminalOverview`, `Sources/GlassTerminal/macOS/MacTerminalOverview.swift:199` | macOS only | Switches between *one workgroup's* terminals |
+| **Spatial grid and carousel** (3D rotation, ±1 card rendered) | `VisionTerminalWorkgroupView.spatialOverview`, `:414` | visionOS only | Same scope: one workgroup |
+| **"Only fresh output may steal selection"** | `MacTerminalActivitySelection`, `MacTerminalOverview.swift:178` | macOS only, but pure and portable | A live gallery wants this; the session gallery does not use it yet |
+| **Idle-hiding policy for overview chrome** | `MacOverviewIdlePolicy`, same file | macOS only, pure | |
+| **Running-workgroup card grid** | `TerminalWorkgroupsView.swift:379` | macOS only | A *third* card treatment (see drift below) |
+| **Cross-capability session list and gallery** | `GlassOpenSession`, `GlassSessionSwitcher`, `GlassSessionGallery`, `Sources/GlassShell/` | Everywhere | The gap all of the above left: they switch within one capability |
+| **Desktop still image** | None. `DesktopSessionModel` holds a framebuffer and builds `CGImage` for the cursor (`:621`) but exposes no frame snapshot | — | Moot today: the desktop contributes no sessions (D31) |
+| **Database / editor still image** | None, and none wanted | — | A card with a name and a symbol is the right answer for both |
+
+**Known drift to settle when the gallery is next touched:** there are now four card treatments —
+`MacTerminalOverview`'s, `VisionTerminalWorkgroupView.overviewCard`'s, the workgroups detail
+grid's, and `GlassSessionCard`. They differ in corner radius, border and how selection is shown.
+`GlassSessionCard` is the candidate to absorb the others, and the two terminal ones should adopt
+it rather than a fifth being added.

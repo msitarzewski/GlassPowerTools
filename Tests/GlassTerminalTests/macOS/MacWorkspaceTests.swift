@@ -73,17 +73,6 @@ struct MacWorkspaceTests {
         #expect(!policy.shouldHide(at: start.advanced(by: .seconds(9)), canHide: true))
     }
 
-    @Test func manualGridSizingClampsAndReflows() {
-        let small = MacTerminalOverviewGrid(count: 12, size: CGSize(width: 1200, height: 600), preferredWidth: 220)
-        let large = MacTerminalOverviewGrid(count: 12, size: CGSize(width: 1200, height: 600), preferredWidth: 600)
-        #expect(small.columns > large.columns)
-        #expect(small.cardWidth == 220)
-        #expect(large.cardWidth == 600)
-        let narrow = MacTerminalOverviewGrid(count: 12, size: CGSize(width: 300, height: 600), preferredWidth: 600)
-        #expect(narrow.columns == 1)
-        #expect(narrow.cardWidth == 288)
-    }
-
     @Test func previewTitleColorPrioritizesErrorsAndTransitions() {
         #expect(MacTerminalPreviewStatus.color(for: ["Running", "Error: Connection lost"]) == .red)
         #expect(MacTerminalPreviewStatus.color(for: ["Connected", "Reconnecting..."]) == .orange)
@@ -110,18 +99,6 @@ struct MacWorkspaceTests {
         #expect(copy.openingView == .carousel)
         #expect(copy.autoFocusOnActivity)
         #expect(copy.gridCardWidth == 460)
-    }
-
-    @Test func responsiveOverviewGridFitsCardsAndAddsColumnsAsSpaceGrows() {
-        let compact = MacTerminalOverviewGrid(count: 6, size: CGSize(width: 480, height: 600))
-        let wide = MacTerminalOverviewGrid(count: 6, size: CGSize(width: 1200, height: 600))
-        #expect(compact.columns >= 1)
-        #expect(wide.columns > compact.columns)
-        #expect(wide.cardWidth <= 520)
-        #expect(CGFloat(wide.columns) * wide.cardWidth + CGFloat(wide.columns - 1) * 18 <= 1200)
-        let empty = MacTerminalOverviewGrid(count: 0, size: .zero)
-        #expect(empty.columns == 1)
-        #expect(empty.cardWidth > 0)
     }
 
     @Test func activityFollowingIgnoresHistoryAndYieldsToManualNavigation() {

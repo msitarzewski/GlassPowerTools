@@ -439,3 +439,17 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     So: before concluding anything about the toolchain, the OS or an entitlement, **check whether
     the screen is locked** — and note that "I reproduced it outside the project" narrows a cause
     without identifying it.
+
+57. **Inventory the feature, not just the seam.** The session switcher's seam was surveyed
+    carefully — where each capability's session lives, who can bring it forward — and the
+    *presentation* was not surveyed at all. So a list was written from scratch, "the carousel" was
+    planned as future work, and `snapshot` was left out of `GlassOpenSession` on the grounds that
+    nothing could supply one, while the product already shipped a grid, a carousel, live previews,
+    a card-width slider, arrow-key navigation, an attention rule and a **tested** layout solver —
+    and `SwiftTermHostModel.previewImage(maxPixelWidth:)` had rendered a terminal to an image
+    since before the merge. The user had to point at it.
+    A reuse check covers the behaviour being built **and the way it is shown**, across every
+    capability and every platform fence, before the first file is written. Searching for the
+    seam's nouns (`openSessions`, `router`) finds none of this; searching for the feature's
+    (`overview`, `grid`, `carousel`, `preview`, `card`, `thumbnail`) finds all of it. The standing
+    inventory is in `systemPatterns.md`; add to it rather than re-deriving it.

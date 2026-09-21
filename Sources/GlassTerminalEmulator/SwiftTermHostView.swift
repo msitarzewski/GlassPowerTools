@@ -596,8 +596,14 @@ public final class SwiftTermHostModel: ObservableObject {
     }
     #endif
 
-    #if os(visionOS)
+    #if canImport(UIKit)
     /// Snapshot the existing UIKit viewport without moving it or changing PTY geometry.
+    ///
+    /// **`canImport(UIKit)`, not `os(visionOS)`.** Every call here — `UIGraphicsImageRenderer`,
+    /// `layer.render(in:)` — is ordinary UIKit and has always worked on iPhone and iPad. The
+    /// narrower fence was around the *feature* that happened to want it first (the spatial
+    /// overview), so a terminal could not draw itself on a phone and the session gallery had
+    /// nothing to show there. Rule 52: fence the API, not the capability.
     public func previewImage(maxPixelWidth: Int = 640) -> UIImage? {
         guard let view = terminalEngine?.hostView,
               view.bounds.width > 0, view.bounds.height > 0 else { return nil }

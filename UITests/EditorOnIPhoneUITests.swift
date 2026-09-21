@@ -211,20 +211,31 @@ extension EditorOnIPhoneUITests {
         shoot(app, "11-sessions-control")
         switcher.tap()
 
-        // The other session is offered; this one is not, because a row that goes where you
-        // already are is a tap that does nothing.
-        //
-        // Counted by row rather than by the absence of the word "OtherProject": the switcher is a
-        // half sheet, so the editor it was opened from is still on screen behind it and its
-        // header says that name. Asserting the name was absent was asserting about the wrong view.
+        // The gallery is what opens: cards, one per other session. Counted by card rather than
+        // by the absence of the word "OtherProject" — the switcher is a half sheet, so the editor
+        // it was opened from is still on screen behind it with its name in the header.
+        let cards = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'session-card-' AND NOT identifier BEGINSWITH 'session-card-close-'"))
+        XCTAssertTrue(cards.firstMatch.waitForExistence(timeout: 10),
+                      "the switcher did not open on the gallery")
+        XCTAssertEqual(cards.count, 1,
+                       "the gallery should show exactly the one other session, not this one too")
+        shoot(app, "12-gallery")
+
+        // And the list is still there, behind the same control the terminal overview uses.
+        let presentation = app.descendants(matching: .any)
+            .matching(identifier: "sessions-presentation").buttons.element(boundBy: 1)
+        if presentation.exists {
+            presentation.tap()
+            let rows = app.descendants(matching: .any)
+                .matching(NSPredicate(format: "identifier BEGINSWITH 'session-row-'"))
+            XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 5), "the list mode is gone")
+            XCTAssertEqual(rows.count, 1)
+            shoot(app, "12b-list")
+        }
+
         let other = app.staticTexts["DemoProject"].firstMatch
         XCTAssertTrue(other.waitForExistence(timeout: 10), "the first editor is not in the switcher")
-        let rows = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier BEGINSWITH 'session-row-'"))
-        XCTAssertEqual(rows.count, 1,
-                       "the switcher should list exactly the one other session, not this one too")
-        shoot(app, "12-switcher")
-
         other.tap()
         XCTAssertTrue(app.staticTexts["README.md"].firstMatch.waitForExistence(timeout: 15),
                       "choosing the other session did not arrive at it")
