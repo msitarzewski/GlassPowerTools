@@ -2575,18 +2575,15 @@ leaving a screen is not closing it where there are no windows (D31, rules 54 and
    extension is statically dispatched, so the registry called the default for every capability
    (rule 53).
 
-**The package suite is not green on this machine, for an unrelated reason.** Any file written with
-`FileProtectionType.complete` is now unreadable by an unentitled process here, and atomic writes
-fail with `mktemp … errno 1`; ~35 tests fail and `GlassShellTests` crashes with SIGTRAP.
-Reproduced in a twelve-line Foundation script and with this work stashed at `369b5f7`, so it is
-the machine, not the change. **The 17 new tests pass** (`GlassOpenSessionTests` 7,
-`GlassEditorSessionLifetimeTests` 10), and the last clean full run this session was 1,683 / exit 0.
+**The suite is green: 1,685 tests, exit status 0.** It was not, for part of the session, and the
+reason was **the screen was locked** — `FileProtectionType.complete` means "unreadable while the
+device is locked" and nine places in `Sources` write such files. The diagnosis first written here
+(a machine fault, confirm on a second Mac, possibly a missing entitlement) was wrong; unlocking
+and re-running was the whole fix. Rule 56.
 
 ### Next
 
-1. **Confirm the data-protection condition on a second Mac**, then decide what the app should do:
-   nine places in `Sources` write protected files and there is no data-protection entitlement.
-2. **The exec seam** — unchanged as the next real feature; four things wait on it.
+1. **The exec seam** — unchanged as the next real feature; four things wait on it.
 3. D3 stage 2, the carousel, now that the seam under it exists and is driven.
 4. The terminal's and the database's rows have never been seen with a live session — they need
    a seeded configuration, which is also what the desktop needs for any UI test at all.

@@ -428,3 +428,14 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     So: ask a platform question **at the point of use**, or behind a computed property that asks
     then. An override for tests is a stored `Bool?` consulted first, never a stored default. Rule
     43 says one answer in one place; this says *and at the right time*.
+
+56. **A locked screen is not a broken machine.** Around 35 tests failed with `EPERM`, atomic
+    writes failed with `mktemp … errno 1`, and `GlassShellTests` took SIGTRAP — and it was
+    reproducible in a twelve-line Foundation script with no project code, in three directories,
+    and with the session's work stashed. Every one of those observations was true and the
+    conclusion drawn from them ("this Mac is in a bad state; confirm on a second one") was wrong.
+    `FileProtectionType.complete` means **unreadable while the device is locked**, nine places in
+    `Sources` write files with it, and the screen was locked. Unlocking it gave 1,685 / exit 0.
+    So: before concluding anything about the toolchain, the OS or an entitlement, **check whether
+    the screen is locked** — and note that "I reproduced it outside the project" narrows a cause
+    without identifying it.

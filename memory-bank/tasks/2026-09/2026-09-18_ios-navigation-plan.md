@@ -319,19 +319,51 @@ been tested. Rule 54.
 | **Two editors on an iPhone, and the way between them** | `EditorOnIPhoneUITests.testTheSessionSwitcherReachesTheOtherEditor` on an iPhone 17 Pro simulator: no control with one session open, the control with two, exactly one row in the switcher, and README.md back on screen after tapping it. Screenshots `10`–`13` |
 | All three platforms build | `xcodebuild` Release for macOS, iOS and visionOS |
 | The terminal's and the database's rows | **NOT RUN.** Both need a live connection, and no simulator test can make one (`TEST_RUNNER_*` never reaches a simulator runner). Their `openSessions()` is unit-tested only through the registry's stub |
-| The whole package suite | **NOT GREEN on this machine, for a reason outside this work** — see below |
+| The whole package suite | **1,685 tests, exit status 0** — see the locked-screen note below |
 
-## The machine, on 2026-09-21
+## The locked screen, on 2026-09-21
 
-Part way through this session the Mac entered a state where **any file marked
-`FileProtectionType.complete` cannot be read back by an unentitled process**, and atomic writes
-fail with `mktemp … errno 1`. Reproduced in a twelve-line Foundation script with no project code
-in it, in three different directories, and reproduced with this work stashed at `369b5f7`. Around
-35 tests across five targets fail on it and `GlassShellTests` crashes with SIGTRAP.
+For part of this session around 35 tests failed with `EPERM` and `GlassShellTests` crashed, and
+the diagnosis written here first — a machine fault to confirm on a second Mac — was **wrong**.
+**The screen was locked.** `FileProtectionType.complete` means "unreadable while the device is
+locked", which is exactly what was observed, including from a twelve-line Foundation script.
+Unlocking it and re-running gives **1,685 tests, exit status 0**.
 
-It is not a test-only problem. Nine places in `Sources` write `.complete`,
-`.completeUnlessOpen` or `.completeUntilFirstUserAuthentication` — `SessionRecorder`'s index and
-casts, three in `SFTPBrowserView`, and `SQLDraftStore` — and `App/GlassPowerTools.entitlements`
-declares no data-protection entitlement. In this state the app cannot read back files it has just
-written. **Worth confirming on a second Mac before concluding anything about the product**; this
-one is on macOS 27.0 with Xcode 27.2 beta.
+Nine places in `Sources` write protected files (`SessionRecorder`'s index and casts, three in
+`SFTPBrowserView`, `SQLDraftStore`). Nothing is wrong with any of them and no data-protection
+entitlement is missing — the protection did its job. Recorded as rule 56 because the symptom
+reads like a permissions bug or a broken toolchain and cost an afternoon.
+
+| Claim | Evidence |
+|---|---|
+| The whole package suite | **1,685 tests, exit status 0**, screen unlocked |
+
+---
+
+# D3 stage 2 — the gallery already exists, 2026-09-21
+
+The user's words: *"We had the prototype for this in glas.sh with terminal grid and gallery
+view."* It is not a prototype and it is not only in glas.sh — it came across in the merge and
+ships today. **D3 stage 2 is a reuse job, not a design job.**
+
+| What exists | Where | What it gives the switcher |
+|---|---|---|
+| `LayoutPreset.OpeningView` — `tabs, grid, carousel` | `Sources/GlassTerminal/Models.swift:1797` | The vocabulary, already persisted per workgroup (`openingView`, `gridCardWidth`) |
+| `MacTerminalOverviewGrid` | `Sources/GlassTerminal/macOS/MacTerminalOverview.swift:149` | **Pure layout maths** — count + size + preferred width → columns and card width, fitting rows to the height. Already covered by `Tests/GlassTerminalTests/macOS/MacWorkspaceTests.swift` |
+| `MacTerminalOverview` | same file, `:199` | Grid ⇄ carousel picker, `LazyVGrid`, carousel cards, scroll-to-selected, arrow-key navigation by row and column, a card-width slider |
+| `MacTerminalActivitySelection` | same file, `:178` | "Only fresh output attracts attention", with a manual-browsing grace period — the rule a live gallery needs to avoid yanking selection around |
+| `spatialOverview` / `overviewCard` | `Sources/GlassTerminal/VisionTerminalWorkgroupView.swift:414` | The visionOS grid and a real carousel: 3D rotation, scale by distance, only ±1 card rendered |
+| `VisionTerminalPreview` → `terminalHostModel.previewImage(maxPixelWidth: 800)` | same file, `:61` | **D4's snapshot, already implemented.** The card is a live terminal image with the session's own frost material |
+
+**Two things it is not, which is the whole gap.** Both are *within one workgroup's terminals* —
+they switch between sessions of one capability — and **neither is built for a phone**:
+`MacTerminalOverview` is macOS and `spatialOverview` is inside `#if os(visionOS)`.
+
+So the work is: lift the card and the layout maths to the shell beside `GlassSessionSwitcher`,
+let them show `GlassOpenSession` rather than `TerminalSession`, and add the `snapshot` the struct
+deliberately left out in stage 1 — the terminal can supply one now, the desktop has frames, and
+the editor and database fall back to a name and an icon as designed.
+
+**Do not re-derive the grid maths.** `MacTerminalOverviewGrid` already solves "how many columns
+fit, at what card width, so the rows fit the height", it is tested, and a second copy would be
+the third place in this product that answers one question (rule 43).

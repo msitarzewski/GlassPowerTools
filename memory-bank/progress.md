@@ -725,14 +725,12 @@ comes from is the question the design pass has to answer, and it wants the user'
 
 ## Known and unfixed, 2026-09-21
 
-- **The package suite cannot be run green on this Mac.** Any file written with
-  `FileProtectionType.complete` is unreadable by an unentitled process here, and atomic writes
-  fail with `mktemp … errno 1`; ~35 tests across five targets fail and `GlassShellTests` crashes
-  with SIGTRAP. Reproduced in a twelve-line Foundation script with no project code, in three
-  directories, **and with this session's work stashed at `369b5f7`**. The last clean full run was
-  1,683 / exit 0 earlier the same session. Nine places in `Sources` write protected files and the
-  app declares no data-protection entitlement, so this is not test-only — confirm on a second Mac
-  before concluding anything about the product.
+- **The suite is green: 1,685 tests, exit status 0.** An earlier run today was not, and the
+  reason was **the screen was locked**. `FileProtectionType.complete` means precisely "unreadable
+  while the device is locked", and nine places in `Sources` write files with it — so
+  `SessionRecorder`, `SFTPBrowserView` and `SQLDraftStore` tests failed with `EPERM`, atomic
+  writes failed with `mktemp … errno 1`, and `GlassShellTests` took SIGTRAP. Unlocking the screen
+  fixed all of it. The protection is working as designed, and no entitlement is missing. Rule 56.
 - **The terminal's and the database's switcher rows have never been seen with a live session.**
   Both need a real connection; a simulator runner cannot have one. Their contributions are
   covered only through the registry's stub.
