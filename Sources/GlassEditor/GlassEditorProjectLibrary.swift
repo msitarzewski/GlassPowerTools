@@ -190,6 +190,17 @@ public final class GlassEditorProjectLibrary {
                 .write(to: sources.appendingPathComponent("main.swift"))
         } catch { return }
         remember(GlassEditorProject.local(root))
+        // A **second real** project, so a test can have two editor sessions open at once — which
+        // is the only way to see the session switcher on a phone without a server to connect to.
+        if arguments.contains("--ui-testing-seed-second-project") {
+            let other = documents.appendingPathComponent("OtherProject", isDirectory: true)
+            do {
+                try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
+                try Data("# Other\n\nThe second project, for the session switcher.\n".utf8)
+                    .write(to: other.appendingPathComponent("NOTES.md"))
+                remember(GlassEditorProject.local(other))
+            } catch { /* the first project is still usable; the test that needs two will say so */ }
+        }
         // A second project whose folder is **not** there, only when asked for. Reported
         // 2026-09-18: a project that refuses to open leaves an alert, and the next project's Open
         // did nothing at all — which needs two projects and a failure to reproduce.

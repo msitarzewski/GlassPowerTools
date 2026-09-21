@@ -874,3 +874,30 @@ have to scan. The screen is wrong for it and a bad one costs more than none.
 tell me when it is done"* — the same seam the editor needs for `git status`, project-wide `rg`
 search and server-side LSP (Stage 5). Build that for the platforms with users first; the Watch is
 then its fourth consumer and a small app.
+
+## D31 — A session outlives the screen it was on, where there are no windows — Implemented 2026-09-21
+
+**Context.** D1/D2 gave a phone one list of what is open and a way back into any of it. Building
+it exposed that two of the four capabilities had nothing to go back *to*: the editor discarded its
+workspace and the desktop closed its connection, both in `onDisappear`, which on a phone fires
+every time the full-screen cover is dismissed — that is, every time the user taps the back
+chevron meaning "show me the library again".
+
+**Decided.** On a device that cannot open windows, **leaving a session's screen does not end the
+session**. Closing is a separate, deliberate act, and the switcher's swipe is where it lives.
+
+- **The editor now follows this.** `forget` keeps the workspace when
+  `closesWorkspaceWithItsWindow` is false; `closeWorkspace` always discards. Without it, tapping
+  Connections threw away open documents and unsaved edits silently. See rule 54.
+- **The terminal and the database already followed it.** Leaving either clears only the id
+  pointing at the session; the connection stays live. That is the behaviour being generalised,
+  not a new one.
+- **The desktop deliberately does not.** `DesktopSessionView.onDisappear` closes the session and
+  is left alone: a live RDP or VNC stream held open in the background on a phone has a cost in
+  battery and data that the other three do not, and nobody has asked for it. It therefore
+  contributes no rows to the switcher, which is honest rather than an omission. **Revisit when
+  someone asks to leave a desktop and come back** — the seam is one `openSessions()` away.
+
+**Consequence accepted.** A database workspace's *tabs* still do not survive the round trip: the
+session and its on-disk SQL drafts do, but `DatabaseWorkspaceView`'s tab state is `@State` and
+dies with the view. Hoisting it onto `DatabaseSessionManager` is the fix and is not made here.

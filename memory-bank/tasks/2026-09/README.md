@@ -376,3 +376,20 @@ is this product's whole idea. Three things to act on: `canOpenWindows` refuses `
 Duo is one; the editor's and database's new compact stacks do not survive a size-class change
 mid-session, which a hinge now causes and an iPad can already test; and the Files browser accepts
 a drop only on macOS, on a device whose headline gesture is dragging between two apps.
+
+## 2026-09-21 — [the session switcher](2026-09-18_ios-navigation-plan.md#built--d1-and-d2-2026-09-21)
+
+D1, D2 and D3 stage 1. Every capability says what it has open through one contributed seam, the
+shell owns the list, and a **Sessions** control sits in each session's own chrome on a device with
+no windows. A terminal, a database and an editor can now reach one another on a phone.
+
+Two defects found on the way, both older than the feature. **Leaving the editor on a phone threw
+its documents away** — `onDisappear → forget` is "the window closed" on a Mac and "the user tapped
+back" on a phone, and unsaved edits went with it silently (D31, rule 54). And the fix did not work
+at first for a second reason: the policy was a **stored** property defaulting to
+`GlassWindowPresentation.canOpenWindows`, read inside `App.init` before any scene existed, when
+the idiom is `.unspecified` and an iPhone answers "yes, windows" (rule 55).
+
+A third was caught by the tests instead of a device: `openSessions()` declared only in a protocol
+extension is statically dispatched, so the registry called the default for every capability and
+the switcher would have been permanently empty (rule 53).

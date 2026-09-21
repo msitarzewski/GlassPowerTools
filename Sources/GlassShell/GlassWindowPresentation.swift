@@ -31,6 +31,11 @@ public enum GlassWindowPresentation {
     /// Requiring both means an iPhone is excluded by either, which is the direction to be wrong in
     /// — presenting in place where a window was possible is a cosmetic difference, and opening a
     /// window where none is possible is the user tapping and nothing happening.
+    /// **Ask it where you need it; never store the answer.** Stored as a property's default it is
+    /// read during app construction, before any scene has connected — and at that moment
+    /// `UIDevice.current.userInterfaceIdiom` is `.unspecified`, which is not `.phone`, so an
+    /// iPhone answers *yes*. That cost an afternoon on 2026-09-21: the editor kept a snapshot of
+    /// this and went on discarding a workspace on every dismissal (rule 55).
     public static var canOpenWindows: Bool {
         #if canImport(UIKit) && !os(visionOS)
         UIApplication.shared.supportsMultipleScenes

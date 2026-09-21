@@ -120,6 +120,57 @@ public final class GlassDatabaseCapability: GlassCapability {
 
     public init(runtime: GlassDatabaseRuntime) { self.runtime = runtime }
 
+    // MARK: Open sessions (D1)
+
+    /// One row per live session, by connection name.
+    ///
+    /// By name rather than newest first, which is what the plan asked for: the sessions are held
+    /// in a dictionary and nothing records when each was opened. A stable order that is true
+    /// beats an order that looks like recency and is not.
+    ///
+    /// `activate` reuses `openQueryEditor`, which already means "put this session's workspace on
+    /// the screen" and already routes in place on a phone. Nothing new was needed here.
+    public func openSessions() -> [GlassOpenSession] {
+        let manager = runtime.sessionManager
+        // Keyed by the *session* id, which `connect` mints fresh — not the connection's id, so
+        // one saved connection opened twice is honestly two rows. The id breaks the tie when two
+        // of them share a name, so the order does not shuffle between draws.
+        return manager.sessions
+            .sorted {
+                let byName = $0.value.connectionConfig.name.localizedStandardCompare($1.value.connectionConfig.name)
+                return byName == .orderedSame ? $0.key.uuidString < $1.key.uuidString : byName == .orderedAscending
+            }
+            .map { sessionID, session in
+                let config = session.connectionConfig
+                return GlassOpenSession(
+                    id: Self.sessionID(sessionID: sessionID),
+                    title: config.name,
+                    subtitle: Self.subtitle(engine: config.engine, state: session.state),
+                    symbolName: symbolName,
+                    activate: { [runtime] in runtime.enqueue(.openQueryEditor(sessionID: sessionID)) },
+                    close: { Task { await manager.disconnect(sessionID: sessionID) } }
+                )
+            }
+    }
+
+    /// The id this capability gives a session in the switcher; the workspace's own chrome
+    /// excludes itself with it.
+    public static func sessionID(sessionID: UUID) -> String {
+        "database:\(sessionID.uuidString)"
+    }
+
+    /// The engine, and the state only when it is worth saying. "PostgreSQL" reads better than
+    /// "PostgreSQL · Connected" on every row, and a session that is *not* connected is the case
+    /// the user needs told.
+    static func subtitle(engine: DatabaseEngineType, state: SessionState) -> String {
+        switch state {
+        case .connected: engine.displayName
+        case .connecting(let stage): "\(engine.displayName) · \(stage.rawValue)"
+        case .disconnected: "\(engine.displayName) · Disconnected"
+        case .error: "\(engine.displayName) · Not connected"
+        }
+    }
+
     // MARK: Setup (the shell's host sheet)
 
     public func makeSetupDraft() -> any GlassServiceDraft {

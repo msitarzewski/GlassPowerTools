@@ -313,6 +313,14 @@ public protocol GlassCapability: AnyObject {
     /// idempotent. Default: nothing to do.
     func catalogDidLoad()
 
+    /// Sessions this capability has open (D1). Default: none. See `GlassOpenSession`.
+    ///
+    /// **A requirement, not only an extension.** Declared solely in a protocol extension it is
+    /// statically dispatched, so the registry — which holds `any GlassCapability` — would call
+    /// the default for every capability and the switcher would be permanently empty. Caught by
+    /// `GlassOpenSessionTests` before it reached a device.
+    func openSessions() -> [GlassOpenSession]
+
     /// Surfaces the capability contributes to the library's sidebar, beside Collections.
     ///
     /// For things that span the whole fleet rather than belonging to one machine — Workgroups,
@@ -518,6 +526,20 @@ public final class GlassCapabilityRegistry {
     /// Every capability's library panels, in kind order, then any standalone ones.
     public var libraryPanels: [GlassLibraryPanel] {
         registered.flatMap { $0.libraryPanels() } + standalonePanels
+    }
+
+    /// Open sessions from something that is not a capability — the editor again, for the third
+    /// time and the same reason. See `GlassOpenSession`.
+    private var sessionProviders: [(id: String, provide: @MainActor () -> [GlassOpenSession])] = []
+
+    public func registerSessionProvider(id: String, _ provide: @escaping @MainActor () -> [GlassOpenSession]) {
+        sessionProviders.removeAll { $0.id == id }
+        sessionProviders.append((id: id, provide: provide))
+    }
+
+    /// The standalone half of `openSessions()`, which lives beside the rest of that feature.
+    func standaloneSessions() -> [GlassOpenSession] {
+        sessionProviders.flatMap { $0.provide() }
     }
 
     /// Every capability's built-in local services (D8), in kind order, with any capability that

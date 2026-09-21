@@ -94,6 +94,8 @@ public struct GlassDesktopBootstrap<Content: View>: View {
     /// the configuration is missing. The capability has already resolved it before enqueuing;
     /// carrying the answer is both simpler and the only version that cannot disagree with itself.
     @State private var activeDesktop: DesktopConnection?
+    /// D2: every other open session. Optional — nothing injects it outside the composed app.
+    @Environment(GlassCapabilityRegistry.self) private var capabilityRegistry: GlassCapabilityRegistry?
 
     public init(runtime: GlassDesktopRuntime, @ViewBuilder content: () -> Content) {
         self.runtime = runtime
@@ -134,6 +136,16 @@ public struct GlassDesktopBootstrap<Content: View>: View {
                             .labelStyle(.iconOnly)
                         }
                     }
+                    // D2. `currentSessionID` is nil because a desktop contributes no rows of its
+                    // own — this session ends when the cover goes, which is what `dismissCurrent`
+                    // does here. Offered anyway: being inside a desktop with no way to a terminal
+                    // is the dead end this feature exists to remove, and leaving by the chevron
+                    // already ends the session in exactly the same way.
+                    .glassSessionsToolbar(
+                        registry: capabilityRegistry,
+                        currentSessionID: nil,
+                        dismissCurrent: { activeDesktop = nil }
+                    )
                 }
                 .glassLayers(runtime.layers)
             }

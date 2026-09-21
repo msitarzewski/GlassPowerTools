@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import GlassShell
 #if os(visionOS)
 import GlassTerminalEmulator
 import UIKit
@@ -124,6 +125,10 @@ struct VisionTerminalWorkgroupView: View {
     @Environment(IOSAppRouter.self) private var iOSRouter
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
+    /// D2: the way to every other open session. Not fenced by platform — the modifier decides
+    /// whether to draw anything, and the branches below compile on macOS too. Optional because a
+    /// view rendered outside the composed app has no registry.
+    @Environment(GlassCapabilityRegistry.self) private var capabilityRegistry: GlassCapabilityRegistry?
 
     @State private var selectedSessionID: UUID?
     @State private var showingSavedHostPicker = false
@@ -298,6 +303,12 @@ struct VisionTerminalWorkgroupView: View {
                             includesSessionSwitcher: true
                         )
                     }
+                    // The way out of this session and into another one. A terminal swaps the
+                    // library root rather than covering it, so there is nothing to dismiss first.
+                    .glassSessionsToolbar(
+                        registry: capabilityRegistry,
+                        currentSessionID: GlassTerminalCapability.sessionID(workgroupID: workgroupID)
+                    )
                     .accessibilityIdentifier("terminal-workgroup-tabs")
             }
         } else {
@@ -312,6 +323,10 @@ struct VisionTerminalWorkgroupView: View {
                         )
                     }
                     .toolbarBackground(.automatic, for: .tabBar)
+                    .glassSessionsToolbar(
+                        registry: capabilityRegistry,
+                        currentSessionID: GlassTerminalCapability.sessionID(workgroupID: workgroupID)
+                    )
                     .accessibilityIdentifier("terminal-workgroup-tabs")
             }
         }

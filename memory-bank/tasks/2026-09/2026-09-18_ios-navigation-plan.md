@@ -245,3 +245,93 @@ reads as a finding rather than an omission.
 Also settled: the editor contributes through a `registerSessionProvider` escape hatch, the same
 one `registerSettingsPage` and `registerLibraryPanel` already exist for, because a file is not a
 service and the editor is not a `GlassCapability`.
+
+---
+
+# Built — D1 and D2, 2026-09-21
+
+**State BUILD complete for D1, D2 and D3 stage 1.** The carousel (D3 stage 2) is not built and
+does not need to be: the seam beneath it is what the list and the cards share.
+
+## What changed
+
+| File | Change |
+|---|---|
+| `Sources/GlassShell/GlassOpenSession.swift` | **New.** `GlassOpenSession` (id, title, subtitle, symbol, `activate`, `close`); `GlassCapability.openSessions()`'s default; the registry aggregate and `openSessions(excluding:)`; `GlassSessionsToolbarModifier` / `.glassSessionsToolbar(…)`; `GlassSessionSwitcher`, the list |
+| `Sources/GlassShell/GlassCapability.swift` | `openSessions()` as a **protocol requirement** (see below); `registerSessionProvider(id:_:)` and `standaloneSessions()` beside the panel and page hooks |
+| `Sources/GlassTerminal/GlassTerminalCapability.swift` | `openSessions()` — one row per workgroup with a live session, newest first; `sessionID(workgroupID:)`; `Request.showWorkgroup` |
+| `Sources/GlassTerminal/TerminalConnectFlow.swift` | Drains `.showWorkgroup` — `iOSRouter.showTerminal` on a phone, `openWindow` elsewhere |
+| `Sources/GlassTerminal/VisionTerminalWorkgroupView.swift` | The **Sessions** control on both phone layouts |
+| `Sources/GlassDatabase/GlassDatabaseCapability.swift` | `openSessions()` — one row per live session, ordered by name then session id; `subtitle(engine:state:)` |
+| `Sources/GlassDatabase/DatabaseWorkspaceView.swift` | The control on the split and both compact screens |
+| `Sources/GlassEditor/GlassEditorScenes.swift` | `closesWorkspaceWithItsWindow`, `closeWorkspace`, `openSessions()`, `sessionTitle`/`sessionSubtitle` |
+| `Sources/GlassEditor/GlassEditorWorkspaceView.swift` | The control on the split layout and both compact screens, with the cover's dismissal |
+| `Sources/GlassEditor/GlassEditorProjectLibrary.swift` | `--ui-testing-seed-second-project`, so a test can have two sessions |
+| `Sources/GlassDesktop/GlassDesktopScenes.swift` | The control inside the desktop's cover |
+| `App/GlassPowerToolsApp.swift` | Registers the editor's provider; puts the registry in the environment |
+
+## The defect this uncovered, which was the bigger half
+
+**Leaving the editor on a phone threw the documents away.** `GlassEditorWorkspaceView.onDisappear`
+calls `forget`, and `forget` did `workspaces[id] = nil`. On a Mac that is right — closing a window
+closes the editor. On a phone `onDisappear` fires every time the full-screen cover is dismissed,
+which is what the **Connections** button does, so tapping it discarded the workspace: open
+documents gone, unsaved edits gone, nothing said, and reopening built a fresh empty one because
+`frontmostWindowID` was nil by then.
+
+Two verbs now. `forget` gives up frontmost and keeps the workspace where there are no windows;
+`closeWorkspace` always discards and is what the switcher's swipe calls. The policy is the
+settable `closesWorkspaceWithItsWindow` rather than a call to `GlassWindowPresentation` inside the
+method — the suite's own machine always answers "Mac", so the phone's behaviour would never have
+been tested. Rule 54.
+
+## Two things the tests caught before a device did
+
+1. **A protocol default in an extension is invisible through `any`** (rule 53). `openSessions()`
+   started life only in `public extension GlassCapability`; the registry holds
+   `[any GlassCapability]`, dispatched statically, and called the default for all of them. The
+   terminal's and the database's implementations were correct and never ran. Now a requirement.
+2. **A database session id is not its connection id.** `connect` mints a fresh `UUID()`; the
+   first version keyed the rows on `connectionConfig.id`, which would have activated nothing and
+   collapsed two sessions of one saved connection into one row.
+
+## What is deliberately not offered
+
+- **The desktop contributes no rows.** Its session ends in `onDisappear` and nothing survives to
+  return to. It still *shows* the control, because being inside a desktop with no way to a
+  terminal is the dead end; leaving by it ends the session exactly as the chevron already does.
+- **A database workspace's tabs do not survive the round trip.** The *session* does — the
+  connection stays open and the SQL drafts are on disk — but `DatabaseWorkspaceView`'s tab state
+  is `@State` and the view is destroyed when the root swaps. Hoisting it onto the session manager
+  is a bigger change than this one and is not made here.
+- **No snapshots, so no cards.** D4's `snapshot` is not in the struct: nothing supplies one yet,
+  and a field that is always nil is a promise with nothing behind it. It goes in with the carousel.
+
+## What is proven, and what is not
+
+| Claim | Evidence |
+|---|---|
+| The seam lists what every contributor has open, in kind order, standalones last | `GlassOpenSessionTests`, 7 tests. Two of them were **red** first: the aggregate returned nothing until `openSessions()` became a protocol requirement |
+| A provider is asked again every time | Its own test — a stored list is the 2026-09-18 stale count again |
+| The session you are in is never offered | `openSessions(excluding:)`, tested including the "id belongs to no session" case |
+| Leaving an editor on a phone keeps its documents, its unsaved edits **and its project** | `GlassEditorSessionLifetimeTests`, 10 tests. Seen **red** against the old `forget`, and the project half seen red against `onDisappear { closeAllProjects() }` |
+| A Mac still closes the editor with its window | Same suite, the other direction |
+| **Two editors on an iPhone, and the way between them** | `EditorOnIPhoneUITests.testTheSessionSwitcherReachesTheOtherEditor` on an iPhone 17 Pro simulator: no control with one session open, the control with two, exactly one row in the switcher, and README.md back on screen after tapping it. Screenshots `10`–`13` |
+| All three platforms build | `xcodebuild` Release for macOS, iOS and visionOS |
+| The terminal's and the database's rows | **NOT RUN.** Both need a live connection, and no simulator test can make one (`TEST_RUNNER_*` never reaches a simulator runner). Their `openSessions()` is unit-tested only through the registry's stub |
+| The whole package suite | **NOT GREEN on this machine, for a reason outside this work** — see below |
+
+## The machine, on 2026-09-21
+
+Part way through this session the Mac entered a state where **any file marked
+`FileProtectionType.complete` cannot be read back by an unentitled process**, and atomic writes
+fail with `mktemp … errno 1`. Reproduced in a twelve-line Foundation script with no project code
+in it, in three different directories, and reproduced with this work stashed at `369b5f7`. Around
+35 tests across five targets fail on it and `GlassShellTests` crashes with SIGTRAP.
+
+It is not a test-only problem. Nine places in `Sources` write `.complete`,
+`.completeUnlessOpen` or `.completeUntilFirstUserAuthentication` — `SessionRecorder`'s index and
+casts, three in `SFTPBrowserView`, and `SQLDraftStore` — and `App/GlassPowerTools.entitlements`
+declares no data-protection entitlement. In this state the app cannot read back files it has just
+written. **Worth confirming on a second Mac before concluding anything about the product**; this
+one is on macOS 27.0 with Xcode 27.2 beta.

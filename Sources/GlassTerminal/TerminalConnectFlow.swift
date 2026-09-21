@@ -290,6 +290,12 @@ struct TerminalConnectFlow: ViewModifier {
             #else
             openWindow(id: "terminal-tailscale")
             #endif
+        case .showWorkgroup(let workgroupID):
+            #if os(iOS)
+            iOSRouter.showTerminal(workgroupID: workgroupID)
+            #else
+            openWindow(id: "terminal", value: workgroupID)
+            #endif
         }
     }
 

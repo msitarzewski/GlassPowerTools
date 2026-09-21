@@ -147,3 +147,87 @@ extension EditorOnIPhoneUITests {
                       "the click after a refusal was absorbed: the editor never opened")
     }
 }
+
+extension EditorOnIPhoneUITests {
+    /// **D2: a way between open sessions, on the device that has no windows.**
+    ///
+    /// Every capability works on a phone and none of them could reach another. This drives the
+    /// only pair of sessions a simulator can have without a server — two editor windows — and
+    /// checks the three claims the feature makes: the control appears once there is somewhere to
+    /// go, the switcher lists the *other* session and not this one, and choosing it arrives.
+    ///
+    /// It also stands on the fix underneath it. Leaving the first editor used to discard its
+    /// workspace, so there would have been nothing to switch back to.
+    func testTheSessionSwitcherReachesTheOtherEditor() throws {
+        continueAfterFailure = true
+        let app = XCUIApplication()
+        app.launchArguments += ["--ui-testing", UUID().uuidString,
+                                "--ui-testing-seed-project", "--ui-testing-seed-second-project"]
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+
+        func openProject(_ name: String) {
+            let projects = app.descendants(matching: .any)
+                .matching(identifier: "glass-library-panel-editor-projects").firstMatch
+            // Coming back from an editor lands on the project detail that was pushed before it,
+            // not the sidebar — so pop until the panel row is reachable again.
+            for _ in 0..<4 where !projects.exists {
+                let back = app.navigationBars.buttons.element(boundBy: 0)
+                guard back.exists else { break }
+                back.tap()
+                Thread.sleep(forTimeInterval: 1.5)
+            }
+            XCTAssertTrue(projects.waitForExistence(timeout: 15), "the Projects panel is not in the library")
+            projects.tap()
+            let row = app.staticTexts[name].firstMatch
+            XCTAssertTrue(row.waitForExistence(timeout: 10), "\(name) is not listed")
+            row.tap()
+            let open = app.buttons["project-open"].firstMatch
+            XCTAssertTrue(open.waitForExistence(timeout: 15), "\(name) has no detail to open from")
+            open.tap()
+            Thread.sleep(forTimeInterval: 4)
+        }
+
+        openProject("DemoProject")
+        XCTAssertTrue(app.staticTexts["README.md"].firstMatch.waitForExistence(timeout: 15),
+                      "the first project did not open on its files")
+        // Nothing else is open yet, so there is nowhere to go and no control offering one.
+        XCTAssertFalse(app.buttons["sessions-switcher"].exists,
+                       "a Sessions control appeared with no other session to reach")
+        shoot(app, "10-first-editor")
+
+
+        // Back to the library. This is the dismissal that used to throw the workspace away.
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        Thread.sleep(forTimeInterval: 2)
+
+        openProject("OtherProject")
+        XCTAssertTrue(app.staticTexts["NOTES.md"].firstMatch.waitForExistence(timeout: 15),
+                      "the second project did not open on its files")
+
+        let switcher = app.buttons["sessions-switcher"].firstMatch
+        XCTAssertTrue(switcher.waitForExistence(timeout: 10),
+                      "with two editors open there is still no way between them")
+        shoot(app, "11-sessions-control")
+        switcher.tap()
+
+        // The other session is offered; this one is not, because a row that goes where you
+        // already are is a tap that does nothing.
+        //
+        // Counted by row rather than by the absence of the word "OtherProject": the switcher is a
+        // half sheet, so the editor it was opened from is still on screen behind it and its
+        // header says that name. Asserting the name was absent was asserting about the wrong view.
+        let other = app.staticTexts["DemoProject"].firstMatch
+        XCTAssertTrue(other.waitForExistence(timeout: 10), "the first editor is not in the switcher")
+        let rows = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'session-row-'"))
+        XCTAssertEqual(rows.count, 1,
+                       "the switcher should list exactly the one other session, not this one too")
+        shoot(app, "12-switcher")
+
+        other.tap()
+        XCTAssertTrue(app.staticTexts["README.md"].firstMatch.waitForExistence(timeout: 15),
+                      "choosing the other session did not arrive at it")
+        shoot(app, "13-switched")
+    }
+}

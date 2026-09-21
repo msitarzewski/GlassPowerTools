@@ -709,3 +709,33 @@ comes from is the question the design pass has to answer, and it wants the user'
   the same shape and nobody has watched any of them; the desktop still has no UI test at all and
   cannot have one until a configuration can be seeded.
 - The Vision Pro is still at 0.4.123.
+
+## The session switcher — D1/D2, 2026-09-21
+
+| Claim | Evidence |
+|---|---|
+| One list of what is open, contributed rather than known by the shell | `GlassOpenSessionTests`, 7 tests. Kind order, standalones last, and the provider asked again every time |
+| A capability's rows actually reach the registry | The two tests that were **red** until `openSessions()` became a protocol *requirement* — an extension-only default is statically dispatched through `any` (rule 53) |
+| The session you are in is never offered | `openSessions(excluding:)`, including an id belonging to no session |
+| An editor left on a phone keeps its documents, unsaved edits and project | `GlassEditorSessionLifetimeTests`, 10 tests, seen **red** against both halves of the old behaviour (`forget`, and `onDisappear { closeAllProjects() }`) |
+| A Mac still closes the editor with its window | The same suite, asserting the behaviour that was preserved |
+| **Two sessions on an iPhone and the way between them** | `EditorOnIPhoneUITests.testTheSessionSwitcherReachesTheOtherEditor`, iPhone 17 Pro simulator: absent with one session, present with two, exactly one row, and the first project back on screen after tapping it. Screenshots `10`–`13` |
+| All three platforms build | `xcodebuild` Release for macOS, iOS and visionOS |
+| New tests | **17**, all passing |
+
+## Known and unfixed, 2026-09-21
+
+- **The package suite cannot be run green on this Mac.** Any file written with
+  `FileProtectionType.complete` is unreadable by an unentitled process here, and atomic writes
+  fail with `mktemp … errno 1`; ~35 tests across five targets fail and `GlassShellTests` crashes
+  with SIGTRAP. Reproduced in a twelve-line Foundation script with no project code, in three
+  directories, **and with this session's work stashed at `369b5f7`**. The last clean full run was
+  1,683 / exit 0 earlier the same session. Nine places in `Sources` write protected files and the
+  app declares no data-protection entitlement, so this is not test-only — confirm on a second Mac
+  before concluding anything about the product.
+- **The terminal's and the database's switcher rows have never been seen with a live session.**
+  Both need a real connection; a simulator runner cannot have one. Their contributions are
+  covered only through the registry's stub.
+- **A database workspace's tabs do not survive the round trip.** The session and its on-disk SQL
+  drafts do; the tab state is `@State` on a view that dies when the root swaps.
+- **The desktop contributes no sessions at all**, by decision (D31) rather than omission.

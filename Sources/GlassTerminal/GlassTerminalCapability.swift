@@ -54,6 +54,9 @@ public final class GlassTerminalRuntime {
         // (`localTerminal` carries no report: the outcome is claimed by the pane that actually
         // starts a shell — see `expectLocalShell`.)
         case showTailscale
+        /// Bring an already-open workgroup back to the screen (D1's `activate`). Not a connect:
+        /// the sessions are live and only the thing pointing at them was cleared.
+        case showWorkgroup(workgroupID: UUID)
         /// Show the connect flow's failure alert with this message (a link with nothing behind it).
         case showFailure(String)
     }
@@ -222,6 +225,36 @@ public final class GlassTerminalCapability: GlassCapability {
     private let runtime: GlassTerminalRuntime
 
     public init(runtime: GlassTerminalRuntime) { self.runtime = runtime }
+
+    // MARK: Open sessions (D1)
+
+    /// One row per workgroup that still has a live session in it, newest first.
+    ///
+    /// The workgroup rather than the session, because that is what the phone actually shows and
+    /// what `showTerminal(workgroupID:)` takes — a connect on iPhone makes a workgroup named
+    /// after the machine and puts the one session in it. A workgroup whose sessions have all
+    /// ended is not listed: it would be a row that goes to an empty screen.
+    public func openSessions() -> [GlassOpenSession] {
+        let manager = runtime.sessionManager
+        return manager.workgroups.reversed().compactMap { workgroup in
+            let live = workgroup.sessionIDs.compactMap { manager.session(for: $0) }
+            guard !live.isEmpty else { return nil }
+            return GlassOpenSession(
+                id: Self.sessionID(workgroupID: workgroup.id),
+                title: workgroup.name,
+                subtitle: live.count == 1 ? live[0].state.displayName : "\(live.count) terminals",
+                symbolName: symbolName,
+                activate: { [runtime] in runtime.enqueue(.showWorkgroup(workgroupID: workgroup.id)) },
+                close: { manager.closeWorkgroup(workgroup.id) }
+            )
+        }
+    }
+
+    /// The id this capability gives a workgroup in the switcher. A terminal's own chrome uses it
+    /// to exclude itself, so the two must agree — hence one function rather than two literals.
+    public static func sessionID(workgroupID: UUID) -> String {
+        "terminal:\(workgroupID.uuidString)"
+    }
 
     public func open(service: HostServiceLink, host: HostProfile, report: @escaping GlassCapabilityReport) {
         open(service: service, host: host, hostAccess: GlassCapabilityHostAccess(address: host.address), report: report)

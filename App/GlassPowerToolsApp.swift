@@ -137,6 +137,9 @@ struct GlassPowerToolsApp: App {
         // Its preferences still belong in the one settings surface, so the page is registered here
         // — the composition root is the only place that knows about both the shell and the editor.
         model.registry.registerSettingsPage(editor.settingsPage)
+        // D1: and its open windows belong in the one session switcher, for the same reason and
+        // through the same escape hatch. Read at draw time so the list follows the editor's state.
+        model.registry.registerSessionProvider(id: "editor") { [editor] in editor.openSessions() }
         // Stage C: Projects in the library, the same way. Answering "is that machine this one?"
         // needs the catalog, which the editor deliberately does not hold, so the answer is supplied
         // from here. Pinned host keys are not consulted yet: the catalog's own local record (D8) is
@@ -281,6 +284,10 @@ struct GlassPowerToolsApp: App {
                 }
             }
             .glassLayers(layers)
+            // The registry reaches every session's own chrome from here: the switcher's control
+            // is drawn inside a terminal, a workspace or an editor, and each of those is a view
+            // in this scene (or a cover presented from it), not something the shell can reach.
+            .environment(model.registry)
             .trackWindowPresence(key: "main", recovery: windowRecovery)
             #if os(macOS)
             .onAppear { terminal.attach(to: appDelegate) }

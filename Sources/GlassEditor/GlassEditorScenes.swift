@@ -85,10 +85,101 @@ public final class GlassEditorRuntime {
         frontmostWorkspaceID = id
     }
 
+    /// Whether a workspace ends when its window leaves the screen.
+    ///
+    /// **True where windows exist and false on a phone**, and the difference is the whole point.
+    /// On a Mac, closing a window closes the editor and taking the documents with it is correct.
+    /// A phone has no window to close: the cover's Connections button means "go back to the
+    /// library", and discarding the workspace there threw the open documents away — unsaved
+    /// edits included — with nothing said and no way back to them.
+    ///
+    /// Settable so a test can be a phone. `GlassWindowPresentation` answers from `UIApplication`,
+    /// which on the machine the suite runs on always says a Mac.
+    ///
+    /// **Asked when it is needed, not stored at init.** As a stored default this read
+    /// `GlassWindowPresentation.canOpenWindows` inside `GlassPowerToolsApp.init` — before any
+    /// scene had connected, when `UIDevice.current.userInterfaceIdiom` is still `.unspecified`.
+    /// `.unspecified != .phone`, so an iPhone answered "this device has windows", the workspace
+    /// was discarded on every dismissal exactly as before, and the session switcher had nothing
+    /// to list. A device capability read during app construction is read before the device has
+    /// answered (rules 43 and 54).
+    private var closesWorkspaceWithItsWindowOverride: Bool?
+    public var closesWorkspaceWithItsWindow: Bool {
+        get { closesWorkspaceWithItsWindowOverride ?? GlassWindowPresentation.canOpenWindows }
+        set { closesWorkspaceWithItsWindowOverride = newValue }
+    }
+
     func forget(_ id: UUID) {
         liveWindows.remove(id)
-        workspaces[id] = nil
         if frontmostWorkspaceID == id { frontmostWorkspaceID = nil }
+        // Kept on a phone: the switcher is how it is reached again, and `closeWorkspace` is how
+        // it is ended on purpose.
+        if closesWorkspaceWithItsWindow { workspaces[id] = nil }
+    }
+
+    /// Ends a workspace deliberately: the switcher's swipe, and the only way to close one on a
+    /// device with no windows. Unlike `forget`, this always discards.
+    public func closeWorkspace(_ id: UUID) {
+        liveWindows.remove(id)
+        if frontmostWorkspaceID == id { frontmostWorkspaceID = nil }
+        // Closing the projects is what releases the readers behind them — an SFTP session for a
+        // project on another machine. On a Mac `onDisappear` had already done it; on a phone this
+        // is the only place it happens, so dropping the workspace without it would leak the
+        // connection.
+        workspaces[id]?.closeAllProjects()
+        workspaces[id] = nil
+    }
+
+    /// The editor's contribution to the session switcher (D1). Registered by the composition root
+    /// through `registerSessionProvider`, because a file is not a service and the editor is not a
+    /// `GlassCapability` — the third feature to need that escape hatch, after settings pages and
+    /// library panels.
+    ///
+    /// An empty workspace is not listed. One is made the first time a window *asks* for one, so
+    /// listing them all would offer rows for windows that never held anything.
+    public func openSessions() -> [GlassOpenSession] {
+        workspaces
+            .sorted { $0.key.uuidString < $1.key.uuidString }
+            .compactMap { id, workspace in
+                guard let title = Self.sessionTitle(of: workspace) else { return nil }
+                return GlassOpenSession(
+                    id: Self.sessionID(windowID: id),
+                    title: title,
+                    subtitle: Self.sessionSubtitle(of: workspace),
+                    // A folder when it is a project and a page when it is loose files: the row
+                    // should look like the thing it returns to.
+                    symbolName: workspace.projects.isEmpty ? "doc.text" : "folder",
+                    activate: { [weak self] in self?.present(id) },
+                    close: { [weak self] in self?.closeWorkspace(id) }
+                )
+            }
+    }
+
+    /// The id the switcher gives an editor window; its own chrome excludes itself with it.
+    public static func sessionID(windowID: UUID) -> String { "editor:\(windowID.uuidString)" }
+
+    /// What to call a window: its project, or the document in front. Nil for a workspace holding
+    /// neither, which is not a session anyone can be sent back to.
+    static func sessionTitle(of workspace: GlassEditorWorkspace) -> String? {
+        if let project = workspace.projects.first { return project.displayName }
+        if let selected = workspace.selection,
+           let document = workspace.documents.first(where: { $0.id == selected }) {
+            return document.displayName
+        }
+        return workspace.documents.first?.displayName
+    }
+
+    /// How many files, and whether any of them would be lost. The unsaved count is said out loud
+    /// because keeping a workspace alive across a dismissal is precisely what protects it.
+    static func sessionSubtitle(of workspace: GlassEditorWorkspace) -> String? {
+        let unsaved = workspace.documents.filter(\.isDirty).count
+        let files = workspace.documents.count
+        let count = files == 1 ? "1 file" : "\(files) files"
+        if unsaved > 0 { return "\(count) · \(unsaved) unsaved" }
+        if files > 0 { return count }
+        // A project row with nothing open said nothing at all, which left a name floating on its
+        // own. What it is, is a project you have not opened a file in yet.
+        return workspace.projects.isEmpty ? nil : "No files open"
     }
 
     /// Opens a file in the window in front, or **prepares a new window** for it and returns that

@@ -399,3 +399,32 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     the *capability* be offered everywhere. A drop target nothing can reach costs nothing and
     starts working the day the system allows it, with no build. Where a capability genuinely has
     to be asked about at runtime, it gets one answer in one place (rule 43).
+
+53. **A default in a protocol extension is invisible through `any`.** `openSessions()` was declared
+    only in `public extension GlassCapability`, so the registry — which holds
+    `[any GlassCapability]` — dispatched statically and called the *default* for every capability.
+    The terminal and the database each implemented it correctly, and the switcher was empty. A
+    contributed hook goes in the **protocol body** with its default in the extension, the way
+    `libraryPanels()` and `settingsPages` already do. Caught by `GlassOpenSessionTests` rather than
+    on a device; the sibling of rule 33, which is the same silence from the other direction.
+
+54. **Leaving a screen is not closing it where there are no windows.** `onDisappear` means "this
+    window closed" on a Mac and "the user tapped back" on a phone, and the editor keyed a lifetime
+    decision on it: `forget` discarded the workspace, so dismissing the full-screen cover threw the
+    open documents away — unsaved edits included — with nothing said and no way back. Two verbs,
+    not one: leaving the screen gives up frontmost, and **closing** is a separate, deliberate act
+    (`closeWorkspace`, reachable from the session switcher). The policy is a settable property
+    rather than a call to `GlassWindowPresentation` inside the method, because the suite's own
+    machine always answers "Mac" and the phone's behaviour would never be tested.
+
+55. **A device capability read during app construction is read before the device has answered.**
+    `closesWorkspaceWithItsWindow` was a stored property defaulting to
+    `GlassWindowPresentation.canOpenWindows`, which meant it ran inside `GlassPowerToolsApp.init`
+    — before any scene had connected. `UIDevice.current.userInterfaceIdiom` is `.unspecified`
+    then, `.unspecified != .phone`, and an iPhone therefore answered *"this device has windows"*.
+    The editor kept discarding its workspace on every dismissal and the session switcher listed
+    nothing, with every unit test green and the registry correctly wired — the UI test's probe
+    said `registry=ok windows=false others=0`, which is how it was found.
+    So: ask a platform question **at the point of use**, or behind a computed property that asks
+    then. An override for tests is a stored `Bool?` consulted first, never a stored default. Rule
+    43 says one answer in one place; this says *and at the right time*.
