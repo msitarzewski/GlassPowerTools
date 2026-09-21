@@ -2631,8 +2631,12 @@ Two reports from one screenshot, both fixed:
 - **The title band leaked the window behind it** in overview mode, because the mode swapped the
   material to `.underWindowBackground`. Inherited from glas.sh — hence "again". Removed; rule 50.
 
-**1,692 tests, exit 0.** macOS Release 0.4.192 built; iOS/visionOS builds and the install are the
-open items — the user has live sessions in 0.4.189 and an install quits them, so it is their call.
+**1,692 tests, exit 0.** Release builds for macOS, iOS and visionOS. **0.4.192 installed on the
+Mac** on the user's word, read back off the bundle. The phone is still on 0.4.189.
+
+A trap while installing: `pgrep -x "Glass Power Tools"` also matches the app's *simulator*
+copies, so the Mac app looked still-running for a minute after it had quit. Match on the
+`/Applications/…` path instead.
 
 Next, unchanged: the exec seam; one card treatment (now five drawings of a card — the overview's
 own tab card is the fifth beside `GlassSessionCard`); the carousel on the phone; seeded

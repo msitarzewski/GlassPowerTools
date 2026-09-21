@@ -449,4 +449,4 @@ mode changed.
 | Arrow navigation crosses from tabs into session cards | `overviewNavigationCrossesFromTabsIntoSessionsElsewhere` |
 | The title band keeps its material in overview | `transparencyAndBlurRemainIndependentAtEveryEndpoint`, rewritten, red against the swap |
 | Package suite | **1,692 tests, exit status 0** |
-| The overview with a real database row, by eye | **NOT SEEN.** 0.4.192 is built and not yet installed — the user has live sessions in 0.4.189 and installing means quitting them |
+| The overview with a real database row, by eye | **NOT YET SEEN.** 0.4.192 is installed on the Mac; the user is driving it |
