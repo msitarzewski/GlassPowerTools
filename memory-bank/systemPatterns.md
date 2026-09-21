@@ -67,7 +67,7 @@ should have produced before any of that was written. Rule 57.
 |---|---|---|---|
 | **Terminal still image** | `SwiftTermHostModel.previewImage(maxPixelWidth:)`, `Sources/GlassTerminalEmulator/SwiftTermHostView.swift:575` (NSImage) and `:601` (UIImage) | Anywhere — `GlassTerminalEmulator` is a base module | Cross-platform already. This is D4's snapshot |
 | **Gallery layout solver** | `GlassGalleryLayout`, `Sources/GlassShell/GlassSessionGallery.swift` | Anywhere | **Moved here 2026-09-21** from `MacTerminalOverviewGrid`. `MacTerminalOverview` uses it through a typealias; its tests moved to `GlassShellTests` and now run on every platform |
-| **Grid ⇄ carousel overview, card-width slider, arrow-key navigation** | `MacTerminalOverview`, `Sources/GlassTerminal/macOS/MacTerminalOverview.swift:199` | macOS only | Switches between *one workgroup's* terminals |
+| **Grid ⇄ carousel overview, card-width slider, arrow-key navigation** | `MacTerminalOverview`, `Sources/GlassTerminal/macOS/MacTerminalOverview.swift` | macOS only | **Since 2026-09-21 shows every open session** — its own tabs live, everything else as `GlassSessionCard` — browsed as one row (`MacOverviewItem`) |
 | **Spatial grid and carousel** (3D rotation, ±1 card rendered) | `VisionTerminalWorkgroupView.spatialOverview`, `:414` | visionOS only | Same scope: one workgroup |
 | **"Only fresh output may steal selection"** | `MacTerminalActivitySelection`, `MacTerminalOverview.swift:178` | macOS only, but pure and portable | A live gallery wants this; the session gallery does not use it yet |
 | **Idle-hiding policy for overview chrome** | `MacOverviewIdlePolicy`, same file | macOS only, pure | |

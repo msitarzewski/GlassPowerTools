@@ -411,3 +411,11 @@ Two defects on the way: `previewImage` was fenced to `os(visionOS)` though every
 ordinary UIKit, so a terminal could not draw itself on a phone (rule 52); and the gallery crashed
 the app on open, because a degenerate first-pass `GeometryReader` size drove a `GridItem` maximum
 below SwiftUI's minimum. **1,690 tests, exit 0.**
+
+## 2026-09-21 — [the Mac overview joins the seam](2026-09-18_ios-navigation-plan.md#the-macs-overview-joins-the-seam-and-the-title-band-stops-leaking--2026-09-21)
+
+Standing in the Terminal Overview, the user asked where the database was. The overview now shows
+every open session beside its own tabs, as one row you can arrow through. And its title band had
+been swapping to `.underWindowBackground` in overview mode — the material that shows the window
+behind — which is why another window's header floated through the title. Inherited from glas.sh;
+removed. **1,692 tests, exit 0.**

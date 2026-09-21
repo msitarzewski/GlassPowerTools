@@ -140,10 +140,45 @@ struct MacWorkspacePreview: View {
 }
 
 enum MacTerminalOverviewNavigation {
-    static func moved(_ selection: UUID?, by offset: Int, in ids: [UUID]) -> UUID? {
+    /// Generic over the id because the overview now browses two kinds of thing — this window's
+    /// tabs and sessions open elsewhere — in one row. Same arithmetic as before.
+    static func moved<ID: Hashable>(_ selection: ID?, by offset: Int, in ids: [ID]) -> ID? {
         guard !ids.isEmpty else { return nil }
         let index = selection.flatMap { ids.firstIndex(of: $0) } ?? 0
         return ids[max(0, min(ids.count - 1, index + offset))]
+    }
+}
+
+/// One thing the overview can show: a tab of this window, previewed live, or a session open
+/// anywhere else in the app — another terminal window, a database, an editor.
+///
+/// The second kind is why the user, standing in this overview, asked where the database was.
+/// It switched between one window's terminals; the product's idea is a machine's services side
+/// by side, and the seam that lists them (`GlassOpenSession`) now exists.
+enum MacOverviewItem: Identifiable {
+    case tab(MacWorkspaceController)
+    case session(GlassOpenSession)
+
+    var id: MacOverviewItemID {
+        switch self {
+        case .tab(let tab): .tab(tab.workspaceID)
+        case .session(let session): .session(session.id)
+        }
+    }
+}
+
+enum MacOverviewItemID: Hashable {
+    case tab(UUID)
+    case session(String)
+}
+
+enum MacOverviewSessions {
+    /// Sessions open elsewhere: everything the app lists, minus the workgroups this window is
+    /// already showing as live tabs — those would be the same terminal twice, once as a preview
+    /// and once as a card.
+    static func others(_ all: [GlassOpenSession], excludingWorkgroups ids: [UUID]) -> [GlassOpenSession] {
+        let own = Set(ids.map { GlassTerminalCapability.sessionID(workgroupID: $0) })
+        return all.filter { !own.contains($0.id) }
     }
 }
 
@@ -186,8 +221,10 @@ struct MacTerminalOverview: View {
     let dismiss: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
-    @State private var selectedID: UUID?
-    @State private var hoveredID: UUID?
+    /// Optional: the workspace scene injects it; a preview or a test host may not.
+    @Environment(GlassTerminalRuntime.self) private var runtime: GlassTerminalRuntime?
+    @State private var selectedID: MacOverviewItemID?
+    @State private var hoveredID: MacOverviewItemID?
     @State private var workgroupOnly = false
     @State private var activitySelection = MacTerminalActivitySelection()
     @FocusState private var navigationFocused: Bool
@@ -197,12 +234,26 @@ struct MacTerminalOverview: View {
         return controller.tabs.filter { $0.workgroupID == id }
     }
 
+    /// Read in the body so the list follows every capability's own state (rule from the panel
+    /// count of 2026-09-18: a stored answer to a live question goes stale).
+    private var others: [GlassOpenSession] {
+        guard !workgroupOnly else { return [] }
+        return MacOverviewSessions.others(runtime?.openSessions?() ?? [],
+                                          excludingWorkgroups: controller.tabs.compactMap(\.workgroupID))
+    }
+
+    private var items: [MacOverviewItem] {
+        tabs.map(MacOverviewItem.tab) + others.map(MacOverviewItem.session)
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             HStack {
                 VStack(alignment: .leading) {
                     Text("Terminal Overview").font(.title2.bold())
-                    Text("\(tabs.count) tabs · Live, read-only previews")
+                    Text(others.isEmpty
+                         ? "\(tabs.count) tabs · Live, read-only previews"
+                         : "\(tabs.count) tabs · \(others.count) open elsewhere · Live, read-only previews")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -223,7 +274,7 @@ struct MacTerminalOverview: View {
             .allowsHitTesting(controlsVisible)
             .accessibilityHidden(!controlsVisible)
             GeometryReader { geometry in
-                let grid = MacTerminalOverviewGrid(count: tabs.count, size: geometry.size, preferredWidth: preferredCardWidth)
+                let grid = MacTerminalOverviewGrid(count: items.count, size: geometry.size, preferredWidth: preferredCardWidth)
                 ScrollViewReader { scroll in
                     Group {
                         if carousel {
@@ -231,8 +282,8 @@ struct MacTerminalOverview: View {
                         } else {
                             ScrollView {
                                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(maximum: grid.cardWidth), spacing: 18), count: grid.columns), spacing: 18) {
-                                    ForEach(tabs, id: \.workspaceID) { tab in
-                                        card(tab).id(tab.workspaceID)
+                                    ForEach(items) { item in
+                                        itemCard(item).id(item.id)
                                     }
                                 }.padding(6)
                             }
@@ -260,16 +311,8 @@ struct MacTerminalOverview: View {
                         }
                         navigate(by: offset)
                     }
-                    .onKeyPress(.return) {
-                        guard let selectedID else { return .ignored }
-                        activate(selectedID)
-                        return .handled
-                    }
-                    .onKeyPress(.space) {
-                        guard let selectedID else { return .ignored }
-                        activate(selectedID)
-                        return .handled
-                    }
+                    .onKeyPress(.return) { activateSelected() ? .handled : .ignored }
+                    .onKeyPress(.space) { activateSelected() ? .handled : .ignored }
                 }
             }
             HStack {
@@ -294,9 +337,9 @@ struct MacTerminalOverview: View {
                 if carousel {
                     Button("Previous", systemImage: "chevron.left") { navigate(by: -1) }
                         .disabled(selectedIndex == 0)
-                    Text("\(tabs.isEmpty ? 0 : selectedIndex + 1) / \(tabs.count)").monospacedDigit()
+                    Text("\(items.isEmpty ? 0 : selectedIndex + 1) / \(items.count)").monospacedDigit()
                     Button("Next", systemImage: "chevron.right") { navigate(by: 1) }
-                        .disabled(selectedIndex >= tabs.count - 1)
+                        .disabled(selectedIndex >= items.count - 1)
                 }
             }
             .opacity(controlsVisible ? 1 : 0)
@@ -315,12 +358,13 @@ struct MacTerminalOverview: View {
             }
         }
         .onAppear {
-            selectedID = controller.selectedTabID
+            selectedID = .tab(controller.selectedTabID)
             navigationFocused = true
         }
         .onChange(of: followsActivity) { navigationFocused = true }
-        .onChange(of: tabs.map(\.workspaceID)) { _, ids in
-            if !ids.contains(selectedID ?? UUID()) { selectedID = ids.first }
+        .onChange(of: items.map(\.id)) { _, ids in
+            if let selectedID, !ids.contains(selectedID) { self.selectedID = ids.first }
+            if selectedID == nil { selectedID = ids.first }
             activitySelection.baseline(activitySamples)
         }
         .task(id: followsActivity && scenePhase == .active) {
@@ -329,7 +373,7 @@ struct MacTerminalOverview: View {
             while !Task.isCancelled {
                 do { try await Task.sleep(for: .milliseconds(500)) }
                 catch { return }
-                if let id = activitySelection.candidate(in: activitySamples) { select(id) }
+                if let id = activitySelection.candidate(in: activitySamples) { select(.tab(id)) }
             }
         }
         .accessibilityElement(children: .contain)
@@ -337,7 +381,21 @@ struct MacTerminalOverview: View {
     }
 
     private var selectedIndex: Int {
-        tabs.firstIndex { $0.workspaceID == selectedID } ?? 0
+        items.firstIndex { $0.id == selectedID } ?? 0
+    }
+
+    /// Opens whatever is selected: a tab of this window in place, or a session elsewhere through
+    /// its own capability, after which this overview has done its job and goes.
+    @discardableResult
+    private func activateSelected() -> Bool {
+        guard let selected = items.first(where: { $0.id == selectedID }) else { return false }
+        switch selected {
+        case .tab(let tab): activate(tab.workspaceID)
+        case .session(let session):
+            session.activate()
+            dismiss()
+        }
+        return true
     }
 
     private var activitySamples: [UUID: ContinuousClock.Instant] {
@@ -349,24 +407,24 @@ struct MacTerminalOverview: View {
         })
     }
 
-    private func select(_ id: UUID?) {
+    private func select(_ id: MacOverviewItemID?) {
         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.22)) { selectedID = id }
     }
 
     private func navigate(by offset: Int) {
         activitySelection.didNavigate()
-        select(MacTerminalOverviewNavigation.moved(selectedID, by: offset, in: tabs.map(\.workspaceID)))
+        select(MacTerminalOverviewNavigation.moved(selectedID, by: offset, in: items.map(\.id)))
         navigationFocused = true
     }
 
     private func carouselCards(in size: CGSize) -> some View {
         let width = max(160, min(680, size.width * 0.64, (size.height - 84) * 1.6))
         let center = selectedIndex
-        let neighbors = tabs.enumerated().filter { abs($0.offset - center) <= 1 }
+        let neighbors = items.enumerated().filter { abs($0.offset - center) <= 1 }
         return ZStack {
-            ForEach(neighbors, id: \.element.workspaceID) { index, tab in
+            ForEach(neighbors, id: \.element.id) { index, item in
                 let distance = index - center
-                card(tab)
+                itemCard(item)
                     .frame(width: width)
                     .scaleEffect(distance == 0 ? 1 : 0.84)
                     .rotation3DEffect(.degrees(reduceMotion ? 0 : Double(distance) * -12), axis: (x: 0, y: 1, z: 0))
@@ -378,6 +436,31 @@ struct MacTerminalOverview: View {
         .clipped()
     }
 
+    @ViewBuilder
+    private func itemCard(_ item: MacOverviewItem) -> some View {
+        switch item {
+        case .tab(let tab): card(tab)
+        case .session(let session): sessionCard(session)
+        }
+    }
+
+    /// A session open elsewhere, as the shell's card — the same one the phone's gallery draws —
+    /// with this overview's selection ring and hover on top so it browses like the tabs do.
+    private func sessionCard(_ session: GlassOpenSession) -> some View {
+        let id = MacOverviewItemID.session(session.id)
+        return GlassSessionCard(session: session,
+                                activate: { session.activate(); dismiss() },
+                                close: { session.close() })
+            .opacity(controlsVisible || selectedID == id || hoveredID == id ? 1 : 0.7)
+            .overlay {
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(selectedID == id ? Color.accentColor : .clear, lineWidth: 3)
+            }
+            .onHover { hovering in hoveredID = hovering ? id : nil }
+            .accessibilityValue(selectedID == id ? "Selected" : "")
+            .accessibilityIdentifier("terminal-overview-session-\(session.id)")
+    }
+
     private func card(_ tab: MacWorkspaceController) -> some View {
         let title = tab.windowIdentity(servers: servers).title
         let statuses = (tab.state.root?.panes ?? []).map { tab.previewStatus(for: $0.id) }
@@ -386,21 +469,21 @@ struct MacTerminalOverview: View {
                 MacWorkspacePreview(controller: tab, alwaysVisible: carousel)
                 Text(title).font(.headline).lineLimit(1)
                     .foregroundStyle(MacTerminalPreviewStatus.color(for: statuses))
-                    .opacity(controlsVisible || selectedID == tab.workspaceID || hoveredID == tab.workspaceID ? 1 : 0.55)
+                    .opacity(controlsVisible || selectedID == .tab(tab.workspaceID) || hoveredID == .tab(tab.workspaceID) ? 1 : 0.55)
             }
             .padding(10)
             .overlay {
                 RoundedRectangle(cornerRadius: 14)
-                    .stroke(selectedID == tab.workspaceID ? Color.accentColor : .clear, lineWidth: 3)
+                    .stroke(selectedID == .tab(tab.workspaceID) ? Color.accentColor : .clear, lineWidth: 3)
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .onHover { hovering in hoveredID = hovering ? tab.workspaceID : nil }
+        .onHover { hovering in hoveredID = hovering ? .tab(tab.workspaceID) : nil }
         .accessibilityLabel("Activate \(title)")
         .accessibilityHint(statuses.joined(separator: " · "))
         .help(statuses.joined(separator: " · "))
-        .accessibilityValue(selectedID == tab.workspaceID ? "Selected" : "")
+        .accessibilityValue(selectedID == .tab(tab.workspaceID) ? "Selected" : "")
         .accessibilityIdentifier("terminal-overview-tab-\(tab.workspaceID.uuidString.lowercased())")
     }
 }

@@ -82,6 +82,12 @@ public final class GlassTerminalRuntime {
     /// The editor as a view, for a device where the browser has to present it itself.
     public var editorFileScreen: GlassEditorFileScreen?
 
+    /// Everything open in the whole app, for the Mac's Terminal Overview to show beside its own
+    /// tabs. Supplied by the composition root, because the answer is the shell's registry and a
+    /// capability must not hold the shell — the same seam as `openFolderAsProject` above. Nil
+    /// means the overview shows only what it always showed.
+    public var openSessions: (@MainActor () -> [GlassOpenSession])?
+
     public init(layers: GlassLayerStore? = nil, windowRecovery: GlassWindowRecoveryManager? = nil) {
         let layers = layers ?? GlassLayerStore()
         self.layers = layers

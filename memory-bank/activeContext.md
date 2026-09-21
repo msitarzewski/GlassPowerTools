@@ -2618,3 +2618,22 @@ overview is covered too; four degenerate sizes are regression tests.
 3. **The carousel**, the third `OpeningView` mode, following the spatial one.
 4. A seeded database/desktop configuration: the terminal's and database's rows, and a real
    terminal snapshot in a card, have never been seen with a live session.
+
+## 2026-09-21 — the Mac overview joins the seam; title band fixed; 0.4.192 built, not installed
+
+Two reports from one screenshot, both fixed:
+[detail](tasks/2026-09/2026-09-18_ios-navigation-plan.md#the-macs-overview-joins-the-seam-and-the-title-band-stops-leaking--2026-09-21).
+
+- **The Terminal Overview now shows every open session** beside its own tabs, through
+  `GlassTerminalRuntime.openSessions` (supplied by the composition root) and `MacOverviewItem`.
+  The plan's "windows are the switcher on a Mac" was wrong in practice: the user stood in the
+  overview and asked where the database was.
+- **The title band leaked the window behind it** in overview mode, because the mode swapped the
+  material to `.underWindowBackground`. Inherited from glas.sh — hence "again". Removed; rule 50.
+
+**1,692 tests, exit 0.** macOS Release 0.4.192 built; iOS/visionOS builds and the install are the
+open items — the user has live sessions in 0.4.189 and an install quits them, so it is their call.
+
+Next, unchanged: the exec seam; one card treatment (now five drawings of a card — the overview's
+own tab card is the fifth beside `GlassSessionCard`); the carousel on the phone; seeded
+database/desktop configurations.

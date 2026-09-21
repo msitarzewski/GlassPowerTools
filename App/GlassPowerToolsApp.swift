@@ -219,6 +219,9 @@ struct GlassPowerToolsApp: App {
         // that into the machine's id, which is what makes the project the *same* project on
         // another device.
         let editorRuntime = editor
+        // The Mac's Terminal Overview shows every open session, not only this window's tabs —
+        // the user asked where the database was, standing in the overview. Read at draw time.
+        terminal.openSessions = { [registry = model.registry] in registry.openSessions() }
         terminal.openFolderAsProject = { @MainActor serverID, path in
             let hostID = library.host(owningEndpoint: EndpointID(rawValue: serverID))?.id
             let project = GlassEditorProject(hostID: hostID, path: path)

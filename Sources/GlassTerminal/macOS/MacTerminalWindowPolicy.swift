@@ -253,11 +253,15 @@ enum MacTerminalWindowPolicy {
     static func apply(_ window: NSWindow, tabbingIdentifier: String, overviewPresented: Bool = false,
                       layers: GlassLayerState = .default) {
         // The family's titlebar sequence (clear backing, transparent titlebar, passive material
-        // whose alpha follows frost) lives in GlassLayers; the overview swaps the material style.
+        // whose alpha follows frost) lives in GlassLayers, and the overview gets the same one.
+        //
+        // It used to swap the title band to `.underWindowBackground` while the overview was up.
+        // That material is *designed* to show what is behind the window, blurred — so with the
+        // database window behind this one, its "MySQL on oscar" header floated through the
+        // terminal's own title (reported 2026-09-21, "we lost the title settings again"). glas.sh
+        // did the same swap, which is why it is "again". Rule 50: chrome that says where you are
+        // does not become see-through because a mode changed.
         GlassWindowLayerPolicy.apply(window, state: layers)
-        if overviewPresented {
-            GlassWindowChrome.installTitlebarMaterial(in: window, materialStyle: .underWindowBackground)
-        }
         // Leave toolbar layout and dragging to SwiftUI/AppKit.
         // The added titlebar material is passive.
         // SwiftUI's navigation sidebar owns terminal tabs inside this

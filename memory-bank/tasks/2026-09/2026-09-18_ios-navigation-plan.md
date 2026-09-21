@@ -410,3 +410,43 @@ above. What is new is small; what moved is the useful part.
 | The Mac overview still lays out as it did | Its two tests, unchanged in content, now running on every platform |
 | **The carousel** | **NOT BUILT.** `OpeningView` has three modes and this is two of them. The spatial carousel in `VisionTerminalWorkgroupView` is the model to follow when it is wanted |
 | **A real terminal snapshot on a phone** | **NOT SEEN.** The gallery's picture path needs a live SSH session, which no simulator test can have. The fallback path is what the screenshots show |
+
+---
+
+# The Mac's overview joins the seam, and the title band stops leaking — 2026-09-21
+
+Reported from the running app, standing in the Terminal Overview: *"Looks like we lost the title
+settings again somehow. Shouldn't the oscar database connection show up in this carousel now?"*
+
+## The overview shows every open session
+
+`MacTerminalOverview` drew `controller.tabs` — this window's terminals — and nothing else. The
+plan had said windows are the switcher on a Mac, so the cross-capability seam reached only the
+phone. The screenshot was the counter-argument, and the seam already existed, so:
+
+| File | Change |
+|---|---|
+| `Sources/GlassTerminal/GlassTerminalCapability.swift` | `GlassTerminalRuntime.openSessions` — the registry's list, supplied by the composition root exactly as `openFolderAsProject` is, because a capability must not hold the shell |
+| `App/GlassPowerToolsApp.swift` | Wires it to `model.registry.openSessions()` |
+| `Sources/GlassTerminal/macOS/MacTerminalOverview.swift` | `MacOverviewItem` — a live tab of this window *or* a session open elsewhere — browsed as one row. `MacOverviewSessions.others` drops the workgroups this window already previews. Sessions draw as `GlassSessionCard`, the phone gallery's card, with the overview's selection ring and hover. `MacTerminalOverviewNavigation.moved` is generic over the id. Return, Space, arrows, the carousel counter and "This workgroup" scope all cover the whole row |
+| `Tests/GlassTerminalTests/macOS/MacWorkspaceTests.swift` | Own tabs are not shown twice; arrow keys walk off the last tab onto the first card and stop at the ends |
+
+## The title band
+
+In overview mode the window swapped its title-band material to `.underWindowBackground` — the
+material *designed* to show what is behind the window, blurred. With the database window behind
+the terminal, its "MySQL on oscar" header floated through the terminal's own title. glas.sh did
+the same swap, which is the "again". The overview now keeps the family's title band; the test that
+asserted the swap was rewritten to assert its absence and seen **red** against the old code.
+Rule 50, one level up: chrome that says where you are does not become see-through because a
+mode changed.
+
+## What is proven
+
+| Claim | Evidence |
+|---|---|
+| Other sessions appear in the overview, own tabs once | `overviewShowsSessionsOpenElsewhereButNotItsOwnTabsTwice` |
+| Arrow navigation crosses from tabs into session cards | `overviewNavigationCrossesFromTabsIntoSessionsElsewhere` |
+| The title band keeps its material in overview | `transparencyAndBlurRemainIndependentAtEveryEndpoint`, rewritten, red against the swap |
+| Package suite | **1,692 tests, exit status 0** |
+| The overview with a real database row, by eye | **NOT SEEN.** 0.4.192 is built and not yet installed — the user has live sessions in 0.4.189 and installing means quitting them |

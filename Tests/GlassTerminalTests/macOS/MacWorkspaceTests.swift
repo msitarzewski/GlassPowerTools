@@ -7,6 +7,7 @@ import NIOCore
 import NIOPosix
 import NIOSSH
 import GlassTerminalEmulator
+import GlassShell
 import SwiftUI
 import Testing
 import UniformTypeIdentifiers
@@ -73,6 +74,36 @@ struct MacWorkspaceTests {
         #expect(!policy.shouldHide(at: start.advanced(by: .seconds(9)), canHide: true))
     }
 
+    /// The overview shows every open session beside its own tabs — except the ones its tabs
+    /// already are. Reported 2026-09-21: standing in the overview, the user asked where the
+    /// database was.
+    @Test func overviewShowsSessionsOpenElsewhereButNotItsOwnTabsTwice() {
+        let mine = UUID(), theirs = UUID()
+        let row: (String) -> GlassOpenSession = {
+            GlassOpenSession(id: $0, title: $0, symbolName: "circle", activate: {}, close: {})
+        }
+        let all = [
+            row(GlassTerminalCapability.sessionID(workgroupID: mine)),
+            row(GlassTerminalCapability.sessionID(workgroupID: theirs)),
+            row("database:oscar"),
+            row("editor:notes"),
+        ]
+        let shown = MacOverviewSessions.others(all, excludingWorkgroups: [mine]).map(\.id)
+        #expect(shown == [GlassTerminalCapability.sessionID(workgroupID: theirs), "database:oscar", "editor:notes"])
+        #expect(MacOverviewSessions.others(all, excludingWorkgroups: []).count == 4,
+                "a window with no workgroup tabs excludes nothing")
+    }
+
+    @Test func overviewNavigationCrossesFromTabsIntoSessionsElsewhere() {
+        // One row to browse: arrow keys walk off the last tab onto the first card, and stop at
+        // the ends rather than wrapping — the same arithmetic the tabs always had.
+        let tab = UUID()
+        let ids: [MacOverviewItemID] = [.tab(tab), .session("database:oscar"), .session("editor:notes")]
+        #expect(MacTerminalOverviewNavigation.moved(.tab(tab), by: 1, in: ids) == .session("database:oscar"))
+        #expect(MacTerminalOverviewNavigation.moved(.session("editor:notes"), by: 1, in: ids) == .session("editor:notes"))
+        #expect(MacTerminalOverviewNavigation.moved(MacOverviewItemID?.none, by: 0, in: ids) == .tab(tab))
+    }
+
     @Test func previewTitleColorPrioritizesErrorsAndTransitions() {
         #expect(MacTerminalPreviewStatus.color(for: ["Running", "Error: Connection lost"]) == .red)
         #expect(MacTerminalPreviewStatus.color(for: ["Connected", "Reconnecting..."]) == .orange)
@@ -127,7 +158,7 @@ struct MacWorkspaceTests {
         #expect(MacTerminalOverviewNavigation.moved(ids[0], by: 2, in: ids) == ids[2])
         #expect(MacTerminalOverviewNavigation.moved(ids[3], by: 1, in: ids) == ids[3])
         #expect(MacTerminalOverviewNavigation.moved(UUID(), by: 0, in: ids) == ids[0])
-        #expect(MacTerminalOverviewNavigation.moved(nil, by: 1, in: []) == nil)
+        #expect(MacTerminalOverviewNavigation.moved(UUID?.none, by: 1, in: [UUID]()) == nil)
     }
 
     @Test @MainActor func previewDoesNotCreateRuntimeOrAlterWorkspace() throws {
@@ -1913,11 +1944,13 @@ struct MacWorkspaceTests {
         #expect(!window.styleMask.contains(.fullSizeContentView))
         #expect(window.titlebarAppearsTransparent)
         #expect(window.toolbarStyle == nativeToolbarStyle)
+        // The overview keeps the family's title band. It used to swap in `.underWindowBackground`,
+        // the material that shows whatever is *behind the window* — so another window's header
+        // floated through this one's title (2026-09-21). One material, in and out of the overview.
         MacTerminalWindowPolicy.apply(window, tabbingIdentifier: "sh.glas.test", overviewPresented: true)
         let materials = window.contentView?.superview?.subviews.compactMap { $0 as? MacTerminalTitlebarMaterialView } ?? []
         #expect(materials.count == 1)
-        #expect(materials.first?.material == .underWindowBackground)
-        #expect(materials.first?.isHidden == false)
+        #expect(materials.first?.material == .sidebar)
         MacTerminalWindowPolicy.apply(window, tabbingIdentifier: "sh.glas.test")
         #expect(materials.first?.material == .sidebar)
     }
