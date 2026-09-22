@@ -901,3 +901,27 @@ session**. Closing is a separate, deliberate act, and the switcher's swipe is wh
 **Consequence accepted.** A database workspace's *tabs* still do not survive the round trip: the
 session and its on-disk SQL drafts do, but `DatabaseWorkspaceView`'s tab state is `@State` and
 dies with the view. Hoisting it onto `DatabaseSessionManager` is the fix and is not made here.
+
+## D32 — Records that agree on an address are one record, automatically — Implemented 2026-09-21
+
+**Context.** Three devices each set oscar up before they had heard of each other's record. The
+catalog merges by record id, so eleven records for one machine accumulated; the library grouped
+them into one row and its detail showed the union of their services — two Terminals, two
+Desktops. The group projection (`GlassShellHost.members`) had been treated as a lasting state,
+and Stage 6's `consolidateRecords(of:)` had been held back for source applications that are now
+obsolete.
+
+**Decided.** After every load and sync, every group whose members **agree on the address** is
+folded into its canonical (oldest) record: services move over, one link survives per
+(kind, name) — the smallest endpoint id, decided from the catalog alone so every device agrees —
+the losers are handed to their capability as removals, and the emptied members are tombstoned.
+Preferences keyed on a member migrate before the fold; a folded member's id keeps resolving.
+
+**Deliberately not folded:** a group whose members **disagree** on the address. Two records
+named "db" at two addresses are two machines sharing a name, and the design keeps surfacing that
+for the user to settle with one edit. The group projection stays as the mechanism for that case
+and for the moment between a sync arriving and the fold running.
+
+**Consequence accepted.** When two devices each configured the same service, one device's
+configuration record is removed. Pre-launch, one user, three devices — the user's words:
+*"there is no every device."*

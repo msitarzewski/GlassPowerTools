@@ -42,3 +42,44 @@ holds; and the six empty records are adoptions that saved a host and then nothin
 
 **Until then, nothing is broken underneath:** both Terminals connect, both Desktops connect;
 they are two records for one machine, not a corrupt one.
+
+---
+
+# Built — the same evening
+
+*"There is no every device. It's just you, me, this Mac, a Vision Pro, and the iPhone."* So both
+halves, tonight, and the second half turned out to be **already written**: `consolidateRecords(of:)`
+existed from Stage 6, held back only because the three source applications still read
+`hosts.json` by their own record ids. They are obsolete. Rule 57 paying for itself again — the
+inventory found the fix before the fix was written.
+
+## What changed
+
+| File | Change |
+|---|---|
+| `Sources/GlassShell/GlassShellModel.swift` | `consolidateDuplicateHosts()` runs in `load()` after every sync; `consolidate(_:)` folds a group into its canonical record, **only when the members agree on the address**; `deduplicated(_:)` keeps one link per (kind, name) with the smallest endpoint id, and the losers go to their capability as a removal; `mergedMemberIDs` keeps a folded member's id resolving; preferences migrate *before* the fold |
+| `Tests/GlassShellTests/GlassShellConsolidationTests.swift` | Four new tests (the oscar shape, capability cleanup, an untouched clean library, deterministic dedup) and five old ones brought to the one-record truth |
+| `Tests/GlassShellTests/GlassShellHostAddressTests.swift`, `GlassShellTunnelHopTests.swift` | Same: a group that agrees on its address is one record after load |
+
+## Three decisions inside it
+
+1. **Only a group that agrees on the address is one machine.** Two records named "db" at two
+   addresses are two machines sharing a name; the design surfaces that for the user to settle
+   with one edit, and merging them would glue a database on one box to a terminal on another.
+   The existing address-disagreement test guards it.
+2. **Which duplicate survives is decided from the catalog alone** — same kind and name, smallest
+   endpoint id — never from this device's preferences, so the Mac, the phone and the headset all
+   reach the same record instead of each preferring its own and fighting over it forever.
+3. **Preferences migrate first, then the fold.** The other order left favourites keyed on a
+   tombstone. Seen red before it was seen green.
+
+## What is proven
+
+| Claim | Evidence |
+|---|---|
+| The oscar shape collapses to one record with each service once, smallest id winning | `loadConsolidatesAndDeduplicates` |
+| The losing duplicate reaches its capability as a removal | `droppedDuplicatesReachTheCapability` |
+| A clean library is not rewritten (so not republished) | `cleanLibraryIsUntouched` |
+| Disagreeing addresses are left alone | `addressGroupsAndDisagreementIsSettled`, unchanged in that half |
+| The whole thing bites | `GlassShellAutoConsolidationTests` seen red with the call in `load()` commented out |
+| On the phone | pending 0.4.196 — and this is the run that matters: three devices' catalogs converging on one oscar |

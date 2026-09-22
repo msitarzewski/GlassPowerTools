@@ -2663,3 +2663,12 @@ Eleven oscar records in the phone's catalog, two of them fully configured (the M
 phone's), grouped into one row whose detail shows the union. Sync by design, not a build problem.
 [Task note](tasks/2026-09/2026-09-21_duplicate-services.md) has the evidence and the two-part
 fix; the second part is the D26 two-device migration and is the user's call to start.
+
+## 2026-09-21 (late) — duplicated services fixed, building
+
+The user cut the ceremony: three devices, one account, nothing shipped. `consolidateRecords(of:)`
+already existed from Stage 6 and had been held back for the obsolete source apps; it now runs
+itself after every sync, merges only groups that agree on the address, keeps one link per
+(kind, name) by smallest endpoint id, and hands losers to their capability. Preferences migrate
+before the fold. New tests seen red without the call. 0.4.196 building for the Mac and the phone;
+**the proof is the three devices converging on one oscar**, which only a real sync can show.

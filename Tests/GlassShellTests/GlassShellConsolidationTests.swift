@@ -56,7 +56,9 @@ struct GlassShellConsolidationTests {
         try await sibling.upsert(older)
         await model.load()
 
-        #expect(model.records.count == 2)
+        // Two records a moment ago; one after load, because consolidation runs itself now
+        // (2026-09-21). The group projection is the mechanism, no longer a lasting state.
+        #expect(model.records.count == 1)
         #expect(model.catalogHosts.count == 1)
         let host = try #require(model.catalogHosts.first)
         #expect(host.id == older.id, "canonical is the oldest record")
@@ -65,7 +67,8 @@ struct GlassShellConsolidationTests {
         #expect(model.serviceKinds(for: host.id) == [.rdp, .ssh])
         #expect(model.catalogItems.count == 1)
         #expect(model.catalogItems.first?.subtitle == "Desktop · Terminal")
-        #expect(host.member(owning: newer.services[0].endpointID)?.id == newer.id)
+        #expect(host.member(owning: newer.services[0].endpointID)?.id == older.id,
+                "the newer record's service now lives on the canonical record")
     }
 
     @Test("A shared alias groups records whose names differ")
@@ -159,15 +162,18 @@ struct GlassShellConsolidationTests {
         let newer = try record("juliet", kinds: [.rdp], createdAt: t0.addingTimeInterval(1))
         try await sibling.upsert(older); try await sibling.upsert(newer)
         await model.load()
+        // `newer.id` is a tombstone after load; adding through it still lands on the machine it
+        // meant, because a merged member id keeps resolving to its canonical record.
         let added = try await model.addService(kind: .database, displayName: "db", to: newer.id)
         let stored = try await sibling.snapshot()
+        #expect(stored.count == 1)
         #expect(stored.first { $0.id == older.id }?.services.contains { $0.endpointID == added.endpointID } == true)
-        #expect(stored.first { $0.id == newer.id }?.services.count == 1)
+        #expect(stored.first { $0.id == newer.id } == nil, "the member record was folded in and deleted")
         #expect(model.catalogHosts.first?.services.count == 3)
 
         try await model.removeService(newer.services[0].endpointID, from: older.id)
         let after = try await sibling.snapshot()
-        #expect(after.first { $0.id == newer.id }?.services.isEmpty == true)
+        #expect(after.first { $0.id == older.id }?.services.count == 2)
         #expect(model.catalogHosts.first?.services.count == 2)
     }
 
@@ -185,7 +191,7 @@ struct GlassShellConsolidationTests {
         #expect(Set(model.services(for: host.id).map(\.endpointID)) == Set([older.services[0].endpointID, newer.services[0].endpointID]))
         model.connect(hostID: newer.id, endpointID: newer.services[0].endpointID)
         #expect(desktop.opened.count == 1)
-        #expect(desktop.opened.first?.1.id == newer.id, "the record that owns the endpoint")
+        #expect(desktop.opened.first?.1.id == older.id, "the record that owns the endpoint — the canonical one, after consolidation")
         #expect(model.lastUsedService(for: host.id)?.endpointID == newer.services[0].endpointID)
         #expect(model.lastConnected(host.id) == nil, "opened is not connected: the capability has not reported yet")
         desktop.pendingReport?(.connected)
@@ -256,7 +262,7 @@ struct GlassShellConsolidationTests {
         let opened = terminal.opened.map(\.0.endpointID) + desktop.opened.map(\.0.endpointID)
         #expect(Set(opened) == Set(host.services.map(\.endpointID)), "every service was opened")
         #expect(terminal.opened.first?.1.id == older.id, "each capability gets the record owning its endpoint")
-        #expect(desktop.opened.first?.1.id == newer.id)
+        #expect(desktop.opened.first?.1.id == older.id, "consolidated: the canonical record owns every endpoint")
         #expect(model.lastUsedService(for: host.id) == nil, "connecting the machine chooses no one service")
 
         terminal.pendingReport?(.connected)
@@ -322,5 +328,111 @@ struct GlassShellCapabilityHookTests {
         _ = registry.serviceDetailActions(service: HostServiceLink(endpointID: EndpointID(), kind: .database, displayName: "d"), host: host)
         #expect(ssh.detailActionRequests == [.ssh])
         #expect(rdp.detailActionRequests.isEmpty)
+    }
+}
+
+/// 2026-09-21: eleven records named oscar on the phone, two fully configured, grouped into one row
+/// that listed the Mac's Terminal and the phone's Terminal. Consolidation runs itself now, and a
+/// service the machine has twice is kept once.
+@MainActor
+@Suite("Two devices that set up one machine become one record")
+struct GlassShellAutoConsolidationTests {
+    private func link(_ kind: HostServiceKind, _ name: String, id: String) -> HostServiceLink {
+        HostServiceLink(endpointID: EndpointID(rawValue: UUID(uuidString: id)!), kind: kind, displayName: name)
+    }
+
+    @Test("Loading merges same-address records and keeps a duplicated service once")
+    func loadConsolidatesAndDeduplicates() async throws {
+        let (model, root, sibling) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        // The Mac's oscar and the phone's oscar: each with its own Terminal and Desktop, the Mac's
+        // with MySQL too. Endpoint ids chosen so the winner is not simply "the older record's".
+        let mac = try HostProfile(displayName: "oscar", address: "192.0.2.10",
+                                  services: [link(.ssh, "Terminal on oscar", id: "BBBBBBBB-0000-0000-0000-000000000001"),
+                                             link(.database, "MySQL on oscar", id: "BBBBBBBB-0000-0000-0000-000000000002"),
+                                             link(.rdp, "oscar", id: "AAAAAAAA-0000-0000-0000-000000000003")],
+                                  createdAt: t0, updatedAt: t0)
+        let phone = try HostProfile(displayName: "oscar", address: "192.0.2.10",
+                                    services: [link(.ssh, "Terminal on oscar", id: "AAAAAAAA-0000-0000-0000-000000000001"),
+                                               link(.rdp, "oscar", id: "BBBBBBBB-0000-0000-0000-000000000003")],
+                                    createdAt: t0.addingTimeInterval(60), updatedAt: t0.addingTimeInterval(60))
+        let empty = try HostProfile(displayName: "oscar", address: "192.0.2.10", services: [],
+                                    createdAt: t0.addingTimeInterval(120), updatedAt: t0.addingTimeInterval(120))
+        try await sibling.upsert(mac); try await sibling.upsert(phone); try await sibling.upsert(empty)
+
+        await model.load()
+
+        let stored = try await sibling.snapshot()
+        #expect(stored.count == 1, "one record for one machine")
+        let survivor = try #require(stored.first)
+        #expect(survivor.id == mac.id, "the oldest record is canonical")
+        #expect(survivor.services.count == 3, "Terminal, MySQL, Desktop — each once")
+        #expect(Set(survivor.services.map(\.kind)) == [.ssh, .database, .rdp])
+        // The smallest endpoint id wins regardless of which record it came from, so every device
+        // decides the same way.
+        #expect(survivor.services.first { $0.kind == .ssh }?.endpointID.rawValue.uuidString == "AAAAAAAA-0000-0000-0000-000000000001")
+        #expect(survivor.services.first { $0.kind == .rdp }?.endpointID.rawValue.uuidString == "AAAAAAAA-0000-0000-0000-000000000003")
+        #expect(model.catalogHosts.count == 1)
+        #expect(model.catalogHosts.first?.isConsolidated == false)
+    }
+
+    @Test("A dropped duplicate is handed to its capability to clean up, like a removal would be")
+    func droppedDuplicatesReachTheCapability() async throws {
+        let (model, root, sibling) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        final class Removing: GlassCapability {
+            let kind: HostServiceKind = .ssh
+            let displayName = "Terminal"; let symbolName = "terminal"
+            var removed: [EndpointID] = []
+            func open(service: HostServiceLink, host: HostProfile, report: @escaping @MainActor (GlassCapabilityOutcome) -> Void) {}
+            func removeService(_ service: HostServiceLink, host: HostProfile) async throws { removed.append(service.endpointID) }
+        }
+        let terminal = Removing()
+        model.registry.register(terminal)
+        let a = try HostProfile(displayName: "oscar", address: "10.0.0.9",
+                                services: [link(.ssh, "Terminal on oscar", id: "AAAAAAAA-0000-0000-0000-000000000001")],
+                                createdAt: t0, updatedAt: t0)
+        let b = try HostProfile(displayName: "oscar", address: "10.0.0.9",
+                                services: [link(.ssh, "terminal on OSCAR", id: "BBBBBBBB-0000-0000-0000-000000000001")],
+                                createdAt: t0.addingTimeInterval(1), updatedAt: t0.addingTimeInterval(1))
+        try await sibling.upsert(a); try await sibling.upsert(b)
+
+        await model.load()
+
+        #expect(terminal.removed.map(\.rawValue.uuidString) == ["BBBBBBBB-0000-0000-0000-000000000001"],
+                "the loser, matched case-insensitively by name, is removed through its capability")
+        #expect(try await sibling.snapshot().first?.services.count == 1)
+    }
+
+    @Test("A library with nothing to merge is left exactly as it was")
+    func cleanLibraryIsUntouched() async throws {
+        let (model, root, sibling) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let one = try record("juliet", kinds: [.ssh, .rdp], createdAt: t0)
+        let two = try record("oscar", kinds: [.database], createdAt: t0)
+        try await sibling.upsert(one); try await sibling.upsert(two)
+        let before = try await sibling.snapshot()
+
+        await model.load()
+        await model.consolidateDuplicateHosts()
+
+        #expect(try await sibling.snapshot() == before, "nothing rewritten, so nothing republished")
+    }
+
+    @Test("Deduplication is pure and deterministic")
+    func deduplicationIsDeterministic() {
+        let links = [link(.ssh, "Terminal on oscar", id: "BBBBBBBB-0000-0000-0000-000000000001"),
+                     link(.ssh, "Terminal on oscar", id: "AAAAAAAA-0000-0000-0000-000000000001"),
+                     link(.ssh, "Other terminal", id: "CCCCCCCC-0000-0000-0000-000000000001"),
+                     link(.rdp, "Terminal on oscar", id: "DDDDDDDD-0000-0000-0000-000000000001")]
+        let (kept, dropped) = GlassShellModel.deduplicated(links)
+        #expect(kept.map(\.endpointID.rawValue.uuidString) == ["AAAAAAAA-0000-0000-0000-000000000001",
+                                                                 "CCCCCCCC-0000-0000-0000-000000000001",
+                                                                 "DDDDDDDD-0000-0000-0000-000000000001"],
+                "same kind and name collapse to the smallest id; a different name or kind is a different service")
+        #expect(dropped.map(\.endpointID.rawValue.uuidString) == ["BBBBBBBB-0000-0000-0000-000000000001"])
+        // The same winners whichever order the records arrived in — the property every device
+        // relies on to reach the same catalog as the others.
+        #expect(Set(GlassShellModel.deduplicated(links.reversed()).kept.map(\.endpointID)) == Set(kept.map(\.endpointID)))
     }
 }

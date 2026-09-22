@@ -226,7 +226,13 @@ public final class GlassShellModel: GlassServiceStore {
             // under the pointer. It fails quietly: an unavailable iCloud account is a normal state,
             // not an error the user caused, and the local catalog is complete on its own.
             await synchronizeCatalog()
+            // Preferences keyed on a member record move to the canonical id **while the group
+            // still lists its members** — a moment later they are one record and the member id
+            // is a tombstone nobody can look up.
             migratePreferencesToCanonicalHosts()
+            // Two devices that each set the same machine up become one record here, not two
+            // rows' worth of services under one name (2026-09-21).
+            await consolidateDuplicateHosts()
             isLoaded = true
             errorMessage = nil
             // Only now can a capability read its own records honestly: until `isLoaded`, every
@@ -585,6 +591,7 @@ public final class GlassShellModel: GlassServiceStore {
 
     public func host(_ id: HostID) -> GlassShellHost? {
         hosts.first { $0.id == id } ?? hosts.first { $0.contains(id) }
+            ?? mergedMemberIDs[id].flatMap { canonical in hosts.first { $0.id == canonical } }
     }
 
     /// The machine one of whose services is this endpoint.
@@ -1138,24 +1145,88 @@ public final class GlassShellModel: GlassServiceStore {
     }
 
     /// Merges a consolidated host's member records into its canonical record **in the catalog**:
-    /// every service moves to the canonical record, aliases and tags are unioned, and the emptied
-    /// members are deleted. Written for Stage 6 and deliberately not reachable from the UI: the
-    /// three source applications still read `hosts.json` by their own record ids, and moving their
-    /// endpoints would strip those apps of their hosts until they are retired.
+    /// every service moves to the canonical record, aliases and tags are unioned, the emptied
+    /// members are deleted — and a service the machine now has twice is kept once.
+    ///
+    /// Written for Stage 6 and held back while the three source applications still read
+    /// `hosts.json` by their own record ids. They are obsolete now, and on 2026-09-21 the phone
+    /// showed why holding back cost something: eleven records named oscar at one address from
+    /// three devices, two of them fully configured, grouped into one row whose detail listed the
+    /// Mac's Terminal and the phone's Terminal, the Mac's Desktop and the phone's Desktop. So
+    /// this runs on its own now — `consolidateDuplicateHosts()` after every load and sync — and
+    /// the group projection is what you see only until the next sync makes it one record.
+    ///
+    /// **Which duplicate survives is decided from the catalog alone**, never from this device's
+    /// preferences, so every device reaches the same answer and none of them fights the others:
+    /// the same kind and the same name (case-insensitively) is the same service, and the
+    /// lexicographically smallest endpoint id keeps it. The losers are removed the way a user
+    /// removing them would be — link first, then the owning capability's own record.
     public func consolidateRecords(of id: HostID) async throws {
         guard let host = host(id) else { throw GlassShellError.hostNotFound(id) }
-        guard host.isConsolidated else { return }
+        try await consolidate(host)
+        await load()
+    }
+
+    /// Every group in the library collapsed to one record. Idempotent; a library with no groups
+    /// does nothing and touches nothing, so a device that is already clean publishes nothing.
+    func consolidateDuplicateHosts() async {
+        let groups = hosts.filter(\.isConsolidated)
+        guard !groups.isEmpty else { return }
+        for group in groups {
+            do { try await consolidate(group) } catch {
+                Logger.catalogSync.error("Consolidating \(group.displayName, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+        // One reload for the whole pass; `consolidate` itself never reloads, which is also what
+        // keeps `load()` from calling this and this from calling `load()`.
+        records = (try? await catalog.snapshot()) ?? records
+        rebuildProjection()
+    }
+
+    /// Member records folded into a canonical one by this process, so an id someone is still
+    /// holding — a selection, a capability's callback, a test's variable — keeps resolving to
+    /// the machine it meant. Preferences are migrated on disk; this covers everything else.
+    private var mergedMemberIDs: [HostID: HostID] = [:]
+
+    private func consolidate(_ host: GlassShellHost) async throws {
+        guard host.isConsolidated, !host.isLocal else { return }
+        // **Only a group that agrees about the address is one machine.** Two records named "db"
+        // at two addresses are two machines that share a name, and the design surfaces that
+        // disagreement for the user to settle with one edit rather than guessing. Merging them
+        // would silently glue a database on one box to a terminal on another.
+        guard host.addresses.count <= 1 else { return }
         for member in host.members.dropFirst() {
+            mergedMemberIDs[member.id] = host.id
             for link in member.services { try await catalog.move(endpointID: link.endpointID, to: host.id) }
             // `move` tombstones a record once its last service leaves; delete only what is left.
             if member.services.isEmpty { try await catalog.delete(hostID: member.id) }
         }
         let fresh = (try await catalog.snapshot()).first { $0.id == host.id } ?? host.canonical
+        let (kept, dropped) = Self.deduplicated(fresh.services)
         let merged = try HostProfile(id: fresh.id, displayName: fresh.displayName, address: host.address, aliases: host.aliases,
-                                     services: fresh.services, tags: host.tags, createdAt: fresh.createdAt,
+                                     services: kept, tags: host.tags, createdAt: fresh.createdAt,
                                      updatedAt: max(Date(), fresh.updatedAt), lastWriterID: preferences.writerID)
         try await catalog.upsert(merged)
-        await load()
+        for link in dropped {
+            if preferences[host: host.id].lastUsedEndpointID == link.endpointID {
+                preferences[host: host.id].lastUsedEndpointID = nil
+                try persistPreferences()
+            }
+            try await registry.capability(for: link.kind)?.removeService(link, host: merged)
+        }
+    }
+
+    /// One link per (kind, name); the smallest endpoint id wins so every device agrees. Pure,
+    /// and the order of the survivors is the order they were listed in.
+    static func deduplicated(_ services: [HostServiceLink]) -> (kept: [HostServiceLink], dropped: [HostServiceLink]) {
+        var winners: [String: HostServiceLink] = [:]
+        for link in services {
+            let key = "\(link.kind.rawValue)|\(link.displayName.lowercased())"
+            if let current = winners[key], current.endpointID.rawValue.uuidString <= link.endpointID.rawValue.uuidString { continue }
+            winners[key] = link
+        }
+        let keptIDs = Set(winners.values.map(\.endpointID))
+        return (services.filter { keptIDs.contains($0.endpointID) }, services.filter { !keptIDs.contains($0.endpointID) })
     }
 
     // MARK: Connecting

@@ -432,3 +432,5 @@ are now annotations on the marks, which cannot drift. Found and fixed against a 
 Two Terminals and two Desktops on oscar, on the phone. Read out of the phone's own catalog over
 the cable: eleven records for one machine, from three devices, grouped into one row that shows the
 union. Diagnosed; the consolidation is the D26 two-device run, to be started deliberately.
+Same evening: fixed. Stage 6's consolidation runs itself after every sync, merges only groups
+that agree on the address, and keeps each service once (D32). 1,696 tests, exit 0.

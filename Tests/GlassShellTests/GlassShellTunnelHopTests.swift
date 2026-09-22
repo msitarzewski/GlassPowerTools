@@ -108,7 +108,9 @@ struct GlassShellTunnelHopTests {
         await model.load()
 
         let host = try #require(model.catalogHosts.first { $0.displayName == "dup" })
-        #expect(host.members.count == 2)
+        // One record now — the two agreed on the address, so load folded them together — and
+        // the SSH service is on it.
+        #expect(host.members.count == 1)
         let member = try #require(model.sshMember(of: host),
                                   "same address, so the SSH service reaches the right machine")
         #expect(member.address == "10.0.0.7")
