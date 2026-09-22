@@ -82,4 +82,5 @@ inventory found the fix before the fix was written.
 | A clean library is not rewritten (so not republished) | `cleanLibraryIsUntouched` |
 | Disagreeing addresses are left alone | `addressGroupsAndDisagreementIsSettled`, unchanged in that half |
 | The whole thing bites | `GlassShellAutoConsolidationTests` seen red with the call in `load()` commented out |
-| On the phone | pending 0.4.196 — and this is the run that matters: three devices' catalogs converging on one oscar |
+| **On the phone** | **Seen.** 0.4.196 launched on the iPhone over the cable and its catalog copied back with `devicectl device copy from` within a minute: **oscar live: 1, tombstoned: 10** — `c737ab54`, Terminal / MySQL / Desktop each exactly once, all configured. The survivors are the Mac's endpoints, as the smallest-id rule predicts (`76bb64f3` < `f26b23f7`, `48c918ef` < `c48ea999`) |
+| The headset | Still on 0.4.123 and still holding its old records live. It cannot resurrect them — in `precedes`, a tombstone beats a live record regardless of dates — but it will keep showing them to itself until it is updated |

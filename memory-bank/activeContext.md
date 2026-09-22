@@ -2671,4 +2671,12 @@ already existed from Stage 6 and had been held back for the obsolete source apps
 itself after every sync, merges only groups that agree on the address, keeps one link per
 (kind, name) by smallest endpoint id, and hands losers to their capability. Preferences migrate
 before the fold. New tests seen red without the call. 0.4.196 building for the Mac and the phone;
-**the proof is the three devices converging on one oscar**, which only a real sync can show.
+**and the proof arrived**: the phone's catalog, copied back over the cable a minute after
+launch, holds **one live oscar and ten tombstones** — Terminal, MySQL, Desktop, each once. The
+headset (0.4.123) still shows itself the old records; a tombstone beats a live record in
+`precedes`, so it cannot bring them back, and it will be clean once it is updated.
+
+A DeviceFS read of the phone's catalog fails with `No message available on STREAM` while the app
+is running; `xcrun devicectl device copy from --domain-type appDataContainer --domain-identifier
+com.glasspowertools --source "Library/Application Support/GlassPowerTools/GlassHostCatalog/hosts.json"`
+works regardless.
