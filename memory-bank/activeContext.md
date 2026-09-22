@@ -2649,3 +2649,10 @@ Mac is on **27.2 beta** now and Swift Charts anchors categorical axis labels at 
 edge. Fixed by naming each bar with an annotation, one helper for all four charts; found with a
 headless `ImageRenderer` probe. [Task note](tasks/2026-09/2026-09-21_charts-on-macos-27-2.md).
 0.4.193 building; install follows.
+
+## 2026-09-21 (evening) — 0.4.195 on the Mac and the iPhone
+
+Both read back off the installed bundle. **A trap on the phone:** over Wi-Fi, `devicectl install`
+printed a tail of power-assertion lines and no `App installed:` line, and the phone still had
+0.4.189 — the read-back is the only proof an install happened. On the cable it installed at once.
+Read the version back every time; never trust the install command's exit.
