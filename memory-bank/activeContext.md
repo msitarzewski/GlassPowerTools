@@ -2692,3 +2692,35 @@ the Mac overview's card stay. Workgroups untouched. D33;
 [task note](tasks/2026-09/2026-09-21_active-and-the-bolt.md).
 
 Four new shell tests pass; the phone walkthrough became the bolt walkthrough and is running.
+
+## 2026-09-21 — end of day — RESUME HERE (supersedes every block above)
+
+**State DOCS. 1,700 tests / exit 0.** Release builds for macOS, iOS and visionOS. **0.4.197 on the
+Mac and the iPhone**, both read back off the bundle. The Vision Pro is on **0.4.123**. Tree clean
+at `f2ed368`.
+
+**What the day did, in order:** the session switcher and its gallery (D1–D3); the locked-screen
+diagnosis and its correction (rule 56); the Mac overview joining the seam and the title band
+fixed; the charts on macOS 27.2 (annotations, compact axis, hover tooltips, one view,
+`Tools/ChartProbe`); eleven oscar records folded into one (D32); and then the day's own switcher
+replaced by **Active** in the library and the **⚡** in every toolbar (D33), at the user's word.
+
+### Next, in order
+
+1. **The exec seam** — *"run a command on this machine and say when it is done."* Four features
+   wait on it: `git status` in the editor, project-wide `rg`, server-side LSP, the Watch (D30).
+2. **Update the Vision Pro.** It still holds the pre-consolidation oscar records and has seen
+   nothing since 0.4.123.
+3. *"A fun way to view that list"* — Active's, later.
+4. A seeded database/desktop configuration, so those can have a UI test at all.
+5. Carried: `replaceAll` whole-kind reconcile; the D26 two-device run (now partly done by D32);
+   drag *out* of the Files browser; test hygiene; `SFTPRemoteEditorView`.
+
+### Things that will bite
+
+- Rules 53–57: an extension-only protocol default is invisible through `any`; leaving a screen
+  is not closing it where there are no windows; a device capability read at init is read too
+  early; **check the lock screen before the toolchain**; inventory the feature, not just the seam.
+- Read a phone's catalog with `devicectl device copy from --domain-type appDataContainer`; the
+  DeviceFS mount fails while the app runs. Read the installed version back off every device.
+- `pgrep -x "Glass Power Tools"` matches the simulator copies too.
