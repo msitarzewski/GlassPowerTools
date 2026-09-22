@@ -157,9 +157,10 @@ struct GlassShellHostAddressTests {
         let grouped = try #require(model.host(a.id))
         // Two records that agree on the address are one record after load, not a lasting group
         // (2026-09-21); `b` is folded into `a`, and `b.id` still resolves to it.
-        #expect(grouped.members.map(\.id) == [a.id] && grouped.address == "10.9.9.9" && grouped.addresses == ["10.9.9.9"])
+        #expect(grouped.members.map(\.id) == [b.id] && grouped.address == "10.9.9.9" && grouped.addresses == ["10.9.9.9"],
+                "the most recently updated member survives the fold")
         #expect(grouped.services.count == 2)
-        #expect(model.host(b.id)?.id == a.id)
+        #expect(model.host(a.id)?.id == b.id)
 
         let drift = try #require(model.host(c1.id))
         #expect(drift.addresses == ["10.1.1.1", "10.1.1.2"] && drift.address == "10.1.1.1", "canonical first; both surfaced")

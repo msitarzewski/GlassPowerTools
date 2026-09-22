@@ -2724,3 +2724,11 @@ replaced by **Active** in the library and the **⚡** in every toolbar (D33), at
 - Read a phone's catalog with `devicectl device copy from --domain-type appDataContainer`; the
   DeviceFS mount fails while the app runs. Read the installed version back off every device.
 - `pgrep -x "Glass Power Tools"` matches the simulator copies too.
+
+## 2026-09-21 (later still) — oscar missing from the Mac; fold survivor changed
+
+The fold's survivor was the oldest record, which is the one most likely to be a tombstone
+elsewhere. Now it is the most recently updated member with services. Shell suite 170 / green;
+package suite and 0.4.198 builds running. **The Mac's catalog is unread** — privacy protection
+on the group container — and the user is copying it out; the Mac is not reinstalled until it has
+been read, so the evidence is not disturbed. The phone still holds oscar live.

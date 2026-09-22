@@ -61,14 +61,16 @@ struct GlassShellConsolidationTests {
         #expect(model.records.count == 1)
         #expect(model.catalogHosts.count == 1)
         let host = try #require(model.catalogHosts.first)
-        #expect(host.id == older.id, "canonical is the oldest record")
-        #expect(host.displayName == "juliet")
+        // The fold keeps the most recently updated member — `newer` — because the oldest is the
+        // record most likely to be a tombstone on another device already (2026-09-21, oscar).
+        #expect(host.id == newer.id, "the survivor is the most recently updated record")
+        #expect(host.displayName == "juliet", "the group's name — the oldest record's — is kept on the survivor")
         #expect(host.services.count == 2)
         #expect(model.serviceKinds(for: host.id) == [.rdp, .ssh])
         #expect(model.catalogItems.count == 1)
         #expect(model.catalogItems.first?.subtitle == "Desktop · Terminal")
-        #expect(host.member(owning: newer.services[0].endpointID)?.id == older.id,
-                "the newer record's service now lives on the canonical record")
+        #expect(host.member(owning: older.services[0].endpointID)?.id == newer.id,
+                "the older record's service now lives on the survivor")
     }
 
     @Test("A shared alias groups records whose names differ")
@@ -136,8 +138,8 @@ struct GlassShellConsolidationTests {
         #expect(fresh.lastConnected(older.id) == t0.addingTimeInterval(500))
         #expect(fresh.lastUsedService(for: older.id)?.endpointID == newer.services[0].endpointID)
         let saved = GlassShellPreferencesStore(fileURL: root.appendingPathComponent("app/shell-preferences.json")).load().preferences
-        #expect(saved.hosts[newer.id] == nil, "stray record removed")
-        #expect(saved.hosts[older.id]?.isFavorite == true)
+        #expect(saved.hosts[older.id] == nil, "the folded record's preference is gone")
+        #expect(saved.hosts[newer.id]?.isFavorite == true, "and lives on the survivor")
     }
 
     @Test("Deleting a host deletes every member record")
@@ -162,18 +164,18 @@ struct GlassShellConsolidationTests {
         let newer = try record("juliet", kinds: [.rdp], createdAt: t0.addingTimeInterval(1))
         try await sibling.upsert(older); try await sibling.upsert(newer)
         await model.load()
-        // `newer.id` is a tombstone after load; adding through it still lands on the machine it
-        // meant, because a merged member id keeps resolving to its canonical record.
-        let added = try await model.addService(kind: .database, displayName: "db", to: newer.id)
+        // `older.id` is a tombstone after load; adding through it still lands on the machine it
+        // meant, because a merged member id keeps resolving to the survivor.
+        let added = try await model.addService(kind: .database, displayName: "db", to: older.id)
         let stored = try await sibling.snapshot()
         #expect(stored.count == 1)
-        #expect(stored.first { $0.id == older.id }?.services.contains { $0.endpointID == added.endpointID } == true)
-        #expect(stored.first { $0.id == newer.id } == nil, "the member record was folded in and deleted")
+        #expect(stored.first { $0.id == newer.id }?.services.contains { $0.endpointID == added.endpointID } == true)
+        #expect(stored.first { $0.id == older.id } == nil, "the older record was folded in and deleted")
         #expect(model.catalogHosts.first?.services.count == 3)
 
-        try await model.removeService(newer.services[0].endpointID, from: older.id)
+        try await model.removeService(older.services[0].endpointID, from: newer.id)
         let after = try await sibling.snapshot()
-        #expect(after.first { $0.id == older.id }?.services.count == 2)
+        #expect(after.first { $0.id == newer.id }?.services.count == 2)
         #expect(model.catalogHosts.first?.services.count == 2)
     }
 
@@ -191,7 +193,7 @@ struct GlassShellConsolidationTests {
         #expect(Set(model.services(for: host.id).map(\.endpointID)) == Set([older.services[0].endpointID, newer.services[0].endpointID]))
         model.connect(hostID: newer.id, endpointID: newer.services[0].endpointID)
         #expect(desktop.opened.count == 1)
-        #expect(desktop.opened.first?.1.id == older.id, "the record that owns the endpoint — the canonical one, after consolidation")
+        #expect(desktop.opened.first?.1.id == newer.id, "the record that owns the endpoint — the survivor, after consolidation")
         #expect(model.lastUsedService(for: host.id)?.endpointID == newer.services[0].endpointID)
         #expect(model.lastConnected(host.id) == nil, "opened is not connected: the capability has not reported yet")
         desktop.pendingReport?(.connected)
@@ -238,7 +240,7 @@ struct GlassShellConsolidationTests {
         try await model.consolidateRecords(of: older.id)
         let stored = try await sibling.snapshot()
         #expect(stored.count == 1)
-        #expect(stored.first?.id == older.id)
+        #expect(stored.first?.id == newer.id, "the most recently updated member survives")
         #expect(stored.first?.services.count == 2)
         #expect(Set(stored.first?.aliases ?? []) == ["10.0.0.5", "juliet.local"])
         #expect(model.catalogHosts.count == 1 && model.records.count == 1)
@@ -261,8 +263,8 @@ struct GlassShellConsolidationTests {
 
         let opened = terminal.opened.map(\.0.endpointID) + desktop.opened.map(\.0.endpointID)
         #expect(Set(opened) == Set(host.services.map(\.endpointID)), "every service was opened")
-        #expect(terminal.opened.first?.1.id == older.id, "each capability gets the record owning its endpoint")
-        #expect(desktop.opened.first?.1.id == older.id, "consolidated: the canonical record owns every endpoint")
+        #expect(terminal.opened.first?.1.id == newer.id, "each capability gets the record owning its endpoint — the survivor")
+        #expect(desktop.opened.first?.1.id == newer.id, "consolidated: the survivor owns every endpoint")
         #expect(model.lastUsedService(for: host.id) == nil, "connecting the machine chooses no one service")
 
         terminal.pendingReport?(.connected)
@@ -365,7 +367,7 @@ struct GlassShellAutoConsolidationTests {
         let stored = try await sibling.snapshot()
         #expect(stored.count == 1, "one record for one machine")
         let survivor = try #require(stored.first)
-        #expect(survivor.id == mac.id, "the oldest record is canonical")
+        #expect(survivor.id == phone.id, "the most recently updated record survives, not the oldest")
         #expect(survivor.services.count == 3, "Terminal, MySQL, Desktop — each once")
         #expect(Set(survivor.services.map(\.kind)) == [.ssh, .database, .rdp])
         // The smallest endpoint id wins regardless of which record it came from, so every device
@@ -434,5 +436,42 @@ struct GlassShellAutoConsolidationTests {
         // The same winners whichever order the records arrived in — the property every device
         // relies on to reach the same catalog as the others.
         #expect(Set(GlassShellModel.deduplicated(links.reversed()).kept.map(\.endpointID)) == Set(kept.map(\.endpointID)))
+    }
+}
+
+
+/// Which member a group folds into.
+@Suite("The fold keeps the record other devices most recently agreed exists")
+@MainActor
+struct GlassShellFoldTargetTests {
+    @Test func theMostRecentlyUpdatedMemberSurvives() throws {
+        // Oldest created, but most recently updated: this is oscar on 2026-09-21 — the Mac's
+        // record, touched on the 18th, while older duplicates were tombstones elsewhere.
+        let stale = try HostProfile(displayName: "oscar", address: "10.0.0.1",
+                                    createdAt: Date(timeIntervalSince1970: 100), updatedAt: Date(timeIntervalSince1970: 100))
+        let touched = try HostProfile(displayName: "oscar", address: "10.0.0.1",
+                                      createdAt: Date(timeIntervalSince1970: 50), updatedAt: Date(timeIntervalSince1970: 900))
+        #expect(GlassShellModel.foldTarget(among: [stale, touched]).id == touched.id)
+        #expect(GlassShellModel.foldTarget(among: [touched, stale]).id == touched.id, "order of arrival is irrelevant")
+    }
+
+    @Test func anEmptyRecordNeverWinsOverOneWithServices() throws {
+        let empty = try HostProfile(displayName: "oscar", address: "10.0.0.1",
+                                    createdAt: Date(timeIntervalSince1970: 900), updatedAt: Date(timeIntervalSince1970: 900))
+        let carrying = try HostProfile(displayName: "oscar", address: "10.0.0.1",
+                                       services: [HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "t")],
+                                       createdAt: Date(timeIntervalSince1970: 100), updatedAt: Date(timeIntervalSince1970: 100))
+        #expect(GlassShellModel.foldTarget(among: [empty, carrying]).id == carrying.id,
+                "an adoption that saved a host and then nothing is a shell, not a home for the services")
+    }
+
+    @Test func aTieGoesToTheSmallestID() throws {
+        let a = try HostProfile(id: HostID(rawValue: UUID(uuidString: "AAAAAAAA-0000-0000-0000-000000000000")!),
+                                displayName: "oscar", address: "10.0.0.1",
+                                createdAt: Date(timeIntervalSince1970: 1), updatedAt: Date(timeIntervalSince1970: 1))
+        let b = try HostProfile(id: HostID(rawValue: UUID(uuidString: "BBBBBBBB-0000-0000-0000-000000000000")!),
+                                displayName: "oscar", address: "10.0.0.1",
+                                createdAt: Date(timeIntervalSince1970: 1), updatedAt: Date(timeIntervalSince1970: 1))
+        #expect(GlassShellModel.foldTarget(among: [b, a]).id == a.id)
     }
 }

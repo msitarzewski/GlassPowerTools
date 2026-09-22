@@ -1198,25 +1198,52 @@ public final class GlassShellModel: GlassServiceStore {
         // disagreement for the user to settle with one edit rather than guessing. Merging them
         // would silently glue a database on one box to a terminal on another.
         guard host.addresses.count <= 1 else { return }
-        for member in host.members.dropFirst() {
-            mergedMemberIDs[member.id] = host.id
-            for link in member.services { try await catalog.move(endpointID: link.endpointID, to: host.id) }
+        let survivor = Self.foldTarget(among: host.members)
+        for member in host.members where member.id != survivor.id {
+            mergedMemberIDs[member.id] = survivor.id
+            for link in member.services { try await catalog.move(endpointID: link.endpointID, to: survivor.id) }
             // `move` tombstones a record once its last service leaves; delete only what is left.
             if member.services.isEmpty { try await catalog.delete(hostID: member.id) }
         }
-        let fresh = (try await catalog.snapshot()).first { $0.id == host.id } ?? host.canonical
+        // Preferences were keyed on the group's canonical id; the survivor may not be it.
+        if survivor.id != host.id, preferences.hosts[host.id] != nil, preferences.hosts[survivor.id] == nil {
+            preferences.hosts[survivor.id] = preferences.hosts[host.id]
+            preferences.hosts[host.id] = nil
+            try persistPreferences()
+        }
+        let fresh = (try await catalog.snapshot()).first { $0.id == survivor.id } ?? survivor
         let (kept, dropped) = Self.deduplicated(fresh.services)
-        let merged = try HostProfile(id: fresh.id, displayName: fresh.displayName, address: host.address, aliases: host.aliases,
+        let merged = try HostProfile(id: fresh.id, displayName: host.displayName, address: host.address, aliases: host.aliases,
                                      services: kept, tags: host.tags, createdAt: fresh.createdAt,
                                      updatedAt: max(Date(), fresh.updatedAt), lastWriterID: preferences.writerID)
         try await catalog.upsert(merged)
         for link in dropped {
-            if preferences[host: host.id].lastUsedEndpointID == link.endpointID {
-                preferences[host: host.id].lastUsedEndpointID = nil
+            if preferences[host: survivor.id].lastUsedEndpointID == link.endpointID {
+                preferences[host: survivor.id].lastUsedEndpointID = nil
                 try persistPreferences()
             }
             try await registry.capability(for: link.kind)?.removeService(link, host: merged)
         }
+    }
+
+    /// The record a group folds into: **the most recently updated member**, ties to the smallest
+    /// id. Not the group's canonical (oldest) record.
+    ///
+    /// On 2026-09-21 folding into the oldest emptied oscar off the Mac. The oldest live record
+    /// in a group is exactly the one most likely to be a tombstone already on another device —
+    /// old duplicates are what other devices cleaned up first — and a tombstone beats a live
+    /// record in the merge whatever the dates. Every service moved into it went with it. The
+    /// most recently updated record is the one every device most recently agreed exists.
+    ///
+    /// A member with services outranks an empty one, whatever the dates: an empty record is an
+    /// adoption that saved a host and then nothing, and folding a machine's services into it
+    /// would keep the shell and throw away the one that had been carrying them.
+    static func foldTarget(among members: [HostProfile]) -> HostProfile {
+        members.max {
+            if $0.services.isEmpty != $1.services.isEmpty { return $0.services.isEmpty }
+            if $0.updatedAt != $1.updatedAt { return $0.updatedAt < $1.updatedAt }
+            return $0.id.rawValue.uuidString > $1.id.rawValue.uuidString
+        }!
     }
 
     /// One link per (kind, name); the smallest endpoint id wins so every device agrees. Pure,

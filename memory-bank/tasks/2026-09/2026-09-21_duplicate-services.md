@@ -84,3 +84,47 @@ inventory found the fix before the fix was written.
 | The whole thing bites | `GlassShellAutoConsolidationTests` seen red with the call in `load()` commented out |
 | **On the phone** | **Seen.** 0.4.196 launched on the iPhone over the cable and its catalog copied back with `devicectl device copy from` within a minute: **oscar live: 1, tombstoned: 10** — `c737ab54`, Terminal / MySQL / Desktop each exactly once, all configured. The survivors are the Mac's endpoints, as the smallest-id rule predicts (`76bb64f3` < `f26b23f7`, `48c918ef` < `c48ea999`) |
 | The headset | Still on 0.4.123 and still holding its old records live. It cannot resurrect them — in `precedes`, a tombstone beats a live record regardless of dates — but it will keep showing them to itself until it is updated |
+
+---
+
+# oscar vanished from the Mac — 2026-09-21, late
+
+*"Weird. oscar is missing now from the Mac :P"* — an hour after D32 shipped.
+
+## What the phone says, read again properly
+
+The first dump never printed `deletedAt`. Read again with it: **ten of the eleven oscar records
+were tombstones already**, some since 13 September; `c737ab54` (the Mac's) was the only live one
+and still is, with three configured services and `updatedAt` 18 September — the fold on the
+phone did not rewrite it. So the phone's duplicates this evening were two links *on one record*,
+and the phone's fix was the dedup, not a fold.
+
+## What the Mac's fold would have done
+
+The fold chose the group's **canonical** record as its survivor, and the canonical is the
+**oldest**. The oldest live record in a group is exactly the one most likely to be a tombstone on
+another device already — old duplicates are what other devices cleaned up first. Move every
+service into it, tombstone the rest, sync: a tombstone for the survivor arrives, and oscar is
+gone with everything that was folded into it. Whether that is precisely what happened on the Mac
+is **unconfirmed** — its catalog is in `~/Library/Group Containers/group.sh.glas.shared/`, which
+macOS privacy protection keeps this shell out of; the user is copying it to the Desktop.
+
+## Changed regardless
+
+- `GlassShellModel.foldTarget(among:)`: the survivor is the member **with services** that was
+  **most recently updated**, ties to the smallest id — the record every device most recently
+  agreed exists. The group's canonical (oldest) record is unchanged as the *display* identity;
+  flipping that instead broke the tunnel and trust rules, which lean on it for the machine's
+  address.
+- Preferences keyed on the canonical follow the survivor. `mergedMemberIDs` maps every folded
+  member to it.
+- Tests: `GlassShellFoldTargetTests` (newest wins, empties never win, ties to smallest id) and
+  the fold tests brought to the survivor.
+
+## Two facts about the merge worth knowing
+
+`GlassCatalogMerge.winner` is last-write-wins by `updatedAt`; only at equal timestamps does a
+tombstone win. But incoming records are applied through `HostCatalogStore.merge`, whose
+`precedes` makes **a tombstone win regardless of dates**. The reconcile can decide a newer live
+record wins and the store will still refuse to revive it. Not changed tonight; it is D19's
+"deleted here must not come back", and changing it is a decision for daylight.
