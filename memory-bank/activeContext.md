@@ -2732,3 +2732,5 @@ elsewhere. Now it is the most recently updated member with services. Shell suite
 package suite and 0.4.198 builds running. **The Mac's catalog is unread** — privacy protection
 on the group container — and the user is copying it out; the Mac is not reinstalled until it has
 been read, so the evidence is not disturbed. The phone still holds oscar live.
+0.4.198 is on the phone (read back), so its next fold uses the safe survivor. The Mac is still on
+0.4.197 with oscar missing, awaiting its catalog copy.
