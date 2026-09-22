@@ -2750,3 +2750,45 @@ than the tombstone's `deletedAt` revive it; ties keep the tombstone. Four catalo
 old test rewritten to the new truth. 1,707 tests, exit 0. 0.4.199 building for the Mac and the
 phone; **the Mac's first launch of it fetches everything (the sync token is never persisted) and
 should bring oscar back on its own** — that is the test, and only the Mac's screen can pass it.
+
+## 2026-09-21 — 23:00 — RESUME HERE (supersedes every block above)
+
+**State DOCS, tree clean after this commit. 1,707 tests / exit 0. 0.4.199 on the Mac and the
+iPhone**, read back off each bundle. Vision Pro on 0.4.123. Today: the session switcher, then
+Active + the ⚡ replacing it (D33); the charts on macOS 27.2; D32 (fold same-address records);
+D34 (a deletion is dated); the fold survivor is the most recently updated member with services.
+
+### Open, in order
+
+1. **oscar on the Mac — unresolved.** Its record was tombstoned by the phone's fold at 21:19
+   (0.4.196, old survivor rule) and the Mac refused the merged record (old immortal-tombstone
+   rule). D34 fixes the rule; the phone was launched on 0.4.199 at ~22:55 so it would publish
+   its merged record, and the Mac was relaunched a minute later to fetch everything. **Whether
+   oscar came back has not been seen.** If it did not: the phone's merged record is not in
+   CloudKit, and the fallback is to **rebuild oscar from the backup** at
+   `~/Desktop/phone-hosts-backup.json` (record `c737ab54`: Terminal `76bb64f3` 668 B, MySQL
+   `a5ad31ce` 540 B, Desktop `48c918ef` 764 B, address `192.0.2.10`). Constraints: the
+   Mac's catalog is in `~/Library/Group Containers/group.sh.glas.shared/`, unreadable and
+   unwritable from the shell (Finder can copy it out); the phone's live catalog is in its App
+   Group container, which `devicectl copy` refuses in both directions; the phone's
+   app-container `hosts.json` is a stale copy. So the rebuild needs a path *inside the app* —
+   the least machinery is a debug launch argument that upserts a record from a JSON file, or a
+   proper "Restore from file" in Settings. Re-using the same endpoint ids keeps the credentials.
+2. **Disconnect / Close in the database workspace.** *"There's no disconnect from a database.
+   Or close?"* Today the only deliberate way to end a database session is Active's row (swipe,
+   or the context menu on the Mac). **On iOS the Databases screen already has a ⋯ overflow menu
+   with Close** — user's screenshot 22:58; find it by `ellipsis.circle` in
+   `Sources/GlassDatabase/SchemaBrowserView.swift:320` — and the Mac workspace has nothing.
+   Mirror it: the same menu on the Mac, Close/Disconnect calling
+   `DatabaseSessionManager.disconnect(sessionID:)`, the call Active's row already makes.
+3. The exec seam; update the Vision Pro; a seeded database/desktop configuration; the carried
+   items.
+
+### Things that will bite
+
+- Writer ids: **`a4d0e867` is the Mac, `6b16e22a` the phone** (from each device's
+  `shell-preferences.json`). Rules 53–57.
+- Read the installed version back off every device; a Wi-Fi `devicectl install` can silently
+  do nothing. `pgrep -x "Glass Power Tools"` matches the simulator copies.
+- The sync token is never persisted: every launch is a full fetch. Publishing happens on the
+  *next* sync after a change, so a device that folds and is not relaunched has published nothing.
