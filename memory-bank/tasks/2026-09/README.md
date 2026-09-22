@@ -426,3 +426,9 @@ The overview's bar-chart names overlapped their bars. The code had not changed; 
 27.2 beta anchors a categorical axis label at the top of its band and ignores `centered:`. Names
 are now annotations on the marks, which cannot drift. Found and fixed against a headless
 `ImageRenderer` probe rather than an install per attempt. Then the rows axis: `5.0E6` became `5M`. Then the exact value on hover, and the four charts became one view.
+
+## 2026-09-21 — [duplicated services](2026-09-21_duplicate-services.md)
+
+Two Terminals and two Desktops on oscar, on the phone. Read out of the phone's own catalog over
+the cable: eleven records for one machine, from three devices, grouped into one row that shows the
+union. Diagnosed; the consolidation is the D26 two-device run, to be started deliberately.

@@ -2656,3 +2656,10 @@ Both read back off the installed bundle. **A trap on the phone:** over Wi-Fi, `d
 printed a tail of power-assertion lines and no `App installed:` line, and the phone still had
 0.4.189 — the read-back is the only proof an install happened. On the cable it installed at once.
 Read the version back every time; never trust the install command's exit.
+
+## 2026-09-21 (late) — duplicated services diagnosed, not yet fixed
+
+Eleven oscar records in the phone's catalog, two of them fully configured (the Mac's and the
+phone's), grouped into one row whose detail shows the union. Sync by design, not a build problem.
+[Task note](tasks/2026-09/2026-09-21_duplicate-services.md) has the evidence and the two-part
+fix; the second part is the D26 two-device migration and is the user's call to start.
