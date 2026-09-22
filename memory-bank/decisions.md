@@ -943,3 +943,21 @@ layout that gallery left behind.
 **Kept deliberately.** Workgroups — the terminal's saved multi-machine layouts — unchanged.
 
 **Later, maybe.** *"A fun way to view that list."* The seam is ready for it.
+
+
+## D34 — A deletion is dated; the later statement wins — Implemented 2026-09-21
+
+**Context.** `GlassCatalogMerge.winner` was last-write-wins by `updatedAt`, but the store that
+applies incoming records (`HostCatalogStore.precedes`) made a tombstone beat a live record
+whatever the dates. When the phone folded its duplicate oscar records into one and the merged
+record arrived at the Mac live and newer, a five-day-old tombstone for that id refused it,
+silently, and oscar vanished from the Mac with every service folded into it.
+
+**Decided.** One rule at both layers: the later statement about a record wins, deletion
+included. A tombstone beats a live record only when its `deletedAt` is at or after the live
+record's `updatedAt`. Ties keep the tombstone.
+
+**Cost accepted.** A device that edits a host after another device deleted it revives it. That
+was D19's "deleted here must not come back" case; the trade is that an edit is a deliberate act
+too, and losing a whole machine to an unrelated old tombstone was the worse failure and the one
+that actually happened. Pre-launch, one user, three devices.

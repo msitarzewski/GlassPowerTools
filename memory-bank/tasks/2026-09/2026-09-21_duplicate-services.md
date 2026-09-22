@@ -128,3 +128,38 @@ tombstone win. But incoming records are applied through `HostCatalogStore.merge`
 `precedes` makes **a tombstone win regardless of dates**. The reconcile can decide a newer live
 record wins and the store will still refuse to revive it. Not changed tonight; it is D19's
 "deleted here must not come back", and changing it is a decision for daylight.
+
+
+---
+
+# The actual mechanism, with the Mac's catalog in hand — 2026-09-21, later
+
+The user copied the Mac's catalog out through Finder. Two corrections first: **the writer ids
+were backwards above** — `a4d0e867` is the **Mac** (its `shell-preferences.json` says so) and
+`6b16e22a` is the **phone** — and the phone's catalog I had been reading over the cable is a
+**stale app-container copy** from the 18th; the phone's live catalog is in its App Group
+container, which `devicectl copy` refuses ("outside the allowed container directories").
+
+So `c737ab54` was the *phone's* record, and at **21:19:31 tonight the phone's fold** (0.4.196,
+the moment it launched) moved its three services into another member and tombstoned it. The
+Mac's copy shows exactly that tombstone: writer `6b16e22a`, empty services, `deletedAt ==
+updatedAt` — the signature of `move` emptying a source. The phone kept oscar, as the merged
+record. The Mac received both: the tombstone for `c737ab54` (applied) and the merged record,
+live and newer — **and refused it**, because `HostCatalogStore.precedes` made a tombstone beat a
+live record whatever the dates, and the Mac held a five-day-old tombstone for that id. The
+reconcile (`GlassCatalogMerge.winner`, last-write-wins) had already decided the live record won;
+the store overruled it silently. The three endpoints are on no record in the Mac's file.
+
+## Fixed
+
+`precedes` is now **the later statement wins, deletion included**: a tombstone beats a live
+record only when it is the more recent of the two; equal instants keep the tombstone so a stale
+echo cannot undo a delete. This is the rule the sync layer always claimed, applied where the
+write actually happens. `HostCatalogTombstoneMergeTests` pins all four cases, including the one
+the old rule existed for — an older edit does not resurrect a newer deletion (D34).
+
+**Why the Mac heals itself:** `catalogSyncToken` is never persisted, so every launch fetches
+everything. The next launch of a build with this rule pulls the phone's live merged record, and
+it now beats the old tombstone. No file surgery, no re-adding, no re-entered credentials —
+provided the phone's merged record still exists live in CloudKit, which its own catalog state
+suggests and only the Mac's next launch can prove.

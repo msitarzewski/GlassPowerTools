@@ -2734,3 +2734,19 @@ on the group container — and the user is copying it out; the Mac is not reinst
 been read, so the evidence is not disturbed. The phone still holds oscar live.
 0.4.198 is on the phone (read back), so its next fold uses the safe survivor. The Mac is still on
 0.4.197 with oscar missing, awaiting its catalog copy.
+
+## 2026-09-21 — night — oscar: the real mechanism, and D34
+
+With the Mac's catalog in hand (copied out through Finder — the shell is kept out of other apps'
+group containers): the writer ids in the notes above were **backwards** (`a4d0e867` = Mac,
+`6b16e22a` = phone), and the phone catalog read over the cable was a **stale app-container
+copy** — the live one is in the App Group container, which `devicectl copy` refuses. The phone's
+fold at 21:19 tonight tombstoned `c737ab54` after moving its services into another record; the
+Mac received the merged record live and newer and **refused it**, because
+`HostCatalogStore.precedes` made a tombstone immortal while the reconcile was last-write-wins.
+
+**D34:** the later statement wins, deletion included. `precedes` now lets a live record newer
+than the tombstone's `deletedAt` revive it; ties keep the tombstone. Four catalog tests, one
+old test rewritten to the new truth. 1,707 tests, exit 0. 0.4.199 building for the Mac and the
+phone; **the Mac's first launch of it fetches everything (the sync token is never persisted) and
+should bring oscar back on its own** — that is the test, and only the Mac's screen can pass it.

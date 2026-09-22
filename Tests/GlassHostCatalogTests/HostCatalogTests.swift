@@ -64,7 +64,11 @@ struct HostCatalogTests {
         #expect(try await HostCatalogStore(fileURL: url).snapshot().count == 40)
     }
 
-    @Test("Tombstones survive offline newer edits and retain references only as history")
+    /// D34 (2026-09-21): a deletion is dated. An edit made *after* it revives the host, an edit
+    /// made *before* it does not — the tombstone keeps the references as history and refuses an
+    /// upsert. It used to be that no edit, however much later, could bring a deleted host back;
+    /// that rule ate a machine when two devices folded duplicates in a different order.
+    @Test("A tombstone yields to a later edit and survives an earlier one, keeping references as history")
     func tombstones() async throws {
         let url = try location()
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
@@ -74,13 +78,23 @@ struct HostCatalogTests {
         ])
         try await store.upsert(host)
         try await store.delete(hostID: host.id)
-        host.updatedAt = Date().addingTimeInterval(3600)
+
+        // An edit from before the deletion — a device that had not heard — changes nothing.
+        // `host` as created is exactly that: its `updatedAt` predates the tombstone's `deletedAt`.
+        // (A timestamp before `createdAt` is invalid, so the stale edit cannot be made older.)
         try await store.merge([host])
         #expect(try await store.snapshot().isEmpty)
         let history = try #require(await store.snapshot(includeDeleted: true).first)
         #expect(history.deletedAt != nil)
-        #expect(history.services == host.services)
+        #expect(history.services == host.services, "the tombstone keeps the references as history")
         await #expect(throws: HostCatalogError.hostDeleted(host.id)) { try await store.upsert(host) }
+
+        // An edit from after the deletion is the later statement, and wins.
+        host.updatedAt = Date().addingTimeInterval(3600)
+        try await store.merge([host])
+        let revived = try #require(await store.snapshot().first)
+        #expect(revived.id == host.id && revived.deletedAt == nil)
+        #expect(revived.services == host.services, "and its services come back with it")
     }
 
     @Test("Merge order is deterministic")
@@ -277,4 +291,66 @@ struct HostCatalogTests {
         #expect(tombstone.services.isEmpty)
     }
 
+}
+
+/// A deletion is dated. The later statement about a record wins, deletion included.
+///
+/// The store used to make a tombstone immortal while `GlassCatalogMerge.winner` was last-write-
+/// wins; on 2026-09-21 the two disagreed and the store's rule ate a machine on the Mac — the
+/// phone folded its duplicate records into one, the merged record arrived live and newer, and
+/// a five-day-old tombstone for that id refused it.
+@Suite("Merging a tombstone against a live record")
+struct HostCatalogTombstoneMergeTests {
+    private func store() throws -> HostCatalogStore {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("tombstone-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        return HostCatalogStore(fileURL: root.appendingPathComponent("hosts.json"))
+    }
+
+    private func oscar(deletedAt: Date?, updatedAt: Date, id: HostID = HostID()) throws -> HostProfile {
+        try HostProfile(id: id, displayName: "oscar", address: "10.0.0.1",
+                        services: deletedAt == nil ? [HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "t")] : [],
+                        createdAt: Date(timeIntervalSince1970: 1), updatedAt: updatedAt, deletedAt: deletedAt)
+    }
+
+    @Test("A live record updated after the deletion revives it, with its services")
+    func newerLiveRecordRevives() async throws {
+        let store = try store()
+        let id = HostID()
+        let dead = try oscar(deletedAt: Date(timeIntervalSince1970: 100), updatedAt: Date(timeIntervalSince1970: 100), id: id)
+        try await store.merge([dead])
+        let alive = try oscar(deletedAt: nil, updatedAt: Date(timeIntervalSince1970: 500), id: id)
+        try await store.merge([alive])
+        let stored = try await store.snapshot(includeDeleted: true).first { $0.id == id }
+        #expect(stored?.deletedAt == nil)
+        #expect(stored?.services.count == 1)
+    }
+
+    @Test("A deletion made after the last edit still deletes")
+    func newerTombstoneStillDeletes() async throws {
+        let store = try store()
+        let id = HostID()
+        try await store.merge([try oscar(deletedAt: nil, updatedAt: Date(timeIntervalSince1970: 100), id: id)])
+        try await store.merge([try oscar(deletedAt: Date(timeIntervalSince1970: 500), updatedAt: Date(timeIntervalSince1970: 500), id: id)])
+        #expect(try await store.snapshot().contains { $0.id == id } == false)
+    }
+
+    @Test("At the same instant the tombstone wins, so a stale echo cannot undo a delete")
+    func tieKeepsTheTombstone() async throws {
+        let store = try store()
+        let id = HostID()
+        let t = Date(timeIntervalSince1970: 300)
+        try await store.merge([try oscar(deletedAt: t, updatedAt: t, id: id)])
+        try await store.merge([try oscar(deletedAt: nil, updatedAt: t, id: id)])
+        #expect(try await store.snapshot().contains { $0.id == id } == false)
+    }
+
+    @Test("An older live record cannot revive a newer deletion — the case the old rule was for")
+    func staleEditDoesNotResurrect() async throws {
+        let store = try store()
+        let id = HostID()
+        try await store.merge([try oscar(deletedAt: Date(timeIntervalSince1970: 500), updatedAt: Date(timeIntervalSince1970: 500), id: id)])
+        try await store.merge([try oscar(deletedAt: nil, updatedAt: Date(timeIntervalSince1970: 100), id: id)])
+        #expect(try await store.snapshot().contains { $0.id == id } == false)
+    }
 }

@@ -441,3 +441,6 @@ The user simplified the day's own work: **Active** joins All, Favorites and Rece
 machine with a disclosure, and every top toolbar gets the ⚡ that goes there. Choosing a row
 switches to the live session. The morning's Sessions control, switcher sheet and gallery are gone;
 the seam under them and the Mac overview's cards stay. Workgroups untouched (D33).
+Then oscar vanished from the Mac: the store made tombstones immortal while the sync was
+last-write-wins, and the phone's fold had tombstoned the record the Mac's copy was keyed on.
+D34 — a deletion is dated — and the fold now keeps the most recently updated member with services.

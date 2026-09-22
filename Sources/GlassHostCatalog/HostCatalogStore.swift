@@ -318,8 +318,24 @@ public actor HostCatalogStore {
         return encoder
     }
 
+    /// Whether `rhs` should replace `lhs` in a merge: the later statement about the record wins,
+    /// **a deletion included** — a tombstone is dated, and it beats a live record only when it is
+    /// the more recent of the two. Equal dates keep the tombstone, so a stale echo of an edit
+    /// cannot undo a delete made at the same instant.
+    ///
+    /// It used to make a tombstone immortal — beat the live record whatever the dates — which is
+    /// the rule `GlassCatalogMerge.winner` never had. On 2026-09-21 the two disagreed and the
+    /// store's rule ate oscar on the Mac: the phone folded its records into one, the merged
+    /// record arrived live and newer, and the Mac's five-day-old tombstone for that record id
+    /// refused it — silently, because the reconcile had already decided the live record won.
     private static func precedes(_ lhs: HostProfile, _ rhs: HostProfile) throws -> Bool {
-        if (lhs.deletedAt != nil) != (rhs.deletedAt != nil) { return lhs.deletedAt == nil }
+        if (lhs.deletedAt != nil) != (rhs.deletedAt != nil) {
+            let live = lhs.deletedAt == nil ? lhs : rhs
+            let dead = lhs.deletedAt == nil ? rhs : lhs
+            let deathBeatsLife = dead.deletedAt! >= live.updatedAt
+            // `rhs` replaces `lhs` when it is the winner.
+            return (rhs.deletedAt != nil) == deathBeatsLife
+        }
         if lhs.updatedAt != rhs.updatedAt { return lhs.updatedAt < rhs.updatedAt }
         if lhs.lastWriterID != rhs.lastWriterID {
             return lhs.lastWriterID.rawValue.uuidString < rhs.lastWriterID.rawValue.uuidString
