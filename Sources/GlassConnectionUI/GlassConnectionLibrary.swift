@@ -101,11 +101,26 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
         return copy
     }
 
+    /// A panel something outside asked to open — the ⚡ asking for Active. Read by `onChange`;
+    /// cleared once opened, so asking twice for the same panel opens it twice.
+    private var panelToOpen: Binding<String?> = .constant(nil)
+
+    public func panelToOpen(_ binding: Binding<String?>) -> Self {
+        var copy = self
+        copy.panelToOpen = binding
+        return copy
+    }
+
+    /// Panels that sit inside the Library section, drawn as rows after the three categories.
+    private var libraryPanels: [GlassLibraryPanel] {
+        panels.filter { $0.sectionTitle == GlassLibraryPanel.librarySectionTitle }
+    }
+
     /// The panels grouped into the sections the sidebar draws, preserving the given order.
     private var panelSections: [(title: String, panels: [GlassLibraryPanel])] {
         var order: [String] = []
         var grouped: [String: [GlassLibraryPanel]] = [:]
-        for panel in panels {
+        for panel in panels where panel.sectionTitle != GlassLibraryPanel.librarySectionTitle {
             if grouped[panel.sectionTitle] == nil { order.append(panel.sectionTitle) }
             grouped[panel.sectionTitle, default: []].append(panel)
         }
@@ -122,36 +137,44 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
     @ViewBuilder private var panelSidebarSections: some View {
         ForEach(panelSections, id: \.title) { section in
             Section(section.title) {
-                ForEach(section.panels) { panel in
-                    HStack {
-                        Label(panel.title, systemImage: panel.symbolName)
-                        Spacer()
-                        if let count = panel.count {
-                            Text(count, format: .number).foregroundStyle(.secondary)
-                        }
-                    }
-                    .contentShape(Rectangle())
-                    .glassGazeHighlight()
-                    .onTapGesture {
-                        openPanelID = panel.id
-                        #if os(iOS)
-                        // A compact stack shows the sidebar as its root; without the push the tap
-                        // changes state and nothing moves.
-                        if horizontalSizeClass == .compact { compactPath = [.results] }
-                        #endif
-                    }
-                    // **One element, not three.** The row is a label, a spacer and a count, and
-                    // an identifier on the `HStack` reached every child: on iOS 27.2 the first
-                    // match for the panel's own identifier was the row's *image*, which is not
-                    // hittable, so a tap on it did nothing. VoiceOver had the same row three
-                    // times for the same reason. Combined, it is one control that says its name
-                    // and how many things are in it.
-                    .accessibilityElement(children: .combine)
-                    .accessibilityAddTraits(openPanelID == panel.id ? .isSelected : [])
-                    .accessibilityIdentifier("glass-library-panel-\(panel.id)")
-                }
+                ForEach(section.panels) { panel in panelRow(panel) }
             }
         }
+    }
+
+    /// The Library-section panels, drawn after All, Favorites and Recent.
+    @ViewBuilder private var librarySectionPanelRows: some View {
+        ForEach(libraryPanels) { panel in panelRow(panel) }
+    }
+
+    private func open(_ panelID: String) {
+        openPanelID = panelID
+        #if os(iOS)
+        // A compact stack shows the sidebar as its root; without the push the tap changes state
+        // and nothing moves.
+        if horizontalSizeClass == .compact { compactPath = [.results] }
+        #endif
+    }
+
+    private func panelRow(_ panel: GlassLibraryPanel) -> some View {
+        HStack {
+            Label(panel.title, systemImage: panel.symbolName)
+            Spacer()
+            if let count = panel.count {
+                Text(count, format: .number).foregroundStyle(.secondary)
+            }
+        }
+        .contentShape(Rectangle())
+        .glassGazeHighlight()
+        .onTapGesture { open(panel.id) }
+        // **One element, not three.** The row is a label, a spacer and a count, and an
+        // identifier on the `HStack` reached every child: on iOS 27.2 the first match for the
+        // panel's own identifier was the row's *image*, which is not hittable, so a tap on it
+        // did nothing. VoiceOver had the same row three times for the same reason. Combined, it
+        // is one control that says its name and how many things are in it.
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(openPanelID == panel.id ? .isSelected : [])
+        .accessibilityIdentifier("glass-library-panel-\(panel.id)")
     }
 
     public func sidebarActions<Actions: View>(@ViewBuilder _ actions: @escaping () -> Actions) -> Self {
@@ -237,19 +260,23 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
     }
 
     @ViewBuilder private var platformNavigation: some View {
-        #if os(visionOS)
-        visionNavigation
-        #elseif os(iOS)
-        if horizontalSizeClass == .compact { compactNavigation } else { regularNavigation }
-        #else
-        regularNavigation
-        #endif
+        honouringPanelRequests(Group {
+            #if os(visionOS)
+            visionNavigation
+            #elseif os(iOS)
+            if horizontalSizeClass == .compact { compactNavigation } else { regularNavigation }
+            #else
+            regularNavigation
+            #endif
+        })
     }
 
     private var regularNavigation: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             GlassLibraryNavigation(projection: projection, scope: $scope,
-                                   onSelect: { openPanelID = nil }) { panelSidebarSections }
+                                   onSelect: { openPanelID = nil },
+                                   extras: { panelSidebarSections },
+                                   libraryExtras: { librarySectionPanelRows })
                 .navigationSplitViewColumnWidth(min: GlassLibraryColumnLayout.navigationMinimum,
                                                  ideal: GlassLibraryColumnLayout.navigationIdeal,
                                                  max: GlassLibraryColumnLayout.navigationMaximum)
@@ -298,7 +325,9 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
                                        onSelect: {
                                            openPanelID = nil
                                            compactPath = [.results]
-                                       }) { panelSidebarSections },
+                                       },
+                                       extras: { panelSidebarSections },
+                                       libraryExtras: { librarySectionPanelRows }),
                 active: compactPath.isEmpty && selection == nil)
             .navigationDestination(for: CompactDestination.self) { destination in
                 switch destination {
@@ -411,6 +440,15 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
     }
 
     #endif
+
+    /// Attached to every platform's navigation so the ⚡ works on each.
+    private func honouringPanelRequests<Content: View>(_ content: Content) -> some View {
+        content.onChange(of: panelToOpen.wrappedValue) { _, wanted in
+            guard let wanted, panels.contains(where: { $0.id == wanted }) else { return }
+            open(wanted)
+            panelToOpen.wrappedValue = nil
+        }
+    }
 
     private func reconcileSelection() {
         selection = projection.resolvedSelection(selection, in: scope, searchQuery: searchText)

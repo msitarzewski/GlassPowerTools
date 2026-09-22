@@ -434,3 +434,10 @@ the cable: eleven records for one machine, from three devices, grouped into one 
 union. Diagnosed; the consolidation is the D26 two-device run, to be started deliberately.
 Same evening: fixed. Stage 6's consolidation runs itself after every sync, merges only groups
 that agree on the address, and keeps each service once (D32). 1,696 tests, exit 0.
+
+## 2026-09-21 — [Active and the ⚡](2026-09-21_active-and-the-bolt.md)
+
+The user simplified the day's own work: **Active** joins All, Favorites and Recent, grouped by
+machine with a disclosure, and every top toolbar gets the ⚡ that goes there. Choosing a row
+switches to the live session. The morning's Sessions control, switcher sheet and gallery are gone;
+the seam under them and the Mac overview's cards stay. Workgroups untouched (D33).

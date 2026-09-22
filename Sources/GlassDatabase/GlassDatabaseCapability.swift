@@ -32,6 +32,9 @@ public final class GlassDatabaseRuntime {
     /// editor's `openFolderAsProject` uses in the other direction.
     public var showHostForConnection: (@MainActor (UUID) -> Void)?
 
+    /// The ⚡ in the workspace's toolbar. Supplied by the composition root.
+    public var showActiveConnections: GlassShowActiveConnections?
+
     /// Everything the shell and the module's own surfaces can ask the database to do. One
     /// queue, consumed by the scenes in stage 3, so opening a workspace — and the failure
     /// alert when it cannot be opened — exists in exactly one place.
@@ -147,6 +150,7 @@ public final class GlassDatabaseCapability: GlassCapability {
                     title: config.name,
                     subtitle: Self.subtitle(engine: config.engine, state: session.state),
                     symbolName: symbolName,
+                    endpointIDs: [EndpointID(rawValue: config.id)],
                     activate: { [runtime] in runtime.enqueue(.openQueryEditor(sessionID: sessionID)) },
                     close: { Task { await manager.disconnect(sessionID: sessionID) } }
                 )

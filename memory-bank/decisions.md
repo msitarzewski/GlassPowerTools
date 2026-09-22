@@ -925,3 +925,21 @@ and for the moment between a sync arriving and the fold running.
 **Consequence accepted.** When two devices each configured the same service, one device's
 configuration record is removed. Pre-launch, one user, three devices — the user's words:
 *"there is no every device."*
+
+## D33 — Active in the library, and one control to reach it — Implemented 2026-09-21
+
+**Context.** Every capability worked on a phone and none could reach another. The morning's
+answer was a per-session Sessions control with a switcher sheet and a gallery (D1–D3). By the
+evening the user cut it: *"simplify the mess out of the open connections problem on every app
+deployment target."*
+
+**Decided.** The library gets a fourth category, **Active** — the live sessions grouped by the
+machine each is on, each machine a disclosure — and every top toolbar in the app gets the **⚡**,
+one control meaning "take me to Active". Choosing a row switches to the open session. The Sessions
+control, its sheet and the gallery are **removed**; `GlassOpenSession` and `openSessions()` stay as
+the seam Active reads, and the Mac's Terminal Overview keeps drawing sessions with the card and
+layout that gallery left behind.
+
+**Kept deliberately.** Workgroups — the terminal's saved multi-machine layouts — unchanged.
+
+**Later, maybe.** *"A fun way to view that list."* The seam is ready for it.

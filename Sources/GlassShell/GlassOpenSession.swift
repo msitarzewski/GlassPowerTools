@@ -16,6 +16,7 @@
 //
 
 import SwiftUI
+import GlassConnectionKit
 
 /// One session a capability has open, and the two things anyone outside it can do with one.
 ///
@@ -43,8 +44,16 @@ public struct GlassOpenSession: Identifiable {
     /// useful where a card waiting for a screenshot would not be. Asked at draw time, never
     /// stored — a picture of a terminal is stale the moment it is taken.
     public let snapshot: (@MainActor () -> Image?)?
+    /// The services this session is a connection through — a terminal's server, a database's
+    /// connection. The library turns these into the machine the session belongs to, so a
+    /// capability never has to know a host id. Several for a workgroup that spans machines.
+    public let endpointIDs: [EndpointID]
+    /// The machine, said directly, for a session that is not through a service: an editor with
+    /// a project on this device (`GlassLocalHost.id`) or on another machine.
+    public let hostID: HostID?
 
     public init(id: String, title: String, subtitle: String? = nil, symbolName: String,
+                endpointIDs: [EndpointID] = [], hostID: HostID? = nil,
                 activate: @escaping @MainActor @Sendable () -> Void,
                 close: @escaping @MainActor @Sendable () -> Void,
                 snapshot: (@MainActor () -> Image?)? = nil) {
@@ -52,6 +61,8 @@ public struct GlassOpenSession: Identifiable {
         self.title = title
         self.subtitle = subtitle
         self.symbolName = symbolName
+        self.endpointIDs = endpointIDs
+        self.hostID = hostID
         self.activate = activate
         self.close = close
         self.snapshot = snapshot
@@ -87,178 +98,7 @@ public extension GlassCapabilityRegistry {
     }
 }
 
-// MARK: - The control, and the list behind it
-
-/// Puts a **Sessions** control in a session's own chrome, with the switcher behind it.
-///
-/// Only where there is no second window to do this job: on macOS, visionOS and iPad the windows
-/// *are* the switcher, and a button that duplicates them is clutter. The gate is
-/// `GlassWindowPresentation.canOpenWindows` rather than `#if os(iOS)` — the difference is an
-/// iPhone against an iPad and both compile as `os(iOS)`, and an iPhone Duo will answer it for
-/// itself when it arrives.
-///
-/// `dismissCurrent` is for a session presented as a cover rather than in place: the editor's and
-/// the desktop's sessions sit *above* the library, so activating a terminal underneath one would
-/// switch a screen nobody can see. A session that swaps the root passes nil.
-public struct GlassSessionsToolbarModifier: ViewModifier {
-    /// Optional so every session's chrome can attach this unconditionally. A view rendered
-    /// outside the app — a preview, a unit test's host — has no registry, and the alternative
-    /// was an `if let` repeated at all four call sites.
-    private let registry: GlassCapabilityRegistry?
-    private let currentSessionID: String?
-    private let dismissCurrent: (@MainActor () -> Void)?
-    @State private var isPresented = false
-
-    public init(registry: GlassCapabilityRegistry?, currentSessionID: String?,
-                dismissCurrent: (@MainActor () -> Void)? = nil) {
-        self.registry = registry
-        self.currentSessionID = currentSessionID
-        self.dismissCurrent = dismissCurrent
-    }
-
-    public func body(content: Content) -> some View {
-        // Read in the body, so the count follows the capabilities' own state.
-        let others = GlassWindowPresentation.canOpenWindows
-            ? []
-            : (registry?.openSessions(excluding: currentSessionID) ?? [])
-        content
-            .toolbar {
-                // Nothing open elsewhere means no control at all. A Sessions button that opens an
-                // empty sheet is worse than no button: it promises somewhere to go.
-                if !others.isEmpty {
-                    ToolbarItem(placement: .primaryAction) {
-                        Button {
-                            isPresented = true
-                        } label: {
-                            Label("\(others.count) other sessions", systemImage: "square.stack")
-                        }
-                        .labelStyle(.iconOnly)
-                        .accessibilityIdentifier("sessions-switcher")
-                        .accessibilityLabel("Sessions")
-                        .accessibilityValue("\(others.count) open elsewhere")
-                    }
-                }
-            }
-            .sheet(isPresented: $isPresented) {
-                if let registry {
-                    GlassSessionSwitcher(registry: registry, currentSessionID: currentSessionID) { session in
-                        isPresented = false
-                        dismissCurrent?()
-                        session.activate()
-                    }
-                    // A peek, not a place. Switching is a glance at a short list and a tap, and
-                    // a sheet that covers the session you are leaving makes it feel like one.
-                    .presentationDetents([.medium, .large])
-                }
-            }
-    }
-}
-
-public extension View {
-    /// See `GlassSessionsToolbarModifier`.
-    func glassSessionsToolbar(registry: GlassCapabilityRegistry?,
-                              currentSessionID: String?,
-                              dismissCurrent: (@MainActor () -> Void)? = nil) -> some View {
-        modifier(GlassSessionsToolbarModifier(registry: registry,
-                                              currentSessionID: currentSessionID,
-                                              dismissCurrent: dismissCurrent))
-    }
-}
-
-/// Stage 1 of D3: a list that works. One row per open session, swipe to close.
-///
-/// Flat rather than grouped. A phone holds a handful of sessions, each row already carries the
-/// capability's symbol and says what its service is, and sections over three rows are furniture.
-/// The carousel is stage 2 and replaces this view, not the seam beneath it.
-public struct GlassSessionSwitcher: View {
-    private let registry: GlassCapabilityRegistry
-    private let currentSessionID: String?
-    private let activate: (GlassOpenSession) -> Void
-    @Environment(\.dismiss) private var dismiss
-
-    public init(registry: GlassCapabilityRegistry, currentSessionID: String?,
-                activate: @escaping (GlassOpenSession) -> Void) {
-        self.registry = registry
-        self.currentSessionID = currentSessionID
-        self.activate = activate
-    }
-
-    /// Cards or rows, remembered. The product already has this choice for a workgroup's
-    /// terminals (`LayoutPreset.OpeningView`), so the switcher offers the same one rather than
-    /// inventing a third vocabulary — and defaults to the gallery, because seeing which terminal
-    /// is which is the reason to have it.
-    @AppStorage("com.glasspowertools.sessions.gallery") private var showsGallery = true
-
-    public var body: some View {
-        let sessions = registry.openSessions(excluding: currentSessionID)
-        NavigationStack {
-            Group {
-                if showsGallery, !sessions.isEmpty {
-                    GlassSessionGallery(sessions: sessions, activate: activate)
-                } else {
-                    list(sessions)
-                }
-            }
-            .navigationTitle("Sessions")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    Picker("Presentation", selection: $showsGallery) {
-                        Label("Gallery", systemImage: "square.grid.2x2").tag(true)
-                        Label("List", systemImage: "list.bullet").tag(false)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelStyle(.iconOnly)
-                    .accessibilityIdentifier("sessions-presentation")
-                }
-            }
-        }
-    }
-
-    private func list(_ sessions: [GlassOpenSession]) -> some View {
-            List {
-                ForEach(sessions) { session in
-                    Button {
-                        activate(session)
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: session.symbolName)
-                                .font(.title3)
-                                .foregroundStyle(.tint)
-                                .frame(width: 28)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(session.title)
-                                if let subtitle = session.subtitle {
-                                    Text(subtitle)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            Spacer(minLength: 0)
-                            Image(systemName: "chevron.forward")
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(.tertiary)
-                        }
-                        .contentShape(.rect)
-                    }
-                    // A row, not a link. The default button tint painted the machine's name blue,
-                    // which reads as "tap this word" rather than "you are somewhere else".
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("session-row-\(session.id)")
-                    .swipeActions(edge: .trailing) {
-                        Button("Close", systemImage: "xmark", role: .destructive) {
-                            session.close()
-                        }
-                    }
-                }
-                if sessions.isEmpty {
-                    // Reachable only if the last other session ended while the sheet was open.
-                    ContentUnavailableView("Nothing else is open",
-                                           systemImage: "square.stack",
-                                           description: Text("Connections you open stay here until you close them."))
-                }
-            }
-    }
-}
+// The Sessions control and its switcher sheet lived here from 2026-09-21 morning to evening.
+// They were a fifth surface bolted onto every session's chrome; the library already knew every
+// machine and only lacked which ones were live. **Active** in the library and the ⚡ in every
+// toolbar replaced them — see `GlassActiveConnections.swift`.

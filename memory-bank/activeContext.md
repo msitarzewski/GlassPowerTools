@@ -2680,3 +2680,15 @@ A DeviceFS read of the phone's catalog fails with `No message available on STREA
 is running; `xcrun devicectl device copy from --domain-type appDataContainer --domain-identifier
 com.glasspowertools --source "Library/Application Support/GlassPowerTools/GlassHostCatalog/hosts.json"`
 works regardless.
+
+## 2026-09-21 (late) — Active and the ⚡, replacing the morning's switcher
+
+*"Simplify the mess out of the open connections problem on every app deployment target."* Done
+as asked: **Active** is the library's fourth category — live sessions grouped by machine, a
+disclosure each — and the **⚡** is in every top toolbar, one control meaning "take me there".
+Choosing a row switches to the live session. The Sessions control, switcher sheet and gallery
+from this morning are deleted; the seam under them (`GlassOpenSession`, `openSessions()`) and
+the Mac overview's card stay. Workgroups untouched. D33;
+[task note](tasks/2026-09/2026-09-21_active-and-the-bolt.md).
+
+Four new shell tests pass; the phone walkthrough became the bolt walkthrough and is running.

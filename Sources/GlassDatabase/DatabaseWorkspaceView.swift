@@ -208,8 +208,6 @@ struct DatabaseWorkspaceView: View {
     #if os(iOS)
     @Environment(DatabaseIOSRouter.self) private var iOSRouter
     #endif
-    /// D2: every other open session. Optional for the same reason the runtime above is.
-    @Environment(GlassCapabilityRegistry.self) private var capabilityRegistry: GlassCapabilityRegistry?
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var appliedInitialSidebarVisibility = false
     @State private var tableRunAvailability = SQLRunAvailability()
@@ -701,7 +699,7 @@ struct DatabaseWorkspaceView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .toolbar { workspaceToolbar }
-        .glassSessionsToolbar(registry: capabilityRegistry, currentSessionID: currentSwitcherID)
+        .glassActiveConnectionsToolbar(show: runtime?.showActiveConnections, dismissCurrent: { showConnections() })
     }
 
     #if os(iOS)
@@ -711,14 +709,14 @@ struct DatabaseWorkspaceView: View {
         NavigationStack(path: $compactPath) {
             schemaBrowser
                 .toolbar { workspaceToolbar }
-                .glassSessionsToolbar(registry: capabilityRegistry, currentSessionID: currentSwitcherID)
+                .glassActiveConnectionsToolbar(show: runtime?.showActiveConnections, dismissCurrent: { showConnections() })
                 .navigationDestination(for: DatabaseCompactRoute.self) { _ in
                     detailSurface
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .navigationTitle(detailTitle)
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar { workspaceToolbar }
-                        .glassSessionsToolbar(registry: capabilityRegistry, currentSessionID: currentSwitcherID)
+                        .glassActiveConnectionsToolbar(show: runtime?.showActiveConnections, dismissCurrent: { showConnections() })
                 }
         }
         // Going back is the only way the detail leaves the stack, and the back button is the
@@ -736,9 +734,6 @@ struct DatabaseWorkspaceView: View {
         detailDepth = compactPath.count
     }
     #endif
-
-    /// This workspace's own row in the switcher, so it is never offered a trip to itself.
-    private var currentSwitcherID: String { GlassDatabaseCapability.sessionID(sessionID: sessionID) }
 
     /// Every control this workspace contributes, in one place so both layouts can attach it.
     ///

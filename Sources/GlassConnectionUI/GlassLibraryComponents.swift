@@ -16,21 +16,27 @@ public enum GlassLibraryColumnLayout {
 
 /// The shared Library/Collections section. Apps can append Workgroups, Network,
 /// or other specialized sections without duplicating the common categories.
-public struct GlassLibraryNavigation<ID: Hashable & Sendable, Extras: View>: View {
+public struct GlassLibraryNavigation<ID: Hashable & Sendable, Extras: View, LibraryExtras: View>: View {
     private let projection: GlassLibraryProjection<ID>
     @Binding private var scope: GlassLibraryScope
     private let favoriteSymbol: String
     private let onSelect: () -> Void
     private let extras: () -> Extras
+    private let libraryExtras: () -> LibraryExtras
 
+    /// - Parameters:
+    ///   - extras: sections after the library's own.
+    ///   - libraryExtras: rows inside the Library section, after All, Favorites and Recent.
     public init(projection: GlassLibraryProjection<ID>, scope: Binding<GlassLibraryScope>,
                 favoriteSymbol: String = "star", onSelect: @escaping () -> Void = {},
-                @ViewBuilder extras: @escaping () -> Extras) {
+                @ViewBuilder extras: @escaping () -> Extras,
+                @ViewBuilder libraryExtras: @escaping () -> LibraryExtras = { EmptyView() }) {
         self.projection = projection
         _scope = scope
         self.favoriteSymbol = favoriteSymbol
         self.onSelect = onSelect
         self.extras = extras
+        self.libraryExtras = libraryExtras
     }
 
     /// The sidebar is a native `List` selection: AppKit and UIKit draw the platform's own
@@ -46,9 +52,9 @@ public struct GlassLibraryNavigation<ID: Hashable & Sendable, Extras: View>: Vie
 
     public var body: some View {
         List(selection: selection) {
-            GlassLibraryCategories(projection: projection) { value, title, _ in
+            GlassLibraryCategories(projection: projection, category: { value, title, _ in
                 category(value, title: title, symbol: symbol(for: value)).tag(value)
-            }
+            }, extras: libraryExtras)
             extras()
         }
         .listStyle(.sidebar)
@@ -83,11 +89,11 @@ public struct GlassLibraryNavigation<ID: Hashable & Sendable, Extras: View>: Vie
     }
 }
 
-public extension GlassLibraryNavigation where Extras == EmptyView {
+public extension GlassLibraryNavigation where Extras == EmptyView, LibraryExtras == EmptyView {
     init(projection: GlassLibraryProjection<ID>, scope: Binding<GlassLibraryScope>,
          favoriteSymbol: String = "star", onSelect: @escaping () -> Void = {}) {
         self.init(projection: projection, scope: scope, favoriteSymbol: favoriteSymbol,
-                  onSelect: onSelect, extras: { EmptyView() })
+                  onSelect: onSelect, extras: { EmptyView() }, libraryExtras: { EmptyView() })
     }
 }
 

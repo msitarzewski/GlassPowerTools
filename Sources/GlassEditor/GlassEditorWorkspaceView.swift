@@ -74,8 +74,6 @@ public struct GlassEditorWorkspaceView: View {
     /// none of its content on an iPhone — a black screen under a working navigation bar, which is
     /// exactly what it did.
     private let dismissal: GlassEditorDismissal?
-    /// D2: every other open session. Optional — a preview or a test host has no registry.
-    @Environment(GlassCapabilityRegistry.self) private var capabilityRegistry: GlassCapabilityRegistry?
 
     public init(workspace: GlassEditorWorkspace, windowID: UUID = UUID(),
                 dismissal: GlassEditorDismissal? = nil) {
@@ -202,8 +200,7 @@ public struct GlassEditorWorkspaceView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .toolbar { toolbarContent(includingDismissal: true) }
-        .glassSessionsToolbar(registry: capabilityRegistry, currentSessionID: switcherID,
-                              dismissCurrent: dismissal?.action)
+        .glassActiveConnectionsToolbar(show: runtime?.showActiveConnections, dismissCurrent: dismissal?.action)
         // **No sidebar without a project.** The sidebar is the project's file tree and holds
         // nothing else — open documents are tabs. With no project open, the control offered to
         // reveal a column that could only ever be blank, so the control goes too: a toggle whose
@@ -284,8 +281,7 @@ public struct GlassEditorWorkspaceView: View {
             // The dismissal chevron belongs to the first screen only; every screen after it has
             // the stack's own back button, and two back controls in one bar is a puzzle.
             .toolbar { toolbarContent(includingDismissal: compactPath.isEmpty) }
-            .glassSessionsToolbar(registry: capabilityRegistry, currentSessionID: switcherID,
-                                  dismissCurrent: dismissal?.action)
+            .glassActiveConnectionsToolbar(show: runtime?.showActiveConnections, dismissCurrent: dismissal?.action)
             .task {
                 // Reads the folder the first time it is opened, through whichever reader its
                 // project was opened with — the same call the disclosure triangle makes.
@@ -299,8 +295,7 @@ public struct GlassEditorWorkspaceView: View {
         GlassLayeredPanel(role: .embedded) { detail }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .toolbar { toolbarContent(includingDismissal: compactPath.isEmpty) }
-            .glassSessionsToolbar(registry: capabilityRegistry, currentSessionID: switcherID,
-                                  dismissCurrent: dismissal?.action)
+            .glassActiveConnectionsToolbar(show: runtime?.showActiveConnections, dismissCurrent: dismissal?.action)
     }
 
     /// Choosing a file from the list: select it, open it, and push the editor.
@@ -656,13 +651,6 @@ public struct GlassEditorWorkspaceView: View {
     }
 
     // MARK: Toolbar
-
-    /// This window's own row in the switcher, so it is never offered a trip to itself.
-    ///
-    /// **The editor is a cover, not a root swap**, so `dismissCurrent` is the dismissal the
-    /// bootstrap handed down: activating a terminal underneath without taking this off the
-    /// screen would switch a surface nobody can see.
-    private var switcherID: String { GlassEditorRuntime.sessionID(windowID: windowID) }
 
 
     /// `includingDismissal` is false on a screen that already has the navigation stack's back

@@ -3,14 +3,20 @@ import GlassConnectionKit
 
 /// Common sections with app-owned category rows. This lets existing native
 /// shells preserve their navigation/focus handlers and specialized sections.
-public struct GlassLibraryCategories<ID: Hashable & Sendable, Category: View>: View {
+public struct GlassLibraryCategories<ID: Hashable & Sendable, Category: View, Extras: View>: View {
     private let projection: GlassLibraryProjection<ID>
     private let category: (GlassLibraryScope, String, Int) -> Category
+    private let extras: () -> Extras
 
+    /// - Parameter extras: rows that belong in the Library section after the three categories —
+    ///   Active, which is another way of looking at the connections rather than a section of
+    ///   its own.
     public init(projection: GlassLibraryProjection<ID>,
-                @ViewBuilder category: @escaping (GlassLibraryScope, String, Int) -> Category) {
+                @ViewBuilder category: @escaping (GlassLibraryScope, String, Int) -> Category,
+                @ViewBuilder extras: @escaping () -> Extras = { EmptyView() }) {
         self.projection = projection
         self.category = category
+        self.extras = extras
     }
 
     public var body: some View {
@@ -18,6 +24,7 @@ public struct GlassLibraryCategories<ID: Hashable & Sendable, Category: View>: V
             category(.allConnections, "All Connections", projection.itemCount(in: .allConnections))
             category(.favorites, "Favorites", projection.itemCount(in: .favorites))
             category(.recent, "Recent", projection.itemCount(in: .recent))
+            extras()
         }
         if !projection.collections.isEmpty {
             Section("Collections") {

@@ -23,6 +23,9 @@ public typealias GlassDesktopReport = @MainActor (GlassCapabilityOutcome) -> Voi
 /// Owns the desktop model for the process. One per app, created in the composition root.
 @MainActor @Observable
 public final class GlassDesktopRuntime {
+    /// The ⚡ in the desktop's toolbar. Supplied by the composition root.
+    public var showActiveConnections: GlassShowActiveConnections?
+
     let app: DesktopAppModel
 
     /// Everything the shell and this module's surfaces can ask the desktop to do. One queue,

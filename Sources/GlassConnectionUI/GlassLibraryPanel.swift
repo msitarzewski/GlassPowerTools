@@ -14,6 +14,11 @@ import GlassConnectionKit
 /// columns: whatever state they share belongs to a model the contributor owns, exactly as
 /// `ConnectionManagerView` owned `selectedWorkgroupSelection` for both halves in glas.sh.
 public struct GlassLibraryPanel: Identifiable {
+    /// A panel whose `sectionTitle` is this sits **inside** the Library section, after All,
+    /// Favorites and Recent, rather than heading a section of its own. Active is the case: it is
+    /// a way of looking at the connections, not a different kind of thing.
+    public static let librarySectionTitle = "Library"
+
     /// Stable across launches: it is the selection value and the accessibility identifier.
     public let id: String
     /// The sidebar section this panel heads, e.g. "Workgroups". Panels sharing a title share a

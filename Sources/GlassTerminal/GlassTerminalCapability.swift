@@ -88,6 +88,10 @@ public final class GlassTerminalRuntime {
     /// means the overview shows only what it always showed.
     public var openSessions: (@MainActor () -> [GlassOpenSession])?
 
+    /// "Take me to the live connections" — the ⚡ in every toolbar. Supplied by the composition
+    /// root, since the library is the shell's; nil means the bolt is not offered.
+    public var showActiveConnections: GlassShowActiveConnections?
+
     public init(layers: GlassLayerStore? = nil, windowRecovery: GlassWindowRecoveryManager? = nil) {
         let layers = layers ?? GlassLayerStore()
         self.layers = layers
@@ -251,6 +255,8 @@ public final class GlassTerminalCapability: GlassCapability {
                 title: workgroup.name,
                 subtitle: live.count == 1 ? live[0].state.displayName : "\(live.count) terminals",
                 symbolName: symbolName,
+                // The machines this workgroup is on: its servers are the shell's endpoints (D26).
+                endpointIDs: live.map { EndpointID(rawValue: $0.server.id) },
                 activate: { [runtime] in runtime.enqueue(.showWorkgroup(workgroupID: workgroup.id)) },
                 close: { manager.closeWorkgroup(workgroup.id) },
                 // The card shows the terminal the workgroup has selected — the one you would be

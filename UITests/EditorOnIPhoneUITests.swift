@@ -149,16 +149,16 @@ extension EditorOnIPhoneUITests {
 }
 
 extension EditorOnIPhoneUITests {
-    /// **D2: a way between open sessions, on the device that has no windows.**
+    /// **The ⚡: from inside any session to every live connection, on the device with no windows.**
     ///
-    /// Every capability works on a phone and none of them could reach another. This drives the
-    /// only pair of sessions a simulator can have without a server — two editor windows — and
-    /// checks the three claims the feature makes: the control appears once there is somewhere to
-    /// go, the switcher lists the *other* session and not this one, and choosing it arrives.
+    /// Drives the only pair of sessions a simulator can have without a server — two editor
+    /// windows — and checks what the bolt promises: it is in the session's own toolbar, tapping it
+    /// leaves the session and lands on the library's Active list, the *other* editor is listed
+    /// there under this device, and choosing it arrives.
     ///
-    /// It also stands on the fix underneath it. Leaving the first editor used to discard its
-    /// workspace, so there would have been nothing to switch back to.
-    func testTheSessionSwitcherReachesTheOtherEditor() throws {
+    /// It stands on the fix underneath it: leaving the first editor used to discard its
+    /// workspace, so there would have been nothing to come back to.
+    func testTheBoltReachesTheOtherEditor() throws {
         continueAfterFailure = true
         let app = XCUIApplication()
         app.launchArguments += ["--ui-testing", UUID().uuidString,
@@ -169,8 +169,6 @@ extension EditorOnIPhoneUITests {
         func openProject(_ name: String) {
             let projects = app.descendants(matching: .any)
                 .matching(identifier: "glass-library-panel-editor-projects").firstMatch
-            // Coming back from an editor lands on the project detail that was pushed before it,
-            // not the sidebar — so pop until the panel row is reachable again.
             for _ in 0..<4 where !projects.exists {
                 let back = app.navigationBars.buttons.element(boundBy: 0)
                 guard back.exists else { break }
@@ -191,13 +189,10 @@ extension EditorOnIPhoneUITests {
         openProject("DemoProject")
         XCTAssertTrue(app.staticTexts["README.md"].firstMatch.waitForExistence(timeout: 15),
                       "the first project did not open on its files")
-        // Nothing else is open yet, so there is nowhere to go and no control offering one.
-        XCTAssertFalse(app.buttons["sessions-switcher"].exists,
-                       "a Sessions control appeared with no other session to reach")
+        XCTAssertTrue(app.buttons["active-connections-bolt"].firstMatch.exists,
+                      "the bolt belongs in every session's toolbar, whether or not anything else is open")
         shoot(app, "10-first-editor")
 
-
-        // Back to the library. This is the dismissal that used to throw the workspace away.
         app.navigationBars.buttons.element(boundBy: 0).tap()
         Thread.sleep(forTimeInterval: 2)
 
@@ -205,40 +200,24 @@ extension EditorOnIPhoneUITests {
         XCTAssertTrue(app.staticTexts["NOTES.md"].firstMatch.waitForExistence(timeout: 15),
                       "the second project did not open on its files")
 
-        let switcher = app.buttons["sessions-switcher"].firstMatch
-        XCTAssertTrue(switcher.waitForExistence(timeout: 10),
-                      "with two editors open there is still no way between them")
-        shoot(app, "11-sessions-control")
-        switcher.tap()
+        let bolt = app.buttons["active-connections-bolt"].firstMatch
+        XCTAssertTrue(bolt.waitForExistence(timeout: 10), "no bolt in the editor's toolbar")
+        shoot(app, "11-bolt")
+        bolt.tap()
 
-        // The gallery is what opens: cards, one per other session. Counted by card rather than
-        // by the absence of the word "OtherProject" — the switcher is a half sheet, so the editor
-        // it was opened from is still on screen behind it with its name in the header.
-        let cards = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier BEGINSWITH 'session-card-' AND NOT identifier BEGINSWITH 'session-card-close-'"))
-        XCTAssertTrue(cards.firstMatch.waitForExistence(timeout: 10),
-                      "the switcher did not open on the gallery")
-        XCTAssertEqual(cards.count, 1,
-                       "the gallery should show exactly the one other session, not this one too")
-        shoot(app, "12-gallery")
-
-        // And the list is still there, behind the same control the terminal overview uses.
-        let presentation = app.descendants(matching: .any)
-            .matching(identifier: "sessions-presentation").buttons.element(boundBy: 1)
-        if presentation.exists {
-            presentation.tap()
-            let rows = app.descendants(matching: .any)
-                .matching(NSPredicate(format: "identifier BEGINSWITH 'session-row-'"))
-            XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 5), "the list mode is gone")
-            XCTAssertEqual(rows.count, 1)
-            shoot(app, "12b-list")
-        }
+        // Out of the editor and onto Active: both editors are live, under this device.
+        let active = app.descendants(matching: .any).matching(identifier: "active-connections").firstMatch
+        XCTAssertTrue(active.waitForExistence(timeout: 15), "the bolt did not land on the Active list")
+        let rows = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'active-session-editor:'"))
+        XCTAssertEqual(rows.count, 2, "both editors should be listed as live")
+        shoot(app, "12-active")
 
         let other = app.staticTexts["DemoProject"].firstMatch
-        XCTAssertTrue(other.waitForExistence(timeout: 10), "the first editor is not in the switcher")
+        XCTAssertTrue(other.waitForExistence(timeout: 10), "the first editor is not under Active")
         other.tap()
         XCTAssertTrue(app.staticTexts["README.md"].firstMatch.waitForExistence(timeout: 15),
-                      "choosing the other session did not arrive at it")
+                      "choosing the live editor did not arrive at it")
         shoot(app, "13-switched")
     }
 }

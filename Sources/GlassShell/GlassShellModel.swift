@@ -85,6 +85,9 @@ public final class GlassShellModel: GlassServiceStore {
     /// 2026-09-19). Every capability that replaces the library on a phone wants this; the
     /// database is the first to use it.
     public var hostToShow: HostID?
+    /// A library panel something asked to be shown — the ⚡ asking for **Active**. The library
+    /// view observes it, opens the panel, and clears it. Same shape as `hostToShow`.
+    public var panelToShow: String?
 
     public func showHost(_ id: HostID) { hostToShow = id }
 

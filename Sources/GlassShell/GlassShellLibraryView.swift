@@ -17,6 +17,8 @@ public struct GlassShellLibraryView: View {
     @State private var setupPrefill: GlassShellSetupPrefill?
     @State private var deleting: GlassShellHost?
     @State private var showSettings = false
+    /// The ⚡'s request, handed to the library as a binding it clears once the panel is open.
+    @State private var panelRequest: String?
     @Environment(\.scenePhase) private var scenePhase
 
     public init(model: GlassShellModel) { self.model = model }
@@ -43,6 +45,9 @@ public struct GlassShellLibraryView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } toolbarActions: {
                 HStack {
+                    // The ⚡, here too: every top toolbar in the app has it, and in the library it
+                    // simply opens Active.
+                    GlassActiveConnectionsButton { model.showActiveConnections() }
                     ForEach(model.registry.registered, id: \.kind) { capability in
                         capability.libraryToolbarItems()
                     }
@@ -61,7 +66,9 @@ public struct GlassShellLibraryView: View {
             // key crosses capabilities: it can sign in to a terminal on one machine and a database
             // on another, and only something that sees the whole library can say what deleting one
             // would unassign (D26 stage 4).
-            .libraryPanels(model.libraryPanels() + model.registry.libraryPanels)
+            // Active first: it sits inside the Library section, after the three categories.
+            .libraryPanels([model.activeConnectionsPanel()] + model.libraryPanels() + model.registry.libraryPanels)
+            .panelToOpen($panelRequest)
             // Right-click, long-press or pinch-and-hold anywhere in the list — including the empty
             // space below the machines, which is where you are looking when what you want is a new
             // one. The same button the toolbar's + is.
@@ -83,6 +90,12 @@ public struct GlassShellLibraryView: View {
             scope = .allConnections
             selection = wanted
             model.hostToShow = nil
+        }
+        // The ⚡ from anywhere in the app: the model says which panel, the library opens it.
+        .onChange(of: model.panelToShow) { _, wanted in
+            guard let wanted else { return }
+            panelRequest = wanted
+            model.panelToShow = nil
         }
         // One sheet for Add Host, Add a service, Edit service and Edit Host (rule 15) — and for
         // importing a machine from another tool, which is an Add Host with the fields filled in.

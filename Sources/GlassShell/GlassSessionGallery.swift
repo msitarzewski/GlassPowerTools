@@ -2,7 +2,7 @@
 //  GlassSessionGallery.swift
 //  Glass Power Tools — GlassShell
 //
-//  D3 stage 2: what is open, as cards you can see rather than names you have to read.
+//  The card and the layout solver the Mac's Terminal Overview draws sessions with.
 //
 //  **Almost none of this is new.** The product has had a terminal overview since glas.sh: a grid,
 //  a carousel, live previews of each session, a card-width slider, arrow-key navigation, and a
@@ -147,35 +147,3 @@ public struct GlassSessionCard: View {
     }
 }
 
-/// Every open session as cards, laid out by `GlassGalleryLayout`.
-public struct GlassSessionGallery: View {
-    private let sessions: [GlassOpenSession]
-    private let activate: (GlassOpenSession) -> Void
-
-    public init(sessions: [GlassOpenSession], activate: @escaping (GlassOpenSession) -> Void) {
-        self.sessions = sessions
-        self.activate = activate
-    }
-
-    public var body: some View {
-        GeometryReader { proxy in
-            let layout = GlassGalleryLayout(count: sessions.count, size: proxy.size)
-            ScrollView {
-                LazyVGrid(
-                    columns: Array(
-                        repeating: GridItem(.flexible(maximum: layout.cardWidth),
-                                            spacing: GlassGalleryLayout.spacing),
-                        count: layout.columns),
-                    spacing: GlassGalleryLayout.spacing
-                ) {
-                    ForEach(sessions) { session in
-                        GlassSessionCard(session: session,
-                                         activate: { activate(session) },
-                                         close: { session.close() })
-                    }
-                }
-                .padding(GlassGalleryLayout.spacing)
-            }
-        }
-    }
-}

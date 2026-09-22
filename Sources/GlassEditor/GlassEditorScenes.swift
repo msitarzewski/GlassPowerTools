@@ -149,6 +149,9 @@ public final class GlassEditorRuntime {
                     // A folder when it is a project and a page when it is loose files: the row
                     // should look like the thing it returns to.
                     symbolName: workspace.projects.isEmpty ? "doc.text" : "folder",
+                    // The machine the files are on: the project's, or this device for a project
+                    // or loose file here.
+                    hostID: workspace.projects.first?.hostID ?? GlassLocalHost.id,
                     activate: { [weak self] in self?.present(id) },
                     close: { [weak self] in self?.closeWorkspace(id) }
                 )
@@ -276,6 +279,9 @@ public final class GlassEditorRuntime {
     /// connection, the trust prompt and the session. Nil means this build has no way to reach
     /// another machine, and a remote project says so rather than failing quietly.
     public var remoteAccess: ((HostID) async throws -> any GlassEditorFileAccess)?
+
+    /// The ⚡ in the editor's toolbar. Supplied by the composition root.
+    public var showActiveConnections: GlassShowActiveConnections?
 
     /// Opens a project already in the library, wherever it lives.
     ///
