@@ -286,8 +286,10 @@ struct ConnectionOverviewView: View {
                             )
                             .foregroundStyle(.tint)
                             .cornerRadius(3)
+                            .overviewBarName(item.name)
                         }
                         .chartXAxis { AxisMarks(position: .bottom) }
+                        .overviewBarChartAxes()
                     }
                 }
 
@@ -303,6 +305,7 @@ struct ConnectionOverviewView: View {
                             )
                             .foregroundStyle(.purple.gradient)
                             .cornerRadius(3)
+                            .overviewBarName(item.name)
                         }
                         .chartXAxis {
                             AxisMarks(position: .bottom) { value in
@@ -318,6 +321,7 @@ struct ConnectionOverviewView: View {
                                 }
                             }
                         }
+                        .overviewBarChartAxes()
                     }
                 }
             }
@@ -808,8 +812,10 @@ struct DatabaseDetailView: View {
                             )
                             .foregroundStyle(.tint)
                             .cornerRadius(3)
+                            .overviewBarName(status.name)
                         }
                         .chartXAxis { AxisMarks(position: .bottom) }
+                        .overviewBarChartAxes()
                     }
                 }
                 if !storageLeaders.isEmpty {
@@ -821,6 +827,7 @@ struct DatabaseDetailView: View {
                             )
                             .foregroundStyle(.purple.gradient)
                             .cornerRadius(3)
+                            .overviewBarName(status.name)
                         }
                         .chartXAxis {
                             AxisMarks(position: .bottom) { value in
@@ -836,6 +843,7 @@ struct DatabaseDetailView: View {
                                 }
                             }
                         }
+                        .overviewBarChartAxes()
                     }
                 }
             }
@@ -1211,6 +1219,42 @@ private struct OverviewMetricCard: View {
         .padding(16)
         .frame(maxWidth: .infinity, minHeight: 82, alignment: .leading)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+    }
+}
+
+/// The name beside a horizontal bar, drawn by the bar rather than by the axis.
+///
+/// On macOS 27.2 (26B5091g) Swift Charts anchors a categorical y-axis label at the **top edge** of
+/// its band and ignores `AxisValueLabel(centered:)`, under every preset — so each name sat on the
+/// bar below it and the overview read as a collision (reported 2026-09-21: *"the database names
+/// and the bar chart overlap for some reason"*; the reason was the OS update). An annotation is
+/// positioned by the mark itself, so it cannot drift from the bar it names. Measured with a
+/// throwaway `ImageRenderer` probe rather than an install per attempt.
+private enum OverviewBarChart {
+    static let labelWidth: CGFloat = 150
+    static let labelSpacing: CGFloat = 8
+}
+
+private extension ChartContent {
+    func overviewBarName(_ name: String) -> some ChartContent {
+        annotation(position: .leading, alignment: .trailing, spacing: OverviewBarChart.labelSpacing,
+                   overflowResolution: .init(x: .disabled, y: .fit)) {
+            Text(name)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(width: OverviewBarChart.labelWidth, alignment: .trailing)
+        }
+    }
+}
+
+private extension View {
+    /// The other half: the axis that used to draw the names is hidden, and the room the
+    /// annotations draw into is reserved so the card does not clip them.
+    func overviewBarChartAxes() -> some View {
+        chartYAxis(.hidden)
+            .padding(.leading, OverviewBarChart.labelWidth + OverviewBarChart.labelSpacing)
     }
 }
 

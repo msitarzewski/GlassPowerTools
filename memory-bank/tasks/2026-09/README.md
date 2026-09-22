@@ -419,3 +419,10 @@ every open session beside its own tabs, as one row you can arrow through. And it
 been swapping to `.underWindowBackground` in overview mode — the material that shows the window
 behind — which is why another window's header floated through the title. Inherited from glas.sh;
 removed. **1,692 tests, exit 0.**
+
+## 2026-09-21 — [charts on macOS 27.2](2026-09-21_charts-on-macos-27-2.md)
+
+The overview's bar-chart names overlapped their bars. The code had not changed; the OS had —
+27.2 beta anchors a categorical axis label at the top of its band and ignores `centered:`. Names
+are now annotations on the marks, which cannot drift. Found and fixed against a headless
+`ImageRenderer` probe rather than an install per attempt.

@@ -2641,3 +2641,11 @@ copies, so the Mac app looked still-running for a minute after it had quit. Matc
 Next, unchanged: the exec seam; one card treatment (now five drawings of a card — the overview's
 own tab card is the fifth beside `GlassSessionCard`); the carousel on the phone; seeded
 database/desktop configurations.
+
+## 2026-09-21 (evening) — charts on macOS 27.2
+
+Reported from 0.4.192: the overview's database names overlapped their bars. Not our change — the
+Mac is on **27.2 beta** now and Swift Charts anchors categorical axis labels at the band's top
+edge. Fixed by naming each bar with an annotation, one helper for all four charts; found with a
+headless `ImageRenderer` probe. [Task note](tasks/2026-09/2026-09-21_charts-on-macos-27-2.md).
+0.4.193 building; install follows.

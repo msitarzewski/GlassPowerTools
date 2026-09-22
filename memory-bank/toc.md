@@ -57,6 +57,7 @@ three source applications are obsolete and no longer compile.
 | [Finding your way around on iOS](tasks/2026-09/2026-09-18_ios-navigation-plan.md) | **The plan, with A, B and C built**: opening a folder lands on its files, file browsing stops being modal, one header that says where you are (SFTP included), and a session switcher for a phone that has no way between open connections — plus everything carried |
 | [The iOS round, day two](tasks/2026-09/2026-09-19_ios-round-two.md) | 0.4.177–0.4.184: the provisional tab, HTML, the keyboard, and the database's collapse to its sidebar — plus the typed-path regression and what Xcode 27.2 broke |
 | [iPhone Duo](tasks/2026-09/2026-09-20_iphone-duo.md) | Ships 23 October: two sessions on one phone at last, a size class that changes on a hinge, and the window gate that may refuse the one iPhone where a second window works |
+| [Charts on macOS 27.2](tasks/2026-09/2026-09-21_charts-on-macos-27-2.md) | The overview's names overlapped their bars after the OS beta moved a categorical axis label to the band's top edge; names are annotations now, found with a headless `ImageRenderer` probe (`Tools/ChartProbe`) |
 | [September tasks](tasks/2026-09/README.md) | Monthly index |
 
 This project is `~/Software/glass/GlassPowerTools`. `../GlassEditorKit` was **absorbed on 2026-09-14**

@@ -284,3 +284,13 @@ live fixtures (`GPT_SSH_TEST_*`, `GPT_DB_TEST_*`) are read with `ProcessInfo.pro
 in the runner, which on macOS inherits the shell's. Every live UI test is therefore **macOS-only
 in practice**, and the database and desktop have no phone-side coverage at all until a
 configuration can be seeded the way `--ui-testing-seed-project` seeds one for the editor.
+
+
+## macOS 27.2 beta (26B5091g) — observed 2026-09-21
+
+The Mac moved to 27.2 during the day. One behaviour change found so far: **Swift Charts places a
+categorical y-axis label at the top edge of its band** and ignores `AxisValueLabel(centered:)`
+under every preset, so a horizontal bar chart's names sit on the bar below. The overview charts
+now name their bars with annotations instead
+([task note](tasks/2026-09/2026-09-21_charts-on-macos-27-2.md)). Chart layout on this machine can
+be measured headless with an `ImageRenderer` probe — `Tools/ChartProbe` is the shape of it.
