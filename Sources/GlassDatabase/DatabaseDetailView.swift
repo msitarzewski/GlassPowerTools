@@ -279,17 +279,7 @@ struct ConnectionOverviewView: View {
                         title: "Largest by Rows",
                         subtitle: "Top \(namespaceLabel.lowercased()) by server-reported row estimate"
                     ) {
-                        Chart(rowLeaders) { item in
-                            BarMark(
-                                x: .value("Rows", item.value),
-                                y: .value(namespaceLabel, item.name)
-                            )
-                            .foregroundStyle(.tint)
-                            .cornerRadius(3)
-                            .overviewBarName(item.name)
-                        }
-                        .overviewRowsAxis()
-                        .overviewBarChartAxes()
+                        OverviewBarChart(kind: .rows, entries: rowLeaders.map { .init(name: $0.name, value: $0.value) })
                     }
                 }
 
@@ -298,17 +288,7 @@ struct ConnectionOverviewView: View {
                         title: "Storage Distribution",
                         subtitle: "Top \(namespaceLabel.lowercased()) by server-reported bytes"
                     ) {
-                        Chart(storageLeaders) { item in
-                            BarMark(
-                                x: .value("Bytes", item.value),
-                                y: .value(namespaceLabel, item.name)
-                            )
-                            .foregroundStyle(.purple.gradient)
-                            .cornerRadius(3)
-                            .overviewBarName(item.name)
-                        }
-                        .overviewBytesAxis()
-                        .overviewBarChartAxes()
+                        OverviewBarChart(kind: .bytes, entries: storageLeaders.map { .init(name: $0.name, value: $0.value) })
                     }
                 }
             }
@@ -792,32 +772,12 @@ struct DatabaseDetailView: View {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 360), spacing: 16)], spacing: 16) {
                 if !rowLeaders.isEmpty {
                     OverviewChartCard(title: "Largest by Rows", subtitle: "Top tables by server-reported row estimate") {
-                        Chart(rowLeaders) { status in
-                            BarMark(
-                                x: .value("Rows", status.rowCount),
-                                y: .value("Table", status.name)
-                            )
-                            .foregroundStyle(.tint)
-                            .cornerRadius(3)
-                            .overviewBarName(status.name)
-                        }
-                        .overviewRowsAxis()
-                        .overviewBarChartAxes()
+                        OverviewBarChart(kind: .rows, entries: rowLeaders.map { .init(name: $0.name, value: $0.rowCount) })
                     }
                 }
                 if !storageLeaders.isEmpty {
                     OverviewChartCard(title: "Storage Distribution", subtitle: "Top tables by server-reported bytes") {
-                        Chart(storageLeaders) { status in
-                            BarMark(
-                                x: .value("Bytes", status.dataLength),
-                                y: .value("Table", status.name)
-                            )
-                            .foregroundStyle(.purple.gradient)
-                            .cornerRadius(3)
-                            .overviewBarName(status.name)
-                        }
-                        .overviewBytesAxis()
-                        .overviewBarChartAxes()
+                        OverviewBarChart(kind: .bytes, entries: storageLeaders.map { .init(name: $0.name, value: $0.dataLength) })
                     }
                 }
             }
@@ -1196,71 +1156,131 @@ private struct OverviewMetricCard: View {
     }
 }
 
-/// The name beside a horizontal bar, drawn by the bar rather than by the axis.
+/// One horizontal bar chart for the overview cards: the names, the axis, and the exact value
+/// on hover, in one place for the four charts that used to each carry their own.
 ///
-/// On macOS 27.2 (26B5091g) Swift Charts anchors a categorical y-axis label at the **top edge** of
-/// its band and ignores `AxisValueLabel(centered:)`, under every preset — so each name sat on the
-/// bar below it and the overview read as a collision (reported 2026-09-21: *"the database names
-/// and the bar chart overlap for some reason"*; the reason was the OS update). An annotation is
-/// positioned by the mark itself, so it cannot drift from the bar it names. Measured with a
-/// throwaway `ImageRenderer` probe rather than an install per attempt.
-private enum OverviewBarChart {
+/// **The names are drawn by the bars, not the axis.** On macOS 27.2 (26B5091g) Swift Charts
+/// anchors a categorical y-axis label at the **top edge** of its band and ignores
+/// `AxisValueLabel(centered:)` under every preset — so each name sat on the bar below it
+/// (reported 2026-09-21: *"the database names and the bar chart overlap for some reason"*; the
+/// reason was the OS update). An annotation is positioned by the mark itself and cannot drift.
+/// Measured with `Tools/ChartProbe` rather than an install per attempt.
+///
+/// **The axis says roughly, the bar says exactly.** `5M` on the axis, `11,856,203 rows` when you
+/// point at the bar (or tap it, where there is nothing to point with). The tooltip is a trailing
+/// annotation on the hovered mark, so it too is placed by the bar.
+private struct OverviewBarChart: View {
+    struct Entry: Identifiable {
+        let name: String
+        let value: Int
+        var id: String { name }
+    }
+
+    enum Kind {
+        case rows, bytes
+
+        var axisTitle: String { self == .rows ? "Rows" : "Bytes" }
+
+        var style: AnyShapeStyle {
+            self == .rows ? AnyShapeStyle(.tint) : AnyShapeStyle(.purple.gradient)
+        }
+
+        /// The axis label: a number people use, never `5.0E6`.
+        @ViewBuilder func axisLabel(_ value: Int) -> some View {
+            switch self {
+            case .rows: Text(value, format: .number.notation(.compactName))
+            case .bytes: Text(ByteCountFormatter.string(fromByteCount: Int64(value), countStyle: .file))
+            }
+        }
+
+        /// The tooltip: the whole number, with the rounded form beside it where the two differ.
+        func exact(_ value: Int) -> String {
+            switch self {
+            case .rows:
+                return "\(value.formatted(.number)) rows"
+            case .bytes:
+                let rounded = ByteCountFormatter.string(fromByteCount: Int64(value), countStyle: .file)
+                return "\(rounded) · \(value.formatted(.number)) bytes"
+            }
+        }
+    }
+
     static let labelWidth: CGFloat = 150
     static let labelSpacing: CGFloat = 8
-}
 
-private extension ChartContent {
-    func overviewBarName(_ name: String) -> some ChartContent {
-        annotation(position: .leading, alignment: .trailing, spacing: OverviewBarChart.labelSpacing,
-                   overflowResolution: .init(x: .disabled, y: .fit)) {
-            Text(name)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .frame(width: OverviewBarChart.labelWidth, alignment: .trailing)
+    let kind: Kind
+    let entries: [Entry]
+    @State private var hovered: Entry.ID?
+
+    var body: some View {
+        Chart(entries) { entry in
+            BarMark(x: .value(kind.axisTitle, entry.value), y: .value("Name", entry.name))
+                .foregroundStyle(kind.style)
+                .cornerRadius(3)
+                .annotation(position: .leading, alignment: .trailing, spacing: Self.labelSpacing,
+                            overflowResolution: .init(x: .disabled, y: .fit)) {
+                    Text(entry.name)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .frame(width: Self.labelWidth, alignment: .trailing)
+                }
+                .annotation(position: .trailing, alignment: .leading, spacing: 6,
+                            overflowResolution: .init(x: .fit, y: .fit)) {
+                    if hovered == entry.id {
+                        Text(kind.exact(entry.value))
+                            .font(.caption.monospacedDigit())
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(.regularMaterial, in: Capsule())
+                            .accessibilityIdentifier("overview-chart-tooltip")
+                    }
+                }
+                .accessibilityLabel(entry.name)
+                .accessibilityValue(kind.exact(entry.value))
         }
-    }
-}
-
-private extension View {
-    /// The other half: the axis that used to draw the names is hidden, and the room the
-    /// annotations draw into is reserved so the card does not clip them.
-    func overviewBarChartAxes() -> some View {
-        chartYAxis(.hidden)
-            .padding(.leading, OverviewBarChart.labelWidth + OverviewBarChart.labelSpacing)
-    }
-
-    /// Row counts as "5M" and "10M", not "5.0E6" — the default label for a large integer axis
-    /// is scientific notation, which is a number for a machine (2026-09-21: *"let's make sure
-    /// exponents are useful"*). Same shape as the bytes axis beside it.
-    func overviewRowsAxis() -> some View {
-        chartXAxis {
+        .chartXAxis {
             AxisMarks(position: .bottom) { value in
                 AxisGridLine()
                 AxisTick()
                 AxisValueLabel {
-                    if let rows = value.as(Int.self) {
-                        Text(rows, format: .number.notation(.compactName))
-                    }
+                    if let number = value.as(Int.self) { kind.axisLabel(number) }
                 }
+            }
+        }
+        // The axis that used to draw the names is hidden, and the room the annotations draw
+        // into is reserved so the card does not clip them.
+        .chartYAxis(.hidden)
+        .padding(.leading, Self.labelWidth + Self.labelSpacing)
+        .chartOverlay { proxy in
+            GeometryReader { geometry in
+                Rectangle()
+                    .fill(.clear)
+                    .contentShape(.rect)
+                    // A pointer where there is one; a tap where there is not. Both resolve the
+                    // pointer's row through the chart's own scale, so nothing here knows how
+                    // tall a band is.
+                    .onContinuousHover { phase in
+                        switch phase {
+                        case .active(let point): hovered = entry(at: point, proxy: proxy, geometry: geometry)
+                        case .ended: hovered = nil
+                        }
+                    }
+                    .onTapGesture { point in
+                        let hit = entry(at: point, proxy: proxy, geometry: geometry)
+                        hovered = hovered == hit ? nil : hit
+                    }
             }
         }
     }
 
-    /// Bytes as "2.5 GB", from the one formatter the rest of the app uses for sizes.
-    func overviewBytesAxis() -> some View {
-        chartXAxis {
-            AxisMarks(position: .bottom) { value in
-                AxisGridLine()
-                AxisTick()
-                AxisValueLabel {
-                    if let bytes = value.as(Int.self) {
-                        Text(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file))
-                    }
-                }
-            }
-        }
+    private func entry(at point: CGPoint, proxy: ChartProxy, geometry: GeometryProxy) -> Entry.ID? {
+        guard let plotFrame = proxy.plotFrame else { return nil }
+        let plot = geometry[plotFrame]
+        guard plot.contains(point) else { return nil }
+        let name: String? = proxy.value(atY: point.y - plot.minY)
+        return name.flatMap { candidate in entries.first { $0.name == candidate }?.id }
     }
 }
 

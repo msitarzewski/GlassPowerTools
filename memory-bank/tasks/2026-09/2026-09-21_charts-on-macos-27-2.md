@@ -40,3 +40,23 @@ integer axis is scientific notation. Now `.number.notation(.compactName)`: `0 ·
 rendered in the probe before install. Both axis blocks moved into helpers beside the name
 helper — `overviewRowsAxis()` and `overviewBytesAxis()` — so the four charts share three
 functions and no chart carries its own axis code any more.
+
+## Follow-up: the exact value on hover — *"tool tips on the numbers in the charts"*
+
+The axis says roughly; the bar now says exactly. Pointing at a bar (or tapping it, where there is
+nothing to point with) shows `11,856,203 rows` or `2.5 GB · 2,491,234,567 bytes` in a capsule at
+the bar's trailing end — a trailing annotation on the hovered mark, so it is placed by the bar
+like the name is. The pointer's row is resolved through the chart's own scale
+(`proxy.value(atY:)`), so nothing knows how tall a band is.
+
+This finished the consolidation the names started: the four charts are now **one view**,
+`OverviewBarChart(kind:entries:)`, with `.rows` and `.bytes` deciding the axis label, the tooltip
+text and the colour. No chart in the file carries its own marks, axis or annotations any more.
+Rendered in `Tools/ChartProbe` with the tooltip forced on the longest bar and the smallest.
+
+| Claim | Evidence |
+|---|---|
+| The tooltip fits at the plot's edge and beside a sliver | `chart-tooltip.png` from the probe |
+| Four charts, one view | `DatabaseDetailView.swift`, `OverviewBarChart` — the call sites are one line each |
+| Database suite | 276 tests, exit 0 |
+| Hover and tap in the running app | pending 0.4.195 |

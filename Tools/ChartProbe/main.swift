@@ -29,6 +29,17 @@ struct Probe: View {
                             .lineLimit(1).truncationMode(.middle)
                             .frame(width: 150, alignment: .trailing)
                     }
+                    // The hover tooltip, forced on two rows so a headless render shows both the
+                    // long-bar case (does it fit at the edge?) and the sliver case.
+                    .annotation(position: .trailing, alignment: .leading, spacing: 6,
+                                overflowResolution: .init(x: .fit, y: .fit)) {
+                        if item.name == "common_vision" || item.name == "mysql" {
+                            Text("\(item.value.formatted(.number)) rows")
+                                .font(.caption.monospacedDigit())
+                                .padding(.horizontal, 8).padding(.vertical, 4)
+                                .background(.regularMaterial, in: Capsule())
+                        }
+                    }
             }
             .chartXAxis {
                 AxisMarks(position: .bottom) { value in
