@@ -32,3 +32,11 @@ width for everyone.
 | The four charts share one helper | `DatabaseDetailView.swift`, `OverviewBarChart` |
 | Database suite | 276 tests, exit 0 |
 | Seen in the running app | pending 0.4.193 |
+
+## Follow-up: the rows axis — *"let's make sure exponents are useful"*
+
+Seen in 0.4.193: the rows charts' x-axis read `5.0E6 · 1.0E7` — the default label for a large
+integer axis is scientific notation. Now `.number.notation(.compactName)`: `0 · 5M · 10M`,
+rendered in the probe before install. Both axis blocks moved into helpers beside the name
+helper — `overviewRowsAxis()` and `overviewBytesAxis()` — so the four charts share three
+functions and no chart carries its own axis code any more.

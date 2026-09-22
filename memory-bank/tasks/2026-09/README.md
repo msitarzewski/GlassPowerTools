@@ -425,4 +425,4 @@ removed. **1,692 tests, exit 0.**
 The overview's bar-chart names overlapped their bars. The code had not changed; the OS had —
 27.2 beta anchors a categorical axis label at the top of its band and ignores `centered:`. Names
 are now annotations on the marks, which cannot drift. Found and fixed against a headless
-`ImageRenderer` probe rather than an install per attempt.
+`ImageRenderer` probe rather than an install per attempt. Then the rows axis: `5.0E6` became `5M`.

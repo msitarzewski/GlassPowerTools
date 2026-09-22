@@ -30,7 +30,12 @@ struct Probe: View {
                             .frame(width: 150, alignment: .trailing)
                     }
             }
-            .chartXAxis { AxisMarks(position: .bottom) }
+            .chartXAxis {
+                AxisMarks(position: .bottom) { value in
+                    AxisGridLine(); AxisTick()
+                    AxisValueLabel { if let rows = value.as(Int.self) { Text(rows, format: .number.notation(.compactName)) } }
+                }
+            }
             .chartYAxis(.hidden)
             .padding(.leading, 158)
             .chartYAxis {

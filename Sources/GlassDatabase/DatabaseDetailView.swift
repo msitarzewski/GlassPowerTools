@@ -288,7 +288,7 @@ struct ConnectionOverviewView: View {
                             .cornerRadius(3)
                             .overviewBarName(item.name)
                         }
-                        .chartXAxis { AxisMarks(position: .bottom) }
+                        .overviewRowsAxis()
                         .overviewBarChartAxes()
                     }
                 }
@@ -307,20 +307,7 @@ struct ConnectionOverviewView: View {
                             .cornerRadius(3)
                             .overviewBarName(item.name)
                         }
-                        .chartXAxis {
-                            AxisMarks(position: .bottom) { value in
-                                AxisGridLine()
-                                AxisTick()
-                                AxisValueLabel {
-                                    if let bytes = value.as(Int.self) {
-                                        Text(ByteCountFormatter.string(
-                                            fromByteCount: Int64(bytes),
-                                            countStyle: .file
-                                        ))
-                                    }
-                                }
-                            }
-                        }
+                        .overviewBytesAxis()
                         .overviewBarChartAxes()
                     }
                 }
@@ -814,7 +801,7 @@ struct DatabaseDetailView: View {
                             .cornerRadius(3)
                             .overviewBarName(status.name)
                         }
-                        .chartXAxis { AxisMarks(position: .bottom) }
+                        .overviewRowsAxis()
                         .overviewBarChartAxes()
                     }
                 }
@@ -829,20 +816,7 @@ struct DatabaseDetailView: View {
                             .cornerRadius(3)
                             .overviewBarName(status.name)
                         }
-                        .chartXAxis {
-                            AxisMarks(position: .bottom) { value in
-                                AxisGridLine()
-                                AxisTick()
-                                AxisValueLabel {
-                                    if let bytes = value.as(Int.self) {
-                                        Text(ByteCountFormatter.string(
-                                            fromByteCount: Int64(bytes),
-                                            countStyle: .file
-                                        ))
-                                    }
-                                }
-                            }
-                        }
+                        .overviewBytesAxis()
                         .overviewBarChartAxes()
                     }
                 }
@@ -1255,6 +1229,38 @@ private extension View {
     func overviewBarChartAxes() -> some View {
         chartYAxis(.hidden)
             .padding(.leading, OverviewBarChart.labelWidth + OverviewBarChart.labelSpacing)
+    }
+
+    /// Row counts as "5M" and "10M", not "5.0E6" — the default label for a large integer axis
+    /// is scientific notation, which is a number for a machine (2026-09-21: *"let's make sure
+    /// exponents are useful"*). Same shape as the bytes axis beside it.
+    func overviewRowsAxis() -> some View {
+        chartXAxis {
+            AxisMarks(position: .bottom) { value in
+                AxisGridLine()
+                AxisTick()
+                AxisValueLabel {
+                    if let rows = value.as(Int.self) {
+                        Text(rows, format: .number.notation(.compactName))
+                    }
+                }
+            }
+        }
+    }
+
+    /// Bytes as "2.5 GB", from the one formatter the rest of the app uses for sizes.
+    func overviewBytesAxis() -> some View {
+        chartXAxis {
+            AxisMarks(position: .bottom) { value in
+                AxisGridLine()
+                AxisTick()
+                AxisValueLabel {
+                    if let bytes = value.as(Int.self) {
+                        Text(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file))
+                    }
+                }
+            }
+        }
     }
 }
 
