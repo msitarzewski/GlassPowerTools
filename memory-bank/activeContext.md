@@ -2793,22 +2793,35 @@ D34 (a deletion is dated); the fold survivor is the most recently updated member
 - The sync token is never persisted: every launch is a full fetch. Publishing happens on the
   *next* sync after a change, so a device that folds and is not relaunched has published nothing.
 
-## 2026-09-23 — 14:10 — RESUME HERE (supersedes every block above)
+## 2026-09-23 — 15:30 — RESUME HERE (supersedes every block above)
 
-**State BUILD.** Committed at this checkpoint (the user asked: *"Update the memory bank to this
-point … Then commit it, and build the new editor"*). 0.4.216 on the Mac and iPhone; Vision Pro
-0.4.123. 1,752 tests, 0 failing.
+**State DOCS, tree clean at `9b4da5f` + this checkpoint.** 0.4.217 on the Mac and iPhone (read
+back); Vision Pro 0.4.123. 1,755 tests, 0 failing. The user compacted here and said *"then we can
+tackle this on return"* — **this** is the database grid.
 
-**D36 built (0.4.217 on the Mac, uncommitted)** — see the research note's *Built*. Was: **a TextKit 1 backend for the Mac editor** — [research](tasks/2026-09/2026-09-23_text-engine-research.md)
-(the state of the art was researched; name it only as that). Behind `GlassEditorEngine`;
-`NSLayoutManager` with non-contiguous layout; colours as temporary attributes; gutter against
-layout-manager line fragments; the TextKit 2 tripwire per backend. iPhone stays TextKit 2 + Preview.
+### Next, in order
 
-**Seen by the user**: the TextKit 1 editor — *"that new renderer is great!"* **Grid measured**: [grid scroll cost](tasks/2026-09/2026-09-23_grid-scroll-cost.md), options proposed.
+1. **The database grid at 120 Hz** — [measurements and options](tasks/2026-09/2026-09-23_grid-scroll-cost.md).
+   Start with option 1 (trim the SwiftUI grid: gestures per row, visual effect only on frozen
+   cells, one material behind the row-number column, cache `displayedRowIndices`), re-measure with
+   `GPT_GRID_TIMING=1 GPT_GRID_PAGE=1000 GPT_GRID_STEPS=1500 swift test -c release --filter
+   GridScrollTimingTests`, then decide with the user on option 2 (`NSTableView`). Target: no frame
+   over 8.3 ms on a long scroll.
+2. **The Mac editor on TextKit 1 (D36) — done and liked** (*"that new renderer is great!"*). Left:
+   re-wrap after resize ~1.7 s on the 14.6 MB SVG; colours as layout-manager temporary attributes
+   and highlighting off the main thread; iPad and Vision Pro unmeasured.
+3. visionOS: the editor toolbar is invisible to UI tests; the Vision Pro update; lower the
+   highlighting ceiling to ~1 MB (proposed, not asked for yet).
 
-**Open question from the user**: *"should we be looking at other editors that claim real time
-rendering somehow? I think this is going to sneak up on us in the Database and Terminal areas too."*
-Answered in conversation; a survey of the terminal's and the grid's rendering paths is the follow-up.
+### Things that will bite
+
+- Rule 59: measure the frame, then the window — offscreen TextKit 1 reads 0.0 ms; confirm in the
+  running app, and never drive the Mac while the user is on it.
+- In-app scroll check: `inapp.sh` pattern (scroll-wheel CGEvents + `sample`; the main thread is
+  the first `Thread_` block, labelled "Main Thread", not always "com.apple.main-thread").
+- The research source is named only as "the state of the art" in the repo (the user's instruction).
+- Writer ids: `a4d0e867` Mac, `6b16e22a` phone. A Wi-Fi `devicectl` install can fail with 4016
+  when the phone is asleep — read the version back.
 
 ### Closed since the 23:00 block
 
