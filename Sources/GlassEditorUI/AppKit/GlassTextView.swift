@@ -3,9 +3,17 @@
 import AppKit
 import GlassEditorCore
 
-/// The macOS text view, forced into TextKit 2 and drawing its own canvas.
+/// The macOS text view, on the text system it was built with, drawing its own canvas.
 ///
-/// **TextKit 2 is not optional here.** `NSTextView` still ships a TextKit 1
+/// **D36 (2026-09-23): the Mac editor runs on TextKit 1**, built by `makeTextKit1()` with
+/// non-contiguous layout — lay out only what is shown, even inside one enormous line. Measured on a
+/// 14.6 MB one-line file: TextKit 1 opens in 0.3 s and scrolls at well under a frame; TextKit 2
+/// took ~5 s in the app and could not scroll it, because its unit of layout is the paragraph. The
+/// research is `memory-bank/tasks/2026-09/2026-09-23_text-engine-research.md`. TextKit 2 stays
+/// available (`makeTextKit2()`) behind the same type; everything below that mentions it applies to
+/// a view built that way.
+///
+/// **On TextKit 2, TextKit 2 is not optional.** `NSTextView` still ships a TextKit 1
 /// compatibility mode, and it is entered *implicitly*: touching
 /// `NSTextView.layoutManager` (or `NSTextContainer.layoutManager`) makes AppKit
 /// tear down `NSTextLayoutManager` and rebuild the view on `NSLayoutManager`,
@@ -48,10 +56,23 @@ public final class GlassTextView: NSTextView {
     /// `shouldChangeTextIn`, then cleared.
     var pendingIntent: EditIntent?
 
+    /// The text system this view was built on. Fixed at construction.
+    public enum TextSystem: Sendable { case textKit1, textKit2 }
+    public private(set) var textSystem: TextSystem = .textKit2
+
     /// The TextKit 2 content storage, reached without ever naming
-    /// `layoutManager`.
+    /// `layoutManager`. Nil on TextKit 1.
     public var contentStorage: NSTextContentStorage? {
         textLayoutManager?.textContentManager as? NSTextContentStorage
+    }
+
+    /// The characters and their attributes, on either text system — the one place that knows the
+    /// difference, so no caller reaches for `layoutManager` on a TextKit 2 view by accident.
+    public var glassTextStorage: NSTextStorage? {
+        switch textSystem {
+        case .textKit2: contentStorage?.textStorage
+        case .textKit1: textStorage
+        }
     }
 
     // MARK: - Construction
@@ -70,6 +91,22 @@ public final class GlassTextView: NSTextView {
 
         let view = GlassTextView(frame: .zero, textContainer: container)
         view.assertUsingTextKit2()
+        return view
+    }
+
+    /// Builds a TextKit 1 view: storage → layout manager → container → view, with **non-contiguous
+    /// layout** on, which is the whole reason for building it (D36).
+    public static func makeTextKit1() -> GlassTextView {
+        let storage = NSTextStorage()
+        let layoutManager = NSLayoutManager()
+        layoutManager.allowsNonContiguousLayout = true
+        storage.addLayoutManager(layoutManager)
+        let container = NSTextContainer(
+            size: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
+        )
+        layoutManager.addTextContainer(container)
+        let view = GlassTextView(frame: .zero, textContainer: container)
+        view.textSystem = .textKit1
         return view
     }
 
@@ -134,6 +171,17 @@ public final class GlassTextView: NSTextView {
             textLayoutManager != nil,
             "GlassTextView fell back to TextKit 1 — something read `layoutManager`"
         )
+    }
+
+    /// The tripwire for whichever system the view was built on: a TextKit 2 view must still be on
+    /// TextKit 2; a TextKit 1 view must still have its non-contiguous layout manager.
+    public func assertOnItsTextSystem() {
+        switch textSystem {
+        case .textKit2: assertUsingTextKit2()
+        case .textKit1:
+            assert(layoutManager?.allowsNonContiguousLayout == true,
+                   "GlassTextView lost its non-contiguous TextKit 1 layout manager")
+        }
     }
 
     /// Whether TextKit 2 is still in force. Public so a consumer embedding this

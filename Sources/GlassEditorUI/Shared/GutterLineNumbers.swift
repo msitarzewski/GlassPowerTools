@@ -89,7 +89,21 @@ public enum GutterLineNumbers {
         ) { utf16Offset in
             model.lineIndex(forUTF16Offset: utf16Offset)
         }
+        draw(visible, in: bounds, offsetY: offsetY, model: model)
+    }
 
+    /// Draws labels already worked out — by TextKit 2 above, or by the Mac's TextKit 1 gutter
+    /// (D36). One drawing, whichever text system found the lines.
+    public static func draw(_ visible: [Label], in bounds: CGRect, offsetY: CGFloat, model: GlassEditorModel) {
+        guard bounds.height > 0 else { return }
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: AttributedAssembly.gutterFont(configuration: model.configuration),
+            .foregroundColor: AttributedAssembly.gutterNumberColor(
+                theme: model.theme,
+                surface: model.surfaceCondition,
+                configuration: model.configuration
+            ),
+        ]
         for label in visible {
             let text = "\(label.number)" as NSString
             let size = text.size(withAttributes: attributes)

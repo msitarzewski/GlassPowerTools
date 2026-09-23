@@ -190,7 +190,7 @@ public final class GlassEditorNSCoordinator: NSObject, NSTextViewDelegate {
     /// (`HighlightedTextEditor.swift:339`), discards marked text and makes every
     /// highlight pass look like a document mutation to the layout system.
     public func applyHighlightAttributes(to textView: GlassTextView) {
-        guard let storage = textView.contentStorage?.textStorage else { return }
+        guard let storage = textView.glassTextStorage else { return }
 
         withApplying {
             let savedSelection = textView.selectedRange()
@@ -217,7 +217,7 @@ public final class GlassEditorNSCoordinator: NSObject, NSTextViewDelegate {
                 GlassEditorNSCoordinator.clamped(savedSelection, maximum: storage.length)
             )
             textView.appliedFontSize = CGFloat(model.configuration.fontSize)
-            textView.assertUsingTextKit2()
+            textView.assertOnItsTextSystem()
             gutter?.needsDisplay = true
             highlightPassCount += 1
         }
@@ -248,7 +248,7 @@ public final class GlassEditorNSCoordinator: NSObject, NSTextViewDelegate {
     /// Guarded, so the resulting `textDidChange` is not read back as a user edit
     /// and re-recorded into the undo stack it just came out of.
     public func syncTextViewFromModel(_ textView: GlassTextView) {
-        guard let storage = textView.contentStorage?.textStorage else { return }
+        guard let storage = textView.glassTextStorage else { return }
         guard storage.string != model.text else {
             applyHighlightAttributes(to: textView)
             return
@@ -283,7 +283,7 @@ public final class GlassEditorNSCoordinator: NSObject, NSTextViewDelegate {
             )
             textView.appliedFontSize = CGFloat(model.configuration.fontSize)
 
-            textView.assertUsingTextKit2()
+            textView.assertOnItsTextSystem()
             model.selectedRange = range(of: textView.selectedRange())
             gutter?.needsDisplay = true
             highlightPassCount += 1

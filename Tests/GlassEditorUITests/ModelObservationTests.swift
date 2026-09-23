@@ -35,7 +35,7 @@ struct ModelObservationTests {
 
     /// Distinct foreground colors present in the text view's storage.
     private func distinctForegroundColors(in engine: GlassEditorAppKitEngine) -> Set<String> {
-        guard let storage = engine.textView.contentStorage?.textStorage else { return [] }
+        guard let storage = engine.textView.glassTextStorage else { return [] }
         var seen = Set<String>()
         storage.enumerateAttribute(
             .foregroundColor,

@@ -15,13 +15,37 @@ struct AppKitEngineTests {
 
     private func makeEngine(
         _ content: String,
-        configuration: GlassEditorConfiguration = GlassEditorConfiguration()
+        configuration: GlassEditorConfiguration = GlassEditorConfiguration(),
+        _ system: GlassTextView.TextSystem = .textKit1
     ) -> GlassEditorAppKitEngine {
         let model = GlassEditorModel(
             snapshot: DocumentLoader.make(content: content, origin: .ephemeral(id: UUID())),
             configuration: configuration
         )
-        return GlassEditorAppKitEngine(model: model)
+        return GlassEditorAppKitEngine(model: model, textSystem: system)
+    }
+
+    /// The height of one line of this engine's text, from its own text system.
+    private func lineHeight(of engine: GlassEditorAppKitEngine) -> CGFloat? {
+        if let layoutManager = engine.textView.textLayoutManager {
+            var height: CGFloat = 0
+            layoutManager.enumerateTextLayoutFragments(
+                from: layoutManager.textContentManager?.documentRange.location,
+                options: [.ensuresLayout, .ensuresExtraLineFragment]
+            ) { fragment in
+                height = fragment.textLineFragments.first?.typographicBounds.height ?? 0
+                return false
+            }
+            return height
+        }
+        guard let layoutManager = engine.textView.layoutManager, layoutManager.numberOfGlyphs > 0 else { return nil }
+        return layoutManager.lineFragmentRect(forGlyphAt: 0, effectiveRange: nil).height
+    }
+
+    /// What the gutter draws, on whichever system the engine was built with.
+    private func gutterLabels(_ engine: GlassEditorAppKitEngine,
+                              _ band: ClosedRange<CGFloat>? = nil) -> [GutterLineNumbers.Label] {
+        GlassLineNumberGutter.labels(for: engine.textView, model: engine.model, verticalRange: band)
     }
 
     /// The engine applies theme/surface/configuration changes by observing the
@@ -38,16 +62,30 @@ struct AppKitEngineTests {
         engine.textView.frame = NSRect(x: 0, y: 0, width: width, height: 4000)
         engine.textView.textContainer?.size = NSSize(width: width, height: .greatestFiniteMagnitude)
         engine.textView.textContainer?.widthTracksTextView = false
-        guard let layoutManager = engine.textView.textLayoutManager,
-              let content = layoutManager.textContentManager else { return }
-        layoutManager.ensureLayout(for: content.documentRange)
+        if let layoutManager = engine.textView.textLayoutManager, let content = layoutManager.textContentManager {
+            layoutManager.ensureLayout(for: content.documentRange)
+        } else if engine.textView.textSystem == .textKit1, let container = engine.textView.textContainer {
+            engine.textView.layoutManager?.ensureLayout(for: container)
+        }
     }
 
-    // MARK: - TextKit 2
+    // MARK: - Text system
 
-    @Test("the text view is on TextKit 2 and stays there")
-    func textKit2IsActive() {
+    /// D36: the Mac editor is TextKit 1 with non-contiguous layout, and an edit must not lose it.
+    @Test("the Mac text view is on TextKit 1 with non-contiguous layout, and stays there")
+    func textKit1IsTheMacDefault() throws {
         let engine = makeEngine("SELECT 1")
+        #expect(engine.textView.textSystem == .textKit1)
+        #expect(engine.textView.layoutManager?.allowsNonContiguousLayout == true)
+        #expect(engine.textView.glassTextStorage?.string == "SELECT 1")
+        try engine.apply(TextEdit.insert(" FROM t", at: 8))
+        #expect(engine.textView.layoutManager?.allowsNonContiguousLayout == true)
+        #expect(engine.textView.glassTextStorage?.string == "SELECT 1 FROM t")
+    }
+
+    @Test("a TextKit 2 text view, when asked for, is on TextKit 2 and stays there")
+    func textKit2IsActive() {
+        let engine = makeEngine("SELECT 1", .textKit2)
         #expect(engine.textView.textLayoutManager != nil)
         #expect(engine.textView.isUsingTextKit2)
         #expect(engine.textView.contentStorage != nil)
@@ -201,7 +239,7 @@ struct AppKitEngineTests {
 
         #expect(engine.coordinator.highlightPassCount > before)
         #expect(engine.textView.appliedFontSize == 22)
-        let storage = engine.textView.contentStorage?.textStorage
+        let storage = engine.textView.glassTextStorage
         let font = storage?.attribute(.font, at: 0, effectiveRange: nil) as? NSFont
         #expect(font?.pointSize == 22)
     }
@@ -224,46 +262,30 @@ struct AppKitEngineTests {
     /// `.ensuresExtraLineFragment`, TextKit 2 lays the final empty line out *inside* the last
     /// paragraph's fragment — `"…\n"` is one fragment, two line fragments, 32 points tall — so
     /// the trailing number was placed at the fragment's bottom rather than at the empty line.
-    @Test("the trailing empty line's number sits on that line, not below the fragment")
-    func gutterPlacesTheTrailingNumberOnItsOwnLine() throws {
-        let engine = makeEngine("Moving to a new place, open to pretty much anything.\n")
+    @Test("the trailing empty line's number sits on that line, not below the fragment", arguments: [GlassTextView.TextSystem.textKit1, .textKit2])
+    func gutterPlacesTheTrailingNumberOnItsOwnLine(_ system: GlassTextView.TextSystem) throws {
+        let engine = makeEngine("Moving to a new place, open to pretty much anything.\n", system)
         layOut(engine, width: 600)
-        let layoutManager = try #require(engine.textView.textLayoutManager)
-
-        let labels = GutterLineNumbers.labels(
-            in: layoutManager, verticalRange: nil, lineCount: engine.model.lineCount
-        ) { engine.model.lineIndex(forUTF16Offset: $0) }
+        let labels = gutterLabels(engine)
 
         #expect(labels.map(\.number) == [1, 2])
         let first = try #require(labels.first)
         let second = try #require(labels.last)
-        // The line's own height, taken from the layout rather than assumed.
-        var lineHeight: CGFloat = 0
-        layoutManager.enumerateTextLayoutFragments(
-            from: layoutManager.textContentManager?.documentRange.location,
-            options: [.ensuresLayout, .ensuresExtraLineFragment]
-        ) { fragment in
-            lineHeight = fragment.textLineFragments.first?.typographicBounds.height ?? 0
-            return false
-        }
+        // The line's own height, taken from the layout rather than assumed: the height of one
+        // line of this document's text, from the text system that laid it out.
+        let lineHeight = try #require(lineHeight(of: engine))
         #expect(lineHeight > 0)
         #expect(second.frame.minY == first.frame.minY + lineHeight,
                 "the second number belongs one line down, where the caret is — not one line below that")
     }
 
-    @Test("the gutter numbers 100 logical lines 1...100")
-    func gutterNumbersHundredLines() {
+    @Test("the gutter numbers 100 logical lines 1...100", arguments: [GlassTextView.TextSystem.textKit1, .textKit2])
+    func gutterNumbersHundredLines(_ system: GlassTextView.TextSystem) {
         let content = (1...100).map { "line \($0)" }.joined(separator: "\n")
-        let engine = makeEngine(content)
+        let engine = makeEngine(content, system)
         layOut(engine, width: 600)
 
-        guard let layoutManager = engine.textView.textLayoutManager else {
-            Issue.record("no TextKit 2 layout manager")
-            return
-        }
-        let labels = GutterLineNumbers.labels(
-            in: layoutManager, verticalRange: nil, lineCount: engine.model.lineCount
-        ) { engine.model.lineIndex(forUTF16Offset: $0) }
+        let labels = gutterLabels(engine)
 
         #expect(labels.count == 100)
         #expect(labels.map(\.number) == Array(1...100))
@@ -271,38 +293,29 @@ struct AppKitEngineTests {
         #expect(zip(labels, labels.dropFirst()).allSatisfy { $0.frame.minY <= $1.frame.minY })
     }
 
-    @Test("soft wraps do not increment the line number")
-    func softWrapsDoNotIncrement() {
+    @Test("soft wraps do not increment the line number", arguments: [GlassTextView.TextSystem.textKit1, .textKit2])
+    func softWrapsDoNotIncrement(_ system: GlassTextView.TextSystem) {
         // Three logical lines, the middle one long enough to wrap several times
         // in a narrow container.
         let long = String(repeating: "wrap ", count: 80)
-        let engine = makeEngine("first\n\(long)\nlast")
+        let engine = makeEngine("first\n\(long)\nlast", system)
         layOut(engine, width: 120)
 
-        guard let layoutManager = engine.textView.textLayoutManager else {
-            Issue.record("no TextKit 2 layout manager")
-            return
-        }
-        let labels = GutterLineNumbers.labels(
-            in: layoutManager, verticalRange: nil, lineCount: engine.model.lineCount
-        ) { engine.model.lineIndex(forUTF16Offset: $0) }
+        let labels = gutterLabels(engine)
 
         #expect(labels.map(\.number) == [1, 2, 3])
-        // The wrapped line really did wrap — otherwise this proves nothing.
-        let wrapped = labels[1]
-        #expect(wrapped.frame.height > labels[0].frame.height * 2)
+        // The wrapped line really did wrap — otherwise this proves nothing: line 3 starts more
+        // than two rows below line 2.
+        #expect(labels[2].frame.minY - labels[1].frame.minY > (labels[0].frame.height) * 2)
     }
 
-    @Test("inserting a line early shifts every number below it")
-    func numbersShiftAfterAnEdit() throws {
-        let engine = makeEngine("alpha\nbeta\ngamma")
+    @Test("inserting a line early shifts every number below it", arguments: [GlassTextView.TextSystem.textKit1, .textKit2])
+    func numbersShiftAfterAnEdit(_ system: GlassTextView.TextSystem) throws {
+        let engine = makeEngine("alpha\nbeta\ngamma", system)
         layOut(engine, width: 600)
 
         func numbers() -> [Int] {
-            guard let layoutManager = engine.textView.textLayoutManager else { return [] }
-            return GutterLineNumbers.labels(
-                in: layoutManager, verticalRange: nil, lineCount: engine.model.lineCount
-            ) { engine.model.lineIndex(forUTF16Offset: $0) }.map(\.number)
+            gutterLabels(engine).map(\.number)
         }
         #expect(numbers() == [1, 2, 3])
 
@@ -316,17 +329,11 @@ struct AppKitEngineTests {
         #expect(numbers() == [1, 2, 3])
     }
 
-    @Test("a trailing terminator produces a final empty numbered line")
-    func trailingTerminatorGetsALine() {
-        let engine = makeEngine("one\ntwo\n")
+    @Test("a trailing terminator produces a final empty numbered line", arguments: [GlassTextView.TextSystem.textKit1, .textKit2])
+    func trailingTerminatorGetsALine(_ system: GlassTextView.TextSystem) {
+        let engine = makeEngine("one\ntwo\n", system)
         layOut(engine, width: 600)
-        guard let layoutManager = engine.textView.textLayoutManager else {
-            Issue.record("no TextKit 2 layout manager")
-            return
-        }
-        let labels = GutterLineNumbers.labels(
-            in: layoutManager, verticalRange: nil, lineCount: engine.model.lineCount
-        ) { engine.model.lineIndex(forUTF16Offset: $0) }
+        let labels = gutterLabels(engine)
         // `TextStorageBuffer` counts three lines for "one\ntwo\n"; the gutter
         // agrees, which is the property that matters — the two must not disagree
         // about what a line is.
@@ -334,57 +341,37 @@ struct AppKitEngineTests {
         #expect(labels.map(\.number) == [1, 2, 3])
     }
 
-    @Test("an empty document still gets a line 1")
-    func emptyDocumentHasOneLine() {
-        let engine = makeEngine("")
+    @Test("an empty document still gets a line 1", arguments: [GlassTextView.TextSystem.textKit1, .textKit2])
+    func emptyDocumentHasOneLine(_ system: GlassTextView.TextSystem) {
+        let engine = makeEngine("", system)
         layOut(engine, width: 600)
-        guard let layoutManager = engine.textView.textLayoutManager else {
-            Issue.record("no TextKit 2 layout manager")
-            return
-        }
-        let labels = GutterLineNumbers.labels(
-            in: layoutManager, verticalRange: nil, lineCount: engine.model.lineCount
-        ) { engine.model.lineIndex(forUTF16Offset: $0) }
+        let labels = gutterLabels(engine)
         #expect(engine.model.lineCount == 1)
         #expect(labels.map(\.number) == [1])
     }
 
-    @Test("a document that is nothing but terminators numbers every empty line")
-    func onlyTerminators() {
-        let engine = makeEngine("\n\n\n")
+    @Test("a document that is nothing but terminators numbers every empty line", arguments: [GlassTextView.TextSystem.textKit1, .textKit2])
+    func onlyTerminators(_ system: GlassTextView.TextSystem) {
+        let engine = makeEngine("\n\n\n", system)
         layOut(engine, width: 600)
-        guard let layoutManager = engine.textView.textLayoutManager else {
-            Issue.record("no TextKit 2 layout manager")
-            return
-        }
-        let labels = GutterLineNumbers.labels(
-            in: layoutManager, verticalRange: nil, lineCount: engine.model.lineCount
-        ) { engine.model.lineIndex(forUTF16Offset: $0) }
+        let labels = gutterLabels(engine)
         #expect(engine.model.lineCount == 4)
         #expect(labels.map(\.number) == [1, 2, 3, 4])
     }
 
-    @Test("clipping to a visible band returns only the lines in it")
-    func verticalRangeClipsLabels() {
-        let engine = makeEngine((1...100).map { "line \($0)" }.joined(separator: "\n"))
+    @Test("clipping to a visible band returns only the lines in it", arguments: [GlassTextView.TextSystem.textKit1, .textKit2])
+    func verticalRangeClipsLabels(_ system: GlassTextView.TextSystem) {
+        let engine = makeEngine((1...100).map { "line \($0)" }.joined(separator: "\n"), system)
         layOut(engine, width: 600)
-        guard let layoutManager = engine.textView.textLayoutManager else {
-            Issue.record("no TextKit 2 layout manager")
-            return
-        }
-        let all = GutterLineNumbers.labels(
-            in: layoutManager, verticalRange: nil, lineCount: engine.model.lineCount
-        ) { engine.model.lineIndex(forUTF16Offset: $0) }
-        guard let lineHeight = all.first?.frame.height, lineHeight > 0 else {
+        let all = gutterLabels(engine)
+        guard all.count > 1, case let lineHeight = all[1].frame.minY - all[0].frame.minY, lineHeight > 0 else {
             Issue.record("no laid-out lines")
             return
         }
 
         // A band starting part-way down the document.
         let band = (lineHeight * 10)...(lineHeight * 14)
-        let clipped = GutterLineNumbers.labels(
-            in: layoutManager, verticalRange: band, lineCount: engine.model.lineCount
-        ) { engine.model.lineIndex(forUTF16Offset: $0) }
+        let clipped = gutterLabels(engine, band)
 
         #expect(clipped.count < all.count)
         #expect(clipped.isEmpty == false)
@@ -394,30 +381,22 @@ struct AppKitEngineTests {
         #expect(clipped.map(\.number) == Array(clipped.first!.number...clipped.last!.number))
     }
 
-    @Test("a clipped band that stops early does not invent a trailing line")
-    func clippedBandDoesNotSynthesiseTrailingLine() {
-        let engine = makeEngine((1...50).map { "line \($0)" }.joined(separator: "\n") + "\n")
+    @Test("a clipped band that stops early does not invent a trailing line", arguments: [GlassTextView.TextSystem.textKit1, .textKit2])
+    func clippedBandDoesNotSynthesiseTrailingLine(_ system: GlassTextView.TextSystem) {
+        let engine = makeEngine((1...50).map { "line \($0)" }.joined(separator: "\n") + "\n", system)
         layOut(engine, width: 600)
-        guard let layoutManager = engine.textView.textLayoutManager else {
-            Issue.record("no TextKit 2 layout manager")
-            return
-        }
-        let all = GutterLineNumbers.labels(
-            in: layoutManager, verticalRange: nil, lineCount: engine.model.lineCount
-        ) { engine.model.lineIndex(forUTF16Offset: $0) }
+        let all = gutterLabels(engine)
         // The trailing empty line is line 51 and is synthesised, since TextKit 2
         // emits no fragment for it.
         #expect(engine.model.lineCount == 51)
         #expect(all.map(\.number) == Array(1...51))
 
-        guard let lineHeight = all.first?.frame.height, lineHeight > 0 else {
+        guard all.count > 1, case let lineHeight = all[1].frame.minY - all[0].frame.minY, lineHeight > 0 else {
             Issue.record("no laid-out lines")
             return
         }
         let topBand = 0...(lineHeight * 3)
-        let clipped = GutterLineNumbers.labels(
-            in: layoutManager, verticalRange: topBand, lineCount: engine.model.lineCount
-        ) { engine.model.lineIndex(forUTF16Offset: $0) }
+        let clipped = gutterLabels(engine, topBand)
         // Enumeration stopped well before the end, so line 51 must not be
         // appended beneath line 4.
         #expect(clipped.contains { $0.number == 51 } == false)
@@ -477,7 +456,7 @@ struct AppKitEngineTests {
         let engine = makeEngine("SELECT 1")
         engine.setHighlightRuns([HighlightRun(range: 0..<6, role: .keyword)])
 
-        let storage = engine.textView.contentStorage?.textStorage
+        let storage = engine.textView.glassTextStorage
         let keyword = storage?.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
         let plain = storage?.attribute(.foregroundColor, at: 7, effectiveRange: nil) as? NSColor
         #expect(keyword != nil)
@@ -489,7 +468,7 @@ struct AppKitEngineTests {
         let engine = makeEngine("SELECT 1")
         engine.setHighlightRuns([HighlightRun(range: 0..<6, role: .keyword)])
 
-        let storage = engine.textView.contentStorage?.textStorage
+        let storage = engine.textView.glassTextStorage
         let before = storage?.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
         let canvasBefore = engine.textView.canvasColor
 

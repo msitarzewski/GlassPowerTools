@@ -31,9 +31,11 @@ public final class GlassEditorAppKitEngine: GlassEditorEngine {
 
     // MARK: - Construction
 
-    public init(model: GlassEditorModel) {
+    /// - Parameter textSystem: TextKit 1 on the Mac (D36); TextKit 2 is kept for comparison and
+    ///   for any surface that proves to need it.
+    public init(model: GlassEditorModel, textSystem: GlassTextView.TextSystem = .textKit1) {
         self.model = model
-        self.textView = GlassTextView.makeTextKit2()
+        self.textView = textSystem == .textKit1 ? GlassTextView.makeTextKit1() : GlassTextView.makeTextKit2()
         self.scrollView = NSScrollView()
         self.containerView = NSView()
         self.coordinator = GlassEditorNSCoordinator(model: model)
@@ -69,7 +71,7 @@ public final class GlassEditorAppKitEngine: GlassEditorEngine {
         installViews()
         applyThemeToCanvas()
         loadInitialContent()
-        textView.assertUsingTextKit2()
+        textView.assertOnItsTextSystem()
         appliedConfiguration = model.configuration
         observeModelHighlights()
         observeModelRevision()
@@ -160,7 +162,7 @@ public final class GlassEditorAppKitEngine: GlassEditorEngine {
     }
 
     private func loadInitialContent() {
-        guard let storage = textView.contentStorage?.textStorage else { return }
+        guard let storage = textView.glassTextStorage else { return }
         storage.setAttributedString(
             AttributedAssembly.attributedString(
                 text: model.text,

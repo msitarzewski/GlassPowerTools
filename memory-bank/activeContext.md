@@ -2799,10 +2799,12 @@ D34 (a deletion is dated); the fold survivor is the most recently updated member
 point … Then commit it, and build the new editor"*). 0.4.216 on the Mac and iPhone; Vision Pro
 0.4.123. 1,752 tests, 0 failing.
 
-**Now building D36: a TextKit 1 backend for the Mac editor** — [research](tasks/2026-09/2026-09-23_text-engine-research.md)
+**D36 built (0.4.217 on the Mac, uncommitted)** — see the research note's *Built*. Was: **a TextKit 1 backend for the Mac editor** — [research](tasks/2026-09/2026-09-23_text-engine-research.md)
 (the state of the art was researched; name it only as that). Behind `GlassEditorEngine`;
 `NSLayoutManager` with non-contiguous layout; colours as temporary attributes; gutter against
 layout-manager line fragments; the TextKit 2 tripwire per backend. iPhone stays TextKit 2 + Preview.
+
+**Seen by the user**: the TextKit 1 editor — *"that new renderer is great!"* **Grid measured**: [grid scroll cost](tasks/2026-09/2026-09-23_grid-scroll-cost.md), options proposed.
 
 **Open question from the user**: *"should we be looking at other editors that claim real time
 rendering somehow? I think this is going to sneak up on us in the Database and Terminal areas too."*

@@ -469,3 +469,11 @@ elsewhere); Markdown with Mermaid, HTML, SVG and CSV get a VS Code–style Previ
 The state of the art in native Mac editors was researched: they edit on TextKit 1 with
 non-contiguous layout. Measured against TextKit 2 on the user's 14.6 MB SVG, TextKit 1 is ~3× faster
 to open and scrolls freely where ours does not. D36 approved: a TextKit 1 backend for the Mac editor.
+
+## 2026-09-23 — [The database grid's scroll cost](2026-09-23_grid-scroll-cost.md)
+
+Measured on the real grid: fine at 60 Hz for a short scroll, but the user's Mac is 120 Hz, and a
+long scroll stutters (up to 358 ms) while SwiftUI builds rows — two tap gestures, accessibility and
+a scroll effect on every cell. The terminal is already on SwiftTerm's Metal renderer. Options
+proposed, nothing changed. The user saw the TextKit 1 editor: *"that new renderer is great!"*
+
