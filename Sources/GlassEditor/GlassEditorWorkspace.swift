@@ -10,6 +10,9 @@
 //
 
 import Foundation
+#if os(iOS)
+import UIKit
+#endif
 import Observation
 import GlassEditorCore
 import GlassEditorUI
@@ -174,10 +177,28 @@ public final class GlassEditorWorkspace {
     ///
     /// Re-opening a file that is already open must never produce a second copy: two editors over
     /// one file is a way to lose work, and it is the first thing a user does by accident.
+    ///
+    /// **A picked or dropped file is security-scoped on iOS**, and reading it without asking for
+    /// access fails — every file chosen through Open File on a phone, text and pictures alike,
+    /// ended at "No Document" (2026-09-23). Access is asked for here and **held while the document
+    /// is open**, because saving writes back to the same file; `close` gives it back. A URL that is
+    /// not scoped answers false and nothing is held.
     @discardableResult
     public func open(_ url: URL, asPreview: Bool = false) async -> GlassEditorDocument? {
-        await open(path: url.standardizedFileURL.path(percentEncoded: false), asPreview: asPreview)
+        let scoped = url.startAccessingSecurityScopedResource()
+        let document = await open(path: url.standardizedFileURL.path(percentEncoded: false), asPreview: asPreview)
+        if scoped {
+            if let document, securityScopedURLs[document.id] == nil {
+                securityScopedURLs[document.id] = url
+            } else {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+        return document
     }
+
+    /// Scoped access held for documents opened from a picker or a drop, returned on close.
+    private var securityScopedURLs: [GlassEditorDocument.ID: URL] = [:]
 
     /// Opens a file on whichever machine its project is on.
     ///
@@ -204,9 +225,12 @@ public final class GlassEditorWorkspace {
     public func open(path rawPath: String,
                      through access: any GlassEditorFileAccess,
                      machine: String?,
-                     asPreview: Bool = false) async -> GlassEditorDocument? {
+                     asPreview: Bool = false,
+                     asText: Bool = false,
+                     allowLargeRemote: Bool = false) async -> GlassEditorDocument? {
         let path = GlassEditorProject.normalized(rawPath)
-        if let existing = documents.first(where: { $0.path == path && $0.machine == machine }) {
+        if let existing = documents.first(where: { $0.path == path && $0.machine == machine }),
+           !(asText && existing.viewer != nil) {
             selection = existing.id
             // Opening it deliberately keeps it; a single click on a file already previewing
             // leaves it exactly where it is.
@@ -227,7 +251,8 @@ public final class GlassEditorWorkspace {
         }
         do {
             let document = try await GlassEditorDocument.open(path: path, through: access,
-                                                             machine: machine)
+                                                             machine: machine, asText: asText,
+                                                             allowLargeRemote: allowLargeRemote)
             apply(to: document)
             // Into the preview's place when there is one, so the tab does not jump while a user
             // clicks down a file list.
@@ -237,6 +262,12 @@ public final class GlassEditorWorkspace {
                 documents.append(document)
             }
             if asPreview { previewDocumentID = document.id }
+            // A phone cannot draw a line this long at all — its text view stays blank — so a file
+            // that has a picture opens as the picture, with the text one press away (2026-09-23:
+            // *"previews only on iOS, that's fine"*).
+            if Self.isPhone, document.hasVeryLongLine, previewKind(for: document) != nil {
+                previewModes[document.id] = .previewOnly
+            }
             if machine != nil { documentAccess[document.id] = access }
             selection = document.id
             // Recents are this device's list of files it can reopen. A file on another machine is
@@ -245,10 +276,66 @@ public final class GlassEditorWorkspace {
             if machine == nil { preferences.noteRecent(URL(filePath: path)) }
             if projects.isEmpty { prefersCollapsedSidebar = true }
             return document
+        } catch let error as GlassEditorOpenError {
+            // A question, not a failure: the window asks, and `confirmLargeOpen` goes ahead.
+            pendingLargeOpen = GlassEditorPendingOpen(path: path, access: access, machine: machine,
+                                                      asPreview: asPreview, reason: error)
+            return nil
         } catch {
             message = "\((path as NSString).lastPathComponent) could not be opened: \(error.localizedDescription)"
             return nil
         }
+    }
+
+    /// Whether this device is a phone, where a very long line opens in Preview.
+    static var isPhone: Bool {
+        #if os(iOS)
+        UIDevice.current.userInterfaceIdiom == .phone
+        #else
+        false
+        #endif
+    }
+
+    /// How each document with a preview is being shown (`GlassEditorPreviewMode`), text by default.
+    public var previewModes: [GlassEditorDocument.ID: GlassEditorPreviewMode] = [:]
+
+    /// The preview a document offers, if any. Viewers offer none: they already are the picture.
+    public func previewKind(for document: GlassEditorDocument) -> GlassEditorPreviewKind? {
+        guard document.viewer == nil else { return nil }
+        return GlassEditorPreviewKind.kind(language: document.model.language, fileName: document.url?.lastPathComponent)
+    }
+
+    /// What a document's preview may read beside it: its project when it has one, else its folder.
+    public func previewRoot(for document: GlassEditorDocument) -> String {
+        if let path = document.path, let owner = project(owning: path) { return owner.path }
+        return document.path.map { ($0 as NSString).deletingLastPathComponent } ?? "/"
+    }
+
+    /// A remote media file that asked before downloading (`GlassEditorOpenError.largeRemoteFile`).
+    public private(set) var pendingLargeOpen: GlassEditorPendingOpen?
+
+    /// The user said yes: download it and show it.
+    public func confirmLargeOpen() async {
+        guard let pending = pendingLargeOpen else { return }
+        pendingLargeOpen = nil
+        await open(path: pending.path, through: pending.access, machine: pending.machine,
+                   asPreview: pending.asPreview, allowLargeRemote: true)
+    }
+
+    public func cancelLargeOpen() { pendingLargeOpen = nil }
+
+    /// The not-text screen's **Open as Text**: the same file, decoded after all, in the viewer's
+    /// place. Asked for deliberately, so it is the old behaviour on request rather than by accident.
+    public func openAsText(_ document: GlassEditorDocument) async {
+        guard document.viewer != nil, let path = document.path else { return }
+        let access = access(for: document)
+        let machine = document.machine
+        let index = documents.firstIndex { $0.id == document.id }
+        close(document.id, force: true)
+        guard let reopened = await open(path: path, through: access, machine: machine, asText: true),
+              let index, let now = documents.firstIndex(where: { $0.id == reopened.id }), now != index,
+              documents.indices.contains(index) else { return }
+        documents.move(fromOffsets: IndexSet(integer: now), toOffset: index)
     }
 
     /// The project a path belongs to, by the prefix its root shares with it.
@@ -295,6 +382,8 @@ public final class GlassEditorWorkspace {
         guard let index = documents.firstIndex(where: { $0.id == id }) else { return true }
         if documents[index].isDirty, !force { return false }
         documentAccess[id] = nil
+        previewModes[id] = nil
+        securityScopedURLs.removeValue(forKey: id)?.stopAccessingSecurityScopedResource()
         if previewDocumentID == id { previewDocumentID = nil }
         documents.remove(at: index)
         if selection == id {
@@ -626,3 +715,13 @@ public final class GlassEditorWorkspace {
         return "Untitled \(index)"
     }
 }
+
+/// An open that stopped to ask, and everything needed to finish it.
+public struct GlassEditorPendingOpen {
+    public let path: String
+    let access: any GlassEditorFileAccess
+    public let machine: String?
+    let asPreview: Bool
+    public let reason: GlassEditorOpenError
+}
+

@@ -27,6 +27,27 @@ private func host(_ name: String = "beast", address: String = "10.0.0.9") throws
 @MainActor
 struct GlassDesktopCapabilityTests {
 
+    @Test("A desktop on screen is a row in Active, on its service's endpoint, until it closes")
+    func openSessionsListsLiveDesktops() async throws {
+        let (runtime, root) = try await makeRuntime()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let capability = GlassDesktopCapability(runtime: runtime)
+        #expect(capability.openSessions().isEmpty)
+
+        let connection = DesktopConnection(name: "oscar", host: "oscar.local", username: "michael")
+        let session = DesktopSessionModel(connection: connection, app: runtime.app)
+        // No host to reach: the attempt fails at once, and a failed desktop is still on screen.
+        try? await session.connect(username: "michael", domain: nil, password: "x")
+        let rows = capability.openSessions()
+        #expect(rows.map(\.id) == [GlassDesktopCapability.sessionID(connectionID: connection.id)])
+        #expect(rows.first?.title == "oscar")
+        #expect(rows.first?.endpointIDs == [connection.id], "on its machine")
+        #expect(rows.first?.subtitle?.hasPrefix("RDP") == true)
+
+        await session.close().value
+        #expect(capability.openSessions().isEmpty, "closed, it is gone")
+    }
+
     @Test("The capability owns .rdp and serves both protocols through the record's field")
     func servesBothProtocols() async throws {
         let (runtime, root) = try await makeRuntime()

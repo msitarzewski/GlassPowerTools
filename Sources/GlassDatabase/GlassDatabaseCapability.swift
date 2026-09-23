@@ -148,7 +148,7 @@ public final class GlassDatabaseCapability: GlassCapability {
                 return GlassOpenSession(
                     id: Self.sessionID(sessionID: sessionID),
                     title: config.name,
-                    subtitle: Self.subtitle(engine: config.engine, state: session.state),
+                    subtitle: Self.subtitle(engine: config.engine, state: session.state, focus: session.workspaceFocus),
                     symbolName: symbolName,
                     endpointIDs: [EndpointID(rawValue: config.id)],
                     activate: { [runtime] in runtime.enqueue(.openQueryEditor(sessionID: sessionID)) },
@@ -166,9 +166,11 @@ public final class GlassDatabaseCapability: GlassCapability {
     /// The engine, and the state only when it is worth saying. "PostgreSQL" reads better than
     /// "PostgreSQL · Connected" on every row, and a session that is *not* connected is the case
     /// the user needs told.
-    static func subtitle(engine: DatabaseEngineType, state: SessionState) -> String {
+    ///
+    /// Connected, the row also says where the workspace is: "MySQL · common_vision › articles".
+    static func subtitle(engine: DatabaseEngineType, state: SessionState, focus: String? = nil) -> String {
         switch state {
-        case .connected: engine.displayName
+        case .connected: focus.map { "\(engine.displayName) · \($0)" } ?? engine.displayName
         case .connecting(let stage): "\(engine.displayName) · \(stage.rawValue)"
         case .disconnected: "\(engine.displayName) · Disconnected"
         case .error: "\(engine.displayName) · Not connected"

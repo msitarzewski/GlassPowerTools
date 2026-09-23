@@ -166,6 +166,9 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
         }
         .contentShape(Rectangle())
         .glassGazeHighlight()
+        // The list's selection is what highlights the row (`GlassLibrarySidebarSelection`); the
+        // tap is still needed on a compact stack, where selection alone does not navigate.
+        .tag(GlassLibrarySidebarSelection.panel(panel.id))
         .onTapGesture { open(panel.id) }
         // **One element, not three.** The row is a label, a spacer and a count, and an
         // identifier on the `HStack` reached every child: on iOS 27.2 the first match for the
@@ -274,6 +277,7 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
     private var regularNavigation: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             GlassLibraryNavigation(projection: projection, scope: $scope,
+                                   openPanelID: $openPanelID, onOpenPanel: { open($0) },
                                    onSelect: { openPanelID = nil },
                                    extras: { panelSidebarSections },
                                    libraryExtras: { librarySectionPanelRows })
@@ -322,6 +326,7 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
         NavigationStack(path: $compactPath) {
             withLibraryToolbar(
                 GlassLibraryNavigation(projection: projection, scope: $scope,
+                                       openPanelID: $openPanelID, onOpenPanel: { open($0) },
                                        onSelect: {
                                            openPanelID = nil
                                            compactPath = [.results]

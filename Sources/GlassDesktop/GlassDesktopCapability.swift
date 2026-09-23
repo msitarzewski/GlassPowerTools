@@ -34,6 +34,8 @@ public final class GlassDesktopRuntime {
     enum Request {
         /// Open a session window for this saved connection.
         case connect(connectionID: EndpointID, report: GlassDesktopReport?)
+        /// Bring an already-open desktop back to the screen (Active's row). Not a connect.
+        case show(connectionID: EndpointID)
         /// Show the failure alert with this message (a link with nothing behind it).
         case showFailure(String)
     }
@@ -126,6 +128,27 @@ public final class GlassDesktopCapability: GlassCapability {
     public let kind: HostServiceKind = .rdp
     public let displayName = "Desktop"
     public let symbolName = "display"
+
+    /// Every desktop on screen, one row each, on the machine its service belongs to.
+    public func openSessions() -> [GlassOpenSession] {
+        runtime.app.liveSessions.map { session in
+            let connection = session.connection
+            let protocolName = connection.protocol == .rdp ? "RDP" : "VNC"
+            return GlassOpenSession(
+                id: Self.sessionID(connectionID: connection.id),
+                title: connection.name,
+                subtitle: session.isConnected ? protocolName : "\(protocolName) · \(session.status)",
+                symbolName: symbolName,
+                endpointIDs: [connection.id],
+                activate: { [runtime] in runtime.enqueue(.show(connectionID: connection.id)) },
+                close: { _ = session.close() }
+            )
+        }
+    }
+
+    public static func sessionID(connectionID: EndpointID) -> String {
+        "desktop:\(connectionID.rawValue.uuidString)"
+    }
     private let runtime: GlassDesktopRuntime
 
     public init(runtime: GlassDesktopRuntime) { self.runtime = runtime }

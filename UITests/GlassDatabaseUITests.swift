@@ -1444,5 +1444,38 @@ final class GlassDatabaseUITests: XCTestCase {
                       "the restored editor reads ‘\(editorText().prefix(120))’")
         snap("32-draft-restored")
     }
+
+    /// Closing the workspace window ends the session (2026-09-22: *"everything else has an
+    /// actual close button for the connection"* — and until then the database did not: the red
+    /// button flushed the drafts and left the session open, findable only in Active). Active is
+    /// the witness: its database row is there while the window is, and gone once it closes.
+    func testClosingTheWorkspaceWindowEndsTheSession() throws {
+        let fixture = try fixture(.mysql)
+        launch()
+        addDatabaseHost(fixture)
+        guard connectToDatabase(fixture) else { return }
+        guard let window = workspaceWindow else {
+            dumpTree("no-workspace-window-to-close")
+            XCTFail("no window holds the schema sidebar, so there is no workspace window to close")
+            return
+        }
+        let liveRow = NSPredicate(format: "identifier BEGINSWITH %@", "active-session-database:")
+        func activeDatabaseRow() -> XCUIElement {
+            app.descendants(matching: .any).matching(liveRow).firstMatch
+        }
+
+        press("active-connections-bolt")
+        XCTAssertTrue(activeDatabaseRow().waitForExistence(timeout: 10), "Active lists the live database while its window is open")
+        snap("40-active-while-open")
+
+        let close = window.buttons[XCUIIdentifierCloseWindow].firstMatch
+        XCTAssertTrue(close.waitForExistence(timeout: 5), "the window's close button")
+        close.click()
+        XCTAssertTrue(waitUntil("the workspace window to close", timeout: 15) { workspaceWindow == nil },
+                      "the workspace window did not close")
+        XCTAssertTrue(waitUntil("Active to drop the database", timeout: 15) { !activeDatabaseRow().exists },
+                      "the window closed and the session stayed open — Active still lists it")
+        snap("41-active-after-close")
+    }
     #endif
 }

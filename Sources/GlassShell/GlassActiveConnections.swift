@@ -53,11 +53,11 @@ public extension GlassShellModel {
         return order.map { GlassActiveMachine(id: $0, name: grouped[$0]!.name, sessions: grouped[$0]!.sessions) }
     }
 
-    /// How many sessions are live, for the sidebar row. Nil rather than zero when there are none,
-    /// so the row says nothing instead of "0" — the same rule every panel count follows.
-    func activeSessionCount() -> Int? {
-        let count = registry.openSessions().count
-        return count == 0 ? nil : count
+    /// How many sessions are live, for the sidebar row. Zero when there are none: *"Active needs
+    /// a 0 like the others when nothing is connected"* (2026-09-22) — Favorites and Workgroups
+    /// say 0, and a row that says nothing looks like a row that has not counted.
+    func activeSessionCount() -> Int {
+        registry.openSessions().count
     }
 
     /// The ⚡'s destination.
@@ -166,7 +166,7 @@ struct GlassActiveConnectionsDetail: View {
     let model: GlassShellModel
 
     var body: some View {
-        let count = model.activeSessionCount() ?? 0
+        let count = model.activeSessionCount()
         ContentUnavailableView(
             count == 0 ? "Nothing Is Open" : "\(count) live",
             systemImage: "bolt.fill",

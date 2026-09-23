@@ -19,6 +19,11 @@ public enum GlassLibraryColumnLayout {
 public struct GlassLibraryNavigation<ID: Hashable & Sendable, Extras: View, LibraryExtras: View>: View {
     private let projection: GlassLibraryProjection<ID>
     @Binding private var scope: GlassLibraryScope
+    /// The Library-section panel that is open, if one is — it is the highlighted row then, not
+    /// the scope (2026-09-22: *"Active doesn't stay highlighted when clicked"*: the panel rows
+    /// carried no tag, so the list went on showing All Connections while Active was open).
+    @Binding private var openPanelID: String?
+    private let onOpenPanel: (String) -> Void
     private let favoriteSymbol: String
     private let onSelect: () -> Void
     private let extras: () -> Extras
@@ -28,9 +33,13 @@ public struct GlassLibraryNavigation<ID: Hashable & Sendable, Extras: View, Libr
     ///   - extras: sections after the library's own.
     ///   - libraryExtras: rows inside the Library section, after All, Favorites and Recent.
     public init(projection: GlassLibraryProjection<ID>, scope: Binding<GlassLibraryScope>,
+                openPanelID: Binding<String?> = .constant(nil),
+                onOpenPanel: @escaping (String) -> Void = { _ in },
                 favoriteSymbol: String = "star", onSelect: @escaping () -> Void = {},
                 @ViewBuilder extras: @escaping () -> Extras,
                 @ViewBuilder libraryExtras: @escaping () -> LibraryExtras = { EmptyView() }) {
+        _openPanelID = openPanelID
+        self.onOpenPanel = onOpenPanel
         self.projection = projection
         _scope = scope
         self.favoriteSymbol = favoriteSymbol
@@ -42,18 +51,24 @@ public struct GlassLibraryNavigation<ID: Hashable & Sendable, Extras: View, Libr
     /// The sidebar is a native `List` selection: AppKit and UIKit draw the platform's own
     /// selection (the inset capsule on macOS 26), so this list matches every other sidebar in the
     /// family instead of painting a row background of its own (project rule 15).
-    private var selection: Binding<GlassLibraryScope?> {
-        Binding(get: { scope }, set: { value in
-            guard let value, value != scope else { return }
-            scope = value
-            onSelect()
+    private var selection: Binding<GlassLibrarySidebarSelection?> {
+        Binding(get: { GlassLibrarySidebarSelection.current(scope: scope, openPanelID: openPanelID) },
+                set: { value in
+            switch GlassLibrarySidebarSelection.change(choosing: value, scope: scope, openPanelID: openPanelID) {
+            case nil: return
+            case .scope(let chosen)?:
+                scope = chosen
+                onSelect()
+            case .panel(let id)?:
+                onOpenPanel(id)
+            }
         })
     }
 
     public var body: some View {
         List(selection: selection) {
             GlassLibraryCategories(projection: projection, category: { value, title, _ in
-                category(value, title: title, symbol: symbol(for: value)).tag(value)
+                category(value, title: title, symbol: symbol(for: value)).tag(GlassLibrarySidebarSelection.scope(value))
             }, extras: libraryExtras)
             extras()
         }
@@ -84,8 +99,35 @@ public struct GlassLibraryNavigation<ID: Hashable & Sendable, Extras: View, Libr
             if scope != value { scope = value }
             onSelect()
         }
-        .accessibilityAddTraits(scope == value ? .isSelected : [])
+        .accessibilityAddTraits(scope == value && openPanelID == nil ? .isSelected : [])
         .accessibilityIdentifier("glass-library-scope-\(value.id)")
+    }
+}
+
+/// What the sidebar list highlights: a scope, or the open panel. One selection type for both,
+/// so the native list draws the highlight on whichever row is actually showing.
+enum GlassLibrarySidebarSelection: Hashable {
+    case scope(GlassLibraryScope)
+    case panel(String)
+
+    /// The row to highlight: the open panel, else the scope.
+    static func current(scope: GlassLibraryScope, openPanelID: String?) -> Self {
+        openPanelID.map { .panel($0) } ?? .scope(scope)
+    }
+
+    enum Change: Equatable {
+        case scope(GlassLibraryScope)
+        case panel(String)
+    }
+
+    /// What choosing `value` changes, or nil when it is what is already showing. Choosing the
+    /// current scope while a panel is open is a change: it closes the panel.
+    static func change(choosing value: Self?, scope: GlassLibraryScope, openPanelID: String?) -> Change? {
+        switch value {
+        case nil: nil
+        case .scope(let chosen)?: chosen == scope && openPanelID == nil ? nil : .scope(chosen)
+        case .panel(let id)?: openPanelID == id ? nil : .panel(id)
+        }
     }
 }
 

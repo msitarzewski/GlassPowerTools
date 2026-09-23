@@ -438,7 +438,7 @@ private func evenDisplayWidth(_ value: UInt32) -> UInt32 {
     return clamped.isMultiple(of: 2) ? clamped : clamped - 1
 }
 
-private func clampedDesktopScaleFactor(_ value: UInt32) -> UInt32 {
+func clampedDesktopScaleFactor(_ value: UInt32) -> UInt32 {
     min(500, max(100, value))
 }
 

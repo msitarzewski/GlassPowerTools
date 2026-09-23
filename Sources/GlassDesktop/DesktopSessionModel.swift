@@ -120,6 +120,11 @@ public final class DesktopSessionModel {
     private var resizeRevision = UUID()
     private var lastRequestedSize: DesktopSize?
     private var lastRequestedScaleFactor: Int?
+    /// Times this attempt has asked for the window again because the server changed the desktop's
+    /// size on its own. Bounded, so a host that will not take the window's size is asked a few
+    /// times and then left alone rather than asked on every frame.
+    private var serverSizeCorrections = 0
+    static let maximumServerSizeCorrections = 3
     /// Pixels per point of the display this window is on, reported by the view.
     private var displayScale: Double = 1
     /// How a touch screen drives the remote pointer.
@@ -213,6 +218,7 @@ public final class DesktopSessionModel {
 
     private func beginAttempt(keepingCredentialPrompt: Bool = false) -> Attempt {
         let previous = transport, disconnect = operations.disconnect
+        app.noteLive(self)
         attemptID = UUID()
         eventTask?.cancel(); eventTask = nil
         frameTask?.cancel(); frameTask = nil
@@ -274,16 +280,21 @@ public final class DesktopSessionModel {
             // Honour Match Window Size from the first frame. Falling back to the saved resolution
             // keeps behaviour unchanged when the view has not reported a size yet.
             let initial = matchWindow ? (windowSize ?? value.desktop) : value.desktop
+            // **The scale goes with the size, from the first frame.** The size alone gave a Retina
+            // window a 4K desktop laid out at 100% — a login screen of tiny type — until the
+            // display channel's first monitor layout carried the 200% (2026-09-22, oscar). The
+            // client core data has a field for it (MS-RDPBCGR 2.2.1.3.2), so it is asked for at
+            // connect. The first monitor layout still repeats it, for a server that only reads
+            // the display channel: `lastRequestedScaleFactor` stays nil until that layout is sent.
             configuration = .rdp(GlassRDPConfiguration(host: value.host, port: value.port,
                 username: account, domain: domain, password: password,
                 width: initial.width, height: initial.height,
                 requiresNLA: value.authentication == .networkLevel,
                 approvedCertificateSHA256: value.certificateSHA256,
-                clipboardEnabled: value.clipboardEnabled, audioEnabled: value.audioEnabled))
+                clipboardEnabled: value.clipboardEnabled, audioEnabled: value.audioEnabled,
+                desktopScaleFactor: currentScaleFactor))
             // The server is already being asked for this size, so no immediate second request.
             lastRequestedSize = initial
-            // The scale factor travels on the display channel, which is not open yet, so the first
-            // monitor layout after connecting still has to carry it.
             lastRequestedScaleFactor = nil
         case .vnc:
             guard !password.isEmpty else { throw RDPCredentialValidationError.missingUsernameOrPassword }
@@ -416,6 +427,7 @@ public final class DesktopSessionModel {
     public func close() -> Task<Void, Never> {
         if let closeTask { return closeTask }
         closed = true
+        app.noteClosed(self)
         shouldClosePresentation = true
         let previous = stopCurrent(), disconnect = operations.disconnect
         wallpaperRevision = UUID()
@@ -610,6 +622,7 @@ public final class DesktopSessionModel {
         pointerPosition = nil; cursorVisible = true
         lastRequestedSize = nil
         lastRequestedScaleFactor = nil
+        serverSizeCorrections = 0
     }
 
     private func updateCursorImage() {
@@ -694,10 +707,31 @@ public final class DesktopSessionModel {
 
     func receive(_ value: GlassRDPFrame, attempt id: UUID) {
         guard id == attemptID, !attemptIsTerminal, state == .connecting || isConnected else { return }
+        let previous = frame
         frame = value
         hadDesktop = true
         updateCursorImage()
         recordFirstDesktopIfReady(snapshot: connection)
+        followServerSizeChange(from: previous, to: value)
+    }
+
+    /// **The server can change its own size.** GNOME's login screen takes the window's size, and
+    /// the session that starts after logging in comes up at 640 × 480 — a desktop this client never
+    /// asked for, that stayed until the user nudged the window by a pixel (2026-09-22, oscar).
+    /// `scheduleResize` drops a request for the size already asked for, which is right while the
+    /// server keeps that size and wrong the moment it does not. A frame at a size other than the
+    /// one requested, arriving after a frame at some other size again, is the server having changed
+    /// its mind — and the window is asked for once more, forgetting that it was asked for before.
+    /// A server that keeps its new size sends no further change and is not asked again; one that
+    /// keeps changing is asked `maximumServerSizeCorrections` times per attempt.
+    private func followServerSizeChange(from previous: GlassRDPFrame?, to value: GlassRDPFrame) {
+        guard matchWindow, isConnected, let requested = lastRequestedSize,
+              value.width != requested.width || value.height != requested.height,
+              previous.map({ $0.width != value.width || $0.height != value.height }) ?? true,
+              serverSizeCorrections < Self.maximumServerSizeCorrections else { return }
+        serverSizeCorrections += 1
+        lastRequestedSize = nil
+        requestCurrentWindowSize()
     }
 
     private func recordFirstDesktopIfReady(snapshot: DesktopConnection) {

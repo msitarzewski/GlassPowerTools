@@ -20,10 +20,14 @@ struct BuiltInHighlightingTests {
         )
     }
 
-    private func settle(until condition: () -> Bool, turns: Int = 80) async {
-        for _ in 0..<turns {
+    /// Waits on real time, not on a count of yields. The reparse after an edit is debounced
+    /// (75 ms by default), and 80 yields took longer than that only on a busy machine — the edit
+    /// test passed under load and failed on a quiet one (2026-09-23).
+    private func settle(until condition: () -> Bool, timeout: Duration = .seconds(10)) async {
+        let deadline = ContinuousClock.now + timeout
+        while ContinuousClock.now < deadline {
             if condition() { return }
-            await Task.yield()
+            try? await Task.sleep(for: .milliseconds(5))
         }
     }
 

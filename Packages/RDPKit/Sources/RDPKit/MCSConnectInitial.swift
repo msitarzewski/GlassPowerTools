@@ -108,10 +108,16 @@ struct MCSConnectInitialConfiguration: Equatable, Sendable {
     var audioPlaybackEnabled: Bool
     var redirectedSessionID: UInt32?
     var storedClientLicense: RDPStoredClientLicense?
+    /// MS-RDPBCGR 2.2.1.3.2 desktopScaleFactor, 100–500 percent: the scale the server should
+    /// lay the first desktop out at. Sent here so a high-resolution client gets a readable
+    /// login screen from the first frame, rather than a 100% desktop until the display control
+    /// channel's first monitor layout replaces it.
+    var desktopScaleFactor: UInt32
 
     init(
         desktopWidth: UInt16 = 1280,
         desktopHeight: UInt16 = 720,
+        desktopScaleFactor: UInt32 = 100,
         clientName: String = "KRDPSWIFT",
         selectedProtocol: RDPSecurityProtocols = .tls,
         requestedProtocols: RDPSecurityProtocols = [.tls, .credSSP],
@@ -128,6 +134,7 @@ struct MCSConnectInitialConfiguration: Equatable, Sendable {
 
         self.desktopWidth = desktopWidth
         self.desktopHeight = desktopHeight
+        self.desktopScaleFactor = clampedDesktopScaleFactor(desktopScaleFactor)
         self.clientName = clientName
         self.selectedProtocol = selectedProtocol
         self.requestedProtocols = requestedProtocols
@@ -242,7 +249,7 @@ struct MCSConnectInitialPDU: Equatable, Sendable {
         body.appendLittleEndianUInt32(0) // desktopPhysicalWidth
         body.appendLittleEndianUInt32(0) // desktopPhysicalHeight
         body.appendLittleEndianUInt16(0) // desktopOrientation
-        body.appendLittleEndianUInt32(100) // desktopScaleFactor (percent)
+        body.appendLittleEndianUInt32(configuration.desktopScaleFactor) // desktopScaleFactor (percent)
         body.appendLittleEndianUInt32(100) // deviceScaleFactor (percent)
 
         precondition(body.count == 230)

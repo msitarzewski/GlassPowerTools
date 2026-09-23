@@ -61,11 +61,7 @@ public final class GlassEditorAppKitEngine: GlassEditorEngine {
         textView.maxSize = NSSize(
             width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude
         )
-        textView.textContainer?.widthTracksTextView = model.configuration.wrapsLines
-        textView.textContainer?.size = NSSize(
-            width: model.configuration.wrapsLines ? 0 : CGFloat.greatestFiniteMagnitude,
-            height: CGFloat.greatestFiniteMagnitude
-        )
+        Self.applyWrapping(model.configuration.wrapsLines, to: textView, in: scrollView)
 
         scrollView.documentView = textView
         coordinator.textView = textView
@@ -259,6 +255,37 @@ public final class GlassEditorAppKitEngine: GlassEditorEngine {
         set { model.theme = newValue }
     }
 
+    /// Wrapped: the container follows the view's width. Unwrapped: **a wide, finite container in a
+    /// view exactly as wide**, so the container is never wider than its view.
+    ///
+    /// It used to keep the view at the window's width with an infinitely wide container inside it.
+    /// TextKit 2 then works out where that container starts from the text's full width, and finding
+    /// the width means laying the document out from the top: about 370 ms a frame for the first
+    /// thousand points of scrolling through a 10,000-line file (2026-09-23, *"why scrolling isn't
+    /// smooth"*, measured by `ScrollTimingTests`).
+    static func applyWrapping(_ wraps: Bool, to textView: NSTextView, in scrollView: NSScrollView) {
+        textView.isHorizontallyResizable = false
+        textView.textContainer?.widthTracksTextView = wraps
+        scrollView.hasHorizontalScroller = !wraps
+        if wraps {
+            textView.autoresizingMask = [.width]
+            textView.textContainer?.size = NSSize(width: scrollView.contentSize.width,
+                                                  height: CGFloat.greatestFiniteMagnitude)
+            textView.frame.size.width = scrollView.contentSize.width
+        } else {
+            textView.autoresizingMask = []
+            textView.textContainer?.size = NSSize(width: unwrappedContainerWidth,
+                                                  height: CGFloat.greatestFiniteMagnitude)
+            textView.frame.size.width = unwrappedContainerWidth + 2 * textView.textContainerInset.width
+        }
+    }
+
+    /// How wide an unwrapped line may run before it folds: wide, and finite. An infinite width is
+    /// what sent TextKit to lay the document out from the top; at 13 pt this is about 14,000
+    /// characters, and a line longer than that already opens wrapped
+    /// (`GlassEditorDocument.veryLongLine`).
+    static let unwrappedContainerWidth: CGFloat = 100_000
+
     /// Applies a configuration delta to the view. Called from observation with
     /// the previously-applied configuration so the branch-triggering fields
     /// (wrap mode, gutter visibility) are diffed rather than reapplied blindly.
@@ -266,11 +293,7 @@ public final class GlassEditorAppKitEngine: GlassEditorEngine {
         let current = model.configuration
         textView.isEditable = current.isEditable
         if previous.wrapsLines != current.wrapsLines {
-            textView.textContainer?.widthTracksTextView = current.wrapsLines
-            textView.textContainer?.size = NSSize(
-                width: current.wrapsLines ? 0 : CGFloat.greatestFiniteMagnitude,
-                height: CGFloat.greatestFiniteMagnitude
-            )
+            Self.applyWrapping(current.wrapsLines, to: textView, in: scrollView)
         }
         if previous.showsLineNumbers != current.showsLineNumbers {
             gutterWidthConstraint?.constant =

@@ -476,7 +476,8 @@ public struct GlassEditorWorkspaceView: View {
                         tabs: workspace.documents.map { document in
                             GlassWorkspaceTabItem(id: document.id,
                                                   title: document.isDirty ? "\(document.displayName) •" : document.displayName,
-                                                  symbolName: symbolName(for: document.model.language),
+                                                  symbolName: document.viewer?.kind.symbolName
+                                                      ?? symbolName(for: document.model.language),
                                                   isProvisional: workspace.isPreview(document.id),
                                                   help: document.locationDescription ?? document.displayName)
                         },
@@ -490,16 +491,38 @@ public struct GlassEditorWorkspaceView: View {
                         })
                     .overlay(alignment: .bottom) { Divider() }
                 }
-                if workspace.findIsPresented { findBar(document) ; Divider() }
+                if workspace.findIsPresented, document.viewer == nil { findBar(document) ; Divider() }
                 // **Identity, or the text never changes.** The engine deliberately observes its
                 // model rather than being pushed values through `updateNSView`, so handing this
                 // view a *different* model does not reach the text view that is already on screen —
                 // it keeps rendering the first document opened. Seen in the running app with three
                 // files open and the first one still showing. One identity per document, so
                 // switching documents builds the engine that belongs to it.
-                GlassEditorView(model: document.model)
+                if let viewer = document.viewer {
+                    // Not text: the file as what it is (`GlassEditorViewerView`).
+                    GlassEditorViewerView(viewer: viewer) {
+                        Task { await workspace.openAsText(document) }
+                    }
                     .id(document.id)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    // Text, its preview beside it, or the preview alone — VS Code's three states.
+                    let kind = workspace.previewKind(for: document)
+                    let mode = kind == nil ? .text : (workspace.previewModes[document.id] ?? .text)
+                    HStack(spacing: 0) {
+                        if mode != .previewOnly {
+                            GlassEditorView(model: document.model)
+                                .id(document.id)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                        if mode == .beside { Divider() }
+                        if mode != .text, let kind {
+                            GlassEditorPreviewPane(document: document, kind: kind,
+                                                   access: workspace.access(for: document),
+                                                   root: workspace.previewRoot(for: document))
+                                .id(document.id)
+                        }
+                    }
+                }
             }
             .navigationTitle(document.displayName)
             // visionOS has no window subtitle — a title bar there is an ornament, not a bar — so
@@ -511,11 +534,14 @@ public struct GlassEditorWorkspaceView: View {
             // row of a `VStack` with no surface of its own, so the gutter's line numbers showed
             // through it. This is the family's bottom bar — the shape the workgroup detail uses.
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                VStack(spacing: 0) {
-                    Divider()
-                    statusBar(document)
+                // A viewer has no lines, encoding or language to report.
+                if document.viewer == nil {
+                    VStack(spacing: 0) {
+                        Divider()
+                        statusBar(document)
+                    }
+                    .background(.bar)
                 }
-                .background(.bar)
             }
         } else if let project = workspace.projects.first {
             // **A folder is open, so say what is in it.** Three ways to open something, shown to
@@ -691,6 +717,18 @@ public struct GlassEditorWorkspaceView: View {
         // can disagree with its project and with the app. The project's own are at the foot of the
         // file list, and the app's defaults are in Settings ▸ Editor at ⌘, — three scopes, and the
         // one in this window's toolbar belongs to what this window is showing.
+        // **Preview**, for text that has a picture: beside the text, then alone, then back.
+        if let document = workspace.selectedDocument, workspace.previewKind(for: document) != nil {
+            let mode = workspace.previewModes[document.id] ?? .text
+            ToolbarItem(placement: .primaryAction) {
+                Button(mode == .text ? "Show Preview" : (mode == .beside ? "Preview Only" : "Hide Preview"),
+                       systemImage: mode == .text ? "eye" : (mode == .beside ? "rectangle.righthalf.filled" : "eye.slash")) {
+                    workspace.previewModes[document.id] = mode.next(roomBeside: previewHasRoomBeside)
+                }
+                .help("Preview: beside the text, then alone, then off")
+                .accessibilityIdentifier("editor-preview-toggle")
+            }
+        }
         ToolbarItem(placement: .primaryAction) {
             Button("Text Settings", systemImage: "gearshape") { isShowingSettings = true }
                 .help("Text settings for this file")
@@ -701,6 +739,15 @@ public struct GlassEditorWorkspaceView: View {
                 .disabled(workspace.selectedDocument?.isDirty != true)
                 .accessibilityIdentifier("editor-save")
         }
+    }
+
+    /// A phone has no room for the text and its preview side by side.
+    private var previewHasRoomBeside: Bool {
+        #if os(iOS)
+        horizontalSizeClass != .compact
+        #else
+        true
+        #endif
     }
 
     // MARK: Actions
@@ -792,6 +839,15 @@ private struct GlassEditorDialogs: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            // A remote media file big enough to ask before it is downloaded.
+            .confirmationDialog("Download this file?", isPresented: Binding(
+            get: { workspace.pendingLargeOpen != nil }, set: { if !$0 { workspace.cancelLargeOpen() } }),
+            titleVisibility: .visible, presenting: workspace.pendingLargeOpen) { _ in
+            Button("Download and View") { Task { await workspace.confirmLargeOpen() } }
+            Button("Cancel", role: .cancel) { workspace.cancelLargeOpen() }
+            } message: { pending in
+            Text(pending.reason.localizedDescription)
+            }
             .alert("Editor", isPresented: Binding(get: { workspace.message != nil },
             set: { if !$0 { workspace.message = nil } })) {
             Button("OK", role: .cancel) { workspace.message = nil }

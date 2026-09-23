@@ -247,7 +247,53 @@ public final class GlassTerminalCapability: GlassCapability {
     /// ended is not listed: it would be a row that goes to an empty screen.
     public func openSessions() -> [GlassOpenSession] {
         let manager = runtime.sessionManager
-        return manager.workgroups.reversed().compactMap { workgroup in
+        return workgroupSessions(manager) + loneSessions(manager)
+    }
+
+    /// **A terminal opened by Connect on a Mac is in no workgroup.** iOS and visionOS put every
+    /// terminal in a workgroup (`presentTerminalWindow`), so the workgroup listing covered them;
+    /// the Mac opens a workspace window with a live-session ticket and the session belongs to
+    /// nothing but its window — so Active showed the MySQL session on oscar and not the terminal
+    /// beside it (2026-09-22). One row per such session; brought forward and closed through the
+    /// window that holds it, which the overview's registry already knows.
+    private func loneSessions(_ manager: SessionManager) -> [GlassOpenSession] {
+        let grouped = Set(manager.workgroups.flatMap(\.sessionIDs))
+        return manager.sessions.filter { !grouped.contains($0.id) }.map { session in
+            GlassOpenSession(
+                id: Self.sessionID(sessionID: session.id),
+                title: session.purpose == .sftp ? "SFTP on \(session.server.name)" : session.server.name,
+                subtitle: session.state.displayName,
+                symbolName: session.purpose == .sftp ? "folder" : symbolName,
+                endpointIDs: [EndpointID(rawValue: session.server.id)],
+                activate: { Self.reveal(session, in: manager) },
+                close: { Self.close(session, in: manager) },
+                snapshot: { Self.preview(of: session) }
+            )
+        }
+    }
+
+    private static func reveal(_ session: TerminalSession, in manager: SessionManager) {
+        #if os(macOS)
+        MacWorkspacePreviewRegistry.shared.reveal(sessionID: session.id)
+        #endif
+    }
+
+    /// Through the window's own pane removal where there is one, so the pane goes with the
+    /// session rather than staying on screen dead; the manager alone otherwise.
+    private static func close(_ session: TerminalSession, in manager: SessionManager) {
+        #if os(macOS)
+        if MacWorkspacePreviewRegistry.shared.close(sessionID: session.id, sessionManager: manager) { return }
+        #endif
+        manager.closeSession(session)
+    }
+
+    /// The id this capability gives a session that is in no workgroup.
+    public static func sessionID(sessionID: UUID) -> String {
+        "terminal-session:\(sessionID.uuidString)"
+    }
+
+    private func workgroupSessions(_ manager: SessionManager) -> [GlassOpenSession] {
+        manager.workgroups.reversed().compactMap { workgroup in
             let live = workgroup.sessionIDs.compactMap { manager.session(for: $0) }
             guard !live.isEmpty else { return nil }
             return GlassOpenSession(

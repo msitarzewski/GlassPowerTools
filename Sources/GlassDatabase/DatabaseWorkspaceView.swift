@@ -388,6 +388,10 @@ struct DatabaseWorkspaceView: View {
         .onChange(of: session?.connectionConfig.id, initial: true) { _, _ in
             restoreDraftsIfNeeded()
         }
+        // Where this workspace is, for Active's row (`DatabaseSession.workspaceFocus`).
+        .onChange(of: tabState.displayed, initial: true) { _, displayed in
+            session?.workspaceFocus = Self.focus(for: displayed) { queryDocuments[$0]?.title }
+        }
         .onDisappear {
             SQLDraftStore.shared.flush()
             if let draftConnectionID {
@@ -604,6 +608,19 @@ struct DatabaseWorkspaceView: View {
         openWindow(id: "main")
     }
 
+    /// **Ends this session on purpose, on a phone.** Everywhere else the workspace is a window
+    /// and the red close button ends the session (`DatabaseSessionManager.releaseWorkspace`). A
+    /// phone has no window to close, and leaving the screen is not closing it (D31), so the ⋯
+    /// menu the user pointed at (2026-09-21, 22:58) carries the one deliberate end: glassdb's
+    /// "Disconnect", calling the `disconnect(sessionID:)` Active's row calls, then back to the
+    /// machine. The primary scene drops the workspace by itself once the session is gone.
+    private func disconnectWorkspace() {
+        Task {
+            await sessionManager.disconnect(sessionID: sessionID)
+            showConnections()
+        }
+    }
+
     private func recoveryTitle(for state: SessionState) -> String {
         switch state {
         case .disconnected: "Disconnected"
@@ -765,6 +782,21 @@ struct DatabaseWorkspaceView: View {
                 .accessibilityIdentifier("database-workspace-connections")
             }
         }
+        #if os(iOS)
+        // **Disconnect, where there is no window to close.** A phone's workspace is a route in
+        // the primary scene; everywhere else it is a window whose close button ends the session.
+        // In the ⋯ overflow the user pointed at (2026-09-21, 22:58); glassdb's label and symbol.
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            ToolbarItem(placement: .secondaryAction) {
+                Button("Disconnect", systemImage: "xmark.circle") {
+                    disconnectWorkspace()
+                }
+                .accessibilityLabel("Disconnect")
+                .accessibilityHint("Closes this database connection and returns to its machine")
+                .accessibilityIdentifier("database-workspace-disconnect")
+            }
+        }
+        #endif
         #if !os(macOS)
         // **No sidebar toggle where there is no sidebar.** On a compact width the schema is
         // the screen and the detail is a push; a control that reveals a column neither of
@@ -1112,6 +1144,17 @@ struct DatabaseWorkspaceView: View {
             return database
         case .query(let id):
             return queryDocuments[id]?.title ?? "Untitled SQL"
+        }
+    }
+
+    /// What Active's row says after the engine: the database, the table inside its database, the
+    /// SQL document's title; nothing on the overview, where "connected" already says it all.
+    static func focus(for selection: WorkspaceSelection, queryTitle: (UUID) -> String?) -> String? {
+        switch selection {
+        case .connection: nil
+        case .database(let database): database
+        case .table(let database, let table): "\(database) › \(table)"
+        case .query(let id): queryTitle(id) ?? "SQL"
         }
     }
 

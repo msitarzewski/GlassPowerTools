@@ -12,15 +12,19 @@ public struct GlassRDPConfiguration: Sendable {
     public var approvedCertificateSHA256: String?
     public var clipboardEnabled: Bool
     public var audioEnabled: Bool
+    /// The scale the server should lay the first desktop out at, 100–500 percent
+    /// (MS-RDPBCGR 2.2.1.3.2 desktopScaleFactor). The display channel's layouts carry their own.
+    public var desktopScaleFactor: Int
 
     public init(host: String, port: UInt16 = 3389, username: String, domain: String? = nil,
                 password: String, width: Int = 1440, height: Int = 900, requiresNLA: Bool = true,
                 approvedCertificateSHA256: String? = nil, clipboardEnabled: Bool = false,
-                audioEnabled: Bool = false) {
+                audioEnabled: Bool = false, desktopScaleFactor: Int = 100) {
         self.host = host; self.port = port; self.username = username; self.domain = domain
         self.password = password; self.width = width; self.height = height
         self.requiresNLA = requiresNLA; self.approvedCertificateSHA256 = approvedCertificateSHA256
         self.clipboardEnabled = clipboardEnabled; self.audioEnabled = audioEnabled
+        self.desktopScaleFactor = min(500, max(100, desktopScaleFactor))
     }
 }
 

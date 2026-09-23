@@ -326,8 +326,37 @@ public final class GlassEditorModel {
     /// Runs may describe a slightly older document — highlighting is
     /// asynchronous — and are clamped at render time rather than rejected here,
     /// so a highlighter is never required to win a race with the typist.
+    ///
+    /// **Long lines are left uncoloured** (2026-09-23). A logo exported from a design tool is
+    /// often one line of megabytes — path data, an embedded base64 image — under the whole-document
+    /// ceiling, so it was coloured in full, and TextKit walks a line's colour runs character by
+    /// character every time it draws it: opening such an SVG on oscar froze the Mac until the app
+    /// was killed. VS Code's rule and its number: tokens stop past 20,000 characters on a line.
     public func setHighlights(_ runs: [HighlightRun]) {
-        highlightRuns = runs
+        guard utf16Length > Self.longLineHighlightLimit else {
+            highlightRuns = runs
+            return
+        }
+        let long = (0..<lineCount).lazy.map { self.lineRange(ofLine: $0) }
+            .filter { $0.count > Self.longLineHighlightLimit }
+        highlightRuns = Self.runs(runs, outside: Array(long))
+    }
+
+    /// Characters on one line past which that line is drawn without syntax colour.
+    public static let longLineHighlightLimit = 20_000
+
+    /// `runs` with every run that touches one of `excluded` removed. Both are in document order.
+    static func runs(_ runs: [HighlightRun], outside excluded: [Range<Int>]) -> [HighlightRun] {
+        guard !excluded.isEmpty else { return runs }
+        var kept: [HighlightRun] = []
+        kept.reserveCapacity(runs.count)
+        var index = 0
+        for run in runs {
+            while index < excluded.count, excluded[index].upperBound <= run.range.lowerBound { index += 1 }
+            if index < excluded.count, excluded[index].overlaps(run.range) { continue }
+            kept.append(run)
+        }
+        return kept
     }
 
     /// Updates what the text is drawn on, which re-resolves every color through

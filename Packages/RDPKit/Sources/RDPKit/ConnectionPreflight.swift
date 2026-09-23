@@ -130,6 +130,8 @@ public struct RDPConnectionConfiguration: Sendable, Equatable {
     public var graphicsFrameCaptureLimit: Int?
     public var desktopWidth: UInt16
     public var desktopHeight: UInt16
+    /// The desktop scale factor, 100–500 percent, carried in the client core data.
+    public var desktopScaleFactor: UInt32 = 100
     public var clipboardEnabled: Bool
     public var audioPlaybackEnabled: Bool
     public var earlyUserAuthorizationEnabled: Bool
@@ -149,6 +151,7 @@ public struct RDPConnectionConfiguration: Sendable, Equatable {
         graphicsFrameCaptureLimit: Int? = 1,
         desktopWidth: UInt16 = 1280,
         desktopHeight: UInt16 = 720,
+        desktopScaleFactor: UInt32 = 100,
         clipboardEnabled: Bool = true,
         audioPlaybackEnabled: Bool = false,
         earlyUserAuthorizationEnabled: Bool = false,
@@ -156,6 +159,7 @@ public struct RDPConnectionConfiguration: Sendable, Equatable {
         storedClientLicense: RDPStoredClientLicense? = nil
     ) {
         self.host = host.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.desktopScaleFactor = clampedDesktopScaleFactor(desktopScaleFactor)
         self.port = port
         self.credentials = credentials
         self.timeoutSeconds = max(1, timeoutSeconds)
@@ -1244,6 +1248,7 @@ public struct RDPPreflightClient: Sendable {
                 let mcsConfiguration = MCSConnectInitialConfiguration(
                     desktopWidth: configuration.desktopWidth,
                     desktopHeight: configuration.desktopHeight,
+                    desktopScaleFactor: configuration.desktopScaleFactor,
                     selectedProtocol: selectedSecurityProtocols ?? .tls,
                     requestedProtocols: request.negotiationRequest.requestedProtocols,
                     channels: configuration.staticVirtualChannels,

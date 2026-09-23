@@ -755,3 +755,24 @@ struct SeededGenerator: RandomNumberGenerator {
         return z ^ (z >> 31)
     }
 }
+
+/// Over the ceiling nothing is parsed — not parsed and then discarded (2026-09-23: a 14.6 MB SVG
+/// spent 13 seconds in a parse whose result the ceiling then threw away).
+@Suite("A document over the highlighting ceiling is not parsed")
+@MainActor
+struct HighlightingCeilingTests {
+    @Test("Over: plaintext, no parse, the length still known. Back under: parsed again")
+    func overAndUnder() throws {
+        let parser = try DocumentParser(language: .json, registry: GrammarRegistry(), highlightingCodeUnitCeiling: 10)
+        parser.parseFull(#"{"a": 1, "b": 2, "c": 3}"#)
+        #expect(parser.highlightingDegraded)
+        #expect(parser.parseCount == 0, "a document over the ceiling was parsed anyway")
+        #expect(parser.documentLength == 24)
+        #expect(parser.highlights.count == 1, "one plain run over the whole document")
+
+        parser.parseFull(#"{"a": 1}"#)
+        #expect(!parser.highlightingDegraded)
+        #expect(parser.parseCount == 1)
+        #expect(parser.highlights.contains { $0.role != .plain }, "coloured again once under the ceiling")
+    }
+}

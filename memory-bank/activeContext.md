@@ -2792,3 +2792,98 @@ D34 (a deletion is dated); the fold survivor is the most recently updated member
   do nothing. `pgrep -x "Glass Power Tools"` matches the simulator copies.
 - The sync token is never persisted: every launch is a full fetch. Publishing happens on the
   *next* sync after a change, so a device that folds and is not relaunched has published nothing.
+
+## 2026-09-23 — 14:10 — RESUME HERE (supersedes every block above)
+
+**State BUILD.** Committed at this checkpoint (the user asked: *"Update the memory bank to this
+point … Then commit it, and build the new editor"*). 0.4.216 on the Mac and iPhone; Vision Pro
+0.4.123. 1,752 tests, 0 failing.
+
+**Now building D36: a TextKit 1 backend for the Mac editor** — [research](tasks/2026-09/2026-09-23_text-engine-research.md)
+(the state of the art was researched; name it only as that). Behind `GlassEditorEngine`;
+`NSLayoutManager` with non-contiguous layout; colours as temporary attributes; gutter against
+layout-manager line fragments; the TextKit 2 tripwire per backend. iPhone stays TextKit 2 + Preview.
+
+**Open question from the user**: *"should we be looking at other editors that claim real time
+rendering somehow? I think this is going to sneak up on us in the Database and Terminal areas too."*
+Answered in conversation; a survey of the terminal's and the grid's rendering paths is the follow-up.
+
+### Closed since the 23:00 block
+
+1. **oscar is back on the Mac** — the user's words at 00:05. D34 held; the phone published on
+   0.4.199 and the Mac fetched it. No rebuild from the backup, no in-app restore path built.
+2. **Disconnect in the database workspace** —
+   [task note](tasks/2026-09/2026-09-22_disconnect-in-the-workspace.md). The 23:00 block was
+   **wrong** that iOS already had Close in the ⋯ menu: that menu was Refresh Overview and
+   Settings, and the user was pointing at where Close should go. Built: one Disconnect
+   (glassdb's label and `xmark.circle`) in the phone's ⋯, the iPad's/headset's bottom group,
+   the Mac's toolbar beside the ⚡ and the Mac's File menu (no key). It calls
+   `DatabaseSessionManager.disconnect(sessionID:)`, goes back to the machine, and the window
+   goes with the session where the workspace is a window. Identifier
+   `database-workspace-disconnect`.
+
+3. **The desktop window's size, and the size after login** —
+   [task note](tasks/2026-09/2026-09-22_desktop-window-and-login-size.md). macOS remembered a
+   thumbnail frame for the desktop window group (floor now 640 × 400; a window found at the floor
+   gets the configured desktop within the screen), and a server that changes its own size after
+   login was never asked for the window again (`followServerSizeChange`: a frame at a size not
+   asked for, after a frame at another size, forgets the request and asks once more; three per
+   attempt at most). Six deterministic tests, the first on `DesktopSessionModel` here.
+
+4. **Reversed 2 (06:40):** the Mac Disconnect button and File item are gone. The rule is the
+   desktop's — *closing the last workspace window ends the database session*
+   (`releaseWorkspace`); a second window on the session closing leaves it; the phone keeps the
+   ⋯ Disconnect. `DatabaseWorkspaceLifetimeTests`.
+5. **A terminal opened by Connect on a Mac is now in Active** — it was in no workgroup, and
+   Active listed workgroups. `GlassTerminalCapability.loneSessions`; on the Mac the overview's
+   `MacWorkspacePreviewRegistry` brings its window forward and removes its pane.
+   `TerminalActiveListingTests`.
+
+6. **Active's database row says where the workspace is** (06:45): `DatabaseSession.workspaceFocus`,
+   published on every change of the displayed tab, rendered as "MySQL · common_vision › articles".
+   `ActiveRowFocusTests`. The terminal's rows do not say where they are yet — the shell title
+   (`OSC 0`) is the natural next reflection.
+
+7. **The sidebar highlights the open panel** (07:25): `GlassLibrarySidebarSelection` — one
+   selection type for scopes and panels, so Active, SSH Keys, Workgroups and Projects rows
+   carry the native highlight. `GlassLibrarySidebarSelectionTests`.
+8. **Seen by the user on the Mac (07:23):** Active's database row reading "MySQL ·
+   common_vision › articles".
+
+9. **The scale goes with the size at connect** (07:35): the client core data's
+   desktopScaleFactor was a fixed 100, so a Retina window got a 100% 4K login screen until the
+   display channel's first layout. Threaded `GlassRDPConfiguration.desktopScaleFactor` →
+   `RDPConnectionConfiguration` → `MCSConnectInitialConfiguration`; the model passes
+   `currentScaleFactor`. Tests at both ends. Whether gnome-remote-desktop reads the core-data
+   scale is the user's server to answer; the display channel still repeats it.
+10. **Active says 0 when empty** (07:50), reversing yesterday's nil. `emptyCountIsZero`.
+
+11. **Desktops in Active** (08:10): `DesktopAppModel.liveSessions`, `GlassDesktopCapability.
+    openSessions()`, `Request.show`. And the 08:06 screenshot shows the login screen at proper
+    scale on 0.4.206: gnome-remote-desktop reads the core-data scale.
+
+12. **Passwordless root through the tunnel** (08:25): the first connect threw the Keychain's
+    "not found" while the reconnect path had decided on 2026-09-20 that nothing stored means
+    no password. One rule now, `DatabaseSessionManager.storedDatabasePassword`.
+
+### Open, in order
+
+0. **See the desktop follow the login on oscar** (0.4.201): connect, log in at GNOME's screen,
+   and the session should come to the window's size by itself. And the window should open at
+   the configured desktop only when the remembered frame is a thumbnail — it is 1,326 × 905
+   right now, so the sizer stands down until someone shrinks a desktop window to the floor.
+1. **See the database close with its window, and the terminal in Active, on the Mac** (0.4.202).
+   The Mac UI test is now `testClosingTheWorkspaceWindowEndsTheSession` (Active is its witness);
+   the runner timed out "enabling automation mode" twice today before any test code, screen
+   unlocked, so it has not run. Run it from Xcode or a shell that has run Mac UI tests.
+2. A **seeded database configuration** for UI tests (a SQLite file the seed can point at) —
+   it makes the Disconnect test runnable on the simulator too, where `TEST_RUNNER_*` never
+   arrives. Then the exec seam; the Vision Pro update; the carried items.
+
+### Things that will bite
+
+- Writer ids: **`a4d0e867` is the Mac, `6b16e22a` the phone**. Rules 53–57.
+- Read the installed version back off every device. `pgrep -x "Glass Power Tools"` matches
+  the simulator copies.
+- The sync token is never persisted; publishing happens on the *next* sync after a change.
+- `~/Desktop/phone-hosts-backup.json` is no longer needed; the user's to delete.

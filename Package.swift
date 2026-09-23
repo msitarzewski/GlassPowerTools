@@ -79,6 +79,9 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.36.0"),
         // Terminal emulator host (glas.sh's misnamed RealityKitContent package) and its engine.
         .package(url: "https://github.com/migueldeicaza/SwiftTerm", exact: "1.15.0"),
+        // D35: the editor's Markdown preview. Apple's parser over cmark-gfm (tables, task lists,
+        // strikethrough, autolinks). Apache-2.0. Pinned exactly, like SwiftTerm.
+        .package(url: "https://github.com/swiftlang/swift-markdown.git", exact: "0.9.0"),
         // Stage 4: the RDP engine. A vendored fork of steelbrain/RDPKit 0.3.1 (MIT, Steelbrain
         // copyright retained), so it sits in Packages/ beside the other vendored forks rather than
         // in Sources/ with our own code. Its patch record is Packages/RDPKit/GLASSDT-PATCHES.md.
@@ -240,7 +243,11 @@ let package = Package(
         .target(name: "GlassEditor",
                 dependencies: ["GlassEditorCore", "GlassEditorUI", "GlassConnectionUI",
                                "GlassLayers", "GlassShell", "GlasSecretStore",
-                               "GlassConnectionKit"]),
+                               "GlassConnectionKit",
+                               .product(name: "Markdown", package: "swift-markdown")],
+                // D35: Mermaid, kept current by `Tools/Mermaid/update-mermaid.sh`, which the
+                // scheme runs before every build.
+                resources: [.copy("Resources/Mermaid"), .copy("Resources/Preview")]),
         .target(
             name: "GlassLayers",
             dependencies: [

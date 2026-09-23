@@ -16,6 +16,7 @@ Code carried in-tree under `Packages/`, with its own license file intact.
 | **TreeSitterMarkdown**, **TreeSitterMarkdownInline** | `tree-sitter-grammars/tree-sitter-markdown` @ `a0a00f817d02412bd92c54d316f164d827b57b5c` | MIT. `Packages/TreeSitterMarkdown/LICENSE` retained. **Vendored rather than depended on, and patched.** Upstream's block `serialize()` copies every open block into a fixed 1024-byte buffer with no bound: above 254 open blocks it overruns — an assert in debug, heap corruption in release — reachable purely by opening a deeply-nested markdown file. The bound is restored in `Packages/TreeSitterMarkdown/src/scanner.c`, where the patch names itself and says why. `parser.c` is the pinned revision byte for byte, and the inline grammar is unmodified. Guarded by `Tests/GlassEditorCoreTests/ScannerOverflowPenTests.swift`. |
 | **TreeSitterSql** | `DerekStride/tree-sitter-sql` @ `851e9cb257ba7c66cc8c14214a31c44d2f1e954e` | MIT. `Packages/TreeSitterSql/LICENSE` retained. **Vendored rather than depended on, and patched.** Upstream's `serialize()` frees and nils `start_tag` — it consumes the state it was asked to snapshot — and `deserialize()` overwrites the pointer without freeing it or checking the allocation (GlassEditorKit pen finding M-5). Still present on upstream's HEAD, checked 2026-09-15, so a newer pin is not the fix. `parser.c` is the pinned revision byte for byte; only `scanner.c` differs, and the patch names itself there. |
 | **TreeSitterYAML** | `tree-sitter-grammars/tree-sitter-yaml` @ `a1c4812a73ec5e089de8e441fdea3a921e8d5079` (2026-05-22) | MIT. `Packages/TreeSitterYAML/LICENSE` retained. **Vendored rather than depended on** because upstream's SPM manifest decides whether to compile `scanner.c` with a *relative* `FileManager.fileExists(atPath:)`, which is false when the package is a dependency — the scanner is silently dropped and the external-scanner symbols go undefined at link. Same commit, same licence, built with the correct sources. |
+| **Mermaid** (`mermaid.min.js`) | npm `mermaid`, **kept at the registry's latest** by `Tools/Mermaid/update-mermaid.sh`, which the GlassPowerTools scheme runs before every build and which verifies the tarball's sha512 against the registry's integrity field (D35). The version in the build is `Sources/GlassEditor/Resources/Mermaid/VERSION` | MIT, "Copyright (c) 2014 - 2022 Knut Sveidqvist". `Sources/GlassEditor/Resources/Mermaid/LICENSE` is copied from the same tarball on every update. Loaded only into the editor's Markdown preview, with no network access (D35). |
 
 ## Tree-sitter grammars — pinned dependencies
 
@@ -87,6 +88,8 @@ swift-collections, swift-atomics, swift-system, swift-numerics, swift-async-algo
 swift-argument-parser, swift-asn1, swift-metrics, swift-service-lifecycle,
 swift-nio-transport-services) are Apache License 2.0. `postgres-nio` is Apache License 2.0.
 `SwiftTerm` is MIT. `tree-sitter` and `swift-tree-sitter` are MIT. `BigInt` is MIT.
+`swift-markdown` (pinned exactly, D35) and its `swift-cmark` are Apache License 2.0; cmark-gfm's
+own notices travel in its source distribution.
 
 **`mysql-nio` is pinned to a fork by revision**, `msitarzewski/mysql-nio`
 `69489876bebca3b54c46680e519669789060d0ae`, Apache License 2.0 as upstream. The pin is mandatory:

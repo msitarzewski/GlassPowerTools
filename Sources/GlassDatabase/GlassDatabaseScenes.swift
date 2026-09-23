@@ -188,17 +188,11 @@ public struct GlassDatabaseBootstrap<Content: View>: View {
         }
     }
 
-    /// SQLite has no credential; every other engine reads the one this service saved. A missing
-    /// password is passed through as empty so the server's own refusal is what the user sees,
-    /// rather than this layer guessing that the password is the problem.
+    /// One rule for the first connect and every reconnect: `DatabaseSessionManager.
+    /// storedDatabasePassword`. This used to keep a stricter rule of its own — nothing stored
+    /// meant an error — so the same service reconnected fine and would not connect (2026-09-22).
     private static func storedPassword(for config: DatabaseConnectionConfig) throws -> String {
-        guard config.engine.supportsCredentials else { return "" }
-        // Deliberately NOT caught here, unlike before: `notFound` used to become `""`, which a
-        // server configured for passwordless auth will happily accept — connecting with no
-        // credential where the user believes one is required. A password the user *chose* to leave
-        // empty is found and returns "" from this call; only a genuinely absent one throws, and the
-        // caller reports it rather than guessing. See `DatabaseSessionManager.storedCredentials`.
-        return try KeychainManager.retrievePassword(for: config)
+        try DatabaseSessionManager.storedDatabasePassword(for: config)
     }
 
     private func present(_ request: DatabaseWorkspaceWindowRequest) {

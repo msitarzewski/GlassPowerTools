@@ -79,6 +79,23 @@ import Testing
     #expect(core.littleEndianUInt32(at: 230) == 100)
 }
 
+/// A 200% client asks for a 200% desktop from the first frame, not from the display channel's
+/// first monitor layout (2026-09-22: a Retina window got a 100% 4K login screen until a resize).
+@Test func clientCoreDataCarriesTheDesktopScaleFactorAndClampsIt() {
+    let scaled = MCSConnectInitialPDU(configuration: MCSConnectInitialConfiguration(desktopScaleFactor: 200))
+        .encodedClientCoreData()
+    #expect(scaled.count == 234)
+    #expect(scaled.littleEndianUInt32(at: 226) == 200)
+    #expect(scaled.littleEndianUInt32(at: 230) == 100, "the device scale factor is left at 100")
+
+    let tooLarge = MCSConnectInitialPDU(configuration: MCSConnectInitialConfiguration(desktopScaleFactor: 700))
+        .encodedClientCoreData()
+    #expect(tooLarge.littleEndianUInt32(at: 226) == 500, "MS-RDPBCGR 2.2.1.3.2 allows 100 through 500")
+    let tooSmall = MCSConnectInitialPDU(configuration: MCSConnectInitialConfiguration(desktopScaleFactor: 50))
+        .encodedClientCoreData()
+    #expect(tooSmall.littleEndianUInt32(at: 226) == 100)
+}
+
 @Test func clientCoreDataNullTerminatesMaximumLengthClientName() {
     let pdu = MCSConnectInitialPDU(configuration: MCSConnectInitialConfiguration(
         clientName: "ABCDEFGHIJKLMNO"

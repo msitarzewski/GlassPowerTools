@@ -32,6 +32,41 @@ final class MacWorkspacePreviewRegistry {
             .compactMap { entries[$0]?.controller }.flatMap(\.tabs)
             .filter { $0.workgroupID == workgroupID && !$0.isClosed }
     }
+
+    /// The window, tab and pane holding a live session — Active's way to a terminal that is in
+    /// no workgroup.
+    private func locate(sessionID: UUID) -> (window: NSWindow, controller: MacWorkspaceWindowController,
+                                             tab: MacWorkspaceController, paneID: UUID)? {
+        for id in entries.keys.sorted(by: { $0.uuidString < $1.uuidString }) {
+            guard let entry = entries[id], let controller = entry.controller, let window = entry.window else { continue }
+            for tab in controller.tabs where !tab.isClosed {
+                if let paneID = tab.sessionsByPaneID.first(where: { $0.value.id == sessionID })?.key {
+                    return (window, controller, tab, paneID)
+                }
+            }
+        }
+        return nil
+    }
+
+    /// Brings the window holding the session forward, on its tab.
+    @discardableResult
+    func reveal(sessionID: UUID) -> Bool {
+        guard let found = locate(sessionID: sessionID) else { return false }
+        found.controller.select(found.tab.workspaceID)
+        NSApp.activate()
+        found.window.makeKeyAndOrderFront(nil)
+        return true
+    }
+
+    /// Removes the session's pane, closing the session with it, and the window if that was its
+    /// last pane. False when no window holds the session, so the caller can close it directly.
+    @discardableResult
+    func close(sessionID: UUID, sessionManager: SessionManager) -> Bool {
+        guard let found = locate(sessionID: sessionID) else { return false }
+        found.tab.removePane(found.paneID, sessionManager: sessionManager)
+        if found.controller.isEmpty { found.window.close() }
+        return true
+    }
 }
 
 extension MacWorkspaceController {

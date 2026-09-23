@@ -57,6 +57,20 @@ public struct DesktopCredentialAccess {
 @MainActor @Observable
 public final class DesktopAppModel {
     public private(set) var connections: [DesktopConnection] = []
+    /// The sessions that are on screen, for Active. Each window makes its own model, so until
+    /// 2026-09-22 nothing in the capability could see a desktop at all (*"Desktops aren't
+    /// showing in the Active section"*). A model joins on its first attempt and leaves when it
+    /// closes; a dropped connection stays listed with its state, so Active can close it.
+    public private(set) var liveSessions: [DesktopSessionModel] = []
+
+    func noteLive(_ session: DesktopSessionModel) {
+        guard !liveSessions.contains(where: { $0 === session }) else { return }
+        liveSessions.append(session)
+    }
+
+    func noteClosed(_ session: DesktopSessionModel) {
+        liveSessions.removeAll { $0 === session }
+    }
     public private(set) var isLoaded = false
     public var errorMessage: String?
     public let notices: DesktopNotices

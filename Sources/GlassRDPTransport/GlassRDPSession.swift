@@ -42,6 +42,7 @@ public actor GlassRDPSession {
                                                       domain: configuration.domain, password: configuration.password),
             graphicsFrameCaptureLimit: nil,
             desktopWidth: UInt16(configuration.width), desktopHeight: UInt16(configuration.height),
+            desktopScaleFactor: UInt32(configuration.desktopScaleFactor),
             clipboardEnabled: configuration.clipboardEnabled, audioPlaybackEnabled: configuration.audioEnabled
         )
         engineConfiguration.requireNetworkLevelAuthentication = configuration.requiresNLA
@@ -52,7 +53,7 @@ public actor GlassRDPSession {
             engineConfiguration.certificatePolicy = .pinned(pin)
         }
         let id = UUID()
-        Self.logger.notice("event=connect attempt=\(id.uuidString, privacy: .public) width=\(configuration.width) height=\(configuration.height)")
+        Self.logger.notice("event=connect attempt=\(id.uuidString, privacy: .public) width=\(configuration.width) height=\(configuration.height) scale=\(configuration.desktopScaleFactor)")
         let cancel = RDPConnectionCancellation()
         let controls = Controls()
         self.activeID = id; self.cancellation = cancel; self.controls = controls

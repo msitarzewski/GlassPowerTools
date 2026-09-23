@@ -82,12 +82,13 @@ struct GlassActiveConnectionsTests {
         #expect(machines.first?.sessions.map(\.id) == ["terminal:9"])
     }
 
-    @Test("Nothing open is nil for the sidebar, not zero")
-    func emptyCountIsNil() async throws {
+    @Test("Nothing open is 0 for the sidebar, like every other row")
+    func emptyCountIsZero() async throws {
         let (model, root, _) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
         await model.load()
-        #expect(model.activeSessionCount() == nil)
+        #expect(model.activeSessionCount() == 0)
+        #expect(model.activeConnectionsPanel().count == 0, "and the panel row carries the 0")
         #expect(model.activeMachines().isEmpty)
     }
 

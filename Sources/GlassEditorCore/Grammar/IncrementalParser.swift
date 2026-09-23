@@ -76,7 +76,9 @@ public final class DocumentParser {
     public private(set) var parseCount: Int = 0
 
     /// Current document length in UTF-16 code units.
-    public var documentLength: Int { utf16.count }
+    public var documentLength: Int { tree == nil && highlightingDegraded ? degradedLength : utf16.count }
+    /// The length of a document over the ceiling, which is counted but not copied.
+    private var degradedLength = 0
 
     /// Above this many UTF-16 code units, highlighting degrades to a single
     /// plaintext run instead of running the query over the whole tree
@@ -130,6 +132,14 @@ public final class DocumentParser {
 
     /// Parse `snapshot` from scratch, discarding any previous tree.
     public func parseFull(_ snapshot: String) {
+        // **Over the ceiling, nothing is parsed** (2026-09-23). The ceiling used to be checked only
+        // when turning the tree into colours, after the copy, the line index and a full
+        // tree-sitter parse had all been paid for: a 14.6 MB one-line SVG spent 13 seconds here to
+        // produce highlighting that was then thrown away. Checked first, it costs one count.
+        guard snapshot.utf16.count <= highlightingCodeUnitCeiling else {
+            degradeWithoutParsing(length: snapshot.utf16.count)
+            return
+        }
         utf16 = Array(snapshot.utf16)
         lineIndex.rebuild(from: utf16)
 
@@ -149,6 +159,10 @@ public final class DocumentParser {
     /// tree-sitter an inconsistent `InputEdit`, which would corrupt the tree
     /// silently instead of loudly.
     public func apply(_ edit: TextEdit, newSnapshot: String) {
+        guard newSnapshot.utf16.count <= highlightingCodeUnitCeiling else {
+            degradeWithoutParsing(length: newSnapshot.utf16.count)
+            return
+        }
         guard let parser, let editedTree = tree else {
             parseFull(newSnapshot)
             return
@@ -200,6 +214,18 @@ public final class DocumentParser {
         lastParseWasIncremental = true
         parseCount += 1
         recomputeHighlights()
+    }
+
+    /// Plaintext for a document over the ceiling, with no tree kept: a later edit that brings it
+    /// back under starts from a full parse, because `tree` is nil.
+    private func degradeWithoutParsing(length: Int) {
+        degradedLength = length
+        utf16 = []
+        tree = nil
+        lastParseWasIncremental = false
+        lastChangedRanges = []
+        highlightingDegraded = true
+        highlights = HighlightExtractor.plainCover(length: length)
     }
 
     // MARK: - Highlighting

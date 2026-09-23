@@ -16,6 +16,9 @@
 //
 
 import Foundation
+import CoreGraphics
+import ImageIO
+import UniformTypeIdentifiers
 import GlassConnectionKit
 import GlassShell
 
@@ -188,6 +191,44 @@ public final class GlassEditorProjectLibrary {
                 .write(to: root.appendingPathComponent("README.md"))
             try Data("let greeting = \"hello\"\nprint(greeting)\n".utf8)
                 .write(to: sources.appendingPathComponent("main.swift"))
+            // For the viewers and Preview (2026-09-23): a picture, and Markdown with a table, a
+            // Mermaid diagram and that picture beside it.
+            try Self.seedPNG().write(to: root.appendingPathComponent("logo.png"))
+            try Data("""
+            # Preview
+
+            | Machine | Services |
+            |---|---|
+            | oscar | 3 |
+            | juliet | 3 |
+
+            ```mermaid
+            graph LR
+              Library --> Active --> Editor
+            ```
+
+            ![logo](logo.png)
+
+            """.utf8).write(to: root.appendingPathComponent("PREVIEW.md"))
+            // A logo the way a design tool exports one: a single line of megabytes. The shape that
+            // froze the Mac on 2026-09-23; asked for only by the test that opens it.
+            // A real file from the host, copied in by the test that names it: the simulator's app
+            // can read the Mac's disk, and a user's own file is the one that matters.
+            if let index = arguments.firstIndex(of: "--ui-testing-seed-file"), arguments.indices.contains(index + 1) {
+                let source = URL(filePath: arguments[index + 1])
+                let target = root.appendingPathComponent(source.lastPathComponent)
+                try? FileManager.default.removeItem(at: target)
+                try FileManager.default.copyItem(at: source, to: target)
+            }
+            if arguments.contains("--ui-testing-seed-large-svg") {
+                var path = "M0 0"
+                path.reserveCapacity(700_000)
+                for step in 0..<60_000 { path += " L\((step * 37) % 1000) \((step * 91) % 300)" }
+                let image = Self.seedPNG().base64EncodedString()
+                let embedded = String(repeating: image, count: 1 + 1_200_000 / max(image.count, 1))
+                let svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" viewBox=\"0 0 1000 300\"><path d=\"\(path) Z\" fill=\"#b5412b\"/><image width=\"200\" height=\"80\" xlink:href=\"data:image/png;base64,\(embedded)\"/></svg>"
+                try Data(svg.utf8).write(to: root.appendingPathComponent("wide-logo.svg"))
+            }
         } catch { return }
         remember(GlassEditorProject.local(root))
         // A **second real** project, so a test can have two editor sessions open at once — which
@@ -208,6 +249,25 @@ public final class GlassEditorProjectLibrary {
             remember(GlassEditorProject.local(documents.appendingPathComponent("GoneProject",
                                                                                isDirectory: true)))
         }
+    }
+
+    /// A small blue square with a white stripe, drawn rather than carried as bytes.
+    private static func seedPNG() -> Data {
+        let size = 96
+        guard let context = CGContext(data: nil, width: size, height: size, bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return Data() }
+        context.setFillColor(CGColor(red: 0.04, green: 0.39, blue: 0.84, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: size, height: size))
+        context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+        context.fill(CGRect(x: 40, y: 12, width: 16, height: 72))
+        guard let image = context.makeImage() else { return Data() }
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil)
+        else { return Data() }
+        CGImageDestinationAddImage(destination, image, nil)
+        CGImageDestinationFinalize(destination)
+        return data as Data
     }
     #endif
 

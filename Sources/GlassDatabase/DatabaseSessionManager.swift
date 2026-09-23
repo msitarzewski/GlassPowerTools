@@ -72,8 +72,18 @@ class DatabaseSessionManager {
         workspaceRequests[windowID] ?? .primary(sessionID: windowID)
     }
 
-    func releaseWorkspace(_ windowID: UUID) {
-        workspaceRequests.removeValue(forKey: windowID)
+    /// **Closing the last window on a session ends the session.** The desktop's and the editor's
+    /// rule, and until 2026-09-22 not the database's: the red close button flushed the drafts and
+    /// left the connection open, findable only in Active (*"everything else has an actual close
+    /// button for the connection"*). A second workspace window on the same session closing leaves
+    /// it alone — glassdb's "Open New Workspace Window", kept. A phone registers a workspace and
+    /// never releases it, because leaving a screen there is not closing it (D31); its ⋯ menu ends
+    /// the session on purpose.
+    @discardableResult
+    func releaseWorkspace(_ windowID: UUID) -> Task<Void, Never>? {
+        guard let released = workspaceRequests.removeValue(forKey: windowID) else { return nil }
+        guard !workspaceRequests.values.contains(where: { $0.sessionID == released.sessionID }) else { return nil }
+        return Task { await disconnect(sessionID: released.sessionID) }
     }
 
     /// Opens a local port that reaches `remoteHost:port` from the host's machine. Supplied by
@@ -982,39 +992,30 @@ class DatabaseSessionManager {
     private static func storedCredentials(
         for config: DatabaseConnectionConfig
     ) throws -> (database: String, ssh: String?) {
-        let databasePassword: String
-        if config.engine.supportsCredentials {
-            // A missing credential is reported, not substituted.
-            //
-            // This used to answer `""` for `notFound`, which is indistinguishable from a password
-            // the user deliberately saved as empty — and against a server configured for
-            // passwordless auth for that account (`trust` in `pg_hba.conf`, `auth_socket` in MySQL)
-            // an empty password **succeeds**, connecting with no credential where the user believes
-            // one is required.
-            //
-            // The two cases are distinguishable and only one is silent: a deliberately empty
-            // password is *found* and returns "" from the line below. `notFound` means nothing was
-            // ever stored, or it was stranded — which the delete sweep in `KeychainManager` used to
-            // make possible by only ever clearing the current policy's descriptor.
-            //
-            // Observed, not theorised: a live PostgreSQL reconnect authenticated with an empty
-            // password for exactly this reason on 2026-09-13.
-            do {
-                databasePassword = try KeychainManager.retrievePassword(for: config)
-            } catch SecretStoreError.notFound {
-                // **Nothing stored means no password, and that is a real configuration.**
-                // `auth_socket`, `trust`, `peer` and any user created without one connect with
-                // an empty password, and a service saved that way stores no keychain item at
-                // all — so refusing here made the app unable to reach servers that work
-                // everywhere else (2026-09-20). Whether the server accepts it is the server's
-                // to say, and it says so accurately; a stranded credential now reads as that
-                // server's own rejection rather than as this sentence.
-                databasePassword = ""
-            }
-        } else {
-            databasePassword = ""
-        }
-        return (databasePassword, nil)
+        (try storedDatabasePassword(for: config), nil)
+    }
+
+    /// The password a saved service connects with, for the first connect and every reconnect.
+    ///
+    /// **Nothing stored means no password, and that is a real configuration.** `auth_socket`,
+    /// `trust`, `peer`, a tunnelled local instance, root on a machine of one's own — all connect
+    /// with an empty password, and the secret store refuses to write an empty value, so a
+    /// service saved that way stores no keychain item at all. Refusing here made the app unable
+    /// to reach servers that work everywhere else (2026-09-20, and again on 2026-09-22 when the
+    /// first connect still threw *"Requested secure item was not found in Keychain"* for MySQL
+    /// on juliet through the tunnel, while a reconnect would have passed). Whether the server
+    /// accepts an empty password is the server's to say, and it says so accurately; a stranded
+    /// credential reads as that server's own rejection rather than as this layer's guess.
+    ///
+    /// Observed either way: a live PostgreSQL reconnect authenticated with an empty password on
+    /// 2026-09-13, which is the case this rule exists for.
+    static func storedDatabasePassword(
+        for config: DatabaseConnectionConfig,
+        retrieve: (DatabaseConnectionConfig) throws -> String = KeychainManager.retrievePassword
+    ) throws -> String {
+        guard config.engine.supportsCredentials else { return "" }
+        do { return try retrieve(config) }
+        catch SecretStoreError.notFound { return "" }
     }
 
     private func invalidateTransport(
@@ -1076,6 +1077,12 @@ class DatabaseSessionManager {
 class DatabaseSession {
     let connectionConfig: DatabaseConnectionConfig
     var state: SessionState = .disconnected
+    /// What the session's workspace is looking at — "common_vision › articles", a SQL document's
+    /// title — so Active's row says where you are and not only that you are connected
+    /// (2026-09-22: *"I have the DB open, but I'm in common-vision.articles"*). Nil on the
+    /// connection overview. The workspace publishes it on every change of its displayed tab;
+    /// with two windows on one session the later change wins.
+    var workspaceFocus: String?
     var connection: (any DatabaseConnection)?
     var engine: (any DatabaseEngine)?
     /// The live forward this session's transport rides, when `usesHostTunnel`. Owned here so

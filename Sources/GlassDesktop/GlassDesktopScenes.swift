@@ -169,6 +169,14 @@ public struct GlassDesktopBootstrap<Content: View>: View {
                     // which is the failure this whole change is about.
                     failure = "That desktop's configuration could not be read. Edit the service in the library to set it up again."
                 }
+            case let .show(connectionID):
+                // The same window value as the connect opened, so a Mac brings the existing
+                // window forward rather than opening a second; a phone shows the cover again.
+                if GlassWindowPresentation.canOpenWindows {
+                    openWindow(id: "desktop-session", value: connectionID.rawValue)
+                } else if let connection = runtime.connection(for: connectionID) {
+                    activeDesktop = connection
+                }
             case let .showFailure(message):
                 failure = message
             }

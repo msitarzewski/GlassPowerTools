@@ -110,6 +110,10 @@ public struct DesktopSessionView: View {
         .frame(minWidth: 800, minHeight: 440)
         #else
         sessionContent
+            #if os(macOS)
+            .frame(minWidth: DesktopWindowSizing.floor.width, minHeight: DesktopWindowSizing.floor.height)
+            .background { DesktopWindowSizer(desktop: session.connection.desktop) }
+            #endif
         #endif
     }
 
@@ -784,3 +788,56 @@ private enum DesktopSessionSettingsSection: CaseIterable, Hashable {
     case appearance, display
     var title: String { self == .appearance ? "Appearance" : "Display" }
 }
+
+#if os(macOS)
+/// Finds the session's window and, if it opened at the floor, gives it the configured desktop
+/// (`DesktopWindowSizing`). Zero-size and non-hit-testing, the shape of `GlassWindowLayerReader`.
+/// Once per window: a user who then shrinks it is not fought.
+private struct DesktopWindowSizer: NSViewRepresentable {
+    let desktop: DesktopSize
+
+    func makeNSView(context: Context) -> SizerView { SizerView() }
+    func updateNSView(_ view: SizerView, context: Context) { view.desktop = desktop }
+
+    final class SizerView: NSView {
+        var desktop = DesktopSize.standard
+        /// Two looks at most — after attaching and on first becoming key — so a window the user
+        /// later shrinks to the floor on purpose is not grown back every time it is focused.
+        private var looks = 0
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            NotificationCenter.default.removeObserver(self, name: NSWindow.didBecomeKeyNotification, object: nil)
+            guard let window else { return }
+            // The remembered frame lands after the content is attached: look after this turn, and
+            // once more when the window becomes key, in case it landed later still.
+            DispatchQueue.main.async { [weak self] in self?.sizeIfAtFloor() }
+            NotificationCenter.default.addObserver(self, selector: #selector(windowBecameKey(_:)),
+                                                   name: NSWindow.didBecomeKeyNotification, object: window)
+        }
+
+        @objc private func windowBecameKey(_ notification: Notification) { sizeIfAtFloor() }
+
+        private func sizeIfAtFloor() {
+            guard looks < 2, let window, let content = window.contentView else { return }
+            looks += 1
+            guard DesktopWindowSizing.isAtFloor(content.frame.size) else { return }
+            looks = 2
+            let visible = (window.screen ?? NSScreen.main)?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1280, height: 800)
+            let chrome = CGSize(width: window.frame.width - content.frame.width,
+                                height: window.frame.height - content.frame.height)
+            let target = DesktopWindowSizing.contentSize(
+                desktop: desktop,
+                available: CGSize(width: visible.width - chrome.width, height: visible.height - chrome.height))
+            var frame = window.frameRect(forContentRect: NSRect(origin: .zero, size: target))
+            // Keep the top-left where it was, and the whole window on the screen.
+            frame.origin = NSPoint(x: window.frame.minX, y: window.frame.maxY - frame.height)
+            frame.origin.x = min(max(frame.minX, visible.minX), max(visible.minX, visible.maxX - frame.width))
+            frame.origin.y = min(max(frame.minY, visible.minY), max(visible.minY, visible.maxY - frame.height))
+            window.setFrame(frame, display: true, animate: false)
+        }
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    }
+}
+#endif

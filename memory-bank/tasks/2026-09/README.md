@@ -444,3 +444,28 @@ the seam under them and the Mac overview's cards stay. Workgroups untouched (D33
 Then oscar vanished from the Mac: the store made tombstones immortal while the sync was
 last-write-wins, and the phone's fold had tombstoned the record the Mac's copy was keyed on.
 D34 — a deletion is dated — and the fold now keeps the most recently updated member with services.
+
+## 2026-09-22 — [Disconnect in the workspace](2026-09-22_disconnect-in-the-workspace.md)
+
+oscar returned to the Mac by itself under D34. Then the database learned the desktop's rule: closing
+the last workspace window ends the session, and the phone's ⋯ menu keeps the one deliberate
+Disconnect. And a terminal opened by Connect on a Mac — in no workgroup — is now a row in Active,
+and a database row says where its workspace is ("MySQL · common_vision › articles").
+
+## 2026-09-22 — [The desktop window's size, and the size after login](2026-09-22_desktop-window-and-login-size.md)
+
+Two defects behind one report: macOS remembered a thumbnail frame for every desktop window (floor
+raised to 640 × 400, and a window found there gets the configured desktop within the screen), and a
+server that changes its own size after login was never asked for the window again (the model now
+forgets its request when a frame arrives at a size it did not ask for, bounded to three per attempt).
+
+## 2026-09-23 — [Viewers and Preview in the editor — plan](2026-09-23_viewers-and-preview.md)
+
+PLAN only. Images, PDF, video and audio open as themselves (Quick Look on the Mac, native viewers
+elsewhere); Markdown with Mermaid, HTML, SVG and CSV get a VS Code–style Preview. D35 proposed.
+
+## 2026-09-23 — [Text engine research](2026-09-23_text-engine-research.md)
+
+The state of the art in native Mac editors was researched: they edit on TextKit 1 with
+non-contiguous layout. Measured against TextKit 2 on the user's 14.6 MB SVG, TextKit 1 is ~3× faster
+to open and scrolls freely where ours does not. D36 approved: a TextKit 1 backend for the Mac editor.

@@ -49,9 +49,15 @@ public final class GlassEditorDocument: Identifiable {
     /// modification time and a digest, which mean the same thing on both machines.
     public private(set) var session: RemoteDocumentSession?
 
+    /// Set when the file is not text: an image, a PDF, a video, a sound, another binary. The text
+    /// model is then empty and never dirty, so nothing that saves or searches reaches it.
+    public let viewer: GlassEditorViewer?
+
     public init(model: GlassEditorModel, url: URL?, untitledName: String = "Untitled",
-                machine: String? = nil, session: RemoteDocumentSession? = nil) {
+                machine: String? = nil, session: RemoteDocumentSession? = nil,
+                viewer: GlassEditorViewer? = nil) {
         self.model = model
+        self.viewer = viewer
         self.url = url
         self.untitledName = untitledName
         self.machine = machine
@@ -65,11 +71,34 @@ public final class GlassEditorDocument: Identifiable {
     /// **One path for both machines.** Where the bytes came from is the argument; everything after
     /// it — the encoding, the line endings, the language, the baseline a later save compares
     /// against — is the same work, and doing it twice would mean doing the second one worse.
+    ///
+    /// **Not every file is text** (2026-09-23). The bytes are classified before they are decoded,
+    /// because decoding cannot fail — its Latin-1 fallback accepts anything — and a PNG decoded is
+    /// a page of garbage. `asText` is the not-text screen's "Open as Text", on request only.
+    /// `allowLargeRemote` is the answer to the question a large remote media file asks first.
     public static func open(path: String,
                             through access: any GlassEditorFileAccess,
-                            machine: String? = nil) async throws -> GlassEditorDocument {
-        let data = try await access.read(path)
+                            machine: String? = nil,
+                            asText: Bool = false,
+                            allowLargeRemote: Bool = false) async throws -> GlassEditorDocument {
         let url = URL(filePath: path)
+        let name = url.lastPathComponent
+        if machine != nil, !asText, !allowLargeRemote,
+           let size = (try? await access.stat(path))?.size, size > GlassEditorOpenError.remoteMediaLimit,
+           GlassEditorFileKind.classify(name: name, prefix: Data()) != .text {
+            throw GlassEditorOpenError.largeRemoteFile(name: name, bytes: size)
+        }
+        let data = try await access.read(path)
+        let kind = asText ? .text : GlassEditorFileKind.classify(name: name, prefix: data.prefix(GlassEditorFileKind.sniffLength))
+        if !kind.isText {
+            let viewer = machine == nil
+                ? GlassEditorViewer(kind: kind, fileURL: url, byteCount: data.count, temporaryDirectory: nil)
+                : try GlassEditorViewer.copying(data, named: name, kind: kind)
+            let snapshot = DocumentSnapshot(content: "", encoding: .utf8(hadBOM: false),
+                                            lineEndings: LineEndingStyle.platformDefault, origin: .local(url))
+            return GlassEditorDocument(model: GlassEditorModel(snapshot: snapshot, language: .plaintext),
+                                       url: url, machine: machine, viewer: viewer)
+        }
         let decoded = try EncodingDetector.decode(data)
         let snapshot = DocumentSnapshot(content: decoded.content,
                                         encoding: decoded.encoding,
@@ -81,6 +110,7 @@ public final class GlassEditorDocument: Identifiable {
         // the difference between an editor that colours a developer's tree and one that colours the
         // half of it that happens to be named conveniently.
         let model = GlassEditorModel(snapshot: snapshot)
+        let hasVeryLongLine = Self.hasLine(longerThan: veryLongLine, in: model)
         if model.language == .plaintext {
             let sniffed = LanguageID.forContent(decoded.content)
             if sniffed != .plaintext { model.language = sniffed }
@@ -92,7 +122,30 @@ public final class GlassEditorDocument: Identifiable {
             openedStat: (try? await access.stat(path)) ?? RemoteStat(),
             openedDigest: access.digest(of: data)
         )
-        return GlassEditorDocument(model: model, url: url, machine: machine, session: session)
+        let document = GlassEditorDocument(model: model, url: url, machine: machine, session: session)
+        // **A line this long is laid out wrapped** (2026-09-23). Apple's text engine lays out a
+        // paragraph at a time, and unwrapped a 14.6-million-character line is one enormous
+        // fragment: 26 seconds on the main thread for the user's logo SVG, against about one
+        // second wrapped. BBEdit gets away without it because it has its own engine. Set on this
+        // file only, as the file's own override, so the gear can still turn it off.
+        if hasVeryLongLine {
+            document.textOverrides.wrapsLines = true
+            document.hasVeryLongLine = true
+        }
+        return document
+    }
+
+    /// Characters on one line past which the file is laid out wrapped, and a phone opens it in
+    /// Preview when there is one.
+    public static let veryLongLine = 100_000
+
+    /// Whether this file has a line longer than `veryLongLine`, found when it was opened.
+    public private(set) var hasVeryLongLine = false
+
+    /// A document shorter than the limit cannot have such a line, so most files cost one compare.
+    static func hasLine(longerThan limit: Int, in model: GlassEditorModel) -> Bool {
+        guard model.utf16Length > limit else { return false }
+        return (0..<model.lineCount).contains { model.lineRange(ofLine: $0).count > limit }
     }
 
     /// The local convenience, unchanged for every caller that has a `URL` and means this device.
@@ -194,6 +247,9 @@ public final class GlassEditorDocument: Identifiable {
     /// choosing a location is the workspace's job, because it needs a file panel.
     public func save(through access: any GlassEditorFileAccess,
                      expecting: RemoteStat? = nil) async throws {
+        // A viewer is never edited, so there is nothing to write — and writing its empty text
+        // model over a picture is the one thing this must never do.
+        guard viewer == nil else { return }
         guard let url else { throw GlassEditorWorkspaceError.needsLocation }
         try await write(to: url, through: access, expecting: expecting)
     }
@@ -202,6 +258,7 @@ public final class GlassEditorDocument: Identifiable {
     /// all follow the file the user chose. Local by definition: the panel that chose it is this
     /// device's.
     public func save(to newURL: URL) async throws {
+        guard viewer == nil else { return }
         let access = GlassEditorLocalFileAccess()
         // A new location expects nothing: whatever is there is being replaced deliberately.
         try await write(to: newURL, through: access, expecting: nil)
@@ -235,6 +292,7 @@ public final class GlassEditorDocument: Identifiable {
 
     /// Throws away local edits and takes the file as it is on the machine now.
     public func reload(through access: any GlassEditorFileAccess) async throws {
+        guard viewer == nil else { return }
         guard let url else { throw GlassEditorWorkspaceError.needsLocation }
         let fresh = try await Self.open(path: url.path(percentEncoded: false),
                                         through: access, machine: machine)

@@ -961,3 +961,39 @@ record's `updatedAt`. Ties keep the tombstone.
 was D19's "deleted here must not come back" case; the trade is that an edit is a deliberate act
 too, and losing a whole machine to an unrelated old tombstone was the worse failure and the one
 that actually happened. Pre-launch, one user, three devices.
+
+## D35 — Previews render Markdown with swift-markdown and Mermaid from a bundled script — Implemented 2026-09-23
+
+**Context.** The editor is to show images and media as themselves and offer a VS Code–style
+Preview for Markdown, HTML, SVG and CSV, with Mermaid diagrams inside Markdown
+([plan](tasks/2026-09/2026-09-23_viewers-and-preview.md)).
+
+**Proposal.** swift-markdown (Apple, Apache-2.0, GFM via cmark-gfm), pinned exactly. Mermaid's
+`mermaid.min.js` (MIT) vendored into `GlassEditor`'s resources at a pinned version. A preview page
+runs no script but the bundled Mermaid, loads nothing from the network, and receives every
+resource through one app-answered URL scheme that reads through the document's own file access;
+HTML files preview with scripts off.
+
+**Status.** Implemented 2026-09-23 — approved by the user with one condition, which is now part
+of the decision: *Mermaid is never stale.* The scheme's build pre-action (`Tools/Mermaid/update-mermaid.sh`)
+checks the npm registry on every build, and a moved version is downloaded, sha512-verified against
+the registry's integrity field, and built in.
+
+## D36 — A TextKit 1 backend for the Mac editor — Approved 2026-09-23
+
+**Context.** [Text engine research](tasks/2026-09/2026-09-23_text-engine-research.md) — the state of the art in native Mac editors — on the
+user's 14.6 MB one-line SVG, bare TextKit 1 with non-contiguous layout opens in 0.3 s and scrolls
+at well under a frame; TextKit 2 takes ~1 s and 30 ms a frame offscreen, and in our real editor the
+file opens in ~5 s and does not scroll. The engine's D-001 kept a `GlassEditorEngine` protocol so a
+backend could be swapped.
+
+**Proposal.** A second AppKit backend on TextKit 1 (`NSLayoutManager`, `allowsNonContiguousLayout`),
+behind the same protocol, used on the Mac. Colours as temporary attributes; the gutter against
+layout-manager line fragments; the TextKit 2 tripwire becomes per-backend. iPhone keeps TextKit 2
+and Preview for huge-line files; iPad and Vision Pro to be measured before choosing.
+
+Independent of the engine, the fast editors' other two practices apply to either: parse off the main
+thread and apply by range; colour without touching the text storage.
+
+**Status.** Approved 2026-09-23 (*"Let's test it … build the new editor"*); building.
+

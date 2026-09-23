@@ -73,23 +73,32 @@ struct TerminalConnectFlow: ViewModifier {
                     answerTrustBroker(.trust(remember: true))
                     return
                 }
-                guard let session = pendingTrustSession else {
+                guard let pending = pendingTrustSession else {
                     clearPendingTrustPrompt()
                     return
                 }
                 guard interactiveHostKeyTrustIsAllowed else {
-                    rejectStrictHostKeyChallenge(challenge, for: session)
+                    rejectStrictHostKeyChallenge(challenge, for: pending)
                     return
                 }
+                // **Taken now, not inside the task.** SwiftUI runs this action, then sets the
+                // alert's `isPresented` to false, whose setter closes and unregisters whatever
+                // session is still pending — before the task below gets to run. The 2026-09 fix
+                // took the session before the *reconnect*, but `trustHostKey` runs first and
+                // looks the session up too, so every first connect to a new machine ended in
+                // "This terminal session is no longer active" and the key was never saved
+                // (2026-09-22, "Public" on Tandem). With nothing pending, the dismissal has
+                // nothing to close.
+                guard let session = Self.takePendingTrustSession(&pendingTrustSession,
+                                                                 challenge: &pendingTrustChallenge) else { return }
                 Task { @MainActor in
                     do {
                         try await sessionManager.trustHostKey(challenge, for: session)
-                        retryPendingConnection()
+                        reconnectTrustedSession(session)
                     } catch {
                         connectionFailureMessage = error.localizedDescription
                         report(.failed(error.localizedDescription), for: session.server.id)
                         sessionManager.closePendingHostTrustSession(session)
-                        clearPendingTrustPrompt()
                     }
                 }
             }
@@ -806,7 +815,8 @@ struct TerminalConnectFlow: ViewModifier {
         }
     }
 
-    /// Reconnects the session whose host key the user just trusted.
+    /// Reconnects the session whose host key the user just trusted. The caller takes it out of
+    /// the prompt state first (`takePendingTrustSession`), before any await.
     ///
     /// The session is taken out of the prompt state *before* the reconnect task starts. The
     /// alert's Confirm action runs first, then SwiftUI sets the alert's `isPresented` binding to
@@ -814,10 +824,6 @@ struct TerminalConnectFlow: ViewModifier {
     /// session). With the session still pending at that point, the cleanup closed it before the
     /// task ran `reconnect`, which then threw `sessionNotRegistered` — the post-trust failure
     /// seen against the real host. Clearing synchronously leaves the dismissal nothing to close.
-    private func retryPendingConnection() {
-        guard let session = Self.takePendingTrustSession(&pendingTrustSession, challenge: &pendingTrustChallenge) else { return }
-        reconnectTrustedSession(session)
-    }
 
     /// Clears the prompt state and hands back the session it held, so the prompt's dismissal
     /// cannot close the session a retry is about to reconnect. Nonisolated for unit testing.

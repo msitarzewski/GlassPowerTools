@@ -116,6 +116,31 @@ public enum DesktopSourceScale: String, Codable, CaseIterable, Sendable {
     }
 }
 
+/// The window a new desktop session opens in, on a Mac.
+///
+/// macOS gives a new window in a group the frame the last one had, and a desktop window that was
+/// once a thumbnail stays one for every desktop after it (2026-09-22: *"opens in essentially a
+/// thumbnail"* — 640 × 400 remote pixels for a 320-point window). So a window found at the floor
+/// is given the configured desktop, one point per pixel, no larger than the screen it is on.
+public enum DesktopWindowSizing {
+    /// The smallest content a desktop window can be, in points. Below it the toolbar collapses
+    /// into a chevron and the desktop is a postage stamp; nobody wants a session there.
+    public static let floor = CGSize(width: 640, height: 400)
+
+    /// The configured desktop at one point per pixel, held inside `available` and never below the
+    /// floor. The floor wins over a screen smaller than it: the window cannot be smaller anyway.
+    public static func contentSize(desktop: DesktopSize, available: CGSize, floor: CGSize = floor) -> CGSize {
+        guard available.width.isFinite, available.height.isFinite else { return floor }
+        return CGSize(width: max(floor.width, min(Double(desktop.width), available.width)),
+                      height: max(floor.height, min(Double(desktop.height), available.height)))
+    }
+
+    /// Whether a window this size is the thumbnail case: at (or under) the floor on either side.
+    public static func isAtFloor(_ content: CGSize, floor: CGSize = floor) -> Bool {
+        content.width <= floor.width + 1 || content.height <= floor.height + 1
+    }
+}
+
 /// The part of the remote framebuffer currently on screen. The whole framebuffer unless one display
 /// has been selected out of a multi-display host.
 public struct DesktopRegion: Equatable, Sendable {

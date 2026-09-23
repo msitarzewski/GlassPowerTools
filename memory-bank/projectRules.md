@@ -453,3 +453,17 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     seam's nouns (`openSessions`, `router`) finds none of this; searching for the feature's
     (`overview`, `grid`, `carousel`, `preview`, `card`, `thumbnail`) finds all of it. The standing
     inventory is in `systemPatterns.md`; add to it rather than re-deriving it.
+
+58. **A limit checked after the work is not a limit.** The highlighter's size ceiling was tested when
+    turning the parse into colours — after copying the text, indexing its lines and running a full
+    tree-sitter parse. A 14.6 MB file spent 13 s on work the ceiling then discarded, and "highlighting
+    off for large files" looked true in the status bar the whole time. Put the guard in front of the
+    cost it exists to avoid, and test that the cost is not paid (`HighlightingCeilingTests` checks
+    `parseCount == 0`, not only the degraded flag).
+59. **Measure the frame, then the window.** Offscreen harnesses (`ScrollTimingTests`,
+    `TextKitComparisonTests`, `LargeFile*TimingTests`) find where time goes and prove a fix; they can
+    also skip work a real window does. Before a claim reaches the user — or a decision rests on it —
+    repeat it in a running app with real input, and look at the screen: a probe whose window never
+    came forward "measured" an idle main thread (2026-09-23). When the user is at the Mac, do not
+    drive it; wait until they step away.
+
