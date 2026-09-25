@@ -466,4 +466,10 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     repeat it in a running app with real input, and look at the screen: a probe whose window never
     came forward "measured" an idle main thread (2026-09-23). When the user is at the Mac, do not
     drive it; wait until they step away.
-
+60. **A command placement draws per scene, and the Mac's export panel is not a Save panel.** A
+    `CommandGroup(after: .saveItem)` in the editor's scene drew; the same placement in the shell's
+    commands, attached to the library scene, drew nothing — replacing or appending (0.4.218,
+    0.4.219). Rule 34 said to read the menu bar; this is what reading it caught. And SwiftUI's
+    `fileExporter` on a Mac is an **export**: "Export As:", an Export button, and an extension added
+    from the content type — a new `.env` becomes `.env.txt`. A document's first save on a Mac is
+    `NSSavePanel` (`GlassEditorSavePanel`), which says Save and writes the name typed.

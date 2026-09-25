@@ -477,3 +477,12 @@ long scroll stutters (up to 358 ms) while SwiftUI builds rows — two tap gestur
 a scroll effect on every cell. The terminal is already on SwiftTerm's Metal renderer. Options
 proposed, nothing changed. The user saw the TextKit 1 editor: *"that new renderer is great!"*
 
+
+## 2026-09-25 — [Editor: Save, ⇧⌘E, ⌘W](2026-09-25_editor-save-and-new-window.md)
+
+From the user making a `.env`: ⌘S belonged to the database and beeped in an editor — the shell now
+owns File ▸ Save as it owns New (D37), beside New because `.saveItem` drew nothing from the shell's
+scene (rule 60). The first save is the Mac Save panel, not SwiftUI's Export panel that added `.txt`.
+⇧⌘E opens on a blank document; ⌘W on the last document closes the window; Explain Plan moved to ⌥⌘E.
+The grid's option-1 changes shipped alongside; the user on oscar: *"rendered 10000 rows like nothing."*
+0.4.223 on the Mac; 1,761 tests pass. Committed locally, not pushed.

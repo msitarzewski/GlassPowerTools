@@ -294,3 +294,20 @@ under every preset, so a horizontal bar chart's names sit on the bar below. The 
 now name their bars with annotations instead
 ([task note](tasks/2026-09/2026-09-21_charts-on-macos-27-2.md)). Chart layout on this machine can
 be measured headless with an `ImageRenderer` probe — `Tools/ChartProbe` is the shape of it.
+
+## Editor and grid engines, 2026-09-25
+
+- **Mac editor text system: TextKit 1** with non-contiguous layout (D36) — `GlassTextView.makeTextKit1()`,
+  `GlassEditorAppKitEngine(textSystem:)` defaulting to `.textKit1`; iPhone, iPad and Vision Pro stay
+  on TextKit 2. Highlighting ceiling 2 M UTF-16 units, checked before parsing (rule 58); runs on lines
+  over 20,000 characters dropped; lines over 100,000 force wrapping (and Preview-only on a phone);
+  unwrapped means a finite 100,000 pt container.
+- **Mac editor save panel:** `NSSavePanel` via `GlassEditorSavePanel` for a never-saved document;
+  other platforms use SwiftUI's `fileExporter` (rule 60).
+- **Database grid:** SwiftUI `LazyVStack` in `TableDetailView.dataGrid`. Since 0.4.218: displayed-row
+  indices memoized (`GridDisplayedRowsMemo`), the horizontal scroll offset only on frozen cells
+  (`gridFrozen`), one tap gesture per cell on the Mac (`gridTap`, click count decides). Timing
+  harness: `GPT_GRID_TIMING=1 GPT_GRID_PAGE=1000 GPT_GRID_STEPS=1500 swift test -c release --filter
+  GridScrollTimingTests` (real view, real SQLite in the managed folder; needs the Mac to itself).
+  `NSTableView` remains the proposed next step if numbers require it.
+- **Terminal renderer:** SwiftTerm's Metal renderer on the Mac and iPhone; CoreGraphics on Vision Pro.

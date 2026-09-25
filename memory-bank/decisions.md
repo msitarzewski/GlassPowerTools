@@ -979,7 +979,7 @@ of the decision: *Mermaid is never stale.* The scheme's build pre-action (`Tools
 checks the npm registry on every build, and a moved version is downloaded, sha512-verified against
 the registry's integrity field, and built in.
 
-## D36 — A TextKit 1 backend for the Mac editor — Approved 2026-09-23
+## D36 — A TextKit 1 backend for the Mac editor — Implemented 2026-09-23
 
 **Context.** [Text engine research](tasks/2026-09/2026-09-23_text-engine-research.md) — the state of the art in native Mac editors — on the
 user's 14.6 MB one-line SVG, bare TextKit 1 with non-contiguous layout opens in 0.3 s and scrolls
@@ -995,5 +995,28 @@ and Preview for huge-line files; iPad and Vision Pro to be measured before choos
 Independent of the engine, the fast editors' other two practices apply to either: parse off the main
 thread and apply by range; colour without touching the text storage.
 
-**Status.** Approved 2026-09-23 (*"Let's test it … build the new editor"*); building.
+**Status.** Approved 2026-09-23 (*"Let's test it … build the new editor"*). **Implemented** the same
+day at `9b4da5f`: `GlassTextView.makeTextKit1()`, `GlassEditorAppKitEngine(textSystem: .textKit1)` the
+Mac default, the gutter numbered from layout-manager line fragments, the tests run on both systems.
+Seen by the user in 0.4.217: *"that new renderer is great!"* — the 14.6 MB SVG opens in 1.9 s (was
+~5 s) and scrolls. Not yet done: colours are still text-storage attributes, highlighting is still on
+the main thread, and re-wrapping that file after a resize takes ~1.7 s.
 
+## D37 — File ▸ Save is the shell's, and the focused window says what it saves — Implemented 2026-09-25
+
+**Context.** ⌘S was the database's "Save SQL Document…", disabled unless a database workspace was
+focused; the editor's Save was on ⌥⌘S. In an editor, ⌘S beeped ([task note](tasks/2026-09/2026-09-25_editor-save-and-new-window.md)).
+
+**Decision.** ⌘N's pattern for ⌘S: the shell owns one Save item (`GlassShellFileCommands`), and each
+window publishes `\.glassSaveItem` — a title and an action — or nothing. The editor says "Save…" for
+a never-saved document and "Save" otherwise; the database says "Save SQL Document…". Off the Mac,
+where the shell's item does not exist, the database keeps its own ⌘S item. Guarded by
+`MenuBarPlacementTests` (one menu owner for ⌘S; both publishers present).
+
+**Placement, as observed.** The item sits in the shell's New group. From the shell's commands
+(attached to the library scene) both `replacing: .saveItem` and `after: .saveItem` drew nothing in the
+running app; the New group is the placement known to reach the menu bar. If Save is wanted beside
+Close, that is the open question: attach an item from a scene whose `.saveItem` does draw.
+
+**Status.** Implemented 2026-09-25 in answer to the user's report (*"command-s should show a save
+interface vs. bonking me"*); 0.4.220 onward, menu bar read back.

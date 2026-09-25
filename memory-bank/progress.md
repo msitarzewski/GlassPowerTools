@@ -756,3 +756,18 @@ comes from is the question the design pass has to answer, and it wants the user'
   TextKit 1 backend, approved and in progress. visionOS editor toolbar invisible to UI tests.
   1,752 tests, 0 failing; 0.4.216 on Mac and iPhone; Vision Pro 0.4.123.
 
+## 2026-09-23 → 25 — verified since `fe4ed86`
+
+- **Mac editor on TextKit 1 (D36)** — committed at `9b4da5f`, seen by the user on 0.4.217 (*"that new
+  renderer is great!"*); corrects the "Not yet" line above.
+- **Database grid, option 1 in part:** memoized displayed rows, frozen-only scroll effect, one tap
+  per cell on the Mac. The user on 0.4.223 against `common_vision` on oscar: *"rendered 10000 rows like
+  nothing."* The timing harness has **not** been re-run; the 8.3 ms target is unverified by numbers.
+- **Editor, from the user's `.env` walk-through:** ⌘S is the shell's File ▸ Save (D37) and no longer
+  beeps in an editor; a new document's first save is the Mac Save panel (no `.txt` appended); the
+  save panel's document is kept apart from its presentation state so the tab adopts the file;
+  ⇧⌘E opens on a blank document; ⌘W on the last document closes the window (a project window stays).
+  Explain Plan moved to ⌥⌘E. Menu bar read back from the running app.
+- 1,761 tests, 0 failing. **0.4.223 on the Mac** (read back). iPhone still 0.4.217; Vision Pro 0.4.123.
+- **Not yet confirmed in the app:** the tab and title taking the saved name, and ⌘W closing the
+  window — the user's walk-through, pending.

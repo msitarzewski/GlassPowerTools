@@ -571,7 +571,8 @@ struct QueryEditorView: View {
                             || queryText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                             || isExecuting
                     )
-                    .keyboardShortcut("e", modifiers: [.command, .shift])
+                    // The Query menu's key (⌥⌘E); ⇧⌘E is New Editor Window.
+                    .keyboardShortcut("e", modifiers: [.command, .option])
 
                     if isExecuting,
                        session?.connection?.capabilities.contains(.cancellation) == true {

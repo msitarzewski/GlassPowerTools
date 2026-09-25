@@ -2902,3 +2902,37 @@ tackle this on return"* — **this** is the database grid.
   the simulator copies.
 - The sync token is never persisted; publishing happens on the *next* sync after a change.
 - `~/Desktop/phone-hosts-backup.json` is no longer needed; the user's to delete.
+
+## 2026-09-25 — RESUME HERE (supersedes every block above)
+
+**State DOCS → committed locally, not pushed** (the user: *"don't push"*). 0.4.223 on the Mac (read
+back); iPhone 0.4.217; Vision Pro 0.4.123. 1,761 tests, 0 failing.
+
+### Done today
+
+1. **Database grid, option 1 in part** ([note](tasks/2026-09/2026-09-23_grid-scroll-cost.md)):
+   `GridDisplayedRowsMemo`, `gridFrozen`, `gridTap`. The user: *"rendered 10000 rows like nothing.
+   Great job."* Harness not re-run.
+2. **Editor, from making a `.env`** ([note](tasks/2026-09/2026-09-25_editor-save-and-new-window.md)):
+   D37 (⌘S the shell's, per-window title and action), `GlassEditorSavePanel` (Save, not Export; no
+   `.txt`), the save panel's document held in `exportTarget`, ⇧⌘E opens a blank document, ⌘W on the
+   last document closes the window (project windows stay), Explain Plan on ⌥⌘E. Rule 60.
+
+### Next, in order
+
+1. **The user's walk-through of 0.4.223:** ⇧⌘E → type → ⌘S → save as `.env` → the tab and title read
+   `.env` → ⌘W closes the window. The adoption fix is inferred from the code, not yet seen working.
+2. **Grid numbers** when the Mac is free: the harness line in `techContext.md`; then decide whether the
+   per-row material or `NSTableView` is needed at all.
+3. Update the iPhone (0.4.217) and Vision Pro (0.4.123).
+4. Carried: re-wrap after resize ~1.7 s; colours as temporary attributes and highlighting off the main
+   thread; iPad/Vision Pro editor measurements; the visionOS toolbar invisible to UI tests; the
+   highlighting ceiling at ~1 MB (proposed, not asked for).
+5. Open choice: Save sits beside New in File (D37's placement note); beside Close needs an item from
+   a scene whose `.saveItem` draws.
+
+### Things that will bite
+
+- Rule 34/39/60: after any `Commands` change, read the running app's menu bar through System Events.
+- Rule 59, and do not drive the Mac while the user is on it; do not quit the app under them.
+- Writer ids: `a4d0e867` Mac, `6b16e22a` phone.

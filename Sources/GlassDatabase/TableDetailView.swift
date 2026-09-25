@@ -382,6 +382,69 @@ enum GridSortDirection: String, Codable, Sendable {
     var sql: String { self == .ascending ? "ASC" : "DESC" }
 }
 
+extension View {
+    /// Holds a frozen column's cell at its pinned position while the grid scrolls sideways. Only
+    /// frozen cells carry the scroll-driven effect: on every cell it was a measured share of the
+    /// cost of building a row (tasks/2026-09/2026-09-23_grid-scroll-cost.md).
+    @ViewBuilder
+    func gridFrozen(_ isFrozen: Bool, leadingOffset: CGFloat, zIndex: Double) -> some View {
+        if isFrozen {
+            visualEffect { content, proxy in
+                content.offset(x: max(0, leadingOffset - proxy.frame(in: .scrollView(axis: .horizontal)).minX))
+            }
+            .zIndex(zIndex)
+        } else {
+            self
+        }
+    }
+
+    /// Select on a click, act on a double-click. Two tap gestures per cell (single and double)
+    /// were the largest share of building a row. On the Mac one gesture does both: the event's
+    /// click count says which click this is, and the first click of a double-click selecting is
+    /// what a Mac list does anyway — without the wait a double-tap gesture puts on every click.
+    /// Touch keeps the two gestures.
+    @ViewBuilder
+    func gridTap(select: @escaping () -> Void, open: @escaping () -> Void) -> some View {
+        #if os(macOS)
+        onTapGesture {
+            if (NSApp.currentEvent?.clickCount ?? 1) >= 2 { open() } else { select() }
+        }
+        #else
+        onTapGesture(count: 2, perform: open)
+            .onTapGesture(perform: select)
+        #endif
+    }
+}
+
+/// The rows the grid shows, in order, kept until the result, the filters or the sorts change.
+/// Every selection click re-evaluates the grid's body, and re-filtering and re-sorting a whole
+/// page per click is work the answer does not need (tasks/2026-09/2026-09-23_grid-scroll-cost.md).
+/// A reference held in `@State` and never observed: storing an answer does not re-render.
+@MainActor
+final class GridDisplayedRowsMemo {
+    struct Key: Equatable {
+        let result: UUID
+        let rowCount: Int
+        let filters: [GridColumnFilter]
+        let sorts: [GridSortDescriptor]
+        let dialect: DatabaseDialect?
+        let isAnalysis: Bool
+        let isTable: Bool
+    }
+
+    private var key: Key?
+    private var rows: [Int] = []
+    private(set) var computations = 0
+
+    func rows(for key: Key, compute: () -> [Int]) -> [Int] {
+        if key == self.key { return rows }
+        rows = compute()
+        self.key = key
+        computations += 1
+        return rows
+    }
+}
+
 struct GridSortDescriptor: Codable, Hashable, Identifiable, Sendable {
     let columnName: String
     var direction: GridSortDirection
@@ -1342,6 +1405,7 @@ struct DataTabView: View {
     /// per page.
     @State private var foreignKeysLoadedFor: String?
     @State private var sorts: [GridSortDescriptor] = []
+    @State private var displayedRowsMemo = GridDisplayedRowsMemo()
     @State private var groupColumns: [String] = []
     @State private var aggregates: [GridAggregateDescriptor] = []
     @State private var filterColumnName = ""
@@ -2827,18 +2891,28 @@ struct DataTabView: View {
         filters filterSet: [GridColumnFilter]? = nil
     ) -> [Int] {
         guard !isAnalysisActive else { return Array(result.rows.indices) }
-        let matching = GridDisplayFilterEvaluator.matchingRowIndices(
-            rows: result.rows,
-            columns: result.columns,
-            filters: filterSet ?? displayFilters,
-            dialect: session?.connection?.dialect
-        )
-        guard !isTableContext else { return matching }
-        return GridDisplaySortEvaluator.sortedRowIndices(
-            rows: result.rows,
-            columns: result.columns,
-            rowIndices: matching,
-            sorts: sorts
+        let dialect = session?.connection?.dialect
+        let compute = {
+            let matching = GridDisplayFilterEvaluator.matchingRowIndices(
+                rows: result.rows,
+                columns: result.columns,
+                filters: filterSet ?? displayFilters,
+                dialect: dialect
+            )
+            guard !isTableContext else { return matching }
+            return GridDisplaySortEvaluator.sortedRowIndices(
+                rows: result.rows,
+                columns: result.columns,
+                rowIndices: matching,
+                sorts: sorts
+            )
+        }
+        // The staged filters of the filter sheet are a preview count, not the grid: not memoized.
+        guard filterSet == nil else { return compute() }
+        return displayedRowsMemo.rows(
+            for: .init(result: result.id, rowCount: result.rows.count, filters: displayFilters, sorts: sorts, dialect: dialect,
+                       isAnalysis: false, isTable: isTableContext),
+            compute: compute
         )
     }
 
@@ -3012,8 +3086,8 @@ struct DataTabView: View {
                                         }
                                         .zIndex(3)
                                         .contentShape(Rectangle())
-                                        .onTapGesture(count: 2) { openEditor(for: rowIndex) }
-                                        .onTapGesture { selectRow(rowIndex) }
+                                        .gridTap(select: { selectRow(rowIndex) },
+                                                 open: { openEditor(for: rowIndex) })
                                         .accessibilityLabel("Row \(displayedRowNumber)")
                                         .accessibilityHint("Selects the entire row. Use Shift or Command for multiple rows. Double-click to edit.")
                                         .accessibilityAddTraits(.isButton)
@@ -3067,19 +3141,12 @@ struct DataTabView: View {
                                                     : AnyShapeStyle(Color.clear)
                                             )
                                             .background(isSelected ? AnyShapeStyle(Color.accentColor.opacity(0.22)) : AnyShapeStyle(Color.clear))
-                                            .visualEffect { content, proxy in
-                                                content.offset(
-                                                    x: isFrozen
-                                                        ? max(0, frozenLeadingOffset - proxy.frame(in: .scrollView(axis: .horizontal)).minX)
-                                                        : 0
-                                                )
-                                            }
-                                            .zIndex(isFrozen ? 2 : 0)
+                                            .gridFrozen(isFrozen, leadingOffset: frozenLeadingOffset, zIndex: 2)
                                             .accessibilityLabel("\(result.columns[colIndex].name): \(value.isNull ? "null" : value.displayString)")
                                             .accessibilityIdentifier("db-grid-cell-\(displayedRowNumber)-\(result.columns[colIndex].name)")
                                             .contentShape(Rectangle())
-                                            .onTapGesture(count: 2) { openEditor(for: rowIndex) }
-                                            .onTapGesture { selectCell(row: rowIndex, column: colIndex) }
+                                            .gridTap(select: { selectCell(row: rowIndex, column: colIndex) },
+                                                     open: { openEditor(for: rowIndex) })
                                     }
                                     if fillerWidth > 0 {
                                         Color.clear.frame(width: fillerWidth, height: rowHeight)

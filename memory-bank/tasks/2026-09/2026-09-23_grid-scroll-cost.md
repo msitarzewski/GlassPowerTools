@@ -47,3 +47,15 @@ evaluation, including a selection click.
    screen's worth of views, never 20 per row), which is what native database tools use. A
    substantial change to the most feature-dense view in the app (selection rectangles, frozen
    columns, inline edit, context menus, accessibility); iOS and visionOS would keep SwiftUI.
+
+## Option 1, partly built — 2026-09-25
+
+In the tree (uncommitted), shipped in 0.4.218 onward: the displayed-row indices memoized
+(`GridDisplayedRowsMemo`, keyed on result id, row count, filters, sorts, dialect, context; tests
+prove every key part invalidates); the scroll-driven offset only on frozen cells (`gridFrozen`); one
+tap gesture per cell on the Mac, the click count choosing select or open (`gridTap`; touch keeps two).
+Not done: one material behind the row-number column.
+
+**Observed by the user** on 0.4.223, the real `common_vision` database on oscar: *"rendered 10000 rows
+like nothing. Great job."* Not yet re-measured with `GridScrollTimingTests` (needs the Mac to itself);
+the 8.3 ms-per-frame target is unverified by numbers.

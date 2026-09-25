@@ -60,6 +60,12 @@ three source applications are obsolete and no longer compile.
 | [Charts on macOS 27.2](tasks/2026-09/2026-09-21_charts-on-macos-27-2.md) | The overview's names overlapped their bars after the OS beta moved a categorical axis label to the band's top edge; names are annotations now, found with a headless `ImageRenderer` probe (`Tools/ChartProbe`) |
 | [Duplicated services](tasks/2026-09/2026-09-21_duplicate-services.md) | Eleven oscar records on the phone, two fully configured, grouped into one row showing the union; the two-part fix, the second being the D26 migration |
 | [Active and the ⚡](tasks/2026-09/2026-09-21_active-and-the-bolt.md) | The library's fourth category and the one control in every toolbar that reaches it; the morning's switcher replaced (D33) |
+| [Disconnect in the workspace](tasks/2026-09/2026-09-22_disconnect-in-the-workspace.md) | Closing the last database workspace window ends the session; the phone keeps ⋯ Disconnect |
+| [Desktop window and login size](tasks/2026-09/2026-09-22_desktop-window-and-login-size.md) | The thumbnail window, and following a server that resizes itself after login |
+| [Viewers and Preview](tasks/2026-09/2026-09-23_viewers-and-preview.md) | D35: images and media as themselves; Markdown with Mermaid, HTML, SVG, CSV previews; the large-file fixes |
+| [Text engine research](tasks/2026-09/2026-09-23_text-engine-research.md) | The state of the art in Mac editors, measured; D36's TextKit 1 backend |
+| [The grid's scroll cost](tasks/2026-09/2026-09-23_grid-scroll-cost.md) | The database grid measured at 120 Hz; option 1 partly built |
+| [Editor: Save, ⇧⌘E, ⌘W](tasks/2026-09/2026-09-25_editor-save-and-new-window.md) | D37's shell-owned ⌘S, the Mac Save panel, a blank document on ⇧⌘E, ⌘W closing the window |
 | [September tasks](tasks/2026-09/README.md) | Monthly index |
 
 This project is `~/Software/glass/GlassPowerTools`. `../GlassEditorKit` was **absorbed on 2026-09-14**

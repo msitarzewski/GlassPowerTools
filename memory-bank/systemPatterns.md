@@ -81,3 +81,20 @@ should have produced before any of that was written. Rule 57.
 grid's, and `GlassSessionCard`. They differ in corner radius, border and how selection is shown.
 `GlassSessionCard` is the candidate to absorb the others, and the two terminal ones should adopt
 it rather than a fifth being added.
+
+## Contextual File items and Mac key owners (2026-09-25)
+
+One menu item per key, aimed by the focused window: the window publishes a focused scene value with
+the item's title and action, or nothing (the item is then disabled, never borrowed from another
+window). `MenuBarPlacementTests` holds a single-owner guard per key.
+
+| Key | Owner | What the window says |
+|---|---|---|
+| ⌘N | shell (`\.glassNewItem`) | New Host · New Terminal Window · New SQL Document · New Document |
+| ⌘S | shell (`\.glassSaveItem`, D37) | Save… / Save (editor) · Save SQL Document… (database) |
+| ⌘W | `GlassCloseCommandRouter` (registered, never declared) | editor: the document, and the window with its last document unless a project is open |
+| ⌘O / ⌥⌘O | editor's Open File… / Open Project… | runs its own panel from any window |
+| ⇧⌘O | database's Open SQL Document… | |
+| ⇧⌘E | editor's New Editor Window — opens on a blank document | |
+| ⌥⌘E | database's Explain Plan (moved from ⇧⌘E, 2026-09-25) | |
+| ⌘T | terminal (Mac workspace; visionOS platform commands) | |

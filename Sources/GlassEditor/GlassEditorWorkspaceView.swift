@@ -42,6 +42,13 @@ public struct GlassEditorWorkspaceView: View {
     @State private var isImporting = false
     @State private var isImportingProject = false
     @State private var exportingDocument: GlassEditorDocument?
+    /// The document the save panel was opened for, kept apart from `exportingDocument` because the
+    /// panel's own dismissal clears that — and when the dismissal came first, the completion found
+    /// nothing, wrote the file and never adopted it: the tab stayed "Untitled" and dirty over a file
+    /// that existed (2026-09-25, a new `.env`).
+    @State private var exportTarget: GlassEditorDocument.ID?
+    /// Counts closes called off, so the Mac window knows ⌘W's close of its last document is off.
+    @State private var closeCancellations = 0
     @State private var closeCandidate: GlassEditorDocument?
     @State private var isGoingToLine = false
     @State private var goToLineText = ""
@@ -138,12 +145,16 @@ public struct GlassEditorWorkspaceView: View {
                       document: exportingDocument.map { GlassEditorTextFile(text: $0.model.text) },
                       contentType: .plainText,
                       defaultFilename: exportingDocument?.displayName) { result in
-            if case .success(let url) = result, let document = exportingDocument {
+            if case .success(let url) = result, let id = exportTarget {
                 // `fileExporter` has already written the bytes; adopting the location is what makes
-                // the next ⌘S go to the file the user just chose rather than asking again.
-                Task { await workspace.save(document.id, to: url) }
+                // the tab take the file's name and the next ⌘S go there rather than asking again.
+                Task { await workspace.save(id, to: url) }
             }
+            exportTarget = nil
             exportingDocument = nil
+        }
+        .onChange(of: exportingDocument?.id) { _, id in
+            if let id { exportTarget = id }
         }
         .modifier(GlassEditorDialogs(workspace: workspace,
                                      closeCandidate: $closeCandidate,
@@ -152,7 +163,8 @@ public struct GlassEditorWorkspaceView: View {
                                      goToLineText: $goToLineText,
                                      settingsProject: $settingsProject,
                                      isShowingSettings: $isShowingSettings,
-                                     goToLine: goToLine))
+                                     goToLine: goToLine,
+                                     closeCancelled: { closeCancellations += 1 }))
         // ⌘N in an editor window means a new document; the shell owns the one File ▸ New item and
         // each window says what it makes (`GlassShellFileCommands`).
         .focusedSceneValue(\.glassNewItem, GlassNewItemAction(title: "New Document") {
@@ -164,20 +176,34 @@ public struct GlassEditorWorkspaceView: View {
         // anyone can read.
         .modifier(MacEditorWindowBehaviour(
             actions: editorActions,
+            saveItem: saveItem,
             canCloseDocument: workspace.selectedDocument != nil,
+            documentCount: workspace.documents.count,
+            hasProjects: !workspace.projects.isEmpty,
+            closeCancellations: closeCancellations,
             closeDocument: { if let document = workspace.selectedDocument { requestClose(document) } }))
         #endif
     }
 
     #if os(macOS)
+    /// ⌘S for the document in front. "Save…" when it has never been saved, because then a panel
+    /// asks where — and enabled for an untitled document even before it is edited, since choosing
+    /// where a new file lives is a reason to save on its own. Nothing to save is a viewer, or no
+    /// document at all.
+    private var saveItem: GlassSaveItemAction? {
+        guard let document = workspace.selectedDocument, document.viewer == nil else { return nil }
+        return GlassSaveItemAction(title: document.hasNeverBeenSaved ? "Save…" : "Save",
+                                   isEnabled: document.hasNeverBeenSaved || document.isDirty) {
+            saveSelected()
+        }
+    }
+
     /// Built here rather than inline in `body`: the whole expression is one literal with nine
     /// closures in it, and the type checker gives up on the chain it sits in.
     private var editorActions: GlassEditorActions {
         GlassEditorActions(
-            canSave: workspace.selectedDocument?.isDirty == true,
             open: { isImporting = true },
             openProject: { isImportingProject = true },
-            save: { saveSelected() },
             increaseFontSize: { workspace.preferences.increaseFontSize() },
             decreaseFontSize: { workspace.preferences.decreaseFontSize() },
             resetFontSize: { workspace.preferences.resetFontSize() },
@@ -754,8 +780,17 @@ public struct GlassEditorWorkspaceView: View {
 
     private func saveSelected() {
         guard let document = workspace.selectedDocument else { return }
-        if document.hasNeverBeenSaved { exportingDocument = document }
-        else { Task { await workspace.save(document.id) } }
+        guard document.hasNeverBeenSaved else {
+            Task { await workspace.save(document.id) }
+            return
+        }
+        #if os(macOS)
+        GlassEditorSavePanel.run(for: document) { url in
+            Task { await workspace.save(document.id, to: url) }
+        }
+        #else
+        exportingDocument = document
+        #endif
     }
 
     private func requestClose(_ document: GlassEditorDocument) {
@@ -836,6 +871,8 @@ private struct GlassEditorDialogs: ViewModifier {
     @Binding var settingsProject: GlassEditorProject?
     @Binding var isShowingSettings: Bool
     let goToLine: () -> Void
+    /// The close was called off — Cancel in the question, or in the Save panel it led to.
+    let closeCancelled: () -> Void
 
     func body(content: Content) -> some View {
         content
@@ -875,7 +912,19 @@ private struct GlassEditorDialogs: ViewModifier {
             get: { closeCandidate != nil }, set: { if !$0 { closeCandidate = nil } }),
             titleVisibility: .visible, presenting: closeCandidate) { document in
             Button("Save", role: .none) {
-            if document.hasNeverBeenSaved { exportingDocument = document }
+            if document.hasNeverBeenSaved {
+            #if os(macOS)
+            // Saved, then closed — the close is what was asked for. Cancelling the panel keeps it.
+            GlassEditorSavePanel.run(for: document) { url in
+            Task {
+            await workspace.save(document.id, to: url)
+            if !document.isDirty { workspace.close(document.id) }
+            }
+            } cancelled: { closeCancelled() }
+            #else
+            exportingDocument = document
+            #endif
+            }
             else { Task { await workspace.save(document.id); workspace.close(document.id, force: true) } }
             closeCandidate = nil
             }
@@ -883,7 +932,7 @@ private struct GlassEditorDialogs: ViewModifier {
             workspace.close(document.id, force: true)
             closeCandidate = nil
             }
-            Button("Cancel", role: .cancel) { closeCandidate = nil }
+            Button("Cancel", role: .cancel) { closeCandidate = nil; closeCancelled() }
             } message: { document in
             Text("\(document.displayName) has changes that have not been saved.")
             }
@@ -985,8 +1034,17 @@ private struct GlassEditorWindowLifecycle: ViewModifier {
 /// remembers where it was.
 private struct MacEditorWindowBehaviour: ViewModifier {
     let actions: GlassEditorActions
+    let saveItem: GlassSaveItemAction?
     let canCloseDocument: Bool
+    let documentCount: Int
+    let hasProjects: Bool
+    let closeCancellations: Int
     let closeDocument: () -> Void
+
+    @State private var windowHolder = GlassEditorWindowHolder()
+    /// Set when ⌘W is closing the window's last document, so the window goes with it once the
+    /// document has actually gone — after the unsaved-changes question, if there was one.
+    @State private var closesWindowWhenEmptied = false
 
     func body(content: Content) -> some View {
         content
@@ -996,17 +1054,73 @@ private struct MacEditorWindowBehaviour: ViewModifier {
             // Always enabled, deliberately: a registration that is present but disabled makes the
             // router *consume* Close and do nothing (it exists so a database's permanent Overview
             // tab cannot be closed by accident), which left ⌘W inert in an empty editor window.
+            //
+            // **⌘W on the last document closes the window too** (2026-09-25: *"Command w means I'm
+            // done here. Not looking for a prompt to do something else."*). It used to leave the
+            // window up on "No Document" and its three buttons. A window with a project open stays,
+            // on its tree: closing a file there is not closing the project, and ⌘W again closes it.
             .glassCloseCommandTarget(priority: .workspace, isEnabled: true) {
-                if canCloseDocument { closeDocument() } else { NSApp.keyWindow?.performClose(nil) }
+                if canCloseDocument {
+                    closesWindowWhenEmptied = documentCount == 1 && !hasProjects
+                    closeDocument()
+                } else {
+                    NSApp.keyWindow?.performClose(nil)
+                }
             }
+            .onChange(of: documentCount) { _, count in
+                guard count == 0, closesWindowWhenEmptied else { return }
+                closesWindowWhenEmptied = false
+                windowHolder.window?.performClose(nil)
+            }
+            // Cancel — in the question, or in the Save panel it led to — leaves the window. Save
+            // and Discard do not: the document goes, and the window with it.
+            .onChange(of: closeCancellations) { _, _ in closesWindowWhenEmptied = false }
             .focusedSceneValue(\.glassEditorActions, actions)
+            .focusedSceneValue(\.glassSaveItem, saveItem)
             .frame(minWidth: 820, minHeight: 520)
-            .background { GlassEditorWindowFrameMemory() }
+            .background { GlassEditorWindowFrameMemory(holder: windowHolder) }
     }
 }
 #endif
 
 #if os(macOS)
+/// The Mac's own Save panel, for a document that has never been saved.
+///
+/// Not SwiftUI's `fileExporter`: on a Mac that is an *export* panel — "Export As:", an Export
+/// button — and typed as plain text it appended `.txt`, so a new `.env` would have been
+/// `.env.txt` (2026-09-25: *"The save button said Export?"*). This is Save, it adds no extension
+/// to the name typed, and the document writes the file itself, once — the exporter wrote it and
+/// then the document wrote it again to adopt it.
+@MainActor
+enum GlassEditorSavePanel {
+    static func run(for document: GlassEditorDocument,
+                    saved: @escaping (URL) -> Void,
+                    cancelled: @escaping () -> Void = {}) {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = document.displayName
+        panel.canCreateDirectories = true
+        // No content types: the name typed is the name written, `.env` included.
+        panel.allowsOtherFileTypes = true
+        let finish: (NSApplication.ModalResponse) -> Void = { response in
+            if response == .OK, let url = panel.url { saved(url) } else { cancelled() }
+        }
+        // A sheet on the editor. `mainWindow`, not `keyWindow`: while the unsaved-changes question
+        // is going away, *it* can still be key; its parent stays main, and AppKit queues a sheet
+        // behind one that is ending.
+        if let window = NSApp.mainWindow {
+            panel.beginSheetModal(for: window, completionHandler: finish)
+        } else {
+            finish(panel.runModal())
+        }
+    }
+}
+
+/// An editor view's own window, held weakly and never observed.
+@MainActor
+final class GlassEditorWindowHolder {
+    weak var window: NSWindow?
+}
+
 /// Remembers where the editor window was and how big it was.
 ///
 /// A SwiftUI `WindowGroup` restores a window's frame through state restoration, which does not run
@@ -1018,17 +1132,24 @@ private struct MacEditorWindowBehaviour: ViewModifier {
 /// a second editor window opens the size of the last one and AppKit cascades it clear of the first.
 private struct GlassEditorWindowFrameMemory: NSViewRepresentable {
     static let autosaveName = "com.glasspowertools.editor.window"
+    /// Where this editor's own window is recorded, for closing it by name rather than whichever
+    /// window happens to be key — a dialog's sheet can still be, as it goes.
+    var holder: GlassEditorWindowHolder? = nil
 
     func makeNSView(context: Context) -> NSView {
         let view = FrameMemoryView(frame: .zero)
+        view.holder = holder
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {}
 
     final class FrameMemoryView: NSView {
+        weak var holder: GlassEditorWindowHolder?
+
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
+            holder?.window = window
             guard let window else { return }
             // Set once. Assigning the name a second time to the same window is harmless, but
             // assigning it while the window is being torn down is not worth finding out about.

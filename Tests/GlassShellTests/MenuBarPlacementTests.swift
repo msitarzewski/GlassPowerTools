@@ -120,6 +120,50 @@ struct MenuBarPlacementTests {
                 "⌘O is declared in \(files.sorted()). It opens a file; a capability's own Open belongs on a modified key.")
     }
 
+    /// ⌘S has one menu owner on a Mac: the shell's File ▸ Save, aimed by `\.glassSaveItem`.
+    ///
+    /// It was the database's Save SQL Document…, disabled in every other window, so in an editor
+    /// ⌘S beeped while the editor's own Save sat on ⌥⌘S (2026-09-25). The two other declarations
+    /// are not menu owners on a Mac: the database's item is compiled only for iPad and headset
+    /// (`#if !os(macOS)`, where the shell's item does not exist), and the SFTP editor's is a
+    /// toolbar button in its own window, which the key window answers before the menu bar.
+    @Test func commandSHasASingleMenuOwnerOnTheMac() throws {
+        var files: [String] = []
+        for file in try swiftSources() {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            guard text.contains(#"keyboardShortcut("s", modifiers: .command)"#) else { continue }
+            files.append(file.lastPathComponent)
+        }
+        #expect(files.sorted() == ["Constants.swift", "GlassShellFileCommands.swift", "SFTPRemoteEditorView.swift"],
+                "⌘S is declared in \(files.sorted()). On a Mac it belongs to the shell's File ▸ Save; a window says what it saves by publishing \\.glassSaveItem.")
+    }
+
+    /// ⇧⌘E is New Editor Window, alone. Explain Plan shared it, and read out of the running app
+    /// (2026-09-25) the Query menu's item had simply lost its key; Explain Plan moved to ⌥⌘E.
+    @Test func shiftCommandEHasASingleOwner() throws {
+        var files: [String] = []
+        for file in try swiftSources() {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            guard text.contains(#"keyboardShortcut("e", modifiers: [.command, .shift])"#) else { continue }
+            files.append(file.lastPathComponent)
+        }
+        #expect(files == ["GlassEditorScenes.swift"],
+                "⇧⌘E is declared in \(files.sorted()). It opens a new editor window; give anything else its own key.")
+    }
+
+    /// Every window with something to save says so; one that stops publishing makes ⌘S a beep.
+    @Test func eachWorkspacePublishesWhatSaveSaves() throws {
+        var publishers: Set<String> = []
+        for file in try swiftSources() {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            if text.contains(#"\.glassSaveItem"#), text.contains("GlassSaveItemAction(") {
+                publishers.insert(file.lastPathComponent)
+            }
+        }
+        #expect(publishers == ["DatabaseWorkspaceView.swift", "GlassEditorWorkspaceView.swift"],
+                "The windows publishing \\.glassSaveItem changed: \(publishers.sorted()).")
+    }
+
     /// Every window that can answer "what does New make here?" publishes the focused value. A
     /// window that stops publishing does not fail anything at runtime — ⌘N just goes grey.
     @Test func eachWorkspacePublishesWhatNewMakes() throws {

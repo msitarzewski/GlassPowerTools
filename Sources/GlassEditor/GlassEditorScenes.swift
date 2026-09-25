@@ -462,10 +462,15 @@ struct GlassEditorCommands: Commands {
 
     var body: some Commands {
         CommandGroup(after: .newItem) {
-            // A new id is a new workspace, so ⇧⌘E is an **empty** editor rather than a second view
-            // of the documents already open.
+            // A new id is a new workspace, so ⇧⌘E is a fresh editor rather than a second view of
+            // the documents already open — and it opens **on a new, empty document**, ready to
+            // type into. An editor with nothing in it asked for a second step (⌘N) before it was
+            // any use (2026-09-25: *"Shift-command-e should open a new blank text document, ready
+            // to edit"*). Opening a file or project from there is File ▸ Open, as before.
             Button("New Editor Window") {
-                openWindow(id: GlassEditorRuntime.windowID, value: UUID())
+                let id = UUID()
+                runtime.workspace(for: id).newDocument()
+                openWindow(id: GlassEditorRuntime.windowID, value: id)
             }
             .keyboardShortcut("e", modifiers: [.command, .shift])
             // **The panel first, a window only on a successful pick.**
@@ -499,11 +504,9 @@ struct GlassEditorCommands: Commands {
             }
             .disabled(runtime.preferences.recents.isEmpty)
         }
-        CommandGroup(after: .saveItem) {
-            Button("Save Document") { actions?.save() }
-                .keyboardShortcut("s", modifiers: [.command, .option])
-                .disabled(actions?.canSave != true)
-        }
+        // No Save here: ⌘S is the shell's one File ▸ Save, and an editor window publishes
+        // `\.glassSaveItem` so that there it saves the document in front. It was "Save Document"
+        // on ⌥⌘S, which left ⌘S — the key everyone presses — beeping in an editor (2026-09-25).
         CommandMenu("Text") {
             // The terminal's shape, key for key (`MacWorkspaceCommands`): ⌘+ with a hidden ⌘=
             // alternate so the unshifted key works too, and ⌘− to go back down.
@@ -559,26 +562,21 @@ private extension GlassEditorCommands {
 /// What the focused editor window can do, published so the menu bar can ask without holding a view.
 @MainActor
 public struct GlassEditorActions {
-    public let canSave: Bool
     public let open: () -> Void
     public let openProject: () -> Void
-    public let save: () -> Void
     public let increaseFontSize: () -> Void
     public let decreaseFontSize: () -> Void
     public let resetFontSize: () -> Void
     public let find: () -> Void
     public let goToLine: () -> Void
 
-    public init(canSave: Bool, open: @escaping () -> Void, openProject: @escaping () -> Void,
-                save: @escaping () -> Void,
+    public init(open: @escaping () -> Void, openProject: @escaping () -> Void,
                 increaseFontSize: @escaping () -> Void,
                 decreaseFontSize: @escaping () -> Void,
                 resetFontSize: @escaping () -> Void,
                 find: @escaping () -> Void, goToLine: @escaping () -> Void) {
-        self.canSave = canSave
         self.open = open
         self.openProject = openProject
-        self.save = save
         self.increaseFontSize = increaseFontSize
         self.decreaseFontSize = decreaseFontSize
         self.resetFontSize = resetFontSize

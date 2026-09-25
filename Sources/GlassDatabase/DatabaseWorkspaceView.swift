@@ -276,6 +276,13 @@ struct DatabaseWorkspaceView: View {
         .focusedSceneValue(\.glassNewItem, GlassNewItemAction(title: "New SQL Document") {
             openQueryDocument()
         })
+        // ⌘S, likewise: the shell's one File ▸ Save, saying what it saves here.
+        .focusedSceneValue(\.glassSaveItem, GlassSaveItemAction(
+            title: "Save SQL Document…",
+            isEnabled: sqlDocument(for: tabState.displayed)?.text.isEmpty == false
+        ) {
+            exportActiveQueryDocument()
+        })
         #endif
         // ⌘W closes the active tab, not the workspace window with every tab in it. The
         // interception that makes this possible moved to the shell on 2026-09-16

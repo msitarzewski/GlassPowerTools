@@ -619,9 +619,14 @@ struct DatabaseCommands: Commands {
             Button("Close Active Tab") { workspaceActions?.closeTab() }
                 .keyboardShortcut("w", modifiers: [.command, .shift])
                 .disabled(workspaceActions?.canCloseTab != true)
+            // On a Mac ⌘S is the shell's one File ▸ Save, and a database workspace publishes
+            // `\.glassSaveItem` so that there it *is* this item (`DatabaseWorkspaceView.swift`).
+            // A second ⌘S here made every other window's ⌘S a beep (2026-09-25).
+            #if !os(macOS)
             Button("Save SQL Document…") { workspaceActions?.saveDocument() }
                 .keyboardShortcut("s", modifiers: .command)
                 .disabled(workspaceActions?.canSave != true)
+            #endif
         }
 
         CommandMenu("Query") {
@@ -635,8 +640,10 @@ struct DatabaseCommands: Commands {
             Button("Run All Statements") { workspaceActions?.executeScript() }
                 .keyboardShortcut(.return, modifiers: [.command, .shift])
                 .disabled(workspaceActions?.canExecute != true)
+            // ⌥⌘E, not ⇧⌘E: ⇧⌘E is New Editor Window, and read out of the running app the two
+            // on one key left Explain Plan with none (2026-09-25).
             Button("Explain Plan") { workspaceActions?.explainPlan() }
-                .keyboardShortcut("e", modifiers: [.command, .shift])
+                .keyboardShortcut("e", modifiers: [.command, .option])
                 .disabled(workspaceActions?.canExecute != true || workspaceActions?.canUseQueryLibrary != true)
             Button("Cancel Query") { workspaceActions?.cancel() }
                 .keyboardShortcut(".", modifiers: .command)

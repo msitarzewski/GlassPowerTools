@@ -2,7 +2,7 @@
 //  GlassShellFileCommands.swift
 //  Glass Power Tools — GlassShell
 //
-//  File ▸ New, owned once by the shell and aimed by whatever window is focused.
+//  File ▸ New and File ▸ Save, owned once by the shell and aimed by whatever window is focused.
 //
 //  **Why the shell owns this placement.** Three merged apps each had their own File menu, and each
 //  replaced `CommandGroup(.newItem)` to get it. Two replacements are not a merge: SwiftUI keeps one
@@ -60,10 +60,44 @@ public extension FocusedValues {
     }
 }
 
+/// What ⌘S saves in the focused window — ⌘N's shape, for the same reason.
+///
+/// ⌘S was the database's "Save SQL Document…", disabled everywhere but a database workspace, while
+/// the editor's own Save sat on ⌥⌘S: an editor window answered ⌘S with the system beep, and the
+/// item that worked was in the menu under a key nobody presses (2026-09-25, saving a new `.env`).
+/// Each window publishes what Save means there; a window with nothing to save publishes nothing.
+@MainActor
+public struct GlassSaveItemAction {
+    /// The whole title: "Save…" when a panel will ask where, "Save" when it will not.
+    public let title: String
+    public let isEnabled: Bool
+    private let action: () -> Void
+
+    public init(title: String, isEnabled: Bool = true, _ action: @escaping () -> Void) {
+        self.title = title
+        self.isEnabled = isEnabled
+        self.action = action
+    }
+
+    public func callAsFunction() { action() }
+}
+
+private struct GlassSaveItemActionKey: FocusedValueKey {
+    typealias Value = GlassSaveItemAction
+}
+
+public extension FocusedValues {
+    var glassSaveItem: GlassSaveItemAction? {
+        get { self[GlassSaveItemActionKey.self] }
+        set { self[GlassSaveItemActionKey.self] = newValue }
+    }
+}
+
 #if os(macOS)
-/// The app's one File ▸ New item. Attached by the composition root to the library scene.
+/// The app's one File ▸ New item, and its one File ▸ Save. Attached by the composition root to the library scene.
 public struct GlassShellFileCommands: Commands {
     @FocusedValue(\.glassNewItem) private var newItem
+    @FocusedValue(\.glassSaveItem) private var saveItem
 
     public init() {}
 
@@ -72,6 +106,12 @@ public struct GlassShellFileCommands: Commands {
             Button(newItem?.title ?? "New") { newItem?() }
                 .keyboardShortcut("n", modifiers: .command)
                 .disabled(newItem == nil)
+            // **Here, beside New — not in the `.saveItem` placement**, which a window-based app does
+            // not draw: read out of the running app (0.4.218 replacing it, 0.4.219 appending after
+            // it), File had no Save at all either way. This group is the one known to reach the menu.
+            Button(saveItem?.title ?? "Save") { saveItem?() }
+                .keyboardShortcut("s", modifiers: .command)
+                .disabled(saveItem?.isEnabled != true)
         }
     }
 }
