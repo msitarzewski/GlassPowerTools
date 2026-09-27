@@ -578,13 +578,13 @@ final class MySQLDatabaseConnection: DatabaseConnection, @unchecked Sendable {
     }
 
     func columns(in table: String, database: String) async throws -> [ColumnInfo] {
-        let safeDB = Self.escapeLiteral(database)
-        let safeTable = Self.escapeLiteral(table)
+        // Bound, not spliced: hand-escaped literals break under NO_BACKSLASH_ESCAPES.
         let result = try await execute(
             "SELECT COLUMN_NAME, DATA_TYPE, COLUMN_TYPE, IS_NULLABLE, COLUMN_KEY, ORDINAL_POSITION, COLUMN_DEFAULT, EXTRA " +
             "FROM INFORMATION_SCHEMA.COLUMNS " +
-            "WHERE TABLE_SCHEMA = '\(safeDB)' AND TABLE_NAME = '\(safeTable)' " +
-            "ORDER BY ORDINAL_POSITION"
+            "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? " +
+            "ORDER BY ORDINAL_POSITION",
+            parameters: [.string(database), .string(table)]
         )
         return result.rows.enumerated().compactMap { index, row in
             guard row.count >= 8,
@@ -671,13 +671,12 @@ final class MySQLDatabaseConnection: DatabaseConnection, @unchecked Sendable {
     }
 
     func foreignKeys(in table: String, database: String) async throws -> [ForeignKeyInfo] {
-        let safeDB = Self.escapeLiteral(database)
-        let safeTable = Self.escapeLiteral(table)
         let result = try await execute(
             "SELECT CONSTRAINT_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME, ORDINAL_POSITION " +
             "FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE " +
-            "WHERE TABLE_SCHEMA = '\(safeDB)' AND TABLE_NAME = '\(safeTable)' AND REFERENCED_TABLE_NAME IS NOT NULL " +
-            "ORDER BY CONSTRAINT_NAME, ORDINAL_POSITION"
+            "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND REFERENCED_TABLE_NAME IS NOT NULL " +
+            "ORDER BY CONSTRAINT_NAME, ORDINAL_POSITION",
+            parameters: [.string(database), .string(table)]
         )
         return result.rows.compactMap { row in
             guard row.count >= 5,
@@ -789,14 +788,6 @@ final class MySQLDatabaseConnection: DatabaseConnection, @unchecked Sendable {
     /// Doubles any existing backticks so `db`name` becomes `db``name`.
     private static func escapeIdentifier(_ value: String) -> String {
         value.replacingOccurrences(of: "`", with: "``")
-    }
-
-    /// Escapes a string literal for use inside single quotes in SQL.
-    /// Doubles single quotes and escapes backslashes.
-    private static func escapeLiteral(_ value: String) -> String {
-        value
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "'", with: "''")
     }
 
     private func mysqlTypeName(_ type: MySQLProtocol.DataType) -> String {

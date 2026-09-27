@@ -652,6 +652,43 @@ private enum LiveDatabaseEnvironment {
         }
     }
 
+    /// Metadata lookups bind the schema and table names. They used to splice them in with hand
+    /// escaping that doubles backslashes, which is wrong under NO_BACKSLASH_ESCAPES: a name holding
+    /// a backslash then matched nothing and the table showed no columns.
+    @Test(.enabled(if: LiveDatabaseEnvironment.mysqlPassword != nil))
+    func mysqlMetadataLookupsBindNamesUnderNoBackslashEscapes() async throws {
+        let password = try #require(LiveDatabaseEnvironment.mysqlPassword)
+        let connection = try await MySQLEngine().connect(
+            host: LiveDatabaseEnvironment.host,
+            port: LiveDatabaseEnvironment.mysqlPort,
+            username: LiveDatabaseEnvironment.mysqlUser,
+            password: password,
+            database: LiveDatabaseEnvironment.mysqlScratchDatabase,
+            tlsPolicy: .disabled
+        )
+        let suffix = UUID().uuidString.prefix(8).lowercased()
+        let parent = "gpt_meta_\(suffix)_p"
+        let child = "gpt_meta_\(suffix)_it's\\odd"
+        let schema = LiveDatabaseEnvironment.mysqlScratchDatabase
+        do {
+            _ = try await connection.execute("SET SESSION sql_mode = CONCAT(@@sql_mode, ',NO_BACKSLASH_ESCAPES')")
+            _ = try await connection.execute("CREATE TABLE \(connection.quotedIdentifier(parent)) (id INT PRIMARY KEY)")
+            _ = try await connection.execute(
+                "CREATE TABLE \(connection.quotedIdentifier(child)) (id INT PRIMARY KEY, parent_id INT, " +
+                "FOREIGN KEY (parent_id) REFERENCES \(connection.quotedIdentifier(parent)) (id))")
+
+            let columns = try await connection.columns(in: child, database: schema)
+            #expect(columns.map(\.name) == ["id", "parent_id"])
+            let keys = try await connection.foreignKeys(in: child, database: schema)
+            #expect(keys.map(\.referencedTable) == [parent])
+        } catch {
+            Issue.record(error)
+        }
+        _ = try? await connection.execute("DROP TABLE IF EXISTS \(connection.quotedIdentifier(child))")
+        _ = try? await connection.execute("DROP TABLE IF EXISTS \(connection.quotedIdentifier(parent))")
+        try? await connection.close()
+    }
+
     @Test(.enabled(if: LiveDatabaseEnvironment.mysqlPassword != nil))
     func mysql8LiveRoundTrip() async throws {
         let password = try #require(LiveDatabaseEnvironment.mysqlPassword)
