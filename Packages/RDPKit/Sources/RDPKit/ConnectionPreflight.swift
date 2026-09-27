@@ -2827,14 +2827,20 @@ private func performTLSHandshake(
     }
 
     var tlsConfiguration = TLSConfiguration.makeClientConfiguration()
-    tlsConfiguration.certificateVerification = .none
-    // Trust is evaluated with Security.framework below before sending application data.
+    // BoringSSL does not decide trust here: the callback below records the chain the server
+    // presents and accepts it, and trust is evaluated with Security.framework over that whole chain
+    // (`inspectPeerCertificates`) before any application data or credential is sent. Verification
+    // is not `.none` only because NIOSSL calls a custom callback solely when it is on; the whole
+    // chain matters because a certificate issued through an intermediate authority does not
+    // validate from its leaf alone. Glass Power Tools, 2026-09-27 (GLASSDT-PATCHES.md).
+    tlsConfiguration.certificateVerification = .noHostnameVerification
     tlsConfiguration.minimumTLSVersion = .tlsv12
     // Windows RDP can issue RSA certificates without digitalSignature,
     // which BoringSSL rejects on the TLS 1.3 certificate path.
     tlsConfiguration.maximumTLSVersion = .tlsv12
 
     let tlsContext = try NIOSSLContext(configuration: tlsConfiguration)
+    let presentedChain = PresentedCertificateChain()
     let handshakePromise = channel.eventLoop.makePromise(of: Void.self)
     let handshakeHandler = TLSHandshakeCompletionHandler(promise: handshakePromise)
     try channel.pipeline.addHandler(handshakeHandler).wait()
@@ -2846,7 +2852,11 @@ private func performTLSHandshake(
     try channel.eventLoop.submit {
         let tlsHandler = try NIOSSLClientHandler(
             context: tlsContext,
-            serverHostname: sniHostname(for: host)
+            serverHostname: sniHostname(for: host),
+            customVerificationCallback: { certificates, promise in
+                presentedChain.certificates = certificates
+                promise.succeed(.certificateVerified)
+            }
         )
         try channel.pipeline.syncOperations.addHandler(tlsHandler, position: .first)
     }.wait()
@@ -2861,7 +2871,8 @@ private func performTLSHandshake(
     try handshakePromise.futureResult.wait()
 
     let peerCertificates = try channel.eventLoop.submit {
-        try channel.pipeline.syncOperations
+        if !presentedChain.certificates.isEmpty { return presentedChain.certificates }
+        return try channel.pipeline.syncOperations
             .handler(type: NIOSSLClientHandler.self)
             .peerCertificate
             .map { [$0] } ?? []
@@ -6943,6 +6954,12 @@ private func receiveApplicationTPKTSoft(
         timeoutDescription: timeoutDescription,
         softTimeout: true
     )
+}
+
+/// The certificates the server presented, leaf first, as the TLS verification callback saw them.
+/// Written and read only on the channel's event loop.
+private final class PresentedCertificateChain: @unchecked Sendable {
+    var certificates: [NIOSSLCertificate] = []
 }
 
 private func inspectPeerCertificates(

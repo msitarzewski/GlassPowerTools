@@ -84,3 +84,20 @@ This does not prove compatibility with a real Windows host, RD Gateway, Kerberos
 ## Post-frame server redirection (2026-09-08)
 
 The active RDPGFX receive loop now recognizes Server Redirection PDUs after a desktop frame and passes them through the same authenticated, certificate-bound handoff policy used during activation. LB_NOREDIRECT is ignored as informational in this loop. Replaced recursive connection hops with an iterative result loop to release the previous report/socket and avoid thread stack exhaustion at the existing maximum of two redirects. A new loopback fixture reproduces NLA→greeter frame→RDSTLS→desktop frame and rejects repeated redirects beyond the bound. Engine1011 tests pass. User-host logs demonstrate the second handoff requirement; actual post-login native desktop acceptance remains pending. No server configuration was changed.
+
+## The whole certificate chain for trust (2026-09-27)
+
+`ConnectionPreflight.swift`: the server's TLS certificate was evaluated with `SecTrust` from its leaf
+alone, because NIOSSL's `peerCertificate` returns only the leaf. A certificate issued through an
+intermediate authority therefore could not validate, and was reported as untrusted even when the
+server sent the intermediate. NIOSSL now records the chain the server presents through a custom
+verification callback that accepts it, and `SecTrust` evaluates that whole chain before any
+application data or credential is sent, exactly as it evaluated the leaf before. Trust is still
+decided by Security.framework and the host's certificate policy (system trust, or a host-and-port
+pin), not by BoringSSL; `certificateVerification` is `.noHostnameVerification` rather than `.none`
+only because NIOSSL invokes a custom callback solely when verification is on.
+
+Validation: the package suite (1015 tests), including the mock server's TLS, CredSSP and RDSTLS
+handshakes, passes. No test presents a multi-certificate chain: the result reports only the leaf's
+digest, and system trust cannot be pointed at a test root. Not yet tried against a real server
+whose certificate comes from an intermediate authority.
