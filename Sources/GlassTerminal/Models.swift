@@ -1272,7 +1272,10 @@ enum TerminalThemeAppearance: String, Codable, CaseIterable, Equatable, Sendable
 }
 
 struct TerminalTheme: Identifiable, Codable, Equatable {
-    nonisolated static let defaultID = UUID(uuidString: "B16B00B5-7E4D-4A51-9A9E-474C41535348")!
+    nonisolated static let defaultID = UUID(uuidString: "76DC53ED-1753-43D4-9E3F-2C9B0CE43CD2")!
+    /// The built-in theme's identifier until 2026-09-27, still read from saved and synced libraries
+    /// and rewritten to `defaultID` (`canonicalize()` re-identifies the built-in record). Never written.
+    nonisolated static let legacyDefaultID = UUID(uuidString: "B16B00B5-7E4D-4A51-9A9E-474C41535348")!
     nonisolated static let maximumNameLength = 128
     nonisolated static let maximumFontNameLength = 128
     nonisolated static let minimumFontSize: CGFloat = 10

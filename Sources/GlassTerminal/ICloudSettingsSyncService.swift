@@ -213,7 +213,10 @@ nonisolated struct ICloudSettingsSyncPayload: Codable, Equatable, Sendable {
             if record.origin == .builtIn, record.isDeleted {
                 throw ICloudSettingsSyncError.invalidPayload("The built-in terminal theme cannot be deleted.")
             }
-            if record.origin == .builtIn, record.id != TerminalTheme.defaultID {
+            // A device on an older build still sends the built-in theme under its former identifier;
+            // the merge re-identifies it.
+            if record.origin == .builtIn,
+               record.id != TerminalTheme.defaultID, record.id != TerminalTheme.legacyDefaultID {
                 throw ICloudSettingsSyncError.invalidPayload("The built-in terminal theme identifier is invalid.")
             }
             if !record.isDeleted {

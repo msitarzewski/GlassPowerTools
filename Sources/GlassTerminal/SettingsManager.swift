@@ -1169,11 +1169,15 @@ class SettingsManager {
                         repairedLegacyColors = true
                     }
                 }
+                // A library saved before the built-in theme's identifier changed: canonicalizing
+                // rewrites it, and saving once keeps it rewritten.
+                let hadLegacyIdentifier = library.selectedThemeID == TerminalTheme.legacyDefaultID
+                    || library.records.contains { $0.id == TerminalTheme.legacyDefaultID }
                 library.canonicalize()
                 themeLibrary = library
                 currentTheme = library.selectedTheme ?? .default
                 themeLibraryLoadError = nil
-                if repairedLegacyColors { persistThemeLibrary() }
+                if repairedLegacyColors || hadLegacyIdentifier { persistThemeLibrary() }
                 return
             } catch {
                 Logger.settings.error("Failed to load theme library: \(error)")

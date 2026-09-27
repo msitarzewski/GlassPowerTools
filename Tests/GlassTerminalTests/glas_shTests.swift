@@ -860,6 +860,57 @@ struct glas_shTests {
         #expect(persisted.selectedTheme?.id == TerminalTheme.defaultID)
     }
 
+    /// The built-in theme's identifier changed on 2026-09-27. A library saved under the old one
+    /// loads under the new one, stays selected, and is saved that way once.
+    @Test func builtInThemeLegacyIdentifierIsRewrittenAndSaved() throws {
+        let suiteName = "sh.glas.test.theme-legacy-id.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let legacyBuiltIn = TerminalTheme.default.reidentified(id: TerminalTheme.legacyDefaultID)
+        let custom = TerminalTheme.default.reidentified(id: UUID(), name: "Mine")
+        var saved = TerminalThemeLibrary.initial()
+        saved.records = [
+            TerminalThemeRecord(theme: legacyBuiltIn, origin: .builtIn, modifiedAt: .distantPast, deletedAt: nil),
+            TerminalThemeRecord(theme: custom, origin: .appleTerminal, modifiedAt: .distantPast, deletedAt: nil),
+        ]
+        saved.selectedThemeID = TerminalTheme.legacyDefaultID
+        defaults.set(try JSONEncoder().encode(saved), forKey: UserDefaultsKeys.themeLibrary)
+        let settings = SettingsManager(loadImmediately: false, settingsDefaults: defaults)
+
+        settings.loadTheme()
+
+        #expect(settings.themeLibrary.selectedThemeID == TerminalTheme.defaultID)
+        #expect(settings.currentTheme.id == TerminalTheme.defaultID)
+        #expect(Set(settings.themeLibrary.activeRecords.map(\.id)) == [TerminalTheme.defaultID, custom.id])
+        let data = try #require(defaults.data(forKey: UserDefaultsKeys.themeLibrary))
+        let persisted = try JSONDecoder().decode(TerminalThemeLibrary.self, from: data)
+        #expect(!persisted.records.contains { $0.id == TerminalTheme.legacyDefaultID }, "saved rewritten")
+        #expect(persisted.selectedThemeID == TerminalTheme.defaultID)
+    }
+
+    /// A device still on an older build syncs the built-in theme under its old identifier; that is
+    /// accepted and merged as the one built-in theme, while any other identifier stays refused.
+    @Test func syncedBuiltInThemeUnderLegacyIdentifierIsAccepted() throws {
+        let now = Date()
+        var payload = makeICloudPayload(customID: UUID(), customDeletedAt: nil, modifiedAt: now)
+        let legacy = TerminalTheme.default.reidentified(id: TerminalTheme.legacyDefaultID)
+        payload.themeRecords[0] = ICloudTerminalThemeRecord(
+            theme: makeICloudTheme(legacy), origin: .builtIn, modifiedAt: now, deletedAt: nil)
+        #expect(throws: Never.self) { try payload.validate() }
+
+        let stranger = TerminalTheme.default.reidentified(id: UUID())
+        payload.themeRecords[0] = ICloudTerminalThemeRecord(
+            theme: makeICloudTheme(stranger), origin: .builtIn, modifiedAt: now, deletedAt: nil)
+        #expect(throws: ICloudSettingsSyncError.self) { try payload.validate() }
+
+        var library = TerminalThemeLibrary.initial(at: .distantPast)
+        library.merge(TerminalThemeLibrary(
+            records: [TerminalThemeRecord(theme: legacy, origin: .builtIn, modifiedAt: now, deletedAt: nil)],
+            selectedThemeID: TerminalTheme.legacyDefaultID, selectionModifiedAt: now))
+        #expect(library.records.filter(\.isBuiltIn).map(\.id) == [TerminalTheme.defaultID])
+        #expect(library.selectedThemeID == TerminalTheme.defaultID)
+    }
+
     @Test func newerThemeLibrarySchemaIsPreservedReadOnly() throws {
         let suiteName = "sh.glas.test.theme-library-future.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
