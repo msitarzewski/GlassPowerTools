@@ -10,5 +10,9 @@
 	<string>$(GPT_ICLOUD_CONTAINER)</string>
 	<key>GlassKeychainGroupSuffix</key>
 	<string>$(GPT_KEYCHAIN_GROUP_SUFFIX)</string>
+	<key>SUFeedURL</key>
+	<string>$(GPT_SPARKLE_FEED_URL)</string>
+	<key>SUPublicEDKey</key>
+	<string>$(GPT_SPARKLE_PUBLIC_KEY)</string>
 </dict>
 </plist>

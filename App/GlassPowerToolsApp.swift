@@ -286,6 +286,11 @@ struct GlassPowerToolsApp: App {
         _desktop = State(initialValue: desktop)
         _windowRecovery = State(initialValue: windowRecovery)
         _editor = State(initialValue: editor)
+        #if os(macOS)
+        // D38: Sparkle's scheduled checks, in a build that names a feed and a signing key — and
+        // never in a UI-test run.
+        if isolatedDirectory == nil { GlassShellUpdates.shared.start() }
+        #endif
     }
 
     /// The library window. On macOS it carries glas.sh's Connections window sizing
@@ -321,7 +326,11 @@ struct GlassPowerToolsApp: App {
             // here. Attached to this scene because the shell has no scene of its own, and because
             // exactly one scope may replace a command placement — two replacements are not merged,
             // they silently delete each other (see `GlassShellFileCommands`).
-            .commands { GlassShellFileCommands() }
+            .commands {
+                GlassShellFileCommands()
+                // D38: Check for Updates…, for the build distributed outside the App Store.
+                GlassShellUpdateCommands()
+            }
         #else
         return group
         #endif

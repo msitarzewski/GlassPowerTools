@@ -1051,7 +1051,15 @@ updates itself. The user required that automatic updates be accounted for.
    CloudKit's change notifications do not reach released copies.
 4. The feed served uncached (D39).
 
-**Status.** Approved by the user 2026-09-25. Nothing built.
+**Status.** Approved 2026-09-25. **Partly implemented 2026-09-27:** Sparkle 2.10.0 linked on macOS
+only (a platform-conditioned product on `GlassShell`); `GlassShellUpdates` starts only when the build
+names `SUFeedURL` and `SUPublicEDKey` (from `Config/Identity.xcconfig`), never in a UI-test run;
+Check for Updates… in the app menu and in Settings ▸ About; the push environment is a build setting
+the release build sets to `production`; `Tools/Release/release-mac.sh` and `appcast.py` (syntax- and
+feed-checked, never run: they need the Developer ID certificate and notarization credentials).
+**Still the owner's:** generate the EdDSA key and set its public half; the Developer ID provisioning
+profile with the CloudKit container, App Group and Keychain group; sync verified on a Developer ID
+build; the feed served uncached.
 
 ## D39 — Documentation and glasspowertools.com — Approved 2026-09-25
 

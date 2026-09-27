@@ -78,6 +78,7 @@ Exact revisions are in `Package.resolved`. Each package's licence and NOTICE fil
 | postgres-nio | MIT | yes |
 | mysql-nio | MIT | — |
 | SwiftTerm | MIT | — |
+| Sparkle (macOS only, the Mac app's updater) | MIT, with the notices of the code it includes in its `LICENSE` | — |
 | BigInt | MIT | — |
 | SwiftTreeSitter | BSD-3-Clause | — |
 | tree-sitter and the six grammar dependencies | MIT | — |

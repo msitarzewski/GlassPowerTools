@@ -49,7 +49,8 @@ Apple Developer team.
 ## Security and privacy
 
 The app talks to the servers you add and to iCloud, and to nothing else unless you connect a
-Tailscale account for device discovery. There are no analytics. Secrets live in the Keychain. See
+Tailscale account for device discovery; the released Mac app will also check its update feed. There
+are no analytics. Secrets live in the Keychain. See
 [SECURITY.md](SECURITY.md) for how credentials and connections are protected — and what is not
 protected — and how to report a vulnerability.
 

@@ -26,8 +26,10 @@ this repository's `PATCHES.md` files record what is changed locally.
   credentials and host-key pins sync through iCloud Keychain. Keys created in the **Secure
   Enclave** never leave the device they were made on and are never offered to another device.
 - **Nothing is sent anywhere else.** The app connects to the servers you add, to iCloud for sync,
-  and, only if you connect a Tailscale account for device discovery, to Tailscale's API. It has no
-  analytics or telemetry. The editor's Markdown preview runs with a content security policy that
+  and, only if you connect a Tailscale account for device discovery, to Tailscale's API. The Mac app,
+  once released, also checks an update feed — Sparkle asks on its second launch whether to do so
+  automatically, and installs only updates signed with the project's key. It has no analytics or
+  telemetry. The editor's Markdown preview runs with a content security policy that
   allows no network access.
 
 ## Connections

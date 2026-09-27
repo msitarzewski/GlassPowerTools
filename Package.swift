@@ -81,6 +81,9 @@ let package = Package(
         // copyright retained), so it sits in Packages/ beside the other vendored forks rather than
         // in Sources/ with our own code. Its patch record is Packages/RDPKit/GLASSDT-PATCHES.md.
         .package(path: "Packages/RDPKit"),
+        // D38: the Mac app is distributed outside the Mac App Store, and macOS has no updater for
+        // that; Sparkle is linked on macOS only (the product condition on GlassShell below).
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.0"),
     ],
     targets: [
         // Credentials, trust storage and mobility. Absorbed from the standalone GlasSecretStore
@@ -259,6 +262,7 @@ let package = Package(
                 "GlassHostCatalog",
                 "GlasSecretStore",
                 "GlassEditorCore",
+                .product(name: "Sparkle", package: "Sparkle", condition: .when(platforms: [.macOS])),
             ],
             // Settings ▸ About ▸ Acknowledgements, from `Tools/Licenses/generate-acknowledgements.py`.
             resources: [.copy("Resources/Acknowledgements.json")]

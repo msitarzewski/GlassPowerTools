@@ -41,6 +41,8 @@
 
     {"pin": "swiftterm", "id": "swiftterm", "name": "SwiftTerm", "group": "Terminal", "license": "MIT"},
 
+    {"pin": "sparkle", "id": "sparkle", "name": "Sparkle", "group": "Updates", "license": "MIT", "note": "Updates for the Mac app (macOS only). Its LICENSE also carries the notices of the code it includes."},
+
     {"pin": "swift-markdown", "id": "swift-markdown", "name": "Swift Markdown", "group": "Editor", "license": "Apache-2.0 WITH Swift-exception"},
     {"pin": "swift-cmark", "id": "swift-cmark", "name": "cmark-gfm (swift-cmark)", "group": "Editor", "license": "BSD-2-Clause AND MIT"},
     {"id": "mermaid", "name": "Mermaid", "group": "Editor", "license": "MIT", "source": "https://github.com/mermaid-js/mermaid", "versionFile": "Sources/GlassEditor/Resources/Mermaid/VERSION", "note": "mermaid.min.js, used by the Markdown preview. It is compiled from Mermaid and the packages listed under Inside Mermaid.",

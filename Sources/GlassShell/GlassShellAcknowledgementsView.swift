@@ -38,7 +38,7 @@ enum GlassAcknowledgements {
 
     /// The order groups read in: the app's own capabilities first, what they are built on after.
     static let groupOrder = ["SSH", "Networking", "Databases", "Terminal", "Remote desktop", "Editor",
-                             "Syntax highlighting", "Artwork", "Swift libraries", "Inside Mermaid"]
+                             "Syntax highlighting", "Artwork", "Updates", "Swift libraries", "Inside Mermaid"]
 
     static func load(from bundle: Bundle = .module) throws -> [GlassAcknowledgement] {
         guard let url = bundle.url(forResource: "Acknowledgements", withExtension: "json") else {

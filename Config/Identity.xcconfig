@@ -28,6 +28,13 @@ GPT_KVSTORE_SUFFIX = sh.glas.app
 // `Tools/Release/release-mac.sh` passes on its command line (D38).
 GPT_APS_ENVIRONMENT = development
 
+// Mac updates (D38, Sparkle). The feed lists releases; each update must be signed with the EdDSA
+// private key whose public half is below. The key pair is made once with Sparkle's `generate_keys`
+// and the private half stays in the maintainer's login Keychain. Empty, the build does not update
+// itself — the right state for a fork, and for this project until the key exists.
+GPT_SPARKLE_FEED_URL = https:/$()/glasspowertools.com/appcast.xml
+GPT_SPARKLE_PUBLIC_KEY =
+
 DEVELOPMENT_TEAM = $(GPT_DEVELOPMENT_TEAM)
 
 #include? "Identity.local.xcconfig"

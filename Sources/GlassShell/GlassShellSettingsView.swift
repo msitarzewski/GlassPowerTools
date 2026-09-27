@@ -295,6 +295,10 @@ struct GlassShellAboutView: View {
             }
             .font(.callout)
             .padding(.top, 2)
+            #if os(macOS) && canImport(Sparkle)
+            GlassShellUpdateSettings()
+                .padding(.top, 4)
+            #endif
             Text("MIT · © 2026 Michael Sitarzewski")
                 .font(.caption2).foregroundStyle(.tertiary)
         }
