@@ -1,5 +1,5 @@
-// AVAudioEngine playback approach adapted from RDPKit/AudioPlayer.swift.
-// Copyright (c) 2026 Steelbrain. MIT license retained in this package's LICENSE.
+// AVAudioEngine playback approach adapted from RDPKit's example AudioPlayer.swift.
+// Copyright (c) 2026 Steelbrain. MIT licence: Packages/RDPKit/LICENSE.
 import AVFoundation
 import Foundation
 import GlassRDPTransport

@@ -251,7 +251,7 @@ static unsigned serialize(Scanner *s, char *buffer) {
     // reachable purely by opening a deeply-nested markdown file. Capping the
     // blocks copied is self-consistent with deserialize (which reads `length`),
     // so a pathological document loses deep-nesting state on an incremental
-    // reparse rather than corrupting memory. See THIRD-PARTY-LICENSES.md.
+    // reparse rather than corrupting memory. See THIRD-PARTY-NOTICES.md.
     size_t max_blocks = (TREE_SITTER_SERIALIZATION_BUFFER_SIZE - size) / sizeof(Block);
     if (blocks_count > max_blocks) {
         blocks_count = max_blocks;

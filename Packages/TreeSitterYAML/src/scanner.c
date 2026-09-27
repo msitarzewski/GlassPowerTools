@@ -185,7 +185,7 @@ static unsigned serialize(Scanner *scanner, char *buffer) {
     // 1024-1025 — two bytes past the 1024-byte buffer, reachable by opening a
     // deeply-nested YAML file. Reserving 2*int16_t stops one iteration earlier;
     // deserialize reads by `length`, so the truncation is self-consistent.
-    // See THIRD-PARTY-LICENSES.md.
+    // See THIRD-PARTY-NOTICES.md.
     for (; typ_itr != typ_end && size + 2 * sizeof(int16_t) <= TREE_SITTER_SERIALIZATION_BUFFER_SIZE; ++typ_itr, ++len_itr) {
         *(int16_t *)&buffer[size] = *typ_itr;
         size += sizeof(int16_t);

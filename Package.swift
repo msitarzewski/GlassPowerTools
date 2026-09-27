@@ -34,35 +34,26 @@ let package = Package(
     dependencies: [
         // The editor engine's own dependency, previously transitive through GlassEditorKit.
         .package(url: "https://github.com/ChimeHQ/SwiftTreeSitter.git", from: "0.9.0"),
-        // Tree-sitter grammars, pinned to the exact commits GlassEditorKit had vendored and
-        // verified (its THIRD-PARTY-LICENSES.md, 2026-08-11). Taken as dependencies rather than
-        // carried: the seven vendored copies were 55 MB of generated C, all MIT, and every one of
-        // these repositories ships an SPM manifest at the pinned commit. Revisions, not ranges, so
-        // the grammar cannot move under us.
+        // Tree-sitter grammars. Every one is fixed to an exact upstream commit, so a grammar cannot
+        // move under us; THIRD-PARTY-NOTICES.md lists them all. Seven are dependencies, because
+        // their own manifests build them correctly (JSON, Bash, TOML, HTML, Go, C, and the
+        // `tree-sitter` runtime through SwiftTreeSitter). The rest are vendored in `Packages/`,
+        // each for a stated reason at its target below: upstream's manifest drops the external
+        // scanner (YAML, Python, JavaScript, Rust, PHP), upstream publishes no generated parser
+        // (Swift), a scanner carries a security fix (Markdown, SQL, YAML), or a header moved (XML).
         .package(url: "https://github.com/tree-sitter/tree-sitter-json",
                  revision: "001c28d7a29832b06b0e831ec77845553c89b56d"),
         .package(url: "https://github.com/tree-sitter/tree-sitter-bash",
                  revision: "a06c2e4415e9bc0346c6b86d401879ffb44058f7"),
         .package(url: "https://github.com/tree-sitter-grammars/tree-sitter-toml",
                  revision: "64b56832c2cffe41758f28e05c756a3a98d16f41"),
-        // 2026-09-19: HTML, asked for while editing files on a server. A dependency rather than a
-        // vendored copy — upstream ships an SPM manifest that compiles both `parser.c` and
-        // `scanner.c` unconditionally, which is the thing YAML's manifest gets wrong.
         .package(url: "https://github.com/tree-sitter/tree-sitter-html",
                  revision: "73a3947324f6efddf9e17c0ea58d454843590cc0"),
-        // 2026-09-16: the languages people actually keep on the machines this app connects to.
-        //
-        // **Swift is deliberately absent.** `alex-pinkus/tree-sitter-swift` ships no generated
-        // `parser.c` at its tags — consuming it means running `tree-sitter generate`, and the
-        // result measured here is a **20.6 MB** C file. Vendoring that for one language is the
-        // exact weight this project shed when it stopped carrying 55 MB of generated grammars, and
-        // Swift is the one language its user edits in Xcode rather than over SSH. Revisit if
-        // upstream publishes a release artifact with the parser in it.
-        // The editor could highlight a compose file and a schema and not one line of Swift, Python,
-        // Go, Rust, C or TypeScript — which is most of what is on oscar and juliet. Resolved from
-        // tags first and then pinned to the exact commits below, so a grammar cannot move under us.
-        .package(url: "https://github.com/tree-sitter/tree-sitter-go", from: "0.21.0"),
-        .package(url: "https://github.com/tree-sitter/tree-sitter-c", from: "0.21.0"),
+        // v0.25.0 and v0.24.2 — commits, like the others, rather than version ranges.
+        .package(url: "https://github.com/tree-sitter/tree-sitter-go",
+                 revision: "1547678a9da59885853f5f5cc8a99cc203fa2e2c"),
+        .package(url: "https://github.com/tree-sitter/tree-sitter-c",
+                 revision: "b780e47fc780ddc8da13afa35a3f4ed5c157823d"),
         // The SSH stack: Citadel and its fork of swift-nio-ssh, vendored at recorded upstream
         // commits with a documented set of local changes (each package's PATCHES.md).
         .package(path: "Packages/Citadel"),
@@ -132,8 +123,9 @@ let package = Package(
         // path, resolved against the manifest process's working directory rather than the package
         // root. True when you clone and build it in place; false when you are a dependency, so the
         // scanner is silently dropped and every `tree_sitter_yaml_external_scanner_*` symbol goes
-        // undefined at link time. Vendored at the same pinned commit instead, with its MIT licence,
-        // and in `Packages/` because it is not our code.
+        // undefined at link time. Vendored at its recorded commit instead, with its MIT licence,
+        // and in `Packages/` because it is not our code. Its `scanner.c` also carries a bounds fix
+        // (pen finding H-2, guarded by `ScannerOverflowPenTests`); `parser.c` is upstream's.
         // Vendored, not pinned, because upstream's block scanner has an unbounded `memcpy` in
         // `serialize()`: with more than 254 open blocks it overruns the fixed 1024-byte
         // serialization buffer — an assert in debug, heap corruption in release, reachable purely
@@ -142,7 +134,7 @@ let package = Package(
         // `ScannerOverflowPenTests` has been aborting ever since. `parser.c` is the pinned
         // revision byte for byte; only `scanner.c` differs, and it says where and why.
         //
-        // The inline grammar stays a pinned dependency: its scanner is unpatched and identical.
+        // The inline grammar is vendored beside it from the same commit, unmodified.
         .target(
             name: "TreeSitterMarkdown",
             path: "Packages/TreeSitterMarkdown",
@@ -264,7 +256,9 @@ let package = Package(
                 "GlassHostCatalog",
                 "GlasSecretStore",
                 "GlassEditorCore",
-            ]
+            ],
+            // Settings ▸ About ▸ Acknowledgements, from `Tools/Licenses/generate-acknowledgements.py`.
+            resources: [.copy("Resources/Acknowledgements.json")]
         ),
         // The SSH engine: no UI, no shell dependency. Consumed by the terminal, database,
         // desktop and editor capabilities through its public API.

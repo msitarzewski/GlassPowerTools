@@ -14,12 +14,11 @@ import TreeSitterYAML
 
 /// Proves every grammar links, parses, and has a highlight query that compiles against it.
 ///
-/// The grammars were vendored into `Sources/TreeSitter*` while this was a standalone package; on
-/// absorption (2026-09-14) they became dependencies pinned to the same commits, because all seven
-/// ship SPM manifests and the vendored copies were 55 MB of generated C. This test is what makes
-/// that safe: it is the build-level check that a pinned grammar still links and parses, and it
-/// would fail loudly if a pin were ever moved to a range and drifted. The licence half is in the
-/// root THIRD-PARTY-NOTICES.md.
+/// Each grammar is fixed to an exact upstream commit — some as pinned dependencies, the rest
+/// vendored in `Packages/` (THIRD-PARTY-NOTICES.md says which and why). This suite checks the
+/// original seven directly against the C symbols; `GrammarCoverageTests` and `GrammarModuleTests`
+/// run every language, so a pin that moved or a vendored copy that broke fails in tests rather
+/// than in the editor.
 @Suite("Vendored tree-sitter grammars")
 struct GrammarVendorTests {
 

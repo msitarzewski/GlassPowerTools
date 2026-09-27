@@ -262,6 +262,7 @@ public struct GlassShellSettingsView: View {
 /// help pages are added when they do.
 struct GlassShellAboutView: View {
     private static let sponsor = URL(string: "https://github.com/sponsors/msitarzewski")!
+    @State private var showsAcknowledgements = false
 
     var body: some View {
         VStack(spacing: 10) {
@@ -282,8 +283,15 @@ struct GlassShellAboutView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 // A couple of balanced lines rather than one running the full width.
                 .frame(maxWidth: 380)
-            Link(destination: Self.sponsor) {
-                Label("Sponsor", systemImage: "heart.fill")
+            HStack(spacing: 18) {
+                Link(destination: Self.sponsor) {
+                    Label("Sponsor", systemImage: "heart.fill")
+                }
+                // Drawn like the link beside it; `.link` exists only on macOS.
+                Button("Acknowledgements") { showsAcknowledgements = true }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.tint)
+                    .accessibilityIdentifier("settings-about-acknowledgements")
             }
             .font(.callout)
             .padding(.top, 2)
@@ -293,5 +301,6 @@ struct GlassShellAboutView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 28)
         .padding(.horizontal)
+        .sheet(isPresented: $showsAcknowledgements) { GlassShellAcknowledgementsView() }
     }
 }

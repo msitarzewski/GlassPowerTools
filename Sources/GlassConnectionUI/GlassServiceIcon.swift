@@ -29,7 +29,8 @@ public struct GlassServiceIcon: View {
 }
 
 /// Heroicons v2 `optimized/24/outline/circle-stack.svg`, from Tailwind Labs, MIT licensed.
-/// The original file and its licence are vendored at `Vendor/heroicons/`; the commands below are
+/// Its licence is at `Documentation/ThirdPartyLicenses/heroicons/` and in the app's
+/// acknowledgements (tailwindlabs/heroicons v2.2.0). The commands below are
 /// that file's single `d` attribute translated one-for-one into `Path`, keeping its 24×24
 /// viewport, 1.5 stroke width and round caps and joins. Do not "simplify" it: it should stay
 /// comparable to upstream.

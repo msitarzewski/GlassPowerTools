@@ -220,8 +220,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/tree-sitter/tree-sitter-c",
       "state" : {
-        "revision" : "b780e47fc780ddc8da13afa35a3f4ed5c157823d",
-        "version" : "0.24.2"
+        "revision" : "b780e47fc780ddc8da13afa35a3f4ed5c157823d"
       }
     },
     {
@@ -229,8 +228,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/tree-sitter/tree-sitter-go",
       "state" : {
-        "revision" : "1547678a9da59885853f5f5cc8a99cc203fa2e2c",
-        "version" : "0.25.0"
+        "revision" : "1547678a9da59885853f5f5cc8a99cc203fa2e2c"
       }
     },
     {
