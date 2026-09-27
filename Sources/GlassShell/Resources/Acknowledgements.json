@@ -107,7 +107,7 @@
    "id": "swift-asn1",
    "license": "Apache-2.0",
    "name": "Swift ASN.1",
-   "revision": "d9a5b37470adc940d22c3bcd5ca6953a516b727f",
+   "revision": "3b6410f7dee09eb33cdd26260c5fd47fda19b0e2",
    "source": "https://github.com/apple/swift-asn1",
    "texts": [
     {
@@ -119,7 +119,7 @@
      "title": "NOTICE.txt"
     }
    ],
-   "version": "1.7.2"
+   "version": "1.7.3"
   },
   {
    "group": "Networking",
@@ -127,7 +127,7 @@
    "license": "Apache-2.0",
    "name": "SwiftNIO",
    "note": "Contains llhttp; see llhttp.",
-   "revision": "a931f2c1de8dd49381ce3bf2e279d033f68d8865",
+   "revision": "21de5f08c1a166a6dd293d0e587ad977bf8dac5d",
    "source": "https://github.com/apple/swift-nio",
    "texts": [
     {
@@ -139,7 +139,7 @@
      "title": "NOTICE.txt"
     }
    ],
-   "version": "2.102.0"
+   "version": "2.103.0"
   },
   {
    "group": "Networking",
@@ -147,7 +147,7 @@
    "license": "Apache-2.0",
    "name": "SwiftNIO SSL",
    "note": "Contains BoringSSL; see BoringSSL.",
-   "revision": "03827c1a9fdb2b6b00a4e93ede8861520263af8c",
+   "revision": "322f3c2a4a21df31c84ca416bf65ee5e9059e440",
    "source": "https://github.com/apple/swift-nio-ssl",
    "texts": [
     {
@@ -159,7 +159,7 @@
      "title": "NOTICE.txt"
     }
    ],
-   "version": "2.37.4"
+   "version": "2.37.5"
   },
   {
    "group": "Networking",
@@ -310,7 +310,7 @@
    "id": "swift-async-algorithms",
    "license": "Apache-2.0 WITH Swift-exception",
    "name": "Swift Async Algorithms",
-   "revision": "3da39bbc4e687d4192af7c9cf4eab805745a0b9c",
+   "revision": "789dcf1f3d3f00251482f40a432ab7144c181987",
    "source": "https://github.com/apple/swift-async-algorithms",
    "texts": [
     {
@@ -318,7 +318,7 @@
      "title": "LICENSE.txt"
     }
    ],
-   "version": "1.1.5"
+   "version": "1.1.6"
   },
   {
    "group": "Swift libraries",
@@ -340,7 +340,7 @@
    "id": "swift-collections",
    "license": "Apache-2.0 WITH Swift-exception",
    "name": "Swift Collections",
-   "revision": "a0cb0954ecb21e4e31b0070e6ed5674e8556685a",
+   "revision": "98ef3c98609a1e31b7e157b5b619579001a789d6",
    "source": "https://github.com/apple/swift-collections",
    "texts": [
     {
@@ -348,7 +348,7 @@
      "title": "LICENSE.txt"
     }
    ],
-   "version": "1.6.0"
+   "version": "1.7.1"
   },
   {
    "group": "Swift libraries",
