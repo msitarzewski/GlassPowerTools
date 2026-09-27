@@ -10,3 +10,6 @@ xcuserdata/
 
 # Private working notes: readable by any local tool, never committed (projectRules rule 61).
 .private/
+
+# A fork's signing identity (see Config/Identity.xcconfig).
+Config/Identity.local.xcconfig

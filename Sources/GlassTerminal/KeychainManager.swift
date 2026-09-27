@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import GlassLayers
 import GlasSecretStore
 import os
 
@@ -323,7 +324,7 @@ enum KeychainManager {
         guard components.count == 2,
               components[0].count == 10,
               components[0].allSatisfy({ $0.isASCII && ($0.isUppercase || $0.isNumber) }),
-              components[1] == "sh.glas.shared" else {
+              components[1] == GlassAppIdentity.keychainGroupSuffix else {
             return nil
         }
         return value

@@ -26,3 +26,26 @@ public enum GlassProduct {
         return candidate
     }
 }
+
+/// Where this build keeps what its processes and devices share: the App Group, the CloudKit
+/// container and the keychain access group.
+///
+/// Set once, in `Config/Identity.xcconfig`, and read here from the bundle's Info.plist, so a fork
+/// signing under another team changes one file instead of six. The literals are this project's own
+/// values, used where there is no app bundle to read (tests, previews, packages built alone).
+/// These name stored things: changing them on an existing install orphans what they point at.
+public enum GlassAppIdentity {
+    /// The App Group whose container and defaults suite the app and its widget share.
+    public nonisolated static let appGroup = infoValue("GlassAppGroup") ?? "group.sh.glas.shared"
+    /// The CloudKit container the host catalog syncs through.
+    public nonisolated static let cloudKitContainer = infoValue("GlassCloudKitContainer") ?? "iCloud.com.glasspowertools"
+    /// The keychain access group without its team prefix (`TEAMID.` + this).
+    public nonisolated static let keychainGroupSuffix = infoValue("GlassKeychainGroupSuffix") ?? "sh.glas.shared"
+
+    /// A value from Info.plist, unless it is empty or an unexpanded build setting.
+    nonisolated static func infoValue(_ key: String, in bundle: Bundle = .main) -> String? {
+        guard let value = bundle.object(forInfoDictionaryKey: key) as? String else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty || trimmed.contains("$(") ? nil : trimmed
+    }
+}

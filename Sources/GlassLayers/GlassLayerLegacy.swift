@@ -46,7 +46,7 @@ enum GlassLayerLegacy {
     /// Bundle identifiers whose standard domains are read best-effort on macOS. Under App Sandbox
     /// these reads come back empty; the App Group suite is the only guaranteed shared store.
     static let legacyBundleIdentifiers = ["sh.glas.app", "app.glassdb", "app.glassdt"]
-    static let appGroupSuite = "group.sh.glas.shared"
+    static let appGroupSuite = GlassAppIdentity.appGroup
 
     static func migrate(from suites: [UserDefaults]) -> (GlassLayerState, GlassLayerMigrationSource) {
         for suite in suites {

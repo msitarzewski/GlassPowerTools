@@ -22,6 +22,7 @@
 //
 
 import Foundation
+import GlassLayers
 import GlassConnectionKit
 import os
 
@@ -30,7 +31,7 @@ import CloudKit
 
 /// The user's private CloudKit database, as the catalog sync sees it.
 public struct GlassCloudKitCatalogBackend: GlassCatalogSyncBackend {
-    public static let containerIdentifier = "iCloud.com.glasspowertools"
+    public static let containerIdentifier = GlassAppIdentity.cloudKitContainer
     static let recordType = "Host"
     /// The encoded `HostProfile`.
     static let payloadKey = "profile"

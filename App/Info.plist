@@ -3,7 +3,13 @@
 <plist version="1.0">
 <dict>
 	<key>GlasKeychainAccessGroup</key>
-	<string>$(AppIdentifierPrefix)sh.glas.shared</string>
+	<string>$(AppIdentifierPrefix)$(GPT_KEYCHAIN_GROUP_SUFFIX)</string>
+	<key>GlassAppGroup</key>
+	<string>$(GPT_APP_GROUP)</string>
+	<key>GlassCloudKitContainer</key>
+	<string>$(GPT_ICLOUD_CONTAINER)</string>
+	<key>GlassKeychainGroupSuffix</key>
+	<string>$(GPT_KEYCHAIN_GROUP_SUFFIX)</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Authenticate to use a hardware-protected SSH key.</string>
 	<key>NSLocalNetworkUsageDescription</key>

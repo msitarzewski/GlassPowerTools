@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import GlassLayers
 
 nonisolated enum UserDefaultsKeys {
     /// **No longer the production store (D26).** Saved servers live on their service links in the
@@ -59,7 +60,7 @@ nonisolated enum UserDefaultsKeys {
 }
 
 nonisolated enum SharedDefaults {
-    static let suiteName = "group.sh.glas.shared"
+    static let suiteName = GlassAppIdentity.appGroup
 
     /// A per-run defaults suite while a UI test is driving the app, so a test never writes into
     /// the user's real store.

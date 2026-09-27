@@ -63,7 +63,10 @@ struct ServerHealthTimelineProvider: TimelineProvider {
     }
 
     private func loadServers() -> [WidgetServerInfo] {
-        guard let defaults = UserDefaults(suiteName: "group.sh.glas.shared"),
+        // The App Group from `Config/Identity.xcconfig`, through this extension's Info.plist.
+        let group = (Bundle.main.object(forInfoDictionaryKey: "GlassAppGroup") as? String)
+            .flatMap { $0.isEmpty || $0.contains("$(") ? nil : $0 } ?? "group.sh.glas.shared"
+        guard let defaults = UserDefaults(suiteName: group),
               let data = defaults.data(forKey: "servers") else {
             return []
         }
@@ -138,7 +141,8 @@ struct ServerHealthSmallView: View {
                     .foregroundStyle(.secondary)
             }
             .padding()
-            .widgetURL(URL(string: "glassh://connect?serverID=\(server.id.uuidString)")!)
+            // No per-server link: the app handles no URLs, and `glassh://` belonged to the old
+            // terminal app, so the link did nothing. A tap opens the app.
         } else {
             ContentUnavailableView("No Servers", systemImage: "server.rack")
         }
@@ -154,7 +158,7 @@ struct ServerHealthMediumView: View {
         } else {
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(entry.servers.prefix(3)) { server in
-                    Link(destination: URL(string: "glassh://connect?serverID=\(server.id.uuidString)")!) {
+                    Group {
                         HStack(spacing: 8) {
                             Circle()
                                 .fill(server.color)
@@ -176,9 +180,6 @@ struct ServerHealthMediumView: View {
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
 
-                            Image(systemName: "arrow.right.circle")
-                                .font(.caption)
-                                .foregroundStyle(.blue)
                         }
                         .padding(.vertical, 4)
                     }

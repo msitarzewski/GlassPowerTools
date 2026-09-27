@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import GlassLayers
 import GlasSecretStore
 import GlassDBKit
 import LocalAuthentication
@@ -196,16 +197,12 @@ enum KeychainManager {
     #endif
 
     private static var resolvedAccessGroup: String? {
-        #if os(visionOS)
-        // The Vision Pro target uses Xcode's generated plist; its provisioning
-        // profile and entitlement are fixed to the shared Glass team group.
-        return "7JQGQ7CRH8.sh.glas.shared"
-        #else
+        // Every platform, Vision Pro included, builds from an Info.plist that carries the group
+        // (`Config/Identity.xcconfig`).
         guard let rawValue = Bundle.main.object(
             forInfoDictionaryKey: accessGroupInfoKey
         ) as? String else { return nil }
         return validatedSharedAccessGroup(rawValue)
-        #endif
     }
 
     static var sharedCredentialAccessAvailable: Bool {
@@ -220,7 +217,7 @@ enum KeychainManager {
         guard components.count == 2,
               components[0].count == 10,
               components[0].allSatisfy({ $0.isASCII && ($0.isUppercase || $0.isNumber) }),
-              components[1] == "sh.glas.shared" else {
+              components[1] == GlassAppIdentity.keychainGroupSuffix else {
             return nil
         }
         return value
