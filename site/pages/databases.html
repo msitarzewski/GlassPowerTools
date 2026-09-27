@@ -1,0 +1,108 @@
+<!--
+title: Databases — Glass Power Tools
+description: MySQL, PostgreSQL and SQLite: browse, filter and edit rows with a review before every write, run and explain SQL, over TLS or SSH.
+-->
+<main class="page" id="content">
+
+<section class="hero">
+  <h1>Databases</h1>
+  <p class="lede">MySQL, PostgreSQL and SQLite, on the same machines as your terminals. Every change is shown to you before it is written.</p>
+  <div class="cta">
+    <a class="button primary" href="help/database-add-service.html">Add a database</a>
+    <a class="button" href="index.html">Back to the overview</a>
+  </div>
+  <p class="status-note">Not released yet. Tested against MySQL 8.4 and PostgreSQL 18 on one disposable test server (checked 2026-09-27).</p>
+</section>
+
+<section class="band">
+  <h2>What it does</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Browse</h3>
+      <p>Databases, schemas, tables and views. Sort, filter and page rows. Freeze and hide columns. Follow a foreign key to the row it points at.</p>
+    </div>
+    <div class="card">
+      <h3>Edit, with a review</h3>
+      <p>Edit, add, delete and paste rows. Change columns, indexes and foreign keys. Nothing is written until you read the change and choose Commit.</p>
+    </div>
+    <div class="card">
+      <h3>Write SQL</h3>
+      <p>Run a statement, a selection or a whole script. Explain Plan without running it. Cancel, format, and save <code>.sql</code> files.</p>
+    </div>
+    <div class="card">
+      <h3>Read-only services</h3>
+      <p>Mark a service read-only, and the connection itself refuses any statement it cannot classify as a read, before it is sent.</p>
+    </div>
+    <div class="card">
+      <h3>Analyze and export</h3>
+      <p>Group and aggregate through a bounded server query. Export rows as CSV, JSON or SQL.</p>
+    </div>
+    <div class="card">
+      <h3>A record of changes</h3>
+      <p>The Mutation Log lists row and schema changes with their outcome. It never records row values.</p>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <h2>How the connection is protected</h2>
+  <div class="two">
+    <div>
+      <h3>TLS</h3>
+      <p>TLS 1.2 or later. Verify against the certificate authorities your device trusts, or against a certificate you supply. If the server fails the check, the connection fails. The app never retries with a weaker mode.</p>
+      <p>A direct connection without encryption is allowed, for a database on the same machine or a network you trust. The setup sheet warns you when you choose it.</p>
+    </div>
+    <div>
+      <h3>Through the host's SSH</h3>
+      <p>Many database servers accept connections only from their own machine. The tunnel reaches them through the host's Terminal service, with the same sign-in and the same host-key trust.</p>
+      <h3>Query history</h3>
+      <p>Before a statement is stored in history, strings and numbers are replaced with <code>?</code>. The SQL sent to the database is not changed.</p>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <h2>The on-device assistant</h2>
+  <p>Where Apple Intelligence is available, a model on your device can draft a query, suggest a fix for an error, and title a SQL tab. Nothing is sent to a server.</p>
+  <p>The sheet shows what the model is given. For a query, that is the database name and one table's column names and types, and no row values. The app's own classifier, not the model, decides whether SQL is a read, a change or destructive. Inserting a query never runs it. The model can be wrong, so treat what it writes as a draft.</p>
+  <p><a href="help/database-on-device-assistant.html">Exactly what each feature is given →</a></p>
+</section>
+
+<section class="band">
+  <h2>On each device</h2>
+  <p class="intro">Written from the app's code. The Vision Pro has not yet run the current build; it was last checked on an earlier one (2026-09-27).</p>
+  <ul class="list">
+    <li><strong>Vision Pro:</strong> the workspace is its own window, which you can place anywhere. Closing it ends the session.</li>
+    <li><strong>Mac:</strong> a window per workspace, a Query menu, keyboard shortcuts and a command palette.</li>
+    <li><strong>iPad:</strong> a window per workspace. Closing the last window on a session ends it.</li>
+    <li><strong>iPhone:</strong> the workspace takes the screen, one level at a time: database, table, rows.</li>
+  </ul>
+</section>
+
+<section class="band">
+  <h2>What it does not do yet</h2>
+  <ul class="list">
+    <li>Three engines: MySQL, PostgreSQL and SQLite. No others.</li>
+    <li>Editing, deleting and pasting rows need a primary key.</li>
+    <li>A single <code>SELECT</code> loads at most 1,000 rows into the results.</li>
+    <li>A pasted range updates rows already loaded. It does not add rows.</li>
+    <li>PostgreSQL has no <code>CREATE TABLE</code> (DDL) view. SQLite tables cannot add or drop foreign keys from the app.</li>
+    <li>A SQLite file is used as a private copy on this device. To see a newer original, choose the file again.</li>
+    <li>On a phone, a workspace's tabs do not survive leaving and coming back. The session and SQL drafts do.</li>
+  </ul>
+</section>
+
+<section class="band">
+  <h2>In the help</h2>
+  <div class="grid">
+    <a class="card" href="help/database-add-service.html"><h3>Add a database</h3><p>Engines, fields and the read-only option.</p></a>
+    <a class="card" href="help/database-encryption-and-tunnel.html"><h3>Encryption and the tunnel</h3><p>TLS modes, the unencrypted warning, and SSH.</p></a>
+    <a class="card" href="help/database-workspace.html"><h3>The workspace</h3><p>Schema browser, overview, Mutation Log, reconnecting.</p></a>
+    <a class="card" href="help/database-data-grid.html"><h3>Browse table data</h3><p>Sort, filter, page, analyze, follow keys, export.</p></a>
+    <a class="card" href="help/database-edit-rows.html"><h3>Edit rows and structure</h3><p>Every change reviewed before it is written.</p></a>
+    <a class="card" href="help/database-sql-editor.html"><h3>Write and run SQL</h3><p>Run, explain, cancel, history, saved queries.</p></a>
+    <a class="card" href="help/database-on-device-assistant.html"><h3>The on-device assistant</h3><p>What it does, and what it is given.</p></a>
+  </div>
+</section>
+
+</main>

@@ -1,0 +1,68 @@
+<!--
+title: Why one app — Glass Power Tools
+description: One library of your machines instead of one app per protocol: how the host model works, why Vision Pro leads, and what the app is not.
+-->
+<main class="page" id="content">
+
+<section class="hero">
+  <h1>One library of machines, not one app per protocol.</h1>
+  <p class="lede">This page explains how Glass Power Tools is put together, and why. It also says what the app is not. It is written so you can weigh it for yourself.</p>
+</section>
+
+<section class="band">
+  <h2>The usual arrangement</h2>
+  <p>A machine you work on often has several ways in: a shell, a database, a desktop, files to edit. Each of those has its own protocol, and each protocol grew its own kind of app.</p>
+  <p>So a common setup is one app per protocol. Each keeps its own list of the same machines, its own settings, and its own idea of where you are. When a machine's address changes, you change it in each app.</p>
+  <p>Nobody planned it that way. The protocols came at different times, from different people, and the tools followed them. It works, and many people are well served by it.</p>
+</section>
+
+<section class="band">
+  <h2>What a host is here</h2>
+  <p class="intro">Glass Power Tools starts from the machine instead of the protocol.</p>
+  <div class="grid">
+    <div class="card">
+      <h3>The address lives on the host</h3>
+      <p>You enter it once. Its Terminal, Database and Desktop services all use it. Change it, and every service follows.</p>
+    </div>
+    <div class="card">
+      <h3>Services list the ways in</h3>
+      <p>A host shows each service it has. With one service, Connect opens it. With several, a split button opens all of them, or the one you choose.</p>
+    </div>
+    <div class="card">
+      <h3>Trust is set up once</h3>
+      <p>When you trust a machine's SSH host key, anything else that reaches it over SSH uses that trust. A database tunnel does not ask again.</p>
+    </div>
+    <div class="card">
+      <h3>One place for sessions</h3>
+      <p>Active lists every open terminal, database, desktop and editor window, grouped by host. The ⚡ button reaches it from any session.</p>
+    </div>
+  </div>
+  <p>The same library holds favorites, collections, other names for a machine, and search. It syncs to your other devices through iCloud. <a href="help/library-add-host.html">Add a machine and its services</a> shows how it works in practice.</p>
+</section>
+
+<section class="band">
+  <h2>Why Vision Pro leads</h2>
+  <p>The project began as an SSH client for Apple Vision Pro. On the headset, a session is a window you place in the room, not a tab in one window. That makes the host model worth having. You can open a server's terminal, its database and its desktop, and put them side by side.</p>
+  <p>These are normal visionOS windows. You can resize them and see through them. A remote desktop can drop its background, so a remote window can float over your space. <a href="help/desktop-vision-pro.html">Remote desktops on Apple Vision Pro</a> describes the controls.</p>
+  <p>The Mac, iPad and iPhone apps are the same app, adapted to each device. Some things exist in one place only. The local shell is Mac only. The iPhone gives each session the full screen.</p>
+</section>
+
+<section class="band">
+  <h2>What it is not</h2>
+  <ul class="list">
+    <li><strong>Not released.</strong> There is no download or TestFlight build today. You can build it from source.</li>
+    <li><strong>Not a service.</strong> No server of ours sits between you and your machines. The app talks to your servers, to iCloud for sync, and to Tailscale only if you connect it.</li>
+    <li><strong>Not on every platform.</strong> Apple Vision Pro, Mac, iPad and iPhone only. There is no Windows, Linux or Android version.</li>
+    <li><strong>Not certified.</strong> The RDP engine is an independent implementation. Microsoft has not certified it. It has been tested against one Linux RDP server (GNOME Remote Desktop); Windows has not yet been verified.</li>
+    <li><strong>Not every protocol.</strong> SSH and SFTP, MySQL, PostgreSQL and SQLite, RDP and VNC. Each product page lists what it does not do yet.</li>
+    <li><strong>Not needed by everyone.</strong> If you reach one machine one way, a single-purpose app may serve you just as well. The case for one library grows with the number of machines and ways in.</li>
+  </ul>
+</section>
+
+<section class="band">
+  <h2>You decide</h2>
+  <p>The claims on this site were checked against the app's code and its test records on 2026-09-27. They are written so you can check them too. <a href="help/index.html">The help</a> describes what the app actually does, on each device. <a href="security.html">Security</a> describes what it protects and what it does not.</p>
+  <p>Whether one library of machines is better for you than one app per protocol is a question only your own work can answer.</p>
+</section>
+
+</main>

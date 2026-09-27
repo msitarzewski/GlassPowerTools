@@ -1,0 +1,101 @@
+<!--
+title: Terminal — Glass Power Tools
+description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, workgroups, port forwarding and SFTP. A local shell on the Mac.
+-->
+<main class="page" id="content">
+
+<section class="hero">
+  <h1>Terminal</h1>
+  <p class="lede">SSH to the machines in your library, with their files a click away. On the Mac, a local shell too.</p>
+  <div class="cta">
+    <a class="button primary" href="help/terminal-connect.html">Connect over SSH</a>
+    <a class="button" href="index.html">Back to the overview</a>
+  </div>
+  <p class="status-note">Not released yet. Tested against OpenSSH 10.2 for shell, SFTP, and RSA and Ed25519 sign-in.</p>
+</section>
+
+<section class="band">
+  <h2>What it does</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Sign in</h3>
+      <p>Password or key. Import RSA and Ed25519 keys in OpenSSH format, or generate a P-256 key in the Secure Enclave. That key never leaves the device, and each use asks you to confirm that you are there.</p>
+    </div>
+    <div class="card">
+      <h3>Host keys</h3>
+      <p>The first time you connect, you compare the machine's SHA-256 fingerprint and choose to trust it. A changed key stops the connection. <strong>Strict</strong> mode refuses any key you have not already trusted.</p>
+    </div>
+    <div class="card">
+      <h3>Tabs, splits and workgroups</h3>
+      <p>Tabs on every device. Split panes on the Mac. A workgroup saves a set of terminal tabs, with startup commands, and opens them together.</p>
+    </div>
+    <div class="card">
+      <h3>Files over SFTP</h3>
+      <p>Browse, upload, download, rename, move and delete. Open a file or a whole folder in the Editor, and save it back to the server.</p>
+    </div>
+    <div class="card">
+      <h3>Port forwarding</h3>
+      <p>Local, remote and SOCKS5 forwards on a live session. Local ports listen on 127.0.0.1 only.</p>
+    </div>
+    <div class="card">
+      <h3>Routes</h3>
+      <p>Jump hosts, in the order you set. Auto-reconnect after a dropped connection, up to five tries. Import hosts from an OpenSSH config file, or from your Tailscale tailnet.</p>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <h2>Small things that protect you</h2>
+  <ul class="list">
+    <li>Pasting several lines, or more than 4,096 bytes, shows the text for review before it is sent.</li>
+    <li>Older algorithms, such as SHA-1 key exchange and AES-CTR, are off. You can turn them on for one host, and you are asked each time you connect.</li>
+    <li>Recording keyboard input is a separate choice from recording output, and the terminal shows <strong>INPUT REC</strong> while it runs.</li>
+    <li>The command assistant, where Apple Intelligence is available, shows the exact command and asks before sending it.</li>
+    <li>On the Mac, Secure Keyboard Entry stops other apps from reading what you type in the terminal.</li>
+  </ul>
+</section>
+
+<section class="band">
+  <h2>On each device</h2>
+  <p class="intro">Written from the app's code. The Vision Pro has not yet run the current build; it was last checked on an earlier one (2026-09-27).</p>
+  <div class="two">
+    <div>
+      <h3>Vision Pro</h3>
+      <p>Each connection opens its own window, named after the machine. Tabs switch between tab, grid and carousel views. Focus Mode dims the room around you.</p>
+      <h3>Mac</h3>
+      <p>A terminal window with tabs and split panes, keyboard shortcuts, a command palette, and a local shell.</p>
+    </div>
+    <div>
+      <h3>iPad and iPhone</h3>
+      <p>The terminal takes the screen, and the session keeps running when you go back to the library. A bar above the on-screen keyboard has Escape, Tab, Control, arrows, F1–F12 and a cursor pad.</p>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <h2>What it does not do yet</h2>
+  <ul class="list">
+    <li>Only the Mac has a local shell. iPad, iPhone and Vision Pro connect over SSH.</li>
+    <li>Imported keys must be RSA or Ed25519, in OpenSSH format. Keys made in the Secure Enclave work only on that device.</li>
+    <li>Port forwards belong to a live session. They are not saved.</li>
+    <li>The SSH config importer reads explicit <code>Host</code> entries. <code>Match</code>, <code>Include</code> and wildcard entries are skipped and reported. It never reads key files.</li>
+    <li>SFTP uploads and downloads files, not folders. Delete removes a folder only when it is empty.</li>
+    <li>On the Mac, a workgroup that includes a legacy-algorithm connection does not open. Open that connection directly.</li>
+  </ul>
+</section>
+
+<section class="band">
+  <h2>In the help</h2>
+  <div class="grid">
+    <a class="card" href="help/terminal-connect.html"><h3>Connect over SSH</h3><p>Set up a service, passwords, jump hosts, old servers, dropped connections.</p></a>
+    <a class="card" href="help/terminal-keys-and-trust.html"><h3>Keys and host trust</h3><p>Sign in with a key and decide whether to trust a machine.</p></a>
+    <a class="card" href="help/terminal-sessions.html"><h3>Work in a terminal</h3><p>Windows, tabs, splits, search, paste review, snippets, recording.</p></a>
+    <a class="card" href="help/terminal-files.html"><h3>Files over SFTP</h3><p>Browse, transfer and edit files on a server.</p></a>
+    <a class="card" href="help/terminal-port-forwarding.html"><h3>Port forwarding</h3><p>Local, remote and SOCKS5 forwards.</p></a>
+    <a class="card" href="help/terminal-workgroups.html"><h3>Workgroups</h3><p>Save sets of terminals and open them together.</p></a>
+    <a class="card" href="help/terminal-settings.html"><h3>Settings and themes</h3><p>Connections, themes, snippets, SSH config import, Tailscale.</p></a>
+    <a class="card" href="help/library-ssh-keys.html"><h3>Manage SSH keys</h3><p>Import, generate, copy and delete keys.</p></a>
+  </div>
+</section>
+
+</main>

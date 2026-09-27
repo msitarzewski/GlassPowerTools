@@ -63,6 +63,28 @@ the build continues with the copy it has.
 The macOS app is not sandboxed: a terminal needs to start local shells and reach the user's files and
 tools. Release builds use the hardened runtime.
 
+**If a build stops at "Downloading binary artifact … Sparkle":** SwiftPM looks for GitHub credentials
+in the Keychain before downloading Sparkle's prebuilt framework, and with more than one saved entry it
+waits on a Keychain prompt. The download is public; skip the lookup with `swift build
+--disable-keychain`, or `-packageAuthorizationProvider netrc` for `xcodebuild`.
+
+## Releasing the Mac app
+
+`Tools/Release/release-mac.sh <version> <build>` archives, signs with Developer ID, notarizes,
+staples, signs the Sparkle update and adds it to `site/static/appcast.xml`, then makes the disk image.
+It needs the Developer ID certificate, Apple notarization credentials in the environment, and
+Sparkle's EdDSA key: create it once with Sparkle's `generate_keys --account GlassPowerTools`, keep
+the private half in the login Keychain, and put the public half in `GPT_SPARKLE_PUBLIC_KEY` in
+`Config/Identity.xcconfig`. Until then the app does not update itself, and the script refuses to run.
+
+## The website
+
+`python3 Tools/Site/build_site.py` builds glasspowertools.com into `_site/`: the pages in
+`site/pages/`, the help in `site/help/` (one `registry.json` drives its sidebar, search, sitemap and
+`llms.txt`), `SECURITY.md`, and the update feed. The build refuses to finish if a help link or anchor
+does not resolve or a page carries an address outside the documentation ranges. Preview it with
+`python3 -m http.server -d _site 8090`.
+
 ## Tests
 
 The package tests are fast and need no network:

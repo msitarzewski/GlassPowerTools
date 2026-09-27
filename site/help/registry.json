@@ -1,0 +1,50 @@
+{
+  "_about": "The one list the help is built from: the sidebar and its order, each page's title and summary, the search index, the sitemap and llms.txt. A page is site/help/<slug>.md; add it here and Tools/Site/build_site.py picks it up.",
+  "groups": [
+    {"name": "Your machines", "pages": [
+      {"slug": "library-browse", "title": "Browse your machines", "summary": "How the library is laid out on each device, how to search it, and what a host's details and this device's host show."},
+      {"slug": "library-add-host", "title": "Add a machine and its services", "summary": "Add a host with a Terminal, Database or Desktop service, add more services, edit them, and remove services or hosts."},
+      {"slug": "library-connect", "title": "Connect and switch between sessions", "summary": "Use the Connect controls, choose which service opens, and switch to or close open sessions from Active and the lightning button."},
+      {"slug": "library-organize", "title": "Favorites, collections and other names", "summary": "Mark favorites, find recent hosts, group hosts into collections, and give a host other names that search and matching use."},
+      {"slug": "library-ssh-keys", "title": "Manage SSH keys", "summary": "Import keys or generate them in the Secure Enclave, see which services use a key, and copy, export, rename or delete keys."},
+      {"slug": "library-sync", "title": "Your library on all your devices", "summary": "What iCloud syncs and what stays on one device, when syncing happens, how to check its status, and how conflicts resolve."},
+      {"slug": "library-settings", "title": "Settings and window appearance", "summary": "Open Settings on each device, set window opacity and frost, and read the General, Privacy and About pages."}
+    ]},
+    {"name": "Terminal", "pages": [
+      {"slug": "terminal-connect", "title": "Connect to a machine over SSH", "summary": "Set up a Terminal service, connect, enter passwords, route through jump hosts, allow legacy algorithms, and recover from dropped connections."},
+      {"slug": "terminal-keys-and-trust", "title": "Sign in with keys and trust host keys", "summary": "Sign in with an SSH or Secure Enclave key, install your public key, and trust or refuse a machine's host key."},
+      {"slug": "terminal-sessions", "title": "Work in a terminal", "summary": "Terminal windows, tabs and splits, the tools menu, text size, search, paste review, snippets, recording and the Mac's local shell."},
+      {"slug": "terminal-files", "title": "Browse and transfer files over SFTP", "summary": "Open the file browser, upload and download, create, rename, move and delete items, and edit remote files in the Editor."},
+      {"slug": "terminal-port-forwarding", "title": "Forward ports through an SSH session", "summary": "Add local, remote and SOCKS5 port forwards to a live SSH session, start and stop them, and fix common failures."},
+      {"slug": "terminal-workgroups", "title": "Save and open terminal Workgroups", "summary": "Create Workgroups of terminal tabs with startup commands, open them on any device, and swap in SSH for Mac-only local tabs."},
+      {"slug": "terminal-settings", "title": "Terminal settings, themes and snippets", "summary": "The Connections, Terminal and Snippets settings pages, theme editing, per-session appearance, SSH config import and Tailscale."}
+    ]},
+    {"name": "Databases", "pages": [
+      {"slug": "database-add-service", "title": "Add a database service", "summary": "Add a MySQL, PostgreSQL or SQLite database to a host, fill in its fields, and make it read-only."},
+      {"slug": "database-encryption-and-tunnel", "title": "Encryption and the SSH tunnel", "summary": "Turn on TLS, choose how the certificate is verified, understand the unencrypted warning, and connect through the host's SSH service."},
+      {"slug": "database-workspace", "title": "The database workspace", "summary": "Connect, browse databases and schemas, read the overview and charts, use schema commands and the Mutation Log, and reconnect."},
+      {"slug": "database-data-grid", "title": "Browse table data", "summary": "Switch table views, sort, filter and page rows, manage columns, analyze, follow foreign keys and export."},
+      {"slug": "database-edit-rows", "title": "Edit rows and structure", "summary": "Edit, add, delete and paste rows with a review before every write, and change columns, indexes and foreign keys."},
+      {"slug": "database-sql-editor", "title": "Write and run SQL", "summary": "Run statements, use Explain Plan, cancel and format, save .sql files, and use query history with literal redaction."},
+      {"slug": "database-on-device-assistant", "title": "The on-device assistant", "summary": "Generate SQL, get suggested fixes and automatic tab titles from the on-device model, and see exactly what it is given."}
+    ]},
+    {"name": "Remote desktops", "pages": [
+      {"slug": "desktop-add-service", "title": "Add a remote desktop", "summary": "Add an RDP or VNC Desktop service to a host, what each field means, and how to edit or remove it."},
+      {"slug": "desktop-import-rdp-file", "title": "Import an RDP file", "summary": "Turn a .rdp file into a host with a Desktop service, what the import keeps, and which files it refuses."},
+      {"slug": "desktop-sign-in-and-trust", "title": "Sign in and trust a remote computer", "summary": "NLA and TLS fallback, VNC password or Mac account sign-in, verifying RDP certificates, and what is not supported."},
+      {"slug": "desktop-sessions", "title": "Connect to and leave a remote desktop", "summary": "Open a desktop, enter a password when asked, read status and failures, reconnect, and close a session."},
+      {"slug": "desktop-vision-pro", "title": "Remote desktops on Apple Vision Pro", "summary": "The desktop window's controls, headset input, glass opacity and frost, and removing the remote background."},
+      {"slug": "desktop-display-and-scaling", "title": "Resolution, scaling and zoom", "summary": "Match Window Size, Detail, fixed resolutions, choosing a display, and zooming the image in the window."},
+      {"slug": "desktop-input", "title": "Keyboard, pointer, clipboard and audio", "summary": "Typing, key buttons, pointer modes and gestures, exchanging clipboard text, and remote audio."}
+    ]},
+    {"name": "Editor", "pages": [
+      {"slug": "editor-opening", "title": "Open the Editor", "summary": "Ways into the Editor on each platform, what an editor window holds, new documents, and how to leave or close it."},
+      {"slug": "editor-projects", "title": "Work with Projects", "summary": "Open folders on this device or on a server as projects, manage the Projects list, and how it syncs between devices."},
+      {"slug": "editor-files-and-tabs", "title": "Files, Folders and Tabs", "summary": "Browse a project's files, preview and keep tabs, create new files locally or on a server, and open files on their own."},
+      {"slug": "editor-saving", "title": "Save Your Work", "summary": "Save with ⌘S or the toolbar, choose where a new document goes, handle files that changed, and close unsaved documents."},
+      {"slug": "editor-languages", "title": "Languages, Find and the Status Bar", "summary": "The 15 highlighted languages and their extensions, changing a file's language, the status bar, Go to Line, and Find and Replace."},
+      {"slug": "editor-preview-and-viewers", "title": "Preview and Viewers", "summary": "Preview Markdown with Mermaid diagrams, HTML, SVG and CSV, and view images, PDFs, video and audio."},
+      {"slug": "editor-settings", "title": "Editor Settings", "summary": "Text size, line numbers and wrapping at three levels: the Editor's defaults, a project, and a single file."}
+    ]}
+  ]
+}

@@ -1,0 +1,135 @@
+<!--
+title: Glass Power Tools — the machines you work on, in one list
+description: Terminals, databases, remote desktops and an editor for Apple Vision Pro, Mac, iPad and iPhone. One library of your machines. MIT licensed.
+-->
+<main class="page" id="content">
+
+<section class="hero">
+  <img class="mark" src="static/icon-512.png" alt="">
+  <h1>The machines you work on, in one list.</h1>
+  <p class="lede">Terminals, databases, remote desktops and an editor, for Apple Vision Pro, Mac, iPad and iPhone. You keep one list of your machines. Each machine lists its services, and Connect opens the one you want.</p>
+  <p class="lede">The source is MIT licensed. The app talks to your servers, to your iCloud, and to Tailscale only if you connect it. It is yours to run.</p>
+  <div class="cta">
+    <a class="button primary" href="help/index.html">Read how it works</a>
+    <a class="button" href="why.html">Why one app</a>
+  </div>
+  <p class="status-note">Not released yet. There is no download or TestFlight build today.</p>
+</section>
+
+<section class="band">
+  <h2>What it does</h2>
+  <p class="intro">Four tools share one library. You add a machine once, with its address. Then you add the ways in: a terminal, a database, a desktop. The address, keys and trust you set up once are used by every tool that needs them.</p>
+  <div class="grid">
+    <a class="card" href="terminal.html">
+      <span class="glyph" aria-hidden="true">❯</span>
+      <h3>Terminal</h3>
+      <p>SSH with host-key pinning, password and key sign-in, tabs, workgroups, port forwarding and an SFTP file browser. A local shell on the Mac.</p>
+    </a>
+    <a class="card" href="databases.html">
+      <span class="glyph" aria-hidden="true">⛁</span>
+      <h3>Databases</h3>
+      <p>MySQL, PostgreSQL and SQLite. Browse, filter and edit rows, follow foreign keys, write and explain queries. Reach a server directly with TLS, or through the machine's own SSH connection.</p>
+    </a>
+    <a class="card" href="desktops.html">
+      <span class="glyph" aria-hidden="true">▣</span>
+      <h3>Remote desktops</h3>
+      <p>RDP and VNC. The remote resolution can follow your window. Audio and clipboard text, when you turn them on.</p>
+    </a>
+    <a class="card" href="editor.html">
+      <span class="glyph" aria-hidden="true">✎</span>
+      <h3>Editor</h3>
+      <p>Files on this device or on a server. Projects with a file tree, highlighting for fifteen languages, and previews for Markdown, HTML, SVG and CSV.</p>
+    </a>
+    <a class="card" href="help/library-browse.html">
+      <span class="glyph" aria-hidden="true">☰</span>
+      <h3>The library</h3>
+      <p>One list of hosts, with favorites, collections and search. It syncs through iCloud. Credentials sync through iCloud Keychain.</p>
+    </a>
+  </div>
+</section>
+
+<section class="band">
+  <h2>Why one app</h2>
+  <p>A machine usually offers several ways in. The common setup is one app per protocol. Each app keeps its own list of the same machines and its own settings. Glass Power Tools keeps one list instead. Whether that fits how you work is for you to judge.</p>
+  <p><a href="why.html">The reasoning, and what the app is not →</a></p>
+</section>
+
+<section class="band">
+  <h2>Vision Pro first</h2>
+  <div class="two">
+    <div>
+      <p>It started as an SSH client for Apple Vision Pro, and the headset still leads the design. Each session is a normal window you place around you. A server's terminal, its database and its desktop can sit side by side in the room.</p>
+      <p>The Mac, iPad and iPhone apps are the same app, adapted to each device. The Mac adds a local shell and menus. The iPhone gives each session the whole screen.</p>
+    </div>
+    <div>
+      <p>An honest note on testing. The current builds are used every day on a Mac and an iPhone. The headset last ran an earlier build. Newer work has not yet been checked on it.</p>
+      <p><a href="help/desktop-vision-pro.html">Remote desktops on Apple Vision Pro</a></p>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <h2>What leaves your devices</h2>
+  <p class="intro">Today the app connects to three kinds of place, and no others. When the Mac app ships it will also check an update feed; it asks on its second launch whether to do that automatically.</p>
+  <ul class="list">
+    <li><strong>The servers you add.</strong> Only when you connect to them.</li>
+    <li><strong>iCloud.</strong> Your host library syncs through your private iCloud database. Passwords, keys and host-key pins sync through iCloud Keychain, except a password you protect with Face ID or Touch ID, which stays on its device. Keys made in the Secure Enclave never leave the device they were made on.</li>
+    <li><strong>Tailscale's API</strong>, only if you connect a Tailscale account to find your devices.</li>
+  </ul>
+  <p>There are no analytics and no telemetry. Secrets live in the Keychain, apart from your settings. The database assistant runs on your device through Apple Intelligence, and the help lists exactly what it is given.</p>
+  <p><a href="security.html">How credentials and connections are protected, and what is not →</a></p>
+</section>
+
+<section class="band">
+  <h2>What it asks of you</h2>
+  <div class="two">
+    <div>
+      <h3>Today</h3>
+      <p>It is not released. It is in daily use and being prepared for release. If you want it now, you build it from source. You need a Mac with Apple silicon and Xcode 27, and you sign it under your own Apple Developer team.</p>
+      <p>It runs on macOS 26, iOS and iPadOS 26, and visionOS 26 or later.</p>
+    </div>
+    <div>
+      <h3>When it ships</h3>
+      <p>The Mac app will be signed with a Developer ID, notarized by Apple, and updated through Sparkle. It will not be in the Mac App Store, because a terminal cannot work inside App Sandbox. It has to start your shell and reach your files, tools and SSH agent.</p>
+      <p>The iPhone, iPad and Vision Pro apps will come through TestFlight, then the App Store.</p>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <h2>Leaving</h2>
+  <p class="intro">You should be able to stop using a tool without losing what you put into it. Here is what that looks like.</p>
+  <ul class="list">
+    <li>The code is MIT licensed. You can read it, change it and build it yourself.</li>
+    <li>It speaks standard protocols: SSH, SFTP, the MySQL and PostgreSQL protocols, RDP and VNC. Your servers need nothing from this app. Any other client can reach them the same way.</li>
+    <li>Imported SSH keys are ordinary OpenSSH keys, the same format other SSH clients use.</li>
+    <li>A SQLite file is opened as a private copy. Your original is never changed.</li>
+    <li>Your editor files stay where they are, on your device or your server. Removing a project from the list does not touch its folder.</li>
+  </ul>
+  <p><strong>What you cannot take with you yet:</strong> the list of hosts and services itself has no export. If you leave, you enter it again in the next app.</p>
+  <p><strong>And one cost that is permanent:</strong> a key made in the Secure Enclave cannot be exported. That is what makes it safe. If you leave, add a different key to the servers that use it first.</p>
+</section>
+
+<section class="band">
+  <h2>Who made it</h2>
+  <p>One developer, Michael Sitarzewski, whose name is on the licence. Nothing is sold today, because nothing is released. The app's About page has a Sponsor link.</p>
+  <p>If people use it, the author gains standing from it. That is a real interest, so it is written down here.</p>
+</section>
+
+<section class="band">
+  <h2>Check it yourself</h2>
+  <p class="intro">You should not have to take this page's word for any of it.</p>
+  <ul class="list">
+    <li><strong>The source.</strong> It will be public at github.com/msitarzewski/GlassPowerTools. It is MIT licensed.</li>
+    <li><strong>What is verified, and how.</strong> The repository's <code>memory-bank/progress.md</code> says what was tested on real hardware and servers, and what was not.</li>
+    <li><strong>Third-party code.</strong> <code>THIRD-PARTY-NOTICES.md</code> lists every component, its licence and the exact revision. Every local change to carried code is written down beside it.</li>
+    <li><strong>The help.</strong> It was written from the app's code, including what the app does not support. <a href="help/index.html">Read the help</a>.</li>
+    <li><strong>Security.</strong> <a href="security.html">How it protects credentials, what it does not protect, and how to report a problem</a>.</li>
+  </ul>
+</section>
+
+<section class="band">
+  <p>That is what it is, what it is not yet, and how to check. Whether one library of machines suits the way you work is yours to decide.</p>
+</section>
+
+</main>

@@ -16,3 +16,6 @@ Config/Identity.local.xcconfig
 
 # Agent session log: local working state, not project history (AGENTS.md).
 .brain/
+
+# The built website (Tools/Site/build_site.py).
+_site/

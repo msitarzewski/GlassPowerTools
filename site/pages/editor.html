@@ -1,0 +1,87 @@
+<!--
+title: Editor — Glass Power Tools
+description: Edit files on this device or on a server over SFTP. Projects with a file tree, fifteen highlighted languages, and Markdown, HTML, SVG and CSV previews.
+-->
+<main class="page" id="content">
+
+<section class="hero">
+  <h1>Editor</h1>
+  <p class="lede">A text and code editor for files on this device, or on a server through its Terminal service. Saves go back where the file came from.</p>
+  <div class="cta">
+    <a class="button primary" href="help/editor-opening.html">Open the Editor</a>
+    <a class="button" href="index.html">Back to the overview</a>
+  </div>
+  <p class="status-note">Not released yet.</p>
+</section>
+
+<section class="band">
+  <h2>What it does</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>Projects, here or on a server</h3>
+      <p>A project is a folder. Open one on this device, or open a server's folder from its SFTP browser. The Projects list syncs where each project is, never its files.</p>
+    </div>
+    <div class="card">
+      <h3>Fifteen languages</h3>
+      <p>C, Go, HTML, JavaScript, JSON, Markdown, PHP, Python, Rust, Shell, SQL, Swift, TOML, XML and YAML. The language comes from the extension, or from the start of the file.</p>
+    </div>
+    <div class="card">
+      <h3>Preview</h3>
+      <p>Markdown with Mermaid diagrams, HTML, SVG, and CSV or TSV as a table. The preview follows your edits.</p>
+    </div>
+    <div class="card">
+      <h3>Viewers</h3>
+      <p>Images, PDFs, video and audio open in a viewer, chosen by what the file contains, not only its name.</p>
+    </div>
+    <div class="card">
+      <h3>Careful saves</h3>
+      <p>A save keeps the file's encoding and line endings. Before every save, the Editor checks whether the file changed since you opened it, and asks what to do if it did.</p>
+    </div>
+    <div class="card">
+      <h3>Settings at three levels</h3>
+      <p>Text size, line numbers and wrapping for the Editor, for a project, or for one open file.</p>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <h2>What a preview can reach</h2>
+  <p>A preview loads nothing from the internet. Scripts in an HTML file do not run. The only script a preview runs is the copy of Mermaid built into the app, and only for Markdown. Relative images come from the file's own project or folder, and nothing outside it.</p>
+</section>
+
+<section class="band">
+  <h2>On each device</h2>
+  <p class="intro">Written from the app's code. The Vision Pro has not yet run the current build; it was last checked on an earlier one (2026-09-27).</p>
+  <ul class="list">
+    <li><strong>Vision Pro and iPad:</strong> an editor window with the file list on the left and tabs across the top.</li>
+    <li><strong>Mac:</strong> the same, with File and Text menus: New Editor Window, Open File, Open Project, Find and Replace, and Go to Line. Viewers use Quick Look.</li>
+    <li><strong>iPhone:</strong> the Editor fills the screen, and each folder is its own screen. Your documents and unsaved changes are kept when you step back to the library.</li>
+  </ul>
+</section>
+
+<section class="band">
+  <h2>What it does not do yet</h2>
+  <ul class="list">
+    <li>TypeScript and JSX are colored with the JavaScript grammar.</li>
+    <li>Very large files, roughly two million characters or more, are shown as plain text without highlighting.</li>
+    <li>There is no Close Project command. Closing the editor window closes its project.</li>
+    <li>Viewers are for reading. Images, PDFs, video and audio are never edited or saved.</li>
+    <li>A folder opened from this device is listed on your other devices, but it opens only where that folder exists.</li>
+    <li>If a server connection drops during a save, the Editor cannot tell whether the file was replaced. It says so, and you open the file again to see.</li>
+  </ul>
+</section>
+
+<section class="band">
+  <h2>In the help</h2>
+  <div class="grid">
+    <a class="card" href="help/editor-opening.html"><h3>Open the Editor</h3><p>Ways in on each device, and how to leave.</p></a>
+    <a class="card" href="help/editor-projects.html"><h3>Projects</h3><p>Folders here or on a server, and how the list syncs.</p></a>
+    <a class="card" href="help/editor-files-and-tabs.html"><h3>Files and tabs</h3><p>The file list, preview tabs and new files.</p></a>
+    <a class="card" href="help/editor-saving.html"><h3>Save your work</h3><p>First saves, changed files and closing.</p></a>
+    <a class="card" href="help/editor-languages.html"><h3>Languages and Find</h3><p>The fifteen languages, the status bar, Go to Line.</p></a>
+    <a class="card" href="help/editor-preview-and-viewers.html"><h3>Preview and viewers</h3><p>Markdown, Mermaid, HTML, SVG, CSV and media.</p></a>
+    <a class="card" href="help/editor-settings.html"><h3>Editor settings</h3><p>Text size, line numbers and wrapping.</p></a>
+  </div>
+</section>
+
+</main>

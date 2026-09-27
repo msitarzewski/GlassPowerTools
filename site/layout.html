@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{title}}</title>
+<meta name="description" content="{{description}}">
+<link rel="canonical" href="{{canonical}}">
+<meta property="og:type" content="{{og_type}}">
+<meta property="og:site_name" content="Glass Power Tools">
+<meta property="og:title" content="{{og_title}}">
+<meta property="og:description" content="{{description}}">
+<meta property="og:url" content="{{canonical}}">
+<meta property="og:image" content="{{base_url}}static/icon-512.png">
+<meta name="twitter:card" content="summary">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/png" href="{{root}}static/icon-64.png">
+<link rel="apple-touch-icon" href="{{root}}static/apple-touch-icon.png">
+<link rel="alternate" type="text/plain" href="{{base_url}}llms.txt" title="llms.txt">
+<link rel="stylesheet" href="{{root}}static/site.css">
+<script type="application/ld+json">{{jsonld}}</script>
+</head>
+<body data-root="{{root}}">
+<a class="skip" href="#content">Skip to content</a>
+<header class="top">
+  <div class="top-inner">
+    <a class="brand" href="{{root}}index.html"><img src="{{root}}static/icon-64.png" alt="" width="26" height="26"><span>Glass Power Tools</span></a>
+    <nav class="nav" aria-label="Site">
+{{nav}}
+    </nav>
+    <div class="top-actions">
+      <button class="search-button" type="button" data-search aria-label="Search the help">⌕ <span class="search-label">Search the help</span> <kbd>⌘K</kbd></button>
+      <button class="theme-button" type="button" data-theme-toggle aria-label="Change appearance">◐</button>
+    </div>
+  </div>
+</header>
+{{body}}
+<footer class="footer">
+  <div class="footer-inner">
+    <span>Glass Power Tools · MIT licence</span>
+{{footer}}
+  </div>
+</footer>
+<div class="palette" role="dialog" aria-modal="true" aria-label="Search the help">
+  <div class="scrim"></div>
+  <div class="panel">
+    <div class="field"><span aria-hidden="true">⌕</span><input type="search" placeholder="Search the help…" autocomplete="off" spellcheck="false" aria-label="Search the help"><kbd>esc</kbd></div>
+    <ul></ul>
+    <div class="hint status"></div>
+  </div>
+</div>
+<script src="{{root}}static/site.js" defer></script>
+</body>
+</html>

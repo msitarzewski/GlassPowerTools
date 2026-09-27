@@ -1,0 +1,94 @@
+<!--
+title: Remote desktops — Glass Power Tools
+description: RDP and VNC desktops that follow your window's size, with certificate checks before sign-in, audio, clipboard text and Vision Pro glass.
+-->
+<main class="page" id="content">
+
+<section class="hero">
+  <h1>Remote desktops</h1>
+  <p class="lede">RDP, built for Linux and Windows servers and so far tested only on Linux, and VNC, including the Apple Remote Desktop sign-in a Mac's Screen Sharing uses (not yet tested against a Mac). Each desktop opens in its own window.</p>
+  <div class="cta">
+    <a class="button primary" href="help/desktop-add-service.html">Add a remote desktop</a>
+    <a class="button" href="index.html">Back to the overview</a>
+  </div>
+  <p class="status-note">Not released yet. The RDP engine has been tested against one Linux RDP server (GNOME Remote Desktop). Windows has not yet been verified.</p>
+</section>
+
+<section class="band">
+  <h2>What it does</h2>
+  <div class="grid">
+    <div class="card">
+      <h3>The resolution follows the window</h3>
+      <p>Resize the window, and the app asks the remote computer to match it, when the server offers display control. Otherwise the image scales to fit.</p>
+    </div>
+    <div class="card">
+      <h3>Sharp text</h3>
+      <p>For RDP, Detail asks for more remote pixels per point, so text stays sharp on high-resolution displays.</p>
+    </div>
+    <div class="card">
+      <h3>Trust before sign-in</h3>
+      <p>Every RDP connection uses TLS. If the certificate is not trusted, the connection stops before your password is sent, and shows its fingerprint for you to compare.</p>
+    </div>
+    <div class="card">
+      <h3>Audio and clipboard</h3>
+      <p>Remote audio over RDP, and clipboard text in both directions. Both are off until you turn them on. Your microphone is never sent.</p>
+    </div>
+    <div class="card">
+      <h3>Import an .rdp file</h3>
+      <p>Turn a <code>.rdp</code> file into a host with a desktop service. The import lists what it left out. Passwords are never imported.</p>
+    </div>
+    <div class="card">
+      <h3>Nothing stays pressed</h3>
+      <p>When the app goes to the background or the window loses focus, held keys and buttons are released on the remote computer.</p>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <h2>On each device</h2>
+  <p class="intro">Written from the app's code. The Vision Pro has not yet run the current build; it was last checked on an earlier one (2026-09-27).</p>
+  <div class="two">
+    <div>
+      <h3>Vision Pro</h3>
+      <p>A desktop is a window you place, resize and see through. Look and pinch to click. A connected keyboard, trackpad or mouse works too. Opacity and frost change how the window sits in the room.</p>
+      <p>Background removal can make black, a chosen color, or the remote wallpaper transparent, so a remote window floats over your space.</p>
+    </div>
+    <div>
+      <h3>Mac</h3>
+      <p>Mouse or trackpad, with left, right and middle buttons, back and forward, and scrolling.</p>
+      <h3>iPad and iPhone</h3>
+      <p>Choose Trackpad or Direct Touch for the pointer. Pinch to zoom the image. Keys that are hard to type have buttons, including Control–Alt–Delete.</p>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <h2>What it does not do</h2>
+  <p class="intro">These are listed in the help, from the app's code.</p>
+  <ul class="list">
+    <li>RD Gateway, connection brokers, Azure Virtual Desktop and Microsoft Entra sign-in.</li>
+    <li>Kerberos. A domain account signs in with its user name, domain and password over NTLM.</li>
+    <li>The older RDP security layer without TLS.</li>
+    <li>RemoteApp, single remote programs.</li>
+    <li>Drive, printer, smart-card and USB redirection. Microphone and camera.</li>
+    <li>More than one remote monitor over RDP. UDP transport; connections use TCP.</li>
+    <li>Clipboard files and images. Only text is exchanged. Over VNC, only Latin-1 characters.</li>
+    <li>On Vision Pro and Mac, desktop windows are not restored when you reopen the app.</li>
+  </ul>
+  <p><strong>VNC is not encrypted after sign-in.</strong> It protects your password, not the screen or your typing. The setup sheet says so. Use VNC on a network you trust, or use RDP.</p>
+</section>
+
+<section class="band">
+  <h2>In the help</h2>
+  <div class="grid">
+    <a class="card" href="help/desktop-add-service.html"><h3>Add a remote desktop</h3><p>RDP or VNC, and what each field means.</p></a>
+    <a class="card" href="help/desktop-sign-in-and-trust.html"><h3>Sign in and trust</h3><p>NLA, certificates, VNC sign-in, and what is not supported.</p></a>
+    <a class="card" href="help/desktop-sessions.html"><h3>Connect and leave</h3><p>Status messages, reconnecting and closing.</p></a>
+    <a class="card" href="help/desktop-display-and-scaling.html"><h3>Resolution and zoom</h3><p>Match Window Size, Detail and fixed resolutions.</p></a>
+    <a class="card" href="help/desktop-input.html"><h3>Keyboard, pointer, clipboard, audio</h3><p>Input on each device.</p></a>
+    <a class="card" href="help/desktop-vision-pro.html"><h3>On Apple Vision Pro</h3><p>Window controls, glass and background removal.</p></a>
+    <a class="card" href="help/desktop-import-rdp-file.html"><h3>Import an RDP file</h3><p>What the import keeps, and what it refuses.</p></a>
+  </div>
+</section>
+
+</main>
