@@ -57,3 +57,15 @@ sort order, Active's swipe hint on the Mac. Each fix with a test was shown faili
 ## For the owner
 
 In `activeContext.md` ("Open questions").
+
+## Correction: RDP against Windows (2026-09-27, the owner)
+
+The site copy and help said Windows was unverified; the 2026-09-14 live-host note records a real
+Windows 11 NLA session, and the capability ledger had never been updated from it. Re-tested on the
+current code (including the whole-chain trust change) with `Tests/LiveDesktop` `GlassWindowsRDPProbe`
+against the Windows 11 VM, build 10.0.29671, the dedicated `gptrdp` account (password reset to a new
+random value through PowerShell's standard input, held only in the session scratchpad):
+unpinned — refused before any credential, `server certificate identity was not authorized`, same
+certificate as 2026-09-14; pinned — connected, first frame 1280×800 after 0.82 s, 3 frames, PASS.
+Display control not advertised, so resizing on Windows is still unproven. Ledger, site, help and
+progress corrected.

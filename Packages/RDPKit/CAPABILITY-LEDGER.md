@@ -4,7 +4,7 @@ This records the production facade's implemented surface, not a claim of complet
 
 | Area | Negotiation and implementation | Evidence / limit |
 | --- | --- | --- |
-| Transport/security | TCP, X.224/MCS, TLS 1.2, system trust or endpoint-bound SHA-256 pin, CredSSP/NTLM, optional required NLA | Real TLS xrdp login and pre-credential certificate rejection; CredSSP fixtures. No real Windows NLA host tested. TLS-fallback policy still prefers NLA when offered. |
+| Transport/security | TCP, X.224/MCS, TLS 1.2, system trust or endpoint-bound SHA-256 pin, CredSSP/NTLM, optional required NLA | Real TLS xrdp login and pre-credential certificate rejection; CredSSP fixtures. Real Windows 11 NLA login (build 10.0.29648 on 2026-09-14, 10.0.29671 on 2026-09-27): refused before credentials without a pin, frames with the certificate pinned; that host advertised no display-control channel. TLS-fallback policy still prefers NLA when offered. |
 | Primary graphics | Raw bitmap, interleaved RLE, RDP6 planar, palette; slow and fast path; surface-bits/frame-marker commands; NSCodec and RemoteFX | Real xrdp 0.9.24 desktop and clipping regression; upstream decoder fixtures. Immutable full-frame BGRA publication requires copies. |
 | RDPGFX | Optional dynamic channel; automatic upstream capability profile offers versions through 10.7; existing H.264 AVC420/AVC444, ClearCodec, RemoteFX/CAVideo and progressive handling remain | Codec and protocol fixtures. AVC444 is RDP-specific reconstruction, not a generic single video layer. No real Windows AVC444/performance claim. Upstream VideoToolbox/Metal implementations preserved. |
 | BCGR drawing orders | All 32 orderSupport bytes are zero | No unimplemented drawing order advertised. |

@@ -63,4 +63,4 @@ These RDP features and setups are not available:
 Clipboard sharing is limited to text. See [Keyboard, pointer, clipboard and audio](desktop-input.md).
 
 > [!NOTE]
-> The RDP engine has been exercised against Linux RDP servers. Compatibility with each version of Windows and Windows Server has not yet been verified.
+> The RDP engine has been tested against Windows 11, signing in with Network Level Authentication, and against a Linux RDP server. Other versions of Windows and Windows Server have not been tried. The Windows 11 host did not offer resizing, so on it the remote resolution stays fixed.
