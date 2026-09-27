@@ -1361,18 +1361,4 @@ extension EndToEndTests {
         XCTAssertNoThrow(try self.channel.interactInMemory())
         XCTAssertThrowsError(try reply.futureResult.wait())
     }
-
-    func testSupportSimultaneousRekeying() throws {
-        XCTAssertNoThrow(try self.channel.configureWithHarness(TestHarness()))
-        XCTAssertNoThrow(try self.channel.activate())
-        XCTAssertNoThrow(try self.channel.interactInMemory())
-
-        XCTAssertNoThrow(try self.channel.clientSSHHandler!._rekey())
-        XCTAssertNoThrow(try self.channel.serverSSHHandler!._rekey())
-        XCTAssertNoThrow(try self.channel.interactInMemory())
-
-        self.channel.clientSSHHandler?.createChannel(nil, nil)
-        XCTAssertNoThrow(try self.channel.interactInMemory())
-        XCTAssertEqual(self.channel.activeServerChannels.count, 1)
-    }
 }

@@ -11,10 +11,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
-//
-// This file was modified by the Glass Power Tools project (2026); the changes are
-// listed in PATCHES.md at the root of this package.
-//
 
 import NIOCore
 
@@ -596,13 +592,6 @@ struct SSHConnectionStateMachine {
             switch message {
             // TODO(cory): One day soon we'll need to support re-keying in this state.
             // For now we only support channel messages.
-            // Glass Power Tools: a peer that sent NEWKEYS may not start another exchange before
-            // ours; reject it as a protocol error rather than falling through (PATCHES.md, N7).
-            case .keyExchange, .keyExchangeInit, .keyExchangeReply, .newKeys:
-                throw NIOSSHError.protocolViolation(
-                    protocolName: "key exchange",
-                    violation: "Peer interleaved key exchange messages after NEWKEYS"
-                )
             case .channelOpen(let message):
                 try state.receiveChannelOpen(message)
             case .channelOpenConfirmation(let message):

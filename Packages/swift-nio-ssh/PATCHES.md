@@ -43,11 +43,14 @@ The diff shows the files listed below, this file, and nothing else.
 | N4 | An RSA key signs in with the `rsa-sha2-512` algorithm (RFC 8332), named both in the request and in the data the signature covers; the key blob keeps its `ssh-rsa` type. | Current OpenSSH servers refuse the SHA-1 `ssh-rsa` signature algorithm, so RSA keys could not sign in. Changing only the request fails too: the server then rejects a signature over data naming a different algorithm. | `SSHMessages.swift`, `UserAuthSignablePayload.swift` | no unit test — an RSA key type is registered by Citadel, not this package. Verified by signing in to OpenSSH 10.2 with an RSA key: refused with only the request changed, accepted with both. |
 | N5 | `SSHChildChannel.remoteAddress0()` returns the parent's remote address. | It returned the parent's *local* address. The public `remoteAddress` property was already correct; NIO's own machinery calls `remoteAddress0()`. | `SSHChildChannel.swift` | `testChildChannelUsesParentAddresses` |
 | N6 | Writing channel data that cannot be serialized (a file region, an unknown extended-data type) fails that write with `ChannelError.operationUnsupported`; unsupported child-channel options and operations fail their promise. | Upstream terminated the process (`preconditionFailure`, `fatalError`). An error is recoverable; a crash of the whole app is not. | `SSHChannelData.swift`, `SSHChildChannel.swift` | `testChannelDataRejectsFileRegionsRecoverably`, `testChannelDataRejectsUnknownExtendedTypesRecoverably`, `testUnsupportedChildChannelDataFailsRecoverably`, `testUnsupportedChildChannelOperationsFailRecoverably` |
-| N7 | A peer that sent NEWKEYS may not interleave another key exchange before ours; such a message is a protocol error. | Upstream fell through to channel-message handling in that state. | `SSHConnectionStateMachine.swift` | `testSupportSimultaneousRekeying` |
 
 The tests above are added in an `extension` at the end of each upstream test file; no upstream test
-was changed. With these changes the package's own suite runs 364 tests (356 upstream, 8 added), all
+was changed. With these changes the package's own suite runs 363 tests (356 upstream, 7 added), all
 passing.
+
+A seventh change, rejecting key-exchange messages that arrive after the peer's NEWKEYS, was carried
+until 2026-09-27 and then dropped: upstream's `default:` branch already throws a protocol violation
+for them, so it only changed the error's wording.
 
 ## Deliberately not changed
 
