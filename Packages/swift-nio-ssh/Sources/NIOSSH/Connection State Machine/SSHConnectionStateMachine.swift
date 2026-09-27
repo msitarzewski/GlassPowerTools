@@ -11,9 +11,12 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
+//
+// This file was modified by the Glass Power Tools project (2026); the changes are
+// listed in PATCHES.md at the root of this package.
+//
 
 import NIOCore
-import NIOConcurrencyHelpers
 
 struct SSHConnectionStateMachine {
     enum State {
@@ -58,13 +61,8 @@ struct SSHConnectionStateMachine {
         case sentDisconnect(SSHConnectionRole)
     }
 
-    final class Attributes: Sendable {
-        private let usernameStorage = NIOLockedValueBox<String?>(nil)
-
-        var username: String? {
-            get { self.usernameStorage.withLockedValue { $0 } }
-            set { self.usernameStorage.withLockedValue { $0 = newValue } }
-        }
+    class Attributes {
+        var username: String? = nil
     }
     
     /// The state of this state machine.
@@ -201,7 +199,7 @@ struct SSHConnectionStateMachine {
                 throw NIOSSHError.remotePeerDoesNotSupportMessage(unimplemented)
 
             default:
-                // Enforce the RFC 4253 key-exchange message restrictions:
+                // TODO: enforce RFC 4253:
                 //
                 // > Once a party has sent a SSH_MSG_KEXINIT message for key exchange or
                 // > re-exchange, until it has sent a SSH_MSG_NEWKEYS message (Section
@@ -253,7 +251,7 @@ struct SSHConnectionStateMachine {
                 throw NIOSSHError.remotePeerDoesNotSupportMessage(unimplemented)
 
             default:
-                // Enforce the RFC 4253 key-exchange message restrictions:
+                // TODO: enforce RFC 4253:
                 //
                 // > Once a party has sent a SSH_MSG_KEXINIT message for key exchange or
                 // > re-exchange, until it has sent a SSH_MSG_NEWKEYS message (Section
@@ -451,7 +449,7 @@ struct SSHConnectionStateMachine {
             case .unimplemented(let unimplemented):
                 throw NIOSSHError.remotePeerDoesNotSupportMessage(unimplemented)
             default:
-                // Enforce the RFC 4253 key-exchange message restrictions:
+                // TODO: enforce RFC 4253:
                 //
                 // > Once a party has sent a SSH_MSG_KEXINIT message for key exchange or
                 // > re-exchange, until it has sent a SSH_MSG_NEWKEYS message (Section
@@ -569,7 +567,7 @@ struct SSHConnectionStateMachine {
             case .unimplemented(let unimplemented):
                 throw NIOSSHError.remotePeerDoesNotSupportMessage(unimplemented)
             default:
-                // Enforce the RFC 4253 key-exchange message restrictions:
+                // TODO: enforce RFC 4253:
                 //
                 // > Once a party has sent a SSH_MSG_KEXINIT message for key exchange or
                 // > re-exchange, until it has sent a SSH_MSG_NEWKEYS message (Section
@@ -596,10 +594,10 @@ struct SSHConnectionStateMachine {
             }
 
             switch message {
-            // Once the peer has sent NEWKEYS for the current exchange it may not
-            // interleave another exchange before we have sent our NEWKEYS. Reject
-            // that peer error recoverably rather than ambiguously falling through
-            // the connection-message handling below.
+            // TODO(cory): One day soon we'll need to support re-keying in this state.
+            // For now we only support channel messages.
+            // Glass Power Tools: a peer that sent NEWKEYS may not start another exchange before
+            // ours; reject it as a protocol error rather than falling through (PATCHES.md, N7).
             case .keyExchange, .keyExchangeInit, .keyExchangeReply, .newKeys:
                 throw NIOSSHError.protocolViolation(
                     protocolName: "key exchange",
@@ -692,7 +690,7 @@ struct SSHConnectionStateMachine {
                 throw NIOSSHError.remotePeerDoesNotSupportMessage(unimplemented)
 
             default:
-                // Enforce the RFC 4253 key-exchange message restrictions:
+                // TODO: enforce RFC 4253:
                 //
                 // > Once a party has sent a SSH_MSG_KEXINIT message for key exchange or
                 // > re-exchange, until it has sent a SSH_MSG_NEWKEYS message (Section
@@ -740,8 +738,8 @@ struct SSHConnectionStateMachine {
 
         case .sentVersion:
             // We can't send anything else now.
-            // The current state machine deliberately waits for the remote version before
-            // permitting key exchange, retaining one RTT in exchange for strict sequencing.
+            // TODO(cory): We could refactor the key exchange state machine to accept the delayed version from the
+            // remote peer, and then we unlock the ability to remove another RTT to the remote peer.
             preconditionFailure("Cannot send other messages before receiving version.")
 
         case .keyExchange(var kex):

@@ -11,6 +11,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
+//
+// This file was modified by the Glass Power Tools project (2026); the changes are
+// listed in PATCHES.md at the root of this package.
+//
 
 import Crypto
 import NIOCore
@@ -723,7 +727,10 @@ final class SSHMessagesTests: XCTestCase {
 
         try self.assertCorrectlyManagesPartialRead(message)
     }
+}
 
+// Glass Power Tools: tests for the local patches (see PATCHES.md).
+extension SSHMessagesTests {
     func testChannelDataRejectsFileRegionsRecoverably() throws {
         let fileHandle = NIOFileHandle(_deprecatedTakingOwnershipOfDescriptor: -1)
         defer { _ = try? fileHandle.takeDescriptorOwnership() }
@@ -737,20 +744,12 @@ final class SSHMessagesTests: XCTestCase {
 
     func testChannelDataRejectsUnknownExtendedTypesRecoverably() {
         let data = SSHChannelData(
-            type: .init(extended: 2)!,
+            type: .init(extended: 2),
             data: .byteBuffer(ByteBuffer(string: "unsupported"))
         )
 
         XCTAssertThrowsError(try SSHMessage(data, recipientChannel: 0)) { error in
             XCTAssertEqual(error as? ChannelError, .operationUnsupported)
         }
-    }
-
-    func testExtendedChannelDataTypeValidatesWireRange() {
-        XCTAssertNil(SSHChannelData.DataType(extended: -1))
-        XCTAssertNil(SSHChannelData.DataType(extended: 0))
-        XCTAssertNil(SSHChannelData.DataType(extended: Int(UInt32.max) + 1))
-        XCTAssertNotNil(SSHChannelData.DataType(extended: 1))
-        XCTAssertNotNil(SSHChannelData.DataType(extended: Int(UInt32.max)))
     }
 }

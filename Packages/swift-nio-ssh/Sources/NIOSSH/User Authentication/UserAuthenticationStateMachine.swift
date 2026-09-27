@@ -15,19 +15,19 @@
 import NIOCore
 
 struct UserAuthenticationStateMachine {
-    static let maximumServerAuthenticationAttempts = 6
-
     private var state: State
     private var delegate: UserAuthDelegate
     private let loop: EventLoop
     private var sessionID: ByteBuffer
-    private var receivedAuthenticationRequestCount = 0
+    private let role: SSHConnectionRole
 
+    // TODO: The server SHOULD limit the number of authentication attempts the client may make.
     init(role: SSHConnectionRole, loop: EventLoop, sessionID: ByteBuffer) {
         self.state = .idle
         self.delegate = UserAuthDelegate(role: role)
         self.loop = loop
         self.sessionID = sessionID
+        self.role = role
     }
 
     fileprivate static let serviceName: String = "ssh-userauth"
@@ -75,7 +75,7 @@ extension UserAuthenticationStateMachine {
             return nil
 
         case (.server, .authenticationFailed):
-            // This state is client-only; servers reject excess attempts by throwing.
+            // TODO(cory): We should be limiting the maximum number of authentication attempts.
             preconditionFailure("Servers cannot enter authentication failed")
 
         case (.client, _):
@@ -120,12 +120,10 @@ extension UserAuthenticationStateMachine {
 
         switch (self.delegate, self.state) {
         case (.server(let delegate), .awaitingNextRequest):
-            try self.recordServerAuthenticationAttempt()
             self.state = .awaitingResponses(1)
             return self.nextAuthResponse(request: message, delegate: delegate)
 
         case (.server(let delegate), .awaitingResponses(let pending)):
-            try self.recordServerAuthenticationAttempt()
             self.state = .awaitingResponses(pending + 1)
             return self.nextAuthResponse(request: message, delegate: delegate)
 
@@ -137,7 +135,7 @@ extension UserAuthenticationStateMachine {
             return nil
 
         case (.server, .authenticationFailed):
-            // This state is client-only; servers reject excess attempts by throwing.
+            // TODO(cory): We should be limiting the maximum number of authentication attempts.
             preconditionFailure("Servers cannot enter authentication failed")
 
         case (.client, _):
@@ -251,7 +249,7 @@ extension UserAuthenticationStateMachine {
              (.client, .awaitingServiceAcceptance):
             preconditionFailure("Sent an auth request without asking us first")
         case (.client, .awaitingResponses):
-            // Parallel client authentication attempts are deliberately unsupported.
+            // TODO(cory): We could probably support parallel auth attempts if we wanted to.
             preconditionFailure("Attempted to send a user auth request while we were waiting for a response to the last one.")
         case (.client, .authenticationSucceeded):
             preconditionFailure("Attempted to send a user auth request after auth succeeded")
@@ -353,7 +351,7 @@ extension UserAuthenticationStateMachine {
              (.client, .awaitingResponses),
              (.client, .authenticationSucceeded),
              (.client, .authenticationFailed):
-            // Authentication startup is deliberately single-shot.
+            // TODO(cory): We could probably support parallel auth attempts if we wanted to.
             preconditionFailure("Cannot start authentication twice, state: \(self.state)")
         case (.server, _):
             return nil
@@ -371,23 +369,11 @@ extension UserAuthenticationStateMachine {
         case (.client, .awaitingResponses),
              (.client, .authenticationSucceeded),
              (.client, .authenticationFailed):
-            // Only one delegate request may be outstanding at a time.
+            // TODO(cory): We could probably support parallel auth attempts if we wanted to.
             preconditionFailure("Request for further auth failed when no such request should be outstanding")
         case (.server, _):
             preconditionFailure("Servers may not authenticate")
         }
-    }
-}
-
-private extension UserAuthenticationStateMachine {
-    mutating func recordServerAuthenticationAttempt() throws {
-        guard self.receivedAuthenticationRequestCount < Self.maximumServerAuthenticationAttempts else {
-            throw NIOSSHError.protocolViolation(
-                protocolName: Self.protocolName,
-                violation: "too many authentication attempts"
-            )
-        }
-        self.receivedAuthenticationRequestCount += 1
     }
 }
 
@@ -430,8 +416,34 @@ private extension UserAuthenticationStateMachine {
                 return self.loop.makeSucceededFuture(.failure(.init(authentications: supportedMethods.strings, partialSuccess: false)))
             }
 
+            // Check if this is a certificate and validate it
+            var validatedCertificate: NIOSSHCertifiedPublicKey? = nil
+            if let certifiedKey = NIOSSHCertifiedPublicKey(key),
+               case .server(let config) = self.role,
+               !config.trustedUserCAKeys.isEmpty {
+                // This is a certificate and we have trusted CAs configured
+                do {
+                    let criticalOptions = try certifiedKey.validate(
+                        principal: request.username,
+                        type: .user,
+                        allowedAuthoritySigningKeys: config.trustedUserCAKeys,
+                        acceptableCriticalOptions: config.acceptableCriticalOptions
+                    )
+                    
+                    // Certificate is valid, store it to pass to the delegate
+                    validatedCertificate = certifiedKey
+                } catch {
+                    // Certificate validation failed
+                    return self.loop.makeSucceededFuture(.failure(.init(authentications: supportedMethods.strings, partialSuccess: false)))
+                }
+            }
+
             // Signature is valid, ask if the delegate is happy.
-            let request = NIOSSHUserAuthenticationRequest(username: request.username, serviceName: request.service, request: .publicKey(.init(publicKey: key)))
+            let request = NIOSSHUserAuthenticationRequest(
+                username: request.username,
+                serviceName: request.service,
+                request: .publicKey(.init(publicKey: key, certifiedKey: validatedCertificate))
+            )
             let promise = self.loop.makePromise(of: NIOSSHUserAuthenticationOutcome.self)
             delegate.requestReceived(request: request, responsePromise: promise)
 
@@ -441,7 +453,26 @@ private extension UserAuthenticationStateMachine {
 
         case .publicKey(.known(key: let key, signature: .none)):
             // This is a weird wrinkle in public key auth: it's a request to ask whether a given key is valid, but not to validate that key itself.
-            // For now we do a shortcut: we just say that all keys are acceptable, rather than ask the delegate.
+            // For certificates, we should validate them before saying they're OK
+            if let certifiedKey = NIOSSHCertifiedPublicKey(key),
+               case .server(let config) = self.role,
+               !config.trustedUserCAKeys.isEmpty {
+                // This is a certificate and we have trusted CAs configured
+                do {
+                    _ = try certifiedKey.validate(
+                        principal: request.username,
+                        type: .user,
+                        allowedAuthoritySigningKeys: config.trustedUserCAKeys,
+                        acceptableCriticalOptions: config.acceptableCriticalOptions
+                    )
+                    // Certificate is valid
+                    return self.loop.makeSucceededFuture(.publicKeyOK(.init(key: key)))
+                } catch {
+                    // Certificate validation failed, reject it
+                    return self.loop.makeSucceededFuture(.failure(.init(authentications: delegate.supportedAuthenticationMethods.strings, partialSuccess: false)))
+                }
+            }
+            // For now we do a shortcut: we just say that all non-certificate keys are acceptable, rather than ask the delegate.
             return self.loop.makeSucceededFuture(.publicKeyOK(.init(key: key)))
 
         case .publicKey(.unknown):

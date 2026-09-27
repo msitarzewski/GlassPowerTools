@@ -14,24 +14,21 @@
 
 import Dispatch
 import Foundation
-import NIOConcurrencyHelpers
 import NIOCore
 import NIOSSH
 
 /// A client user auth delegate that provides an interactive prompt for password-based user auth.
-final class InteractivePasswordPromptDelegate: NIOSSHClientUserAuthenticationDelegate, Sendable {
+final class InteractivePasswordPromptDelegate: NIOSSHClientUserAuthenticationDelegate {
     private let queue: DispatchQueue
 
-    private struct Credentials {
-        var username: String?
-        var password: String?
-    }
+    private var username: String?
 
-    private let credentials: NIOLockedValueBox<Credentials>
+    private var password: String?
 
     init(username: String?, password: String?) {
         self.queue = DispatchQueue(label: "io.swiftnio.ssh.InteractivePasswordPromptDelegate")
-        self.credentials = NIOLockedValueBox(Credentials(username: username, password: password))
+        self.username = username
+        self.password = password
     }
 
     func nextAuthenticationType(availableMethods: NIOSSHAvailableUserAuthenticationMethods, nextChallengePromise: EventLoopPromise<NIOSSHUserAuthenticationOffer?>) {
@@ -42,31 +39,21 @@ final class InteractivePasswordPromptDelegate: NIOSSHClientUserAuthenticationDel
         }
 
         self.queue.async {
-            if self.credentials.withLockedValue({ $0.username == nil }) {
+            if self.username == nil {
                 print("Username: ", terminator: "")
-                let username = readLine() ?? ""
-                self.credentials.withLockedValue { $0.username = username }
+                self.username = readLine() ?? ""
             }
 
-            if self.credentials.withLockedValue({ $0.password == nil }) {
-                let password: String
+            if self.password == nil {
                 #if os(Windows) || os(Android)
                 print("Password: ", terminator: "")
-                password = readLine() ?? ""
+                self.password = readLine() ?? ""
                 #else
-                password = String(cString: getpass("Password: "))
+                self.password = String(cString: getpass("Password: "))
                 #endif
-                self.credentials.withLockedValue { $0.password = password }
             }
 
-            let credentials = self.credentials.withLockedValue { $0 }
-            nextChallengePromise.succeed(
-                NIOSSHUserAuthenticationOffer(
-                    username: credentials.username!,
-                    serviceName: "",
-                    offer: .password(.init(password: credentials.password!))
-                )
-            )
+            nextChallengePromise.succeed(NIOSSHUserAuthenticationOffer(username: self.username!, serviceName: "", offer: .password(.init(password: self.password!))))
         }
     }
 }

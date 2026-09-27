@@ -1,6 +1,6 @@
 import Foundation
 import NIOCore
-import NIOSSH
+@preconcurrency import NIOSSH
 
 /// glas.sh `SSHError` (Models.swift:2781) plus the trust and tunnel cases the engine adds.
 public enum SSHTransportError: Error, Sendable, Equatable {

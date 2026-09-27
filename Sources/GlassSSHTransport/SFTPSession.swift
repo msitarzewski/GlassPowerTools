@@ -1,5 +1,5 @@
 import Foundation
-import Citadel
+@preconcurrency import Citadel
 import Logging
 import NIOCore
 

@@ -45,16 +45,14 @@ public final class SFTPClient: Sendable {
         let serializeHandler = MessageToByteHandler(SFTPMessageSerializer())
         let sftpInboundHandler = SFTPClientInboundHandler(responses: responses, logger: logger)
         
-        do {
-            try channel.pipeline.syncOperations.addHandlers(
-                SSHChannelDataUnwrapper(),
-                SSHOutboundChannelDataWrapper(),
-                deserializeHandler,
-                serializeHandler,
-                sftpInboundHandler,
-                CloseErrorHandler(logger: logger)
-            )
-
+        return channel.pipeline.addHandlers(
+            SSHChannelDataUnwrapper(),
+            SSHOutboundChannelDataWrapper(),
+            deserializeHandler,
+            serializeHandler,
+            sftpInboundHandler,
+            CloseErrorHandler(logger: logger)
+        ).map {
             let client = SFTPClient(channel: channel, responses: responses, logger: logger)
 
             client.channel.closeFuture.whenComplete { _ in
@@ -62,9 +60,7 @@ public final class SFTPClient: Sendable {
                 logger.trace("SFTP shutdown, failing any remaining incomplete requests")
                 responses.close()
             }
-            return channel.eventLoop.makeSucceededFuture(client)
-        } catch {
-            return channel.eventLoop.makeFailedFuture(error)
+            return client
         }
     }
     

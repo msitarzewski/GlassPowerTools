@@ -36,11 +36,11 @@ public extension GlobalRequestDelegate {
 }
 
 /// A namespace of ``GlobalRequest`` objects that implementations of ``GlobalRequestDelegate`` may be asked to handle.
-public enum GlobalRequest: Sendable {
+public enum GlobalRequest {
     /// A request from a client to a server for the server to listen on a port on the client's behalf. If accepted,
     /// the server will listen on a port, and will forward accepted connections to the client using the "forwarded-tcpip"
     /// channel type.
-    public enum TCPForwardingRequest: Equatable, Sendable {
+    public enum TCPForwardingRequest: Equatable {
         /// A request to listen on a given address.
         case listen(host: String, port: Int)
 
@@ -49,7 +49,7 @@ public enum GlobalRequest: Sendable {
     }
 
     /// The data associated with a successful response to a TCP forwarding request.
-    public struct TCPForwardingResponse: Hashable, Sendable {
+    public struct TCPForwardingResponse: Hashable {
         /// If requested to listen on a port, and the port the client requested was 0, this is set to the
         /// port that was actually bound. Otherwise is nil.
         public var boundPort: Int?

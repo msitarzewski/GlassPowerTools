@@ -15,22 +15,20 @@ import NIOCore
 import NIOPosix
 import NIOSSH
 
-final class PortForwardingServer: Sendable {
-    private let serverChannel: NIOLoopBoundBox<Channel?>
+final class PortForwardingServer {
+    private var serverChannel: Channel?
     private let serverLoop: EventLoop
     private let group: EventLoopGroup
     private let bindHost: Substring
     private let bindPort: Int
-    private let forwardingChannelConstructor: @Sendable (Channel) -> EventLoopFuture<Void>
+    private let forwardingChannelConstructor: (Channel) -> EventLoopFuture<Void>
 
-    @preconcurrency
     init(group: EventLoopGroup,
          bindHost: Substring,
          bindPort: Int,
-         _ forwardingChannelConstructor: @escaping @Sendable (Channel) -> EventLoopFuture<Void>)
+         _ forwardingChannelConstructor: @escaping (Channel) -> EventLoopFuture<Void>)
     {
         self.serverLoop = group.next()
-        self.serverChannel = NIOLoopBoundBox(nil, eventLoop: self.serverLoop)
         self.group = group
         self.forwardingChannelConstructor = forwardingChannelConstructor
         self.bindHost = bindHost
@@ -43,14 +41,14 @@ final class PortForwardingServer: Sendable {
             .childChannelInitializer(self.forwardingChannelConstructor)
             .bind(host: String(self.bindHost), port: self.bindPort)
             .flatMap {
-                self.serverChannel.value = $0
+                self.serverChannel = $0
                 return $0.closeFuture
             }
     }
 
     func close() -> EventLoopFuture<Void> {
         self.serverLoop.flatSubmit {
-            guard let server = self.serverChannel.value else {
+            guard let server = self.serverChannel else {
                 // The server wasn't created yet, so we can just shut down straight away and let
                 // the OS clean us up.
                 return self.serverLoop.makeSucceededFuture(())

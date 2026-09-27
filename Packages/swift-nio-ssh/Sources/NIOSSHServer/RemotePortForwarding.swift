@@ -24,47 +24,35 @@ import NIOSSH
 // Please note that, as with the rest of this example, there are important security features missing from
 // this demo.
 final class RemotePortForwarder {
-    private var listeningState: (channel: NIOLoopBoundBox<Channel?>, eventLoop: EventLoop)?
+    private var serverChannel: Channel?
 
-    private let inboundSSHHandler: NIOSSHHandler
+    private var inboundSSHHandler: NIOSSHHandler
 
     init(inboundSSHHandler: NIOSSHHandler) {
         self.inboundSSHHandler = inboundSSHHandler
     }
 
     func beginListening(on host: String, port: Int, loop: EventLoop) -> EventLoopFuture<Int?> {
-        let serverChannel = NIOLoopBoundBox<Channel?>(nil, eventLoop: loop)
-        let loopBoundSSHHandler = NIOLoopBound(self.inboundSSHHandler, eventLoop: loop)
-        self.listeningState = (serverChannel, loop)
-
-        return ServerBootstrap(group: loop).serverChannelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SocketOptionName(SO_REUSEADDR)), value: 1)
+        ServerBootstrap(group: loop).serverChannelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SocketOptionName(SO_REUSEADDR)), value: 1)
             .childChannelOption(ChannelOptions.allowRemoteHalfClosure, value: true)
             .childChannelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SocketOptionName(SO_REUSEADDR)), value: 1)
             .childChannelInitializer { childChannel in
                 let (ours, theirs) = GlueHandler.matchedPair()
-                let loopBoundGlueHandler = NIOLoopBound(theirs, eventLoop: loop)
 
                 // Ok, ask for the remote channel to be created. This needs remote half closure turned on and to be
                 // set up for data I/O.
                 let promise = loop.makePromise(of: Channel.self)
-                loopBoundSSHHandler.value.createChannel(promise, channelType: .forwardedTCPIP(.init(listeningHost: host, listeningPort: childChannel.localAddress!.port!, originatorAddress: childChannel.remoteAddress!))) { sshChildChannel, _ in
-                    sshChildChannel.eventLoop.makeCompletedFuture {
-                        let sync = sshChildChannel.pipeline.syncOperations
-                        try sync.addHandler(DataToBufferCodec())
-                        try sync.addHandler(loopBoundGlueHandler.value)
-                    }.flatMap {
+                self.inboundSSHHandler.createChannel(promise, channelType: .forwardedTCPIP(.init(listeningHost: host, listeningPort: childChannel.localAddress!.port!, originatorAddress: childChannel.remoteAddress!))) { sshChildChannel, _ in
+                    sshChildChannel.pipeline.addHandlers([DataToBufferCodec(), theirs]).flatMap {
                         sshChildChannel.setOption(ChannelOptions.allowRemoteHalfClosure, value: true)
                     }
                 }
 
                 // Great, now we add the glue handler to the newly-accepted channel, and then we don't allow this channel to go
                 // active until the SSH channel has. Both should go active at once.
-                return childChannel.eventLoop.makeCompletedFuture {
-                    try childChannel.pipeline.syncOperations.addHandler(ours)
-                }.flatMap { promise.futureResult }.map { _ in () }
+                return childChannel.pipeline.addHandler(ours).flatMap { _ in promise.futureResult }.map { _ in () }
             }
             .bind(host: host, port: port).map { channel in
-                serverChannel.value = channel
                 if port == 0 {
                     return channel.localAddress!.port!
                 } else {
@@ -74,13 +62,7 @@ final class RemotePortForwarder {
     }
 
     func stopListening() {
-        guard let listeningState = self.listeningState else {
-            return
-        }
-        self.listeningState = nil
-        listeningState.eventLoop.execute {
-            listeningState.channel.value?.close(promise: nil)
-        }
+        self.serverChannel?.close(promise: nil)
     }
 }
 
@@ -97,7 +79,6 @@ final class RemotePortForwarderGlobalRequestDelegate: GlobalRequestDelegate {
             }
 
             let forwarder = RemotePortForwarder(inboundSSHHandler: handler)
-            self.forwarder = forwarder
             forwarder.beginListening(on: host, port: port, loop: promise.futureResult.eventLoop).map {
                 GlobalRequest.TCPForwardingResponse(boundPort: $0)
             }.cascade(to: promise)

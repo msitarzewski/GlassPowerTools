@@ -1,7 +1,7 @@
 import Foundation
 import GlasSecretStore
 import GlassConnectionKit
-import Citadel
+@preconcurrency import Citadel
 import Crypto
 import _CryptoExtras
 

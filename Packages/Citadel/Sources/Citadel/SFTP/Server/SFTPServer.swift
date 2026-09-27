@@ -4,7 +4,7 @@ import NIOSSH
 import Logging
 
 /// Represents a file in the SFTP subsystem.
-public protocol SFTPFileHandle: Sendable {
+public protocol SFTPFileHandle {
     /// Reads data from the file. The length of the data read is determined by the length parameter. The data is read from the given offset in the file.
     func read(at offset: UInt64, length: UInt32) async throws -> ByteBuffer
 
@@ -22,18 +22,18 @@ public protocol SFTPFileHandle: Sendable {
 }
 
 /// Represents a file listing in a directory.
-public protocol SFTPDirectoryHandle: Sendable {
+public protocol SFTPDirectoryHandle {
     func listFiles(context: SSHContext) async throws -> [SFTPFileListing]
 }
 
 /// The context for the current SSH connection. This is passed to the delegate for each operation.
-public struct SSHContext: Sendable {
+public struct SSHContext {
     /// The username of the user that is connected to the SSH server.
     public let username: String?
 }
 
-public struct SSHShellContext: Sendable {
-    public struct WindowSize: Sendable {
+public struct SSHShellContext {
+    public struct WindowSize {
         public let columns: Int
         public let rows: Int
     }
@@ -104,18 +104,13 @@ enum SFTPServerSubsystem {
             username: username
         )
         
-        do {
-            try channel.pipeline.syncOperations.addHandlers(
-                SSHChannelDataUnwrapper(),
-                SSHOutboundChannelDataWrapper(),
-                deserializeHandler,
-                serializeHandler,
-                sftpInboundHandler,
-                CloseErrorHandler(logger: logger)
-            )
-            return channel.eventLoop.makeSucceededVoidFuture()
-        } catch {
-            return channel.eventLoop.makeFailedFuture(error)
-        }
+        return channel.pipeline.addHandlers(
+            SSHChannelDataUnwrapper(),
+            SSHOutboundChannelDataWrapper(),
+            deserializeHandler,
+            serializeHandler,
+            sftpInboundHandler,
+            CloseErrorHandler(logger: logger)
+        )
     }
 }

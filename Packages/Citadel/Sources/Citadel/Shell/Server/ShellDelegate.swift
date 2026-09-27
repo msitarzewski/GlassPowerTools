@@ -2,12 +2,12 @@ import NIO
 import NIOSSH
 import Logging
 
-public enum ShellClientEvent: Sendable {
+public enum ShellClientEvent {
     case stdin(ByteBuffer)
 }
 
 public struct ShellServerEvent: Sendable {
-    internal enum Event: Sendable {
+    internal enum Event {
         case stdout(ByteBuffer)
     }
     
@@ -42,7 +42,7 @@ public struct ShellOutboundWriter: Sendable {
     }
 }
 
-final class ShellServerInboundHandler: ChannelInboundHandler, Sendable {
+final class ShellServerInboundHandler: ChannelInboundHandler {
     typealias InboundIn = ByteBuffer
     
     let logger: Logger
@@ -99,9 +99,7 @@ final class ShellServerInboundHandler: ChannelInboundHandler, Sendable {
             }
         }
 
-        done.futureResult.whenFailure { [channel] error in
-            channel.pipeline.fireErrorCaught(error)
-        }
+        done.futureResult.whenFailure(context.fireErrorCaught)
     }
     
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
@@ -132,16 +130,11 @@ enum ShellServerSubsystem {
             username: username
         )
         
-        do {
-            try channel.pipeline.syncOperations.addHandlers(
-                SSHChannelDataUnwrapper(),
-                SSHOutboundChannelDataWrapper(),
-                shellInboundHandler,
-                CloseErrorHandler(logger: logger)
-            )
-            return channel.eventLoop.makeSucceededVoidFuture()
-        } catch {
-            return channel.eventLoop.makeFailedFuture(error)
-        }
+        return channel.pipeline.addHandlers(
+            SSHChannelDataUnwrapper(),
+            SSHOutboundChannelDataWrapper(),
+            shellInboundHandler,
+            CloseErrorHandler(logger: logger)
+        )
     }
 }

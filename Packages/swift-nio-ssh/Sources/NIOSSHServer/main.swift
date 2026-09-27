@@ -57,23 +57,14 @@ defer {
 func sshChildChannelInitializer(_ channel: Channel, _ channelType: SSHChannelType) -> EventLoopFuture<Void> {
     switch channelType {
     case .session:
-        return channel.eventLoop.makeCompletedFuture {
-            try channel.pipeline.syncOperations.addHandler(ExampleExecHandler())
-        }
+        return channel.pipeline.addHandler(ExampleExecHandler())
     case .directTCPIP(let target):
         let (ours, theirs) = GlueHandler.matchedPair()
-        let loopBoundGlueHandler = NIOLoopBound(theirs, eventLoop: channel.eventLoop)
 
-        return channel.eventLoop.makeCompletedFuture {
-            let sync = channel.pipeline.syncOperations
-            try sync.addHandler(DataToBufferCodec())
-            try sync.addHandler(ours)
-        }.flatMap {
+        return channel.pipeline.addHandlers([DataToBufferCodec(), ours]).flatMap {
             createOutboundConnection(targetHost: target.targetHost, targetPort: target.targetPort, loop: channel.eventLoop)
         }.flatMap { targetChannel in
-            targetChannel.eventLoop.makeCompletedFuture {
-                try targetChannel.pipeline.syncOperations.addHandler(loopBoundGlueHandler.value)
-            }
+            targetChannel.pipeline.addHandler(theirs)
         }
     case .forwardedTCPIP:
         return channel.eventLoop.makeFailedFuture(SSHServerError.invalidChannelType)
@@ -85,23 +76,7 @@ let hostKey = NIOSSHPrivateKey(ed25519Key: .init())
 
 let bootstrap = ServerBootstrap(group: group)
     .childChannelInitializer { channel in
-        channel.eventLoop.makeCompletedFuture {
-            let sync = channel.pipeline.syncOperations
-            try sync.addHandler(
-                NIOSSHHandler(
-                    role: .server(
-                        .init(
-                            hostKeys: [hostKey],
-                            userAuthDelegate: HardcodedPasswordDelegate(),
-                            globalRequestDelegate: RemotePortForwarderGlobalRequestDelegate()
-                        )
-                    ),
-                    allocator: channel.allocator,
-                    inboundChildChannelInitializer: sshChildChannelInitializer(_:_:)
-                )
-            )
-            try sync.addHandler(ErrorHandler())
-        }
+        channel.pipeline.addHandlers([NIOSSHHandler(role: .server(.init(hostKeys: [hostKey], userAuthDelegate: HardcodedPasswordDelegate(), globalRequestDelegate: RemotePortForwarderGlobalRequestDelegate())), allocator: channel.allocator, inboundChildChannelInitializer: sshChildChannelInitializer(_:_:)), ErrorHandler()])
     }
     .serverChannelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
     .serverChannelOption(ChannelOptions.socket(SocketOptionLevel(IPPROTO_TCP), TCP_NODELAY), value: 1)

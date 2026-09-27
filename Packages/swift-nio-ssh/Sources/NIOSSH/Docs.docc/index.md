@@ -19,7 +19,7 @@ SwiftNIO SSH supports SSHv2 with the following feature set:
 - All session channel features, including shell and exec channel requests
 - Direct and reverse TCP port forwarding
 - Modern cryptographic primitives only: Ed25519 and ECDSA over the major NIST curves (P256, P384, P521) for asymmetric cryptography, AES-GCM for symmetric cryptography, x25519 for key exchange
-- Password and public key user authentication
+- Password and public key user authentication (including SSH certificate support)
 - Supports all platforms supported by SwiftNIO and Swift Crypto
 
 ## How do I use SwiftNIO SSH?
@@ -115,6 +115,15 @@ User authentication is a vital part of SSH. To manage it, SwiftNIO SSH uses a pa
 The client protocol is straightforward: SwiftNIO SSH will invoke the method ``NIOSSHClientUserAuthenticationDelegate/nextAuthenticationType(availableMethods:nextChallengePromise:)`` on the delegate. The `availableMethods` will be an instance of ``NIOSSHAvailableUserAuthenticationMethods`` communicating which authentication methods the server has suggested will be acceptable. The delegate can then complete `nextChallengePromise` with either a new authentication request, or with `nil` to indicate that the client has run out of things to try.
 
 The server protocol is more complex. The delegate must provide a ``NIOSSHServerUserAuthenticationDelegate/supportedAuthenticationMethods`` property that communicates which authentication methods are supported by the delegate. Then, each time the client sends a user auth request, the ``NIOSSHServerUserAuthenticationDelegate/requestReceived(request:responsePromise:)`` method will be invoked. This may be invoked multiple times in parallel, as clients are allowed to issue auth requests in parallel. The `responsePromise` should be succeeded with the result of the authentication. There are three results: ``NIOSSHUserAuthenticationOutcome/success`` and ``NIOSSHUserAuthenticationOutcome/failure`` are straightforward, but in principle the server can require multiple challenges using ``NIOSSHUserAuthenticationOutcome/partialSuccess(remainingMethods:)``.
+
+#### SSH Certificate Authentication
+
+SwiftNIO SSH supports SSH certificate authentication through the public key authentication method. When using certificates:
+
+- Clients can offer a ``NIOSSHCertifiedPublicKey`` as part of their public key authentication by using the ``NIOSSHUserAuthenticationOffer/Offer/PrivateKey/init(privateKey:certifiedKey:)`` initializer.
+- Servers will automatically validate certificates against configured trusted certificate authorities (CAs) when ``SSHServerConfiguration/trustedUserCAKeys`` is set.
+- The ``NIOSSHUserAuthenticationRequest/Request/PublicKey/certifiedKey`` property will contain the parsed certificate information after successful validation.
+- Certificate validation includes checking the certificate type, principal, validity period, signature, and critical options.
 
 ### Direct Port Forwarding
 

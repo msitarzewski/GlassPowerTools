@@ -31,6 +31,16 @@ public struct SSHClientConfiguration {
 
     /// The maximum packet size that this NIOSSH client will accept
     public var maximumPacketSize = SSHPacketParser.defaultMaximumPacketSize
+    
+    /// The trusted certificate authority public keys for host authentication.
+    /// When set, hosts presenting certificates signed by these CAs will be authenticated
+    /// if the certificate is valid and the principal matches the hostname.
+    public var trustedHostCAKeys: [NIOSSHPublicKey] = []
+    
+    /// The hostname that this client is connecting to.
+    /// This is used for validating host certificates when `trustedHostCAKeys` is configured.
+    /// If not set, host certificate validation will accept any hostname.
+    public var hostname: String?
 
     public init(userAuthDelegate: NIOSSHClientUserAuthenticationDelegate,
                 serverAuthDelegate: NIOSSHClientServerAuthenticationDelegate,
@@ -41,8 +51,3 @@ public struct SSHClientConfiguration {
         self.globalRequestDelegate = globalRequestDelegate ?? DefaultGlobalRequestDelegate()
     }
 }
-
-// The delegates are intentionally not required to be Sendable, so neither is
-// the configuration that stores them.
-@available(*, unavailable)
-extension SSHClientConfiguration: Sendable {}

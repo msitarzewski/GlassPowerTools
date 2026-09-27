@@ -1,4 +1,4 @@
-// swift-tools-version:6.3
+// swift-tools-version:5.10
 //===----------------------------------------------------------------------===//
 //
 // This source file is part of the SwiftNIO open source project
@@ -12,6 +12,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
+//
+// This file was modified by the Glass Power Tools project (2026); the changes are
+// listed in PATCHES.md at the root of this package.
+//
 
 import PackageDescription
 
@@ -19,6 +23,10 @@ let strictConcurrencyDevelopment = false
 
 let strictConcurrencySettings: [SwiftSetting] = {
     var initialSettings: [SwiftSetting] = []
+    initialSettings.append(contentsOf: [
+        .enableUpcomingFeature("StrictConcurrency"),
+        .enableUpcomingFeature("InferSendableFromCaptures"),
+    ])
 
     if strictConcurrencyDevelopment {
         // -warnings-as-errors here is a workaround so that IDE-based development can
@@ -32,29 +40,30 @@ let strictConcurrencySettings: [SwiftSetting] = {
 let package = Package(
     name: "swift-nio-ssh",
     platforms: [
-        .macOS(.v26),
-        .iOS(.v26),
-        .visionOS(.v26),
+        .macOS(.v10_15),
+        .iOS(.v13),
+        .watchOS(.v6),
+        .tvOS(.v13),
     ],
     products: [
         .library(name: "NIOSSH", targets: ["NIOSSH"])
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.101.3"),
-        .package(url: "https://github.com/apple/swift-crypto.git", "4.5.1"..<"5.0.0"),
-        .package(url: "https://github.com/apple/swift-atomics.git", from: "1.3.1"),
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.81.0"),
+        .package(url: "https://github.com/apple/swift-crypto.git", "1.0.0"..<"5.0.0"),
+        .package(url: "https://github.com/apple/swift-atomics.git", from: "1.0.2"),
     ],
     targets: [
         .target(
             name: "NIOSSH",
             dependencies: [
+                .product(name: "NIO", package: "swift-nio"),
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
                 .product(name: "NIOFoundationCompat", package: "swift-nio"),
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Atomics", package: "swift-atomics"),
             ],
-            exclude: ["Docs.docc"],
             swiftSettings: strictConcurrencySettings
         ),
         .executableTarget(
@@ -64,8 +73,7 @@ let package = Package(
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
-            ],
-            swiftSettings: strictConcurrencySettings
+            ]
         ),
         .executableTarget(
             name: "NIOSSHServer",
@@ -75,8 +83,7 @@ let package = Package(
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "NIOFoundationCompat", package: "swift-nio"),
                 .product(name: "Crypto", package: "swift-crypto"),
-            ],
-            swiftSettings: strictConcurrencySettings
+            ]
         ),
         .executableTarget(
             name: "NIOSSHPerformanceTester",
@@ -85,8 +92,7 @@ let package = Package(
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOEmbedded", package: "swift-nio"),
                 .product(name: "Crypto", package: "swift-crypto"),
-            ],
-            swiftSettings: strictConcurrencySettings
+            ]
         ),
         .testTarget(
             name: "NIOSSHTests",
@@ -95,7 +101,6 @@ let package = Package(
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOEmbedded", package: "swift-nio"),
                 .product(name: "NIOFoundationCompat", package: "swift-nio"),
-                .product(name: "Atomics", package: "swift-atomics"),
             ],
             swiftSettings: strictConcurrencySettings
         ),

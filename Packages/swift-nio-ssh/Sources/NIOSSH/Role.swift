@@ -69,6 +69,3 @@ public enum SSHConnectionRole {
         }
     }
 }
-
-@available(*, unavailable)
-extension SSHConnectionRole: Sendable {}

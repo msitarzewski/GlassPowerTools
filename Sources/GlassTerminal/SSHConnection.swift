@@ -17,7 +17,7 @@ import Foundation
 import GlasSecretStore
 import GlassSSHTransport
 import NIOCore
-import NIOSSH
+@preconcurrency import NIOSSH
 import os
 
 enum SSHError: LocalizedError {

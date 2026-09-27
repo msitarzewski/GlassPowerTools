@@ -11,6 +11,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
+//
+// This file was modified by the Glass Power Tools project (2026); the changes are
+// listed in PATCHES.md at the root of this package.
+//
 
 import NIOCore
 
@@ -45,6 +49,8 @@ internal struct UserAuthSignablePayload {
         newBuffer.writeSSHString(serviceName.utf8)
         newBuffer.writeSSHString("publickey".utf8)
         newBuffer.writeSSHBoolean(true)
+        // Glass Power Tools: the algorithm named in the signed data must match the one in the
+        // request, so an RSA key signs rsa-sha2-512 here too (PATCHES.md, N4).
         if publicKey.keyPrefix.elementsEqual("ssh-rsa".utf8) {
             newBuffer.writeSSHString("rsa-sha2-512".utf8)
         } else {

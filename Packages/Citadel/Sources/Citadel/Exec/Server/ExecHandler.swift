@@ -15,7 +15,6 @@
 import Dispatch
 import Foundation
 import NIOCore
-import NIOConcurrencyHelpers
 import NIOFoundationCompat
 import NIOPosix
 import NIOSSH
@@ -38,48 +37,35 @@ enum SSHServerError: Error {
     case notListening
 }
 
-final class ExecHandler: ChannelDuplexHandler, Sendable {
+final class ExecHandler: ChannelDuplexHandler {
     typealias InboundIn = SSHChannelData
     typealias InboundOut = SSHChannelData
     typealias OutboundIn = SSHChannelData
     typealias OutboundOut = SSHChannelData
     
-    private struct State: Sendable {
-        var context: ExecCommandContext?
-        var pipeChannel: Channel?
-    }
-
     let delegate: ExecDelegate?
-    private let state = NIOLockedValueBox(State())
     
     init(delegate: ExecDelegate?, username: String?) {
         self.delegate = delegate
         self.username = username
     }
     
+    var context: ExecCommandContext?
+    var pipeChannel: Channel?
+    var environment: [String: String] = [:]
     let username: String?
     
     func handlerAdded(context: ChannelHandlerContext) {
-        let channel = context.channel
-        channel.setOption(ChannelOptions.allowRemoteHalfClosure, value: true).whenFailure { error in
-            channel.pipeline.fireErrorCaught(error)
+        context.channel.setOption(ChannelOptions.allowRemoteHalfClosure, value: true).whenFailure { error in
+            context.fireErrorCaught(error)
         }
     }
     
     func channelInactive(context: ChannelHandlerContext) {
-        let channel = context.channel
-        let commandContext = state.withLockedValue { state in
-            let commandContext = state.context
-            state.context = nil
-            state.pipeChannel = nil
-            return commandContext
-        }
         Task {
-            do {
-                try await commandContext?.terminate()
-            } catch {
-                channel.pipeline.fireErrorCaught(error)
-            }
+            try await self.context?.terminate()
+            self.context = nil
+            self.pipeChannel = nil
         }
         context.fireChannelInactive()
     }
@@ -90,31 +76,19 @@ final class ExecHandler: ChannelDuplexHandler, Sendable {
             if let delegate = delegate {
                 self.exec(event, delegate: delegate, channel: context.channel)
             } else if event.wantReply {
-                let channel = context.channel
-                channel.triggerUserOutboundEvent(ChannelFailureEvent()).whenComplete { _ in
-                    channel.close(promise: nil)
+                context.channel.triggerUserOutboundEvent(ChannelFailureEvent()).whenComplete { _ in
+                    context.channel.close(promise: nil)
                 }
             }
         case let event as SSHChannelRequestEvent.EnvironmentRequest:
             if let delegate = delegate {
-                let channel = context.channel
                 Task {
-                    do {
-                        try await delegate.setEnvironmentValue(event.value, forKey: event.name)
-                    } catch {
-                        channel.pipeline.fireErrorCaught(error)
-                    }
+                    try await delegate.setEnvironmentValue(event.value, forKey: event.name)
                 }
             }
         case ChannelEvent.inputClosed:
-            let channel = context.channel
-            let commandContext = state.withLockedValue(\.context)
             Task {
-                do {
-                    try await commandContext?.inputClosed()
-                } catch {
-                    channel.pipeline.fireErrorCaught(error)
-                }
+                try await self.context?.inputClosed()
             }
         default:
             context.fireUserInboundEventTriggered(event)
@@ -143,7 +117,7 @@ final class ExecHandler: ChannelDuplexHandler, Sendable {
             }
         }
         
-        let (ours, theirs) = GlueHandler.matchedPair(eventLoop: channel.eventLoop)
+        let (ours, theirs) = GlueHandler.matchedPair()
         
         // Ok, great, we've sorted stdout and stdin. For stderr we need a different strategy: we just park a thread for this.
         let stderrHandle = handler.stderrPipe.fileHandleForReading
@@ -155,44 +129,30 @@ final class ExecHandler: ChannelDuplexHandler, Sendable {
                 }
                 var buffer = channel.allocator.buffer(capacity: data.count)
                 buffer.writeContiguousBytes(data)
-                channel.write(SSHChannelData(type: .stdErr, data: .byteBuffer(buffer)), promise: nil)
+                channel.writeAndFlush(SSHChannelData(type: .stdErr, data: .byteBuffer(buffer)), promise: nil)
             } catch {
                 channel.close(promise: nil)
             }
         }
         
-        let addHandler: EventLoopFuture<Void>
-        do {
-            try channel.pipeline.syncOperations.addHandler(ours)
-            addHandler = channel.eventLoop.makeSucceededVoidFuture()
-        } catch {
-            addHandler = channel.eventLoop.makeFailedFuture(error)
-        }
-
-        addHandler.flatMap {
+        channel.pipeline.addHandler(ours).flatMap {
             NIOPipeBootstrap(group: channel.eventLoop)
                 .channelOption(ChannelOptions.allowRemoteHalfClosure, value: true)
                 .channelInitializer { pipeChannel in
-                    do {
-                        try pipeChannel.pipeline.syncOperations.addHandlers(SSHInboundChannelDataWrapper(), theirs)
-                        return pipeChannel.eventLoop.makeSucceededVoidFuture()
-                    } catch {
-                        return pipeChannel.eventLoop.makeFailedFuture(error)
-                    }
-                }.takingOwnershipOfDescriptors(
-                    input: dup(handler.stdoutPipe.fileHandleForReading.fileDescriptor),
-                    output: dup(handler.stdinPipe.fileHandleForWriting.fileDescriptor)
+                    pipeChannel.pipeline.addHandlers(SSHInboundChannelDataWrapper(), SSHOutboundChannelDataUnwrapper(), theirs)
+                }.withPipes(
+                    inputDescriptor: dup(handler.stdoutPipe.fileHandleForReading.fileDescriptor),
+                    outputDescriptor: dup(handler.stdinPipe.fileHandleForWriting.fileDescriptor)
                 )
         }.flatMap { pipeChannel -> EventLoopFuture<Channel> in
-            self.state.withLockedValue { $0.pipeChannel = pipeChannel }
+            self.pipeChannel = pipeChannel
             let start = channel.eventLoop.makePromise(of: Void.self)
             start.completeWithTask {
                 do {
-                    let commandContext = try await delegate.start(
+                    self.context = try await delegate.start(
                         command: event.command,
                         outputHandler: handler
                     )
-                    self.state.withLockedValue { $0.context = commandContext }
                 } catch {
                     try await pipeChannel.close(mode: .all)
                 }
@@ -209,16 +169,13 @@ final class ExecHandler: ChannelDuplexHandler, Sendable {
             }
         }.flatMap { pipeChannel in
             successPromise.futureResult.flatMap { code in
-                channel.triggerUserOutboundEvent(
-                    SSHChannelRequestEvent.ExitStatus(exitStatus: code)
-                ).flatMap {
-                    pipeChannel.close(mode: .all)
-                }
+                pipeChannel.close(mode: .all).map { code }
             }
+        }.flatMap { code in
+            channel.triggerUserOutboundEvent(SSHChannelRequestEvent.ExitStatus(exitStatus: code))
         }.whenComplete { result in
             switch result {
             case .success:
-                handler.onExit?(ExecExitContext())
                 channel.close(promise: nil)
             case .failure:
                 if event.wantReply {

@@ -11,6 +11,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
+//
+// This file was modified by the Glass Power Tools project (2026); the changes are
+// listed in PATCHES.md at the root of this package.
+//
 
 import NIOCore
 
@@ -170,6 +174,8 @@ extension SSHChannelMultiplexer {
         }
     }
 
+    // Glass Power Tools: the parent connection's writability reaches every child channel, so
+    // writers back off when the connection's buffer is full (see PATCHES.md, N2).
     func parentChannelWritabilityChanged(_ newValue: Bool) {
         for channel in self.channels.values {
             channel.parentChannelWritabilityChanged(newValue: newValue)
@@ -193,8 +199,7 @@ extension SSHChannelMultiplexer {
             throw NIOSSHError.tcpShutdown
         }
 
-        // Allocate sequential channel identifiers and wrap at OpenSSH's signed
-        // 32-bit upper bound below; the dictionary remains the channel lookup.
+        // TODO: We need a better channel ID system. Maybe use indices into Arrays instead?
         let channelID = self.nextChannelID
         self.nextChannelID &+= 1
 

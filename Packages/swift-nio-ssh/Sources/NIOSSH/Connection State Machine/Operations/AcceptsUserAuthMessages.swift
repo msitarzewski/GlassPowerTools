@@ -14,7 +14,7 @@
 
 import NIOCore
 
-protocol AcceptsUserAuthMessages: _NIOSSHSendableMetatype {
+protocol AcceptsUserAuthMessages {
     var userAuthStateMachine: UserAuthenticationStateMachine { get set }
 
     var connectionAttributes: SSHConnectionStateMachine.Attributes { get }
@@ -23,7 +23,7 @@ protocol AcceptsUserAuthMessages: _NIOSSHSendableMetatype {
 }
 
 /// This event indicates that server wants us to display the following message to the end user.
-public struct NIOUserAuthBannerEvent: Hashable, Sendable {
+public struct NIOUserAuthBannerEvent: Hashable {
     /// The message to be displayed to end user
     public var message: String
 
@@ -37,7 +37,7 @@ public struct NIOUserAuthBannerEvent: Hashable, Sendable {
 }
 
 /// This event indicates that server accepted our response to authentication challenge. The SSH session can be considered active after this point.
-public struct UserAuthSuccessEvent: Hashable, Sendable {
+public struct UserAuthSuccessEvent: Hashable {
     public init() {}
 }
 
@@ -66,11 +66,9 @@ extension AcceptsUserAuthMessages {
         let result = try self.userAuthStateMachine.receiveUserAuthRequest(message)
         
         if let future = result {
-            let banner: SSHServerConfiguration.UserAuthBanner?
+            var banner: SSHServerConfiguration.UserAuthBanner?
             if case .server(let config) = role {
                 banner = config.banner
-            } else {
-                banner = nil
             }
 
             let connectionAttributes = self.connectionAttributes

@@ -63,7 +63,8 @@ let package = Package(
         // tags first and then pinned to the exact commits below, so a grammar cannot move under us.
         .package(url: "https://github.com/tree-sitter/tree-sitter-go", from: "0.21.0"),
         .package(url: "https://github.com/tree-sitter/tree-sitter-c", from: "0.21.0"),
-                // The SSH stack vendored from glas.sh, verbatim (see Stage 2 transport note).
+        // The SSH stack: Citadel and its fork of swift-nio-ssh, vendored at recorded upstream
+        // commits with a documented set of local changes (each package's PATCHES.md).
         .package(path: "Packages/Citadel"),
         .package(path: "Packages/swift-nio-ssh"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.101.3"),

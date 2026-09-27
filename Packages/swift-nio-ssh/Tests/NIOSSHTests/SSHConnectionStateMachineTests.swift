@@ -45,21 +45,21 @@ final class SSHConnectionStateMachineTests: XCTestCase {
     }
 
     private func run(clientMessage: SSHMultiMessage?, client: inout SSHConnectionStateMachine, serverMessage: SSHMultiMessage?, server: inout SSHConnectionStateMachine, allocator: ByteBufferAllocator, loop: EmbeddedEventLoop, dripFeed: Bool = false) throws {
-        let clientMessage = NIOLoopBoundBox(clientMessage, eventLoop: loop)
-        let serverMessage = NIOLoopBoundBox(serverMessage, eventLoop: loop)
+        var clientMessage = clientMessage
+        var serverMessage = serverMessage
         var clientBuffer = allocator.buffer(capacity: 1024)
         var serverBuffer = allocator.buffer(capacity: 1024)
-        let waitingForClientMessage = NIOLoopBoundBox(false, eventLoop: loop)
-        let waitingForServerMessage = NIOLoopBoundBox(false, eventLoop: loop)
+        var waitingForClientMessage = false
+        var waitingForServerMessage = false
 
-        while clientMessage.value != nil || serverMessage.value != nil {
-            if let clientMessage = clientMessage.value {
+        while clientMessage != nil || serverMessage != nil {
+            if let clientMessage = clientMessage {
                 for message in clientMessage {
                     XCTAssertNoThrow(try client.processOutboundMessage(message, buffer: &clientBuffer, allocator: allocator, loop: loop))
                 }
             }
 
-            if let serverMessage = serverMessage.value {
+            if let serverMessage = serverMessage {
                 for message in serverMessage {
                     XCTAssertNoThrow(try server.processOutboundMessage(message, buffer: &serverBuffer, allocator: allocator, loop: loop))
                 }
@@ -72,23 +72,23 @@ final class SSHConnectionStateMachineTests: XCTestCase {
                         if clientBuffer.readableBytes > 0 {
                             switch try assertNoThrowWithValue(server.processInboundMessage(allocator: allocator, loop: loop)) {
                             case .some(.emitMessage(let message)):
-                                serverMessage.value.append(message)
+                                serverMessage.append(message)
                             case .none:
                                 ()
                             case .some(.noMessage):
                                 ()
                             case .some(.possibleFutureMessage(let futureMessage)):
-                                waitingForServerMessage.value = true
+                                waitingForServerMessage = true
 
                                 futureMessage.whenComplete { result in
-                                    waitingForServerMessage.value = false
+                                    waitingForServerMessage = false
 
                                     switch result {
                                     case .failure(let err):
                                         XCTFail("Unexpected error in delayed message production: \(err)")
                                     case .success(let message):
                                         if let message = message {
-                                            serverMessage.value.append(message)
+                                            serverMessage.append(message)
                                         }
                                     }
                                 }
@@ -112,23 +112,23 @@ final class SSHConnectionStateMachineTests: XCTestCase {
                         if serverBuffer.readableBytes > 0 {
                             switch try assertNoThrowWithValue(client.processInboundMessage(allocator: allocator, loop: loop)) {
                             case .some(.emitMessage(let message)):
-                                clientMessage.value.append(message)
+                                clientMessage.append(message)
                             case .none:
                                 ()
                             case .some(.noMessage):
                                 ()
                             case .some(.possibleFutureMessage(let futureMessage)):
-                                waitingForClientMessage.value = true
+                                waitingForClientMessage = true
 
                                 futureMessage.whenComplete { result in
-                                    waitingForClientMessage.value = false
+                                    waitingForClientMessage = false
 
                                     switch result {
                                     case .failure(let err):
                                         XCTFail("Unexpected error in delayed message production: \(err)")
                                     case .success(let message):
                                         if let message = message {
-                                            clientMessage.value.append(message)
+                                            clientMessage.append(message)
                                         }
                                     }
                                 }
@@ -143,29 +143,29 @@ final class SSHConnectionStateMachineTests: XCTestCase {
                 serverBuffer.clear()
             }
 
-            clientMessage.value = nil
-            serverMessage.value = nil
+            clientMessage = nil
+            serverMessage = nil
 
             clientLoop: while true {
                 switch try assertNoThrowWithValue(client.processInboundMessage(allocator: allocator, loop: loop)) {
                 case .some(.emitMessage(let message)):
-                    clientMessage.value.append(message)
+                    clientMessage.append(message)
                 case .none:
                     break clientLoop
                 case .some(.noMessage):
                     ()
                 case .some(.possibleFutureMessage(let futureMessage)):
-                    waitingForClientMessage.value = true
+                    waitingForClientMessage = true
 
                     futureMessage.whenComplete { result in
-                        waitingForClientMessage.value = false
+                        waitingForClientMessage = false
 
                         switch result {
                         case .failure(let err):
                             XCTFail("Unexpected error in delayed message production: \(err)")
                         case .success(let message):
                             if let message = message {
-                                clientMessage.value.append(message)
+                                clientMessage.append(message)
                             }
                         }
                     }
@@ -179,24 +179,24 @@ final class SSHConnectionStateMachineTests: XCTestCase {
             serverLoop: while true {
                 switch try assertNoThrowWithValue(server.processInboundMessage(allocator: allocator, loop: loop)) {
                 case .some(.emitMessage(let message)):
-                    serverMessage.value.append(message)
+                    serverMessage.append(message)
                 case .none:
                     break serverLoop
                 case .some(.noMessage):
                     ()
                 case .some(.possibleFutureMessage(let futureMessage)):
-                    precondition(!waitingForServerMessage.value, "Unexpected emit message while another message is being processed")
-                    waitingForServerMessage.value = true
+                    precondition(!waitingForServerMessage, "Unexpected emit message while another message is being processed")
+                    waitingForServerMessage = true
 
                     futureMessage.whenComplete { result in
-                        waitingForServerMessage.value = false
+                        waitingForServerMessage = false
 
                         switch result {
                         case .failure(let err):
                             XCTFail("Unexpected error in delayed message production: \(err)")
                         case .success(let message):
                             if let message = message {
-                                serverMessage.value.append(message)
+                                serverMessage.append(message)
                             }
                         }
                     }
@@ -209,8 +209,8 @@ final class SSHConnectionStateMachineTests: XCTestCase {
             loop.run()
         }
 
-        XCTAssertFalse(waitingForClientMessage.value, "Loop exited while waiting for a client message")
-        XCTAssertFalse(waitingForServerMessage.value, "Loop exited while waiting for a server message")
+        XCTAssertFalse(waitingForClientMessage, "Loop exited while waiting for a client message")
+        XCTAssertFalse(waitingForServerMessage, "Loop exited while waiting for a server message")
     }
 
     private func assertForwardsToMultiplexer(_ message: SSHMessage, sender: inout SSHConnectionStateMachine, receiver: inout SSHConnectionStateMachine, allocator: ByteBufferAllocator, loop: EmbeddedEventLoop) throws {

@@ -1,7 +1,7 @@
 import Foundation
-import Citadel
+@preconcurrency import Citadel
 import NIOCore
-import NIOSSH
+@preconcurrency import NIOSSH
 
 /// The PTY glas.sh requested for every interactive session (`runInteractiveTTY`, Models.swift:2320).
 public struct SSHPTYRequest: Sendable, Hashable {

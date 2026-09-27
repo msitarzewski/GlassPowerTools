@@ -2,7 +2,6 @@ import CCryptoBoringSSL
 import Foundation
 import BigInt
 import NIO
-import NIOConcurrencyHelpers
 import NIOSSH
 import Crypto
 
@@ -17,11 +16,7 @@ public struct DiffieHellmanGroup14Sha1: NIOSSHKeyExchangeAlgorithmProtocol {
     private var theirKey: Insecure.RSA.PublicKey?
     private var sharedSecret: Data?
     public let ourKey: Insecure.RSA.PrivateKey
-    private static let configuredKey = NIOLockedValueBox<Insecure.RSA.PrivateKey?>(nil)
-    public static var ourKey: Insecure.RSA.PrivateKey? {
-        get { configuredKey.withLockedValue { $0 } }
-        set { configuredKey.withLockedValue { $0 = newValue } }
-    }
+    public static var ourKey: Insecure.RSA.PrivateKey?
     
     private struct _KeyExchangeResult {
         var sessionID: ByteBuffer

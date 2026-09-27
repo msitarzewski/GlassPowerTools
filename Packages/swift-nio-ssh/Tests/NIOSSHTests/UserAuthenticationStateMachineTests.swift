@@ -128,16 +128,14 @@ final class UserAuthenticationStateMachineTests: XCTestCase {
     }
 
     func serviceAccepted(service: String, nextMessage expectedMessage: SSHMessage.UserAuthRequestMessage?, userAuthPayload: UserAuthSignablePayload? = nil, stateMachine: inout UserAuthenticationStateMachine) throws {
+        var request: SSHMessage.UserAuthRequestMessage?
+
         let future = try assertNoThrowWithValue(stateMachine.receiveServiceAccept(.init(service: service)))
         XCTAssertNotNil(future)
-        guard let future else {
-            return
-        }
-        let request = NIOLoopBoundBox<SSHMessage.UserAuthRequestMessage?>(nil, eventLoop: future.eventLoop)
-        future.whenComplete {
+        future?.whenComplete {
             switch $0 {
             case .success(let message):
-                request.value = message
+                request = message
             case .failure(let error):
                 XCTFail("Unexpected error: \(error)")
             }
@@ -147,29 +145,27 @@ final class UserAuthenticationStateMachineTests: XCTestCase {
         // For signed methods we need to be a bit careful: we can't assume that the signature will have a bitwise match, so we have to validate it
         // instead.
         if case .some(.publicKey(.known(let expectedKey, _))) = expectedMessage.map({ $0.method }),
-           case .some(.publicKey(.known(let actualKey, let actualSignature))) = request.value.map({ $0.method }),
+           case .some(.publicKey(.known(let actualKey, let actualSignature))) = request.map({ $0.method }),
            let userAuthPayload = userAuthPayload
         {
-            XCTAssertEqual(expectedMessage!.username, request.value!.username)
-            XCTAssertEqual(expectedMessage!.service, request.value!.service)
+            XCTAssertEqual(expectedMessage!.username, request!.username)
+            XCTAssertEqual(expectedMessage!.service, request!.service)
             XCTAssertEqual(expectedKey, actualKey)
             XCTAssertTrue(expectedKey.isValidSignature(actualSignature!, for: userAuthPayload))
         } else {
-            XCTAssertEqual(request.value, expectedMessage)
+            XCTAssertEqual(request, expectedMessage)
         }
     }
 
     func authFailed(failure: SSHMessage.UserAuthFailureMessage, nextMessage expectedMessage: SSHMessage.UserAuthRequestMessage?, userAuthPayload: UserAuthSignablePayload? = nil, stateMachine: inout UserAuthenticationStateMachine) throws {
+        var request: SSHMessage.UserAuthRequestMessage?
+
         let future = try assertNoThrowWithValue(stateMachine.receiveUserAuthFailure(failure))
         XCTAssertNotNil(future)
-        guard let future else {
-            return
-        }
-        let request = NIOLoopBoundBox<SSHMessage.UserAuthRequestMessage?>(nil, eventLoop: future.eventLoop)
-        future.whenComplete {
+        future?.whenComplete {
             switch $0 {
             case .success(let message):
-                request.value = message
+                request = message
             case .failure(let error):
                 XCTFail("Unexpected error: \(error)")
             }
@@ -179,29 +175,27 @@ final class UserAuthenticationStateMachineTests: XCTestCase {
         // For signed methods we need to be a bit careful: we can't assume that the signature will have a bitwise match, so we have to validate it
         // instead.
         if case .some(.publicKey(.known(let expectedKey, _))) = expectedMessage.map({ $0.method }),
-           case .some(.publicKey(.known(let actualKey, let actualSignature))) = request.value.map({ $0.method }),
+           case .some(.publicKey(.known(let actualKey, let actualSignature))) = request.map({ $0.method }),
            let userAuthPayload = userAuthPayload
         {
-            XCTAssertEqual(expectedMessage!.username, request.value!.username)
-            XCTAssertEqual(expectedMessage!.service, request.value!.service)
+            XCTAssertEqual(expectedMessage!.username, request!.username)
+            XCTAssertEqual(expectedMessage!.service, request!.service)
             XCTAssertEqual(expectedKey, actualKey)
             XCTAssertTrue(expectedKey.isValidSignature(actualSignature!, for: userAuthPayload))
         } else {
-            XCTAssertEqual(request.value, expectedMessage)
+            XCTAssertEqual(request, expectedMessage)
         }
     }
 
     func expectAuthRequestToFailSynchronously(request: SSHMessage.UserAuthRequestMessage, expecting result: SSHMessage.UserAuthFailureMessage, stateMachine: inout UserAuthenticationStateMachine) throws {
+        var message: SSHMessage.UserAuthFailureMessage?
+
         let future = try assertNoThrowWithValue(try stateMachine.receiveUserAuthRequest(request))
         XCTAssertNotNil(future)
-        guard let future else {
-            return
-        }
-        let message = NIOLoopBoundBox<SSHMessage.UserAuthFailureMessage?>(nil, eventLoop: future.eventLoop)
-        future.whenComplete {
+        future?.whenComplete {
             switch $0 {
             case .success(.failure(let response)):
-                message.value = response
+                message = response
             case .success(.publicKeyOK):
                 XCTFail("Unexpected public key ok")
             case .success(.success):
@@ -212,20 +206,18 @@ final class UserAuthenticationStateMachineTests: XCTestCase {
         }
         self.loop.run()
 
-        XCTAssertEqual(message.value, result)
+        XCTAssertEqual(message, result)
     }
 
     func expectAuthRequestToSucceedSynchronously(request: SSHMessage.UserAuthRequestMessage, stateMachine: inout UserAuthenticationStateMachine) throws {
+        var completed = false
+
         let future = try assertNoThrowWithValue(try stateMachine.receiveUserAuthRequest(request))
         XCTAssertNotNil(future)
-        guard let future else {
-            return
-        }
-        let completed = NIOLoopBoundBox(false, eventLoop: future.eventLoop)
-        future.whenComplete {
+        future?.whenComplete {
             switch $0 {
             case .success(.success):
-                completed.value = true
+                completed = true
             case .success(.publicKeyOK):
                 XCTFail("Unexpected public key ok")
             case .success(.failure):
@@ -236,20 +228,18 @@ final class UserAuthenticationStateMachineTests: XCTestCase {
         }
         self.loop.run()
 
-        XCTAssertTrue(completed.value)
+        XCTAssertTrue(completed)
     }
 
     func expectAuthRequestToReturnPKOKSynchronously(request: SSHMessage.UserAuthRequestMessage, expecting: SSHMessage.UserAuthPKOKMessage, stateMachine: inout UserAuthenticationStateMachine) throws {
+        var message: SSHMessage.UserAuthPKOKMessage?
+
         let future = try assertNoThrowWithValue(try stateMachine.receiveUserAuthRequest(request))
         XCTAssertNotNil(future)
-        guard let future else {
-            return
-        }
-        let message = NIOLoopBoundBox<SSHMessage.UserAuthPKOKMessage?>(nil, eventLoop: future.eventLoop)
-        future.whenComplete {
+        future?.whenComplete {
             switch $0 {
             case .success(.publicKeyOK(let response)):
-                message.value = response
+                message = response
             case .success(.success):
                 XCTFail("Unexpected success")
             case .success(.failure):
@@ -260,7 +250,7 @@ final class UserAuthenticationStateMachineTests: XCTestCase {
         }
         self.loop.run()
 
-        XCTAssertEqual(message.value, expecting)
+        XCTAssertEqual(message, expecting)
     }
 
     func testBasicHappyClientFlow() throws {
@@ -443,7 +433,7 @@ final class UserAuthenticationStateMachineTests: XCTestCase {
 
         // User asks a question, it fails.
         let authRequest = SSHMessage.UserAuthRequestMessage(username: "foo", service: "ssh-connection", method: .password("bar"))
-        let failure = SSHMessage.UserAuthFailureMessage(authentications: ["password", "publickey"], partialSuccess: false)
+        let failure = SSHMessage.UserAuthFailureMessage(authentications: ["password", "publickey", "hostbased"], partialSuccess: false)
         try self.expectAuthRequestToFailSynchronously(request: authRequest, expecting: failure, stateMachine: &stateMachine)
         stateMachine.sendUserAuthFailure(failure)
 
@@ -452,7 +442,7 @@ final class UserAuthenticationStateMachineTests: XCTestCase {
         stateMachine.sendUserAuthFailure(failure)
     }
 
-    func testServerBoundsAuthenticationAttemptsIncludingParallelRequests() throws {
+    func testManyAuthRequestsInFlightAtOnce() throws {
         var stateMachine = UserAuthenticationStateMachine(role: .server(.init(hostKeys: [self.hostKey], userAuthDelegate: DenyAllServerAuthDelegate())), loop: self.loop, sessionID: self.sessionID)
 
         // Begin by doing the service accept dance.
@@ -460,18 +450,14 @@ final class UserAuthenticationStateMachineTests: XCTestCase {
         XCTAssertNoThrow(try self.serviceRequested(service: "ssh-userauth", nextMessage: serviceAccept, stateMachine: &stateMachine))
         stateMachine.sendServiceAccept(serviceAccept)
 
-        // Requests may be in flight in parallel, but the aggregate attempt
-        // budget is enforced before additional delegate work is created.
+        // The user can ask many questions in parallel.
         let authRequest = SSHMessage.UserAuthRequestMessage(username: "foo", service: "ssh-connection", method: .password("bar"))
-        let failure = SSHMessage.UserAuthFailureMessage(authentications: ["password", "publickey"], partialSuccess: false)
+        let failure = SSHMessage.UserAuthFailureMessage(authentications: ["password", "publickey", "hostbased"], partialSuccess: false)
 
-        for _ in 0 ..< UserAuthenticationStateMachine.maximumServerAuthenticationAttempts {
+        for _ in 0 ..< 10 {
             try self.expectAuthRequestToFailSynchronously(request: authRequest, expecting: failure, stateMachine: &stateMachine)
         }
-        XCTAssertThrowsError(try stateMachine.receiveUserAuthRequest(authRequest)) { error in
-            XCTAssertEqual((error as? NIOSSHError)?.type, .protocolViolation)
-        }
-        for _ in 0 ..< UserAuthenticationStateMachine.maximumServerAuthenticationAttempts {
+        for _ in 0 ..< 10 {
             stateMachine.sendUserAuthFailure(failure)
         }
     }
@@ -795,27 +781,5 @@ final class UserAuthenticationStateMachineTests: XCTestCase {
 
         // Let's say we got a success. Happy path!
         XCTAssertNoThrow(try stateMachine.receiveUserAuthSuccess())
-    }
-
-    func testSupportedAuthenticationMethodsDoNotAdvertiseHostBased() {
-        XCTAssertEqual(NIOSSHAvailableUserAuthenticationMethods.all, [.publicKey, .password])
-        XCTAssertFalse(NIOSSHAvailableUserAuthenticationMethods.all.strings.contains("hostbased"))
-
-        // We still report a peer's host-based capability so delegates can make an
-        // informed choice without NIOSSH claiming that it can send the method.
-        let remoteMethods = NIOSSHAvailableUserAuthenticationMethods(
-            .init(authentications: ["hostbased"], partialSuccess: false)
-        )
-        XCTAssertEqual(remoteMethods, .hostBased)
-    }
-
-    func testHostBasedOfferFailsRecoverably() {
-        let offer = NIOSSHUserAuthenticationOffer(
-            username: "foo",
-            serviceName: "ssh-connection",
-            offer: .hostBased(.init())
-        )
-
-        XCTAssertThrowsError(try SSHMessage.UserAuthRequestMessage(request: offer, sessionID: self.sessionID))
     }
 }

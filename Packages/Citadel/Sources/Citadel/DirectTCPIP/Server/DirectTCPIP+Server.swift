@@ -1,23 +1,13 @@
 import NIO
 import NIOSSH
 
-fileprivate final class ProxyChannelHandler: ChannelOutboundHandler, Sendable {
+fileprivate final class ProxyChannelHandler: ChannelOutboundHandler {
     typealias OutboundIn = ByteBuffer
 
-    private let write: @Sendable (ByteBuffer, EventLoopPromise<Void>?) -> Void
+    private let write: (ByteBuffer, EventLoopPromise<Void>?) -> Void
 
-    init(write: @escaping @Sendable (ByteBuffer, EventLoopPromise<Void>?) -> Void) {
+    init(write: @escaping (ByteBuffer, EventLoopPromise<Void>?) -> Void) {
         self.write = write
-    }
-
-    static func weaklyForwarding(to channel: Channel) -> ProxyChannelHandler {
-        ProxyChannelHandler { [weak channel] data, promise in
-            guard let channel else {
-                promise?.fail(ChannelError.ioOnClosedChannel)
-                return
-            }
-            channel.writeAndFlush(data, promise: promise)
-        }
     }
 
     func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
@@ -52,14 +42,20 @@ public struct DirectTCPIPForwardingDelegate: DirectTCPIPDelegate {
         return ClientBootstrap(group: channel.eventLoop)
             .connect(host: request.targetHost, port: request.targetPort)
             .flatMap { remote in
-                return channel.pipeline.addHandlers([
+                channel.pipeline.addHandlers([
                     DataToBufferCodec()
                 ]).flatMap {
                     channel.pipeline.addHandler(ProxyChannelHandler { data, promise in
                         remote.writeAndFlush(data, promise: promise)
                     })
                 }.flatMap {
-                    remote.pipeline.addHandler(ProxyChannelHandler.weaklyForwarding(to: channel))
+                    remote.pipeline.addHandler(ProxyChannelHandler { [weak channel] data, promise in
+                        guard let channel else {
+                            promise?.fail(ChannelError.ioOnClosedChannel)
+                            return
+                        }
+                        channel.writeAndFlush(data, promise: promise)
+                    })
                 }
             }
     }

@@ -57,15 +57,12 @@ extension SSHAlgorithms.Modification<(NIOSSHPublicKeyProtocol.Type, NIOSSHSignat
     }
 }
 
-// NIOSSH exposes algorithm metatypes without Sendable annotations. Metatypes are
-// immutable process-wide identities, so this container is safe to transfer even
-// though the upstream protocol declarations have not adopted Sendable yet.
-public struct SSHAlgorithms: @unchecked Sendable {
+public struct SSHAlgorithms: Sendable {
     /// Represents a modification to a list of items.
     ///
     /// - replace: Replaces the existing list of items with the given list of items.
     /// - add: Adds the given list of items to the list of items.
-    public enum Modification<T>: @unchecked Sendable {
+    public enum Modification<T: Sendable>: Sendable {
         case replace(with: [T])
         case add([T])
     }
@@ -113,8 +110,10 @@ public struct SSHAlgorithms: @unchecked Sendable {
 }
 
 /// Represents an SSH connection.
-public final class SSHClient: Sendable {
-    private struct State: Sendable {
+public final class SSHClient {
+    // Glass Power Tools: the reconnect task replaces the session while callers read it, so the
+    // mutable state lives behind one lock (see PATCHES.md, C7).
+    private struct State {
         var session: SSHClientSession
         var userInitiatedClose = false
         var reconnect = _SSHReconnectMode.never
@@ -127,7 +126,7 @@ public final class SSHClient: Sendable {
         get { state.withLockedValue(\.session) }
         set { state.withLockedValue { $0.session = newValue } }
     }
-    let authenticationMethod: @Sendable () -> SSHAuthenticationMethod
+    let authenticationMethod: () -> SSHAuthenticationMethod
     let hostKeyValidator: SSHHostKeyValidator
     private let algorithms: SSHAlgorithms
     private let protocolOptions: Set<SSHProtocolOption>
@@ -143,7 +142,7 @@ public final class SSHClient: Sendable {
     
     init(
         session: SSHClientSession,
-        authenticationMethod: @escaping @Sendable @autoclosure () -> SSHAuthenticationMethod,
+        authenticationMethod: @escaping @autoclosure () -> SSHAuthenticationMethod,
         hostKeyValidator: SSHHostKeyValidator,
         algorithms: SSHAlgorithms = SSHAlgorithms(),
         protocolOptions: Set<SSHProtocolOption>
@@ -192,10 +191,11 @@ public final class SSHClient: Sendable {
             settings: settings
         ).get()
         
-        let session = try await SSHClientSession.established(
-            on: channel,
-            inboundChannelHandler: inboundChannelHandler
-        )
+        let sshHandler = try await channel.pipeline.handler(type: NIOSSHHandler.self).get()
+        let handshakeHandler = try await channel.pipeline.handler(type: ClientHandshakeHandler.self).get()
+        let session = try await handshakeHandler.authenticated.map {
+            SSHClientSession(channel: channel, inboundChannelHandler: inboundChannelHandler, sshHandler: sshHandler)
+        }.get()
 
         return SSHClient(
             session: session,
@@ -223,10 +223,11 @@ public final class SSHClient: Sendable {
             )
         }
         
-        let session = try await SSHClientSession.established(
-            on: channel,
-            inboundChannelHandler: inboundChannelHandler
-        )
+        let sshHandler = try await channel.pipeline.handler(type: NIOSSHHandler.self).get()
+        let handshakeHandler = try await channel.pipeline.handler(type: ClientHandshakeHandler.self).get()
+        let session = try await handshakeHandler.authenticated.map {
+            SSHClientSession(channel: channel, inboundChannelHandler: inboundChannelHandler, sshHandler: sshHandler)
+        }.get()
 
         return SSHClient(
             session: session,
@@ -247,7 +248,7 @@ public final class SSHClient: Sendable {
     /// - Returns: An SSH client.
     public static func connect(
         on channel: Channel,
-        authenticationMethod: @escaping @Sendable @autoclosure () -> SSHAuthenticationMethod,
+        authenticationMethod: @escaping @autoclosure () -> SSHAuthenticationMethod,
         hostKeyValidator: SSHHostKeyValidator,
         algorithms: SSHAlgorithms = SSHAlgorithms(),
         protocolOptions: Set<SSHProtocolOption> = []
@@ -261,11 +262,8 @@ public final class SSHClient: Sendable {
             protocolOptions: protocolOptions
         ).get()
         
-        let session = try await SSHClientSession.established(
-            on: channel,
-            inboundChannelHandler: inboundChannelHandler,
-            awaitingHandshake: false
-        )
+        let sshHandler = try await channel.pipeline.handler(type: NIOSSHHandler.self).get()
+        let session = SSHClientSession(channel: channel, inboundChannelHandler: inboundChannelHandler, sshHandler: sshHandler)
         
         return SSHClient(
             session: session,
@@ -298,7 +296,7 @@ public final class SSHClient: Sendable {
         algorithms: SSHAlgorithms = SSHAlgorithms(),
         protocolOptions: Set<SSHProtocolOption> = [],
         group: MultiThreadedEventLoopGroup = .singleton,
-        channelHandlers: [ChannelHandler & Sendable] = [],
+        channelHandlers: [ChannelHandler] = [],
         connectTimeout:TimeAmount = .seconds(30)
     ) async throws -> SSHClient {
         let session = try await SSHClientSession.connect(

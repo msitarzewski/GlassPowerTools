@@ -14,27 +14,23 @@
 
 import NIOCore
 
-final class GlueHandler: Sendable {
-    private struct State {
-        var partner: GlueHandler?
-        var context: ChannelHandlerContext?
-        var pendingRead = false
-    }
-
-    private let state: NIOLoopBoundBox<State>
-
-    private init(eventLoop: EventLoop) {
-        self.state = NIOLoopBoundBox(State(), eventLoop: eventLoop)
-    }
+final class GlueHandler {
+    private var partner: GlueHandler?
+    
+    private var context: ChannelHandlerContext?
+    
+    private var pendingRead: Bool = false
+    
+    private init() {}
 }
 
 extension GlueHandler {
-    static func matchedPair(eventLoop: EventLoop) -> (GlueHandler, GlueHandler) {
-        let first = GlueHandler(eventLoop: eventLoop)
-        let second = GlueHandler(eventLoop: eventLoop)
+    static func matchedPair() -> (GlueHandler, GlueHandler) {
+        let first = GlueHandler()
+        let second = GlueHandler()
         
-        first.state.value.partner = second
-        second.state.value.partner = first
+        first.partner = second
+        second.partner = first
         
         return (first, second)
     }
@@ -42,30 +38,30 @@ extension GlueHandler {
 
 extension GlueHandler {
     private func partnerWrite(_ data: NIOAny) {
-        state.value.context?.write(data, promise: nil)
+        self.context?.write(data, promise: nil)
     }
     
     private func partnerFlush() {
-        state.value.context?.flush()
+        self.context?.flush()
     }
     
     private func partnerWriteEOF() {
-        state.value.context?.close(mode: .output, promise: nil)
+        //self.context?.close(mode: .output, promise: nil)
     }
-
+    
     private func partnerCloseFull() {
-        state.value.context?.close(promise: nil)
+        //self.context?.close(promise: nil)
     }
     
     private func partnerBecameWritable() {
-        if state.value.pendingRead {
-            state.value.pendingRead = false
-            state.value.context?.read()
+        if self.pendingRead {
+            self.pendingRead = false
+            self.context?.read()
         }
     }
     
     private var partnerWritable: Bool {
-        state.value.context?.channel.isWritable ?? false
+        self.context?.channel.isWritable ?? false
     }
 }
 
@@ -75,54 +71,54 @@ extension GlueHandler: ChannelDuplexHandler {
     typealias OutboundOut = NIOAny
     
     func handlerAdded(context: ChannelHandlerContext) {
-        state.value.context = context
+        self.context = context
         
         // It's possible our partner asked if we were writable, before, and we couldn't answer.
         // Consider updating it.
         if context.channel.isWritable {
-            state.value.partner?.partnerBecameWritable()
+            self.partner?.partnerBecameWritable()
         }
     }
     
     func handlerRemoved(context: ChannelHandlerContext) {
-        state.value.context = nil
-        state.value.partner = nil
+        self.context = nil
+        self.partner = nil
     }
     
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-        state.value.partner?.partnerWrite(data)
+        self.partner?.partnerWrite(data)
     }
     
     func channelReadComplete(context: ChannelHandlerContext) {
-        state.value.partner?.partnerFlush()
+        self.partner?.partnerFlush()
     }
     
     func channelInactive(context: ChannelHandlerContext) {
-        state.value.partner?.partnerCloseFull()
+        self.partner?.partnerCloseFull()
     }
     
     func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
         if let event = event as? ChannelEvent, case .inputClosed = event {
             // We have read EOF.
-            state.value.partner?.partnerWriteEOF()
+            self.partner?.partnerWriteEOF()
         }
     }
     
     func errorCaught(context: ChannelHandlerContext, error: Error) {
-        state.value.partner?.partnerCloseFull()
+        self.partner?.partnerCloseFull()
     }
     
     func channelWritabilityChanged(context: ChannelHandlerContext) {
         if context.channel.isWritable {
-            state.value.partner?.partnerBecameWritable()
+            self.partner?.partnerBecameWritable()
         }
     }
     
     func read(context: ChannelHandlerContext) {
-        if let partner = state.value.partner, partner.partnerWritable {
+        if let partner = self.partner, partner.partnerWritable {
             context.read()
         } else {
-            state.value.pendingRead = true
+            self.pendingRead = true
         }
     }
 }

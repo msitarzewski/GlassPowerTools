@@ -362,13 +362,11 @@ let client = try await SSHClient.connect(
 
 You can also use `SSHAlgorithms.all` to enable all supported algorithms.
 
-## Upstream compatibility note
+## TODO
 
 A couple of code is held back until further work in SwiftNIO SSH is completed. We're currently working with Apple to resolve these.
 
-- RSA authentication depends on the vendored NIOSSH implementation in this
-  repository. Keep the matching Citadel and NIOSSH revisions pinned together
-  when updating either package.
+- [ ] RSA Authentication (implemented & supported, but in a [fork of NIOSSH](https://github.com/Joannis/swift-nio-ssh-1/pull/1))
 
 ## Contributing
 

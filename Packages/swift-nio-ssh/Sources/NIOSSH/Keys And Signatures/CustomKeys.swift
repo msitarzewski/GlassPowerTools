@@ -13,14 +13,14 @@
 //===----------------------------------------------------------------------===//
 
 import Foundation
-import NIOCore
+import NIO
 
 /// A signature is a mathematical scheme for verifying the authenticity of digital messages or documents.
 ///
 /// This protocol can be implemented by a type that represents such a signature to NIOSSH.
 ///
 /// - See: https://en.wikipedia.org/wiki/Digital_signature
-public protocol NIOSSHSignatureProtocol: Sendable, _NIOSSHSendableMetatype {
+public protocol NIOSSHSignatureProtocol {
     /// An identifier that represents the type of signature used in an SSH packet.
     /// This identifier MUST be unique to the signature implementation.
     /// The returned value MUST NOT overlap with other signature implementations or a specifications that the signature does not implement.
@@ -43,7 +43,7 @@ internal extension NIOSSHSignatureProtocol {
     }
 }
 
-public protocol NIOSSHPublicKeyProtocol: Sendable, _NIOSSHSendableMetatype {
+public protocol NIOSSHPublicKeyProtocol {
     /// An identifier that represents the type of public key used in an SSH packet.
     /// This identifier MUST be unique to the public key implementation.
     /// The returned value MUST NOT overlap with other public key implementations or a specifications that the public key does not implement.
@@ -69,7 +69,7 @@ internal extension NIOSSHPublicKeyProtocol {
     }
 }
 
-public protocol NIOSSHPrivateKeyProtocol: Sendable, _NIOSSHSendableMetatype {
+public protocol NIOSSHPrivateKeyProtocol {
     /// An identifier that represents the type of private key used in an SSH packet.
     /// This identifier MUST be unique to the private key implementation.
     /// The returned value MUST NOT overlap with other private key implementations or a specifications that the private key does not implement.

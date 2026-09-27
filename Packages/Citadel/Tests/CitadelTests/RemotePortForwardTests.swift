@@ -83,8 +83,7 @@ final class RemotePortForwardTests: XCTestCase {
             }
         }
 
-        // Cancellation is the expected completion signal after all three
-        // listeners have been established for the bounded test interval.
+        // TODO: Confirmation from swift-testing
         try await withThrowingTaskGroup(of: Void.self) { group in
             for _ in 0..<3 {
                 group.addTask {

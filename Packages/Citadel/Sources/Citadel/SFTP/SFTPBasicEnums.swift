@@ -35,7 +35,7 @@ public enum SFTPProtocolVersion: RawRepresentable, Hashable, Comparable, Sendabl
     }
 }
 
-public enum SFTPMessageType: UInt8, Sendable {
+public enum SFTPMessageType: UInt8 {
     case initialize = 1
     case version = 2
     case openFile = 3

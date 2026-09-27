@@ -96,16 +96,15 @@ fileprivate struct _SimpleShell {
 
             let inputString = currentLine.readString(length: currentLine.readableBytes)
 
-            let tokens = inputString?
-                .split(whereSeparator: { $0.isWhitespace })
-                .map(String.init) ?? []
-
-            if let commandName = tokens.first,
-               let command = commands.first(where: { $0.name == commandName }) {
+            if 
+                let inputString,
+                let command = commands.first(where: { $0.name == inputString })
+            {
                 outbound.write(Terminal.newLine)
                 do {
                     try await command.invoke(
-                        invocation: InvokeCommandContext(arguments: Array(tokens.dropFirst())),
+                        // TODO: Actual arguments
+                        invocation: InvokeCommandContext(arguments: [inputString]),
                         inbound: inbound,
                         outbound: outbound,
                         context: context

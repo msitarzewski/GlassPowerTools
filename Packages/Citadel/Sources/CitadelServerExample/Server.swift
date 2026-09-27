@@ -60,7 +60,7 @@ import NIOSSH
     }
 }
 
-struct LoginHandler: NIOSSHServerUserAuthenticationDelegate, Sendable {
+struct LoginHandler: NIOSSHServerUserAuthenticationDelegate {
     let username: String
     let password: String
     

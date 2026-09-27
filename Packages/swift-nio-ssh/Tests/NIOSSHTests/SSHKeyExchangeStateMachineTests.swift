@@ -1013,7 +1013,7 @@ final class SSHKeyExchangeStateMachineTests: XCTestCase {
         let response = try assertNoThrowWithValue(client.handle(keyExchangeReply: ecdhReply))
 
         // This future has not completed yet.
-        let completed = NIOLoopBoundBox(false, eventLoop: response.eventLoop)
+        var completed = false
         response.whenComplete { result in
             switch result {
             case .success:
@@ -1021,9 +1021,9 @@ final class SSHKeyExchangeStateMachineTests: XCTestCase {
             case .failure(let error):
                 XCTAssertEqual(error as? TestError, .bang)
             }
-            completed.value = true
+            completed = true
         }
-        XCTAssertFalse(completed.value)
+        XCTAssertFalse(completed)
 
         // The host key we gave the delegate matches the one we got.
         guard let (hostKey, promise) = hostKeyDelegate.data else {
@@ -1032,17 +1032,17 @@ final class SSHKeyExchangeStateMachineTests: XCTestCase {
         }
 
         XCTAssertEqual(hostKey, serverHostKey.publicKey)
-        XCTAssertFalse(completed.value)
+        XCTAssertFalse(completed)
 
         // Fail the promise.
         promise.fail(TestError.bang)
-        XCTAssertTrue(completed.value)
+        XCTAssertTrue(completed)
     }
 }
 
 private extension SSHKeyExchangeStateMachineTests {
     /// A simple function that passes a message to the state machine and erases the return value.
-    func handleUnexpectedMessageErasingValue(_ message: SSHMessage,
+    fileprivate func handleUnexpectedMessageErasingValue(_ message: SSHMessage,
                                                          allowedStages: SSHKeyExchangeStateMachineTests.HandshakeStages,
                                                          currentStage: SSHKeyExchangeStateMachineTests.HandshakeStages,
                                                          stateMachine: inout SSHKeyExchangeStateMachine,

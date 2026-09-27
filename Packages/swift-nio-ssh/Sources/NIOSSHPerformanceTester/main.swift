@@ -20,15 +20,14 @@ import NIOSSH
 
 // MARK: Test Harness
 
-var _warning: String = ""
+var warning: String = ""
 assert({
     print("======================================================")
     print("= YOU ARE RUNNING NIOPerformanceTester IN DEBUG MODE =")
     print("======================================================")
-    _warning = " <<< DEBUG MODE >>>"
+    warning = " <<< DEBUG MODE >>>"
     return true
 }())
-let warning = _warning
 
 public func measure(_ fn: () throws -> Int) rethrows -> [TimeInterval] {
     func measureOne(_ fn: () throws -> Int) rethrows -> TimeInterval {

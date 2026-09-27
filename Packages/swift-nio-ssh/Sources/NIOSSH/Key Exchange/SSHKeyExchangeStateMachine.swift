@@ -274,10 +274,41 @@ struct SSHKeyExchangeStateMachine {
                 guard case .client(let clientConfig) = self.role else {
                     preconditionFailure("Should not be in .keyExchangeInitSent as server")
                 }
-                let promise = self.loop.makePromise(of: Void.self)
-                clientConfig.serverAuthDelegate.validateHostKey(hostKey: message.hostKey, validationCompletePromise: promise)
-                return promise.futureResult.map {
-                    SSHMultiMessage(SSHMessage.newKeys)
+                
+                // Check if this is a certificate and validate it if we have trusted CAs
+                if let certifiedKey = NIOSSHCertifiedPublicKey(message.hostKey),
+                   !clientConfig.trustedHostCAKeys.isEmpty {
+                    // This is a certificate and we have trusted CAs configured
+                    do {
+                        // Use the configured hostname for validation, or empty string to accept any
+                        let principal = clientConfig.hostname ?? ""
+                        let _ = try certifiedKey.validate(
+                            principal: principal,
+                            type: .host,
+                            allowedAuthoritySigningKeys: clientConfig.trustedHostCAKeys,
+                            acceptableCriticalOptions: [] // Host certificates typically don't have critical options
+                        )
+                        // Certificate is valid, now let the delegate do additional validation
+                        let promise = self.loop.makePromise(of: Void.self)
+                        clientConfig.serverAuthDelegate.validateHostCertificate(
+                            hostKey: message.hostKey,
+                            certifiedKey: certifiedKey,
+                            validationCompletePromise: promise
+                        )
+                        return promise.futureResult.map {
+                            SSHMultiMessage(SSHMessage.newKeys)
+                        }
+                    } catch {
+                        // Certificate validation failed
+                        return self.loop.makeFailedFuture(error)
+                    }
+                } else {
+                    // Regular key validation or no trusted CAs configured
+                    let promise = self.loop.makePromise(of: Void.self)
+                    clientConfig.serverAuthDelegate.validateHostKey(hostKey: message.hostKey, validationCompletePromise: promise)
+                    return promise.futureResult.map {
+                        SSHMultiMessage(SSHMessage.newKeys)
+                    }
                 }
             case .server:
                 preconditionFailure("Servers cannot enter key exchange init sent.")

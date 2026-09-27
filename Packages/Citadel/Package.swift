@@ -1,4 +1,4 @@
-// swift-tools-version:6.3
+// swift-tools-version:5.9
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -6,9 +6,8 @@ import PackageDescription
 let package = Package(
     name: "Citadel",
     platforms: [
-        .macOS(.v26),
-        .iOS(.v26),
-        .visionOS(.v26)
+        .macOS(.v14),
+        .iOS(.v17)
     ],
     products: [
         .library(
@@ -17,11 +16,12 @@ let package = Package(
         ),
     ],
     dependencies: [
+        // .package(path: "/Users/joannisorlandos/git/joannis/swift-nio-ssh"),
         .package(path: "../swift-nio-ssh"),
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.101.3"),
-        .package(url: "https://github.com/apple/swift-log.git", from: "1.14.0"),
-        .package(url: "https://github.com/attaswift/BigInt.git", from: "6.0.0"),
-        .package(url: "https://github.com/apple/swift-crypto.git", "4.5.1"..<"5.0.0"),
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.81.0"),
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.0.0"),
+        .package(url: "https://github.com/attaswift/BigInt.git", "5.2.0"..<"7.0.0"),
+        .package(url: "https://github.com/apple/swift-crypto.git", "3.12.3"..<"5.0.0"),
     ],
     targets: [
         .target(name: "CCitadelBcrypt"),
@@ -41,14 +41,10 @@ let package = Package(
             name: "CitadelTests",
             dependencies: [
                 "Citadel",
-                .product(name: "NIO", package: "swift-nio"),
                 .product(name: "NIOSSH", package: "swift-nio-ssh"),
-                .product(name: "Crypto", package: "swift-crypto"),
-                .product(name: "_CryptoExtras", package: "swift-crypto"),
                 .product(name: "BigInt", package: "BigInt"),
                 .product(name: "Logging", package: "swift-log"),
             ]
         ),
-    ],
-    swiftLanguageModes: [.v6]
+    ]
 )

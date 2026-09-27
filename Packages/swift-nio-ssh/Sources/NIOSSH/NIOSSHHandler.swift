@@ -11,6 +11,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
+//
+// This file was modified by the Glass Power Tools project (2026); the changes are
+// listed in PATCHES.md at the root of this package.
+//
 
 import NIOCore
 
@@ -295,7 +299,7 @@ extension NIOSSHHandler: ChannelDuplexHandler {
         case .possibleFutureMessage(let future):
             precondition(!self.awaitingInboundDecision)
             self.awaitingInboundDecision = true
-            future.hop(to: context.eventLoop).assumeIsolatedUnsafeUnchecked().whenComplete { result in
+            future.hop(to: context.eventLoop).whenComplete { result in
                 guard self.context === context else {
                     return
                 }
@@ -473,8 +477,7 @@ extension NIOSSHHandler {
             }
         }
 
-        // This promise is created on the context's event loop above.
-        responsePromise.futureResult.assumeIsolatedUnsafeUnchecked().whenComplete { result in
+        responsePromise.futureResult.whenComplete { result in
             guard message.wantReply else {
                 // Nothing to do.
                 return
@@ -522,7 +525,7 @@ extension NIOSSHHandler {
         // Sending a single global request is tricky, because we don't want to succeed the promise until we have the result of the
         // request. That means we need a buffer of promises for request success/failure messages, as well as to create new promises.
         let writePromise = context.eventLoop.makePromise(of: Void.self)
-        writePromise.futureResult.assumeIsolatedUnsafeUnchecked().whenComplete { result in
+        writePromise.futureResult.whenComplete { result in
             switch result {
             case .success:
                 guard self.context != nil else {

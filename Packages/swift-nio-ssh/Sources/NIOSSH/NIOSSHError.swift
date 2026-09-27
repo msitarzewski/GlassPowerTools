@@ -29,7 +29,7 @@ public struct NIOSSHError: Error {
     private var diagnostics: String?
 }
 
-extension NIOSSHError: Sendable {}
+extension NIOSSHError: NIOSSHSendable {}
 
 // MARK: - Internal helper functions for error construction.
 
@@ -300,7 +300,7 @@ extension NIOSSHError.ErrorType: Hashable {}
 
 // MARK: - NIOSSHError.ErrorType Sendable conformance
 
-extension NIOSSHError.ErrorType: Sendable {}
+extension NIOSSHError.ErrorType: NIOSSHSendable {}
 
 // MARK: - NIOSSHError.ErrorType CustomStringConvertible conformance
 

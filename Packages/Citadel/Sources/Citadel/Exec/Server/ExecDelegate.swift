@@ -1,7 +1,6 @@
 import Foundation
-import NIOConcurrencyHelpers
 
-public protocol ExecCommandContext: Sendable {
+public protocol ExecCommandContext {
     func terminate() async throws
     func inputClosed() async throws
 }
@@ -10,11 +9,11 @@ extension ExecCommandContext {
     public func inputClosed() async throws { }
 }
 
-public struct ExecExitContext: Sendable {
+public struct ExecExitContext {
     
 }
 
-public final class ExecOutputHandler: Sendable {
+public final class ExecOutputHandler {
     public typealias ExitHandler = @Sendable (ExecExitContext) -> ()
     
     public let username: String?
@@ -22,18 +21,11 @@ public final class ExecOutputHandler: Sendable {
     public let stdoutPipe = Pipe()
     public let stderrPipe = Pipe()
     
-    private let _onExit = NIOLockedValueBox<ExitHandler?>(nil)
-    var onExit: ExitHandler? {
-        _onExit.withLockedValue { $0 }
-    }
-    let onSuccess: @Sendable (Int) -> ()
-    let onFailure: @Sendable (Error) -> ()
+    var onExit: ExitHandler?
+    let onSuccess: (Int) -> ()
+    let onFailure: (Error) -> ()
     
-    init(
-        username: String?,
-        onSuccess: @escaping @Sendable (Int) -> (),
-        onFailure: @escaping @Sendable (Error) -> ()
-    ) {
+    init(username: String?, onSuccess: @escaping (Int) -> (), onFailure: @escaping (Error) -> ()) {
         self.username = username
         self.onSuccess = onSuccess
         self.onFailure = onFailure
@@ -48,7 +40,7 @@ public final class ExecOutputHandler: Sendable {
     }
     
     public func onExit(_ handle: @escaping ExitHandler) {
-        _onExit.withLockedValue { $0 = handle }
+        self.onExit = handle
     }
 }
 

@@ -11,6 +11,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
+//
+// This file was modified by the Glass Power Tools project (2026); the changes are
+// listed in PATCHES.md at the root of this package.
+//
 
 import Atomics
 import NIOConcurrencyHelpers
@@ -150,6 +154,8 @@ final class SSHChildChannel {
         self._pipeline = ChannelPipeline(channel: self)
     }
 }
+
+extension SSHChildChannel: NIOSSHSendable {}
 
 extension SSHChildChannel: Channel, ChannelCore {
     public var closeFuture: EventLoopFuture<Void> {
@@ -654,11 +660,31 @@ private extension SSHChildChannel {
         switch data {
         case .data(let data):
             // We only futz with the window manager if the channel is not already closed.
-            if !self.didClose, let increment = self.windowManager.unbufferBytes(data.data.readableBytes) {
+            //
+            // `didClose` alone is not sufficient. It is set by `closedCleanly`
+            // and `errorEncountered`, both of which run only once the channel
+            // has reached `.closed` — but a read can be satisfied earlier than
+            // that. `deliverPendingReads` is also reached from `tryToRead`,
+            // which gates on `isActiveOnChannel`, and that stays true in
+            // `.closedLocally` and `.closedRemotely` so buffered data is not
+            // lost after a close.
+            //
+            // So between sending a close and the peer confirming it, a pending
+            // read would emit a window adjust into a channel the state machine
+            // already considers closed, and `sendChannelWindowAdjust` traps on
+            // exactly those states. That window is where a stream torn down
+            // mid-transfer lives, which is why it shows up under load and never
+            // for a command that runs to completion.
+            //
+            // The read itself is still delivered below; only the window update
+            // is skipped, which costs nothing because a closing channel will
+            // not be asked for more data.
+            if !self.didClose, self.state.canSendWindowAdjust,
+               let increment = self.windowManager.unbufferBytes(data.data.readableBytes) {
                 let update = SSHMessage.ChannelWindowAdjustMessage(recipientChannel: self.state.remoteChannelIdentifier!, bytesToAdd: UInt32(increment))
                 self.processOutboundMessage(.channelWindowAdjust(update), promise: nil)
             }
-            self.pipeline.syncOperations.fireChannelRead(NIOAny(data))
+            self.pipeline.fireChannelRead(NIOAny(data))
 
         case .eof:
             self.pipeline.fireUserInboundEventTriggered(ChannelEvent.inputClosed)

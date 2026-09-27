@@ -11,6 +11,10 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 //===----------------------------------------------------------------------===//
+//
+// This file was modified by the Glass Power Tools project (2026); the changes are
+// listed in PATCHES.md at the root of this package.
+//
 
 import NIOCore
 
@@ -1304,6 +1308,9 @@ extension ByteBuffer {
         case .publicKey(.known(key: let key, signature: let signature)):
             writtenBytes += self.writeSSHString("publickey".utf8)
             writtenBytes += self.writeSSHBoolean(signature != nil)
+            // Glass Power Tools: an RSA key signs in with rsa-sha2-512 (RFC 8332). Current OpenSSH
+            // servers refuse the SHA-1 `ssh-rsa` algorithm, so RSA keys could not sign in
+            // (see PATCHES.md, N4). The key blob itself keeps its `ssh-rsa` type.
             let userAuthAlgorithm: String.UTF8View
             if key.keyPrefix.elementsEqual("ssh-rsa".utf8) {
                 userAuthAlgorithm = "rsa-sha2-512".utf8

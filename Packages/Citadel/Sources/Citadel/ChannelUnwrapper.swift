@@ -1,14 +1,13 @@
 import NIO
 import NIOSSH
 
-final class SSHChannelDataUnwrapper: ChannelInboundHandler, Sendable {
+final class SSHChannelDataUnwrapper: ChannelInboundHandler {
     typealias InboundIn = SSHChannelData
     typealias InboundOut = ByteBuffer
 
     func handlerAdded(context: ChannelHandlerContext) {
-        let channel = context.channel
-        channel.setOption(ChannelOptions.allowRemoteHalfClosure, value: true).whenFailure { error in
-            channel.pipeline.fireErrorCaught(error)
+        context.channel.setOption(ChannelOptions.allowRemoteHalfClosure, value: true).whenFailure { error in
+            context.fireErrorCaught(error)
         }
     }
 
@@ -16,6 +15,7 @@ final class SSHChannelDataUnwrapper: ChannelInboundHandler, Sendable {
         let data = self.unwrapInboundIn(data)
 
         guard case .byteBuffer(let bytes) = data.data else {
+            // Glass Power Tools: unexpected data is an error, not a crash (PATCHES.md, C9).
             context.fireErrorCaught(SSHChannelError.invalidDataType)
             return
         }
@@ -29,7 +29,7 @@ final class SSHChannelDataUnwrapper: ChannelInboundHandler, Sendable {
     }
 }
 
-final class SSHOutboundChannelDataWrapper: ChannelOutboundHandler, Sendable {
+final class SSHOutboundChannelDataWrapper: ChannelOutboundHandler {
     typealias OutboundIn = ByteBuffer
     typealias OutboundOut = SSHChannelData
     
@@ -39,7 +39,23 @@ final class SSHOutboundChannelDataWrapper: ChannelOutboundHandler, Sendable {
     }
 }
 
-final class SSHInboundChannelDataWrapper: ChannelInboundHandler, Sendable {
+final class SSHOutboundChannelDataUnwrapper: ChannelOutboundHandler {
+    typealias OutboundIn = SSHChannelData
+    typealias OutboundOut = ByteBuffer
+
+    func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
+        let data = self.unwrapOutboundIn(data)
+
+        guard case .byteBuffer(let bytes) = data.data else {
+            context.fireErrorCaught(SSHChannelError.invalidDataType)
+            return
+        }
+
+        context.write(self.wrapOutboundOut(bytes), promise: promise)
+    }
+}
+
+final class SSHInboundChannelDataWrapper: ChannelInboundHandler {
     typealias InboundIn = ByteBuffer
     typealias InboundOut = SSHChannelData
 

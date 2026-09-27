@@ -1,16 +1,15 @@
 import NIO
 import NIOSSH
 
-internal final class DataToBufferCodec: ChannelDuplexHandler, Sendable {
+internal final class DataToBufferCodec: ChannelDuplexHandler {
     typealias InboundIn = SSHChannelData
     typealias InboundOut = ByteBuffer
     typealias OutboundIn = ByteBuffer
     typealias OutboundOut = SSHChannelData
 
     func handlerAdded(context: ChannelHandlerContext) {
-        let channel = context.channel
-        channel.setOption(ChannelOptions.allowRemoteHalfClosure, value: true).whenFailure { error in
-            channel.pipeline.fireErrorCaught(error)
+        context.channel.setOption(ChannelOptions.allowRemoteHalfClosure, value: true).whenFailure { error in
+            context.fireErrorCaught(error)
         }
     }
 
@@ -40,7 +39,7 @@ extension SSHClient {
     /// Creates a new direct TCP/IP channel. This channel type is used to open a TCP/IP connection to a remote host, through the remote SSH server.
     public func createDirectTCPIPChannel(
         using settings: SSHChannelType.DirectTCPIP,
-        initialize: @escaping @Sendable (Channel) -> EventLoopFuture<Void>
+        initialize: @escaping (Channel) -> EventLoopFuture<Void>
     ) async throws -> Channel {
         return try await eventLoop.flatSubmit { [eventLoop, sshHandler = self.session.sshHandler] in
             let createdChannel = eventLoop.makePromise(of: Channel.self)

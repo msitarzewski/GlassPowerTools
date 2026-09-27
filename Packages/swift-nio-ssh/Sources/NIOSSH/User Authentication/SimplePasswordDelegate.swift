@@ -23,9 +23,6 @@ public final class SimplePasswordDelegate {
     }
 }
 
-@available(*, unavailable)
-extension SimplePasswordDelegate: Sendable {}
-
 extension SimplePasswordDelegate: NIOSSHClientUserAuthenticationDelegate {
     public func nextAuthenticationType(availableMethods: NIOSSHAvailableUserAuthenticationMethods, nextChallengePromise: EventLoopPromise<NIOSSHUserAuthenticationOffer?>) {
         if let authRequest = self.authRequest, availableMethods.contains(.password) {

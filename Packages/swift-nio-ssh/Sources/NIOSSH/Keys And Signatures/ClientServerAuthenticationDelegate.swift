@@ -28,4 +28,23 @@ public protocol NIOSSHClientServerAuthenticationDelegate {
     ///      - hostKey: The host key presented by the server
     ///      - validationCompletePromise: A promise that must be succeeded or failed based on whether the host key is trusted.
     func validateHostKey(hostKey: NIOSSHPublicKey, validationCompletePromise: EventLoopPromise<Void>)
+    
+    /// Invoked to validate a host certificate. This method is called when the server presents a certificate
+    /// instead of a plain host key, and the client has trusted CA keys configured.
+    ///
+    /// The default implementation calls `validateHostKey` for backward compatibility.
+    ///
+    /// - parameters:
+    ///      - hostKey: The host key presented by the server (which contains a certificate)
+    ///      - certifiedKey: The parsed certificate information
+    ///      - validationCompletePromise: A promise that must be succeeded or failed based on whether the certificate is trusted.
+    func validateHostCertificate(hostKey: NIOSSHPublicKey, certifiedKey: NIOSSHCertifiedPublicKey, validationCompletePromise: EventLoopPromise<Void>)
+}
+
+// Provide default implementation for backward compatibility
+public extension NIOSSHClientServerAuthenticationDelegate {
+    func validateHostCertificate(hostKey: NIOSSHPublicKey, certifiedKey: NIOSSHCertifiedPublicKey, validationCompletePromise: EventLoopPromise<Void>) {
+        // By default, just call the regular host key validation
+        self.validateHostKey(hostKey: hostKey, validationCompletePromise: validationCompletePromise)
+    }
 }

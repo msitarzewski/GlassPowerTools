@@ -26,7 +26,7 @@ import NIOCore
 ///
 /// Some channel types have associated metadata. That metadata can be retrieved from SSH channels using
 /// channel options.
-public enum SSHChannelType: Equatable, Sendable {
+public enum SSHChannelType: Equatable, NIOSSHSendable {
     /// A "session" is remote execution of a program.
     case session
 
@@ -38,7 +38,7 @@ public enum SSHChannelType: Equatable, Sendable {
 }
 
 public extension SSHChannelType {
-    struct DirectTCPIP: Equatable, Sendable {
+    struct DirectTCPIP: Equatable, NIOSSHSendable {
         /// The target host for the forwarded TCP connection.
         public var targetHost: String
 
@@ -72,7 +72,7 @@ public extension SSHChannelType {
 }
 
 public extension SSHChannelType {
-    struct ForwardedTCPIP: Equatable, Sendable {
+    struct ForwardedTCPIP: Equatable, NIOSSHSendable {
         /// The host the remote peer connected to. This should be identical to the one that was requested.
         public var listeningHost: String
 

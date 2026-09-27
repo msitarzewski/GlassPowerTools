@@ -12,6 +12,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-enum Constants: Sendable {
+enum Constants {
     static let version = "SSH-2.0-SwiftNIOSSH_1.0"
 }

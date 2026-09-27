@@ -1,6 +1,6 @@
 import Foundation
-import Citadel
-import NIOSSH
+@preconcurrency import Citadel
+@preconcurrency import NIOSSH
 import Crypto
 import _CryptoExtras
 import GlasSecretStore
