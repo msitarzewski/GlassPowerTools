@@ -214,9 +214,8 @@ struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        #if !os(iOS)
-        .padding()
-        #endif
+        // No extra padding: a grouped form brings its own margins, and a second set made these
+        // pages sit inset from the shell's in the Mac's Settings window (2026-09-25).
         .task {
             serverManager.loadServersIfNeeded()
             await loadTailscaleCredentialState()
@@ -515,9 +514,8 @@ struct TerminalSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        #if !os(iOS)
-        .padding()
-        #endif
+        // No extra padding: a grouped form brings its own margins, and a second set made these
+        // pages sit inset from the shell's in the Mac's Settings window (2026-09-25).
         .sheet(isPresented: $showingThemeEditor) {
             ThemeEditorView()
                 .environment(settingsManager)

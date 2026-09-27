@@ -14,6 +14,16 @@ public enum GlassShellSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .about: "About"
         }
     }
+
+    /// The toolbar icon on a Mac, where Settings is a row of icon tabs.
+    public var systemImage: String {
+        switch self {
+        case .general: "gearshape"
+        case .appearance: "paintpalette"
+        case .privacy: "hand.raised"
+        case .about: "info.circle"
+        }
+    }
 }
 
 /// A page in the one settings surface: the shell's own, or one a capability contributes.
@@ -33,6 +43,10 @@ public enum GlassShellSettingsSelection: Hashable, Sendable {
 public struct GlassShellSettingsView: View {
     private let model: GlassShellModel
     @State private var page = GlassShellSettingsSelection.shell(.general)
+    #if os(macOS) || os(visionOS)
+    /// HIG: a settings window reopens on the pane last viewed.
+    @AppStorage("com.glasspowertools.settings.pane") private var storedPane = "general"
+    #endif
     @Environment(\.dismiss) private var dismiss
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -49,30 +63,78 @@ public struct GlassShellSettingsView: View {
         }
     }
 
+    private func systemImage(_ selection: GlassShellSettingsSelection) -> String {
+        switch selection {
+        case .shell(let page): page.systemImage
+        case .capability(let id): capabilityPages.first { $0.id == id }?.systemImage ?? "puzzlepiece"
+        }
+    }
+
+    private var options: [GlassShellSettingsSelection] {
+        GlassShellSettingsSelection.options(capabilityPages: capabilityPages)
+    }
+
     public var body: some View {
-        GlassSettingsSections(selection: $page,
-                              options: GlassShellSettingsSelection.options(capabilityPages: capabilityPages),
-                              title: title, pickerIdentifier: "settings-sections") { selection in
-            // **A contributed page owns its own container.** The shell's own pages are
-            // `Section`s and need a `Form` around them; a capability's page is already one —
-            // and a `Form` inside a `Form` collapses on iOS into a single clipped row, which is
-            // what Settings ▸ Terminal was on a phone: the word "Theme", cut in half, and
-            // nothing else (photographed 2026-09-19). On a Mac the nesting merely drew a box
-            // inside a box, so it survived there unnoticed.
-            Group {
-                switch selection {
-                case .shell(let page):
-                    Form { shellPage(page) }
-                        .formStyle(.grouped)
-                case .capability(let id):
-                    if let page = capabilityPages.first(where: { $0.id == id }) {
-                        page.makeView().accessibilityIdentifier("settings-page-\(id)")
-                    } else {
-                        ContentUnavailableView("Settings Unavailable", systemImage: "gearshape",
-                                               description: Text("This page belongs to a capability that is not loaded."))
+        #if os(macOS) || os(visionOS)
+        tabs
+        #else
+        sections
+        #endif
+    }
+
+    #if os(macOS) || os(visionOS)
+    /// **Icon tabs: the Mac's toolbar row, the headset's leading ornament** — one `TabView`, drawn
+    /// natively by each (2026-09-25, the user pointing at AudioPaper's, then: *"These become
+    /// ornaments in visionOS naturally right?"*). On the Mac it was a segmented picker the width of
+    /// eight titles, which made the window ~900 pt wide and left every grouped form floating in
+    /// wide margins. On visionOS it was a column of buttons inside the window, built on 2026-09-11
+    /// when Settings was a *sheet* and a `TabView`'s ornament vanished from the accessibility tree;
+    /// Settings is its own window there now, where an ornament is the ordinary case.
+    private var tabs: some View {
+        TabView(selection: Binding(
+            get: { options.first { key($0) == storedPane } ?? .shell(.general) },
+            set: { storedPane = key($0) })) {
+            ForEach(options, id: \.self) { selection in
+                Tab(title(selection), systemImage: systemImage(selection), value: selection) {
+                    #if os(visionOS)
+                    // The root of the window must be the `TabView` for the ornament; each pane
+                    // keeps its own stack for whatever it pushes.
+                    NavigationStack {
+                        pageContent(selection).navigationTitle(title(selection))
                     }
+                    #else
+                    if case .capability = selection {
+                        // A capability's page can be long (Terminal's is): a set height, scrolling.
+                        pageContent(selection).frame(height: 540)
+                    } else {
+                        // HIG, and AudioPaper's: the window fits the pane rather than scrolling it.
+                        pageContent(selection)
+                            .scrollDisabled(true)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    #endif
                 }
             }
+        }
+        .accessibilityIdentifier("settings-sections")
+        #if os(macOS)
+        .frame(width: 640)
+        #endif
+    }
+
+    private func key(_ selection: GlassShellSettingsSelection) -> String {
+        switch selection {
+        case .shell(let page): page.rawValue
+        case .capability(let id): id
+        }
+    }
+    #endif
+
+    private var sections: some View {
+        GlassSettingsSections(selection: $page,
+                              options: options,
+                              title: title, pickerIdentifier: "settings-sections") { selection in
+            pageContent(selection)
             #if os(iOS)
             // A compact iPhone pushes each page onto the sheet's stack, and the presenter's Done
             // button stays behind on the root. A modal must be dismissable from wherever the user
@@ -87,9 +149,31 @@ public struct GlassShellSettingsView: View {
             #endif
         }
         .navigationTitle("Settings")
-        #if os(macOS)
-        .frame(minWidth: 520, minHeight: 380)
-        #endif
+    }
+
+    @ViewBuilder
+    private func pageContent(_ selection: GlassShellSettingsSelection) -> some View {
+            // **A contributed page owns its own container.** The shell's own pages are
+            // `Section`s and need a `Form` around them; a capability's page is already one —
+            // and a `Form` inside a `Form` collapses on iOS into a single clipped row, which is
+            // what Settings ▸ Terminal was on a phone: the word "Theme", cut in half, and
+            // nothing else (photographed 2026-09-19). On a Mac the nesting merely drew a box
+            // inside a box, so it survived there unnoticed.
+            switch selection {
+            case .shell(.about):
+                // Not a form: an identity card, centred (AudioPaper's, which the user asked for).
+                GlassShellAboutView()
+            case .shell(let page):
+                Form { shellPage(page) }
+                    .formStyle(.grouped)
+            case .capability(let id):
+                if let page = capabilityPages.first(where: { $0.id == id }) {
+                    page.makeView().accessibilityIdentifier("settings-page-\(id)")
+                } else {
+                    ContentUnavailableView("Settings Unavailable", systemImage: "gearshape",
+                                           description: Text("This page belongs to a capability that is not loaded."))
+                }
+            }
     }
 
     /// The shell's own four. Each is a set of `Section`s, so the caller supplies the `Form`.
@@ -99,7 +183,7 @@ public struct GlassShellSettingsView: View {
         case .general: general
         case .appearance: GlassLayerControls()
         case .privacy: privacy
-        case .about: about
+        case .about: EmptyView()   // `GlassShellAboutView`, outside a form
         }
     }
 
@@ -116,6 +200,8 @@ public struct GlassShellSettingsView: View {
                 Text("Records that describe the same machine are shown as one host. They are combined here, not rewritten in the shared library.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
+            LabeledContent("Library file", value: model.catalogFileURL.lastPathComponent)
+            LabeledContent("Appearance migrated from", value: model.layers.migrationSource == .none ? "Defaults" : model.layers.migrationSource.rawValue)
             if let problem = model.preferencesProblem {
                 Text(problem).font(.footnote).foregroundStyle(.orange)
             }
@@ -163,20 +249,49 @@ public struct GlassShellSettingsView: View {
         }
     }
 
-    private var about: some View {
-        Section {
-            LabeledContent("Glass Power Tools", value: Self.versionString)
-            LabeledContent("Library file", value: model.catalogFileURL.lastPathComponent)
-            LabeledContent("Appearance migrated from", value: model.layers.migrationSource == .none ? "Defaults" : model.layers.migrationSource.rawValue)
-            Text("Terminal, databases and remote desktops for every machine you own — on Mac, iPad, iPhone and Vision Pro.")
-                .font(.footnote).foregroundStyle(.secondary)
-        }
-    }
-
     static var versionString: String {
         let info = Bundle.main.infoDictionary
         let version = info?["CFBundleShortVersionString"] as? String ?? "0.0"
         let build = info?["CFBundleVersion"] as? String ?? "0"
         return "\(version) (\(build))"
+    }
+}
+
+/// App identity, links and licence — the family's About layout (AudioPaper's, 2026-09-25: *"get our
+/// about section all schnappy like this one"*). Links only to pages that exist: the repository and
+/// help pages are added when they do.
+struct GlassShellAboutView: View {
+    private static let sponsor = URL(string: "https://github.com/sponsors/msitarzewski")!
+
+    var body: some View {
+        VStack(spacing: 10) {
+            #if os(macOS)
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable().scaledToFit()
+                .frame(width: 72, height: 72)
+                .accessibilityHidden(true)
+            #endif
+            Text("Glass Power Tools").font(.title2.weight(.semibold))
+            Text("Version \(GlassShellSettingsView.versionString)")
+                .font(.caption).foregroundStyle(.secondary)
+                .accessibilityIdentifier("settings-about-version")
+            Text("Terminals, databases, remote desktops and an editor for every machine you own — on Mac, iPad, iPhone and Vision Pro.")
+                .font(.callout).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(5)
+                .fixedSize(horizontal: false, vertical: true)
+                // A couple of balanced lines rather than one running the full width.
+                .frame(maxWidth: 380)
+            Link(destination: Self.sponsor) {
+                Label("Sponsor", systemImage: "heart.fill")
+            }
+            .font(.callout)
+            .padding(.top, 2)
+            Text("MIT · © 2026 Michael Sitarzewski")
+                .font(.caption2).foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 28)
+        .padding(.horizontal)
     }
 }

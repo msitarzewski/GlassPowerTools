@@ -302,7 +302,12 @@ final class GlassShellLibraryUITests: XCTestCase {
         #else
         tap("connection-library-settings")
         #endif
+        #if os(macOS)
+        // Settings on a Mac is a row of icon tabs in the window's toolbar (2026-09-25).
+        XCTAssertTrue(app.toolbars.buttons["General"].firstMatch.waitForExistence(timeout: 10))
+        #else
         XCTAssertTrue(element("settings-sections").waitForExistence(timeout: 10))
+        #endif
     }
 
     private func closeSettings() {
@@ -320,6 +325,9 @@ final class GlassShellLibraryUITests: XCTestCase {
         // which XCUITest exposes as a tab bar rather than as children of the TabView element.
         let candidates = [app.tabBars.buttons[title], picker.buttons[title], app.buttons[title].firstMatch]
         let button = candidates.first(where: { $0.waitForExistence(timeout: 2) }) ?? candidates[0]
+        #elseif os(macOS)
+        _ = picker
+        let button = app.toolbars.buttons[title].firstMatch
         #else
         let button = picker.buttons[title].exists ? picker.buttons[title] : picker.radioButtons[title]
         #endif
@@ -526,17 +534,17 @@ final class GlassShellLibraryUITests: XCTestCase {
     func testSameMachineRecordsAreOneRowWithAllServiceIcons() {
         app.terminate()
         runID = UUID()
-        app = launch(extraArguments: ["--ui-testing-seed-hosts", "juliet:ssh|juliet:rdp|oscar:rdp+ssh"])
+        app = launch(extraArguments: ["--ui-testing-seed-hosts", "bravo:ssh|bravo:rdp|alpha:rdp+ssh"])
         enterAllConnections()
-        let rows = app.descendants(matching: .any).matching(identifier: "host-row-juliet")
-        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 15), "juliet row")
+        let rows = app.descendants(matching: .any).matching(identifier: "host-row-bravo")
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 15), "bravo row")
         XCTAssertEqual(rows.count, 1, "one row per machine")
-        XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "host-row-oscar").count, 1)
+        XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "host-row-alpha").count, 1)
         // Icons for both kinds, on both hosts: two of each across the two rows.
         #if os(macOS)
         // The kit row combines its children into one element and macOS folds the icons'
         // identifiers into the row's; the icons are evidenced by their labels in the row's label.
-        for name in ["juliet", "oscar"] {
+        for name in ["bravo", "alpha"] {
             let label = element("host-row-\(name)").label
             XCTAssertTrue(label.contains("Terminal"), "\(name) row lists the terminal icon: \(label)")
             XCTAssertTrue(label.contains("Desktop"), "\(name) row lists the desktop icon: \(label)")
@@ -555,10 +563,10 @@ final class GlassShellLibraryUITests: XCTestCase {
     func testRowConnectControlIsSplitAndCarriesNoLabel() {
         app.terminate()
         runID = UUID()
-        app = launch(extraArguments: ["--ui-testing-seed-hosts", "oscar@10.9.8.7:rdp+ssh+database"])
+        app = launch(extraArguments: ["--ui-testing-seed-hosts", "alpha@10.9.8.7:rdp+ssh+database"])
         enterAllConnections()
-        let row = element("host-row-oscar")
-        XCTAssertTrue(row.waitForExistence(timeout: 15), "oscar row")
+        let row = element("host-row-alpha")
+        XCTAssertTrue(row.waitForExistence(timeout: 15), "alpha row")
 
         // The row no longer dates the last connection or names/counts the services; the icons do
         // that. "Connect" survives only as the play button's accessibility label, which VoiceOver

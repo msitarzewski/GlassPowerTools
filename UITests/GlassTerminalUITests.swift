@@ -470,14 +470,23 @@ final class GlassTerminalUITests: XCTestCase {
         press("connection-library-settings")
         #endif
         let picker = element("settings-sections")
+        #if os(macOS)
+        // Settings on a Mac is a row of icon tabs in the window's toolbar (2026-09-25).
+        XCTAssertTrue(app.toolbars.buttons["General"].firstMatch.waitForExistence(timeout: 10), "settings tabs")
+        #else
         XCTAssertTrue(picker.waitForExistence(timeout: 10), "settings picker")
+        #endif
         // visionOS renders the sections TabView as the leading ornament, exposed as a tab bar.
         func page(_ title: String) -> XCUIElement {
             #if os(visionOS)
             if app.tabBars.buttons[title].waitForExistence(timeout: 2) { return app.tabBars.buttons[title] }
             if app.buttons[title].firstMatch.waitForExistence(timeout: 2) { return app.buttons[title].firstMatch }
             #endif
+            #if os(macOS)
+            return app.toolbars.buttons[title].firstMatch
+            #else
             return picker.buttons[title].exists ? picker.buttons[title] : picker.radioButtons[title]
+            #endif
         }
         for title in ["Connections", "Terminal", "Snippets"] {
             if !page(title).waitForExistence(timeout: 5) {

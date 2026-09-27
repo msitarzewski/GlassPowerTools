@@ -16,6 +16,9 @@ public struct GlassShellLibraryView: View {
     /// Set only when the sheet was opened by an import; cleared implicitly by the next open.
     @State private var setupPrefill: GlassShellSetupPrefill?
     @State private var deleting: GlassShellHost?
+    #if os(visionOS)
+    @Environment(\.openWindow) private var openSettingsWindow
+    #endif
     @State private var showSettings = false
     /// The ⚡'s request, handed to the library as a binding it clears once the panel is open.
     @State private var panelRequest: String?
@@ -55,7 +58,16 @@ public struct GlassShellLibraryView: View {
                     // toggle); compact stacks and the visionOS tab bar have no sidebar region.
                     #if !os(macOS)
                     addHostButton
-                    Button("Settings", systemImage: "gearshape") { showSettings = true }
+                    Button("Settings", systemImage: "gearshape") {
+                        // The headset's Settings is its own window, where its icon tabs are the
+                        // leading ornament; in a sheet that ornament was lost (2026-09-11). The
+                        // database workspace already opened this window.
+                        #if os(visionOS)
+                        openSettingsWindow(id: "settings")
+                        #else
+                        showSettings = true
+                        #endif
+                    }
                         .accessibilityIdentifier("connection-library-settings")
                     #endif
                 }

@@ -346,10 +346,10 @@ struct GlassPowerToolsApp: App {
         }
         #elseif os(visionOS)
         Window("Settings", id: "settings") {
-            NavigationStack {
-                GlassShellSettingsView(model: model)
-            }
-            .glassLayers(layers)
+            // No `NavigationStack` around it: the settings `TabView` is the window's root so its
+            // tabs become the leading ornament; each pane has its own stack inside its tab.
+            GlassShellSettingsView(model: model)
+                .glassLayers(layers)
         }
         #endif
     }

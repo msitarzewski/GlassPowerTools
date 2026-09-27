@@ -24,7 +24,7 @@ public enum GlassTerminalSettingsPages {
     /// In glas.sh's order: General (connections, security, Tailscale, SSH keys, iCloud), Terminal
     /// (theme, canvas, font, size, cursor), Snippets.
     public static let all: [GlassTerminalSettingsPage] = [
-        GlassTerminalSettingsPage(id: "terminal.general", title: "Connections", systemImage: "gear") { runtime in
+        GlassTerminalSettingsPage(id: "terminal.general", title: "Connections", systemImage: "network") { runtime in
             AnyView(GeneralSettingsView().environment(runtime.settingsManager).environment(runtime.sessionManager))
         },
         GlassTerminalSettingsPage(id: "terminal.terminal", title: "Terminal", systemImage: "terminal") { runtime in
