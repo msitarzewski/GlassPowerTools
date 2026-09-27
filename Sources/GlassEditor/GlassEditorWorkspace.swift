@@ -415,6 +415,18 @@ public final class GlassEditorWorkspace {
         await saveChecking(document)
     }
 
+    /// Saves, then closes — but only if the save left the document clean. A save can stop to ask
+    /// about a file that changed underneath, or fail; closing anyway lost the edits (2026-09-27).
+    /// Returns whether the document closed.
+    @discardableResult
+    public func saveThenClose(_ id: GlassEditorDocument.ID) async -> Bool {
+        await save(id)
+        guard let document = documents.first(where: { $0.id == id }), !document.isDirty else {
+            return documents.first(where: { $0.id == id }) == nil
+        }
+        return close(id)
+    }
+
     private func saveChecking(_ document: GlassEditorDocument) async {
         let access = access(for: document)
         let check = await document.checkBeforeSaving(through: access)

@@ -941,7 +941,11 @@ private struct GlassEditorDialogs: ViewModifier {
             saveOutsideProjects(document, true)
             }
             }
-            else { Task { await workspace.save(document.id); workspace.close(document.id, force: true) } }
+            else {
+            // Closed only once it is safely saved; a conflict or a failed save keeps it open
+            // (and a window close waiting on it is cancelled).
+            Task { if await !workspace.saveThenClose(document.id) { closeCancelled() } }
+            }
             closeCandidate = nil
             }
             Button("Discard Changes", role: .destructive) {
