@@ -49,6 +49,8 @@ public struct GlassEditorWorkspaceView: View {
     @State private var exportTarget: GlassEditorDocument.ID?
     /// Counts closes called off, so the Mac window knows ⌘W's close of its last document is off.
     @State private var closeCancellations = 0
+    /// A new document choosing its first location among the window's projects.
+    @State private var firstSave: GlassEditorFirstSave?
     @State private var closeCandidate: GlassEditorDocument?
     @State private var isGoingToLine = false
     @State private var goToLineText = ""
@@ -164,7 +166,9 @@ public struct GlassEditorWorkspaceView: View {
                                      settingsProject: $settingsProject,
                                      isShowingSettings: $isShowingSettings,
                                      goToLine: goToLine,
-                                     closeCancelled: { closeCancellations += 1 }))
+                                     closeCancelled: { closeCancellations += 1 },
+                                     firstSave: $firstSave,
+                                     saveOutsideProjects: { saveOutsideProjects($0, closesAfterSaving: $1) }))
         // ⌘N in an editor window means a new document; the shell owns the one File ▸ New item and
         // each window says what it makes (`GlassShellFileCommands`).
         .focusedSceneValue(\.glassNewItem, GlassNewItemAction(title: "New Document") {
@@ -429,7 +433,7 @@ public struct GlassEditorWorkspaceView: View {
     }
 
     /// What sits under the file's name in the title bar: the project and where it is, the way the
-    /// terminal puts `michael@192.0.2.10:22` under "Terminal on oscar". A file opened on its own
+    /// terminal puts `user@192.0.2.10:22` under "Terminal on alpha". A file opened on its own
     /// says where it is instead — the folder is the useful fact either way.
     private func subtitle(for document: GlassEditorDocument) -> String {
         if let project = workspace.projects.first {
@@ -784,9 +788,24 @@ public struct GlassEditorWorkspaceView: View {
             Task { await workspace.save(document.id) }
             return
         }
+        // With a project open — here or on a server — the first save offers its folders.
+        if !workspace.projects.isEmpty {
+            firstSave = GlassEditorFirstSave(document: document, closesAfterSaving: false)
+        } else {
+            saveOutsideProjects(document, closesAfterSaving: false)
+        }
+    }
+
+    /// The platform's own panel: the Mac's Save panel, the document exporter elsewhere.
+    private func saveOutsideProjects(_ document: GlassEditorDocument, closesAfterSaving: Bool) {
         #if os(macOS)
         GlassEditorSavePanel.run(for: document) { url in
-            Task { await workspace.save(document.id, to: url) }
+            Task {
+                await workspace.save(document.id, to: url)
+                if closesAfterSaving, !document.isDirty { workspace.close(document.id) }
+            }
+        } cancelled: {
+            if closesAfterSaving { closeCancellations += 1 }
         }
         #else
         exportingDocument = document
@@ -873,6 +892,8 @@ private struct GlassEditorDialogs: ViewModifier {
     let goToLine: () -> Void
     /// The close was called off — Cancel in the question, or in the Save panel it led to.
     let closeCancelled: () -> Void
+    @Binding var firstSave: GlassEditorFirstSave?
+    let saveOutsideProjects: (GlassEditorDocument, Bool) -> Void
 
     func body(content: Content) -> some View {
         content
@@ -913,17 +934,12 @@ private struct GlassEditorDialogs: ViewModifier {
             titleVisibility: .visible, presenting: closeCandidate) { document in
             Button("Save", role: .none) {
             if document.hasNeverBeenSaved {
-            #if os(macOS)
-            // Saved, then closed — the close is what was asked for. Cancelling the panel keeps it.
-            GlassEditorSavePanel.run(for: document) { url in
-            Task {
-            await workspace.save(document.id, to: url)
-            if !document.isDirty { workspace.close(document.id) }
+            // Saved, then closed — the close is what was asked for. Cancelling keeps it.
+            if !workspace.projects.isEmpty {
+            firstSave = GlassEditorFirstSave(document: document, closesAfterSaving: true)
+            } else {
+            saveOutsideProjects(document, true)
             }
-            } cancelled: { closeCancelled() }
-            #else
-            exportingDocument = document
-            #endif
             }
             else { Task { await workspace.save(document.id); workspace.close(document.id, force: true) } }
             closeCandidate = nil
@@ -949,6 +965,16 @@ private struct GlassEditorDialogs: ViewModifier {
             #endif
             Button("Go") { goToLine(); isGoingToLine = false }
             Button("Cancel", role: .cancel) { isGoingToLine = false }
+            }
+            .sheet(item: $firstSave) { request in
+            GlassEditorSaveToProjectSheet(
+            workspace: workspace, request: request,
+            saveElsewhere: { firstSave = nil; saveOutsideProjects(request.document, request.closesAfterSaving) },
+            dismiss: {
+            // Dismissed without saving a document that was closing: the close is off.
+            if request.closesAfterSaving, request.document.hasNeverBeenSaved { closeCancelled() }
+            firstSave = nil
+            })
             }
     }
 }
@@ -1312,6 +1338,13 @@ private struct GlassEditorFileRow: View {
     let node: GlassEditorProjectNode
     let symbol: String
     let open: (GlassEditorProjectNode) -> Void
+    @State private var isNamingNewFile = false
+    @State private var newFileName = ""
+
+    /// The folder a new file goes in: this one, or the one this file is in.
+    private var newFileFolder: String {
+        node.isDirectory ? node.path : (node.path as NSString).deletingLastPathComponent
+    }
 
     var body: some View {
         // **The row is as wide as the column, not as wide as the filename.**
@@ -1346,9 +1379,33 @@ private struct GlassEditorFileRow: View {
         .contentShape(Rectangle())
         .contextMenu {
             Button(node.isDirectory ? "Open Folder" : "Open") { open(node) }
+            // Local or on a server, through the project's own access (2026-09-26: the editor had
+            // no way to start a new file on a server).
+            Button("New File…", systemImage: "doc.badge.plus") {
+                newFileName = ""
+                isNamingNewFile = true
+            }
             if node.isDirectory {
                 Button("Refresh") { refresh() }
             }
+        }
+        .alert("New File", isPresented: $isNamingNewFile) {
+            TextField("File name", text: $newFileName)
+            Button("Create") {
+                let name = newFileName, folder = newFileFolder
+                Task {
+                    do {
+                        try await workspace.createFile(named: name, inFolder: folder)
+                        // A file's folder is already open; a folder shows its new file.
+                        if node.isDirectory { workspace.setExpanded(true, for: node.id) }
+                    } catch {
+                        workspace.message = error.localizedDescription
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("In \((newFileFolder as NSString).lastPathComponent.isEmpty ? "/" : (newFileFolder as NSString).lastPathComponent). It opens in the editor.")
         }
         .accessibilityIdentifier("editor-file-\(node.name)")
     }

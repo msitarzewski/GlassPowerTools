@@ -257,6 +257,20 @@ public final class GlassEditorDocument: Identifiable {
     /// Writes to a new location and adopts it, so the document's name, language and future saves
     /// all follow the file the user chose. Local by definition: the panel that chose it is this
     /// device's.
+    /// Writes to a new location on any machine and adopts it — the remote twin of `save(to:)`,
+    /// for a new document saved into a project on a server (2026-09-26). The access is the
+    /// project's own, so the bytes go the way the project's files go.
+    public func save(toPath path: String, through access: any GlassEditorFileAccess,
+                     machine: String?) async throws {
+        guard viewer == nil else { return }
+        let newURL = URL(filePath: path)
+        // A new location expects nothing: the caller checked the name was free.
+        try await write(to: newURL, through: access, expecting: nil)
+        url = newURL
+        self.machine = machine
+        setLanguage(LanguageID.forFileExtension(newURL.pathExtension))
+    }
+
     public func save(to newURL: URL) async throws {
         guard viewer == nil else { return }
         let access = GlassEditorLocalFileAccess()

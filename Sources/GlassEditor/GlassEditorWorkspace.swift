@@ -583,6 +583,98 @@ public final class GlassEditorWorkspace {
         return project
     }
 
+    // MARK: New files
+
+    /// Why a new file could not be made, in words that say what to do.
+    public enum CreateFileError: LocalizedError, Equatable {
+        case invalidName
+        case exists(String)
+
+        public var errorDescription: String? {
+            switch self {
+            case .invalidName: "A file name can't be empty or contain a slash. Choose another name."
+            case .exists(let name): "\(name) already exists in this folder. Choose another name."
+            }
+        }
+    }
+
+    /// Creates an empty file in a project folder — on this Mac or on a server, through the same
+    /// file access the project was opened with — shows it in the tree and opens it.
+    ///
+    /// There was no way to start a new file on a server from the editor (2026-09-26). The folder's
+    /// own listing is the existence check, not `stat`: `stat` answering nil means "not observed",
+    /// and an existing file must never be replaced by a new, empty one.
+    @discardableResult
+    public func createFile(named rawName: String, inFolder folder: String) async throws -> GlassEditorDocument? {
+        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, name != ".", name != "..", !name.contains("/") else {
+            throw CreateFileError.invalidName
+        }
+        let folderPath = GlassEditorProject.normalized(folder)
+        let path = GlassEditorProject.normalized(folderPath == "/" ? "/" + name : folderPath + "/" + name)
+        let owner = project(owning: path)
+        let access = owner.flatMap { projectAccess[$0.id] } ?? GlassEditorLocalFileAccess()
+        let siblings = try await access.contents(ofDirectory: folderPath)
+        guard !siblings.contains(where: { $0.name == name }) else { throw CreateFileError.exists(name) }
+        try await access.write(Data(), to: path, expecting: nil)
+        refreshFolder(at: folderPath)
+        return await open(path: path)
+    }
+
+    /// Saves a never-saved document into a project folder — on this Mac or on a server — and
+    /// adopts that location, so the tab takes the name and the next ⌘S goes there.
+    public func saveNewDocument(_ id: GlassEditorDocument.ID, named rawName: String,
+                                inFolder folder: String) async throws {
+        guard let document = documents.first(where: { $0.id == id }) else { return }
+        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, name != ".", name != "..", !name.contains("/") else {
+            throw CreateFileError.invalidName
+        }
+        let folderPath = GlassEditorProject.normalized(folder)
+        let path = GlassEditorProject.normalized(folderPath == "/" ? "/" + name : folderPath + "/" + name)
+        let owner = project(owning: path)
+        let access = owner.flatMap { projectAccess[$0.id] } ?? GlassEditorLocalFileAccess()
+        let siblings = try await access.contents(ofDirectory: folderPath)
+        guard !siblings.contains(where: { $0.name == name }) else { throw CreateFileError.exists(name) }
+        let machine = owner.flatMap { machineName(of: $0.id) }
+        try await document.save(toPath: path, through: access, machine: machine)
+        makePermanent(id)
+        if machine == nil { preferences.noteRecent(URL(filePath: path)) }
+        refreshFolder(at: folderPath)
+    }
+
+    /// Every folder a new document could be saved into: each project's root and the folders
+    /// already read below it, in tree order, with the project each belongs to.
+    public var saveDestinations: [(project: GlassEditorProject, path: String)] {
+        var result: [(GlassEditorProject, String)] = []
+        func walk(_ node: GlassEditorProjectNode, in project: GlassEditorProject) {
+            guard node.isDirectory else { return }
+            result.append((project, node.path))
+            for child in node.children ?? [] { walk(child, in: project) }
+        }
+        for project in projects {
+            if let root = projectRoots[project.id] { walk(root, in: project) }
+        }
+        return result.map { (project: $0.0, path: $0.1) }
+    }
+
+    /// Re-reads a loaded folder so a change made from here shows in the tree.
+    public func refreshFolder(at rawPath: String) {
+        let path = GlassEditorProject.normalized(rawPath)
+        func search(_ node: GlassEditorProjectNode) -> GlassEditorProjectNode? {
+            if node.path == path { return node }
+            for child in node.children ?? [] where child.isDirectory {
+                if let found = search(child) { return found }
+            }
+            return nil
+        }
+        for root in projectRoots.values {
+            guard let folder = search(root) else { continue }
+            folder.invalidate()
+            folder.beginLoadingChildrenIfNeeded(using: access(for: folder))
+        }
+    }
+
     // MARK: The tree, and where "here" is
 
     /// The node with this id, anywhere in any open project. Only loaded folders are searched: a

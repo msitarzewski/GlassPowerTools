@@ -490,6 +490,8 @@ struct SFTPBrowserView: View {
 
     // File operations
     @State private var showingNewFolderAlert = false
+    @State private var showingNewFileAlert = false
+    @State private var newFileName = ""
     @State private var newFolderName = ""
     @State private var showingFileImporter = false
     @State private var showingFolderPicker = false
@@ -627,6 +629,20 @@ struct SFTPBrowserView: View {
         }
         .onDisappear {
             Task { _ = await shutdownTransferAndConnection() }
+        }
+        // A new, empty file, opened in the editor. The SFTP browser could make a folder and not
+        // a file (2026-09-26: "an SFTP window has no New File"), so there was no way to start a
+        // file on a server from here.
+        .alert("New File", isPresented: $showingNewFileAlert) {
+            TextField("File name", text: $newFileName)
+            Button("Create") {
+                Task { await createFile(named: newFileName) }
+            }
+            Button("Cancel", role: .cancel) {
+                newFileName = ""
+            }
+        } message: {
+            Text("Enter a name for the new file. It opens in the editor.")
         }
         .alert("New Folder", isPresented: $showingNewFolderAlert) {
             TextField("Folder name", text: $newFolderName)
@@ -2270,6 +2286,13 @@ struct SFTPBrowserView: View {
                 }
 
                 Button {
+                    newFileName = ""
+                    showingNewFileAlert = true
+                } label: {
+                    Label("New File", systemImage: "doc.badge.plus")
+                }
+
+                Button {
                     showingFileImporter = true
                 } label: {
                     Label("Upload File", systemImage: "square.and.arrow.up")
@@ -3435,6 +3458,35 @@ struct SFTPBrowserView: View {
         } catch {
             self.error = "Failed to create folder: \(error.localizedDescription)"
         }
+    }
+
+    /// Creates an empty file in the current folder and opens it in the editor. Exclusive: an
+    /// existing file of that name is an error, never replaced — a new file must not become a way
+    /// to empty an old one.
+    private func createFile(named name: String) async {
+        guard let client = sftpClient, Self.isSafeBasename(name) else {
+            error = SFTPTransferError.unsafeName.localizedDescription
+            return
+        }
+
+        let filePath = remotePath(for: name)
+
+        operationInProgress = "Creating file..."
+        do {
+            let file = try await client.openFile(filePath: filePath, flags: [.write, .create, .forceCreate])
+            try await file.close()
+            newFileName = ""
+            await loadDirectory()
+        } catch {
+            operationInProgress = nil
+            self.error = "Could not create \(name): a file or folder with that name may already exist. \(error.localizedDescription)"
+            return
+        }
+        operationInProgress = nil
+
+        guard let component = entries.first(where: { $0.filename == name }) else { return }
+        // Through the one place that decides where a file opens — the editor, not the old sheet.
+        beginRemoteEdit(SFTPBrowserEntry(component: component, parentPath: currentPath, depth: 0))
     }
 
     private func deleteEntry(_ entry: SFTPBrowserEntry) async {
