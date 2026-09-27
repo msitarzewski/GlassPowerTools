@@ -70,7 +70,10 @@ let package = Package(
         .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.33.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.36.0"),
         // Terminal emulator host (glas.sh's misnamed RealityKitContent package) and its engine.
-        .package(url: "https://github.com/migueldeicaza/SwiftTerm", exact: "1.15.0"),
+        .package(url: "https://github.com/migueldeicaza/SwiftTerm", exact: "1.18.0"),
+        // Not 1.19: it adds a build-tool plugin (it writes SwiftTerm's git branch and commit into a
+        // generated file on every build) that Xcode must be told to trust. The owner's call, not a
+        // dependency update's.
         // D35: the editor's Markdown preview. Apple's parser over cmark-gfm (tables, task lists,
         // strikethrough, autolinks). Apache-2.0. Pinned exactly, like SwiftTerm.
         .package(url: "https://github.com/swiftlang/swift-markdown.git", exact: "0.9.0"),

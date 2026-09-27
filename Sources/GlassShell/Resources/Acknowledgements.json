@@ -419,15 +419,15 @@
    "id": "swiftterm",
    "license": "MIT",
    "name": "SwiftTerm",
-   "revision": "dd2fb8ac5b861e7bf617c872895e338f38165648",
+   "revision": "7691f85b222a67a66b58499e1b2647443cf0dda7",
    "source": "https://github.com/migueldeicaza/SwiftTerm",
    "texts": [
     {
-     "body": "Copyright (c) 2019-2022 Miguel de Icaza (https://github.com/migueldeicaza)\nCopyright (c) 2017-2019, The xterm.js authors (https://github.com/xtermjs/xterm.js)\nCopyright (c) 2014-2016, SourceLair Private Company (https://www.sourcelair.com)\nCopyright (c) 2012-2013, Christopher Jeffrey (https://github.com/chjj/)\n\nPermission is hereby granted, free of charge, to any person obtaining\na copy of this software and associated documentation files (the\n\"Software\"), to deal in the Software without restriction, including\nwithout limitation the rights to use, copy, modify, merge, publish,\ndistribute, sublicense, and/or sell copies of the Software, and to\npermit persons to whom the Software is furnished to do so, subject to\nthe following conditions:\n\nThe above copyright notice and this permission notice shall be\nincluded in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND,\nEXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF\nMERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND\nNONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE\nLIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION\nOF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION\nWITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.",
+     "body": "Copyright (c) 2019-2026 Miguel de Icaza (https://github.com/migueldeicaza)\nCopyright (c) 2017-2019, The xterm.js authors (https://github.com/xtermjs/xterm.js)\nCopyright (c) 2014-2016, SourceLair Private Company (https://www.sourcelair.com)\nCopyright (c) 2012-2013, Christopher Jeffrey (https://github.com/chjj/)\n\nPermission is hereby granted, free of charge, to any person obtaining\na copy of this software and associated documentation files (the\n\"Software\"), to deal in the Software without restriction, including\nwithout limitation the rights to use, copy, modify, merge, publish,\ndistribute, sublicense, and/or sell copies of the Software, and to\npermit persons to whom the Software is furnished to do so, subject to\nthe following conditions:\n\nThe above copyright notice and this permission notice shall be\nincluded in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND,\nEXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF\nMERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND\nNONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE\nLIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION\nOF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION\nWITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.",
      "title": "LICENSE"
     }
    ],
-   "version": "1.15.0"
+   "version": "1.18.0"
   },
   {
    "group": "Editor",
