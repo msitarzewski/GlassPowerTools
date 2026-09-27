@@ -167,6 +167,13 @@ struct DatabaseAdvancedFields: View {
                     .accessibilityIdentifier("\(identifierPrefix)-tls")
                 if draft.useTLS {
                     tlsVerificationRows
+                } else if draft.sendsInTheClear {
+                    Label("Not encrypted. Unless the database is on this device, its password and every query and result cross the network readable. Turn this on, or reach it through the Terminal service.",
+                          systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("\(identifierPrefix)-tls-off-warning")
                 }
             }
 

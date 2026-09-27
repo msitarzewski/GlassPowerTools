@@ -372,7 +372,12 @@ struct ConnectionOverviewView: View {
         guard let config else { return "Unavailable" }
         if config.engine == .sqlite { return "Local file" }
         let route = config.usesHostTunnel ? "Host tunnel" : "Direct"
-        guard config.useTLS else { return route }
+        guard config.useTLS else {
+            // Said, not hidden: a direct connection without TLS sends the password and every
+            // query readable, unless the database is on this device.
+            let loopback = ["127.0.0.1", "::1", "localhost"].contains(config.host.lowercased())
+            return config.usesHostTunnel || loopback ? route : "\(route) · not encrypted"
+        }
         return "\(route) · TLS: \(config.tlsVerification.shortDescription.lowercased())"
     }
 

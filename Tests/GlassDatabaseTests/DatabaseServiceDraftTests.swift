@@ -61,6 +61,25 @@ struct DatabaseServiceDraftTests {
         return draft
     }
 
+    @Test("A direct, unencrypted network connection is flagged; encryption or the tunnel clears it")
+    func unencryptedDirectConnectionIsFlagged() {
+        let draft = networkDraft()
+        draft.useTLS = false
+        draft.usesHostTunnel = false
+        #expect(draft.sendsInTheClear)
+        #expect(draft.validate(address: "db.example.test").isEmpty, "a warning, not a block")
+
+        draft.useTLS = true
+        #expect(!draft.sendsInTheClear)
+        draft.useTLS = false
+        draft.usesHostTunnel = true
+        #expect(!draft.sendsInTheClear)
+
+        draft.usesHostTunnel = false
+        draft.engine = .sqlite
+        #expect(!draft.sendsInTheClear, "a local file crosses no network")
+    }
+
     @Test("A complete draft validates; the database name is optional, the credentials are not")
     func requiredFields() {
         let draft = networkDraft()

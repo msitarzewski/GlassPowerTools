@@ -171,6 +171,13 @@ final class DatabaseServiceDraft: GlassServiceDraft {
         value.trimmingCharacters(in: .whitespacesAndNewlines).precomposedStringWithCanonicalMapping
     }
 
+    /// A network database reached directly with encryption off: the password, every query and
+    /// every result cross the network readable. Not a validation error — a database on the same
+    /// machine, or on a private network the user trusts, is a legitimate choice — but it is said.
+    var sendsInTheClear: Bool {
+        engine.supportsNetworkTransport && engine.supportsTLS && !usesHostTunnel && !useTLS
+    }
+
     /// What blocks a save. `address` is the host's; a database service never has its own, so it
     /// is only checked for the engines that speak over a network.
     func issues(address: String) -> [Field: String] {

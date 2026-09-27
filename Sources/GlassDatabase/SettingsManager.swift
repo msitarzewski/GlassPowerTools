@@ -43,7 +43,9 @@ class SettingsManager {
     var dataGridFontSize: Double = 13.0
     var showLineNumbers: Bool = true
     var autoFormatJSONInRecordEditor: Bool = true
-    var redactQueryHistoryLiterals: Bool = false
+    /// On unless turned off (2026-09-27): history is kept on disk, and a literal can be a password
+    /// (`ALTER USER … IDENTIFIED BY '…'`) or a customer's data.
+    var redactQueryHistoryLiterals: Bool = QueryHistoryRedaction.defaultValue
     private(set) var queryFailureNotificationPreference: QueryFailureNotificationPreference = .undecided
     var savedQueries: [SavedQuery] = []
 

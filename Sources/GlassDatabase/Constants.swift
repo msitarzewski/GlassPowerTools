@@ -718,3 +718,13 @@ struct DatabasePersistentToolbar: ToolbarContent {
 #endif
 // The command palette lives in GlassLayers, so both capabilities contribute entries to one
 // surface. A byte-for-byte copy of it used to sit here.
+
+/// Whether query history keeps literals, read the same way by the setting and by the writer. An
+/// install that never chose gets redaction: `bool(forKey:)` would have read that as off.
+nonisolated enum QueryHistoryRedaction {
+    static let defaultValue = true
+
+    static func isOn(in defaults: UserDefaults) -> Bool {
+        defaults.object(forKey: UserDefaultsKeys.redactQueryHistoryLiterals) as? Bool ?? defaultValue
+    }
+}

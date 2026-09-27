@@ -895,7 +895,7 @@ class DatabaseSessionManager {
         affectedRows: UInt64?,
         error: String?
     ) {
-        let redactLiterals = defaults.bool(forKey: UserDefaultsKeys.redactQueryHistoryLiterals)
+        let redactLiterals = QueryHistoryRedaction.isOn(in: defaults)
         let retainedSQL = redactLiterals ? SQLHighlighter.redactingLiterals(in: sql) : sql
         persistentQueryHistory.append(QueryHistoryEntry(
             sql: retainedSQL,
