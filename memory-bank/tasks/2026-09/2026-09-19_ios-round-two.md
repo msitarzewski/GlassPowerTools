@@ -27,7 +27,7 @@ driving it.** Nine reports, seven of them defects, one of them mine.
 `DatabaseWorkspaceView` is a `NavigationSplitView`, and on a compact width SwiftUI collapses one
 into a single stack showing its **sidebar**. So on a phone the workspace *was* the schema browser:
 Browse Data, a table and the SQL Editor button each selected a destination in a column that was
-never on screen — *"Browse data in the Database on iOS absorbs the click, too."*
+never on screen — as the user reported, Browse Data in the database on iOS swallowed the tap too.
 
 It is the same defect the editor had on 2026-09-17, and it survived two days because **nobody had
 driven the database on a phone** (rule 46, and it was item 2 of the carried list in the navigation
@@ -42,7 +42,7 @@ Three consequences, all reported within the hour:
 2. **The footer was three things in one strip** — the schema browser's floating bottom search, a
    `.bottomBar` toolbar group, and the list rows behind both. On a compact width the SQL editor
    moves to the top bar and the rest into the overflow menu; the bottom belongs to the search.
-3. **"Now the databases can't be clicked"** — my own regression, below.
+3. **The databases could no longer be tapped** — my own regression, below.
 
 ## The regression I caused
 
@@ -80,8 +80,9 @@ already navigates.
 
 ## Still true at the end of the day
 
-- **The session switcher is not built.** Sections D1–D3 of the navigation plan, and the terminal's
-  own question — *"if I leave an SSH session, is it still connected?"* — is the argument for it.
+- **The session switcher is not built.** Sections D1–D3 of the navigation plan, and the user's
+  own question about the terminal — whether an SSH session is still connected after leaving it — is
+  the argument for it.
   It is: leaving only clears `router.terminalWorkgroupID`, and the way back is the Workgroups
   panel, which nobody would think to open.
 - **The terminal and the desktop have still never been driven on a phone.** The database's three

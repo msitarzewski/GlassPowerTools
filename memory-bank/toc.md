@@ -1,10 +1,10 @@
 # Glass Power Tools Memory Bank
 
-Created 2026-09-10. Aggregate owner: coordinating agent `/root` until handed off.
+Created 2026-09-10; curated 2026-09-27 for publication. Aggregate owner: the coordinating agent.
 
-Read [AGENTS.md](../AGENTS.md), then [active context](activeContext.md), [progress](progress.md) and
-the [merge plan](tasks/2026-09/2026-09-10_merge-plan.md). Stages 1 to 3.5 are built and tested; the
-three source applications are obsolete and no longer compile.
+Read [AGENTS.md](../AGENTS.md), then [active context](activeContext.md) and [progress](progress.md).
+All four capabilities and the shell are built; the project is in release preparation. The three
+source applications are obsolete and no longer compile.
 
 | Note | Purpose |
 |---|---|
@@ -12,8 +12,8 @@ three source applications are obsolete and no longer compile.
 | [Product context](productContext.md) | The host-centric model and the interface it implies |
 | [System patterns](systemPatterns.md) | Intended module boundaries and what they replace |
 | [Technical context](techContext.md) | Measured sizes, dependencies, targets and identities |
-| [Active context](activeContext.md) | Current state, ownership and next action |
-| [Progress](progress.md) | What is verified by running, what is only compiled, and what two devices still have to prove |
+| [Active context](activeContext.md) | Current state, authorization, the release checklist and open questions |
+| [Progress](progress.md) | What is built, how each part is verified, what is not verified, and what is open |
 | [Project rules](projectRules.md) | Rules specific to this merge |
 | [Decisions](decisions.md) | Decisions with status and provenance |
 | [Merge plan](tasks/2026-09/2026-09-10_merge-plan.md) | The staged plan, its risks and open questions |
@@ -67,6 +67,8 @@ three source applications are obsolete and no longer compile.
 | [The grid's scroll cost](tasks/2026-09/2026-09-23_grid-scroll-cost.md) | The database grid measured at 120 Hz; option 1 partly built |
 | [Editor: Save, ⇧⌘E, ⌘W](tasks/2026-09/2026-09-25_editor-save-and-new-window.md) | D37's shell-owned ⌘S, the Mac Save panel, a blank document on ⇧⌘E, ⌘W closing the window |
 | [Documentation and site plan](tasks/2026-09/2026-09-25_documentation-and-site-plan.md) | The vision → audit → help → sites plan; Anomalous's help and AudioPaper's site as models; glasspowertools.com |
+| [Licensing and acknowledgements](tasks/2026-09/2026-09-26_licensing-and-acknowledgements.md) | Corrected notices, the generated licence folder and in-app Acknowledgements, the Mermaid licence gate |
+| [Dependencies and the audit's fixes](tasks/2026-09/2026-09-27_release-audit-fixes.md) | What moved and what is blocked upstream; each public-release audit finding, its fix and its proof |
 | [September tasks](tasks/2026-09/README.md) | Monthly index |
 
 This project is `~/Software/glass/GlassPowerTools`. `../GlassEditorKit` was **absorbed on 2026-09-14**
@@ -75,8 +77,8 @@ capability. `../GlassConnectionKit` was **absorbed on
 2026-09-14** and is now a historical record like the rest. `../glas.sh`, `../glassdb`, `../glassDT` and `../GlasSecretStore` are
 obsolete and do not compile — a historical record to read, never something to keep building.
 GlasSecretStore was absorbed into `Sources/GlasSecretStore` on 2026-09-13. Two further siblings are **not** inputs:
-`../docs` holds two July 2026 security audit reports whose still-open findings are tracked in
-[technical context](techContext.md). A stale copy of glassdb was archived to
+`../docs` holds two July 2026 security audit reports of glas.sh and glassdb; every finding in them
+is closed (see [technical context](techContext.md)). A stale copy of glassdb was archived to
 `../glassdb-connection-library.zip` and removed on 2026-09-10. The full layout is in [technical context](techContext.md).
 
 **Examples, not machines.** Examples and test fixtures use neutral values — `alpha`, `bravo`,
@@ -84,4 +86,5 @@ GlasSecretStore was absorbed into `Sources/GlasSecretStore` on 2026-09-13. Two f
 that stand for nothing real. No real machine names, addresses, device identifiers, database names
 or hosting details are written into this repository (`projectRules.md`, rule 61).
 
-Operational transitions are recorded in `.brain/sessions.jsonl` at the project root.
+Operational transitions are recorded in `.brain/sessions.jsonl` at the project root, which is local
+and git-ignored.

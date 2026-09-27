@@ -116,7 +116,7 @@ inherited from glassDT without a decision having been taken.
 ## Approved — engines are first-class shared modules; one capability module per app (2026-09-10)
 
 **Status: Approved by the user on 2026-09-10 and refined the same day on the user's instruction
-("first-class integrations, not hacks"). Not implemented.**
+that integrations be first-class rather than workarounds. Not implemented.**
 
 Two layers, and the rule that capabilities never depend on each other holds between them:
 
@@ -437,9 +437,9 @@ have written 0 over the stored value**. See
 
 ## D18 — credentials synchronize through iCloud Keychain — Approved 2026-09-13
 
-The user: *"We can't truly sync database sessions if the database passwords stay app-private. That
-must change… define everything on Mac, then pick up Vision Pro and get to work without having to
-mess with settings and passwords."*
+The owner stated that database sessions cannot truly sync while database passwords stay app-private,
+and that this must change: define everything on the Mac, then pick up the Vision Pro and get to work
+without touching settings or passwords.
 
 `GlasSecretStore` was built for this and defaulted off. `SecretMobilityPolicy.iCloudKeychain` exists,
 `validateMobility` already enforces Apple's constraints, `kSecAttrSynchronizable` is wired into every
@@ -466,7 +466,7 @@ need the user**.
 
 ## D21 — credential sync is on by default — Approved 2026-09-13
 
-The user: *"Default on for my intended audience."*
+The owner chose on by default for the intended audience.
 
 The experience the product promises is picking up a Vision Pro and working; an opt-in buried in
 settings does not deliver that, because the moment a user has to discover a switch they have already
@@ -482,7 +482,7 @@ them regardless of this setting.
 
 ## D22 — existing device-only secrets are rewritten, not migrated — Approved 2026-09-13
 
-The user: *"no one uses this tool. rewrite."*
+The owner noted that no one uses the tool yet and chose a rewrite.
 
 There is no installed base to preserve, so the stage takes the simple path: a secret written under
 `.deviceOnly` is not migrated in place. It is replaced the next time it is saved, and the old item is
@@ -542,9 +542,9 @@ again on another device is correct behaviour and indefensible as a surprise.
 
 ## D23 — pinned SSH host keys synchronize, and there is one configuration for them — Implemented 2026-09-13
 
-**Approved by the standing continuity requirement, not by a fresh question.** The user's words for
-Stage 3.5 were *"define everything on Mac, then pick up Vision Pro and get to work without having to
-mess with settings and passwords."* Host trust was left device-bound as an open question, which in
+**Approved by the standing continuity requirement, not by a fresh question.** The owner's requirement for
+Stage 3.5 was to define everything on the Mac, then pick up the Vision Pro and get to work without
+touching settings or passwords. Host trust was left device-bound as an open question, which in
 practice meant: every machine the Mac already trusts has to be re-approved, by fingerprint, on the
 Vision Pro and again on the iPhone. That is the thing the requirement names.
 
@@ -598,8 +598,9 @@ D22 authorized, and it exercises the prompt rather than avoiding it.
 ## D24 — the family's sidebar toolbar arrangement — Implemented 2026-09-13
 
 **Approved by the user after an expensive detour**, and recorded because it had already been
-rediscovered and lost more than once: *"both Glas.sh and GlassDB use this pattern… copy it. It's
-already done and proven working. Then set this as the standard when there's a sidebar."*
+rediscovered and lost more than once: the owner pointed out that glas.sh and glassdb both already
+use this pattern, proven working, and directed that it be copied and made the standard for any window
+with a sidebar.
 
 **On macOS, do not remove `.sidebarToggle`.** glassdb's `databaseSidebarChrome()`
 (`glassdb/Constants.swift:267-273`) removes it on every platform *except* macOS, and glas.sh never
@@ -636,7 +637,7 @@ whole time. When it disagreed with reasoning about placements, the implementatio
 
 ## D25 — deleting a machine deletes what its capabilities stored — Implemented 2026-09-13
 
-Found by the user: *"Is there still a cache somewhere? I deleted all of my stored sessions!"* — a
+Found by the owner, who asked whether a cache remained after deleting every stored session — a
 host deleted from the library kept appearing in the terminal's Connect Saved Host.
 
 `deleteHost` removed the catalog records and the preferences and **told no capability**. Each one's
@@ -659,9 +660,9 @@ collected and rethrown once every service has had its turn.
 
 ## D26 — the catalog is the one store for a connection
 
-**Status: Approved** by the user, 2026-09-14: *"which if I read the options correctly... is D"*, and
-*"'Too big right now: it's a migration of existing local data' means making sure that any stores
-owned by Power Tools are cleaned up (including keys), and this is done correctly."*
+**Status: Approved** by the user, 2026-09-14: option D, with the clarification that the "too big
+right now: it's a migration of existing local data" objection instead means making sure every store
+Power Tools owns is cleaned up (including keys) and that this is done correctly.
 
 **The decision.** A service's own configuration lives on its `HostServiceLink`, encoded by the
 capability that owns it. The catalog *is* the store, not a copy of one. Each capability's separate
@@ -675,8 +676,8 @@ is no installed base to migrate, so "one store" costs no more than "two stores k
 is the version that stays correct.
 
 **Why migration was never a real constraint, recorded because it was got wrong three times.** The
-user has said since 2026-09-11 that the user base is the two of us — *"Data loss is fine. NO ONE
-USES IT YET"*. Pricing in a migration cost turned the correct design into "too big right now" and
+user has said since 2026-09-11 that the user base is the two of us, that no one uses it yet, and
+that data loss is acceptable. Pricing in a migration cost turned the correct design into "too big right now" and
 recommended the weaker one. **When the user has stated a constraint is absent, stop re-deriving it.**
 
 **What this makes true**, and it is the sentence the product is: add a host on any device, attach a
@@ -690,9 +691,9 @@ that do not: the service configuration and the key record.
 cannot leave its device. "Works everywhere" is therefore true of an imported key and false of a
 generated hardware one, by design.
 
-**Amended the same day: keys are not a detail of this.** *"We need that key to live on its own …
-so the key itself survives if I delete the Linux server Terminal connection, so that it can be reused for
-other hosts and services."* A key outlives connections and is shared by them, so it gets its own
+**Amended the same day: keys are not a detail of this.** The user required a key to exist on its
+own, so that it survives deleting the Linux server's Terminal connection and can be reused for other
+hosts and services. A key outlives connections and is shared by them, so it gets its own
 stage and its own manager — see
 [keys first class](tasks/2026-09/2026-09-14_d26-keys-first-class.md). The original scope item 2
 below understated it as folding a library into the Keychain.
@@ -702,8 +703,8 @@ below understated it as folding a library into the Keychain.
 1. Connection configuration onto the service link; the per-capability stores deleted.
 2. Keys promoted to a first-class, workspace-level library with a manager surface, independent of
    any connection's lifetime. **A service whose credential cannot leave the device does not appear
-   on other devices at all** — the user's model, 2026-09-14: *"the Terminal using a device bound key
-   becomes a device bound terminal and doesn't show on iPhone."* Secure Enclave material is the
+   on other devices at all** — the user's model, 2026-09-14: a Terminal that uses a device-bound key
+   becomes a device-bound terminal and does not appear on the iPhone. Secure Enclave material is the
    trigger, the binding is derived from the credential rather than stored, and the publish/apply
    pair must both be implemented or a device deletes its own hardware-key services on the second
    sync.
@@ -725,7 +726,7 @@ record sync and D23's pin sync together.
 
 ## D27 — every saved connection has a host record, created for the user rather than by them
 
-**Status: Approved** by the user, 2026-09-14: *"Your reco is good."*
+**Status: Approved** by the user, 2026-09-14, who accepted the recommendation.
 
 **The finding that forced it.** Two paths create a saved server with no host record and no service
 link, both with a fresh `UUID()`: `SettingsManager.importSSHConfig` (`SettingsManager.swift:1040-1049`)
@@ -757,9 +758,9 @@ correctness fix, not a migration.
 
 ## D28 — what authenticates what is derived, never stored
 
-**Status: Approved** by the user, 2026-09-14, from the scenario they set: *"the Mac and the Linux server share
-a key and the Mac terminal using said key is deleted. The Linux server's terminal still uses it… we need a
-lookup table of some kind that tracks usage by auths."*
+**Status: Approved** by the user, 2026-09-14, from the scenario they set: the Mac and the Linux server share
+a key, and the Mac terminal using it is deleted while the Linux server's terminal still uses it; the user
+asked for some kind of lookup that tracks which services use each credential.
 
 **The decision: no table.** The edge already exists on the service's own configuration
 (`sshKeyID`). Once D26 stage 1 puts configurations in the catalog, "which services use key K" is one
@@ -781,7 +782,7 @@ Terminal". The Linux server is untouched because nothing ever pointed at it.
 | Database over SSH | holds no key; borrows the host's forward from the terminal (D7) |
 
 So the surface is a **key** manager with a usage list, plus flat 1:1 inventory rows for everything
-else — considerably smaller than "track usage by auths" first sounded.
+else — considerably smaller than tracking usage for every credential first sounded.
 
 **Detaching from the key side is a write, and it has consequences that must be stated at the point
 of choice:**
@@ -802,12 +803,12 @@ that is the state after the Mac deletion and the signal that it is safe to delet
 
 **Where it lives:** the key manager panel in the library sidebar beside Collections (D26 stage 4),
 with "used by" as host · service rows each carrying its own detach — which is the point of the
-request: *"Disconnect XYZ key from the Linux server's terminal"* without walking Connections › the Linux server › Terminal.
+request: detaching a given key from the Linux server's terminal directly, without walking Connections › the Linux server › Terminal.
 
 ## D29 — Uninstalling is a feature, not a support article
 
-**Status: Proposed, 2026-09-16.** The user's words while clearing three dead apps off the Mac by
-hand: *"make uninstalling as easy as installing. :)"*
+**Status: Proposed, 2026-09-16.** While clearing three dead apps off the Mac by
+hand, the user asked for uninstalling to be as easy as installing.
 
 **Why it earns its place in this product rather than a README.** Removing the three source apps
 today meant walking eight locations — the bundle, a preferences plist, a sandbox container, saved
@@ -830,8 +831,8 @@ it safe, because the answer differs by what else is installed. The app knows.
    "start clean" stop being the same irreversible act.
 4. **Removes, then reports what it could not remove and why** — a file the sandbox refuses, a
    Keychain item another app's access group holds. Never a silent partial success.
-5. **Quits and moves its own bundle to the Trash**, which is where "as easy as installing" actually
-   lands: the user does not then go hunting in `~/Library`.
+5. **Quits and moves its own bundle to the Trash**, which is where uninstalling actually becomes as
+   easy as installing: the user does not then go hunting in `~/Library`.
 
 **What it must never do:** touch another app's container, delete a Keychain item outside this app's
 access group, or remove the shared App Group container while any sibling still declares it. The
@@ -848,8 +849,8 @@ is that list executed.
 
 ## D30 — watchOS stays out until someone else is using this — Approved 2026-09-20
 
-**Status:** Approved by the user, 2026-09-20: *"Let's come back to watch once someone other than
-me is using this thing."* `AGENTS.md` has excluded Apple TV and watchOS since the merge was
+**Status:** Approved by the user, 2026-09-20: the Watch is to be revisited once someone other than
+the owner is using the product. `AGENTS.md` has excluded Apple TV and watchOS since the merge was
 decided; this reaffirms it with a condition attached rather than leaving it a flat no.
 
 **The use cases, ranked, so the next look starts from them rather than from scratch.** They were
@@ -923,15 +924,15 @@ for the user to settle with one edit. The group projection stays as the mechanis
 and for the moment between a sync arriving and the fold running.
 
 **Consequence accepted.** When two devices each configured the same service, one device's
-configuration record is removed. Pre-launch, one user, three devices — the user's words:
-*"there is no every device."*
+configuration record is removed. Pre-launch, one user, three devices — as the user put it, there
+is no fleet of devices to protect.
 
 ## D33 — Active in the library, and one control to reach it — Implemented 2026-09-21
 
 **Context.** Every capability worked on a phone and none could reach another. The morning's
 answer was a per-session Sessions control with a switcher sheet and a gallery (D1–D3). By the
-evening the user cut it: *"simplify the mess out of the open connections problem on every app
-deployment target."*
+evening the user cut it, asking for the open-connections problem to be drastically simplified on
+every deployment target.
 
 **Decided.** The library gets a fourth category, **Active** — the live sessions grouped by the
 machine each is on, each machine a disclosure — and every top toolbar in the app gets the **⚡**,
@@ -942,7 +943,7 @@ layout that gallery left behind.
 
 **Kept deliberately.** Workgroups — the terminal's saved multi-machine layouts — unchanged.
 
-**Later, maybe.** *"A fun way to view that list."* The seam is ready for it.
+**Later, maybe.** The user would like a more playful way to view that list. The seam is ready for it.
 
 
 ## D34 — A deletion is dated; the later statement wins — Implemented 2026-09-21
@@ -975,7 +976,7 @@ resource through one app-answered URL scheme that reads through the document's o
 HTML files preview with scripts off.
 
 **Status.** Implemented 2026-09-23 — approved by the user with one condition, which is now part
-of the decision: *Mermaid is never stale.* The scheme's build pre-action (`Tools/Mermaid/update-mermaid.sh`)
+of the decision: Mermaid must never be stale. The scheme's build pre-action (`Tools/Mermaid/update-mermaid.sh`)
 checks the npm registry on every build, and a moved version is downloaded, sha512-verified against
 the registry's integrity field, and built in.
 
@@ -995,10 +996,10 @@ and Preview for huge-line files; iPad and Vision Pro to be measured before choos
 Independent of the engine, the fast editors' other two practices apply to either: parse off the main
 thread and apply by range; colour without touching the text storage.
 
-**Status.** Approved 2026-09-23 (*"Let's test it … build the new editor"*). **Implemented** the same
+**Status.** Approved 2026-09-23 (the user asked to test it and build the new editor). **Implemented** the same
 day at `9b4da5f`: `GlassTextView.makeTextKit1()`, `GlassEditorAppKitEngine(textSystem: .textKit1)` the
 Mac default, the gutter numbered from layout-manager line fragments, the tests run on both systems.
-Seen by the user in 0.4.217: *"that new renderer is great!"* — the 14.6 MB SVG opens in 1.9 s (was
+Seen by the user in 0.4.217, who was pleased with the new renderer — the 14.6 MB SVG opens in 1.9 s (was
 ~5 s) and scrolls. Not yet done: colours are still text-storage attributes, highlighting is still on
 the main thread, and re-wrapping that file after a resize takes ~1.7 s.
 
@@ -1018,20 +1019,20 @@ where the shell's item does not exist, the database keeps its own ⌘S item. Gua
 running app; the New group is the placement known to reach the menu bar. If Save is wanted beside
 Close, that is the open question: attach an item from a scene whose `.saveItem` does draw.
 
-**Status.** Implemented 2026-09-25 in answer to the user's report (*"command-s should show a save
-interface vs. bonking me"*); 0.4.220 onward, menu bar read back.
+**Status.** Implemented 2026-09-25 in answer to the user's report that ⌘S should show a save
+interface rather than beep; 0.4.220 onward, menu bar read back.
 
 ## D38 — Distribution and automatic updates: Developer ID + Sparkle on the Mac, TestFlight then the App Store elsewhere — Approved 2026-09-25
 
 **Context.** No build has been distributed yet; every install so far is from Xcode, which never
-updates itself. The user: *"we do need to account for automatic updates."*
+updates itself. The user required that automatic updates be accounted for.
 
 **Decision.**
 - **macOS: Developer ID, notarized, updated by Sparkle** — the Mac App Store is not open to this app.
   It requires App Sandbox (App Store Review Guidelines 2.4.5(i)), `Platforms/macOS/macOS.entitlements`
   has none, and sandboxing is not a formality here: a local shell started inside the sandbox inherits
   it and cannot reach the user's files or tools, and `~/.ssh`, `ssh-agent` and open-anything editing
-  would all need workarounds. The user: *"Desktop can't go through the app store. It's not sandboxed."*
+  would all need workarounds. The user confirmed the Mac build cannot go through the App Store because it is not sandboxed.
   Reuse the release path of AudioPaper, the author's other open-source Mac app (its
   `scripts/release.sh` and `appcast.py`): archive,
   export with Developer ID and hardened runtime, notarize, staple, a Sparkle zip signed with the EdDSA
@@ -1073,5 +1074,5 @@ product page per capability and a help centre. Plan and models:
 - **The update feed must be served uncached** (`appcast.xml`, and the site's HTML and JSON), so an
   update is never missed; a requirement on the hosting, tracked privately.
 
-**Status.** Approved by the user 2026-09-25 (*"This plan"* in conversation; *"document all of these
-decisions"*). Nothing built.
+**Status.** Approved by the user 2026-09-25 (accepting this plan in conversation and asking for all of
+these decisions to be documented). Nothing built.

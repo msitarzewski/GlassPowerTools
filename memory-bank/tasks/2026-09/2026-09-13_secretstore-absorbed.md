@@ -1,9 +1,10 @@
 # GlasSecretStore absorbed, and the host-trust defect that came with it
 
 **Date** 2026-09-13 · **Owner** coordinating agent · **State** DOCS
-**Authorization:** *"GLASSSECRETSTORE IS OBSOLETED WITH THIS NEW GLASS POWER TOOLS. LITERALLY
-EVERYTHING IS STORED AND ACCESSIBLE BY GLASS POWER TOOLS NOW. ABSORB WHAT YOU NEED FROM
-GLASSSECRETSTORE."* and *"THEY ARE NOT COMPILING THEYRE OBSOLETE."*
+**Authorization:** the owner stated that GlasSecretStore is made obsolete by Glass Power Tools,
+that everything is now stored and accessed by Glass Power Tools, and directed that whatever is
+needed be absorbed from GlasSecretStore; the owner also confirmed the source applications no longer
+compile and are obsolete.
 
 ## What moved
 

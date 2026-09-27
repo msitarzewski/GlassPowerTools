@@ -1,8 +1,8 @@
 # The database grid's scroll cost — measured, 2026-09-23
 
-The user: *"should we be looking at other editors that claim real time rendering somehow? I think
-this is going to sneak up on us in the Database and Terminal areas too."* Then, stepping away:
-*"Take a look around."* Investigation only; the grid is unchanged.
+The user asked whether we should study other editors that claim real-time rendering, expecting the
+same cost to surface in the database and terminal too, and then, stepping away, asked for a look
+around. Investigation only; the grid is unchanged.
 
 ## Terminal — already on the state-of-the-art path
 
@@ -56,6 +56,6 @@ prove every key part invalidates); the scroll-driven offset only on frozen cells
 tap gesture per cell on the Mac, the click count choosing select or open (`gridTap`; touch keeps two).
 Not done: one material behind the row-number column.
 
-**Observed by the user** on 0.4.223, the real `shop` database on the Linux server: *"rendered 10000 rows
-like nothing. Great job."* Not yet re-measured with `GridScrollTimingTests` (needs the Mac to itself);
+**Observed by the user** on 0.4.223, the real `shop` database on the Linux server: 10,000 rows rendered
+effortlessly, and the user was pleased. Not yet re-measured with `GridScrollTimingTests` (needs the Mac to itself);
 the 8.3 ms-per-frame target is unverified by numbers.

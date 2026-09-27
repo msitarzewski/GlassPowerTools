@@ -52,8 +52,8 @@ platforms. A built-in service appears on the host, connects, and has no Edit and
 is no stored configuration to open or delete, and both surfaces say so rather than reporting the
 service as broken (`GlassShellModel.swift` `builtInServiceNotEditable`, `GlassShellLibraryView.swift:297`).
 
-`supportsLocalSetup` defaults to **true** because the user's answer to "which kinds belong on This
-Mac?" was "all of them", so a capability opts out rather than in. The terminal opts out
+`supportsLocalSetup` defaults to **true** because the user answered that every kind belongs on This
+Mac, so a capability opts out rather than in. The terminal opts out
 (`GlassTerminalCapability.swift:252`): its local service is the built-in shell, and glas.sh's
 workgroups already hold a saved shell, directory and layout, so a second configurable way to make
 one would only be a worse one. **`GlassDatabase` was not edited and gets local setup for free.**
@@ -232,7 +232,7 @@ Screenshots, taken from the passing macOS run (project rule 11, own window only)
 ## Remaining work
 
 1. **Files on the local host is not shipped.** It needs a local backend for the SFTP browser, or a
-   new local-filesystem browser. The user already called it "weird"; it is the one part of D8's
+   new local-filesystem browser. The user already found it an odd fit; it is the one part of D8's
    table that is absent, and it is absent visibly rather than as a row that does nothing.
 2. **`GlassDatabaseCapability.hostCanForwardPorts`** — the one-line change above, for W-capability.
 3. **Stage 4's desktop capability inherits local setup** from the `supportsLocalSetup` default, so

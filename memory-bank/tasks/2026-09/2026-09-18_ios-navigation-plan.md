@@ -65,8 +65,8 @@ primary scene, and the only way back to the library is to close what they are lo
 these are windows and the problem does not exist; on a phone it is the whole of the product's
 navigation model, missing.
 
-**What the user asked for:** an app-switcher, activated when a session is open — *"imagine swiping
-through the open connections like the iOS app switcher view"*.
+**What the user asked for:** an app-switcher, activated when a session is open — swiping through the
+open connections the way the iOS app switcher works.
 
 ### D1. One list of what is open
 
@@ -342,8 +342,8 @@ reads like a permissions bug or a broken toolchain and cost an afternoon.
 
 # D3 stage 2 — the gallery already exists, 2026-09-21
 
-The user's words: *"We had the prototype for this in glas.sh with terminal grid and gallery
-view."* It is not a prototype and it is not only in glas.sh — it came across in the merge and
+The user pointed out that glas.sh already had a prototype of this in its terminal grid and gallery
+view. It is not a prototype and it is not only in glas.sh — it came across in the merge and
 ships today. **D3 stage 2 is a reuse job, not a design job.**
 
 | What exists | Where | What it gives the switcher |
@@ -415,8 +415,8 @@ above. What is new is small; what moved is the useful part.
 
 # The Mac's overview joins the seam, and the title band stops leaking — 2026-09-21
 
-Reported from the running app, standing in the Terminal Overview: *"Looks like we lost the title
-settings again somehow. Shouldn't the Linux server database connection show up in this carousel now?"*
+Reported from the running app, standing in the Terminal Overview: the title settings appeared to be
+lost again, and the Linux server's database connection was expected to show up in this carousel.
 
 ## The overview shows every open session
 

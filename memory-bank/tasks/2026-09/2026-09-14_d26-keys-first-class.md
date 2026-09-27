@@ -2,9 +2,9 @@
 
 Owner: coordinating agent. 2026-09-14. **Status: PLAN. Nothing built.**
 
-Added at the user's direction: *"We need that key to live on its own … so the key itself survives if
-I delete the Linux server Terminal connection, so that it can be reused for other hosts and services. …
-should the keys survive on their own? Yes. That also means we need a key manager interface."*
+Added at the user's direction: a key must exist on its own, so that it survives deleting the Linux
+server's Terminal connection and can be reused for other hosts and services. Keys survive on their
+own, which also means a key manager interface is needed.
 
 This corrects a hole in [D26](../../decisions.md): that plan folded the key library in as a detail of
 connection sync. A key is not a detail of a connection. It **outlives** connections, it is **shared
@@ -45,8 +45,9 @@ So this is promotion and completion, not new construction.
 
 ## Device-bound means it does not appear elsewhere — the user's model
 
-*"Why show it if it's not usable on the platform? Maybe the Terminal using a device bound key
-becomes a device bound terminal and doesn't show on iPhone? Trigger being the device based key?"*
+The user questioned showing a key on a platform that cannot use it, and proposed instead that a
+Terminal using a device-bound key become a device-bound terminal that does not appear on the iPhone,
+with the device-bound key as the trigger.
 
 **Adopted.** An earlier draft of this note proposed showing a hardware key on devices that cannot
 use it, clearly marked. That is worse: a thing you can see, cannot use, and must have explained is

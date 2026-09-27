@@ -143,7 +143,7 @@ Asked for from use, built in one pass:
   the section header is gone.
 - **Two gears, two scopes.** The toolbar's opens the app's settings (line numbers, text size —
   true of every document); the sidebar's opens **this project's** (name, machine, folder).
-- **No Close Project.** Closing the window closes the project — *"I'm done with this project"* —
+- **No Close Project.** Closing the window closes the project — it means being done with that project —
   and open documents stay open, because a file in a tab is work and a folder is a view.
 - **Opening a file with no project collapses the tree**, because a project column with no project
   in it is a stripe of empty space beside the text.
@@ -187,7 +187,8 @@ From a morning of use, each found by using the thing:
 
 ## One workspace per window — 0.4.153
 
-*"⇧⌘E opened the same window with the same docs? I'd expect a new empty editor."* Right, and it was
+The user reported that ⇧⌘E opened the same window with the same documents, where a new empty
+editor was expected. Right, and it was
 a design error rather than a slip: the editor kept **one workspace for the whole app**, so every
 window was a view of the same documents. That is a panel pretending to be a window. A Mac editor is
 the other way round — a window *is* a set of tabs.

@@ -1,9 +1,9 @@
 # Editor: ⇧⌘E opens a blank document, ⌘S saves, the title follows — 2026-09-25
 
 The user, making a new `.env` in a new project: ⇧⌘E, then ⌘N, typed, ⌘S → the system beep; File ▸
-Save Document worked, and afterwards the title bar still said "Untitled". *"Shift-command-e should
-open a new blank text document, ready to edit. The user can then use the File menu, or command keys
-to open a project or folder."* Authorized by that report; local changes only.
+Save Document worked, and afterwards the title bar still said "Untitled". The user's requirement: ⇧⌘E
+opens a new blank text document, ready to edit, and the File menu or keyboard shortcuts then open a
+project or folder. Authorized by that report; local changes only.
 
 ## Causes (from the source)
 
@@ -21,7 +21,7 @@ to open a project or folder."* Authorized by that report; local changes only.
   File ▸ Save on ⌘S, **inside the shell's New group** — ⌘N's pattern. Read out of the running app:
   from the shell's commands (attached to the library scene), `replacing: .saveItem` (0.4.218) and
   `after: .saveItem` (0.4.219) both drew nothing; the editor's own `after: .saveItem` item had
-  drawn, from the editor's scene (the user: *"Save WAS in there before you started looking for it"*).
+  drawn, from the editor's scene (the user pointed out Save had been in that menu before the search for it began).
   0.4.220, beside New: present.
 - `GlassEditorWorkspaceView.swift`: publishes Save ("Save…" when untitled, enabled for an untitled
   document or a dirty one, none for a viewer); `exportTarget` holds the panel's document apart from
@@ -45,7 +45,7 @@ to open a project or folder."* Authorized by that report; local changes only.
 
 ## ⌘W on the last document closes the window
 
-The user: *"Command w means I'm done here. Not looking for a prompt to do something else."* ⌘W on
+The user: ⌘W means being done with the window, not a prompt to do something else. ⌘W on
 the window's last document used to leave "No Document" and its three buttons. Now
 `MacEditorWindowBehaviour` marks the close and, once the document count reaches zero (after the
 unsaved-changes question, if any), closes **its own window** — held by `GlassEditorWindowHolder`
@@ -87,7 +87,7 @@ General, About, Terminal and Connections in 0.4.225 and checked.
 
 ## visionOS Settings: the same TabView, as the leading ornament — 0.4.226 built
 
-The user: *"These become ornaments in visionOS naturally right?"* — then *"Ok proceed."* The icon
+The user asked whether these naturally become ornaments on visionOS, then approved proceeding. The icon
 `TabView` is now used on visionOS too (each pane in its own `NavigationStack`, the `TabView` the
 window's root; the App's visionOS `Window("Settings")` lost its outer stack). The library's gear on
 visionOS opens that window instead of a sheet, as the database workspace already did — the

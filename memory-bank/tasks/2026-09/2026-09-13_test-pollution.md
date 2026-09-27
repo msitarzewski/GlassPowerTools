@@ -1,8 +1,8 @@
 # UI tests were writing into the user's real store
 
 **Date** 2026-09-13 · **Owner** coordinating agent · **State** fixed, with cleanup outstanding
-**Found by** the user, looking at Connect Saved Host: *"where are these 'previous connections'
-stored? We need to wipe them."*
+**Found by** the user, looking at Connect Saved Host, who asked where these previous
+connections were stored and wanted them wiped.
 
 ## What was wrong
 

@@ -61,8 +61,8 @@ beside the code in `THIRD-PARTY-NOTICES.md`. Cost measured today: markdown 2.2 M
 **SQL 41 MB**. That last figure undoes most of the size win the absorption bought.
 
 **B — fork upstream, apply the patch, pin the fork.** Keeps the repository small and the patch
-visible as a commit with a message. The user has already said this is acceptable: *"I'm also ok with
-pinning against a version in a git repo."* Needs two repositories created and the patches applied
+visible as a commit with a message. The user has already said this is acceptable: pinning against a
+version in a Git repository is fine. Needs two repositories created and the patches applied
 there.
 
 **Recommendation: B for SQL, either for markdown.** SQL's 41 MB is the whole argument; markdown's

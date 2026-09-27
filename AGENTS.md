@@ -7,16 +7,15 @@
 
 Glass Power Tools is an MIT-licensed, native Apple application that merges the previously separate
 glas.sh (SSH/terminal), glassdb (databases) and glassDT (RDP/VNC remote desktop) apps into one
-product, with GlassEditorKit available as a further capability. Bundle identifier
-`com.glasspowertools`. The merge was decided on 2026-09-10. Stages 1 to 3.5 are built: the shell,
-the SSH/terminal capability, the database capability and cross-device continuity.
+product, with the editor (GlassEditorKit) as a fourth capability. Bundle identifier
+`com.glasspowertools`. The merge was decided on 2026-09-10. All four capabilities and the shell are
+built; the project is in release preparation (`memory-bank/activeContext.md`).
 
-**Read first:** `memory-bank/toc.md`, then `memory-bank/activeContext.md` and the merge plan in
-`memory-bank/tasks/2026-09/2026-09-10_merge-plan.md`.
+**Read first:** `memory-bank/toc.md`, then `memory-bank/activeContext.md` and `memory-bank/progress.md`.
 
-**The source applications are obsolete and no longer compile** — the user's words, 2026-09-13:
-*"THEY ARE NOT COMPILING THEYRE OBSOLETE."* `../glas.sh`, `../glassdb`, `../glassDT` and
-`../GlasSecretStore` are a historical record to read, not software to keep building. Do not spend
+**The source applications are obsolete and no longer compile** (confirmed by the owner, 2026-09-13).
+`../glas.sh`, `../glassdb`, `../glassDT` and `../GlasSecretStore` are a historical record to read,
+not software to keep building. Do not spend
 effort preserving them, and do not treat a change here as needing to stay compatible with them.
 
 **Why one product.** The shared catalog already models a host owning several services, so the three
@@ -139,7 +138,7 @@ Read this guide and the required Memory Bank files before implementation. A shor
 2. Read `memory-bank/activeContext.md`, `progress.md`, and the current month's task README if present.
 3. Check current files and Git status when applicable; identify pre-existing changes and active agent ownership.
 4. Read `.brain/mcp.config.json` or `.mcp.json` only if present and relevant; use tools actually available in the session.
-5. When writes are authorized and assigned to you, record a concise session entry in `.brain/sessions.jsonl` with the actual timestamp, agent/session identifier, objective, mode and known state. Do not fabricate token usage, tool availability or historical timestamps.
+5. When writes are authorized and assigned to you, record a concise session entry in `.brain/sessions.jsonl` (local and git-ignored: an operational log, not project history) with the actual timestamp, agent/session identifier, objective, mode and known state. Do not fabricate token usage, tool availability or historical timestamps.
 
 **Fast Track** — small changes/reviews:
 - Load the affected task, relevant rules and source; consult `quick-start.md` if available.

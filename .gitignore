@@ -13,3 +13,6 @@ xcuserdata/
 
 # A fork's signing identity (see Config/Identity.xcconfig).
 Config/Identity.local.xcconfig
+
+# Agent session log: local working state, not project history (AGENTS.md).
+.brain/

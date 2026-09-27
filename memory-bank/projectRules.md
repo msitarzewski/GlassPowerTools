@@ -6,8 +6,9 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
    make it fit the new shell is how a merge turns into a rewrite and loses a year.
 2. **Draw the shell boundary before the second capability.** Otherwise the first capability's
    assumptions silently become the boundary.
-3. **The source apps keep building until parity.** They are the working software. Nothing in
-   `../glas.sh`, `../glassdb` or `../glassDT` is deleted, moved or reset as part of this work.
+3. **The source apps are a record, not a dependency.** They no longer compile (2026-09-13) and are
+   read for provenance and design only. Nothing in `../glas.sh`, `../glassdb` or `../glassDT` is
+   deleted, moved or reset as part of this work.
 4. **One capability reaches parity at a time**, with its own validation, before the next starts.
 5. **Never present a moved capability as working because it compiles.** Parity means its own tests
    and native workflows pass here.
@@ -246,11 +247,10 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     `GlassCapability.catalogDidLoad()` is how a capability learns it may now build its index. Any
     reconcile that deletes what is missing from a list needs to know where the list came from.
 
-36. **There is no legacy. Do not write migration code.** 2026-09-16, the user's words: *"there is no
-    LEGACY. We're building the first version of this. There is no reason to import old previous
-    version settings. There are no users, we don't need the baggage for that… they shouldn't be
-    changing so drastically at this point to require code specifically dedicated to morphing
-    preferences."* A recovery pass that refilled emptied service links from the pre-D26
+36. **There is no legacy. Do not write migration code.** 2026-09-16, the user was emphatic: there is no
+    legacy; this is the first version of the product, there are no users, and there is no reason to
+    import settings from earlier builds or carry that baggage. Settings should not be changing so
+    drastically at this stage that code dedicated to converting preferences is needed. A recovery pass that refilled emptied service links from the pre-D26
     `UserDefaults` copy was written, tested and then **deleted** for exactly this reason. The data
     on this Mac is the user's *test* data; re-entering four records costs minutes, and shipping a
     migration to save them costs a permanent seam in the product. Fix the defect that lost the data
@@ -362,7 +362,7 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     `DatabaseWorkspaceView` got a compact `NavigationStack(path:)` typed `[DatabaseCompactRoute]`
     on 2026-09-19. The schema browser inside it has pushed its own `CompactSchemaDatabaseDestination`
     for a database's tables since glassdb — and **a typed path accepts only its own type**, so every
-    one of those links silently did nothing: *"now the databases can't be clicked"*, reported within
+    one of those links silently did nothing — the databases could no longer be tapped, reported within
     the hour by the only person driving a phone. `NavigationPath` takes both, at the cost of not
     being able to ask what is in it. The working half of a screen is the half to leave alone.
 

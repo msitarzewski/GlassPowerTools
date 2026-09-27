@@ -1,8 +1,8 @@
 # A terminal service that synced without its settings — 2026-09-17 (night)
 
 **Owner:** coordinating agent. **State:** BUILD → DOCS.
-**Reported:** *"I set up the desktop on iPhone and ssh — the desktop settings transferred and
-worked, but the ssh settings didn't."* The Mac showed **Terminal on the Mac** in the library and
+**Reported:** the user set up a desktop and an SSH terminal on the iPhone; the desktop settings
+transferred and worked, but the SSH settings did not. The Mac showed **Terminal on the Mac** in the library and
 connecting said: *"has no saved terminal configuration. Edit the service to set it up, or remove
 it."*
 

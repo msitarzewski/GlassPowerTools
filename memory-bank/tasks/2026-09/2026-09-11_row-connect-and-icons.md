@@ -2,19 +2,16 @@
 
 Worker W9. Baseline `b932dd8`. Not committed (coordinator commits).
 
-User requirements, verbatim:
+User requirements, paraphrased:
 
-> "Remove the word connect, remove the last ocnnected [never] and the number of services
-> connected. The glance at the icons reveals how many services are connected. This is a unilateral
-> move (all platforms). Move the dropdown into the button... a click/tap on the Play itself loads
-> all services. A click/tap/pinch on the arrow allows a single service to become active. Were are
-> these icons from? use the circle-stack from hero icons, please for the DB. The others are fine.
-> Also fleet wide."
-
-> "I expect these buttons on Mac... are we using Apple HIG/UX patterns in this panel? I see missing
-> background. Seems like a miss." / "Check all platforms."
-
-> "Let's move delete into the edit modal or in a right/context click/pinch."
+- Remove the word "Connect", the "last connected [never]" text and the count of connected services
+  from the row; the service icons already show at a glance how many services there are. Apply this
+  on all platforms. Move the dropdown into the button: a click or tap on Play itself connects all
+  services, and a click, tap or pinch on the arrow activates a single service. Use Heroicons'
+  circle-stack icon for the database; the other icons are fine. Apply it everywhere.
+- The detail-panel buttons on the Mac should follow Apple HIG patterns; the panel was missing its
+  background. Check all platforms.
+- Move Delete into the edit sheet or into a right-click/context/pinch menu.
 
 ## What changed
 
@@ -132,7 +129,7 @@ edit sheet with its footer), `att-w9-mac/…CB3D0BF5….png` (two rows in the li
 ## Observations, not changed in this pass
 
 - The connect-failure alert suggests granting Local Network access for **any** timeout. When the
-  address simply has nothing behind it (the user's host said `192.0.2.6`; the VM is at
+  address simply has nothing behind it (the user's host said `198.51.100.6`; the VM is at
   `192.0.2.6`) the hint is misleading. Worth gating on "the host is on a local subnet **and** the
   app was actually denied" — not trivial, so not done here.
 - "Delete Host…" carries `role: .destructive`; macOS renders a plain destructive button without red

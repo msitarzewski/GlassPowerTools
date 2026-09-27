@@ -70,7 +70,7 @@
 - 2026-09-10: **Stage 2 W3 landed** (`ded6ad2`): `ConnectionManagerView` (3,697 lines) deleted
   after re-homing workgroups, Tailscale, server actions and local terminal; layering proven on
   the connection panel sheets and visionOS terminal chrome; settings merged (pending three shell
-  hooks); user requirement "choose a key file" delivered with `SSHPrivateKeyImport` and
+  hooks); the user's requirement to choose a key file delivered with `SSHPrivateKeyImport` and
   ssh-keygen-fixture tests. 347 tests, one inherited failure now being root-caused by a narrow
   worker. Consolidation worker adding the hooks and the visionOS row fix; integration worker
   driving a real session.
@@ -475,7 +475,7 @@ to open and scrolls freely where ours does not. D36 approved: a TextKit 1 backen
 Measured on the real grid: fine at 60 Hz for a short scroll, but the user's Mac is 120 Hz, and a
 long scroll stutters (up to 358 ms) while SwiftUI builds rows — two tap gestures, accessibility and
 a scroll effect on every cell. The terminal is already on SwiftTerm's Metal renderer. Options
-proposed, nothing changed. The user saw the TextKit 1 editor: *"that new renderer is great!"*
+proposed, nothing changed. The user saw the TextKit 1 editor and was pleased with the new renderer.
 
 
 ## 2026-09-25 — [Editor: Save, ⇧⌘E, ⌘W](2026-09-25_editor-save-and-new-window.md)
@@ -484,7 +484,7 @@ From the user making a `.env`: ⌘S belonged to the database and beeped in an ed
 owns File ▸ Save as it owns New (D37), beside New because `.saveItem` drew nothing from the shell's
 scene (rule 60). The first save is the Mac Save panel, not SwiftUI's Export panel that added `.txt`.
 ⇧⌘E opens on a blank document; ⌘W on the last document closes the window; Explain Plan moved to ⌥⌘E.
-The grid's option-1 changes shipped alongside; the user on the Linux server: *"rendered 10000 rows like nothing."*
+The grid's option-1 changes shipped alongside; the user on the Linux server saw 10,000 rows render effortlessly.
 0.4.223 on the Mac; 1,761 tests pass. Committed locally, not pushed.
 
 ## 2026-09-25 — [Documentation and glasspowertools.com — plan](2026-09-25_documentation-and-site-plan.md)

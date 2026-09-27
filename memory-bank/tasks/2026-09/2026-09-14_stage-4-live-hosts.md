@@ -2,8 +2,8 @@
 
 Owner: coordinating agent. 2026-09-14. **Status: measured. Every result below is a real execution.**
 
-Authorized by the user: *"You can set up screen sharing on the scratch parallels vm and on windows
-11 to test."*
+Authorized by the user: screen sharing could be set up for testing on the scratch Parallels VM and
+on Windows 11.
 
 ## The headline: RDP against real Windows, for the first time
 
@@ -107,7 +107,7 @@ screenshot.** A saved desktop named `bravo`, reached over Tailscale:
 | Account | a real Mac account |
 | Last connected | **28 sec** |
 
-The user's words: *"Just verified port 5900, mac user name and password."*
+The user confirmed it was verified with port 5900, a Mac user name and password.
 
 **This is the result that was never obtained.** `Documentation/Verification/VNC/README.md` recorded
 only that the Apple Remote Desktop exchange was *well formed*, with a deliberately invalid account,

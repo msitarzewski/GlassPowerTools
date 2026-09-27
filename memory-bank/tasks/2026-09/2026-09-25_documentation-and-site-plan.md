@@ -1,7 +1,8 @@
 # Documentation and glasspowertools.com — plan, 2026-09-25
 
-State **PLAN**, nothing built. Decisions: D38 (distribution), D39 (documentation and site). The user: *"four apps in one, a suite of Power Tools … The primary use
-case though, is devs looking for a first class Apple Vision Pro experience across the suite."*
+State **PLAN**, nothing built. Decisions: D38 (distribution), D39 (documentation and site). The user described the product as four apps in one, a suite of
+power tools, whose primary audience is developers looking for a first-class Apple Vision Pro
+experience across the suite.
 
 ## Agreed shape (the user's, refined in conversation)
 
@@ -33,8 +34,8 @@ case though, is devs looking for a first class Apple Vision Pro experience acros
 
 **glasspowertools.com**, owned by the user, self-hosted as a static site. The build produces
 `_site/`; deploying it follows the user's private infrastructure runbook — **no machine names,
-addresses or server details in this repository** (the user: *"Machine names in general, tokens, keys
-etc. need to be left out. 'hosting facts' aren't public knowledge."*). Scripts are written for the
+addresses or server details in this repository** (the user: machine names in general, tokens, keys and
+the like stay out, and hosting details are not public knowledge). Scripts are written for the
 user and run by the user. The feed and HTML must be served uncached.
 
 Suggested order: a placeholder page live early (proves DNS and the deploy end to end),

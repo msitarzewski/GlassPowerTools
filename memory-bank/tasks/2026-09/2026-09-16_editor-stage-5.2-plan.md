@@ -1,10 +1,9 @@
 # Stage 5.2 — the editor stops looking like a different app
 
 **Date** 2026-09-16 · **State** PLAN · **Owner** coordinating agent
-**Authorization** the user's review of the shipped editor: *"I'd like to get the editor's project
-file list to mirror the UI of the other lists we already have… I like the database the most, so
-let's make that the template"*, plus five specific corrections and *"Projects should be treated the
-same way as Workgroups."* Planning and building are authorized; committing is not, and is asked for
+**Authorization** the user's review of the shipped editor: the editor's project file list should
+mirror the family's other lists, with the database's list (the user's favourite) as the template,
+plus five specific corrections, and Projects should be treated the same way as Workgroups. Planning and building are authorized; committing is not, and is asked for
 separately.
 
 Related: [the remaining work](2026-09-14_remaining-work-plan.md) (*Stage 5 — what is left, in
@@ -13,7 +12,7 @@ order*), [D26 keys first class](2026-09-14_d26-keys-first-class.md) for the pane
 
 ---
 
-## What is wrong, in the user's words
+## What is wrong, as the user reported it
 
 | # | Report | Where it lives |
 |---|---|---|

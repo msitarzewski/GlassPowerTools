@@ -1,9 +1,9 @@
 # Active, and the ⚡ — 2026-09-21
 
-*"We can simplify the mess out of the open connections problem on every app deployment target.
-Add 'Active' to the Library of Connections: All, Favorites, Recent, Active. Then make that an
-icon in the main toolbar, app wide. Every top toolbar gets the lightning bolt."* And on the
-switcher built that morning: *"Replace, yes."* Workgroups stays as it is; Active groups by
+The user asked for the open-connections problem to be drastically simplified on every deployment
+target: add Active to the library's categories (All, Favorites, Recent, Active), make it an icon in
+the main toolbar app-wide, and give every top toolbar the lightning bolt. On the switcher built that
+morning, the user confirmed it should be replaced. Workgroups stays as it is; Active groups by
 machine with a disclosure, like the Files list.
 
 ## The idea, and why it is simpler

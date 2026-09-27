@@ -345,8 +345,8 @@ proven; the click is not.
 
 ## Edit opened nothing after the window closed — 0.4.165
 
-Reported: *"Repeat Edits doesn't open a new window. Right click > edit works. Close windows, right
-click edit a different file fails to open an editor."*
+Reported: repeated Edit did not open a new window. Right-click ▸ Edit worked, but after closing the
+windows, right-click ▸ Edit on a different file failed to open an editor.
 
 ### The runtime did not know whether a window existed
 
@@ -373,7 +373,7 @@ window of its own, and a workspace made without a window is not mistaken for one
 
 ## No sidebar without a project
 
-Asked: *"can we hide the whole idea of a sidebar unless there's a file tree to examine?"*
+Asked: could the sidebar be hidden entirely unless there is a file tree to examine?
 
 The sidebar is the project's file tree and holds nothing else — open documents are tabs. With no
 project, the toggle offered to reveal a column that could only ever be blank, so **the toggle goes
@@ -392,7 +392,7 @@ disappearing toggle reads as broken rather than as tidy — it is one line eithe
 
 ## Desktop opened nothing on the iPhone — 0.4.166
 
-Reported: *"desktop isn't opening in iPhone. Nothing happens."*
+Reported: a desktop did not open on the iPhone; nothing happened.
 
 ### The same defect a third time
 
@@ -440,10 +440,10 @@ The fastest check available is the phone itself, which has a configured desktop 
 
 ### Confirmed working, then shaped to match glassDT — 0.4.167
 
-**0.4.166 worked on the real iPhone** (the user's words: *"The iPhone version worked that you
-installed on my actual phone"*). The diagnosis was right and the cover was the fix.
+**0.4.166 worked on the real iPhone** (the user confirmed the build installed on their own
+phone worked). The diagnosis was right and the cover was the fix.
 
-Then, asked *"GlassDT worked perfectly solve it"*, the right move was to read what glassDT actually
+Then, told that glassDT had worked perfectly and to solve it the same way, the right move was to read what glassDT actually
 did rather than keep a guess that happened to work. `LibraryScene` in
 `../glassDT/App/glassDTApp.swift:107-143` is the same `fullScreenCover` + `NavigationStack`, with
 two differences worth taking:

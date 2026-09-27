@@ -1,6 +1,6 @@
 # The overview's bar charts on macOS 27.2 — 2026-09-21
 
-**Reported:** *"The database names here and the bar chart overlap for some reason."* Screenshot
+**Reported:** the database names and the bar chart overlapped. Screenshot
 of the connection overview's *Largest by Rows* and *Storage Distribution* cards: each name drawn
 inside the plot at the top of its band, each bar at the bottom of its band, so every name sat on
 the bar below it.
@@ -33,7 +33,7 @@ width for everyone.
 | Database suite | 276 tests, exit 0 |
 | Seen in the running app | pending 0.4.193 |
 
-## Follow-up: the rows axis — *"let's make sure exponents are useful"*
+## Follow-up: the rows axis — make large numbers readable
 
 Seen in 0.4.193: the rows charts' x-axis read `5.0E6 · 1.0E7` — the default label for a large
 integer axis is scientific notation. Now `.number.notation(.compactName)`: `0 · 5M · 10M`,
@@ -41,7 +41,7 @@ rendered in the probe before install. Both axis blocks moved into helpers beside
 helper — `overviewRowsAxis()` and `overviewBytesAxis()` — so the four charts share three
 functions and no chart carries its own axis code any more.
 
-## Follow-up: the exact value on hover — *"tool tips on the numbers in the charts"*
+## Follow-up: the exact value on hover — tooltips on the chart values
 
 The axis says roughly; the bar now says exactly. Pointing at a bar (or tapping it, where there is
 nothing to point with) shows `11,856,203 rows` or `2.5 GB · 2,491,234,567 bytes` in a capsule at

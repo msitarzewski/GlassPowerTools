@@ -1,7 +1,7 @@
 # App icon — SVG-first layers with light, dark and clear — W10, 2026-09-11
 
-Worker W10. Requirement (user): "Let's have a light, dark, and clear mode of the icon, like these?
-… They're SVGs first … can we make that diligently?" The family contact sheet sets the convention:
+Worker W10. Requirement (user): the icon should have light, dark and clear modes like the
+family's examples, authored SVG-first, and done carefully. The family contact sheet sets the convention:
 LIGHT = near-white background, RED primary, GREY secondary; DARK = near-black background, RED
 primary, WHITE secondary; CLEAR = the system's own rendition, "backdrop-dependent", not authored.
 Not committed (coordinator commits).

@@ -1,8 +1,8 @@
-# Connections do not travel between devices — the gap behind "CloudKit isn't working"
+# Connections do not travel between devices — the gap behind the CloudKit report
 
 Owner: coordinating agent. 2026-09-14. **Status: diagnosed, not fixed. Needs a decision.**
 
-Reported by the user: *"the cloudkit isn't working for connections."*
+Reported by the user: CloudKit sync was not working for connections.
 
 ## What is actually true
 

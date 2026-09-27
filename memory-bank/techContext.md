@@ -327,3 +327,19 @@ Not built yet. Mac releases: Developer ID + notarization + Sparkle (macOS-only d
 CloudKit container, App Group and Keychain group. iOS, iPadOS, visionOS: TestFlight, then the App
 Store. The site is static, built into `_site/`; where and how it is hosted is kept out of this repository
 (private infrastructure notes).
+
+## Dependencies, 2026-09-27
+
+Every dependency is pinned to a revision in `Package.resolved`; Xcode's copy must match it
+(`Tools/Packages/sync-xcode-pins.py`, `PackagePinAgreementTests`). Notable versions: swift-nio
+2.103.0, swift-nio-ssl 2.37.5, swift-crypto 4.5.2, BigInt 6.0.1, SwiftTerm **1.18.0** (exact),
+swift-markdown 0.9.0 (exact), tree-sitter 0.25.10, postgres-nio 1.33.1, mysql-nio at the fork's
+recorded revision. Vendored: Citadel `ae8562f`, swift-nio-ssh 0.3.7 (`6acaa1a`), RDPKit 0.3.1.
+
+Held back, with the reason:
+
+| Dependency | Newest | Why not taken |
+|---|---|---|
+| SwiftTerm | 1.19.0 (1.20.0 pre-release) | 1.19 adds a build-tool plugin that Xcode must be told to trust; the owner's decision |
+| tree-sitter | 0.27.0 | SwiftTreeSitter (latest tag and `main`) allows only 0.25.x |
+| swift-crypto | 5.0.0 | postgres-nio's latest release and mysql-nio (upstream and the fork) allow only `< 5.0.0`; Citadel's and swift-nio-ssh's vendored manifests say the same |

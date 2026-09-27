@@ -1,8 +1,8 @@
 # visionOS design pass — native HIG, on the Glass language already built
 
 **Date** 2026-09-13 · **Owner** coordinating agent · **State** BUILD — passes 1 and 2 done; pass 1 still unverified on device
-**Authorization:** the user, from the physical headset: *"pay attention to the design. it's terribly
-off… These are functional, but don't provide that polished magic visionOS experience."* Scope agreed:
+**Authorization:** the user, from the physical headset, asked for attention to the design: it was
+far off, functional but without the polished visionOS experience the product should have. Scope agreed:
 **native visionOS HIG conformance plus the Glass/transparency/theme controls**, with visionOS-first
 as the goal rather than a later wish. Sequenced **before Stage 4**, so the desktop capability is
 built into the right patterns instead of inheriting the flat ones.
@@ -189,7 +189,7 @@ Recorded as given so nothing is lost. Struck through as each lands.
 7. **Workgroups become a fleet-wide panel in the Connections sidebar, like Collections.**
 
 5 and 6 are a re-arrangement of what pass 1 put in the bottom ornament, not a retreat from it — the
-user's words were *"love the bottom ornaments on the connections window!"* The ornament stays; what
+user said they loved the bottom ornaments on the Connections window. The ornament stays; what
 lives in it changes so the Mac's semantics carry over: Add Host belongs to the sidebar, Settings
 belongs top-trailing.
 
@@ -255,8 +255,8 @@ The user asked for the columns to stop being opaque white and honour the transpa
 `List` and `Form` each paint their own scroll background, so they were covering the window's layer —
 and every pixel they missed showed the desktop, which was the hairline at the column divider and the
 band under the footer. Hiding those backgrounds fixed the seams and **over-corrected**: at the
-default `ultraThin` material the columns read as bare wallpaper. The user's verdict: *"Now this is
-broken?!"*
+default `ultraThin` material the columns read as bare wallpaper. The user's verdict was that it
+now looked broken.
 
 **Open.** Either a thicker default material (`.regular` is what a sidebar uses) or opaque columns.
 Not decided, and deliberately not changed unilaterally — it is a look, not a defect.

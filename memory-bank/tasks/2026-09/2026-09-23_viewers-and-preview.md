@@ -1,10 +1,10 @@
 # Viewers and Preview in the editor — plan, 2026-09-23
 
-**State BUILD → QA (2026-09-23).** Approved by the user: *"This plan is approved!"*, with Mermaid on the condition that updating it is part of the build. Stages 1–4 built; see *Built* at the end. The user asked: *"How difficult would it be to show images and
-media in the Editor view? So when I click a png I get the image, not the binary?"*, then *"The
-things that are text and visual (markdown) should have a preview button like VSCode and its
-offspring"*, then *"Go ahead with these now, too: CSV as a table, and Mermaid diagrams. Please
-create a plan to address the image and preview tasks."* Authorization: this plan. Building starts
+**State BUILD → QA (2026-09-23).** Approved by the user, with Mermaid on the condition that updating it is part of the build. Stages 1–4 built; see *Built* at the end. The user asked how hard it would be to show images and
+media in the editor, so that clicking a PNG shows the image rather than its bytes; then for a
+Preview button, as in VS Code and its derivatives, on text formats with a visual form such as
+Markdown; then to include CSV as a table and Mermaid diagrams as well, and to plan the image and
+preview work. Authorization: this plan. Building starts
 on the user's word.
 
 ## Task contract
@@ -49,7 +49,7 @@ A text document's model is read in 25 places, all in `GlassEditorWorkspace.swift
    file on the Linux server is fetched through that file's own `GlassEditorFileAccess` — the same SFTP
    connection — never by the web view. HTML files are previewed with scripts off entirely.
 
-The user approved swift-markdown in spirit ("go ahead"); the Mermaid script exception is new and
+The user approved swift-markdown in spirit; the Mermaid script exception is new and
 is recorded as Proposed until built.
 
 ## Stages
@@ -127,7 +127,7 @@ is recorded as Proposed until built.
 | 5 Tests and on-screen proof | through each stage, plus ~2 h |
 
 Built in that order; each stage installs on the Mac and the phone when it stands on its own
-(stages 1–3 are the "click a PNG, see the image" answer).
+(stages 1–3 answer the request to see the image when clicking a PNG).
 
 ## Risks
 
@@ -145,9 +145,9 @@ The user's go on this plan, and on D35's Mermaid script exception. Then stage 1.
 
 ## Built — 2026-09-23
 
-**Mermaid is part of the build** (the user's condition: *"make updating it a part of the build
-process. Check the version number and if it moves, download and build the new version in. We never
-want stale."*). `Tools/Mermaid/update-mermaid.sh` asks the npm registry for `mermaid@latest`; if the
+**Mermaid is part of the build** (the user's condition: updating it is part of the build
+process — check the version number and, if it moves, download and build the new version in, so it
+is never stale). `Tools/Mermaid/update-mermaid.sh` asks the npm registry for `mermaid@latest`; if the
 version moved it downloads the tarball, **verifies its sha512 against the registry's integrity
 field**, and replaces `Sources/GlassEditor/Resources/Mermaid/{mermaid.min.js,LICENSE,VERSION}`;
 unchanged, it writes nothing; offline or failed, the build continues on the copy it has and says so.
@@ -216,8 +216,8 @@ Preview, anything else on the not-text screen saying why, with Open as Text stil
 
 ## Where the user's logo's time went, measured (09:00)
 
-*"How does BBEdit open a file like that so quickly without complaining? … macOS should be able to
-do that nearly instantly. … previews only on iOS, that's fine."* Measured headless on the Mac
+The user asked how BBEdit opens such a file so quickly without complaint, expected macOS to manage
+it nearly instantly, and accepted previews-only on iOS. Measured headless on the Mac
 (`LargeFileOpenTimingTests`, `LargeFileLayoutTimingTests`, both skip unless `GPT_LARGE_FILE`):
 
 | Stage | Before | After |
@@ -239,7 +239,7 @@ Also: `BuiltInHighlightingTests.settle` waited on a count of yields against a 75
 failed on a quiet machine — now waits on time. Open ≈ 0.4 s, then ≈ 1 s to lay out; not instant,
 and anything faster needs a text engine of our own (BBEdit's route) — not proposed.
 
-## Scrolling (09:40) — *"Can we check and see why scrolling isn't smooth?"* (Mac editor)
+## Scrolling (09:40) — why scrolling is not smooth (Mac editor)
 
 Measured offscreen, release build, 120 frames of 40 pt (`ScrollTimingTests`, gated by
 `GPT_SCROLL_TIMING`; `GPT_SCROLL_CASE`, `GPT_SCROLL_STEPS`, `GPT_LARGE_FILE`):

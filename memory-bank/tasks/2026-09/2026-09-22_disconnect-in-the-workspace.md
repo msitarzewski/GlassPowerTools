@@ -1,7 +1,8 @@
 # Disconnect in the database workspace — 2026-09-22
 
-*"It occurs to me that there's no 'disconnect' from a database. Or close?"* and, pointing at the
-⋯ in the Databases screen on the phone: *"There's a menu here for close on xOS."* (2026-09-21).
+The user noticed there was no way to disconnect from or close a database and, pointing at the ⋯ in
+the Databases screen on the phone, suggested that menu as the place for Close on the other
+platforms (2026-09-21).
 
 ## What was true
 
@@ -10,7 +11,7 @@ context menu on the Mac. The workspace itself, on every platform, had nothing. *
 resume note said iOS already had Close in that ⋯ menu; it did not.** The menu the user pointed
 at is the system overflow for the workspace's `.secondaryAction` group (Refresh Overview,
 Settings) and `SchemaBrowserView.swift:320` is the per-*table* menu (Browse Data, Copy, Drop…).
-The user was saying "put it here", not "it is here". Corrected in the resume block.
+The user was proposing a location, not describing an existing item. Corrected in the resume block.
 
 ## Reuse
 
@@ -56,8 +57,8 @@ local backup of the phone's records is no longer needed.
 
 ## Reversed, 06:40 — the window is the close button
 
-*"The X is only needed on the iPhone and iPad when not in windowed mode, right? Everything else
-has an actual close button for the connection?"* Not quite: the desktop and the editor end their
+The user asked whether the X was needed only on iPhone and iPad outside windowed mode, since
+everything else has a real close button for the connection. Not quite: the desktop and the editor end their
 session when their window closes, and the database did not — the red button flushed the drafts,
 released the window request and left the session open, findable only in Active. That is the
 actual defect; the Mac toolbar button papered over it.
@@ -93,8 +94,8 @@ its endpoint; grouped, it is the workgroup's row once; closing the row ends the 
 
 ## And the row says where you are (06:45)
 
-*"Let's update the Active list with a reflection of what's open. I have the DB open, but I'm in
-shop.articles."* `DatabaseSession.workspaceFocus` — set by the workspace on every
+The user asked for the Active list to reflect what is open: the database was open, but the view was
+on a specific table (`shop.articles`). `DatabaseSession.workspaceFocus` — set by the workspace on every
 change of its displayed tab (`DatabaseWorkspaceView.focus(for:queryTitle:)`: the database, the
 table as "database › table", the SQL document's title, nil on the overview) — and
 `GlassDatabaseCapability.subtitle(engine:state:focus:)` renders "MySQL · shop ›
@@ -108,7 +109,7 @@ a lone terminal's, its state). A terminal's "where" would be its title bar — t
 
 ## And the sidebar highlights it (07:25)
 
-*"Active doesn't stay highlighted when clicked?"* The sidebar is a native `List(selection:)`
+The user reported that Active did not stay highlighted when clicked. The sidebar is a native `List(selection:)`
 typed `GlassLibraryScope?`, and every panel row — Active, SSH Keys, Workgroups, Projects — was a
 tap gesture with no tag, so the list went on highlighting All Connections while a panel was
 showing. One selection type now, `GlassLibrarySidebarSelection` (`.scope` or `.panel`):
@@ -120,14 +121,14 @@ stack. `GlassLibrarySidebarSelectionTests`. The accessibility selected trait fol
 
 ## And Active says 0 (07:50)
 
-*"Active needs a 0 like the others when nothing is connected."* Yesterday's nil-when-empty
+The user asked for Active to show 0, like the other rows, when nothing is connected. Yesterday's nil-when-empty
 (`activeSessionCount() -> Int?`, "the same rule every panel count follows") was wrong on its
 premise — Favorites and Workgroups say 0 — and is reversed: the count is an `Int`, the row shows
 0, `emptyCountIsZero` replaces `emptyCountIsNil`.
 
 ## And the desktop (08:10)
 
-*"Desktops aren't showing in the Active section."* The desktop capability had no
+The user reported that desktops were not showing in the Active section. The desktop capability had no
 `openSessions()` at all, and nothing tracked its sessions: each window makes its own
 `DesktopSessionModel`. Now `DesktopAppModel.liveSessions` holds them — a model joins in
 `beginAttempt` and leaves in `close()`, so a dropped desktop stays listed with its state until
@@ -169,12 +170,12 @@ never saved by the failed attempt, so the next connect prompts again and should 
 
 No unit test reaches the ordering (it is inside an alert action); `HostTrustRetryTests` covers
 the handoff itself. **Not seen working** — needs a machine whose key is not yet pinned.
-The user also said *"the settings weren't saved"* — not yet understood; asked.
+The user also reported that settings were not saved — not yet understood; asked.
 
-## "The settings weren't saved" — not reproduced (2026-09-23)
+## Settings reported as not saved — not reproduced (2026-09-23)
 
-The user: *"The whole set of settings for the terminal: user name, etc."* on "Public". Not
-reproduced. `NewHostTerminalSettingsTests` drives the real host sheet over a real catalog file
+The user clarified it was the terminal's whole set of settings (user name and the rest), on
+a newly added server. Not reproduced. `NewHostTerminalSettingsTests` drives the real host sheet over a real catalog file
 (key auth, port 2222): the settings are what Edit shows right after saving and after a relaunch.
 Ruled out by reading: the sheet's link-then-record order and its rollback (only on a failed
 commit, and then the host is deleted too); `replaceAll` against an unread catalog (guarded);

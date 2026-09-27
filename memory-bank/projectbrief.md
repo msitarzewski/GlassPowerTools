@@ -84,7 +84,7 @@ before any service setup opens. The Add SSH Key window needs a proper layout.
 
 **Added 2026-09-11 (user): one-and-done setup.** Adding a host offers its services right then; a
 service is created complete, with its required configuration, in the same sheet — no "Set Up…"
-or pending state anywhere, and no legacy path ("there is no legacy; plan for a day 1 experience").
+or pending state anywhere, and no legacy path (there is no legacy; plan for the first-run experience).
 Layout: machine fields (Name, Address) on top, then tabs `[ Terminal | Database | Desktop ]`; a tab
 shows an "Add <kind> to this host" toggle and, once on, only that kind's required fields with the
 optional ones under an Advanced disclosure; the tab label marks enabled services. Save is all or

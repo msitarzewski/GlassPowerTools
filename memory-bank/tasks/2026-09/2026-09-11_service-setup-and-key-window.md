@@ -1,8 +1,8 @@
 # Service setup never asks for an address; Add SSH Key window — W7, 2026-09-11
 
-Worker W7. Requirement (user, verbatim): "There shouldn't be a host in the Terminal/SSH connection
-setup. It's defined at the machine/connection level and inherited by the different connection
-types." Of the Add SSH Key window: "This modal needs attention too." Not committed (coordinator).
+Worker W7. Requirement (user, paraphrased): the Terminal/SSH connection setup should have no host
+field; the address is defined at the machine level and inherited by each connection type. The
+Add SSH Key window also needed layout attention. Not committed (coordinator).
 
 ## Changed files
 
@@ -41,7 +41,7 @@ the needs-address view instead of a form. The shell's per-service Connect is the
 
 Launching the Release build against the user's real library ran `adoptKnownAddresses()`: the
 `alpha` host record in the shared catalog gained the address its saved terminal server already
-carried (`192.0.2.6` as shown in the detail). That is the designed behaviour for hosts that
+carried (`198.51.100.6` as shown in the detail). That is the designed behaviour for hosts that
 predate addresses, applied to real data by this verification.
 
 ## Remaining

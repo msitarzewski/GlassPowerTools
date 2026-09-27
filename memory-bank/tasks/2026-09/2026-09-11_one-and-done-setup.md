@@ -1,9 +1,9 @@
 # One-and-done host and service setup — W8, 2026-09-11
 
-Worker W8. Requirement (user, verbatim): "this should be a one and done setup. Show only the
-basic/required fields, and put the advanced/option thing behind an advanced disclosure pattern. In
-fact, adding a host should provide an option to add the services right then." "there is no legacy.
-Plan for a day 1 experience." Tabs `[ Terminal | Database | Desktop ]` under the machine fields,
+Worker W8. Requirement (user, paraphrased): setup should be one and done. Show only the
+basic, required fields and put the advanced options behind an Advanced disclosure; adding a host
+should offer to add its services right then. There is no legacy; plan for the first-run
+experience. Tabs `[ Terminal | Database | Desktop ]` under the machine fields,
 each with an "Add <kind> to this host" toggle. Not committed (coordinator commits).
 
 ## Design

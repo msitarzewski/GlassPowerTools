@@ -1,7 +1,7 @@
 # The editor on a phone — 2026-09-17 (late)
 
 **Owner:** coordinating agent. **State:** BUILD.
-**Reported:** *"the editor doesn't actually work at all. The file title shows but no content."*
+**Reported:** the editor did not work at all on the phone — the file title showed, but no content.
 
 ## Two defects, and neither was in the editor's text view
 

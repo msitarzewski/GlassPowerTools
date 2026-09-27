@@ -30,7 +30,7 @@ and, usually, a Terminal service with credentials. So the database service shoul
 fields at all**: when the database is not directly reachable, the capability asks the shell for the
 host's SSH transport and calls `forward(localPort: nil, toHost: "127.0.0.1", port: dbPort)`.
 
-This is the user's "SFTP to be used by Edit, port forwarding by DB" requirement made real, and it is
+This is the user's requirement that SFTP serve the editor and port forwarding serve the database, made real, and it is
 the single biggest simplification in the port: the Database tab of the setup sheet loses an entire
 SSH section. It also unifies host trust — a host trusted in the terminal is trusted for the tunnel.
 
@@ -52,10 +52,10 @@ or keep an advanced "reach through another host" picker. Recommend the former; d
 
 ### D8 — "This Mac" is a real host — **APPROVED 2026-09-12**
 
-The user: "It should behave like a connection (All Connections) with multiple options allowed for
-database (for SQLite, local MySQL, Postgres, etc). Multiple local terminals with each click of the
-terminal icon in the toolbar. Files is weird, but monitor/screen could allow for containers/VMs on
-localhost too. So... all of them?" — **yes, all of them.**
+The user asked for it to behave like a connection in All Connections, allowing several database
+services (SQLite, local MySQL, PostgreSQL and so on), a new local terminal on each click of the
+toolbar's terminal icon, and screen sharing for local containers and VMs; Files seemed an odd fit,
+but the user concluded every kind should be allowed — **yes, all of them.**
 
 A built-in local host appears in the library like any other machine and takes every service kind:
 
@@ -94,7 +94,7 @@ The survey lists what glassdb does **not** do. Porting faithfully ports these ga
 | iOS Settings omits Appearance entirely (`SettingsView.swift:129-152`) | Trivial: the shell owns Appearance now, so this resolves itself |
 | **Open bug: SQL draft data loss** on window close / app quit, explicitly unfixed and explicitly not to be described as fixed | Medium: durable drafts. **Porting verbatim ports the bug.** |
 
-**Decided: parity-plus.** The user: "Parity plus since we're here." So Stage 3 ships every small
+**Decided: parity-plus.** The user chose parity plus, since the work was already under way. So Stage 3 ships every small
 and medium closure in the table above — row deletion with the same exactly-one-affected-row guard
 the update path uses, foreign-key navigation, the audit viewer, AI on iOS, and **the SQL draft-loss
 fix**, which is a correctness bug and must not be carried over. CREATE/DDL breadth (tables,

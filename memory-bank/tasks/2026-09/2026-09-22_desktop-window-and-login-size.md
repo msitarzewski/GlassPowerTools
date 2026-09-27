@@ -1,8 +1,8 @@
 # The desktop window's size, and the size after login — 2026-09-22
 
-*"The Desktop mode doesn't have a default desktop size on Mac, so it opens in essentially a
-thumbnail. Then when I resize it and log in [640 × 480, stretched] and after a 1 pixel resize
-[2,660 × 1,626]."* Three screenshots of the Linux server over RDP (GNOME's login screen, then the session).
+The user reported that the desktop window had no default size on the Mac, so it opened at roughly
+thumbnail size; after resizing and logging in the session was 640 × 480, stretched, and after a
+one-pixel resize it became 2,660 × 1,626. Three screenshots of the Linux server over RDP (GNOME's login screen, then the session).
 
 ## Two defects, not one
 
@@ -52,8 +52,9 @@ project. This note's tests are the first on `DesktopSessionModel` here.
 
 ## Third defect, 07:35 — the scale arrives one step late
 
-*"The default image size here is set to 1920x1080 but this is not that. The desktop settings
-on the RDP connection in Ubuntu show 4k resolution until I resize."* Two screenshots: the login
+The user noted the configured image size was 1920 × 1080 but the session did not match it, and
+that Ubuntu's display settings over the RDP connection showed a 4K resolution until the window was
+resized. Two screenshots: the login
 screen at 3,840 × 1,968 with tiny type; after a one-pixel nudge, 3,828 × 1,956 at **200%** and
 readable. Not the host's choice and not the saved 1920 × 1080: with Match Window Size on the
 window decides (the saved size is the fallback for Match Window off), and 3,840 × 1,968 is the

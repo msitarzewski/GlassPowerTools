@@ -1,6 +1,7 @@
 # Duplicated services on the phone — 2026-09-21
 
-**Reported:** *"services are duplicated on iPhone. Is it a build/versioning/sync part?"* The Linux server
+**Reported:** services were duplicated on the iPhone, with the user asking whether build, versioning
+or sync was the cause. The Linux server
 host detail on 0.4.195 shows two Terminals, two Desktops, one MySQL, and two Files rows.
 
 **Neither build nor versioning. Sync — and more precisely the design under it.** Read straight
@@ -47,7 +48,8 @@ they are two records for one machine, not a corrupt one.
 
 # Built — the same evening
 
-*"There is no every device. It's just you, me, this Mac, a Vision Pro, and the iPhone."* So both
+The user pointed out there is no wider fleet of devices: only the two of us, this Mac, a Vision Pro
+and the iPhone. So both
 halves, tonight, and the second half turned out to be **already written**: `consolidateRecords(of:)`
 existed from Stage 6, held back only because the three source applications still read
 `hosts.json` by their own record ids. They are obsolete. Rule 57 paying for itself again — the
@@ -89,7 +91,7 @@ inventory found the fix before the fix was written.
 
 # The Linux server vanished from the Mac — 2026-09-21, late
 
-*"Weird. The Linux server is missing now from the Mac :P"* — an hour after D32 shipped.
+The user reported the Linux server was now missing from the Mac — an hour after D32 shipped.
 
 ## What the phone says, read again properly
 

@@ -2,8 +2,8 @@
 
 Owner: coordinating agent. 2026-09-14. **Status: PLAN. Nothing built from this note yet.**
 
-Authorization: *"Please create a thorough plan for the remainder of the work. Reuse is essential,
-we're working on a professional and public codebase. Be precise in your edits."* D26 itself is
+Authorization: the user asked for a thorough plan for the remainder of the work, stressing that
+reuse is essential in a professional, public codebase and that edits must be precise. D26 itself is
 already **Approved** ([decisions](../../decisions.md#d26)); this note plans its execution and
 everything queued behind it.
 
@@ -19,7 +19,7 @@ Three constraints the user set, applied to every item below rather than stated o
 - **Public codebase.** Provenance comments, licence chain and `THIRD-PARTY-NOTICES.md` stay intact;
   nothing is deleted on a grep alone (rule 24 again), and every deletion here names its replacement.
 
-**The magic directive** — *"familiar to a Mac user, but visionOS magic to use"* (2026-09-13), with
+**The magic directive** — familiar to a Mac user, but with the feel of visionOS to use (2026-09-13), with
 visionOS leading the design — binds one item in this plan above all: the **key manager** (D26 stage
 4) is a new surface, and new surfaces get designed on the headset's terms and adapted down, not
 drawn as a Mac panel and ported. It also binds Stage 4 W5.
@@ -390,7 +390,7 @@ listing `~/Library/Preferences`. The empty-plist finding was verified by inspect
 
 ## Terminal, part 1: the seam (2026-09-14) — **done, and behaviour-neutral by construction**
 
-Authorized: *"Word given."* Nothing committed; the user commits.
+Authorized: the user gave the go-ahead. Nothing committed; the user commits.
 
 **What landed.** `ServerPersistenceStore` (`ServerManager.swift:59-96`), the load/hasStoredValue/
 save/restore quartet shaped after the database's `ConnectionPersistenceStore`. Reads now go through
@@ -505,7 +505,7 @@ leave host catalogs behind as well as defaults domains.
 
 ## Stage 5, partially done early: the test residue is swept
 
-Authorized: *"clean the old test files."* Done 2026-09-14, on this Mac only — nothing in the
+Authorized: the user asked for the old test files to be cleaned up. Done 2026-09-14, on this Mac only — nothing in the
 repository changed, so this is an environment cleanup, not a commit.
 
 | Removed | Count |
@@ -832,7 +832,7 @@ is what it reads.
 
 ## The menu bar: three apps that each owned File, 2026-09-16
 
-Reported by the user against the installed 0.4.119: *"Command-T doesn't work for a new tab/session."*
+Reported by the user against the installed 0.4.119: ⌘T did not open a new tab or session.
 
 ### What was actually wrong
 
@@ -924,7 +924,7 @@ the only thing that proves D26's sentence.
 
 ## The reset that was data loss — 2026-09-16
 
-*"Why are my connection settings reset each time?"* The machine stayed in the library, the SSH key
+The user asked why their connection settings were reset each time. The machine stayed in the library, the SSH key
 stayed in the key list, and Edit Terminal on the Linux server said **"This terminal has no saved configuration
 behind it. Remove the service and add it again."**
 
@@ -957,15 +957,15 @@ Installed as 0.4.121.
 **Recovery was written and then deleted, deliberately.** The pre-D26 `servers` key and the
 desktop's `connections.json` both still held the erased records, and a one-time pass that refilled
 only empty links — never overwriting, never resurrecting a deleted record, guarded by four tests —
-worked. The user's direction ended it: *"there is no LEGACY… we don't need the baggage."* This is
+worked. The user's direction ended it: there is no legacy, and the product does not need that baggage. This is
 the first version, the data on that Mac is test data, and four records are cheaper to re-enter than
 a migration is to carry. See **rule 36**, which also retires the stage 5 item about deleting legacy
 keys on first launch: nothing reads them.
 
 ## Stage 5, first take — the editor as a surface, 2026-09-16
 
-Built in one pass at the user's direction: *"Take a shot at planning and one-shotting the Edit
-module… all platforms, best in class features, and Apple magic functionality."*
+Built in one pass at the user's direction: plan and build the Edit module in a single attempt, for
+all platforms, with best-in-class features and polished Apple-native behaviour.
 
 **What was already there, and is not rebuilt.** `GlassEditorCore` and `GlassEditorUI` are a complete
 editing engine — text storage, undo with coalescing, tree-sitter highlighting, a find engine,
@@ -986,8 +986,8 @@ document came from, what it is called, whether it has been saved.
 | `GlassEditorWorkspaceView` | sidebar of projects and documents, editor, find bar, status bar |
 | `GlassEditorScenes` | the window, the runtime, and the File/Text menu items |
 
-**The project idea is the answer to the user's question.** *"I'm on my Mac in the Editor, move to
-Vision Pro where the Mac is an SSH connection — make the association between the two somehow?"* A
+**The project idea is the answer to the user's question**: how to move from the editor on the Mac
+to the Vision Pro, where the Mac is an SSH connection, and have the two associated. A
 project is `(hostID, path)` rather than a URL, so it is the same project on both devices and travels
 on the existing D19 catalog sync; each device decides the transport. **Identity is the SSH host key,
 never a name or an address**: a hostname is ambiguous, a Tailscale address moves, and only the
@@ -1022,7 +1022,7 @@ on another machine shows its badge and cannot be browsed.
 Six added (Python, JavaScript, Go, Rust, C, PHP) to the six config formats that were there. **The
 SFTP remote editor picks its grammar with `LanguageID.forFileExtension`**, so a `.py` or `.php` file
 opened on a server through the Files browser now colours with no further change — the point the user
-made when he said *"don't forget the other integrations."*
+made in reminding us not to forget the other integrations.
 
 Three of the six had to be vendored (`Packages/TreeSitterPython`, `TreeSitterJavaScript`,
 `TreeSitterRust`, `TreeSitterPHP`) for the reason YAML already was: upstream's SPM manifest compiles
