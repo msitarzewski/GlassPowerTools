@@ -179,7 +179,7 @@ public enum RDPFileImporter {
         case password, authentication, port, resolution, audio, other
         var message: String {
             switch self {
-            case .password: "Saved passwords aren't imported. Enter your password when connecting, or save it in Keychain below."
+            case .password: "Saved passwords aren't imported. Enter it in Password below, or when connecting."
             case .authentication: "Authentication preferences in the file weren't imported. Network Level Authentication and certificate review remain enabled."
             case .port: "The port in the server address takes precedence over the file's separate port setting."
             case .resolution: "The initial resolution was adjusted to fit supported desktop limits."
@@ -202,11 +202,11 @@ public enum RDPFileImportError: Error, LocalizedError {
         case .repeatedSetting: "The file repeats a connection setting. Remove the duplicate before importing."
         case .invalidValue: "An RDP connection setting has an invalid type or value."
         case .missingHost: "The RDP file doesn't contain a server address."
-        case .gateway: "This file specifies an RD Gateway, which glassDT doesn't support. Import a direct desktop connection instead."
-        case .remoteApp: "This is a RemoteApp connection. glassDT currently imports full desktop connections."
-        case .broker: "This file requires broker routing that glassDT doesn't support. Import a direct desktop connection instead."
-        case .entra: "This file requires Microsoft Entra authentication, which glassDT doesn't support."
-        case .remoteProgram: "This file starts a custom remote program. glassDT currently imports standard desktop sessions."
+        case .gateway: "This file specifies an RD Gateway, which this app doesn't support. Import a direct desktop connection instead."
+        case .remoteApp: "This is a RemoteApp connection. This app currently imports full desktop connections."
+        case .broker: "This file requires broker routing that this app doesn't support. Import a direct desktop connection instead."
+        case .entra: "This file requires Microsoft Entra authentication, which this app doesn't support."
+        case .remoteProgram: "This file starts a custom remote program. This app currently imports standard desktop sessions."
         }
     }
 }

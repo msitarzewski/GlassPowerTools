@@ -278,7 +278,7 @@ public struct GlassShellLibraryView: View {
                 if host.isLocal {
                     // This device: there is nothing to reach and nothing to type (D8).
                     LabeledContent("Address", value: "This device").accessibilityIdentifier("host-detail-address")
-                    Text("Services here run on this machine: they reach it at \(GlassLocalHost.address), or open a file you choose. Nothing about this host is shared with the other Glass apps or with your other devices.")
+                    Text("Services here run on this machine: they reach it at \(GlassLocalHost.address), or open a file you choose. Nothing about this host is shared with your other devices.")
                         .font(.footnote).foregroundStyle(.secondary)
                 } else if host.addresses.count > 1 {
                     LabeledContent("Address", value: host.addresses.joined(separator: " · "))
@@ -477,7 +477,9 @@ public struct GlassShellLibraryView: View {
                 }.accessibilityIdentifier("host-delete-confirm")
                 Button("Cancel", role: .cancel) { deleting = nil }
             } message: { host in
-                Text("This removes \(host.displayName) and its \(host.services.count) service link\(host.services.count == 1 ? "" : "s") from the shared library. Credentials are not touched.")
+                // Said as it is: the services' settings and saved passwords go too, everywhere the
+                // library syncs. The old text said credentials were not touched.
+                Text(GlassShellHost.deletionConsequence(host))
             }
             .alert("Unable to Complete", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
                 Button("OK") { model.errorMessage = nil }

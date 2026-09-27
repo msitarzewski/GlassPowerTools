@@ -33,13 +33,13 @@ enum DatabaseConnectionFailure {
             return error.localizedDescription
         }
         Logger.connections.error(
-            "\(config.engine.rawValue, privacy: .public) transport failure: \(String(describing: error), privacy: .public)"
+            "\(config.engine.rawValue, privacy: .public) transport failure: \(String(describing: error), privacy: .private)"
         )
         var message = "\(config.name) didn't answer at \(config.host):\(config.port)."
         if !config.usesHostTunnel {
             message += " Databases are usually set up to accept connections only from the machine "
-                + "they run on. Edit this database and turn on \"Connect through this host's SSH "
-                + "tunnel\" under Advanced."
+                + "they run on. Edit this database and turn on \"Reach it through this machine's "
+                + "Terminal service\" under Advanced."
         } else {
             message += " The tunnel reached the machine, so check that the database is running "
                 + "and listening on that port."

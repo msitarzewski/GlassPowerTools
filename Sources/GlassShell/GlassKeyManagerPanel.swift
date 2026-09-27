@@ -27,6 +27,7 @@ import UniformTypeIdentifiers
 import GlassConnectionKit
 import GlassConnectionUI
 import GlasSecretStore
+import CryptoKit
 #if canImport(AppKit)
 import AppKit
 #endif
@@ -159,7 +160,11 @@ public struct GlassKeyManagerPanel: View {
             ToolbarItem {
                 Menu {
                     Button("Import a Key…", systemImage: "square.and.arrow.down") { panel.showingImport = true }
-                    Button("Generate in the Secure Enclave…", systemImage: "lock.shield") { panel.showingGenerate = true }
+                    // Only where there is one: offered everywhere, it then failed on the devices
+                    // without a Secure Enclave.
+                    if SecureEnclave.isAvailable {
+                        Button("Generate in the Secure Enclave…", systemImage: "lock.shield") { panel.showingGenerate = true }
+                    }
                 } label: {
                     Label("Add Key", systemImage: "plus")
                 }

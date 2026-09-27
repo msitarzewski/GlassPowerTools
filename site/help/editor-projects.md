@@ -28,7 +28,7 @@ To edit one file without opening its folder, choose **Edit** on the file instead
 
 The detail shows the project's **Folder**, **Machine** and **Last Opened** date, and an **Availability** note that says how this device reaches it:
 
-- **On this Mac** — the folder is on this device and opens from its file system.
+- **On this Mac** (**On this device** on Vision Pro, iPad and iPhone) — the folder is on this device and opens from its file system.
 - **Over SSH · alpha** — the folder is on alpha and opens over its Terminal service.
 - **alpha — no terminal service** — the machine has no Terminal service in your library, so **Open** is unavailable. Add a Terminal service to the machine and the project opens over it.
 

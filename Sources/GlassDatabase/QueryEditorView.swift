@@ -613,7 +613,7 @@ struct QueryEditorView: View {
 
                     if let result = currentResult, result.error == nil {
                         Button {
-                            openWindow(id: "results", value: result.id)
+                            openWindow(id: "database-results", value: result.id)
                         } label: {
                             Label("Detach Results", systemImage: "rectangle.portrait.and.arrow.right")
                         }

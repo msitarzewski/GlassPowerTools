@@ -27,7 +27,8 @@ three separately pinned copies of the shared packages.
 **User requirements carried forward from the three apps:**
 - Native Mac, iPad, iPhone and Vision Pro experiences. Apple TV and watchOS are excluded.
 - One library of hosts. A host shows an icon per defined service, and Connect chooses among them when
-  more than one exists: a chevron menu on Mac, press and hold on touch. "Paired Services" becomes
+  more than one exists: a chevron menu beside Connect, on every platform (press and hold was the
+  first plan; a visible control won). "Paired Services" becomes
   "Add a service…".
 - One settings and configuration surface for all capabilities, replacing three drifting designs.
 - Preserve the family library, favorites, groups, selection and detail-panel patterns. Users must not

@@ -47,7 +47,7 @@ If the connection to a server drops during a save, the Editor cannot tell whethe
 
 Close a document with its tab's close button, or **on Mac** with ⌘W. Tabs appear once two or more documents are open. If it has unsaved changes, **Close without saving?** offers:
 
-- **Save** — saves, then closes. A never-saved document first asks where to save it.
+- **Save** — saves, then closes. A never-saved document first asks where to save it. If the save fails, or stops to ask about a file that changed, the document stays open with your changes.
 - **Discard Changes** — closes without saving.
 - **Cancel** — keeps the document open.
 

@@ -575,9 +575,7 @@ public struct GlassShellHostSetupSheet: View {
             Button("Delete Host…", role: .destructive) { confirmingDelete = true }
                 .accessibilityIdentifier("host-editor-delete")
         } footer: {
-            Text(host.services.isEmpty
-                 ? "Removes \(host.displayName) from the shared library. Credentials are not touched."
-                 : "Removes \(host.displayName) and its \(host.services.count) service link\(host.services.count == 1 ? "" : "s") from the shared library. Credentials are not touched.")
+            Text(GlassShellHost.deletionConsequence(host))
         }
         .alert("Delete Host?", isPresented: $confirmingDelete) {
             Button("Delete", role: .destructive) {

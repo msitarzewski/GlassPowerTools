@@ -10,8 +10,8 @@ Workgroups are in the library's sidebar, beside Collections, under **Workgroups*
 
 Use **Search workgroups...** to filter the list. A Workgroup's menu (right-click, or touch and hold) offers **Open**, **Edit**, **Duplicate** and **Delete**.
 
-> [!WARNING]
-> **Delete** in that menu removes the Workgroup at once, without asking.
+> [!NOTE]
+> **Delete…** in that menu asks you to confirm. Deleting a Workgroup removes it from this device; the connections in it are not affected.
 
 ## Create a Workgroup
 

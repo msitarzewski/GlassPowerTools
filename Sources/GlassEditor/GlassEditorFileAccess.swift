@@ -235,7 +235,7 @@ public struct GlassEditorConflict: Identifiable, Sendable {
 
     /// What happened, in the words a person would use.
     public var explanation: String {
-        let where_ = machine.map { "on \($0)" } ?? "on this Mac"
+        let where_ = machine.map { "on \($0)" } ?? GlassEditorPlace.thisDevice
         switch state {
         case .remoteChangedLocalDirty:
             return "\(name) has changed \(where_) since you opened it, and you have unsaved edits. Saving replaces what is there now."
@@ -245,6 +245,38 @@ public struct GlassEditorConflict: Identifiable, Sendable {
             return "\(name) could not be checked \(where_) — it may have changed since you opened it. Saving replaces whatever is there now."
         case .noConflict:
             return "\(name) is unchanged \(where_)."
+        }
+    }
+}
+
+/// How the device the editor runs on is named in text: "this Mac" was said on every platform.
+enum GlassEditorPlace {
+    static var thisDevice: String {
+        #if os(macOS)
+        "on this Mac"
+        #else
+        "on this device"
+        #endif
+    }
+}
+
+extension String {
+    /// "on this Mac" → "On this Mac".
+    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
+}
+
+/// Why a project on another machine cannot be opened. The editor reaches another machine only
+/// through its Terminal service; the message used to be the port-forwarding one.
+public enum GlassEditorRemoteAccessError: LocalizedError, Equatable {
+    case machineNotInLibrary
+    case noTerminalService
+
+    public var errorDescription: String? {
+        switch self {
+        case .machineNotInLibrary:
+            "The machine this project is on is no longer in your library. Add it again, or remove the project."
+        case .noTerminalService:
+            "Files on another machine are reached through its Terminal service, and this machine has none. Add a Terminal service to it in the library, then open the project again."
         }
     }
 }

@@ -135,7 +135,7 @@ public struct DesktopSettingsView: View {
                     Text("Saved Settings")
                 }
             case .about:
-                Section("glassDT") {
+                Section("Desktop") {
                     LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development")
                     LabeledContent("Remote Desktop Protocol", value: "RDP")
                     LabeledContent("App License", value: "MIT")

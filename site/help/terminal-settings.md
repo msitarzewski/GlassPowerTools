@@ -29,7 +29,7 @@ The terminal adds three pages to Settings: **Connections**, **Terminal** and **S
 
 **On Mac:** **Import** reads a Terminal profile **From .terminal File…**, or from **Apple Built-in Profiles**.
 
-**Sync themes**, under **iCloud Sync**, keeps your themes the same on every device. The same switch also syncs your reconnect, closing, scrollback, bell, cursor, initial size and tint preferences. It never syncs passwords, keys, saved connections, host keys or snippets.
+**Sync terminal settings**, under **iCloud Sync**, keeps your themes the same on every device. It also syncs your reconnect, closing, scrollback, bell, cursor, initial size and tint preferences. It never syncs passwords, keys, saved connections, host keys or snippets.
 
 ## Change one session's appearance
 

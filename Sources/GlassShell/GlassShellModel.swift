@@ -25,7 +25,7 @@ public enum GlassShellError: LocalizedError, Equatable {
         case .hostNotFound: "That host is no longer in the library."
         case .serviceNotFound: "That service is no longer on the host."
         case .invalidName: "Enter a name."
-        case .preferencesReadOnly: "Favorites and recent services are read-only until the preferences file can be read or is reset in Settings."
+        case .preferencesReadOnly: "Favorites and recent services are read-only because the preferences file could not be read. Quit and reopen the app to try again."
         case .localHostNotRemovable: "\(GlassLocalHost.displayName) is this device and is always in the library. Remove its services instead."
         case .builtInServiceNotEditable(let name): "\(name) is built in to this device. There is nothing to configure and nothing to remove."
         case .localHostHasNoAddress: "\(GlassLocalHost.displayName) is this device, so it has no address to set."
@@ -162,7 +162,7 @@ public final class GlassShellModel: GlassServiceStore {
             catalogFileURL = fileURL
             catalog = HostCatalogStore(fileURL: fileURL, writerID: writerID)
             hasSharedContainer = true
-            hostLibraryStatus = "Host library is shared with glas.sh, glassdb and glassDT on this device."
+            hostLibraryStatus = "The host library is kept in the app group container on this device."
         } else {
             let fileURL = directory.appendingPathComponent(Self.catalogRelativePath)
             catalogFileURL = fileURL

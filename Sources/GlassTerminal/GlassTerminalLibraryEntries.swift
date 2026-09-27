@@ -109,8 +109,13 @@ struct TerminalLibraryCommands: Commands {
 
     var body: some Commands {
         CommandMenu("Library") {
+            // ⌥⌘W is Close Pane on the Mac (MacWorkspaceCommands); a shortcut has one owner.
+            #if os(macOS)
+            Button("Workgroups…") { runtime.requestShowWorkgroups() }
+            #else
             Button("Workgroups…") { runtime.requestShowWorkgroups() }
                 .keyboardShortcut("w", modifiers: [.command, .option])
+            #endif
             Button("Tailscale Devices…") { runtime.requestShowTailscale() }
                 .disabled(!runtime.tailscaleIsConfigured)
         }

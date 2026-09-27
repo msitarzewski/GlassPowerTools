@@ -163,6 +163,15 @@ struct GlassActiveSessionRow: View {
 /// The detail column on a wide layout. Rows switch rather than select, so there is nothing to
 /// detail; this says what the column is for instead of sitting blank.
 struct GlassActiveConnectionsDetail: View {
+    /// How a row is closed where this is read: a Mac mouse cannot swipe.
+    static var closeHint: String {
+        #if os(macOS)
+        "Choose a session to switch to it. Right-click one to close it."
+        #else
+        "Choose a session to switch to it. Swipe one to close it."
+        #endif
+    }
+
     let model: GlassShellModel
 
     var body: some View {
@@ -172,7 +181,7 @@ struct GlassActiveConnectionsDetail: View {
             systemImage: "bolt.fill",
             description: Text(count == 0
                               ? "Connect to a machine and it appears under Active while the session is live."
-                              : "Choose a session to switch to it. Swipe one to close it."))
+                              : Self.closeHint))
     }
 }
 

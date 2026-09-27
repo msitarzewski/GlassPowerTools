@@ -82,7 +82,7 @@ public enum GlassEditorProjectReach: Sendable, Hashable {
 
     public var badge: String {
         switch self {
-        case .thisMachine: "On this Mac"
+        case .thisMachine: GlassEditorPlace.thisDevice.capitalizedFirst
         case .overSSH(let host): "Over SSH · \(host)"
         case .unreachable(let host): "\(host) — no terminal service"
         }

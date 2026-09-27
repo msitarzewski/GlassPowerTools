@@ -523,7 +523,7 @@ public final class GlassTerminalCapability: GlassCapability {
             GlassServiceTool(id: "files-\(serverID.uuidString.lowercased())",
                              title: "Files",
                              symbolName: "folder",
-                             subtitle: "Browse this machine's files over \(GlassServicePresentation.displayName(for: service.kind))") {
+                             subtitle: "Browse this machine's files over SFTP") {
                 runtime.requestConnect(serverID: serverID, purpose: .sftp)
             }
         ]

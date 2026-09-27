@@ -174,10 +174,9 @@ struct GlassPowerToolsApp: App {
         // connection, resolves no credential and judges no host key.
         let registry = model.registry
         editor.remoteAccess = { @MainActor hostID in
-            guard let record = library.record(hostID),
-                  let capability = registry.capability(for: .ssh) else {
-                throw GlassPortForwardError.unavailable
-            }
+            guard let record = library.record(hostID) else { throw GlassEditorRemoteAccessError.machineNotInLibrary }
+            guard record.services.contains(where: { $0.kind == .ssh }),
+                  let capability = registry.capability(for: .ssh) else { throw GlassEditorRemoteAccessError.noTerminalService }
             let lister = try await capability.openDirectoryLister(host: record)
             return GlassEditorRemoteFileAccess { path in
                 try await lister.list(path).map {

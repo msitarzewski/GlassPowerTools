@@ -17,11 +17,11 @@ Use **Search Keys** to filter the list by name.
 4. The sheet shows what it found, such as the key type and whether a passphrase is required. If it is, enter the **Passphrase**.
 5. Choose **Save**.
 
-RSA and ED25519 private keys are supported. When you choose a file and have not typed a name, the name is filled in from the key's comment or the file name.
+RSA and ED25519 private keys are supported. An ECDSA key imported from a file is marked **not supported for authentication**; the P-256 keys that sign in are the ones made in the Secure Enclave. When you choose a file and have not typed a name, the name is filled in from the key's comment or the file name.
 
 ## Generate a key in the Secure Enclave
 
-1. Choose **Add Key** (+), then **Generate in the Secure Enclave…**.
+1. Choose **Add Key** (+), then **Generate in the Secure Enclave…**. The choice appears only on a device that has a Secure Enclave.
 2. In **Generate Key**, enter a **Key name**.
 3. Choose **Generate**.
 

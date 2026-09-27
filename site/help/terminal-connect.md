@@ -62,7 +62,7 @@ The app still tries modern algorithms first and falls back only if the server re
 > [!WARNING]
 > Legacy algorithms give weaker protection. Use them only for a server you control, until you can upgrade it.
 
-**On Mac:** a Workgroup that includes such a connection does not open. Open that connection directly instead.
+A Workgroup that includes such a connection does not open, on any device. Open that connection directly instead.
 
 ## When a connection drops
 

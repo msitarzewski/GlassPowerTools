@@ -28,11 +28,14 @@ public enum SSHDeclaredKeyType: String, Sendable, Hashable, CaseIterable {
         }
     }
 
-    /// Whether the engine can authenticate with this type (`SSHAuthenticationBuilder`).
+    /// Whether a key of this type **imported from a file** can sign in (`SSHAuthenticationBuilder`
+    /// reads OpenSSH RSA and Ed25519 keys). P-256 signs in only as a key made in the Secure Enclave,
+    /// which never passes through a file; an imported P-256 key was shown as usable and then
+    /// refused on Save (2026-09-27).
     public var isSupportedForAuthentication: Bool {
         switch self {
-        case .rsa, .ed25519, .ecdsaP256: true
-        case .ecdsaP384, .ecdsaP521: false
+        case .rsa, .ed25519: true
+        case .ecdsaP256, .ecdsaP384, .ecdsaP521: false
         }
     }
 

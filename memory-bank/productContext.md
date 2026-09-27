@@ -21,7 +21,7 @@ across three applications.
 
 A host row shows an icon per service it actually has. Connect opens the service last used on that
 host. When a host has more than one service, the rest are reachable from the same control: a chevron
-menu on Mac, press and hold on touch. A host with one service behaves exactly as it does today.
+menu beside Connect on every platform (the press-and-hold plan gave way to a visible control). A host with one service behaves exactly as it does today.
 
 ## Design order
 

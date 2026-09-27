@@ -1881,7 +1881,7 @@ struct DataTabView: View {
             }
         }
         #endif
-        .alert("Review SQL Before Execution", isPresented: .init(
+        .alert("Review SQL Before Executing", isPresented: .init(
             get: { pendingQueryStatements != nil },
             set: { if !$0 { pendingQueryStatements = nil } }
         )) {

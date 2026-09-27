@@ -882,8 +882,10 @@ class SettingsManager {
         guard let index = sshKeys.firstIndex(where: { $0.id == keyID }) else {
             throw SecretStoreError.notFound
         }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw SSHKeyNameError.empty }
         var candidateKeys = sshKeys
-        candidateKeys[index].name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        candidateKeys[index].name = trimmed
         try persistSSHKeysAndVerify(candidateKeys)
         sshKeys = candidateKeys
     }
@@ -1715,4 +1717,10 @@ struct TerminalGlassAppearance: Equatable {
     var paintsTheme: Bool { opacity > 0 }
     var compositesBlur: Bool { blur > 0 }
     var isFullyTransparent: Bool { !paintsTheme && !compositesBlur }
+}
+
+/// A key with no name cannot be told apart in the list or chosen in a form.
+enum SSHKeyNameError: LocalizedError {
+    case empty
+    var errorDescription: String? { "A key needs a name." }
 }

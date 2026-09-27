@@ -666,7 +666,10 @@ struct SFTPBrowserView: View {
             }
         } message: {
             if let entry = entryToDelete {
-                Text("Are you sure you want to delete \"\(entry.filename)\"? This cannot be undone.")
+                // Folders go with SFTP's rmdir, which removes only an empty folder: said up front.
+                Text(isDirectory(entry)
+                     ? "Delete the folder \"\(entry.filename)\"? Only an empty folder can be deleted; delete what is inside it first. This cannot be undone."
+                     : "Are you sure you want to delete \"\(entry.filename)\"? This cannot be undone.")
             }
         }
         .alert("Delete \(selectedFilenames.count) Items?", isPresented: $showingBatchDeleteConfirmation) {
@@ -675,7 +678,7 @@ struct SFTPBrowserView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Are you sure you want to delete \(selectedFilenames.count) selected items? This cannot be undone.")
+            Text("Are you sure you want to delete \(selectedFilenames.count) selected items? Folders are deleted only if they are empty. This cannot be undone.")
         }
         .alert("Rename", isPresented: $showingRenamePrompt) {
             TextField("New name", text: $renameDraft)
@@ -3512,7 +3515,9 @@ struct SFTPBrowserView: View {
             }
             await loadDirectory()
         } catch {
-            self.error = "Failed to delete \(entry.filename): \(error.localizedDescription)"
+            self.error = isDirectory(entry)
+                ? "\(entry.filename) could not be deleted. A folder must be empty first; delete what is inside it and try again."
+                : "Failed to delete \(entry.filename): \(error.localizedDescription)"
         }
     }
 

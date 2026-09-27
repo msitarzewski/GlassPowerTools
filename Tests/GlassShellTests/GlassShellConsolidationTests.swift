@@ -475,3 +475,15 @@ struct GlassShellFoldTargetTests {
         #expect(GlassShellModel.foldTarget(among: [b, a]).id == a.id)
     }
 }
+
+/// The library lists hosts the way Finder lists names: case does not decide the order, and
+/// numbers compare as numbers. "bravo" used to come after "Zulu".
+@Suite("Host order")
+struct GlassShellHostOrderTests {
+    @Test("hosts sort case-insensitively, with numbers in numeric order")
+    func finderOrder() throws {
+        let names = ["Zulu", "bravo", "web10", "Alpha", "web2"]
+        let hosts = GlassShellHostGrouping.group(try names.map { try HostProfile(displayName: $0) })
+        #expect(hosts.map(\.displayName) == ["Alpha", "bravo", "web2", "web10", "Zulu"])
+    }
+}

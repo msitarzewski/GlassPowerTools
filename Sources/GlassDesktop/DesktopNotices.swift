@@ -8,7 +8,7 @@ struct DesktopNoticeDelivery {
     var authorize: () async throws -> Bool = { try await GlassSystemNotifications.requestAuthorization() }
     var failure: (UUID) async throws -> Bool = { id in
         try await GlassSystemNotifications.post(title: "Remote Desktop Interrupted",
-            body: "A remote desktop connection needs attention. Open glassDT to reconnect.",
+            body: "A remote desktop connection needs attention. Open Glass Power Tools to reconnect.",
             threadIdentifier: "app.glassdt.connection-failures", identifier: id.uuidString)
     }
 }
@@ -43,7 +43,7 @@ public final class DesktopNotices {
         do {
             let granted = try await delivery.authorize()
             save(granted)
-            if !granted { statusMessage = "Allow notifications for glassDT in system settings to receive notices." }
+            if !granted { statusMessage = "Allow notifications for Glass Power Tools in System Settings to receive notices." }
         } catch {
             save(false); statusMessage = "Notifications could not be enabled. Please try again."
         }

@@ -913,7 +913,7 @@ struct ThemeEditorView: View {
 
                 GroupBox("iCloud Sync") {
                     VStack(alignment: .leading, spacing: 8) {
-                        Toggle("Sync themes", isOn: iCloudSyncBinding)
+                        Toggle("Sync terminal settings", isOn: iCloudSyncBinding)
                         Text(settingsManager.iCloudSyncStatusText)
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -1714,6 +1714,8 @@ struct RenameSSHKeyView: View {
                         settingsManager.renameSSHKey(key.id, name: name)
                         dismiss()
                     }
+                    // A key with no name cannot be told apart in the list or chosen in a form.
+                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
         }

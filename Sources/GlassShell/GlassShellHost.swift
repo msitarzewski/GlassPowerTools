@@ -151,8 +151,22 @@ public enum GlassShellHostGrouping {
         var groups: [Int: [HostProfile]] = [:]
         for (index, record) in records.enumerated() { groups[find(index), default: []].append(record) }
         return groups.values.map(GlassShellHost.init(members:)).sorted {
-            if $0.displayName != $1.displayName { return $0.displayName < $1.displayName }
+            // As Finder sorts: "bravo" before "Zulu", "web2" before "web10".
+            let order = $0.displayName.localizedStandardCompare($1.displayName)
+            if order != .orderedSame { return order == .orderedAscending }
             return $0.id.rawValue.uuidString < $1.id.rawValue.uuidString
         }
+    }
+}
+
+extension GlassShellHost {
+    /// What deleting a host does, for its confirmation: the services' settings and saved passwords
+    /// go with it, on every device the library reaches. SSH keys are the library's and stay.
+    static func deletionConsequence(_ host: GlassShellHost) -> String {
+        guard !host.services.isEmpty else {
+            return "This removes \(host.displayName) from your library on every device."
+        }
+        let services = host.services.count == 1 ? "its service" : "its \(host.services.count) services"
+        return "This removes \(host.displayName) and \(services) from your library on every device, with each service's settings and saved password. Your SSH keys stay in SSH Keys."
     }
 }

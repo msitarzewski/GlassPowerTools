@@ -28,6 +28,9 @@ final class TerminalWorkgroupsModel {
     var searchQuery: String = ""
     var editorContext: WorkgroupEditorContext?
     var failureMessage: String?
+    /// A Workgroup waiting for its deletion to be confirmed; deleting from the menu used to be
+    /// immediate, with nothing to undo it.
+    var pendingDeletion: LayoutPreset?
 
     init() {}
 }
@@ -110,6 +113,18 @@ struct TerminalWorkgroupsView: View {
             ) { preset in
                 settingsManager.upsertLayoutPreset(preset)
             }
+        }
+        .confirmationDialog("Delete Workgroup?", isPresented: Binding(
+            get: { model.pendingDeletion != nil },
+            set: { if !$0 { model.pendingDeletion = nil } }
+        ), titleVisibility: .visible, presenting: model.pendingDeletion) { preset in
+            Button("Delete", role: .destructive) {
+                settingsManager.deleteLayoutPreset(preset)
+                model.pendingDeletion = nil
+            }
+            Button("Cancel", role: .cancel) { model.pendingDeletion = nil }
+        } message: { preset in
+            Text("\(preset.name) and its layout are removed from this device. The connections in it are not affected.")
         }
         .alert("Workgroups", isPresented: Binding(
             get: { model.failureMessage != nil },
@@ -241,8 +256,8 @@ struct TerminalWorkgroupsView: View {
                             model.editorContext = .duplicate(preset)
                         }
                         Divider()
-                        Button("Delete", systemImage: "trash", role: .destructive) {
-                            settingsManager.deleteLayoutPreset(preset)
+                        Button("Delete…", systemImage: "trash", role: .destructive) {
+                            model.pendingDeletion = preset
                         }
                     }
                 }

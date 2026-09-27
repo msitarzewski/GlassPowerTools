@@ -189,7 +189,7 @@ public struct GlassShellSettingsView: View {
 
     private var general: some View {
         Section("Host Library") {
-            LabeledContent("Sharing", value: model.hasSharedContainer ? "Shared with the Glass family" : "This app only")
+            LabeledContent("Storage", value: model.hasSharedContainer ? "App group container" : "This app's container")
             Text(model.hostLibraryStatus).font(.footnote).foregroundStyle(.secondary)
             LabeledContent("Hosts", value: model.hosts.count, format: .number)
             // Counted against the catalog's own hosts: this device is not one of its records

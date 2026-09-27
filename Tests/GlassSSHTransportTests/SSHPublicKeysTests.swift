@@ -121,6 +121,10 @@ AchkG92DPg9/h94Hlidb8Dl6fz0aV2/rQzwgI=
         #expect(throws: SSHKeyHeaderError.notAnOpenSSHPrivateKey) { _ = try SSHPublicKeys.declaredKeyType(inOpenSSHPrivateKey: "not a key") }
         #expect(throws: SSHKeyHeaderError.notAnOpenSSHPrivateKey) { _ = try SSHPublicKeys.declaredKeyType(inOpenSSHPrivateKey: Self.ed25519PublicLine) }
         #expect(SSHDeclaredKeyType.ecdsaP384.isSupportedForAuthentication == false)
+        // Imported P-256 keys are refused on Save; the Secure Enclave's own P-256 keys never
+        // come through this check.
+        #expect(SSHDeclaredKeyType.ecdsaP256.isSupportedForAuthentication == false)
+        #expect(SSHDeclaredKeyType.ed25519.isSupportedForAuthentication && SSHDeclaredKeyType.rsa.isSupportedForAuthentication)
         #expect(SSHDeclaredKeyType.ed25519.displayName == "ED25519")
     }
 
