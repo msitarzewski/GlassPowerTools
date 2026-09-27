@@ -40,6 +40,16 @@ struct DesktopRequiredFields: View {
                 .accessibilityIdentifier("\(identifierPrefix)-protocol")
                 .onChange(of: draft.desktopProtocol) { _, _ in draft.protocolDidChange() }
             })
+            if draft.desktopProtocol == .vnc {
+                // Said where the choice is made: the RFB security types this client speaks protect
+                // the password at sign-in and nothing after it.
+                Label("VNC protects the password at sign-in, not what follows: the screen and your typing cross the network readable. Use it on a network you trust.",
+                      systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("\(identifierPrefix)-vnc-unencrypted")
+            }
 
             DesktopFormTextField(
                 // glassDT's own wording: a Mac being screen-shared takes a Mac account, and
