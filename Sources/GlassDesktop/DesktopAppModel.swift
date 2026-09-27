@@ -5,6 +5,7 @@ import GlassConnectionKit
 import GlassShell
 import GlassHostCatalog
 import GlasSecretStore
+import os
 
 /// Synchronous credential boundary. Production delegates directly to the family
 /// store; tests can exercise transaction failures without creating secret items.
@@ -56,6 +57,7 @@ public struct DesktopCredentialAccess {
 
 @MainActor @Observable
 public final class DesktopAppModel {
+    private static let logger = Logger(subsystem: "com.glasspowertools", category: "desktop")
     public private(set) var connections: [DesktopConnection] = []
     /// The sessions that are on screen, for Active. Each window makes its own model, so until
     /// 2026-09-22 nothing in the capability could see a desktop at all (*"Desktops aren't
@@ -194,6 +196,12 @@ public final class DesktopAppModel {
         }
         do {
             connections = try await requireRepository().save(value, replacing: previous)
+            // A new password replaced the old credential: remove the old one, or every password
+            // change would leave a copy in the Keychain (and, synced, on every device). Best
+            // effort — the record already points at the new credential.
+            if newCredentialID != nil, let previous, previous.credentialID != value.credentialID {
+                try? credentials.delete(previous.credentialID.rawValue, configuration(for: previous))
+            }
         } catch {
             if let newCredentialID {
                 do { try credentials.delete(newCredentialID, configuration(for: value)) }
@@ -221,6 +229,12 @@ public final class DesktopAppModel {
             // The shell removes the host record and cascades to this capability (D25); this
             // deletes only what the capability itself stored.
             connections = try await requireRepository().delete(connection.id)
+            // And the password it held. Removing the record alone left the credential in the
+            // Keychain — synced, on every device — with nothing pointing at it. Deleting an item
+            // another device already removed is not an error.
+            // A failure here does not undo the removal the person asked for; it is logged.
+            do { try credentials.delete(connection.credentialID.rawValue, configuration(for: connection)) }
+            catch { Self.logger.error("Removed desktop \(connection.id.rawValue, privacy: .public) but not its credential: \(error.localizedDescription, privacy: .public)") }
             errorMessage = nil
         } catch { errorMessage = error.localizedDescription }
     }
