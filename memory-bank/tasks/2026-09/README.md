@@ -501,3 +501,12 @@ manifest now generates the licence folder and the app's Settings ▸ About ▸ A
 updates refuse an unreviewed licence kind; tests fail on an uncovered pin, vendored package or Mermaid
 version, and on Xcode's pins drifting from the package's (they had: swift-crypto 3 in the app). Go and
 C pinned to commits; every vendored grammar verified against upstream. 1,771 tests pass. Not committed.
+
+## 2026-09-27 — [Dependencies and the audit's fixes](2026-09-27_release-audit-fixes.md) · [Help, site and updates](2026-09-27_help-site-and-updates.md)
+
+Overnight release preparation, committed locally in small commits: point releases and SwiftTerm
+1.18; the public-release audit's fixes (theme identifier, signing identity file, database TLS
+warning, history redaction, a real MySQL metadata defect, UI tests kept off the real project list and
+iCloud, RDP certificate chains, VNC's lack of encryption stated); the memory bank curated; README,
+SECURITY, CONTRIBUTING, BUILDING; 35 help pages audited from the code and the site built; Sparkle and
+a release script; and the defects the help audit found. Upstream drafts sit in the private folder.

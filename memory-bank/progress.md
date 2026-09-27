@@ -21,8 +21,11 @@ All four capabilities and the shell are built and in daily use on the owner's Ma
 | Editor: documents, projects on this device and over SFTP, New File, first save into a project, viewers, Markdown preview with Mermaid, 16 grammars, TextKit 1 on the Mac (D36) | built | unit, UI on iPhone simulator, server (7 live remote-editing tests), device (Mac) |
 | Acknowledgements and licence notices (generated, guarded by tests) | built | unit |
 
-Package suite: **1,777 tests**, all passing (2026-09-27), plus the vendored packages' own suites
-(swift-nio-ssh 363, Citadel 58, RDPKit 1,015). Release builds succeed for macOS, iOS and visionOS.
+Package suite: about **1,790 tests**. The last full run with the screen unlocked passed (1,777, early
+2026-09-27); the night's later runs were under a locked screen, where file-protected stores cannot be
+read — they fail the same 137 tests before and after the night's changes, and every new test passes.
+Vendored suites: swift-nio-ssh 363, Citadel 58, RDPKit 1,015. Release builds succeed for macOS, iOS
+and visionOS.
 
 ## Release preparation (2026-09-26 → 27)
 
@@ -35,9 +38,13 @@ history redacted by default, MySQL metadata lookups bound rather than escaped (a
 project list, RDP trust evaluated over the whole certificate chain, and VNC's lack of session
 encryption stated in the setup form. Details in `tasks/2026-09/`.
 
-Remaining before a first public release: README and contributor documents, the help and the site
-(D39), the Mac release path (D38: Sparkle, Developer ID profile, notarization), and — only on the
-owner's word — the history rewrite and the first push.
+Also done: README, SECURITY, CONTRIBUTING and a building guide; 35 help pages audited from the code,
+the site and its generator (not deployed); Sparkle for the Mac with a release script (never run); and
+the defects the help audit found (`tasks/2026-09/2026-09-27_help-site-and-updates.md`).
+
+Remaining before a first public release: the owner's release steps (Sparkle key, Developer ID
+profile, notarization, deploying the site), the behaviour findings listed in `activeContext.md`, and
+— only on the owner's word — the history rewrite and the first push.
 
 ## Not verified
 

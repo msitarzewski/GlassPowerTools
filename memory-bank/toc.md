@@ -69,6 +69,7 @@ source applications are obsolete and no longer compile.
 | [Documentation and site plan](tasks/2026-09/2026-09-25_documentation-and-site-plan.md) | The vision → audit → help → sites plan; Anomalous's help and AudioPaper's site as models; glasspowertools.com |
 | [Licensing and acknowledgements](tasks/2026-09/2026-09-26_licensing-and-acknowledgements.md) | Corrected notices, the generated licence folder and in-app Acknowledgements, the Mermaid licence gate |
 | [Dependencies and the audit's fixes](tasks/2026-09/2026-09-27_release-audit-fixes.md) | What moved and what is blocked upstream; each public-release audit finding, its fix and its proof |
+| [Help, site and updates](tasks/2026-09/2026-09-27_help-site-and-updates.md) | 35 help pages audited from the code, glasspowertools.com and its generator, Sparkle and the release script, and the defects the audit found |
 | [September tasks](tasks/2026-09/README.md) | Monthly index |
 
 This project is `~/Software/glass/GlassPowerTools`. `../GlassEditorKit` was **absorbed on 2026-09-14**
