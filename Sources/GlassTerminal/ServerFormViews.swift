@@ -636,7 +636,7 @@ struct TerminalAdvancedFields: View {
             // like a plain compatibility switch. It enables group-14 KEX and AES-128-CTR for this
             // host only (SSHConnectionOptions.allowLegacyAlgorithms); host-key policy is unaffected.
             Label {
-                Text("Weakens the cryptography used to reach this host. Only for old servers that reject modern algorithms; every connection will ask you to confirm.")
+                Text("Weakens the cryptography used to reach this host. Only for old servers that reject modern algorithms. Opening this connection asks you to confirm, and a Workgroup that includes it will not open.")
             } icon: {
                 Image(systemName: "exclamationmark.triangle.fill")
             }

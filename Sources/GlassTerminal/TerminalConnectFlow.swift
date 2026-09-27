@@ -323,6 +323,16 @@ struct TerminalConnectFlow: ViewModifier {
         #endif
     }
 
+    /// Whether a Workgroup includes a connection that allows legacy SSH algorithms, which only a
+    /// direct, confirmed connection may use.
+    static func workgroupNeedsLegacyConsent(_ preset: LayoutPreset, servers: [ServerConfiguration]) -> Bool {
+        preset.sessionIntents.contains { intent in
+            servers.contains { $0.id == intent.serverID && $0.legacyAlgorithmsEnabled }
+        }
+    }
+
+    static let legacyWorkgroupMessage = "A connection in this Workgroup uses legacy algorithms. Open that connection directly to review its security settings."
+
     #if os(visionOS) || os(iOS)
     private func resumeWorkgroupAfterPasswordPrompt() {
         guard let preset = pendingPasswordWorkgroup else { return }
@@ -339,6 +349,13 @@ struct TerminalConnectFlow: ViewModifier {
         guard !isOpeningWorkgroup, passwordPromptServer == nil else { return }
         if !reviewedLocalEntries && preset.sessionIntents.contains(where: { $0.kind == .local }) {
             substitutionReviewPreset = preset
+            return
+        }
+        // The Mac's policy, on every platform: a Workgroup opens its connections without the
+        // per-connection confirmation that legacy algorithms require, so it does not open one of
+        // those at all. Before this, a headset, iPad or iPhone connected it without asking.
+        if Self.workgroupNeedsLegacyConsent(preset, servers: serverManager.servers) {
+            connectionFailureMessage = Self.legacyWorkgroupMessage
             return
         }
         // Resolve credentials for the entire recipe before opening any sessions.
@@ -425,10 +442,8 @@ struct TerminalConnectFlow: ViewModifier {
         // Keep every pane's position even when a saved endpoint is missing;
         // its native pane offers recovery without rearranging the workspace.
         // Legacy algorithm consent still requires the direct connection flow.
-        if preset.sessionIntents.contains(where: { intent in
-            serverManager.servers.contains { $0.id == intent.serverID && $0.legacyAlgorithmsEnabled }
-        }) {
-            connectionFailureMessage = "A connection in this Workgroup uses legacy algorithms. Open that connection directly to review its security settings."
+        if Self.workgroupNeedsLegacyConsent(preset, servers: serverManager.servers) {
+            connectionFailureMessage = Self.legacyWorkgroupMessage
             return
         }
         do {
