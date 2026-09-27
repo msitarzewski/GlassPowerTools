@@ -169,10 +169,13 @@ public final class GlassEditorProjectLibrary {
     /// before the install points at a directory that no longer exists. That is not a hypothetical;
     /// it cost an evening, and the app was right to refuse to open it.
     ///
-    /// Only alongside `--ui-testing`, and only when the list is empty.
+    /// Only alongside `--ui-testing <uuid>` — the per-run identifier the app uses to give the
+    /// editor a defaults suite of its own — because the seed replaces the whole list.
     private func seedForUITestingIfRequested() {
         let arguments = ProcessInfo.processInfo.arguments
-        guard arguments.contains("--ui-testing"),
+        guard let flag = arguments.firstIndex(of: "--ui-testing"), arguments.indices.contains(flag + 1),
+              UUID(uuidString: arguments[flag + 1]) != nil,
+              defaults != .standard,
               arguments.contains("--ui-testing-seed-project"),
               let documents = try? FileManager.default.url(for: .documentDirectory, in: .userDomainMask,
                                                            appropriateFor: nil, create: true)

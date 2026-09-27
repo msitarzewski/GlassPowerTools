@@ -133,7 +133,13 @@ struct GlassPowerToolsApp: App {
         // Stage 5: the editor. Not a capability — a file is not a service on a machine — so it is
         // registered nowhere and simply owns its own window. What makes it part of the product is
         // that a project names a *host*, which is the catalog's identity (see `GlassEditorProject`).
-        let editor = GlassEditorRuntime(layers: layers)
+        // Under `--ui-testing <uuid>` the editor keeps its projects and preferences in a suite of
+        // its own, as the shell keeps its storage: the project seed replaces the list, and in the
+        // standard suite that list is the real one, shared with the installed app.
+        let editorDefaults = isolatedDirectory.flatMap {
+            UserDefaults(suiteName: "com.glasspowertools.editor.uitests.\($0.lastPathComponent)")
+        } ?? .standard
+        let editor = GlassEditorRuntime(layers: layers, defaults: editorDefaults)
         // Its preferences still belong in the one settings surface, so the page is registered here
         // — the composition root is the only place that knows about both the shell and the editor.
         model.registry.registerSettingsPage(editor.settingsPage)
@@ -264,11 +270,14 @@ struct GlassPowerToolsApp: App {
         }
         // The project list travels with everything else. Attached rather than required: without an
         // account the list is a local one and nothing else changes.
+        // Never from a test run: its seeded list would replace the person's on every device.
         let projects = editor.projects
-        Task { @MainActor in
-            await projects.startSynchronizing(
-                with: GlassSettingsSyncService(projectStore: GlassUbiquitousSettingsStore())
-            )
+        if isolatedDirectory == nil {
+            Task { @MainActor in
+                await projects.startSynchronizing(
+                    with: GlassSettingsSyncService(projectStore: GlassUbiquitousSettingsStore())
+                )
+            }
         }
         _layers = State(initialValue: layers)
         _model = State(initialValue: model)
