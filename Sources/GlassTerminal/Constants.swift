@@ -89,6 +89,10 @@ nonisolated enum SharedDefaults {
         #endif
     }
 
+    /// True while a UI test drives the app (`--ui-testing <uuid>`). Its settings must not reach
+    /// iCloud either: the key-value store is the person's own, shared with every device.
+    static var isUITestRun: Bool { testSuite != nil }
+
     #if os(macOS)
     static let legacyMacBundleIdentifier = "sh.glas.mac"
     static let legacyMacDomainMigrationSentinel = "legacyMacDomainMigrationComplete"

@@ -1310,7 +1310,9 @@ class SettingsManager {
         iCloudPushTask?.cancel()
         iCloudSyncConfigured = false
 
-        guard iCloudSyncEnabled else {
+        // A UI-test run keeps its settings local: its themes and preferences are fixtures, and
+        // the key-value store would carry them to the person's other devices.
+        guard iCloudSyncEnabled, !SharedDefaults.isUITestRun else {
             iCloudSettingsSyncService.stop()
             iCloudSyncStatusText = "Off"
             return
