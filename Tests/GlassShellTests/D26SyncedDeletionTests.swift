@@ -68,8 +68,8 @@ struct D26SyncedDeletionTests {
         defer { try? FileManager.default.removeItem(at: root) }
         await model.load()
 
-        let endpoint = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                    address: "oscar.example", serviceName: "Terminal")
+        let endpoint = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                    address: "alpha.example", serviceName: "Terminal")
         let mine = try #require(model.records.first)
 
         // The same record, deleted, as the account would hand it back.
@@ -92,10 +92,10 @@ struct D26SyncedDeletionTests {
         defer { try? FileManager.default.removeItem(at: root) }
         await model.load()
 
-        let kept = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                address: "oscar.example", serviceName: "Terminal")
-        let dropped = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                   address: "oscar.example", serviceName: "Second")
+        let kept = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                address: "alpha.example", serviceName: "Terminal")
+        let dropped = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                   address: "alpha.example", serviceName: "Second")
         let mine = try #require(model.records.first)
 
         var edited = mine
@@ -116,12 +116,12 @@ struct D26SyncedDeletionTests {
         defer { try? FileManager.default.removeItem(at: root) }
         await model.load()
 
-        _ = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                         address: "oscar.example", serviceName: "Terminal")
+        _ = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                         address: "alpha.example", serviceName: "Terminal")
         let mine = try #require(model.records.first)
 
         var renamed = mine
-        renamed.displayName = "oscar renamed elsewhere"
+        renamed.displayName = "alpha renamed elsewhere"
         renamed.updatedAt = Date(timeIntervalSinceNow: 60)
         backend.remote = [renamed]
 
@@ -137,7 +137,7 @@ struct D26SyncedDeletionTests {
         defer { try? FileManager.default.removeItem(at: root) }
         await model.load()
 
-        var incoming = try HostProfile(displayName: "juliet", address: "juliet.example")
+        var incoming = try HostProfile(displayName: "bravo", address: "bravo.example")
         incoming.services = [HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal")]
         backend.remote = [incoming]
 

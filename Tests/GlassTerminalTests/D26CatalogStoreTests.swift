@@ -62,16 +62,16 @@ struct D26CatalogStoreTests {
         await model.load()
         let manager = makeManager(model)
 
-        let adopted = try await manager.adoptedIdentity(hostName: "oscar", address: "oscar.example",
+        let adopted = try await manager.adoptedIdentity(hostName: "alpha", address: "alpha.example",
                                                     serviceName: "Terminal")
         try await manager.addServerOrThrow(
-            ServerConfiguration(id: adopted.id, name: "oscar", host: "oscar.example", username: "michael"))
+            ServerConfiguration(id: adopted.id, name: "alpha", host: "alpha.example", username: "michael"))
 
         // The catalog holds it, under the endpoint id the link uses — the invariant every
         // capability already relied on and D26 makes load-bearing.
         let stored = try #require(model.configuration(ServerConfiguration.self,
                                                       for: EndpointID(rawValue: adopted.id)))
-        #expect(stored.name == "oscar")
+        #expect(stored.name == "alpha")
         #expect(stored.username == "michael")
     }
 
@@ -99,9 +99,9 @@ struct D26CatalogStoreTests {
         await model.load()
         let manager = makeManager(model)
 
-        let adopted = try await manager.adoptedIdentity(hostName: "oscar", address: "oscar.example",
+        let adopted = try await manager.adoptedIdentity(hostName: "alpha", address: "alpha.example",
                                                     serviceName: "Terminal")
-        let server = ServerConfiguration(id: adopted.id, name: "oscar", host: "oscar.example", username: "m")
+        let server = ServerConfiguration(id: adopted.id, name: "alpha", host: "alpha.example", username: "m")
         try await manager.addServerOrThrow(server)
         #expect(model.catalogHosts.flatMap(\.services).count == 1)
 
@@ -120,9 +120,9 @@ struct D26CatalogStoreTests {
         await model.load()
         let manager = makeManager(model)
 
-        let adopted = try await manager.adoptedIdentity(hostName: "oscar", address: "oscar.example",
+        let adopted = try await manager.adoptedIdentity(hostName: "alpha", address: "alpha.example",
                                                     serviceName: "Terminal")
-        var server = ServerConfiguration(id: adopted.id, name: "oscar", host: "oscar.example", username: "m")
+        var server = ServerConfiguration(id: adopted.id, name: "alpha", host: "alpha.example", username: "m")
         try await manager.addServerOrThrow(server)
 
         server.username = "michael"
@@ -155,14 +155,14 @@ struct D26CatalogStoreTests {
 
         // Another device adds a terminal service and its configuration. This is what lands in the
         // catalog when D19 delivers; the shell then tells every capability the catalog has loaded.
-        let adopted = try await manager.adoptedIdentity(hostName: "juliet",
-                                                        address: "192.0.2.12",
+        let adopted = try await manager.adoptedIdentity(hostName: "bravo",
+                                                        address: "192.0.2.20",
                                                         serviceName: "Terminal")
         // One record per service link, which is how the catalog stores a configuration — not a
         // list on one link.
         try await model.setConfiguration(
-            encoding: ServerConfiguration(id: adopted.id, name: "juliet",
-                                          host: "192.0.2.12", username: "michael"),
+            encoding: ServerConfiguration(id: adopted.id, name: "bravo",
+                                          host: "192.0.2.20", username: "michael"),
             for: EndpointID(rawValue: adopted.id))
 
         // The shell's notification after a later load. Before the fix this was a no-op and the
@@ -170,7 +170,7 @@ struct D26CatalogStoreTests {
         manager.reloadFromStore()
         #expect(manager.servers.contains { $0.id == adopted.id },
                 "a service that arrived after the first load was never read")
-        #expect(manager.server(for: adopted.id)?.host == "192.0.2.12")
+        #expect(manager.server(for: adopted.id)?.host == "192.0.2.20")
     }
 
     /// The other half of the same report. When a service link arrives without its configuration,
@@ -186,8 +186,8 @@ struct D26CatalogStoreTests {
 
         // A link with nothing behind it: what another device's sync leaves when the configuration
         // has not arrived.
-        let adopted = try await manager.adoptedIdentity(hostName: "juliet",
-                                                        address: "192.0.2.12",
+        let adopted = try await manager.adoptedIdentity(hostName: "bravo",
+                                                        address: "192.0.2.20",
                                                         serviceName: "Terminal")
         await model.load()
         let endpoint = EndpointID(rawValue: adopted.id)
@@ -224,19 +224,19 @@ struct D26CatalogStoreTests {
         manager.reloadFromStore()
 
         // This device saves one server.
-        let mine = try await manager.adoptedIdentity(hostName: "oscar", address: "oscar.example",
+        let mine = try await manager.adoptedIdentity(hostName: "alpha", address: "alpha.example",
                                                      serviceName: "Terminal")
         try await manager.addServerOrThrow(
-            ServerConfiguration(id: mine.id, name: "oscar", host: "oscar.example", username: "michael"))
+            ServerConfiguration(id: mine.id, name: "alpha", host: "alpha.example", username: "michael"))
 
         // Another device adds its own terminal service and configuration; D19 delivers it into the
         // catalog. This device has not looked again.
-        let theirs = try await manager.adoptedIdentity(hostName: "juliet",
-                                                       address: "192.0.2.12",
+        let theirs = try await manager.adoptedIdentity(hostName: "bravo",
+                                                       address: "192.0.2.20",
                                                        serviceName: "Terminal")
         try await model.setConfiguration(
-            encoding: ServerConfiguration(id: theirs.id, name: "juliet",
-                                          host: "192.0.2.12", username: "michael"),
+            encoding: ServerConfiguration(id: theirs.id, name: "bravo",
+                                          host: "192.0.2.20", username: "michael"),
             for: EndpointID(rawValue: theirs.id))
         #expect(model.configuration(ServerConfiguration.self,
                                     for: EndpointID(rawValue: theirs.id)) != nil)
@@ -248,7 +248,7 @@ struct D26CatalogStoreTests {
         // Any save now reconciles the catalog to this device's list. With the list current, the
         // other device's record is in it and survives.
         try await manager.updateServerOrThrow(
-            ServerConfiguration(id: mine.id, name: "oscar renamed", host: "oscar.example",
+            ServerConfiguration(id: mine.id, name: "alpha renamed", host: "alpha.example",
                                 username: "michael"))
         #expect(model.configuration(ServerConfiguration.self,
                                     for: EndpointID(rawValue: theirs.id)) != nil,

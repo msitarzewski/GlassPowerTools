@@ -22,7 +22,7 @@ Swift Charts layout can be measured headless on this machine.
 and cannot drift from it; the y-axis is hidden and the chart is padded on the leading side by the
 label width so the card does not clip the names. One helper pair — `overviewBarName(_:)` and
 `overviewBarChartAxes()` — shared by all four charts (databases and tables, rows and bytes). Long
-names truncate in the middle at 150pt, so `cv_3263493d-…70f01223b2ec` no longer sets the axis
+names truncate in the middle at 150pt, so `tenant_7c1e2a90-…5d8e2f1b0a47` no longer sets the axis
 width for everyone.
 
 | Claim | Evidence |

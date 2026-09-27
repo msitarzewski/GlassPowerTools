@@ -147,8 +147,8 @@ Asked for from use, built in one pass:
   and open documents stay open, because a file in a tab is work and a folder is a view.
 - **Opening a file with no project collapses the tree**, because a project column with no project
   in it is a stripe of empty space beside the text.
-- **Title and subtitle, family-wide.** The terminal's shape — *"Terminal on oscar"* over
-  `michael@192.0.2.10:22` — now in the editor (file name over `project — ~/path`) **and the
+- **Title and subtitle, family-wide.** The terminal's shape — *"Terminal on the Linux server"* over
+  `user@192.0.2.10:22` — now in the editor (file name over `project — ~/path`) **and the
   database**, where a table was previously `database · table` glued onto one line, truncating the
   useful half first. It is the table's name over `connection · database` now.
 

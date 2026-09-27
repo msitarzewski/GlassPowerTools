@@ -6,8 +6,8 @@
 //  file — the arrangement the terminal has had since 2026-09-16 (`D26RelaunchTests`) and the
 //  desktop did not.
 //
-//  Reported 2026-09-17: *"I set the settings on oscar for Desktop, and on a close and reopen the
-//  configuration was lost."*
+//  Reported 2026-09-17: a desktop's settings, saved on a machine, were gone after the app was
+//  closed and reopened.
 //
 //  The desktop's own tests drive `DesktopAppModel` over `GlassInMemoryServiceStore`, which answers
 //  `isCatalogLoaded == true` from the moment it exists. That is precisely the condition the defect
@@ -53,9 +53,9 @@ struct D26DesktopRelaunchTests {
 
         let (model, desktop) = await launch(over: root)
         await model.load()
-        let endpoint = try await model.adoptService(kind: .rdp, hostName: "oscar",
-                                                    address: "192.0.2.10", serviceName: "Desktop on oscar")
-        try await desktop.app.save(DesktopConnection(id: endpoint, name: "Desktop on oscar",
+        let endpoint = try await model.adoptService(kind: .rdp, hostName: "alpha",
+                                                    address: "192.0.2.10", serviceName: "Desktop on alpha")
+        try await desktop.app.save(DesktopConnection(id: endpoint, name: "Desktop on alpha",
                                                      host: "192.0.2.10", username: "michael"),
                                    password: nil)
         #expect(desktop.app.connections.count == 1)
@@ -68,7 +68,7 @@ struct D26DesktopRelaunchTests {
         // tests the record's survival rather than the scheduler's timing.
         await secondDesktop.app.load()
 
-        #expect(secondDesktop.app.connections.map(\.name) == ["Desktop on oscar"],
+        #expect(secondDesktop.app.connections.map(\.name) == ["Desktop on alpha"],
                 "the saved desktop did not survive a relaunch")
         #expect(relaunched.configuration(for: endpoint) != nil,
                 "the catalog no longer holds the desktop's record")
@@ -87,9 +87,9 @@ struct D26DesktopRelaunchTests {
 
         let (model, desktop) = await launch(over: root)
         await model.load()
-        let endpoint = try await model.adoptService(kind: .rdp, hostName: "oscar",
-                                                    address: "192.0.2.10", serviceName: "Desktop on oscar")
-        try await desktop.app.save(DesktopConnection(id: endpoint, name: "Desktop on oscar",
+        let endpoint = try await model.adoptService(kind: .rdp, hostName: "alpha",
+                                                    address: "192.0.2.10", serviceName: "Desktop on alpha")
+        try await desktop.app.save(DesktopConnection(id: endpoint, name: "Desktop on alpha",
                                                      host: "192.0.2.10", username: "michael"),
                                    password: nil)
 
@@ -99,7 +99,7 @@ struct D26DesktopRelaunchTests {
         await relaunched.load()
         #expect(secondDesktop.app.connections.isEmpty, "the fixture no longer reproduces the window")
 
-        let host = try #require(relaunched.hosts.first { $0.displayName == "oscar" })
+        let host = try #require(relaunched.hosts.first { $0.displayName == "alpha" })
         let service = try #require(host.services.first { $0.endpointID == endpoint })
         let capability = try #require(relaunched.registry.capability(for: .rdp))
         let ownerRecord = try #require(host.member(owning: endpoint))
@@ -116,22 +116,22 @@ struct D26DesktopRelaunchTests {
 
         let (model, desktop) = await launch(over: root)
         await model.load()
-        let first = try await model.adoptService(kind: .rdp, hostName: "oscar",
-                                                 address: "192.0.2.10", serviceName: "Desktop on oscar")
-        try await desktop.app.save(DesktopConnection(id: first, name: "Desktop on oscar",
+        let first = try await model.adoptService(kind: .rdp, hostName: "alpha",
+                                                 address: "192.0.2.10", serviceName: "Desktop on alpha")
+        try await desktop.app.save(DesktopConnection(id: first, name: "Desktop on alpha",
                                                      host: "192.0.2.10", username: "michael"),
                                    password: nil)
 
         let (relaunched, secondDesktop) = await launch(over: root)
         await relaunched.load()
-        let second = try await relaunched.adoptService(kind: .rdp, hostName: "juliet",
-                                                       address: "10.0.0.9", serviceName: "Desktop on juliet")
-        try await secondDesktop.app.save(DesktopConnection(id: second, name: "Desktop on juliet",
+        let second = try await relaunched.adoptService(kind: .rdp, hostName: "bravo",
+                                                       address: "10.0.0.9", serviceName: "Desktop on bravo")
+        try await secondDesktop.app.save(DesktopConnection(id: second, name: "Desktop on bravo",
                                                           host: "10.0.0.9", username: "michael"),
                                          password: nil)
 
         #expect(secondDesktop.app.connections.map(\.name).sorted()
-                == ["Desktop on juliet", "Desktop on oscar"],
+                == ["Desktop on alpha", "Desktop on bravo"],
                 "saving a second desktop erased the first")
         #expect(relaunched.configuration(for: first) != nil,
                 "the first desktop's record was reconciled away by the second write")

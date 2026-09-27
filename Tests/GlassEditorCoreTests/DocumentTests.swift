@@ -411,7 +411,7 @@ struct DocumentLoaderTests {
     func remoteSnapshotCarriesIdentity() throws {
         let reference = RemoteDocumentRef(
             connectionID: UUID(),
-            host: "umbp.tail1234.ts.net",
+            host: "charlie.tail1234.ts.net",
             path: "/etc/nginx/nginx.conf"
         )
         let digest = ContentDigest(hexString: String(repeating: "ab", count: 32))

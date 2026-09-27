@@ -5,15 +5,15 @@
 //  Is this saved SSH connection actually *this* machine?
 //
 //  The question came from a real workflow: a project is open on the Mac at `~/Software/thing`; the
-//  same folder on the same machine is, from the Vision Pro, an SSH connection called juliet. For
+//  same folder on the same machine is, from the Vision Pro, an SSH connection called bravo. For
 //  the project to be one project, a device has to be able to look at a host record and say "that is
 //  me" — and then read the files directly instead of dialling itself over the network.
 //
 //  **The SSH host key is the answer, and nothing else is.**
 //
-//  - A *hostname* is not identity: two machines are called `juliet.local` on two networks, and
+//  - A *hostname* is not identity: two machines are called `bravo.local` on two networks, and
 //    the same machine answers to four names.
-//  - An *address* is not identity: `192.0.2.10` is a Tailscale address that moves, `127.0.0.1`
+//  - An *address* is not identity: a Tailscale address can move, `127.0.0.1`
 //    is every machine, and a LAN address is whatever DHCP said this morning.
 //  - A *hardware UUID* would be identity, but only this device's own — there is no way to ask the
 //    far end for one without already having a session, which is the thing we are trying to avoid.

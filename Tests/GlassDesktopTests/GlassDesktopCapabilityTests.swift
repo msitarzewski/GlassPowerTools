@@ -34,13 +34,13 @@ struct GlassDesktopCapabilityTests {
         let capability = GlassDesktopCapability(runtime: runtime)
         #expect(capability.openSessions().isEmpty)
 
-        let connection = DesktopConnection(name: "oscar", host: "oscar.local", username: "michael")
+        let connection = DesktopConnection(name: "alpha", host: "alpha.local", username: "michael")
         let session = DesktopSessionModel(connection: connection, app: runtime.app)
         // No host to reach: the attempt fails at once, and a failed desktop is still on screen.
         try? await session.connect(username: "michael", domain: nil, password: "x")
         let rows = capability.openSessions()
         #expect(rows.map(\.id) == [GlassDesktopCapability.sessionID(connectionID: connection.id)])
-        #expect(rows.first?.title == "oscar")
+        #expect(rows.first?.title == "alpha")
         #expect(rows.first?.endpointIDs == [connection.id], "on its machine")
         #expect(rows.first?.subtitle?.hasPrefix("RDP") == true)
 

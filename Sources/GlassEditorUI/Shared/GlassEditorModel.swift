@@ -330,7 +330,7 @@ public final class GlassEditorModel {
     /// **Long lines are left uncoloured** (2026-09-23). A logo exported from a design tool is
     /// often one line of megabytes — path data, an embedded base64 image — under the whole-document
     /// ceiling, so it was coloured in full, and TextKit walks a line's colour runs character by
-    /// character every time it draws it: opening such an SVG on oscar froze the Mac until the app
+    /// character every time it draws it: opening such an SVG on a remote server froze the Mac until the app
     /// was killed. VS Code's rule and its number: tokens stop past 20,000 characters on a line.
     public func setHighlights(_ runs: [HighlightRun]) {
         guard utf16Length > Self.longLineHighlightLimit else {

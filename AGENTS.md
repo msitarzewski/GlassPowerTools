@@ -34,9 +34,9 @@ three separately pinned copies of the shared packages.
 - Preserve the family library, favorites, groups, selection and detail-panel patterns. Users must not
   have to learn a new navigation model.
 - **GlassEditorKit was absorbed on 2026-09-14 too.** It was never a future capability: the
-  database's SQL and record editors and the terminal's SFTP remote editor already use it. Its seven
-  tree-sitter grammars are now pinned dependencies rather than 55 MB of vendored C — except YAML,
-  whose upstream manifest cannot be consumed as a dependency (see `THIRD-PARTY-NOTICES.md`).
+  database's SQL and record editors and the terminal's SFTP remote editor already use it. Its
+  tree-sitter grammars are each fixed to an exact upstream commit: six are dependencies, ten are
+  vendored in `Packages/` for a stated reason each (see `THIRD-PARTY-NOTICES.md`).
 - The shared connection kit was absorbed on 2026-09-14 for the same reason as the secret store:
   it existed so three separate applications could agree about one model, and there is one
   application now. `../GlassConnectionKit` is a historical record, not a dependency.
@@ -123,6 +123,10 @@ Read this guide and the required Memory Bank files before implementation. A shor
 - **Status honesty**: Never present a stub, simulated production result, compile-only check, renderer flag, or documentation claim as a working feature. Test fixtures and explicit previews are allowed outside production behavior.
 - **External input**: Validate untrusted protocol data, lengths, dimensions, allocations and state transitions. Fix defects without hiding them behind silent fallback or swallowed errors.
 - **Secrets**: No passwords, private keys, tokens or credential dumps in code, logs, research, Memory Bank or agent handoffs.
+- **Private infrastructure**: The repository is public. No real machine names, network addresses, device
+  identifiers, database or client names, home paths or hosting details anywhere in tracked files — and no
+  code names that stand in for them. Examples use neutral values (`alpha`, `example.com`, `192.0.2.x`).
+  See `memory-bank/projectRules.md`, rule 61.
 
 ---
 

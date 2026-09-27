@@ -56,6 +56,6 @@ prove every key part invalidates); the scroll-driven offset only on frozen cells
 tap gesture per cell on the Mac, the click count choosing select or open (`gridTap`; touch keeps two).
 Not done: one material behind the row-number column.
 
-**Observed by the user** on 0.4.223, the real `common_vision` database on oscar: *"rendered 10000 rows
+**Observed by the user** on 0.4.223, the real `shop` database on the Linux server: *"rendered 10000 rows
 like nothing. Great job."* Not yet re-measured with `GridScrollTimingTests` (needs the Mac to itself);
 the 8.3 ms-per-frame target is unverified by numbers.

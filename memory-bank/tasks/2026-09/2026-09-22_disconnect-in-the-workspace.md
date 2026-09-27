@@ -50,9 +50,9 @@ to them as a fault.
 
 ## Also closed today
 
-**oscar is back on the Mac** (user, 2026-09-22 00:0x) after the phone published its merged
+**The Linux server is back on the Mac** (user, 2026-09-22 00:0x) after the phone published its merged
 record on 0.4.199 and the Mac fetched it under D34. No rebuild from the backup was needed; the
-backup at `~/Desktop/phone-hosts-backup.json` can go whenever the user likes.
+local backup of the phone's records is no longer needed.
 
 ## Reversed, 06:40 — the window is the close button
 
@@ -82,7 +82,7 @@ second does; an unregistered window is inert). The Mac UI test is now
 Active listed workgroups (`openSessions()` walked `manager.workgroups`), and every terminal on
 iOS and visionOS is in one (`presentTerminalWindow`). The Mac opens a workspace window with a
 live-session ticket and the session belongs to nothing but its window — so the MySQL session on
-oscar was listed and the terminal beside it was not (screenshot 06:32). Now
+The Linux server was listed and the terminal beside it was not (screenshot 06:32). Now
 `GlassTerminalCapability.loneSessions` lists every live session in no workgroup as its own row
 on its server's endpoint (`terminal-session:` ids), and on the Mac
 `MacWorkspacePreviewRegistry` — the overview's registry of window controllers and their
@@ -94,10 +94,10 @@ its endpoint; grouped, it is the workgroup's row once; closing the row ends the 
 ## And the row says where you are (06:45)
 
 *"Let's update the Active list with a reflection of what's open. I have the DB open, but I'm in
-common-vision.articles."* `DatabaseSession.workspaceFocus` — set by the workspace on every
+shop.articles."* `DatabaseSession.workspaceFocus` — set by the workspace on every
 change of its displayed tab (`DatabaseWorkspaceView.focus(for:queryTitle:)`: the database, the
 table as "database › table", the SQL document's title, nil on the overview) — and
-`GlassDatabaseCapability.subtitle(engine:state:focus:)` renders "MySQL · common_vision ›
+`GlassDatabaseCapability.subtitle(engine:state:focus:)` renders "MySQL · shop ›
 articles" while connected. `DatabaseSession` is `@Observable` and Active computes its rows in
 its body, so the panel redraws when the focus changes. With two windows on one session the
 later change wins. `ActiveRowFocusTests`.
@@ -132,18 +132,18 @@ premise — Favorites and Workgroups say 0 — and is reversed: the count is an 
 `DesktopSessionModel`. Now `DesktopAppModel.liveSessions` holds them — a model joins in
 `beginAttempt` and leaves in `close()`, so a dropped desktop stays listed with its state until
 its window goes — and `GlassDesktopCapability.openSessions()` lists one row per desktop on its
-service's endpoint ("oscar", "RDP" or "RDP · Disconnected"), `desktop:` ids. Activate is a new
+service's endpoint ("the Linux server", "RDP" or "RDP · Disconnected"), `desktop:` ids. Activate is a new
 `Request.show(connectionID:)`: the bootstrap opens the `desktop-session` window with the same
 value the connect used, which on a Mac brings the existing window forward; on a phone it shows
 the cover again. Close is `session.close()`, which the window follows. No snapshot yet.
 `openSessionsListsLiveDesktops` in `GlassDesktopCapabilityTests`.
 
-Also seen in the user's 08:06 screenshot: the oscar login screen laid out at proper scale on
+Also seen in the user's 08:06 screenshot: the Linux server login screen laid out at proper scale on
 0.4.206 — gnome-remote-desktop honours the core-data desktopScaleFactor.
 
 ## Passwordless root through the tunnel (08:25)
 
-*"Requested secure item was not found in Keychain."* — MySQL on juliet, root with no
+*"Requested secure item was not found in Keychain."* — MySQL on the Mac, root with no
 password, through the host's tunnel. Two paths, two rules: `DatabaseSessionManager.
 storedCredentials` (reconnect) had taken the 2026-09-20 decision — nothing stored means no
 password, a real configuration, because the secret store refuses to write an empty value
@@ -156,9 +156,8 @@ Keychain.
 
 ## A new machine's first connect always failed (14:20)
 
-*"How does this happen? It's the first Tandem server I've tried to add."* — "Connection Failed:
-This terminal session is no longer active" on connecting "Public" (203.0.113.10), Last
-Connected: Never. Only a machine whose host key is not yet trusted takes this path. The trust
+Adding a new server and connecting for the first time failed with "Connection Failed:
+This terminal session is no longer active", Last Connected: Never. Only a machine whose host key is not yet trusted takes this path. The trust
 alert's Confirm spawned a task that called `trustHostKey`, then `retryPendingConnection`, which
 took the session out of the prompt state. But SwiftUI sets the alert's `isPresented` to false
 right after the action returns, and that setter closes and unregisters any session still

@@ -429,7 +429,7 @@ are now annotations on the marks, which cannot drift. Found and fixed against a 
 
 ## 2026-09-21 — [duplicated services](2026-09-21_duplicate-services.md)
 
-Two Terminals and two Desktops on oscar, on the phone. Read out of the phone's own catalog over
+Two Terminals and two Desktops on the Linux server, on the phone. Read out of the phone's own catalog over
 the cable: eleven records for one machine, from three devices, grouped into one row that shows the
 union. Diagnosed; the consolidation is the D26 two-device run, to be started deliberately.
 Same evening: fixed. Stage 6's consolidation runs itself after every sync, merges only groups
@@ -441,16 +441,16 @@ The user simplified the day's own work: **Active** joins All, Favorites and Rece
 machine with a disclosure, and every top toolbar gets the ⚡ that goes there. Choosing a row
 switches to the live session. The morning's Sessions control, switcher sheet and gallery are gone;
 the seam under them and the Mac overview's cards stay. Workgroups untouched (D33).
-Then oscar vanished from the Mac: the store made tombstones immortal while the sync was
+Then the Linux server vanished from the Mac: the store made tombstones immortal while the sync was
 last-write-wins, and the phone's fold had tombstoned the record the Mac's copy was keyed on.
 D34 — a deletion is dated — and the fold now keeps the most recently updated member with services.
 
 ## 2026-09-22 — [Disconnect in the workspace](2026-09-22_disconnect-in-the-workspace.md)
 
-oscar returned to the Mac by itself under D34. Then the database learned the desktop's rule: closing
+The Linux server returned to the Mac by itself under D34. Then the database learned the desktop's rule: closing
 the last workspace window ends the session, and the phone's ⋯ menu keeps the one deliberate
 Disconnect. And a terminal opened by Connect on a Mac — in no workgroup — is now a row in Active,
-and a database row says where its workspace is ("MySQL · common_vision › articles").
+and a database row says where its workspace is ("MySQL · shop › articles").
 
 ## 2026-09-22 — [The desktop window's size, and the size after login](2026-09-22_desktop-window-and-login-size.md)
 
@@ -484,5 +484,20 @@ From the user making a `.env`: ⌘S belonged to the database and beeped in an ed
 owns File ▸ Save as it owns New (D37), beside New because `.saveItem` drew nothing from the shell's
 scene (rule 60). The first save is the Mac Save panel, not SwiftUI's Export panel that added `.txt`.
 ⇧⌘E opens on a blank document; ⌘W on the last document closes the window; Explain Plan moved to ⌥⌘E.
-The grid's option-1 changes shipped alongside; the user on oscar: *"rendered 10000 rows like nothing."*
+The grid's option-1 changes shipped alongside; the user on the Linux server: *"rendered 10000 rows like nothing."*
 0.4.223 on the Mac; 1,761 tests pass. Committed locally, not pushed.
+
+## 2026-09-25 — [Documentation and glasspowertools.com — plan](2026-09-25_documentation-and-site-plan.md)
+
+PLAN only. The vision, then every surface audited against the code (which becomes the help), then a
+landing page, product pages and an Anomalous-style help centre as static files, Bedrock copy.
+At glasspowertools.com, self-hosted; hosting details are kept out of the repository.
+
+## 2026-09-26 — [Licensing and acknowledgements](2026-09-26_licensing-and-acknowledgements.md)
+
+Release-prep item 1. Three licences were wrong in the notices and several components missing,
+including a second BoringSSL under a different licence and the ~115 packages inside Mermaid. One
+manifest now generates the licence folder and the app's Settings ▸ About ▸ Acknowledgements; Mermaid
+updates refuse an unreviewed licence kind; tests fail on an uncovered pin, vendored package or Mermaid
+version, and on Xcode's pins drifting from the package's (they had: swift-crypto 3 in the app). Go and
+C pinned to commits; every vendored grammar verified against upstream. 1,771 tests pass. Not committed.

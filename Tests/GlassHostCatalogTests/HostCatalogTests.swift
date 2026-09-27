@@ -307,8 +307,8 @@ struct HostCatalogTombstoneMergeTests {
         return HostCatalogStore(fileURL: root.appendingPathComponent("hosts.json"))
     }
 
-    private func oscar(deletedAt: Date?, updatedAt: Date, id: HostID = HostID()) throws -> HostProfile {
-        try HostProfile(id: id, displayName: "oscar", address: "10.0.0.1",
+    private func alpha(deletedAt: Date?, updatedAt: Date, id: HostID = HostID()) throws -> HostProfile {
+        try HostProfile(id: id, displayName: "alpha", address: "10.0.0.1",
                         services: deletedAt == nil ? [HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "t")] : [],
                         createdAt: Date(timeIntervalSince1970: 1), updatedAt: updatedAt, deletedAt: deletedAt)
     }
@@ -317,9 +317,9 @@ struct HostCatalogTombstoneMergeTests {
     func newerLiveRecordRevives() async throws {
         let store = try store()
         let id = HostID()
-        let dead = try oscar(deletedAt: Date(timeIntervalSince1970: 100), updatedAt: Date(timeIntervalSince1970: 100), id: id)
+        let dead = try alpha(deletedAt: Date(timeIntervalSince1970: 100), updatedAt: Date(timeIntervalSince1970: 100), id: id)
         try await store.merge([dead])
-        let alive = try oscar(deletedAt: nil, updatedAt: Date(timeIntervalSince1970: 500), id: id)
+        let alive = try alpha(deletedAt: nil, updatedAt: Date(timeIntervalSince1970: 500), id: id)
         try await store.merge([alive])
         let stored = try await store.snapshot(includeDeleted: true).first { $0.id == id }
         #expect(stored?.deletedAt == nil)
@@ -330,8 +330,8 @@ struct HostCatalogTombstoneMergeTests {
     func newerTombstoneStillDeletes() async throws {
         let store = try store()
         let id = HostID()
-        try await store.merge([try oscar(deletedAt: nil, updatedAt: Date(timeIntervalSince1970: 100), id: id)])
-        try await store.merge([try oscar(deletedAt: Date(timeIntervalSince1970: 500), updatedAt: Date(timeIntervalSince1970: 500), id: id)])
+        try await store.merge([try alpha(deletedAt: nil, updatedAt: Date(timeIntervalSince1970: 100), id: id)])
+        try await store.merge([try alpha(deletedAt: Date(timeIntervalSince1970: 500), updatedAt: Date(timeIntervalSince1970: 500), id: id)])
         #expect(try await store.snapshot().contains { $0.id == id } == false)
     }
 
@@ -340,8 +340,8 @@ struct HostCatalogTombstoneMergeTests {
         let store = try store()
         let id = HostID()
         let t = Date(timeIntervalSince1970: 300)
-        try await store.merge([try oscar(deletedAt: t, updatedAt: t, id: id)])
-        try await store.merge([try oscar(deletedAt: nil, updatedAt: t, id: id)])
+        try await store.merge([try alpha(deletedAt: t, updatedAt: t, id: id)])
+        try await store.merge([try alpha(deletedAt: nil, updatedAt: t, id: id)])
         #expect(try await store.snapshot().contains { $0.id == id } == false)
     }
 
@@ -349,8 +349,8 @@ struct HostCatalogTombstoneMergeTests {
     func staleEditDoesNotResurrect() async throws {
         let store = try store()
         let id = HostID()
-        try await store.merge([try oscar(deletedAt: Date(timeIntervalSince1970: 500), updatedAt: Date(timeIntervalSince1970: 500), id: id)])
-        try await store.merge([try oscar(deletedAt: nil, updatedAt: Date(timeIntervalSince1970: 100), id: id)])
+        try await store.merge([try alpha(deletedAt: Date(timeIntervalSince1970: 500), updatedAt: Date(timeIntervalSince1970: 500), id: id)])
+        try await store.merge([try alpha(deletedAt: nil, updatedAt: Date(timeIntervalSince1970: 100), id: id)])
         #expect(try await store.snapshot().contains { $0.id == id } == false)
     }
 }

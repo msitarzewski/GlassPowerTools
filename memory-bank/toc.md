@@ -58,7 +58,7 @@ three source applications are obsolete and no longer compile.
 | [The iOS round, day two](tasks/2026-09/2026-09-19_ios-round-two.md) | 0.4.177–0.4.184: the provisional tab, HTML, the keyboard, and the database's collapse to its sidebar — plus the typed-path regression and what Xcode 27.2 broke |
 | [iPhone Duo](tasks/2026-09/2026-09-20_iphone-duo.md) | Ships 23 October: two sessions on one phone at last, a size class that changes on a hinge, and the window gate that may refuse the one iPhone where a second window works |
 | [Charts on macOS 27.2](tasks/2026-09/2026-09-21_charts-on-macos-27-2.md) | The overview's names overlapped their bars after the OS beta moved a categorical axis label to the band's top edge; names are annotations now, found with a headless `ImageRenderer` probe (`Tools/ChartProbe`) |
-| [Duplicated services](tasks/2026-09/2026-09-21_duplicate-services.md) | Eleven oscar records on the phone, two fully configured, grouped into one row showing the union; the two-part fix, the second being the D26 migration |
+| [Duplicated services](tasks/2026-09/2026-09-21_duplicate-services.md) | Eleven Linux server records on the phone, two fully configured, grouped into one row showing the union; the two-part fix, the second being the D26 migration |
 | [Active and the ⚡](tasks/2026-09/2026-09-21_active-and-the-bolt.md) | The library's fourth category and the one control in every toolbar that reaches it; the morning's switcher replaced (D33) |
 | [Disconnect in the workspace](tasks/2026-09/2026-09-22_disconnect-in-the-workspace.md) | Closing the last database workspace window ends the session; the phone keeps ⋯ Disconnect |
 | [Desktop window and login size](tasks/2026-09/2026-09-22_desktop-window-and-login-size.md) | The thumbnail window, and following a server that resizes itself after login |
@@ -66,6 +66,7 @@ three source applications are obsolete and no longer compile.
 | [Text engine research](tasks/2026-09/2026-09-23_text-engine-research.md) | The state of the art in Mac editors, measured; D36's TextKit 1 backend |
 | [The grid's scroll cost](tasks/2026-09/2026-09-23_grid-scroll-cost.md) | The database grid measured at 120 Hz; option 1 partly built |
 | [Editor: Save, ⇧⌘E, ⌘W](tasks/2026-09/2026-09-25_editor-save-and-new-window.md) | D37's shell-owned ⌘S, the Mac Save panel, a blank document on ⇧⌘E, ⌘W closing the window |
+| [Documentation and site plan](tasks/2026-09/2026-09-25_documentation-and-site-plan.md) | The vision → audit → help → sites plan; Anomalous's help and AudioPaper's site as models; glasspowertools.com |
 | [September tasks](tasks/2026-09/README.md) | Monthly index |
 
 This project is `~/Software/glass/GlassPowerTools`. `../GlassEditorKit` was **absorbed on 2026-09-14**
@@ -77,5 +78,10 @@ GlasSecretStore was absorbed into `Sources/GlasSecretStore` on 2026-09-13. Two f
 `../docs` holds two July 2026 security audit reports whose still-open findings are tracked in
 [technical context](techContext.md). A stale copy of glassdb was archived to
 `../glassdb-connection-library.zip` and removed on 2026-09-10. The full layout is in [technical context](techContext.md).
+
+**Examples, not machines.** Examples and test fixtures use neutral values — `alpha`, `bravo`,
+`shop`, `example.com` names and addresses reserved for documentation (`192.0.2.x`, `203.0.113.x`) —
+that stand for nothing real. No real machine names, addresses, device identifiers, database names
+or hosting details are written into this repository (`projectRules.md`, rule 61).
 
 Operational transitions are recorded in `.brain/sessions.jsonl` at the project root.

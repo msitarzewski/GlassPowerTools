@@ -1138,7 +1138,7 @@ struct DatabaseWorkspaceView: View {
     }
 
     /// **The thing you are looking at**, with where it lives underneath — the shape the terminal
-    /// established (*"Terminal on oscar"* over `michael@192.0.2.10:22`) and the editor now
+    /// established (*"Terminal on alpha"* over `user@192.0.2.10:22`) and the editor now
     /// follows too. A table's name was previously glued to its database with a middle dot, which
     /// put two different facts on one line and truncated the useful one first.
     private var detailTitle: String {

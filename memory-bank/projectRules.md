@@ -473,3 +473,12 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     `fileExporter` on a Mac is an **export**: "Export As:", an Export button, and an extension added
     from the content type — a new `.env` becomes `.env.txt`. A document's first save on a Mac is
     `NSSavePanel` (`GlassEditorSavePanel`), which says Save and writes the name typed.
+61. **Nothing about real machines goes into the repository — not even in disguise.** No real machine
+    names, network addresses, device identifiers, database names, client names, home-directory paths,
+    hosting layout, tokens or keys: in code, comments, tests, fixtures, notes, logs or commit messages.
+    Examples use neutral values that stand for nothing — `alpha`, `bravo`, `shop`, `example.com`
+    names, addresses reserved for documentation (`192.0.2.x`, `203.0.113.x`). **Never a stand-in that
+    mirrors something real** (a look-alike address in the same range, a code name for a real host):
+    a code name needs a decoder, and a decoder is the same leak kept somewhere else. Describe events
+    in plain words — "the Linux server", "the Mac" — and keep genuinely private working details in
+    a git-ignored location, never in tracked files. The repository is public (2026-09-26).

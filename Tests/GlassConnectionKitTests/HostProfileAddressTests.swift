@@ -20,14 +20,14 @@ struct HostProfileAddressTests {
         let encoder = JSONEncoder(), decoder = JSONDecoder()
         encoder.dateEncodingStrategy = .millisecondsSince1970
         decoder.dateDecodingStrategy = .millisecondsSince1970
-        let legacy = try HostProfile(displayName: "oscar", aliases: ["oscar.local"])
+        let legacy = try HostProfile(displayName: "alpha", aliases: ["alpha.local"])
         var json = try #require(JSONSerialization.jsonObject(with: encoder.encode(legacy)) as? [String: Any])
         #expect(json["address"] == nil, "absent, not null, when unset")
         json.removeValue(forKey: "address")
         let decodedLegacy = try decoder.decode(HostProfile.self, from: JSONSerialization.data(withJSONObject: json))
         #expect(decodedLegacy.address == nil && decodedLegacy == legacy)
 
-        let addressed = try HostProfile(id: legacy.id, displayName: "oscar", address: "192.0.2.6", aliases: ["oscar.local"],
+        let addressed = try HostProfile(id: legacy.id, displayName: "alpha", address: "192.0.2.6", aliases: ["alpha.local"],
                                         createdAt: legacy.createdAt, updatedAt: legacy.updatedAt, lastWriterID: legacy.lastWriterID)
         let data = try encoder.encode(addressed)
         #expect(try decoder.decode(HostProfile.self, from: data) == addressed)

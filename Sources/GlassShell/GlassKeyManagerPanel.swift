@@ -388,7 +388,7 @@ public struct GlassKeyManagerPanel: View {
         }
     }
 
-    /// `id_oscar_key.pub` — the name is the user's, reduced to what a file system will take.
+    /// `id_alpha_key.pub` — the name is the user's, reduced to what a file system will take.
     static func exportFilename(for key: StoredSSHKey) -> String {
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_"))
         let stem = key.name.unicodeScalars

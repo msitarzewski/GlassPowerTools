@@ -69,3 +69,29 @@ question's Save uses it too, then closes the document (and the window, when ⌘W
 either place calls the close off (`closeCancellations`). iPhone, iPad and headset keep
 `fileExporter`. 1,761 tests pass; 0.4.223 installed and relaunched, version read back. Click-through
 is the user's.
+
+## Settings on the Mac, AudioPaper's shape — 0.4.225
+
+The user, pointing at AudioPaper (its `App/Views/SettingsView.swift`): too much
+padding, icon tabs, and an About like its. On macOS `GlassShellSettingsView` is now a `TabView` of
+`Tab(title, systemImage:)` — the toolbar icon row — 640 pt wide, the last pane remembered
+(`com.glasspowertools.settings.pane`). The shell's panes fit their content (`scrollDisabled`,
+`fixedSize` vertical, as AudioPaper does); a capability's pane is 540 pt tall and scrolls. Shell page
+icons: gearshape, paintpalette, hand.raised, info.circle; Connections moved from `gear` to `network`
+so it is not a second General. `GlassShellAboutView`: app icon, name, version, one-line description,
+Sponsor, "MIT · © 2026 Michael Sitarzewski" — no GitHub, Help or Privacy links until those pages
+exist. Library file and appearance-migration diagnostics moved to General. The terminal's Connections
+and Terminal forms lost a second `.padding()` around a grouped form. iPhone, iPad and headset keep
+`GlassSettingsSections`. Mac UI tests find the toolbar tabs (built, not run). Screenshots taken of
+General, About, Terminal and Connections in 0.4.225 and checked.
+
+## visionOS Settings: the same TabView, as the leading ornament — 0.4.226 built
+
+The user: *"These become ornaments in visionOS naturally right?"* — then *"Ok proceed."* The icon
+`TabView` is now used on visionOS too (each pane in its own `NavigationStack`, the `TabView` the
+window's root; the App's visionOS `Window("Settings")` lost its outer stack). The library's gear on
+visionOS opens that window instead of a sheet, as the database workspace already did — the
+2026-09-11 finding (ornament missing from the accessibility tree) was made in a sheet. Built for
+visionOS, macOS and iOS; not yet installed on the headset (the user will say when it is on). To check
+on device: the ornament shows, every tab is reachable, pushes inside a pane work, UI tests find
+`app.tabBars.buttons[title]`.

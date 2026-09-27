@@ -7,3 +7,6 @@ xcuserdata/
 # Local Xcode/SwiftPM state. This repository builds from GlassPowerTools.xcodeproj,
 # so the generated package workspace is never the project of record.
 .swiftpm/
+
+# Private working notes: readable by any local tool, never committed (projectRules rule 61).
+.private/

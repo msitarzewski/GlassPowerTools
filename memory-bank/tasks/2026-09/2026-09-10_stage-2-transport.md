@@ -74,7 +74,7 @@ off-loop.
 | `xcodebuild -scheme GlassSSHTransport`, iOS Simulator (iPhone 17 Pro Max, iOS 27.0) | **BUILD SUCCEEDED**, 0 warnings in the target |
 | `xcodebuild -scheme GlassSSHTransport`, visionOS Simulator (Apple Vision Pro, OS 27.0) | **BUILD SUCCEEDED**, 0 warnings in the target |
 | Unit tests, macOS host: SOCKS5 protocol 7, ownership/identity 6, host trust 7, credentials 5, tunnels 6, first-class consumers 4, gated suite 5 (not-run paths) | **40 tests in 7 suites passed**, three consecutive runs |
-| Real-host suite (`GPT_SSH_TEST_HOST=192.0.2.6`, user `michael`, key `~/.ssh/scratch_vm`) | **Not run — blocked by macOS Local Network privacy in this session.** All five tests fail at TCP connect with `errno 65 No route to host`. Evidence: `nc -z 192.0.2.6 22` succeeds and `ssh … 'echo ok; uname -sr'` returns `ok` / `Linux 7.0.0-29-generic` from the same shell (Apple-signed tools are exempt), while an ad-hoc-signed Swift binary doing a plain BSD `connect()` to `192.0.2.6:22` gets `errno 65` and the same binary reaches `127.0.0.1:22` and reads `SSH-2.0-OpenSSH_`. The VM is on `bridge100` (a local network); no TCC prompt can be answered from this session. |
+| Real-host suite (`GPT_SSH_TEST_HOST=192.0.2.6`, user `michael`, key `~/.ssh/<test VM key>`) | **Not run — blocked by macOS Local Network privacy in this session.** All five tests fail at TCP connect with `errno 65 No route to host`. Evidence: `nc -z 192.0.2.6 22` succeeds and `ssh … 'echo ok; uname -sr'` returns `ok` / `Linux 7.0.0-29-generic` from the same shell (Apple-signed tools are exempt), while an ad-hoc-signed Swift binary doing a plain BSD `connect()` to `192.0.2.6:22` gets `errno 65` and the same binary reaches `127.0.0.1:22` and reads `SSH-2.0-OpenSSH_`. The VM is on `bridge100` (a local network); no TCC prompt can be answered from this session. |
 
 **How the package tests were run.** `swift test` at the repository root cannot run yet: SwiftPM
 links every test target into one bundle and W2's `GlassTerminal` is mid-move (its own
@@ -87,7 +87,7 @@ by path with `Tests` symlinked to `Tests/GlassSSHTransportTests`). Once `GlassTe
 
 **To run the real-host suite** (from a terminal whose app has the Local Network grant, e.g. after
 System Settings → Privacy & Security → Local Network for the terminal, or Terminal.app):
-`GPT_SSH_TEST_HOST=192.0.2.6 GPT_SSH_TEST_USER=michael GPT_SSH_TEST_KEY_PATH=$HOME/.ssh/scratch_vm swift test --build-system native --filter SSHTransportIntegrationTests`.
+`GPT_SSH_TEST_HOST=192.0.2.6 GPT_SSH_TEST_USER=michael GPT_SSH_TEST_KEY_PATH=$HOME/.ssh/<test VM key> swift test --build-system native --filter SSHTransportIntegrationTests`.
 The suite is read-only apart from a `/tmp/glasspowertools-transport-<uuid>` directory it creates
 and removes; it trusts the host key for the run only and records nothing.
 

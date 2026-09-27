@@ -66,14 +66,14 @@ struct ServerPersistenceTests {
     }
 
     @Test @MainActor func aFailedWriteRollsBackAndRethrowsTheOriginalFailure() async throws {
-        let existing = server(named: "oscar")
+        let existing = server(named: "alpha")
         let (manager, defaults, suite, writes) = try await fixture(existing: [existing]) { attempt, data in
             attempt == 1 ? nil : data
         }
         defer { defaults.removePersistentDomain(forName: suite) }
 
         await #expect(throws: ServerManagerError.persistenceReadbackMismatch) {
-            try await manager.addServerOrThrow(server(named: "juliet"))
+            try await manager.addServerOrThrow(server(named: "bravo"))
         }
 
         // Two writes: the candidate catalog, then the rollback to the original.
@@ -84,7 +84,7 @@ struct ServerPersistenceTests {
     }
 
     @Test @MainActor func aFailedRollbackIsReportedAsSuchRatherThanAsTheOriginalFailure() async throws {
-        let existing = server(named: "oscar")
+        let existing = server(named: "alpha")
         let empty = try JSONEncoder().encode([ServerConfiguration]())
         // The candidate write lands nowhere; the rollback lands an empty catalog instead of the
         // original, so its readback disagrees and the rollback is the failure that gets reported.
@@ -94,7 +94,7 @@ struct ServerPersistenceTests {
         defer { defaults.removePersistentDomain(forName: suite) }
 
         await #expect(throws: ServerManagerError.rollbackFailed) {
-            try await manager.addServerOrThrow(server(named: "juliet"))
+            try await manager.addServerOrThrow(server(named: "bravo"))
         }
         #expect(writes.count == 2)
         // The in-memory list is still the truth the user last saw, even though the store is not.
@@ -102,8 +102,8 @@ struct ServerPersistenceTests {
     }
 
     @Test @MainActor func aSuccessfulWriteCommitsBothTheCatalogAndTheInMemoryList() async throws {
-        let existing = server(named: "oscar")
-        let added = server(named: "juliet")
+        let existing = server(named: "alpha")
+        let added = server(named: "bravo")
         let (manager, defaults, suite, writes) = try await fixture(existing: [existing]) { _, data in data }
         defer { defaults.removePersistentDomain(forName: suite) }
 

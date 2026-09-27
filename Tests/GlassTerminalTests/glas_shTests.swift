@@ -7392,7 +7392,7 @@ struct glas_shTests {
 
     @Test @MainActor func connectionManagerIdentifiesLocalNetworkSSHHosts() {
         #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("localhost"))
-        #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("pip.local"))
+        #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("nas.local"))
         #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("10.20.30.40"))
         #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("172.16.0.1"))
         #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("172.31.255.255"))
@@ -7410,9 +7410,9 @@ struct glas_shTests {
 
     @Test @MainActor func localConnectionFailureAddsActionablePermissionGuidance() {
         let localMessage = TerminalConnectFlow.connectionFailureMessage(
-            base: "Could not reach pip.local:22.",
+            base: "Could not reach nas.local:22.",
             diagnostics: "Connection timed out.",
-            host: "pip.local"
+            host: "nas.local"
         )
         #expect(localMessage.contains("Connection timed out."))
         #expect(localMessage.contains("Privacy & Security > Local Network"))

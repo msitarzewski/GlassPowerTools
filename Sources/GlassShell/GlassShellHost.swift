@@ -4,8 +4,8 @@ import GlassConnectionKit
 /// One machine as the library shows it: every catalog record that describes the same host,
 /// consolidated for presentation. The shared catalog was written by three separate apps, each of
 /// which created its own `HostProfile` per endpoint (`HostCatalogStore.applyPublication` keys new
-/// records by the endpoint's id and matches only by endpoint id), so "juliet" from glas.sh and
-/// "juliet" from glassDT are two records. Until Stage 6 those apps still read the file by their
+/// records by the endpoint's id and matches only by endpoint id), so "bravo" from glas.sh and
+/// "bravo" from glassDT are two records. Until Stage 6 those apps still read the file by their
 /// own ids, so the records are grouped here and never merged on disk.
 public struct GlassShellHost: Identifiable, Hashable, Sendable {
     /// The canonical member's id: the oldest record, ties broken by id. Favorites, last-used and

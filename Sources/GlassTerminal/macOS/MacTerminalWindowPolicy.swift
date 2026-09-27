@@ -257,7 +257,7 @@ enum MacTerminalWindowPolicy {
         //
         // It used to swap the title band to `.underWindowBackground` while the overview was up.
         // That material is *designed* to show what is behind the window, blurred — so with the
-        // database window behind this one, its "MySQL on oscar" header floated through the
+        // database window behind this one, the database's own header floated through the
         // terminal's own title (reported 2026-09-21, "we lost the title settings again"). glas.sh
         // did the same swap, which is why it is "again". Rule 50: chrome that says where you are
         // does not become see-through because a mode changed.

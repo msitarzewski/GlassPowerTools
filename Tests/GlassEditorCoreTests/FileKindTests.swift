@@ -31,7 +31,7 @@ struct FileKindTests {
 
     @Test("Text stays text, even named like media; SVG, HTML, Markdown and CSV are text")
     func textIsText() {
-        let text = Data("# Title\n\nHello, oscar.\n".utf8)
+        let text = Data("# Title\n\nHello, alpha.\n".utf8)
         #expect(GlassEditorFileKind.classify(name: "README.md", prefix: text) == .text)
         #expect(GlassEditorFileKind.classify(name: "fake.png", prefix: text) == .text, "text bytes behind a media name")
         #expect(GlassEditorFileKind.classify(name: "icon.svg", prefix: Data("<svg xmlns=\"http://www.w3.org/2000/svg\"/>".utf8)) == .text)

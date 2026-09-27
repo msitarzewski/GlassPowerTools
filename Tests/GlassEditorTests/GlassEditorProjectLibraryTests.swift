@@ -256,7 +256,7 @@ struct GlassEditorRemoteDirectoryReaderTests {
     }
 
     private struct Unreachable: LocalizedError {
-        var errorDescription: String? { "juliet is not answering." }
+        var errorDescription: String? { "bravo is not answering." }
     }
 
     @Test("a remote listing becomes the same tree a local one does")
@@ -328,7 +328,7 @@ struct GlassEditorRemoteDirectoryReaderTests {
 
         await root.loadChildrenIfNeeded(using: reader)
         #expect(root.children?.isEmpty == true)
-        #expect(root.loadError == "juliet is not answering.")
+        #expect(root.loadError == "bravo is not answering.")
         #expect(!root.isLoading)
     }
 }
@@ -360,10 +360,10 @@ struct GlassEditorRemoteProjectTests {
         let project = GlassEditorProject(hostID: HostID(), path: "/srv/app")
         let opened = workspace.openProject(project, access: access([
             "/srv/app": [.init(name: "main.swift", isDirectory: false)]
-        ]), reach: .overSSH(host: "juliet"))
+        ]), reach: .overSSH(host: "bravo"))
 
         #expect(workspace.projects.map(\.path) == ["/srv/app"])
-        #expect(workspace.projectReach[opened.id] == .overSSH(host: "juliet"))
+        #expect(workspace.projectReach[opened.id] == .overSSH(host: "bravo"))
         let root = try #require(workspace.projectRoots[opened.id])
         for _ in 0..<200 where root.children == nil { await Task.yield() }
         #expect((root.children ?? []).map(\.name) == ["main.swift"])
@@ -375,12 +375,12 @@ struct GlassEditorRemoteProjectTests {
         let project = GlassEditorProject(hostID: HostID(), path: "/srv/app")
         let opened = workspace.openProject(project, access: access([
             "/srv/app": [.init(name: "main.swift", isDirectory: false)]
-        ]), reach: .overSSH(host: "juliet"))
+        ]), reach: .overSSH(host: "bravo"))
         let root = try #require(workspace.projectRoots[opened.id])
         for _ in 0..<200 where root.children == nil { await Task.yield() }
         let file = try #require((root.children ?? []).first)
 
-        #expect(workspace.machineOf(file) == "juliet")
+        #expect(workspace.machineOf(file) == "bravo")
         // And a local project's file has no machine to name.
         #expect(workspace.machineOf(
             GlassEditorProjectNode(name: "x", path: "/tmp/x", isDirectory: false)
@@ -395,7 +395,7 @@ struct GlassEditorRemoteProjectTests {
         let project = GlassEditorProject(hostID: HostID(), path: "/srv/app")
         let opened = workspace.openProject(project,
                                            access: access(onClose: { flag.closed = true }),
-                                           reach: .overSSH(host: "juliet"))
+                                           reach: .overSSH(host: "bravo"))
 
         workspace.closeProject(opened.id)
         for _ in 0..<200 where !flag.closed { await Task.yield() }
@@ -530,14 +530,14 @@ struct GlassEditorFileAccessTests {
 
         let workspace = workspace()
         workspace.openProject(GlassEditorProject(hostID: HostID(), path: "/srv/app"),
-                              access: machine.access(), reach: .overSSH(host: "juliet"))
+                              access: machine.access(), reach: .overSSH(host: "bravo"))
 
         let opened = await workspace.open(path: "/srv/app/main.swift")
         let document = try #require(opened, "a file on another machine did not open")
         #expect(document.model.text == "let x = 1\n")
-        #expect(document.machine == "juliet")
+        #expect(document.machine == "bravo")
         // The machine is named under the filename, because /srv/app on two machines is two files.
-        #expect(document.locationDescription == "juliet · /srv/app")
+        #expect(document.locationDescription == "bravo · /srv/app")
 
         try document.model.replaceAllContent(with: "let x = 2\n")
         await workspace.save(document.id)
@@ -555,7 +555,7 @@ struct GlassEditorFileAccessTests {
 
         let workspace = workspace()
         workspace.openProject(GlassEditorProject(hostID: HostID(), path: "/srv/app"),
-                              access: machine.access(), reach: .overSSH(host: "juliet"))
+                              access: machine.access(), reach: .overSSH(host: "bravo"))
         let opened = await workspace.open(path: "/srv/app/main.swift")
         let document = try #require(opened)
 
@@ -567,8 +567,8 @@ struct GlassEditorFileAccessTests {
 
         await workspace.save(document.id)
         let conflict = try #require(workspace.pendingConflict)
-        #expect(conflict.machine == "juliet")
-        #expect(conflict.explanation.contains("juliet"))
+        #expect(conflict.machine == "bravo")
+        #expect(conflict.explanation.contains("bravo"))
         #expect(machine.writes.isEmpty, "the machine was written to before the question was answered")
     }
 
@@ -582,7 +582,7 @@ struct GlassEditorFileAccessTests {
 
         let workspace = workspace()
         workspace.openProject(GlassEditorProject(hostID: HostID(), path: "/srv/app"),
-                              access: machine.access(), reach: .overSSH(host: "juliet"))
+                              access: machine.access(), reach: .overSSH(host: "bravo"))
         let opened = await workspace.open(path: "/srv/app/main.swift")
         let document = try #require(opened)
         try document.model.replaceAllContent(with: "mine\n")
@@ -604,7 +604,7 @@ struct GlassEditorFileAccessTests {
         // No stat recorded at all: the access returns nil.
         let workspace = workspace()
         workspace.openProject(GlassEditorProject(hostID: HostID(), path: "/srv/app"),
-                              access: machine.access(), reach: .overSSH(host: "juliet"))
+                              access: machine.access(), reach: .overSSH(host: "bravo"))
         let opened = await workspace.open(path: "/srv/app/main.swift")
         let document = try #require(opened)
 
@@ -621,7 +621,7 @@ struct GlassEditorFileAccessTests {
 
         let workspace = workspace()
         workspace.openProject(GlassEditorProject(hostID: HostID(), path: "/srv/app"),
-                              access: machine.access(), reach: .overSSH(host: "juliet"))
+                              access: machine.access(), reach: .overSSH(host: "bravo"))
         let opened = await workspace.open(path: "/srv/app/main.swift")
         let document = try #require(opened)
         try document.model.replaceAllContent(with: "mine\n")
@@ -684,7 +684,7 @@ struct GlassEditorVerifiedWriteTests {
     private func openRemote(_ machine: Machine, into workspace: GlassEditorWorkspace) async throws
     -> GlassEditorDocument {
         workspace.openProject(GlassEditorProject(hostID: HostID(), path: "/srv/app"),
-                              access: machine.access(), reach: .overSSH(host: "juliet"))
+                              access: machine.access(), reach: .overSSH(host: "bravo"))
         let opened = await workspace.open(path: "/srv/app/main.swift")
         return try #require(opened)
     }

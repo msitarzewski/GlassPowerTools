@@ -64,7 +64,7 @@ struct GlassEditorViewerTests {
         let workspace = workspace()
         var folder: URL?
         do {
-            let document = try #require(await workspace.open(path: "/srv/app/logo.png", through: remote, machine: "oscar"))
+            let document = try #require(await workspace.open(path: "/srv/app/logo.png", through: remote, machine: "alpha"))
             let viewer = try #require(document.viewer)
             #expect(viewer.kind == .image)
             #expect(viewer.fileURL.lastPathComponent == "logo.png", "the name, so viewers read the extension")
@@ -84,7 +84,7 @@ struct GlassEditorViewerTests {
         remote.reportedSizes["/srv/movie.mp4"] = GlassEditorOpenError.remoteMediaLimit + 1
         let workspace = workspace()
 
-        #expect(await workspace.open(path: "/srv/movie.mp4", through: remote, machine: "oscar") == nil)
+        #expect(await workspace.open(path: "/srv/movie.mp4", through: remote, machine: "alpha") == nil)
         #expect(workspace.pendingLargeOpen?.path == "/srv/movie.mp4")
         #expect(remote.reads == 0, "nothing was downloaded before asking")
         #expect(workspace.message == nil, "a question, not an error")
@@ -92,7 +92,7 @@ struct GlassEditorViewerTests {
         workspace.cancelLargeOpen()
         #expect(workspace.pendingLargeOpen == nil && remote.reads == 0)
 
-        _ = await workspace.open(path: "/srv/movie.mp4", through: remote, machine: "oscar")
+        _ = await workspace.open(path: "/srv/movie.mp4", through: remote, machine: "alpha")
         await workspace.confirmLargeOpen()
         #expect(workspace.documents.first?.viewer?.kind == .video)
     }
@@ -103,7 +103,7 @@ struct GlassEditorViewerTests {
         remote.files["/var/log/big.log"] = Data("line\n".utf8)
         remote.reportedSizes["/var/log/big.log"] = GlassEditorOpenError.remoteMediaLimit + 1
         let workspace = workspace()
-        let document = try #require(await workspace.open(path: "/var/log/big.log", through: remote, machine: "oscar"))
+        let document = try #require(await workspace.open(path: "/var/log/big.log", through: remote, machine: "alpha"))
         #expect(document.viewer == nil && workspace.pendingLargeOpen == nil)
     }
 

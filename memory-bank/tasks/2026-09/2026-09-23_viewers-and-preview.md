@@ -46,7 +46,7 @@ A text document's model is read in 25 places, all in `GlassEditorWorkspace.swift
 3. **The preview's safety rule**, which Mermaid forces into the open: a preview page runs **no
    script except the bundled Mermaid**, loads **nothing from the network**, and gets every
    resource through one custom URL scheme the app answers itself. A relative image in a Markdown
-   file on oscar is fetched through that file's own `GlassEditorFileAccess` — the same SFTP
+   file on the Linux server is fetched through that file's own `GlassEditorFileAccess` — the same SFTP
    connection — never by the web view. HTML files are previewed with scripts off entirely.
 
 The user approved swift-markdown in spirit ("go ahead"); the Mermaid script exception is new and
@@ -113,7 +113,7 @@ is recorded as Proposed until built.
   task lists, a Mermaid fence; CSV parsing edge cases; the preview's resource resolver refuses
   anything outside the file's machine and paths that escape with `..`.
 - Proof on screen, not only tests: a PNG, a PDF, an MP4 and a Markdown file with a table and a
-  Mermaid diagram, opened locally and from oscar, photographed on the Mac, and on the iPhone
+  Mermaid diagram, opened locally and from the Linux server, photographed on the Mac, and on the iPhone
   simulator (rule: drive the phone). Vision Pro build only, until the headset is updated.
 
 ## Order and size
@@ -165,7 +165,7 @@ every build prints `update-mermaid: 12.0.0 is current`. A pinned swift-markdown 
 
 The UI-test seed (`--ui-testing-seed-project`) now also writes a drawn `logo.png` and a `PREVIEW.md`.
 
-**Not yet proven:** a remote file on oscar (viewer copy, relative images over SFTP) — needs the
+**Not yet proven:** a remote file on the Linux server (viewer copy, relative images over SFTP) — needs the
 user's server; the Vision Pro simulator run (in progress at this checkpoint); video and audio on
 screen (Quick Look/AVKit, not photographed).
 
@@ -179,8 +179,8 @@ screen (Quick Look/AVKit, not photographed).
    `GlassEditorWorkspace.open(_ url:)`: access is asked for and **held while the document is
    open** (saving writes back to the same file), returned in `close`, which is the only way a
    document leaves (the preview slot goes through it too). 0.4.213. Not yet seen on the phone.
-2. **The Mac froze on a remote SVG** (user: oscar,
-   `…/baby-back-shak/artifacts/logo/shakrub-logo-horizontal.svg`; they force-quit it). Not
+2. **The Mac froze on a remote SVG** (user: the Linux server,
+   `…/client-project/artifacts/logo/logo-horizontal.svg`; they force-quit it). Not
    Preview and not the viewer: the text engine. Reproduced with a 1.88 MB one-line SVG (path data
    and an embedded base64 PNG): under `highlightingCodeUnitCeiling` (2,000,000), so fully
    coloured, and TextKit walks a line's colour runs per character each time it draws it — the
@@ -189,7 +189,7 @@ screen (Quick Look/AVKit, not photographed).
    `GlassEditorModel.setHighlights` drops runs on any line over 20,000 characters
    (`longLineHighlightLimit`), checked only when the document is longer than that.
    `LongLineHighlightTests`. Same file on 0.4.214: responsive, preview drawn. The user's own
-   file was never read from here (this shell has no key for oscar).
+   file was never read from here (this shell has no key for the Linux server).
 
 ## Open
 
@@ -198,11 +198,11 @@ screen (Quick Look/AVKit, not photographed).
   `testAPictureOpensAsItselfAndMarkdownPreviews` skips there with that reason. The image viewer
   half passed on visionOS. Whether the toolbar is drawn in the headset is for the device.
 - Scroll-follow by heading and highlighted code blocks in the Markdown preview (the plan allowed
-  plain); a remote file on oscar through a viewer; video and audio on screen.
+  plain); a remote file on the Linux server through a viewer; video and audio on screen.
 
 ## The user's own logo on the iPhone simulator (08:31)
 
-`shakrub-logo-horizontal.svg`: **14,588,762 bytes on one line**, one `<path>`, one embedded PNG
+`logo-horizontal.svg`: **14,588,762 bytes on one line**, one `<path>`, one embedded PNG
 (1368 × 1824) — over the 2,000,000-unit highlighting ceiling, so already uncoloured; the long-line
 rule never applies to it. `testTheUsersOneLineLogoOpens` (reads `TEST_RUNNER_GPT_SEED_FILE`, which
 did reach the simulator runner this time; the seed copies a named host file into DemoProject):

@@ -1462,7 +1462,7 @@ struct DataTabView: View {
     /// The table-browsing surface loads its own schema identifiers (the
     /// document surface receives them from QueryEditorView's loader). Without
     /// this, table-surface completion had only keywords and current-table
-    /// columns — `comm` could never offer `common_vision`.
+    /// columns — `comm` could never offer `shop`.
     @State private var tableSurfaceIdentifiers: [String] = []
     @State private var qualifiedTableIdentifiers: [String: [String]] = [:]
     @State private var completionDatabaseNames: [String] = []
@@ -6346,7 +6346,7 @@ struct ForeignKeysTabView: View {
 /// database's table names, and plain plus table-qualified column names for up
 /// to 50 tables. One implementation serves both the SQL-document editor and
 /// the table Data surface, so a fragment like `comm` completes to
-/// `common_vision` everywhere an editor appears.
+/// `shop` everywhere an editor appears.
 enum SchemaCompletionIdentifiers {
     /// Fetch only the requested database's tables, not every database's columns.
     /// Validate against live database names so an alias is not used as a database.

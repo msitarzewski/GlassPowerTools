@@ -325,7 +325,7 @@ public actor HostCatalogStore {
     ///
     /// It used to make a tombstone immortal — beat the live record whatever the dates — which is
     /// the rule `GlassCatalogMerge.winner` never had. On 2026-09-21 the two disagreed and the
-    /// store's rule ate oscar on the Mac: the phone folded its records into one, the merged
+    /// store's rule ate a server's record on the Mac: the phone folded its records into one, the merged
     /// record arrived live and newer, and the Mac's five-day-old tombstone for that record id
     /// refused it — silently, because the reconcile had already decided the live record won.
     private static func precedes(_ lhs: HostProfile, _ rhs: HostProfile) throws -> Bool {

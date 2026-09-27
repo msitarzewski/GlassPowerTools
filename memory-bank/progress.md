@@ -558,7 +558,7 @@ Both VMs are configured and were left running.
 |---|---|
 | Editor | The full walkthrough, twice, photographed at every step, plus two UI tests on iOS 27.2 |
 | Database | Schema → tables → detail, the SQL editor, the grid and its pinned chrome. Three defects and one regression found and fixed |
-| Desktop | **RDP to `oscar`**: a GNOME login at 1,320 × 2,318, "Connected", with the Esc/Tab/Keyboard bar |
+| Desktop | **RDP to `alpha`**: a GNOME login at 1,320 × 2,318, "Connected", with the Esc/Tab/Keyboard bar |
 | Terminal | Driven in the same pass; no defects reported |
 
 ## Seen on the new 27.2 simulators, 2026-09-20
@@ -745,13 +745,13 @@ comes from is the question the design pass has to answer, and it wants the user'
   Sidebar highlights the open panel; Active shows 0. A missing database password connects empty on
   first connect as on reconnect. A new machine's first connect no longer dies at the trust prompt.
 - **Desktop**: a thumbnail-sized window opens at the configured size; the desktop follows the
-  server's size change after login; the scale travels in the connect — seen on oscar.
+  server's size change after login; the scale travels in the connect — seen on the Linux server.
 - **Editor**: images, PDF, video, audio open in viewers (Quick Look on the Mac); Preview for
   Markdown with Mermaid, HTML, SVG, CSV (D35; Mermaid refreshed by the scheme's build pre-action);
   iPhone Open File asks for security-scoped access; large one-line files — parser skips over the
   ceiling (rule 58), long lines uncoloured, very long lines open wrapped, a phone opens them in
   Preview; unwrapped scrolling no longer hitches (finite container). Mac, iPhone simulator and
-  oscar-shaped fixtures; the user's own 14.6 MB SVG on the iPhone simulator.
+  the Linux server-shaped fixtures; the user's own 14.6 MB SVG on the iPhone simulator.
 - **Not yet**: the Mac editor still cannot scroll the 14.6 MB one-line file (TextKit 2) — D36, a
   TextKit 1 backend, approved and in progress. visionOS editor toolbar invisible to UI tests.
   1,752 tests, 0 failing; 0.4.216 on Mac and iPhone; Vision Pro 0.4.123.
@@ -761,7 +761,7 @@ comes from is the question the design pass has to answer, and it wants the user'
 - **Mac editor on TextKit 1 (D36)** — committed at `9b4da5f`, seen by the user on 0.4.217 (*"that new
   renderer is great!"*); corrects the "Not yet" line above.
 - **Database grid, option 1 in part:** memoized displayed rows, frozen-only scroll effect, one tap
-  per cell on the Mac. The user on 0.4.223 against `common_vision` on oscar: *"rendered 10000 rows like
+  per cell on the Mac. The user on 0.4.223 against `shop` on the Linux server: *"rendered 10000 rows like
   nothing."* The timing harness has **not** been re-run; the 8.3 ms target is unverified by numbers.
 - **Editor, from the user's `.env` walk-through:** ⌘S is the shell's File ▸ Save (D37) and no longer
   beeps in an editor; a new document's first save is the Mac Save panel (no `.txt` appended); the

@@ -799,7 +799,7 @@ case unreadable                // this build cannot say, and must not pretend ot
 ```
 
 The distinction that earns the enum is **shared or not**. A password ends with the service that uses
-it. A key can authenticate a terminal on `oscar` and another on `juliet`, which is why deleting one
+it. A key can authenticate a terminal on `alpha` and another on `bravo`, which is why deleting one
 must leave the key alone and why the manager has to name who is using it.
 
 `unreadable` is the failure mode designed in rather than retrofitted: a configuration written by a
@@ -819,7 +819,7 @@ forgot to tell the other store. Both readers, and stage 3's redaction, now go th
 **The Mac's screen was locked for this entire piece** (rule 28), so every test that writes a host
 catalog fails at the write. What is verified: **the app target builds**, and the three suites that
 touch no catalog pass (12 tests). `D28KeyUsageTests` — five tests including the user's own
-`juliet`/`oscar` scenario — **has never been run** and must be before this is believed.
+`bravo`/`alpha` scenario — **has never been run** and must be before this is believed.
 
 **Owed:** a full unlocked run covering stages 1–4 and the two-device acceptance list.
 
@@ -873,7 +873,7 @@ library's Add Host button gave up its own ⌘N for the same reason.
 ### ⇧⌘T — another tab on the same machine
 
 `MacNewWorkspaceTabAction` gained `repeatingCurrentConnection()` and a title naming the machine —
-**"New Tab on oscar"**. It copies the focused pane's **intent**, not its session: a
+**"New Tab on the Linux server"**. It copies the focused pane's **intent**, not its session: a
 `MacWorkspacePaneIntent` already carries the saved server for SSH and the shell and directory for
 local, so the new tab connects through the same server, credentials and host trust with no chooser.
 `sourceSessionIndex` is cleared — it identifies a pane inside a restored workgroup layout, and this
@@ -925,7 +925,7 @@ the only thing that proves D26's sentence.
 ## The reset that was data loss — 2026-09-16
 
 *"Why are my connection settings reset each time?"* The machine stayed in the library, the SSH key
-stayed in the key list, and Edit Terminal on oscar said **"This terminal has no saved configuration
+stayed in the key list, and Edit Terminal on the Linux server said **"This terminal has no saved configuration
 behind it. Remove the service and add it again."**
 
 **Cause.** `App.init` calls `terminal.connectToLibrary(store: model)`, and `ServerManager.attach`
@@ -987,7 +987,7 @@ document came from, what it is called, whether it has been saved.
 | `GlassEditorScenes` | the window, the runtime, and the File/Text menu items |
 
 **The project idea is the answer to the user's question.** *"I'm on my Mac in the Editor, move to
-Vision Pro where juliet is an SSH connection — make the association between the two somehow?"* A
+Vision Pro where the Mac is an SSH connection — make the association between the two somehow?"* A
 project is `(hostID, path)` rather than a URL, so it is the same project on both devices and travels
 on the existing D19 catalog sync; each device decides the transport. **Identity is the SSH host key,
 never a name or an address**: a hostname is ambiguous, a Tailscale address moves, and only the
@@ -1040,7 +1040,7 @@ demanded something upstream does not emit.
 
 ### Duplicate services — residue, not a new defect
 
-oscar showed two Terminals and two Desktops, identical, one of each dead: the morning's persistence
+The Linux server showed two Terminals and two Desktops, identical, one of each dead: the morning's persistence
 defect emptied configurations without removing their links, and re-adding a service created a second
 link beside the corpse. **The row now says "Terminal · Not set up" in orange** when nothing is behind
 the link, so the dead one is identifiable and removable. Built-in local services are never marked —

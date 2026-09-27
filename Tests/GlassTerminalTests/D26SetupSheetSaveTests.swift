@@ -87,7 +87,7 @@ struct D26SetupSheetSaveTests {
         let (model, runtime, root) = try makeShell()
         defer { try? FileManager.default.removeItem(at: root) }
         await model.load()
-        let created = try await model.addHost(displayName: "oscar", address: "oscar.example")
+        let created = try await model.addHost(displayName: "alpha", address: "alpha.example")
         let host = try #require(model.host(created.id))
 
         let setup = GlassShellSetupModel(model: model, mode: .addService(host, .ssh))

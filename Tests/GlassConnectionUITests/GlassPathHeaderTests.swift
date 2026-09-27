@@ -11,7 +11,7 @@ struct GlassPathHeaderTests {
 
     @Test func aTrailingSeparatorIsTheSameFolder() {
         #expect(GlassPathLocation(path: "/home/ann/") == GlassPathLocation(path: "/home/ann"))
-        #expect(GlassPathLocation(path: "/home/ann///").name == "michael")
+        #expect(GlassPathLocation(path: "/home/ann///").name == "ann")
     }
 
     @Test func theRootHasANameAndNoParent() {
@@ -58,7 +58,7 @@ struct GlassPathHeaderTests {
         let home = "/Users/ann"
         #expect(GlassPathLocation.abbreviatingHome("/etc/hosts", home: home) == "/etc/hosts")
         // A sibling whose name merely starts with home's is not inside it.
-        #expect(GlassPathLocation.abbreviatingHome("/Users/michaela/notes", home: home)
-                == "/Users/michaela/notes")
+        #expect(GlassPathLocation.abbreviatingHome("/Users/anna/notes", home: home)
+                == "/Users/anna/notes")
     }
 }

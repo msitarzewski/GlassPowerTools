@@ -3,9 +3,9 @@ import Charts
 import AppKit
 
 struct Item: Identifiable { let id = UUID(); let name: String; let value: Int }
-let items = [("common_vision", 12_000_000), ("stationnub", 8_000_000), ("performance_schema", 2_300_000),
-             ("compute_institute", 90_000), ("friendm", 60_000), ("cv_3263493d-1f10-4eef-962d-70f01223b2ec", 30_000),
-             ("summary_post_new", 20_000), ("mysql", 10_000)].map { Item(name: $0.0, value: $0.1) }
+let items = [("shop", 12_000_000), ("inventory", 8_000_000), ("performance_schema", 2_300_000),
+             ("analytics", 90_000), ("crm", 60_000), ("tenant_7c1e2a90-4b6d-4f1e-9a3c-5d8e2f1b0a47", 30_000),
+             ("reports", 20_000), ("mysql", 10_000)].map { Item(name: $0.0, value: $0.1) }
 
 var preset: AxisMarkPreset {
     switch CommandLine.arguments.dropFirst(2).first ?? "" {
@@ -33,7 +33,7 @@ struct Probe: View {
                     // long-bar case (does it fit at the edge?) and the sliver case.
                     .annotation(position: .trailing, alignment: .leading, spacing: 6,
                                 overflowResolution: .init(x: .fit, y: .fit)) {
-                        if item.name == "common_vision" || item.name == "mysql" {
+                        if item.name == "shop" || item.name == "mysql" {
                             Text("\(item.value.formatted(.number)) rows")
                                 .font(.caption.monospacedDigit())
                                 .padding(.horizontal, 8).padding(.vertical, 4)

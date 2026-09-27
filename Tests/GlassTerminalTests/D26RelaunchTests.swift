@@ -67,9 +67,9 @@ struct D26RelaunchTests {
         let (model, runtime) = launch(over: root)
         await model.load()
         let manager = runtime.sessionManager.serverManager
-        let endpoint = try await model.adoptService(kind: .ssh, hostName: "oscar",
+        let endpoint = try await model.adoptService(kind: .ssh, hostName: "alpha",
                                                     address: "192.0.2.10", serviceName: "Terminal")
-        let server = ServerConfiguration(id: endpoint.rawValue, name: "Terminal on oscar",
+        let server = ServerConfiguration(id: endpoint.rawValue, name: "Terminal on alpha",
                                          host: "192.0.2.10", port: 22, username: "michael",
                                          authMethod: .sshKey)
         try await manager.addServerOrThrow(server)
@@ -94,9 +94,9 @@ struct D26RelaunchTests {
 
         let (model, runtime) = launch(over: root)
         await model.load()
-        let kept = try await model.adoptService(kind: .ssh, hostName: "oscar",
+        let kept = try await model.adoptService(kind: .ssh, hostName: "alpha",
                                                 address: "192.0.2.10", serviceName: "Terminal")
-        let server = ServerConfiguration(id: kept.rawValue, name: "Terminal on oscar",
+        let server = ServerConfiguration(id: kept.rawValue, name: "Terminal on alpha",
                                          host: "192.0.2.10", port: 22, username: "michael",
                                          authMethod: .sshKey)
         try await runtime.sessionManager.serverManager.addServerOrThrow(server)
@@ -106,9 +106,9 @@ struct D26RelaunchTests {
         let (model2, runtime2) = launch(over: root)
         await model2.load()
         let manager2 = runtime2.sessionManager.serverManager
-        let second = try await model2.adoptService(kind: .ssh, hostName: "juliet",
+        let second = try await model2.adoptService(kind: .ssh, hostName: "bravo",
                                                    address: "10.0.0.9", serviceName: "Terminal")
-        let another = ServerConfiguration(id: second.rawValue, name: "Terminal on juliet",
+        let another = ServerConfiguration(id: second.rawValue, name: "Terminal on bravo",
                                           host: "10.0.0.9", port: 22, username: "michael",
                                           authMethod: .sshKey)
         try await manager2.addServerOrThrow(another)

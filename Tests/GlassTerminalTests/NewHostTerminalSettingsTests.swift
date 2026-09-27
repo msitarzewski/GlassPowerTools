@@ -52,20 +52,20 @@ struct NewHostTerminalSettingsTests {
         setup.name = "Public"
         setup.address = "203.0.113.10"
         let draft = try #require(setup.draft(for: .ssh) as? TerminalServiceDraft)
-        draft.username = "tandem"
+        draft.username = "deploy"
         draft.port = "2222"
         draft.authMethod = .sshKey
         draft.sshKeyID = key.id
         let hostID = try #require(await setup.save(), "sheet: \(setup.error ?? "")")
 
         let before = try editDraft(model, host: hostID)
-        #expect(before.username == "tandem", "Edit right after saving")
+        #expect(before.username == "deploy", "Edit right after saving")
         #expect(before.port == "2222")
 
         let (model2, _) = launch(over: root)
         await model2.load()
         let after = try editDraft(model2, host: hostID)
-        #expect(after.username == "tandem", "Edit after a relaunch")
+        #expect(after.username == "deploy", "Edit after a relaunch")
         #expect(after.port == "2222")
     }
 }

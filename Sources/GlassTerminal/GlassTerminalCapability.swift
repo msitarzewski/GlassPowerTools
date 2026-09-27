@@ -253,7 +253,7 @@ public final class GlassTerminalCapability: GlassCapability {
     /// **A terminal opened by Connect on a Mac is in no workgroup.** iOS and visionOS put every
     /// terminal in a workgroup (`presentTerminalWindow`), so the workgroup listing covered them;
     /// the Mac opens a workspace window with a live-session ticket and the session belongs to
-    /// nothing but its window — so Active showed the MySQL session on oscar and not the terminal
+    /// nothing but its window — so Active showed the MySQL session on a server and not the terminal
     /// beside it (2026-09-22). One row per such session; brought forward and closed through the
     /// window that holds it, which the overview's registry already knows.
     private func loneSessions(_ manager: SessionManager) -> [GlassOpenSession] {

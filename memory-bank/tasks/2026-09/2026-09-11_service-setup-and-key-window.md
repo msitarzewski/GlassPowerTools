@@ -40,7 +40,7 @@ the needs-address view instead of a form. The shell's per-service Connect is the
 ## Side effect to know about
 
 Launching the Release build against the user's real library ran `adoptKnownAddresses()`: the
-`oscar` host record in the shared catalog gained the address its saved terminal server already
+`alpha` host record in the shared catalog gained the address its saved terminal server already
 carried (`192.0.2.6` as shown in the detail). That is the designed behaviour for hosts that
 predate addresses, applied to real data by this verification.
 

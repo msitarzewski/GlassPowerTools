@@ -11,7 +11,7 @@ Not committed (coordinator commits).
 `App/GlassPowerTools.icon` held three raster layers aligned to the user's composite and a single
 `automatic-gradient` fill — one appearance, no per-layer colour. It is now four hand-authored SVGs
 with per-appearance fills, following the schema proven by the family's approved document
-(`icon-lab/archive/2026-09-06/.../agency-agents-app/docs/icon/AppIcon.icon/icon.json`): top-level
+(an earlier approved `AppIcon.icon/icon.json`): top-level
 `fill-specializations`, one group per layer, `glass: true`, and `{"solid": …}` per appearance.
 The PNGs are deleted; `Assets/` holds only SVG.
 

@@ -209,7 +209,7 @@ public protocol GlassServiceDraft: AnyObject {
 ///
 /// The distinction that matters is **shared or not**. A password belongs to the service that uses
 /// it and to nothing else, so deleting that service ends the story. A key is shared: the same key
-/// can authenticate a terminal on `oscar` and another on `juliet`, which is why deleting one of
+/// can authenticate a terminal on `alpha` and another on `bravo`, which is why deleting one of
 /// them must leave the key alone, and why a key manager has to be able to say who is using it.
 public enum GlassServiceCredential: Sendable, Equatable {
     /// Something belonging to this service alone — a password. Nothing else references it.

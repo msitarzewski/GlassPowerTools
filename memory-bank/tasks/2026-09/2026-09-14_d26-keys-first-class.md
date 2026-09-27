@@ -3,7 +3,7 @@
 Owner: coordinating agent. 2026-09-14. **Status: PLAN. Nothing built.**
 
 Added at the user's direction: *"We need that key to live on its own … so the key itself survives if
-I delete the oscar Terminal connection, so that it can be reused for other hosts and services. …
+I delete the Linux server Terminal connection, so that it can be reused for other hosts and services. …
 should the keys survive on their own? Yes. That also means we need a key manager interface."*
 
 This corrects a hole in [D26](../../decisions.md): that plan folded the key library in as a detail of
@@ -62,7 +62,7 @@ rather than the synchronizing one. It is the only device-bound credential kind t
 A host can own several services. If device-binding applied to the whole machine, a host with a
 hardware-key terminal **and** a database would disappear from the phone entirely, taking the
 perfectly usable database with it. So the host travels; the service that cannot work elsewhere does
-not. On the phone, `oscar` is present with whatever services actually function there.
+not. On the phone, `alpha` is present with whatever services actually function there.
 
 A host left with no visible services on a device is still worth showing — it is a machine you know
 about, with an address, that you can add a service to.
@@ -76,7 +76,7 @@ So:
 - **On apply:** this device's own device-bound services are **re-attached** to whichever profile
   wins the merge.
 
-Without the second half the Mac publishes `oscar` without its hardware-key terminal, pulls its own
+Without the second half the Mac publishes `alpha` without its hardware-key terminal, pulls its own
 record back as the winner, and **deletes its own local service**. Nothing fails; the configuration
 is simply gone. This is the single most important line in this note.
 
@@ -154,9 +154,9 @@ Revised sequence. The key work moves out of "a detail of step 2" and becomes its
 
 The user's scenario, unchanged, plus the one this addendum adds:
 
-1. Add `oscar` with a Terminal service on the Mac, authenticate with an imported key, connect from
+1. Add `alpha` with a Terminal service on the Mac, authenticate with an imported key, connect from
    the phone without re-approving host trust.
-2. **Delete the oscar Terminal connection. The key is still there**, still usable, and the manager
+2. **Delete the Linux server Terminal connection. The key is still there**, still usable, and the manager
    shows it is now used by nothing.
 3. Attach the same key to a second host and connect with it from a third device.
 4. **Generate a Secure Enclave key on the Mac and use it for a second terminal on the same host.**

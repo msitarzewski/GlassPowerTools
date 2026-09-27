@@ -2,7 +2,7 @@
 
 *"The Desktop mode doesn't have a default desktop size on Mac, so it opens in essentially a
 thumbnail. Then when I resize it and log in [640 × 480, stretched] and after a 1 pixel resize
-[2,660 × 1,626]."* Three screenshots of oscar over RDP (GNOME's login screen, then the session).
+[2,660 × 1,626]."* Three screenshots of the Linux server over RDP (GNOME's login screen, then the session).
 
 ## Two defects, not one
 
@@ -40,7 +40,7 @@ one fact that cannot lie about what the server is doing.
   login test fails at its three expectations, so it bites.
 - `swift test`: **1,713 tests, 0 failing**. Release 0.4.201 built for macOS, iOS and visionOS;
   **installed on the Mac and the phone**, versions read back.
-- **Not seen on oscar yet**: the window opening at the configured size from a remembered
+- **Not seen on the Linux server yet**: the window opening at the configured size from a remembered
   thumbnail (the remembered frame is currently 1,326 × 905, so the sizer stands down), and the
   session following the window through GNOME's login. The user has the server.
 

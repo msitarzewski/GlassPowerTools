@@ -10,7 +10,7 @@ import Testing
 struct DatabaseWorkspaceLifetimeTests {
     private func manager(with sessionID: UUID) -> DatabaseSessionManager {
         let manager = DatabaseSessionManager(loadImmediately: false)
-        manager.sessions[sessionID] = DatabaseSession(connectionConfig: DatabaseConnectionConfig(name: "oscar"))
+        manager.sessions[sessionID] = DatabaseSession(connectionConfig: DatabaseConnectionConfig(name: "alpha"))
         manager.sessions[sessionID]?.state = .connected
         return manager
     }

@@ -4,7 +4,7 @@ import GlassRDPTransport
 @testable import GlassDesktop
 
 /// The server can change its own size — GNOME's login screen takes the window, the session after
-/// it comes up at 640 × 480 — and the window must be asked for again (2026-09-22, oscar).
+/// it comes up at 640 × 480 — and the window must be asked for again (2026-09-22, alpha).
 @Suite("A desktop that changes size on its own is asked for the window again")
 @MainActor
 struct DesktopSessionResizeTests {
@@ -20,7 +20,7 @@ struct DesktopSessionResizeTests {
                 .appendingPathComponent("DesktopResize-\(UUID().uuidString)", isDirectory: true)
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
             app = DesktopAppModel(storageDirectory: root, credentialAccess: .inMemory())
-            connection = DesktopConnection(name: "oscar", host: "oscar.local", username: "michael")
+            connection = DesktopConnection(name: "alpha", host: "alpha.local", username: "michael")
         }
 
         func clean() { try? FileManager.default.removeItem(at: root) }

@@ -115,12 +115,12 @@ struct D26KeyManagerPanelTests {
         await model.load()
 
         let stored = key("shared")
-        let onOscar = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                  address: "oscar.example", serviceName: "Terminal")
-        let onJuliet = try await model.adoptService(kind: .ssh, hostName: "juliet",
-                                                      address: "juliet.example", serviceName: "Terminal")
-        capability.credentials = [onOscar: .sharedKey(id: stored.id, deviceBound: false),
-                                  onJuliet: .sharedKey(id: stored.id, deviceBound: false)]
+        let onAlpha = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                  address: "alpha.example", serviceName: "Terminal")
+        let onBravo = try await model.adoptService(kind: .ssh, hostName: "bravo",
+                                                      address: "bravo.example", serviceName: "Terminal")
+        capability.credentials = [onAlpha: .sharedKey(id: stored.id, deviceBound: false),
+                                  onBravo: .sharedKey(id: stored.id, deviceBound: false)]
         model.attachKeyStore(StubKeyStore(keys: [stored]))
 
         let panel = GlassKeyManagerPanel(presentation: .detail, model: model, panel: model.keyPanel)
@@ -128,8 +128,8 @@ struct D26KeyManagerPanelTests {
 
         #expect(warning.contains("'shared'"))
         #expect(warning.contains("2 services will be left without a key"))
-        #expect(warning.contains("Terminal on oscar"))
-        #expect(warning.contains("Terminal on juliet"))
+        #expect(warning.contains("Terminal on alpha"))
+        #expect(warning.contains("Terminal on bravo"))
     }
 
     /// A key nothing uses says so plainly — the case where deleting is safe is worth stating, or a
@@ -155,8 +155,8 @@ struct D26KeyManagerPanelTests {
         await model.load()
 
         let stored = key("shared")
-        let readable = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                    address: "oscar.example", serviceName: "Terminal")
+        let readable = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                    address: "alpha.example", serviceName: "Terminal")
         let opaque = try await model.adoptService(kind: .ssh, hostName: "newer",
                                                   address: "newer.example", serviceName: "Terminal")
         capability.credentials = [readable: .sharedKey(id: stored.id, deviceBound: false),
@@ -201,7 +201,7 @@ struct D26KeyManagerPanelTests {
     }
 
     @Test func exportedFilenamesAreTheUsersNameMadeSafe() {
-        #expect(GlassKeyManagerPanel.exportFilename(for: key("oscar key")) == "oscar_key.pub")
+        #expect(GlassKeyManagerPanel.exportFilename(for: key("alpha key")) == "alpha_key.pub")
         #expect(GlassKeyManagerPanel.exportFilename(for: key("../../etc/passwd")) == "etc_passwd.pub")
         #expect(GlassKeyManagerPanel.exportFilename(for: key("///")) == "ssh_key.pub")
     }

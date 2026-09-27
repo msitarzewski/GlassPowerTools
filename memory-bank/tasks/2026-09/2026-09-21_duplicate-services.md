@@ -1,6 +1,6 @@
 # Duplicated services on the phone — 2026-09-21
 
-**Reported:** *"services are duplicated on iPhone. Is it a build/versioning/sync part?"* The oscar
+**Reported:** *"services are duplicated on iPhone. Is it a build/versioning/sync part?"* The Linux server
 host detail on 0.4.195 shows two Terminals, two Desktops, one MySQL, and two Files rows.
 
 **Neither build nor versioning. Sync — and more precisely the design under it.** Read straight
@@ -8,7 +8,7 @@ out of the phone's catalog, mounted on the Mac through CoreDevice DeviceFS while
 the cable (`~/Library/Developer/CoreDevice/DeviceFS/device-…/AppDataContainers/com.glasspowertools/
 Library/Application Support/GlassPowerTools/GlassHostCatalog/hosts.json`):
 
-- **Eleven host records named oscar**, all at `192.0.2.10`, from three writer ids. Writer ids
+- **Eleven host records for the Linux server**, all at one address, from three writer ids. Writer ids
   are persisted in `shell-preferences.json`, so three writers are three devices.
 - Two records carry full service configurations: **`c737ab54` is the Mac's** (its preferences key
   it, last-used MySQL) with Terminal + MySQL + Desktop, and **`e6a9eaed` is the phone's** (its
@@ -22,7 +22,7 @@ services — which is exactly the screenshot: the Mac's Terminal and the phone's
 Desktop and the phone's Desktop, and the one configured MySQL. The Files rows are the two
 Terminals each offering their tool.
 
-**Why there are two configured records.** Each device set oscar up itself, before it had the
+**Why there are two configured records.** Each device set the Linux server up itself, before it had the
 other's record — the D26 two-device acceptance run that was never done would have shown this on
 day one. `adoptService` matches an existing host by address, but only among records it already
 holds; and the six empty records are adoptions that saved a host and then nothing on it.
@@ -58,7 +58,7 @@ inventory found the fix before the fix was written.
 | File | Change |
 |---|---|
 | `Sources/GlassShell/GlassShellModel.swift` | `consolidateDuplicateHosts()` runs in `load()` after every sync; `consolidate(_:)` folds a group into its canonical record, **only when the members agree on the address**; `deduplicated(_:)` keeps one link per (kind, name) with the smallest endpoint id, and the losers go to their capability as a removal; `mergedMemberIDs` keeps a folded member's id resolving; preferences migrate *before* the fold |
-| `Tests/GlassShellTests/GlassShellConsolidationTests.swift` | Four new tests (the oscar shape, capability cleanup, an untouched clean library, deterministic dedup) and five old ones brought to the one-record truth |
+| `Tests/GlassShellTests/GlassShellConsolidationTests.swift` | Four new tests (the Linux server shape, capability cleanup, an untouched clean library, deterministic dedup) and five old ones brought to the one-record truth |
 | `Tests/GlassShellTests/GlassShellHostAddressTests.swift`, `GlassShellTunnelHopTests.swift` | Same: a group that agrees on its address is one record after load |
 
 ## Three decisions inside it
@@ -77,23 +77,23 @@ inventory found the fix before the fix was written.
 
 | Claim | Evidence |
 |---|---|
-| The oscar shape collapses to one record with each service once, smallest id winning | `loadConsolidatesAndDeduplicates` |
+| The Linux server shape collapses to one record with each service once, smallest id winning | `loadConsolidatesAndDeduplicates` |
 | The losing duplicate reaches its capability as a removal | `droppedDuplicatesReachTheCapability` |
 | A clean library is not rewritten (so not republished) | `cleanLibraryIsUntouched` |
 | Disagreeing addresses are left alone | `addressGroupsAndDisagreementIsSettled`, unchanged in that half |
 | The whole thing bites | `GlassShellAutoConsolidationTests` seen red with the call in `load()` commented out |
-| **On the phone** | **Seen.** 0.4.196 launched on the iPhone over the cable and its catalog copied back with `devicectl device copy from` within a minute: **oscar live: 1, tombstoned: 10** — `c737ab54`, Terminal / MySQL / Desktop each exactly once, all configured. The survivors are the Mac's endpoints, as the smallest-id rule predicts (`76bb64f3` < `f26b23f7`, `48c918ef` < `c48ea999`) |
+| **On the phone** | **Seen.** 0.4.196 launched on the iPhone over the cable and its catalog copied back with `devicectl device copy from` within a minute: **The Linux server live: 1, tombstoned: 10** — `c737ab54`, Terminal / MySQL / Desktop each exactly once, all configured. The survivors are the Mac's endpoints, as the smallest-id rule predicts (`76bb64f3` < `f26b23f7`, `48c918ef` < `c48ea999`) |
 | The headset | Still on 0.4.123 and still holding its old records live. It cannot resurrect them — in `precedes`, a tombstone beats a live record regardless of dates — but it will keep showing them to itself until it is updated |
 
 ---
 
-# oscar vanished from the Mac — 2026-09-21, late
+# The Linux server vanished from the Mac — 2026-09-21, late
 
-*"Weird. oscar is missing now from the Mac :P"* — an hour after D32 shipped.
+*"Weird. The Linux server is missing now from the Mac :P"* — an hour after D32 shipped.
 
 ## What the phone says, read again properly
 
-The first dump never printed `deletedAt`. Read again with it: **ten of the eleven oscar records
+The first dump never printed `deletedAt`. Read again with it: **ten of the eleven Linux server records
 were tombstones already**, some since 13 September; `c737ab54` (the Mac's) was the only live one
 and still is, with three configured services and `updatedAt` 18 September — the fold on the
 phone did not rewrite it. So the phone's duplicates this evening were two links *on one record*,
@@ -104,7 +104,7 @@ and the phone's fix was the dedup, not a fold.
 The fold chose the group's **canonical** record as its survivor, and the canonical is the
 **oldest**. The oldest live record in a group is exactly the one most likely to be a tombstone on
 another device already — old duplicates are what other devices cleaned up first. Move every
-service into it, tombstone the rest, sync: a tombstone for the survivor arrives, and oscar is
+service into it, tombstone the rest, sync: a tombstone for the survivor arrives, and the Linux server is
 gone with everything that was folded into it. Whether that is precisely what happened on the Mac
 is **unconfirmed** — its catalog is in `~/Library/Group Containers/group.sh.glas.shared/`, which
 macOS privacy protection keeps this shell out of; the user is copying it to the Desktop.
@@ -135,15 +135,15 @@ record wins and the store will still refuse to revive it. Not changed tonight; i
 # The actual mechanism, with the Mac's catalog in hand — 2026-09-21, later
 
 The user copied the Mac's catalog out through Finder. Two corrections first: **the writer ids
-were backwards above** — `a4d0e867` is the **Mac** (its `shell-preferences.json` says so) and
-`6b16e22a` is the **phone** — and the phone's catalog I had been reading over the cable is a
+were backwards above** — `<Mac writer id>` is the **Mac** (its `shell-preferences.json` says so) and
+`<phone writer id>` is the **phone** — and the phone's catalog I had been reading over the cable is a
 **stale app-container copy** from the 18th; the phone's live catalog is in its App Group
 container, which `devicectl copy` refuses ("outside the allowed container directories").
 
 So `c737ab54` was the *phone's* record, and at **21:19:31 tonight the phone's fold** (0.4.196,
 the moment it launched) moved its three services into another member and tombstoned it. The
-Mac's copy shows exactly that tombstone: writer `6b16e22a`, empty services, `deletedAt ==
-updatedAt` — the signature of `move` emptying a source. The phone kept oscar, as the merged
+Mac's copy shows exactly that tombstone: writer `<phone writer id>`, empty services, `deletedAt ==
+updatedAt` — the signature of `move` emptying a source. The phone kept the Linux server, as the merged
 record. The Mac received both: the tombstone for `c737ab54` (applied) and the merged record,
 live and newer — **and refused it**, because `HostCatalogStore.precedes` made a tombstone beat a
 live record whatever the dates, and the Mac held a five-day-old tombstone for that id. The

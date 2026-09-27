@@ -22,7 +22,7 @@ struct MacWorkspaceFocusedActions {
 struct MacNewWorkspaceTabAction {
     let isEnabled: Bool
     /// What the focused tab is connected to, for naming the ⇧⌘T item after the machine — "New Tab
-    /// on oscar" rather than a description of the mechanism. Nil when the focused tab has nothing to
+    /// on alpha" rather than a description of the mechanism. Nil when the focused tab has nothing to
     /// repeat: an empty tab has no connection to carry over, and the item says so by being absent.
     let currentConnectionName: String?
     private let action: () -> Void
@@ -39,7 +39,7 @@ struct MacNewWorkspaceTabAction {
 
     var canRepeatCurrentConnection: Bool { isEnabled && currentConnectionName != nil }
 
-    /// "New Tab on oscar" — the title carries the machine, so the menu says what will happen.
+    /// "New Tab on alpha" — the title carries the machine, so the menu says what will happen.
     var repeatTitle: String {
         currentConnectionName.map { "New Tab on \($0)" } ?? "New Tab with Same Connection"
     }

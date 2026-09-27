@@ -4,7 +4,7 @@ import Foundation
 import GlassEditorCore
 
 /// A line longer than 20,000 characters is drawn without syntax colour (2026-09-23: a one-line
-/// logo SVG on oscar froze the Mac while TextKit walked its colour runs).
+/// logo SVG on alpha froze the Mac while TextKit walked its colour runs).
 @Suite("Long lines are left uncoloured")
 @MainActor
 struct LongLineHighlightTests {

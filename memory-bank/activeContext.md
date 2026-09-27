@@ -151,9 +151,9 @@ briefly broke their builds.
 
 ## Stage 2 in progress; 1.8 proven — 2026-09-10 evening, commit `5f12575`
 
-**1.8 passed on the iPhone 17 Pro Max and on the Vision Pro** (user screenshots of both; visionOS shows `Michael`, `juliet`, `oscar`; the Vision Pro's catalog already holds `oscar` as one host with two services while the iPhone's holds two records — real data has both shapes). **visionOS defect:** the sidebar row's Connect label wraps vertically; routed to the shell worker. After the user enabled automatic signing in Xcode,
+**1.8 passed on the iPhone 17 Pro Max and on the Vision Pro** (user screenshots of both; visionOS shows `Michael`, `bravo`, `alpha`; the Vision Pro's catalog already holds `alpha` as one host with two services while the iPhone's holds two records — real data has both shapes). **visionOS defect:** the sidebar row's Connect label wraps vertically; routed to the shell worker. After the user enabled automatic signing in Xcode,
 per-App-ID managed profiles appeared (iOS/visionOS: 8 devices; macOS), the app installed on the
-iPhone and the Vision Pro, and the user's screenshot shows the existing hosts (`juliet`, `oscar`)
+iPhone and the Vision Pro, and the user's screenshot shows the existing hosts (`bravo`, `alpha`)
 from the shared catalog — no migration. macOS now signs with the real profile and no override.
 
 **Defect exposed by that screenshot (user requirement: "one line per host, multiple icons"):** each
@@ -163,7 +163,7 @@ records into one row with every service icon, presentation-level only (the sourc
 `hosts.json` by their own IDs until Stage 6).
 
 **Consolidation landed (`7ebe746`):** one row per host with every service icon, on all platforms;
-visionOS row fixed (simulator screenshot judged by eye: `juliet` / `oscar`, "Desktop · Terminal",
+visionOS row fixed (simulator screenshot judged by eye: `bravo` / `alpha`, "Desktop · Terminal",
 two icons, icon-only Connect). Root cause recorded: the catalog matches only by endpoint id and
 each app publishes its own record per saved endpoint. `hosts.json` is not rewritten; the on-disk
 merge is written, tested and unwired until Stage 6. Three `GlassCapability` hooks are in the shell
@@ -234,7 +234,7 @@ the notes, not by resuming agents.
 ### Then, to close Stage 2
 
 Run: whole package tests; UI suites on iOS, visionOS, macOS; the terminal UI test with
-`TEST_RUNNER_GPT_SSH_TEST_HOST=192.0.2.6 …_USER=michael …_KEY_PATH=$HOME/.ssh/scratch_vm` on the
+`TEST_RUNNER_GPT_SSH_TEST_HOST=192.0.2.6 …_USER=michael …_KEY_PATH=$HOME/.ssh/<test VM key>` on the
 iOS simulator (reaches the VM) and macOS; the engine's gated CLI suite
 (`GPT_SSH_TEST_*`, `swift test --build-system native --filter SSHTransportIntegrationTests`) —
 **blocked until the user grants Local Network to the terminal app (was Ghostty)**; then the parity
@@ -393,7 +393,7 @@ Local Network grant is in place)**; iPhone all suites green after a rerun of two
 `pkill` had disturbed; new address-step test passed alone twice, flaked once under load in the full
 suite (recorded, not masked). Screenshots judged by eye: key sheet and address prompt match the
 server-form pattern. Note: launching the Release build adopted the saved terminal address onto the
-real `oscar` record (designed behaviour). Open: `GlassTerminalLibraryEntries.swift` "Set Up…" bypasses
+real `alpha` record (designed behaviour). Open: `GlassTerminalLibraryEntries.swift` "Set Up…" bypasses
 the shell's address gate for legacy records; the ⋯ menu's items not captured; W4's post-failure
 accessibility recursion; visionOS UI suite not re-run since W7; widget on device; live iCloud sync.
 
@@ -490,7 +490,7 @@ layers (Prompt, Screen, Bezel, Database) with `glass: true` and per-appearance s
 light: near-white gradient + grey secondaries; dark: near-black gradient + white secondaries; red
 screen `srgb:0.906,0.035,0.039` sampled from the user's composite. Clear/tinted are derived by the
 system, not authored. Schema copied from the family's approved document at
-`~/Software/icon-lab/archive/2026-09-06/approved-source-icons/.../AppIcon.icon/icon.json`.
+an earlier approved Icon Composer document (`AppIcon.icon/icon.json`).
 `actool` compiles clean; `assetutil --info` shows Aqua, DarkAqua and Tintable variants for all four
 layers. **Limitation recorded:** the CLI cannot render the dark or clear renditions as the OS
 composites them (`iconutil` extracts only the default; `assetutil` reports structure). Dark was
@@ -863,8 +863,8 @@ OpenSSH's own first-connect prompt — prints `SHA256:` followed by **unpadded**
 
 | Source | String |
 |---|---|
-| `ssh-keygen -lf` | `SHA256:O/zNAQP8+gbY+no+sgjwkOLRBlT2Q2MVq6Ltk6KnRqg` |
-| Glass Power Tools, until now | `O/zNAQP8+gbY+no+sgjwkOLRBlT2Q2MVq6Ltk6KnRqg=` |
+| `ssh-keygen -lf` | `SHA256:Example0FingerprintExample0FingerprintExa` |
+| Glass Power Tools, until now | `Example0FingerprintExample0FingerprintExa=` |
 
 Same 32 bytes — the VM's ed25519 blob was decoded and both digests computed to confirm it. **The
 bytes were never wrong; the string was.** D14 exists so a *person* can compare what the app shows
@@ -1445,14 +1445,14 @@ the execution log for every stage and the surface survey behind D27/D28.
 | Platform | Version | How verified |
 |---|---|---|
 | macOS `/Applications/GlassPowerTools.app` | **0.4.119 (119)** | read off the bundle |
-| iPhone 17 Pro Max `00000000-0000000000000A02` | **0.4.119 (119)** | read off the device |
-| Vision Pro `00000000-0000000000000A01` | **not installed** | built and signed; the headset is paired but timed out — it was asleep |
+| iPhone 17 Pro Max `<iPhone UDID>` | **0.4.119 (119)** | read off the device |
+| Vision Pro `<Vision Pro UDID>` | **not installed** | built and signed; the headset is paired but timed out — it was asleep |
 
 **Finish the Vision Pro install first.** The app is already built at
 `<scratchpad>/dd-xros/Build/Products/Release-xros/GlassPowerTools.app`; wake the headset and
-`xcrun devicectl device install app --device 00000000-0000000000000A01 <path>`, then read the
+`xcrun devicectl device install app --device <Vision Pro UDID> <path>`, then read the
 version back (rule 16). If the scratchpad is gone, rebuild with
-`-destination 'platform=visionOS,id=00000000-0000000000000A01'`.
+`-destination 'platform=visionOS,id=<Vision Pro UDID>'`.
 
 ### Where D26 stands
 
@@ -1538,7 +1538,7 @@ Fixed the way the user asked for: **⌘N is a stub the focused window aims** —
 Document* in a database workspace, *New Terminal Window* in a terminal workspace, *New Host* in the
 library, and a disabled *New* elsewhere. `GlassShellFileCommands` is the one scope that replaces the
 placement; capabilities append with `after:` and keep their items unbound.
-**⇧⌘T is new**: "New Tab on oscar", copying the focused pane's intent so it connects with no chooser.
+**⇧⌘T is new**: "New Tab on the Linux server", copying the focused pane's intent so it connects with no chooser.
 
 **D26 stage 4's panel is built.** `GlassKeyManagerPanel` in the shell, contributed through
 `GlassShellModel.libraryPanels()` and joined at `GlassShellLibraryView`. `GlassKeyStore` is the
@@ -1549,7 +1549,7 @@ checked against `ssh-keygen -lf`, and the transport's own fingerprint now goes t
 
 ### Do these next, in order
 
-1. **Install 0.4.120 and look.** *The app was running with the user's live oscar session all session,
+1. **Install 0.4.120 and look.** *The app was running with the user's live Linux server session all session,
    so nothing was installed.* Quit it first, then install and **read the menu bar back**
    (rule 34's `osascript` line) to confirm ⌘T, ⇧⌘T and — still unproven — that ⌘W is *Close Tab*
    again. Then open the library and confirm the **Keys** panel is actually in the sidebar: that line
@@ -1588,8 +1588,8 @@ sync, which is why fixing the Mac alone did not hold.
 Rule to carry: **every device is on the current build or on nothing.**
 
 Installed now, each read back off the bundle or the device: **macOS
-`/Applications/Glass Power Tools.app` 0.4.123**, **iPhone `00000000-0000000000000A02` 0.4.123**,
-**Vision Pro `00000000-0000000000000A01` 0.4.123**. The headset had
+`/Applications/Glass Power Tools.app` 0.4.123**, **iPhone `<iPhone UDID>` 0.4.123**,
+**Vision Pro `<Vision Pro UDID>` 0.4.123**. The headset had
 been sitting on **0.4.92 (build 95)** — pre-D26, and therefore a live copy of the defect that erased
 configurations and republished the erasure through the catalog sync. It was the last device that
 could have re-opened the loop; it is now current.
@@ -1641,8 +1641,8 @@ all build.
 | Platform | Version |
 |---|---|
 | macOS `/Applications/Glass Power Tools.app` | **0.4.153** — the editor with one workspace per window, rounds two to four |
-| iPhone `00000000-0000000000000A02` | **0.4.143** — installed 2026-09-17, version read back off the device |
-| Vision Pro `00000000-0000000000000A01` | **0.4.123** — locked at every later attempt |
+| iPhone `<iPhone UDID>` | **0.4.143** — installed 2026-09-17, version read back off the device |
+| Vision Pro `<Vision Pro UDID>` | **0.4.123** — locked at every later attempt |
 
 The process is now `Glass Power Tools` (rule 37): **`pgrep -x GlassPowerTools` matches nothing**, and
 the bundle installs to `/Applications/Glass Power Tools.app`.
@@ -1701,7 +1701,7 @@ the machine and suggests the tunnel.
 ### Environment
 
 Ubuntu `192.0.2.6`: TigerVNC 5902, GNOME RD 3389, user `gptrdp`. Windows `192.0.2.3`
-unprovisioned. oscar `192.0.2.10`: SSH open, **MySQL on 3306 is not reachable from outside** —
+unprovisioned. The Linux server: SSH open, **MySQL on 3306 is not reachable from outside** —
 it needs the service's SSH tunnel switched on, which is what the new connect error now says.
 
 ## 2026-09-17 — RESUME HERE (supersedes the 2026-09-16 block above)
@@ -1714,8 +1714,8 @@ iOS and visionOS all build.
 | Platform | Version |
 |---|---|
 | macOS `/Applications/Glass Power Tools.app` | **0.4.158** |
-| iPhone `00000000-0000000000000A02` | **0.4.143** — before the editor's rounds two to four |
-| Vision Pro `00000000-0000000000000A01` | **0.4.123** — far behind; not attempted since 2026-09-16 |
+| iPhone `<iPhone UDID>` | **0.4.143** — before the editor's rounds two to four |
+| Vision Pro `<Vision Pro UDID>` | **0.4.123** — far behind; not attempted since 2026-09-16 |
 
 ### What today was
 
@@ -1820,10 +1820,10 @@ first real listing and its first real save.
 ### Running the live tests
 
     GPT_SSH_TEST_HOST=192.0.2.6 GPT_SSH_TEST_USER=michael \
-    GPT_SSH_TEST_KEY_PATH=$HOME/.ssh/scratch_vm swift test --filter LiveRemoteEditing
+    GPT_SSH_TEST_KEY_PATH=$HOME/.ssh/<test VM key> swift test --filter LiveRemoteEditing
 
 Unconfigured they print **NOT RUN** rather than passing quietly. `gptrdp` is the *desktop* account
-on that VM and has no SSH key; `michael` with `~/.ssh/scratch_vm` is the SSH one.
+on that VM and has no SSH key; `michael` with `~/.ssh/<test VM key>` is the SSH one.
 
 ### Things that will bite
 
@@ -2361,7 +2361,7 @@ reaches its children) and **50** (pinned chrome must occlude whatever the transp
 the iPhone**.
 
 **The terminal and the desktop have now been driven on a phone, by the user, and both work.** RDP
-to `oscar` rendered a GNOME login at 1,320 × 2,318 with the Esc/Tab/Keyboard bar, reported
+to `alpha` rendered a GNOME login at 1,320 × 2,318 with the Esc/Tab/Keyboard bar, reported
 "Connected", and the terminal came through the same pass. That closes the oldest item on the
 carried list — rule 46's debt is paid for three of the four capabilities, and only the editor's
 own phone pass predates it.
@@ -2504,7 +2504,7 @@ Three changes, and the third is the point:
 committed; the tree is clean.
 
 **What is true now.** All four capabilities have been driven on a phone and work: the terminal
-and the desktop by the user (RDP to `oscar` at 1,320 × 2,318), the editor and the database here.
+and the desktop by the user (RDP to `alpha` at 1,320 × 2,318), the editor and the database here.
 0.4.189 also launches on the new **iPadOS 27.2** and **visionOS 27.2** simulators — the headset's
 first sighting since 0.4.123, where it still reads as a flat grey plate.
 
@@ -2659,7 +2659,7 @@ Read the version back every time; never trust the install command's exit.
 
 ## 2026-09-21 (late) — duplicated services diagnosed, not yet fixed
 
-Eleven oscar records in the phone's catalog, two of them fully configured (the Mac's and the
+Eleven Linux server records in the phone's catalog, two of them fully configured (the Mac's and the
 phone's), grouped into one row whose detail shows the union. Sync by design, not a build problem.
 [Task note](tasks/2026-09/2026-09-21_duplicate-services.md) has the evidence and the two-part
 fix; the second part is the D26 two-device migration and is the user's call to start.
@@ -2672,7 +2672,7 @@ itself after every sync, merges only groups that agree on the address, keeps one
 (kind, name) by smallest endpoint id, and hands losers to their capability. Preferences migrate
 before the fold. New tests seen red without the call. 0.4.196 building for the Mac and the phone;
 **and the proof arrived**: the phone's catalog, copied back over the cable a minute after
-launch, holds **one live oscar and ten tombstones** — Terminal, MySQL, Desktop, each once. The
+launch, holds **one live record for the Linux server and ten tombstones** — Terminal, MySQL, Desktop, each once. The
 headset (0.4.123) still shows itself the old records; a tombstone beats a live record in
 `precedes`, so it cannot bring them back, and it will be clean once it is updated.
 
@@ -2688,7 +2688,7 @@ as asked: **Active** is the library's fourth category — live sessions grouped 
 disclosure each — and the **⚡** is in every top toolbar, one control meaning "take me there".
 Choosing a row switches to the live session. The Sessions control, switcher sheet and gallery
 from this morning are deleted; the seam under them (`GlassOpenSession`, `openSessions()`) and
-the Mac overview's card stay. Workgroups untouched. D33;
+The Mac overview's card stay. Workgroups untouched. D33;
 [task note](tasks/2026-09/2026-09-21_active-and-the-bolt.md).
 
 Four new shell tests pass; the phone walkthrough became the bolt walkthrough and is running.
@@ -2702,14 +2702,14 @@ at `f2ed368`.
 **What the day did, in order:** the session switcher and its gallery (D1–D3); the locked-screen
 diagnosis and its correction (rule 56); the Mac overview joining the seam and the title band
 fixed; the charts on macOS 27.2 (annotations, compact axis, hover tooltips, one view,
-`Tools/ChartProbe`); eleven oscar records folded into one (D32); and then the day's own switcher
+`Tools/ChartProbe`); eleven Linux server records folded into one (D32); and then the day's own switcher
 replaced by **Active** in the library and the **⚡** in every toolbar (D33), at the user's word.
 
 ### Next, in order
 
 1. **The exec seam** — *"run a command on this machine and say when it is done."* Four features
    wait on it: `git status` in the editor, project-wide `rg`, server-side LSP, the Watch (D30).
-2. **Update the Vision Pro.** It still holds the pre-consolidation oscar records and has seen
+2. **Update the Vision Pro.** It still holds the pre-consolidation Linux server records and has seen
    nothing since 0.4.123.
 3. *"A fun way to view that list"* — Active's, later.
 4. A seeded database/desktop configuration, so those can have a UI test at all.
@@ -2725,21 +2725,21 @@ replaced by **Active** in the library and the **⚡** in every toolbar (D33), at
   DeviceFS mount fails while the app runs. Read the installed version back off every device.
 - `pgrep -x "Glass Power Tools"` matches the simulator copies too.
 
-## 2026-09-21 (later still) — oscar missing from the Mac; fold survivor changed
+## 2026-09-21 (later still) — the Linux server missing from the Mac; fold survivor changed
 
 The fold's survivor was the oldest record, which is the one most likely to be a tombstone
 elsewhere. Now it is the most recently updated member with services. Shell suite 170 / green;
 package suite and 0.4.198 builds running. **The Mac's catalog is unread** — privacy protection
 on the group container — and the user is copying it out; the Mac is not reinstalled until it has
-been read, so the evidence is not disturbed. The phone still holds oscar live.
+been read, so the evidence is not disturbed. The phone still holds the Linux server live.
 0.4.198 is on the phone (read back), so its next fold uses the safe survivor. The Mac is still on
-0.4.197 with oscar missing, awaiting its catalog copy.
+0.4.197 with the Linux server missing, awaiting its catalog copy.
 
-## 2026-09-21 — night — oscar: the real mechanism, and D34
+## 2026-09-21 — night — the Linux server: the real mechanism, and D34
 
 With the Mac's catalog in hand (copied out through Finder — the shell is kept out of other apps'
-group containers): the writer ids in the notes above were **backwards** (`a4d0e867` = Mac,
-`6b16e22a` = phone), and the phone catalog read over the cable was a **stale app-container
+group containers): the writer ids in the notes above were **backwards** (`<Mac writer id>` = Mac,
+`<phone writer id>` = phone), and the phone catalog read over the cable was a **stale app-container
 copy** — the live one is in the App Group container, which `devicectl copy` refuses. The phone's
 fold at 21:19 tonight tombstoned `c737ab54` after moving its services into another record; the
 Mac received the merged record live and newer and **refused it**, because
@@ -2748,8 +2748,8 @@ Mac received the merged record live and newer and **refused it**, because
 **D34:** the later statement wins, deletion included. `precedes` now lets a live record newer
 than the tombstone's `deletedAt` revive it; ties keep the tombstone. Four catalog tests, one
 old test rewritten to the new truth. 1,707 tests, exit 0. 0.4.199 building for the Mac and the
-phone; **the Mac's first launch of it fetches everything (the sync token is never persisted) and
-should bring oscar back on its own** — that is the test, and only the Mac's screen can pass it.
+phone; **The Mac's first launch of it fetches everything (the sync token is never persisted) and
+should bring the Linux server back on its own** — that is the test, and only the Mac's screen can pass it.
 
 ## 2026-09-21 — 23:00 — RESUME HERE (supersedes every block above)
 
@@ -2760,14 +2760,13 @@ D34 (a deletion is dated); the fold survivor is the most recently updated member
 
 ### Open, in order
 
-1. **oscar on the Mac — unresolved.** Its record was tombstoned by the phone's fold at 21:19
+1. **The Linux server on the Mac — unresolved.** Its record was tombstoned by the phone's fold at 21:19
    (0.4.196, old survivor rule) and the Mac refused the merged record (old immortal-tombstone
    rule). D34 fixes the rule; the phone was launched on 0.4.199 at ~22:55 so it would publish
    its merged record, and the Mac was relaunched a minute later to fetch everything. **Whether
-   oscar came back has not been seen.** If it did not: the phone's merged record is not in
-   CloudKit, and the fallback is to **rebuild oscar from the backup** at
-   `~/Desktop/phone-hosts-backup.json` (record `c737ab54`: Terminal `76bb64f3` 668 B, MySQL
-   `a5ad31ce` 540 B, Desktop `48c918ef` 764 B, address `192.0.2.10`). Constraints: the
+   the Linux server came back has not been seen.** If it did not: the phone's merged record is not in
+   CloudKit, and the fallback is to **rebuild the Linux server from the backup** at
+   a local backup of the phone's host records. Constraints: the
    Mac's catalog is in `~/Library/Group Containers/group.sh.glas.shared/`, unreadable and
    unwritable from the shell (Finder can copy it out); the phone's live catalog is in its App
    Group container, which `devicectl copy` refuses in both directions; the phone's
@@ -2786,7 +2785,7 @@ D34 (a deletion is dated); the fold survivor is the most recently updated member
 
 ### Things that will bite
 
-- Writer ids: **`a4d0e867` is the Mac, `6b16e22a` the phone** (from each device's
+- Writer ids: **`<Mac writer id>` is the Mac, `<phone writer id>` the phone** (from each device's
   `shell-preferences.json`). Rules 53–57.
 - Read the installed version back off every device; a Wi-Fi `devicectl install` can silently
   do nothing. `pgrep -x "Glass Power Tools"` matches the simulator copies.
@@ -2820,12 +2819,12 @@ tackle this on return"* — **this** is the database grid.
 - In-app scroll check: `inapp.sh` pattern (scroll-wheel CGEvents + `sample`; the main thread is
   the first `Thread_` block, labelled "Main Thread", not always "com.apple.main-thread").
 - The research source is named only as "the state of the art" in the repo (the user's instruction).
-- Writer ids: `a4d0e867` Mac, `6b16e22a` phone. A Wi-Fi `devicectl` install can fail with 4016
+- Writer ids: `<Mac writer id>` Mac, `<phone writer id>` phone. A Wi-Fi `devicectl` install can fail with 4016
   when the phone is asleep — read the version back.
 
 ### Closed since the 23:00 block
 
-1. **oscar is back on the Mac** — the user's words at 00:05. D34 held; the phone published on
+1. **The Linux server is back on the Mac** — the user's words at 00:05. D34 held; the phone published on
    0.4.199 and the Mac fetched it. No rebuild from the backup, no in-app restore path built.
 2. **Disconnect in the database workspace** —
    [task note](tasks/2026-09/2026-09-22_disconnect-in-the-workspace.md). The 23:00 block was
@@ -2855,7 +2854,7 @@ tackle this on return"* — **this** is the database grid.
    `TerminalActiveListingTests`.
 
 6. **Active's database row says where the workspace is** (06:45): `DatabaseSession.workspaceFocus`,
-   published on every change of the displayed tab, rendered as "MySQL · common_vision › articles".
+   published on every change of the displayed tab, rendered as "MySQL · shop › articles".
    `ActiveRowFocusTests`. The terminal's rows do not say where they are yet — the shell title
    (`OSC 0`) is the natural next reflection.
 
@@ -2863,7 +2862,7 @@ tackle this on return"* — **this** is the database grid.
    selection type for scopes and panels, so Active, SSH Keys, Workgroups and Projects rows
    carry the native highlight. `GlassLibrarySidebarSelectionTests`.
 8. **Seen by the user on the Mac (07:23):** Active's database row reading "MySQL ·
-   common_vision › articles".
+   shop › articles".
 
 9. **The scale goes with the size at connect** (07:35): the client core data's
    desktopScaleFactor was a fixed 100, so a Retina window got a 100% 4K login screen until the
@@ -2883,7 +2882,7 @@ tackle this on return"* — **this** is the database grid.
 
 ### Open, in order
 
-0. **See the desktop follow the login on oscar** (0.4.201): connect, log in at GNOME's screen,
+0. **See the desktop follow the login on the Linux server** (0.4.201): connect, log in at GNOME's screen,
    and the session should come to the window's size by itself. And the window should open at
    the configured desktop only when the remembered frame is a thumbnail — it is 1,326 × 905
    right now, so the sizer stands down until someone shrinks a desktop window to the floor.
@@ -2897,15 +2896,14 @@ tackle this on return"* — **this** is the database grid.
 
 ### Things that will bite
 
-- Writer ids: **`a4d0e867` is the Mac, `6b16e22a` the phone**. Rules 53–57.
+- Writer ids: **`<Mac writer id>` is the Mac, `<phone writer id>` the phone**. Rules 53–57.
 - Read the installed version back off every device. `pgrep -x "Glass Power Tools"` matches
   the simulator copies.
 - The sync token is never persisted; publishing happens on the *next* sync after a change.
-- `~/Desktop/phone-hosts-backup.json` is no longer needed; the user's to delete.
 
 ## 2026-09-25 — RESUME HERE (supersedes every block above)
 
-**State DOCS → committed locally, not pushed** (the user: *"don't push"*). 0.4.223 on the Mac (read
+**State DOCS → committed locally, not pushed** (the user: *"don't push"*). Since the commit: Mac Settings as icon tabs and an AudioPaper-style About (0.4.225 on the Mac), visionOS Settings as a TabView (0.4.226 built), D38, D39 — uncommitted. Earlier: 0.4.223 on the Mac (read
 back); iPhone 0.4.217; Vision Pro 0.4.123. 1,761 tests, 0 failing.
 
 ### Done today
@@ -2930,9 +2928,37 @@ back); iPhone 0.4.217; Vision Pro 0.4.123. 1,761 tests, 0 failing.
    highlighting ceiling at ~1 MB (proposed, not asked for).
 5. Open choice: Save sits beside New in File (D37's placement note); beside Close needs an item from
    a scene whose `.saveItem` draws.
+6. **Documentation and the site (D39)** and **distribution (D38)** — decided, nothing built. First
+   steps: a placeholder on glasspowertools.com (proves DNS and the deploy), then the vision page and
+   the registry of surfaces taken from the code, for the user's review. Open:
+   the registrar for glasspowertools.com; fix-as-found during the audit (proposed).
+7. **Vision Pro 0.4.226** is built (Settings as icon tabs → the leading ornament; the library's gear
+   opens the Settings window) but not installed: the Mac has **no pairing record** for the headset
+   (`devicectl` lists only the iPhone and Watch). It was updating to visionOS 27.2 beta 2; re-pair
+   via Remote Devices + Xcode's Devices window, then install and check the ornament.
 
 ### Things that will bite
 
 - Rule 34/39/60: after any `Commands` change, read the running app's menu bar through System Events.
 - Rule 59, and do not drive the Mac while the user is on it; do not quit the app under them.
-- Writer ids: `a4d0e867` Mac, `6b16e22a` phone.
+- Writer ids: `<Mac writer id>` Mac, `<phone writer id>` phone.
+
+## 2026-09-26 — RESUME HERE (supersedes every block above)
+
+**Release preparation; no new features** (the user: *"get back on track with the release prep work.
+I'll stop adding features."*). Working detail and the ordered checklist are in the git-ignored
+`.private/` folder (`RESUME.md`), readable by any tool on this Mac.
+
+Since `f34e80d`, uncommitted: Mac Settings as icon tabs and a new About; visionOS Settings as a tab
+view; the repository-wide privacy rule (rule 61) applied; the SSH stack re-vendored at recorded
+upstream commits with documented patches (`Packages/*/PATCHES.md`); in the editor and SFTP browser,
+New File and saving a new document into a project folder. Tests: 1,766 app tests, the vendored
+packages' own suites, and live SSH/SFTP/database suites against a disposable test VM — all passing.
+
+**Licensing done (item 1)** — see `tasks/2026-09/2026-09-26_licensing-and-acknowledgements.md`:
+corrected notices, generated licence folder and in-app Acknowledgements, Mermaid licence gate, guard
+tests, Xcode pins re-aligned with the package's. 1,771 tests pass; macOS 0.4.231 built, not installed
+(the app was open).
+
+Next: refresh dependencies, curate this memory bank into a current-state summary, then README and
+SECURITY.md.

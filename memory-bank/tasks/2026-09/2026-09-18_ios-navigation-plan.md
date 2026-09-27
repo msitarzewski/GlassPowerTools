@@ -47,9 +47,9 @@ a string of text rather than a place. The editor's tree has no header of its own
 
 **One header, used by both:**
 
-- **The current folder's name, large.** `sensor`, not `/home/ann/projects/sensor`.
+- **The current folder's name, large.** `sensor`, not `~/projects/sensor`.
 - **The full path beneath it**, across the header's whole width, in a smaller secondary weight,
-  **without the current folder repeated** — `/home/ann/projects`.
+  **without the current folder repeated** — `~/projects`.
 - **Truncated from the front** when it does not fit (`…/michael/projects`), because the end of a
   path is the part that locates you and the beginning is the part you can infer.
 
@@ -181,7 +181,7 @@ iPhone walkthrough driven twice with a screenshot at every step.
 2. **`~F/Documents`.** The editor's private `abbreviated(_:)` dropped `home.count - 1` characters,
    keeping home's last character instead of the separator after it. It is now
    `GlassPathLocation.abbreviatingHome`, shared with the Files browser and covered by two tests —
-   one of which also refuses `/Users/michaela` as "inside" `/Users/ann`.
+   one of which also refuses `/Users/anna` as "inside" `/Users/ann`.
 
 ## What is proven, and what is not
 
@@ -416,7 +416,7 @@ above. What is new is small; what moved is the useful part.
 # The Mac's overview joins the seam, and the title band stops leaking — 2026-09-21
 
 Reported from the running app, standing in the Terminal Overview: *"Looks like we lost the title
-settings again somehow. Shouldn't the oscar database connection show up in this carousel now?"*
+settings again somehow. Shouldn't the Linux server database connection show up in this carousel now?"*
 
 ## The overview shows every open session
 
@@ -435,7 +435,7 @@ phone. The screenshot was the counter-argument, and the seam already existed, so
 
 In overview mode the window swapped its title-band material to `.underWindowBackground` — the
 material *designed* to show what is behind the window, blurred. With the database window behind
-the terminal, its "MySQL on oscar" header floated through the terminal's own title. glas.sh did
+the terminal, its "MySQL on the Linux server" header floated through the terminal's own title. glas.sh did
 the same swap, which is the "again". The overview now keeps the family's title band; the test that
 asserted the swap was rewritten to assert its absence and seen **red** against the old code.
 Rule 50, one level up: chrome that says where you are does not become see-through because a

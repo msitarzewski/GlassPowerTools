@@ -30,7 +30,7 @@ public enum GlassLocalHost {
     /// Beside the shared catalog's own relative path, under this app's private storage.
     static let storeRelativePath = "GlassHostCatalog/local-host.json"
 
-    /// What the device is called. Deliberately not the machine's own name: a Mac called "juliet"
+    /// What the device is called. Deliberately not the machine's own name: a Mac called "bravo"
     /// may also be in the shared library as a machine reached over SSH, and two rows with one name
     /// would be indistinguishable. "This Mac" is what the user called it.
     public static var displayName: String {

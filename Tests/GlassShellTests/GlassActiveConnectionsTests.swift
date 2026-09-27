@@ -42,28 +42,28 @@ struct GlassActiveConnectionsTests {
     func groupsByMachine() async throws {
         let (model, root, store) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
-        let oscarTerminal = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on oscar")
-        let oscarDatabase = HostServiceLink(endpointID: EndpointID(), kind: .database, displayName: "MySQL on oscar")
-        let beastTerminal = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on juliet")
-        let oscar = try HostProfile(displayName: "oscar", address: "10.0.0.1", services: [oscarTerminal, oscarDatabase])
-        let beast = try HostProfile(displayName: "juliet", address: "10.0.0.2", services: [beastTerminal])
-        try await store.upsert(oscar); try await store.upsert(beast)
+        let alphaTerminal = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on alpha")
+        let alphaDatabase = HostServiceLink(endpointID: EndpointID(), kind: .database, displayName: "MySQL on alpha")
+        let beastTerminal = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on bravo")
+        let alpha = try HostProfile(displayName: "alpha", address: "10.0.0.1", services: [alphaTerminal, alphaDatabase])
+        let beast = try HostProfile(displayName: "bravo", address: "10.0.0.2", services: [beastTerminal])
+        try await store.upsert(alpha); try await store.upsert(beast)
 
         let terminal = StubCapability(kind: .ssh, displayName: "Terminal")
-        terminal.sessions = [session("terminal:1", title: "oscar", endpoints: [oscarTerminal.endpointID]),
-                             session("terminal:2", title: "juliet", endpoints: [beastTerminal.endpointID])]
+        terminal.sessions = [session("terminal:1", title: "alpha", endpoints: [alphaTerminal.endpointID]),
+                             session("terminal:2", title: "bravo", endpoints: [beastTerminal.endpointID])]
         let database = StubCapability(kind: .database, displayName: "Database")
-        database.sessions = [session("database:1", title: "MySQL on oscar", endpoints: [oscarDatabase.endpointID])]
+        database.sessions = [session("database:1", title: "MySQL on alpha", endpoints: [alphaDatabase.endpointID])]
         model.registry.register(terminal); model.registry.register(database)
         model.registry.registerSessionProvider(id: "editor") { [self] in
-            [session("editor:1", title: "notes", host: oscar.id)]
+            [session("editor:1", title: "notes", host: alpha.id)]
         }
         await model.load()
 
         let machines = model.activeMachines()
-        #expect(machines.map(\.name) == ["oscar", "juliet"], "machines in the order sessions were listed")
+        #expect(machines.map(\.name) == ["alpha", "bravo"], "machines in the order sessions were listed")
         #expect(machines.first?.sessions.map(\.id) == ["terminal:1", "database:1", "editor:1"],
-                "the terminal, the database and the editor on oscar are one group")
+                "the terminal, the database and the editor on alpha are one group")
         #expect(machines.last?.sessions.map(\.id) == ["terminal:2"])
         #expect(model.activeSessionCount() == 4)
     }

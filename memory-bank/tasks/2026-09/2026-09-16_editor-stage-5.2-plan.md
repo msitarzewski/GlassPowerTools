@@ -101,8 +101,8 @@ point at all on iOS or visionOS.** A library panel is the entry point on every p
 `GlassLibraryPanel` (`GlassLibraryPanel.swift`, the mechanism Workgroups and SSH Keys already use):
 
 - **results** — the list of projects. Each row: the project's name, its machine, its path, and the
-  reach badge `GlassEditorProjectReach` already produces (*On this Mac* / *Over SSH · juliet* /
-  *juliet — no terminal service*).
+  reach badge `GlassEditorProjectReach` already produces (*On this Mac* / *Over SSH · the Mac* /
+  *the Mac — no terminal service*).
 - **detail** — the project's facts in a grouped `Form`, with the workgroup detail's action bar:
   **Rename** lower-left, **Open in Editor** lower-right and prominent
   (`TerminalWorkgroupsView.swift:413-434`, copied in shape, not in code).
@@ -176,7 +176,7 @@ because the badge would promise something the tree cannot do.
 | A2 | A screenshot of a scrolled document. Compositing is not provable by reading code |
 | B1/B2 | The suite for the extraction; both windows looked at side by side |
 | C1/C2 | Unit tests: merge with tombstones, a project whose host is absent, two devices writing at once. Then **two real devices** — the panel on the phone showing a project added on the Mac |
-| D | A real folder on oscar, opened from the headset |
+| D | A real folder on the Linux server, opened from the headset |
 
 ---
 

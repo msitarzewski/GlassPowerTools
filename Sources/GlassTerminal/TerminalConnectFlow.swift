@@ -87,7 +87,7 @@ struct TerminalConnectFlow: ViewModifier {
                 // took the session before the *reconnect*, but `trustHostKey` runs first and
                 // looks the session up too, so every first connect to a new machine ended in
                 // "This terminal session is no longer active" and the key was never saved
-                // (2026-09-22, "Public" on Tandem). With nothing pending, the dismissal has
+                // (2026-09-22, the first connect to a newly added server). With nothing pending, the dismissal has
                 // nothing to close.
                 guard let session = Self.takePendingTrustSession(&pendingTrustSession,
                                                                  challenge: &pendingTrustChallenge) else { return }

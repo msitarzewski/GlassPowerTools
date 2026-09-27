@@ -85,11 +85,11 @@ struct MacWorkspaceTests {
         let all = [
             row(GlassTerminalCapability.sessionID(workgroupID: mine)),
             row(GlassTerminalCapability.sessionID(workgroupID: theirs)),
-            row("database:oscar"),
+            row("database:alpha"),
             row("editor:notes"),
         ]
         let shown = MacOverviewSessions.others(all, excludingWorkgroups: [mine]).map(\.id)
-        #expect(shown == [GlassTerminalCapability.sessionID(workgroupID: theirs), "database:oscar", "editor:notes"])
+        #expect(shown == [GlassTerminalCapability.sessionID(workgroupID: theirs), "database:alpha", "editor:notes"])
         #expect(MacOverviewSessions.others(all, excludingWorkgroups: []).count == 4,
                 "a window with no workgroup tabs excludes nothing")
     }
@@ -98,8 +98,8 @@ struct MacWorkspaceTests {
         // One row to browse: arrow keys walk off the last tab onto the first card, and stop at
         // the ends rather than wrapping — the same arithmetic the tabs always had.
         let tab = UUID()
-        let ids: [MacOverviewItemID] = [.tab(tab), .session("database:oscar"), .session("editor:notes")]
-        #expect(MacTerminalOverviewNavigation.moved(.tab(tab), by: 1, in: ids) == .session("database:oscar"))
+        let ids: [MacOverviewItemID] = [.tab(tab), .session("database:alpha"), .session("editor:notes")]
+        #expect(MacTerminalOverviewNavigation.moved(.tab(tab), by: 1, in: ids) == .session("database:alpha"))
         #expect(MacTerminalOverviewNavigation.moved(.session("editor:notes"), by: 1, in: ids) == .session("editor:notes"))
         #expect(MacTerminalOverviewNavigation.moved(MacOverviewItemID?.none, by: 0, in: ids) == .tab(tab))
     }
@@ -1619,9 +1619,9 @@ struct MacWorkspaceTests {
         let fixture = try WorkspaceDefaultsFixture()
         defer { fixture.cleanup() }
         let server = ServerConfiguration(
-            name: "Umbp",
-            host: "192.0.2.11",
-            username: "michael"
+            name: "Charlie",
+            host: "192.0.2.30",
+            username: "user"
         )
         let controller = MacWorkspaceController(
             request: MacWorkspaceLaunchRequest(
@@ -1635,8 +1635,8 @@ struct MacWorkspaceTests {
         #expect(
             controller.windowIdentity(servers: [server])
                 == MacWorkspaceWindowIdentity(
-                    title: "Umbp",
-                    subtitle: "michael@192.0.2.11:22"
+                    title: "Charlie",
+                    subtitle: "user@192.0.2.30:22"
                 )
         )
     }

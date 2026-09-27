@@ -194,7 +194,7 @@ struct AtomicSaverTests {
     @Test("Remote and ephemeral origins are refused, never half-saved locally")
     func refusesOriginsThePackageDoesNotOwn() {
         let remote = DocumentOrigin.remote(
-            RemoteDocumentRef(connectionID: UUID(), host: "umbp.tail1234.ts.net", path: "/etc/hosts")
+            RemoteDocumentRef(connectionID: UUID(), host: "charlie.tail1234.ts.net", path: "/etc/hosts")
         )
         #expect(throws: EditorError.self) {
             try AtomicSaver.save("x", encoding: .utf8(hadBOM: false), to: remote)

@@ -13,7 +13,7 @@
 //  - **The current folder's name, large.** `sensor`, not `/home/ann/projects/sensor`.
 //  - **The path that leads to it beneath**, across the whole width, smaller and secondary, without
 //    the current folder repeated — `/home/ann/projects`.
-//  - **Truncated from the front** when it will not fit: `…/michael/projects`. The end of a path is
+//  - **Truncated from the front** when it will not fit: `…/ann/projects`. The end of a path is
 //    the part that locates you; the beginning is the part you can infer.
 //
 
@@ -41,7 +41,7 @@ public struct GlassPathLocation: Equatable, Sendable {
     public init(path: String, separator: Character = "/") {
         let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
         // A trailing separator is the same folder written differently — `/home/ann/` names
-        // `michael`, not an unnamed folder inside it.
+        // `ann`, not an unnamed folder inside it.
         var body = trimmed
         while body.count > 1, body.last == separator { body.removeLast() }
 

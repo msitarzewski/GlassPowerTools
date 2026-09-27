@@ -70,7 +70,7 @@ icons until gazed at. That is correct native behaviour.
 ## Validation, and how to actually get a picture
 
 Every visionOS judgement comes from a capture on the **physical headset**. The UI suite runs there:
-`-destination 'platform=visionOS,id=00000000-0000000000000A01'`, proven this session (a full run:
+`-destination 'platform=visionOS,id=<Vision Pro UDID>'`, proven this session (a full run:
 10 passed, 2 failed). The headset must be **unlocked** — a locked one stops the run at
 *"Unlock My Vision Pro to Continue"* and xcodebuild waits rather than failing.
 

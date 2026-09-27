@@ -19,7 +19,7 @@ public enum DocumentOrigin: Sendable, Hashable {
 public struct RemoteDocumentRef: Sendable, Hashable {
     /// Consumer's connection identity (e.g. a glas.sh session UUID).
     public var connectionID: UUID
-    /// Display host, e.g. "umbp.tail1234.ts.net".
+    /// Display host, e.g. "charlie.tail1234.ts.net".
     public var host: String
     /// Remote absolute path as the consumer's transport understands it.
     public var path: String

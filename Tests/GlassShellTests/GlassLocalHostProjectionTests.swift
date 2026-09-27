@@ -68,12 +68,12 @@ struct GlassLocalHostProjectionTests {
 
         // A machine arriving from the account — enough to make `toApplyLocally` non-empty, which is
         // the branch that rebuilds the projection.
-        let incoming = try HostProfile(id: HostID(), displayName: "juliet",
+        let incoming = try HostProfile(id: HostID(), displayName: "bravo",
                                        lastWriterID: WriterID())
         backend.remote = [incoming]
         await model.synchronizeCatalog()
 
-        #expect(model.hosts.contains { $0.displayName == "juliet" }, "the incoming machine was not applied")
+        #expect(model.hosts.contains { $0.displayName == "bravo" }, "the incoming machine was not applied")
         #expect(model.hosts.contains { $0.isLocal }, "This Mac disappeared when the sync applied a record")
         #expect(model.hosts.first?.isLocal == true, "This Mac is no longer at the head")
     }

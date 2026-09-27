@@ -97,3 +97,11 @@ services-count subtitle on any platform — the service icons already say how ma
 connect control is one button with two regions: the play glyph connects **every** service on the
 host; the chevron picks a single service (tap, click or pinch, not hover-only). The database icon
 is Heroicons `circle-stack`; terminal and desktop keep their SF Symbols. Applies family-wide.
+
+## Distribution and documentation (2026-09-25)
+
+- **Updates are automatic on every platform** — Sparkle on the Mac (Developer ID; the Mac App Store's
+  sandbox rules it out), TestFlight then the App Store on iPhone, iPad and Vision Pro (D38).
+- **Primary audience:** developers who want a first-class Vision Pro experience across the suite.
+- **glasspowertools.com**: a landing page, a page per capability and an Anomalous-style help centre,
+  written from an audit of the code; Bedrock for the copy (D39).

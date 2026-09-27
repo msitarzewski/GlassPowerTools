@@ -691,7 +691,7 @@ cannot leave its device. "Works everywhere" is therefore true of an imported key
 generated hardware one, by design.
 
 **Amended the same day: keys are not a detail of this.** *"We need that key to live on its own …
-so the key itself survives if I delete the oscar Terminal connection, so that it can be reused for
+so the key itself survives if I delete the Linux server Terminal connection, so that it can be reused for
 other hosts and services."* A key outlives connections and is shared by them, so it gets its own
 stage and its own manager — see
 [keys first class](tasks/2026-09/2026-09-14_d26-keys-first-class.md). The original scope item 2
@@ -757,8 +757,8 @@ correctness fix, not a migration.
 
 ## D28 — what authenticates what is derived, never stored
 
-**Status: Approved** by the user, 2026-09-14, from the scenario they set: *"juliet and oscar share
-a key and the juliet terminal using said key is deleted. oscar's terminal still uses it… we need a
+**Status: Approved** by the user, 2026-09-14, from the scenario they set: *"the Mac and the Linux server share
+a key and the Mac terminal using said key is deleted. The Linux server's terminal still uses it… we need a
 lookup table of some kind that tracks usage by auths."*
 
 **The decision: no table.** The edge already exists on the service's own configuration
@@ -767,9 +767,9 @@ pass over `configurations(ofKind:)`. A stored usage table is a second copy of a 
 exists and has to be kept in step through deletion, editing, sync and merge — and D25 is exactly the
 bug where deleting a thing forgot to tell the other store. A derived index cannot drift.
 
-**The user's scenario falls out of it with no cascade to write:** deleting juliet's Terminal
-removes that service's configuration, the edge goes with it, and the key reads "used by 1 · oscar ·
-Terminal". oscar is untouched because nothing ever pointed at it.
+**The user's scenario falls out of it with no cascade to write:** deleting the Mac's Terminal
+removes that service's configuration, the edge goes with it, and the key reads "used by 1 · the Linux server ·
+Terminal". The Linux server is untouched because nothing ever pointed at it.
 
 **Only keys are shared. Measured 2026-09-14:**
 
@@ -798,11 +798,11 @@ of choice:**
 rather than fatal. So "used by" must report *"2 services, plus 1 this build cannot read"* rather than
 silently undercounting — otherwise a key still in use reads as unused and gets deleted. A zero only
 ever proves where you looked (project rule 24). A key genuinely used by nothing says so plainly:
-that is the state after the juliet deletion and the signal that it is safe to delete.
+that is the state after the Mac deletion and the signal that it is safe to delete.
 
 **Where it lives:** the key manager panel in the library sidebar beside Collections (D26 stage 4),
 with "used by" as host · service rows each carrying its own detach — which is the point of the
-request: *"Disconnect XYZ key from oscar's terminal"* without walking Connections › oscar › Terminal.
+request: *"Disconnect XYZ key from the Linux server's terminal"* without walking Connections › the Linux server › Terminal.
 
 ## D29 — Uninstalling is a feature, not a support article
 
@@ -904,7 +904,7 @@ dies with the view. Hoisting it onto `DatabaseSessionManager` is the fix and is 
 
 ## D32 — Records that agree on an address are one record, automatically — Implemented 2026-09-21
 
-**Context.** Three devices each set oscar up before they had heard of each other's record. The
+**Context.** Three devices each set the Linux server up before they had heard of each other's record. The
 catalog merges by record id, so eleven records for one machine accumulated; the library grouped
 them into one row and its detail showed the union of their services — two Terminals, two
 Desktops. The group projection (`GlassShellHost.members`) had been treated as a lasting state,
@@ -949,9 +949,9 @@ layout that gallery left behind.
 
 **Context.** `GlassCatalogMerge.winner` was last-write-wins by `updatedAt`, but the store that
 applies incoming records (`HostCatalogStore.precedes`) made a tombstone beat a live record
-whatever the dates. When the phone folded its duplicate oscar records into one and the merged
+whatever the dates. When the phone folded its duplicate Linux server records into one and the merged
 record arrived at the Mac live and newer, a five-day-old tombstone for that id refused it,
-silently, and oscar vanished from the Mac with every service folded into it.
+silently, and the Linux server vanished from the Mac with every service folded into it.
 
 **Decided.** One rule at both layers: the later statement about a record wins, deletion
 included. A tombstone beats a live record only when its `deletedAt` is at or after the live
@@ -1020,3 +1020,58 @@ Close, that is the open question: attach an item from a scene whose `.saveItem` 
 
 **Status.** Implemented 2026-09-25 in answer to the user's report (*"command-s should show a save
 interface vs. bonking me"*); 0.4.220 onward, menu bar read back.
+
+## D38 — Distribution and automatic updates: Developer ID + Sparkle on the Mac, TestFlight then the App Store elsewhere — Approved 2026-09-25
+
+**Context.** No build has been distributed yet; every install so far is from Xcode, which never
+updates itself. The user: *"we do need to account for automatic updates."*
+
+**Decision.**
+- **macOS: Developer ID, notarized, updated by Sparkle** — the Mac App Store is not open to this app.
+  It requires App Sandbox (App Store Review Guidelines 2.4.5(i)), `Platforms/macOS/macOS.entitlements`
+  has none, and sandboxing is not a formality here: a local shell started inside the sandbox inherits
+  it and cannot reach the user's files or tools, and `~/.ssh`, `ssh-agent` and open-anything editing
+  would all need workarounds. The user: *"Desktop can't go through the app store. It's not sandboxed."*
+  Reuse the release path of AudioPaper, the author's other open-source Mac app (its
+  `scripts/release.sh` and `appcast.py`): archive,
+  export with Developer ID and hardened runtime, notarize, staple, a Sparkle zip signed with the EdDSA
+  key, the feed entry, then the DMG. The feed is `https://glasspowertools.com/appcast.xml`; the update
+  zip is on the site or on GitHub Releases, depending on whether the repository is public.
+- **iOS, iPadOS, visionOS: TestFlight first, then the App Store.** Those platforms do not let an app
+  update itself; TestFlight's automatic updates and the App Store's are the mechanism. TestFlight also
+  installs over the air, which removes the Xcode-pairing dependency seen on 2026-09-25.
+
+**Required before the first Mac release** (not yet done):
+1. Sparkle linked for **macOS only** — one multiplatform target, so a platform-filtered dependency.
+2. A **Developer ID provisioning profile** carrying the CloudKit container `iCloud.com.glasspowertools`,
+   the App Group `group.sh.glas.shared` and the Keychain group; sync verified on a Developer ID build
+   before it ships.
+3. `com.apple.developer.aps-environment` **`production`** for release builds (it is `development`), or
+   CloudKit's change notifications do not reach released copies.
+4. The feed served uncached (D39).
+
+**Status.** Approved by the user 2026-09-25. Nothing built.
+
+## D39 — Documentation and glasspowertools.com — Approved 2026-09-25
+
+**Decision.** Documentation is built in the order the user set: the vision; then an audit of every
+surface against the code, fixing discrepancies, whose output is the help; then a landing page, one
+product page per capability and a help centre. Plan and models:
+[documentation and site plan](tasks/2026-09/2026-09-25_documentation-and-site-plan.md).
+- **Audience first:** developers who want a first-class Vision Pro experience; every surface is
+  written Vision Pro first, other platforms' differences marked, each claim at its verified level.
+- **Help centre:** Anomalous's help system (anomalous.bot/help — one registry for
+  sidebar, ⌘K search, meta, JSON-LD, sitemap, `llms.txt`), rebuilt as static files: a registry and
+  Markdown pages in this repo, generated by an extension of AudioPaper's `build_site.py`.
+- **Copy:** Bedrock for the landing and product pages (`bedrock-brand-voice` writes, `ask-bedrock`
+  judges); help pages plain and exact; nothing claimed beyond what the audit verified.
+- **Hosting:** **glasspowertools.com** (owned by the user), a static site the build produces as a
+  folder of files, served from the user's own infrastructure. **How and where it is hosted is not
+  recorded in this repository** — machine names, addresses and server layout are private; the
+  deployment runbook lives in the user's private infrastructure notes. Deployment scripts are run by
+  the user.
+- **The update feed must be served uncached** (`appcast.xml`, and the site's HTML and JSON), so an
+  update is never missed; a requirement on the hosting, tracked privately.
+
+**Status.** Approved by the user 2026-09-25 (*"This plan"* in conversation; *"document all of these
+decisions"*). Nothing built.

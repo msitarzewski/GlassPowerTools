@@ -7,8 +7,8 @@
 //  to be kept in step through deletion, editing, sync and merge — and D25 is the bug where deleting
 //  a thing forgot to tell the other store.
 //
-//  The scenario these exist for is the user's: *juliet and oscar share a key, and the juliet
-//  terminal using it is deleted. oscar's terminal still uses it.*
+//  The scenario these exist for is the user's: *bravo and alpha share a key, and the bravo
+//  terminal using it is deleted. alpha's terminal still uses it.*
 //
 
 import Foundation
@@ -55,22 +55,22 @@ struct D28KeyUsageTests {
         await model.load()
         let key = UUID()
 
-        let onOscar = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                  address: "oscar.example", serviceName: "Terminal")
-        let onJuliet = try await model.adoptService(kind: .ssh, hostName: "juliet",
-                                                      address: "juliet.example", serviceName: "Terminal")
-        capability.credentials = [onOscar: .sharedKey(id: key, deviceBound: false),
-                                  onJuliet: .sharedKey(id: key, deviceBound: false)]
+        let onAlpha = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                  address: "alpha.example", serviceName: "Terminal")
+        let onBravo = try await model.adoptService(kind: .ssh, hostName: "bravo",
+                                                      address: "bravo.example", serviceName: "Terminal")
+        capability.credentials = [onAlpha: .sharedKey(id: key, deviceBound: false),
+                                  onBravo: .sharedKey(id: key, deviceBound: false)]
 
         #expect(model.usageCount(ofKey: key).readable == 2)
 
-        // juliet's terminal goes. Nothing points the key at oscar — it was never a stored edge.
-        let julietID = try #require(model.catalogHosts.first { $0.displayName == "juliet" }).id
-        try await model.removeService(onJuliet, from: julietID)
+        // bravo's terminal goes. Nothing points the key at alpha — it was never a stored edge.
+        let bravoID = try #require(model.catalogHosts.first { $0.displayName == "bravo" }).id
+        try await model.removeService(onBravo, from: bravoID)
 
         let remaining = model.services(usingKey: key)
         #expect(remaining.count == 1)
-        #expect(remaining.first?.host.displayName == "oscar")
+        #expect(remaining.first?.host.displayName == "alpha")
         #expect(model.usageCount(ofKey: key).readable == 1)
     }
 
@@ -80,10 +80,10 @@ struct D28KeyUsageTests {
         await model.load()
         let key = UUID()
 
-        let withKey = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                   address: "oscar.example", serviceName: "Key")
-        let withPassword = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                        address: "oscar.example", serviceName: "Password")
+        let withKey = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                   address: "alpha.example", serviceName: "Key")
+        let withPassword = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                        address: "alpha.example", serviceName: "Password")
         capability.credentials = [withKey: .sharedKey(id: key, deviceBound: false),
                                   withPassword: .ownedByService]
 
@@ -99,10 +99,10 @@ struct D28KeyUsageTests {
         await model.load()
         let key = UUID()
 
-        let readable = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                    address: "oscar.example", serviceName: "Known")
-        let opaque = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                  address: "oscar.example", serviceName: "Newer build")
+        let readable = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                    address: "alpha.example", serviceName: "Known")
+        let opaque = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                  address: "alpha.example", serviceName: "Newer build")
         capability.credentials = [readable: .sharedKey(id: key, deviceBound: false),
                                   opaque: .unreadable]
 
@@ -118,8 +118,8 @@ struct D28KeyUsageTests {
         defer { try? FileManager.default.removeItem(at: root) }
         await model.load()
 
-        let endpoint = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                    address: "oscar.example", serviceName: "Terminal")
+        let endpoint = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                    address: "alpha.example", serviceName: "Terminal")
         capability.credentials = [endpoint: .sharedKey(id: UUID(), deviceBound: false)]
 
         #expect(model.services(usingKey: UUID()).isEmpty)
@@ -133,8 +133,8 @@ struct D28KeyUsageTests {
         await model.load()
         let key = UUID()
 
-        let endpoint = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                    address: "oscar.example", serviceName: "Hardware")
+        let endpoint = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                    address: "alpha.example", serviceName: "Hardware")
         capability.credentials = [endpoint: .sharedKey(id: key, deviceBound: true)]
 
         #expect(model.usageCount(ofKey: key).readable == 1)

@@ -22,8 +22,8 @@ struct GlassShellTagVocabularyTests {
         let (model, root) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
         #expect(model.tagVocabulary.isEmpty)
-        _ = try await model.addHost(displayName: "oscar", aliases: [], tags: ["Clients", "lab", "prod"])
-        _ = try await model.addHost(displayName: "juliet", aliases: ["beast"], tags: ["Prod", "Home", " clients "])
+        _ = try await model.addHost(displayName: "alpha", aliases: [], tags: ["Clients", "lab", "prod"])
+        _ = try await model.addHost(displayName: "bravo", aliases: ["beast"], tags: ["Prod", "Home", " clients "])
         let vocabulary = model.tagVocabulary
         #expect(vocabulary.map { $0.lowercased() } == ["clients", "home", "lab", "prod"],
                 "one entry per tag regardless of case or whitespace, sorted case-insensitively; got \(vocabulary)")

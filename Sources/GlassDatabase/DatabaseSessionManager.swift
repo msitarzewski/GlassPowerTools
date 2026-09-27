@@ -1003,7 +1003,7 @@ class DatabaseSessionManager {
     /// service saved that way stores no keychain item at all. Refusing here made the app unable
     /// to reach servers that work everywhere else (2026-09-20, and again on 2026-09-22 when the
     /// first connect still threw *"Requested secure item was not found in Keychain"* for MySQL
-    /// on juliet through the tunnel, while a reconnect would have passed). Whether the server
+    /// on the user's Mac through the tunnel, while a reconnect would have passed). Whether the server
     /// accepts an empty password is the server's to say, and it says so accurately; a stranded
     /// credential reads as that server's own rejection rather than as this layer's guess.
     ///
@@ -1077,9 +1077,9 @@ class DatabaseSessionManager {
 class DatabaseSession {
     let connectionConfig: DatabaseConnectionConfig
     var state: SessionState = .disconnected
-    /// What the session's workspace is looking at — "common_vision › articles", a SQL document's
+    /// What the session's workspace is looking at — "shop › articles", a SQL document's
     /// title — so Active's row says where you are and not only that you are connected
-    /// (2026-09-22: *"I have the DB open, but I'm in common-vision.articles"*). Nil on the
+    /// (2026-09-22: Active should say which table the open workspace is on). Nil on the
     /// connection overview. The workspace publishes it on every change of its displayed tab;
     /// with two windows on one session the later change wins.
     var workspaceFocus: String?

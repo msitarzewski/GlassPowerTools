@@ -85,7 +85,7 @@ private struct GlassEditorPreviewNavigation: WebPage.NavigationDeciding {
 }
 
 /// Answers `glass-preview:` requests: the app's two scripts from the bundle, the file's
-/// neighbours through the document's own access — the same SFTP connection for a file on oscar.
+/// neighbours through the document's own access — the same SFTP connection for a file on a remote server.
 struct GlassEditorPreviewSchemeHandler: URLSchemeHandler {
     let root: String
     let read: @MainActor (String) async throws -> Data

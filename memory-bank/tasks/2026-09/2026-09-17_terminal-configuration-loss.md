@@ -2,7 +2,7 @@
 
 **Owner:** coordinating agent. **State:** BUILD → DOCS.
 **Reported:** *"I set up the desktop on iPhone and ssh — the desktop settings transferred and
-worked, but the ssh settings didn't."* The Mac showed **Terminal on juliet** in the library and
+worked, but the ssh settings didn't."* The Mac showed **Terminal on the Mac** in the library and
 connecting said: *"has no saved terminal configuration. Edit the service to set it up, or remove
 it."*
 

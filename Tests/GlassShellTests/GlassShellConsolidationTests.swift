@@ -50,8 +50,8 @@ struct GlassShellConsolidationTests {
     func sameNameDifferentCase() async throws {
         let (model, root, sibling) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
-        let older = try record("juliet", kinds: [.ssh], createdAt: t0)
-        let newer = try record("Juliet.local", kinds: [.rdp], createdAt: t0.addingTimeInterval(60))
+        let older = try record("bravo", kinds: [.ssh], createdAt: t0)
+        let newer = try record("Bravo.local", kinds: [.rdp], createdAt: t0.addingTimeInterval(60))
         try await sibling.upsert(newer)
         try await sibling.upsert(older)
         await model.load()
@@ -62,9 +62,9 @@ struct GlassShellConsolidationTests {
         #expect(model.catalogHosts.count == 1)
         let host = try #require(model.catalogHosts.first)
         // The fold keeps the most recently updated member — `newer` — because the oldest is the
-        // record most likely to be a tombstone on another device already (2026-09-21, oscar).
+        // record most likely to be a tombstone on another device already (2026-09-21, alpha).
         #expect(host.id == newer.id, "the survivor is the most recently updated record")
-        #expect(host.displayName == "juliet", "the group's name — the oldest record's — is kept on the survivor")
+        #expect(host.displayName == "bravo", "the group's name — the oldest record's — is kept on the survivor")
         #expect(host.services.count == 2)
         #expect(model.serviceKinds(for: host.id) == [.rdp, .ssh])
         #expect(model.catalogItems.count == 1)
@@ -78,7 +78,7 @@ struct GlassShellConsolidationTests {
         let (model, root, sibling) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
         try await sibling.upsert(try record("Max Beast", aliases: ["10.0.0.5"], kinds: [.ssh], createdAt: t0))
-        try await sibling.upsert(try record("juliet-desktop", aliases: ["10.0.0.5"], kinds: [.rdp], createdAt: t0.addingTimeInterval(1)))
+        try await sibling.upsert(try record("bravo-desktop", aliases: ["10.0.0.5"], kinds: [.rdp], createdAt: t0.addingTimeInterval(1)))
         await model.load()
         #expect(model.catalogHosts.count == 1)
         #expect(model.catalogHosts.first?.services.count == 2)
@@ -101,25 +101,25 @@ struct GlassShellConsolidationTests {
     func alreadySingleRecordUntouched() async throws {
         let (model, root, sibling) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
-        let oscar = try record("oscar", kinds: [.rdp, .ssh], createdAt: t0)
-        try await sibling.upsert(oscar)
+        let alpha = try record("alpha", kinds: [.rdp, .ssh], createdAt: t0)
+        try await sibling.upsert(alpha)
         await model.load()
         let host = try #require(model.catalogHosts.first)
-        #expect(host.id == oscar.id)
+        #expect(host.id == alpha.id)
         #expect(!host.isConsolidated)
-        #expect(host.services.map(\.endpointID) == oscar.services.map(\.endpointID))
+        #expect(host.services.map(\.endpointID) == alpha.services.map(\.endpointID))
         let stored = try await sibling.snapshot()
         #expect(stored.count == 1)
-        #expect(stored.first?.id == oscar.id && stored.first?.services == oscar.services
-                && stored.first?.displayName == oscar.displayName, "nothing rewritten")
+        #expect(stored.first?.id == alpha.id && stored.first?.services == alpha.services
+                && stored.first?.displayName == alpha.displayName, "nothing rewritten")
     }
 
     @Test("Preferences keyed on a member record migrate to the canonical id once")
     func preferencesMigrate() async throws {
         let (model, root, sibling) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
-        let older = try record("juliet", kinds: [.ssh], createdAt: t0)
-        let newer = try record("juliet", kinds: [.rdp], createdAt: t0.addingTimeInterval(60))
+        let older = try record("bravo", kinds: [.ssh], createdAt: t0)
+        let newer = try record("bravo", kinds: [.rdp], createdAt: t0.addingTimeInterval(60))
         try await sibling.upsert(older); try await sibling.upsert(newer)
         // A favorite and a connection recorded against the newer record before grouping existed.
         var prefs = GlassShellPreferences()
@@ -146,11 +146,11 @@ struct GlassShellConsolidationTests {
     func deleteRemovesAllMembers() async throws {
         let (model, root, sibling) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
-        try await sibling.upsert(try record("juliet", kinds: [.ssh], createdAt: t0))
-        try await sibling.upsert(try record("juliet", kinds: [.rdp], createdAt: t0.addingTimeInterval(1)))
+        try await sibling.upsert(try record("bravo", kinds: [.ssh], createdAt: t0))
+        try await sibling.upsert(try record("bravo", kinds: [.rdp], createdAt: t0.addingTimeInterval(1)))
         try await sibling.upsert(try record("other", kinds: [.ssh], createdAt: t0))
         await model.load()
-        let host = try #require(model.catalogHosts.first { $0.displayName == "juliet" })
+        let host = try #require(model.catalogHosts.first { $0.displayName == "bravo" })
         try await model.deleteHost(host.id)
         #expect(model.catalogHosts.map(\.displayName) == ["other"])
         #expect(try await sibling.snapshot().count == 1)
@@ -160,8 +160,8 @@ struct GlassShellConsolidationTests {
     func addAndRemoveService() async throws {
         let (model, root, sibling) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
-        let older = try record("juliet", kinds: [.ssh], createdAt: t0)
-        let newer = try record("juliet", kinds: [.rdp], createdAt: t0.addingTimeInterval(1))
+        let older = try record("bravo", kinds: [.ssh], createdAt: t0)
+        let newer = try record("bravo", kinds: [.rdp], createdAt: t0.addingTimeInterval(1))
         try await sibling.upsert(older); try await sibling.upsert(newer)
         await model.load()
         // `older.id` is a tombstone after load; adding through it still lands on the machine it
@@ -183,8 +183,8 @@ struct GlassShellConsolidationTests {
     func pickerAndConnect() async throws {
         let (model, root, sibling) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
-        let older = try record("juliet", kinds: [.ssh], createdAt: t0)
-        let newer = try record("juliet", kinds: [.rdp], createdAt: t0.addingTimeInterval(1))
+        let older = try record("bravo", kinds: [.ssh], createdAt: t0)
+        let newer = try record("bravo", kinds: [.rdp], createdAt: t0.addingTimeInterval(1))
         try await sibling.upsert(older); try await sibling.upsert(newer)
         let desktop = RecordingCapability(kind: .rdp)
         model.registry.register(desktop)
@@ -204,7 +204,7 @@ struct GlassShellConsolidationTests {
     func failedAttemptDoesNotStampLastConnected() async throws {
         let (model, root, sibling) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
-        let record = try record("juliet", kinds: [.ssh], createdAt: t0)
+        let record = try record("bravo", kinds: [.ssh], createdAt: t0)
         try await sibling.upsert(record)
         let terminal = RecordingCapability(kind: .ssh)
         model.registry.register(terminal)
@@ -233,8 +233,8 @@ struct GlassShellConsolidationTests {
     func consolidateMergesInCatalog() async throws {
         let (model, root, sibling) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
-        let older = try record("juliet", aliases: ["10.0.0.5"], kinds: [.ssh], createdAt: t0)
-        let newer = try record("juliet", aliases: ["juliet.local"], kinds: [.rdp], createdAt: t0.addingTimeInterval(1))
+        let older = try record("bravo", aliases: ["10.0.0.5"], kinds: [.ssh], createdAt: t0)
+        let newer = try record("bravo", aliases: ["bravo.local"], kinds: [.rdp], createdAt: t0.addingTimeInterval(1))
         try await sibling.upsert(older); try await sibling.upsert(newer)
         await model.load()
         try await model.consolidateRecords(of: older.id)
@@ -242,7 +242,7 @@ struct GlassShellConsolidationTests {
         #expect(stored.count == 1)
         #expect(stored.first?.id == newer.id, "the most recently updated member survives")
         #expect(stored.first?.services.count == 2)
-        #expect(Set(stored.first?.aliases ?? []) == ["10.0.0.5", "juliet.local"])
+        #expect(Set(stored.first?.aliases ?? []) == ["10.0.0.5", "bravo.local"])
         #expect(model.catalogHosts.count == 1 && model.records.count == 1)
     }
 
@@ -250,8 +250,8 @@ struct GlassShellConsolidationTests {
     func connectAllOpensEveryService() async throws {
         let (model, root, sibling) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
-        let older = try record("juliet", kinds: [.ssh], createdAt: t0)
-        let newer = try record("juliet", kinds: [.rdp], createdAt: t0.addingTimeInterval(1))
+        let older = try record("bravo", kinds: [.ssh], createdAt: t0)
+        let newer = try record("bravo", kinds: [.rdp], createdAt: t0.addingTimeInterval(1))
         try await sibling.upsert(older); try await sibling.upsert(newer)
         let terminal = RecordingCapability(kind: .ssh)
         let desktop = RecordingCapability(kind: .rdp)
@@ -275,7 +275,7 @@ struct GlassShellConsolidationTests {
     func connectAllReportsUnavailableKinds() async throws {
         let (model, root, sibling) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
-        let host = try record("juliet", kinds: [.ssh, .database], createdAt: t0)
+        let host = try record("bravo", kinds: [.ssh, .database], createdAt: t0)
         try await sibling.upsert(host)
         let terminal = RecordingCapability(kind: .ssh)
         model.registry.register(terminal)      // no database capability in this build
@@ -333,7 +333,7 @@ struct GlassShellCapabilityHookTests {
     }
 }
 
-/// 2026-09-21: eleven records named oscar on the phone, two fully configured, grouped into one row
+/// 2026-09-21: eleven records named alpha on the phone, two fully configured, grouped into one row
 /// that listed the Mac's Terminal and the phone's Terminal. Consolidation runs itself now, and a
 /// service the machine has twice is kept once.
 @MainActor
@@ -347,18 +347,18 @@ struct GlassShellAutoConsolidationTests {
     func loadConsolidatesAndDeduplicates() async throws {
         let (model, root, sibling) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
-        // The Mac's oscar and the phone's oscar: each with its own Terminal and Desktop, the Mac's
+        // The Mac's alpha and the phone's alpha: each with its own Terminal and Desktop, the Mac's
         // with MySQL too. Endpoint ids chosen so the winner is not simply "the older record's".
-        let mac = try HostProfile(displayName: "oscar", address: "192.0.2.10",
-                                  services: [link(.ssh, "Terminal on oscar", id: "BBBBBBBB-0000-0000-0000-000000000001"),
-                                             link(.database, "MySQL on oscar", id: "BBBBBBBB-0000-0000-0000-000000000002"),
-                                             link(.rdp, "oscar", id: "AAAAAAAA-0000-0000-0000-000000000003")],
+        let mac = try HostProfile(displayName: "alpha", address: "192.0.2.10",
+                                  services: [link(.ssh, "Terminal on alpha", id: "BBBBBBBB-0000-0000-0000-000000000001"),
+                                             link(.database, "MySQL on alpha", id: "BBBBBBBB-0000-0000-0000-000000000002"),
+                                             link(.rdp, "alpha", id: "AAAAAAAA-0000-0000-0000-000000000003")],
                                   createdAt: t0, updatedAt: t0)
-        let phone = try HostProfile(displayName: "oscar", address: "192.0.2.10",
-                                    services: [link(.ssh, "Terminal on oscar", id: "AAAAAAAA-0000-0000-0000-000000000001"),
-                                               link(.rdp, "oscar", id: "BBBBBBBB-0000-0000-0000-000000000003")],
+        let phone = try HostProfile(displayName: "alpha", address: "192.0.2.10",
+                                    services: [link(.ssh, "Terminal on alpha", id: "AAAAAAAA-0000-0000-0000-000000000001"),
+                                               link(.rdp, "alpha", id: "BBBBBBBB-0000-0000-0000-000000000003")],
                                     createdAt: t0.addingTimeInterval(60), updatedAt: t0.addingTimeInterval(60))
-        let empty = try HostProfile(displayName: "oscar", address: "192.0.2.10", services: [],
+        let empty = try HostProfile(displayName: "alpha", address: "192.0.2.10", services: [],
                                     createdAt: t0.addingTimeInterval(120), updatedAt: t0.addingTimeInterval(120))
         try await sibling.upsert(mac); try await sibling.upsert(phone); try await sibling.upsert(empty)
 
@@ -391,11 +391,11 @@ struct GlassShellAutoConsolidationTests {
         }
         let terminal = Removing()
         model.registry.register(terminal)
-        let a = try HostProfile(displayName: "oscar", address: "10.0.0.9",
-                                services: [link(.ssh, "Terminal on oscar", id: "AAAAAAAA-0000-0000-0000-000000000001")],
+        let a = try HostProfile(displayName: "alpha", address: "10.0.0.9",
+                                services: [link(.ssh, "Terminal on alpha", id: "AAAAAAAA-0000-0000-0000-000000000001")],
                                 createdAt: t0, updatedAt: t0)
-        let b = try HostProfile(displayName: "oscar", address: "10.0.0.9",
-                                services: [link(.ssh, "terminal on OSCAR", id: "BBBBBBBB-0000-0000-0000-000000000001")],
+        let b = try HostProfile(displayName: "alpha", address: "10.0.0.9",
+                                services: [link(.ssh, "terminal on ALPHA", id: "BBBBBBBB-0000-0000-0000-000000000001")],
                                 createdAt: t0.addingTimeInterval(1), updatedAt: t0.addingTimeInterval(1))
         try await sibling.upsert(a); try await sibling.upsert(b)
 
@@ -410,8 +410,8 @@ struct GlassShellAutoConsolidationTests {
     func cleanLibraryIsUntouched() async throws {
         let (model, root, sibling) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
-        let one = try record("juliet", kinds: [.ssh, .rdp], createdAt: t0)
-        let two = try record("oscar", kinds: [.database], createdAt: t0)
+        let one = try record("bravo", kinds: [.ssh, .rdp], createdAt: t0)
+        let two = try record("alpha", kinds: [.database], createdAt: t0)
         try await sibling.upsert(one); try await sibling.upsert(two)
         let before = try await sibling.snapshot()
 
@@ -423,10 +423,10 @@ struct GlassShellAutoConsolidationTests {
 
     @Test("Deduplication is pure and deterministic")
     func deduplicationIsDeterministic() {
-        let links = [link(.ssh, "Terminal on oscar", id: "BBBBBBBB-0000-0000-0000-000000000001"),
-                     link(.ssh, "Terminal on oscar", id: "AAAAAAAA-0000-0000-0000-000000000001"),
+        let links = [link(.ssh, "Terminal on alpha", id: "BBBBBBBB-0000-0000-0000-000000000001"),
+                     link(.ssh, "Terminal on alpha", id: "AAAAAAAA-0000-0000-0000-000000000001"),
                      link(.ssh, "Other terminal", id: "CCCCCCCC-0000-0000-0000-000000000001"),
-                     link(.rdp, "Terminal on oscar", id: "DDDDDDDD-0000-0000-0000-000000000001")]
+                     link(.rdp, "Terminal on alpha", id: "DDDDDDDD-0000-0000-0000-000000000001")]
         let (kept, dropped) = GlassShellModel.deduplicated(links)
         #expect(kept.map(\.endpointID.rawValue.uuidString) == ["AAAAAAAA-0000-0000-0000-000000000001",
                                                                  "CCCCCCCC-0000-0000-0000-000000000001",
@@ -445,20 +445,20 @@ struct GlassShellAutoConsolidationTests {
 @MainActor
 struct GlassShellFoldTargetTests {
     @Test func theMostRecentlyUpdatedMemberSurvives() throws {
-        // Oldest created, but most recently updated: this is oscar on 2026-09-21 — the Mac's
+        // Oldest created, but most recently updated: this is alpha on 2026-09-21 — the Mac's
         // record, touched on the 18th, while older duplicates were tombstones elsewhere.
-        let stale = try HostProfile(displayName: "oscar", address: "10.0.0.1",
+        let stale = try HostProfile(displayName: "alpha", address: "10.0.0.1",
                                     createdAt: Date(timeIntervalSince1970: 100), updatedAt: Date(timeIntervalSince1970: 100))
-        let touched = try HostProfile(displayName: "oscar", address: "10.0.0.1",
+        let touched = try HostProfile(displayName: "alpha", address: "10.0.0.1",
                                       createdAt: Date(timeIntervalSince1970: 50), updatedAt: Date(timeIntervalSince1970: 900))
         #expect(GlassShellModel.foldTarget(among: [stale, touched]).id == touched.id)
         #expect(GlassShellModel.foldTarget(among: [touched, stale]).id == touched.id, "order of arrival is irrelevant")
     }
 
     @Test func anEmptyRecordNeverWinsOverOneWithServices() throws {
-        let empty = try HostProfile(displayName: "oscar", address: "10.0.0.1",
+        let empty = try HostProfile(displayName: "alpha", address: "10.0.0.1",
                                     createdAt: Date(timeIntervalSince1970: 900), updatedAt: Date(timeIntervalSince1970: 900))
-        let carrying = try HostProfile(displayName: "oscar", address: "10.0.0.1",
+        let carrying = try HostProfile(displayName: "alpha", address: "10.0.0.1",
                                        services: [HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "t")],
                                        createdAt: Date(timeIntervalSince1970: 100), updatedAt: Date(timeIntervalSince1970: 100))
         #expect(GlassShellModel.foldTarget(among: [empty, carrying]).id == carrying.id,
@@ -467,10 +467,10 @@ struct GlassShellFoldTargetTests {
 
     @Test func aTieGoesToTheSmallestID() throws {
         let a = try HostProfile(id: HostID(rawValue: UUID(uuidString: "AAAAAAAA-0000-0000-0000-000000000000")!),
-                                displayName: "oscar", address: "10.0.0.1",
+                                displayName: "alpha", address: "10.0.0.1",
                                 createdAt: Date(timeIntervalSince1970: 1), updatedAt: Date(timeIntervalSince1970: 1))
         let b = try HostProfile(id: HostID(rawValue: UUID(uuidString: "BBBBBBBB-0000-0000-0000-000000000000")!),
-                                displayName: "oscar", address: "10.0.0.1",
+                                displayName: "alpha", address: "10.0.0.1",
                                 createdAt: Date(timeIntervalSince1970: 1), updatedAt: Date(timeIntervalSince1970: 1))
         #expect(GlassShellModel.foldTarget(among: [b, a]).id == a.id)
     }

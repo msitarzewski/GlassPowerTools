@@ -98,7 +98,7 @@ read -rs -p "Password: " P; printf '%s' "$P" > /tmp/msp.pw; chmod 600 /tmp/msp.p
 ## Closed: a signed-in Apple Screen Sharing session works
 
 **2026-09-14, observed by the user in the running glassDT app and shown to the coordinator in a
-screenshot.** A saved desktop named `juliet`, reached over Tailscale:
+screenshot.** A saved desktop named `bravo`, reached over Tailscale:
 
 | Field | Value |
 |---|---|

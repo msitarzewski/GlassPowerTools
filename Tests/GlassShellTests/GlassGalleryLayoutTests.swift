@@ -40,7 +40,7 @@ struct GlassGalleryLayoutTests {
 @MainActor
 struct GlassSessionCardContractTests {
     private func session(snapshot: (@MainActor () -> Image?)? = nil) -> GlassOpenSession {
-        GlassOpenSession(id: "terminal:1", title: "oscar", subtitle: "Connected",
+        GlassOpenSession(id: "terminal:1", title: "alpha", subtitle: "Connected",
                          symbolName: "terminal", activate: {}, close: {}, snapshot: snapshot)
     }
 

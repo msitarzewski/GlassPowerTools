@@ -5,7 +5,7 @@
 //  A service link with nothing behind it is a different thing from a service, and the library has
 //  to be able to tell them apart.
 //
-//  Reported 2026-09-16: oscar showed **two Terminals and two Desktops**, identical in every visible
+//  Reported 2026-09-16: alpha showed **two Terminals and two Desktops**, identical in every visible
 //  way. One of each was dead — the persistence defect emptied the configuration behind a link
 //  without removing the link, and re-adding the service created a second link beside the corpse.
 //  Pressing Connect on the wrong one said "has no saved configuration", which is the first moment
@@ -59,17 +59,17 @@ struct GlassShellServiceStateTests {
         defer { try? FileManager.default.removeItem(at: root) }
         await model.load()
 
-        let live = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                address: "192.0.2.10", serviceName: "Terminal on oscar")
-        let dead = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                address: "192.0.2.10", serviceName: "Terminal on oscar")
+        let live = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                address: "192.0.2.10", serviceName: "Terminal on alpha")
+        let dead = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                address: "192.0.2.10", serviceName: "Terminal on alpha")
         try await model.setConfiguration(Data("a saved server".utf8), for: live)
 
         #expect(model.configuration(for: live) != nil, "the configured link reads as empty")
         #expect(model.configuration(for: dead) == nil, "the bare link reads as configured")
 
         // Both are on the same machine, which is why they look identical in the list.
-        let host = try #require(model.hosts.first { $0.displayName == "oscar" })
+        let host = try #require(model.hosts.first { $0.displayName == "alpha" })
         let terminals = host.services.filter { $0.kind == .ssh }
         #expect(terminals.count == 2)
     }
@@ -80,16 +80,16 @@ struct GlassShellServiceStateTests {
         defer { try? FileManager.default.removeItem(at: root) }
         await model.load()
 
-        let live = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                address: "192.0.2.10", serviceName: "Terminal on oscar")
-        let dead = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                address: "192.0.2.10", serviceName: "Terminal on oscar")
+        let live = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                address: "192.0.2.10", serviceName: "Terminal on alpha")
+        let dead = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                address: "192.0.2.10", serviceName: "Terminal on alpha")
         try await model.setConfiguration(Data("a saved server".utf8), for: live)
 
-        let host = try #require(model.hosts.first { $0.displayName == "oscar" })
+        let host = try #require(model.hosts.first { $0.displayName == "alpha" })
         try await model.removeService(dead, from: host.id)
 
-        let after = try #require(model.hosts.first { $0.displayName == "oscar" })
+        let after = try #require(model.hosts.first { $0.displayName == "alpha" })
         #expect(after.services.filter { $0.kind == .ssh }.count == 1)
         #expect(model.configuration(for: live) != nil, "removing the dead link took the live one's record")
     }

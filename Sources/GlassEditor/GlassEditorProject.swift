@@ -4,11 +4,11 @@
 //
 //  A project is a folder **on a machine**, and the machine is a host record.
 //
-//  This is the whole idea, and it is why a project is not simply a `URL`. The user's question was:
-//  *"I'm on my Mac in the Editor, move to Vision Pro where juliet is an SSH connection — make the
-//  association between the two somehow?"* The association already exists. `~/Software/thing` on
-//  juliet is the same project whether you reach it through the file system because you are
-//  sitting at juliet, or over SFTP because you are in a headset across the room. What changes is
+//  This is the whole idea, and it is why a project is not simply a `URL`. The question was how a
+//  project opened in the editor on a Mac relates to the same folder reached over SSH from a Vision
+//  Pro. The association already exists. `~/Software/thing` on
+//  the Mac is the same project whether you reach it through the file system because you are
+//  sitting at the Mac, or over SFTP because you are in a headset across the room. What changes is
 //  the transport, not the project.
 //
 //  So a project is `(hostID, path)`. The host id is the catalog's, which means a project travels

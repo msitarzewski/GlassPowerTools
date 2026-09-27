@@ -167,7 +167,7 @@ public final class GlassDatabaseCapability: GlassCapability {
     /// "PostgreSQL · Connected" on every row, and a session that is *not* connected is the case
     /// the user needs told.
     ///
-    /// Connected, the row also says where the workspace is: "MySQL · common_vision › articles".
+    /// Connected, the row also says where the workspace is: "MySQL · shop › articles".
     static func subtitle(engine: DatabaseEngineType, state: SessionState, focus: String? = nil) -> String {
         switch state {
         case .connected: focus.map { "\(engine.displayName) · \($0)" } ?? engine.displayName

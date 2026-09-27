@@ -79,10 +79,10 @@ struct D26DeviceBoundSyncTests {
         defer { try? FileManager.default.removeItem(at: root) }
         await model.load()
 
-        let bound = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                 address: "oscar.example", serviceName: "Hardware key")
-        let portable = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                    address: "oscar.example", serviceName: "Password")
+        let bound = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                 address: "alpha.example", serviceName: "Hardware key")
+        let portable = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                    address: "alpha.example", serviceName: "Password")
         capability.deviceBound = [bound]
 
         model.enableCatalogSync(backend)
@@ -101,8 +101,8 @@ struct D26DeviceBoundSyncTests {
         defer { try? FileManager.default.removeItem(at: root) }
         await model.load()
 
-        let bound = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                 address: "oscar.example", serviceName: "Hardware key")
+        let bound = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                 address: "alpha.example", serviceName: "Hardware key")
         capability.deviceBound = [bound]
         let hostID = try #require(model.records.first).id
 
@@ -132,15 +132,15 @@ struct D26DeviceBoundSyncTests {
         defer { try? FileManager.default.removeItem(at: root) }
         await model.load()
 
-        let bound = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                 address: "oscar.example", serviceName: "Hardware key")
+        let bound = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                 address: "alpha.example", serviceName: "Hardware key")
         capability.deviceBound = [bound]
         let mine = try #require(model.records.first)
 
         // Another device edits the host. Its copy has never contained the bound service.
         var elsewhere = mine
         elsewhere.services = []
-        elsewhere.displayName = "oscar renamed elsewhere"
+        elsewhere.displayName = "alpha renamed elsewhere"
         elsewhere.updatedAt = Date(timeIntervalSinceNow: 60)
         backend.remote = [elsewhere]
 
@@ -157,8 +157,8 @@ struct D26DeviceBoundSyncTests {
         defer { try? FileManager.default.removeItem(at: root) }
         await model.load()
 
-        let endpoint = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                    address: "oscar.example", serviceName: "Terminal")
+        let endpoint = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                    address: "alpha.example", serviceName: "Terminal")
         capability.deviceBound = [endpoint]
         model.enableCatalogSync(backend)
         await model.synchronizeCatalog()
@@ -166,8 +166,8 @@ struct D26DeviceBoundSyncTests {
 
         // The user switches it from a hardware key to a password.
         capability.deviceBound = []
-        try await model.updateHost(try #require(model.records.first).id, displayName: "oscar",
-                                   address: "oscar.example", aliases: [], tags: [])
+        try await model.updateHost(try #require(model.records.first).id, displayName: "alpha",
+                                   address: "alpha.example", aliases: [], tags: [])
         await model.synchronizeCatalog()
 
         #expect(backend.remote.first?.services.map(\.endpointID) == [endpoint])

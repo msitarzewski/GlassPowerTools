@@ -77,8 +77,8 @@ struct D19SyncPublishTests {
         accountCopy.updatedAt = Date().addingTimeInterval(60)
 
         // A second machine the account has never heard of — the one that has to travel.
-        _ = try await model.adoptService(kind: .database, hostName: "oscar",
-                                         address: "192.0.2.10", serviceName: "MySQL on oscar")
+        _ = try await model.adoptService(kind: .database, hostName: "alpha",
+                                         address: "192.0.2.10", serviceName: "MySQL on alpha")
 
         // The account still holds the machine this device deleted, exactly as CloudKit would
         // return it until the tombstone reaches it.
@@ -88,7 +88,7 @@ struct D19SyncPublishTests {
         await model.synchronizeCatalog()
 
         let publishedNames = Set(backend.saved.map(\.displayName))
-        #expect(publishedNames.contains("oscar"),
+        #expect(publishedNames.contains("alpha"),
                 "nothing was published: applying the incoming record for a deleted machine stopped the sync")
         if case .failed(let reason) = model.catalogSyncStatus {
             Issue.record("the sync reported a failure: \(reason)")

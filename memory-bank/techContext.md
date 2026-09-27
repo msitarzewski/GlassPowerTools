@@ -35,7 +35,7 @@ confirmed present.
   `../glassdb`, and Stage 3 migrates from there. Do not unpack the archive to consult it.
 - `../docs` — two **security and maturity audit reports** of glas.sh and glassdb dated 2026-07-16/17,
   with `file:line` citations and severity tiers. Not user documentation and not a journal. They cite
-  GlasSecretStore at `/Users/ann/Developer/GlasSecretStore/`, an old path, confirming they
+  GlasSecretStore at `~/Developer/GlasSecretStore/`, an old path, confirming they
   predate the current layout. Not an input to the merge, but not merely historical either: see the
   carried-forward findings below before Stage 2.
 
@@ -185,10 +185,10 @@ current look carries over.
 
 | Purpose | Host | User | Auth | Verified |
 |---|---|---|---|---|
-| SSH / SFTP / tunnel integration tests | `192.0.2.6` (Parallels scratch VM, Linux 7.0.0-29-generic) | `michael` | ED25519 key at `~/.ssh/scratch_vm` | `echo ok` over BatchMode SSH; `Subsystem sftp /usr/lib/openssh/sftp-server`; no `AllowTcpForwarding` restriction |
+| SSH / SFTP / tunnel integration tests | `192.0.2.6` (Parallels scratch VM, Linux 7.0.0-29-generic) | `michael` | ED25519 key at `~/.ssh/<test VM key>` | `echo ok` over BatchMode SSH; `Subsystem sftp /usr/lib/openssh/sftp-server`; no `AllowTcpForwarding` restriction |
 
 Environment for the gated tests: `GPT_SSH_TEST_HOST=192.0.2.6 GPT_SSH_TEST_USER=michael
-GPT_SSH_TEST_KEY_PATH=$HOME/.ssh/scratch_vm`. Never record key material or passwords here.
+GPT_SSH_TEST_KEY_PATH=$HOME/.ssh/<test VM key>`. Never record key material or passwords here.
 
 ## macOS accessibility crash under XCUITest (root-caused 2026-09-10)
 
@@ -217,7 +217,7 @@ prompt, so the simulator is not subject to the Mac's Local Network gate.
 **macOS App Sandbox (found 2026-09-10 evening, fixed):** the Stage 1 project's
 `Platforms/macOS/macOS.entitlements` carried `com.apple.security.app-sandbox`, `network.client`
 and `files.user-selected.read-only`, which glas.sh's macOS entitlements never had. The sandbox broke
-the Mac local terminal (`zsh: can't set tty pgrp: operation not permitted`) and would have blocked
+The Mac local terminal (`zsh: can't set tty pgrp: operation not permitted`) and would have blocked
 the SSH agent socket, `~/.ssh` reads and file-promise drags. The file is now byte-identical to
 glas.sh's: App Group, Keychain group, iCloud KVS, hardened runtime on, no sandbox.
 
@@ -231,25 +231,32 @@ what was found. This is where things actually are.
 **No sibling package remains a dependency.** GlasSecretStore, GlassConnectionKit and GlassEditorKit
 were absorbed; `../glas.sh`, `../glassdb`, `../glassDT` and those three are historical records.
 
-**Three tree-sitter grammars are vendored rather than pinned, each for a stated reason** —
-`THIRD-PARTY-NOTICES.md` carries the detail:
+**Sixteen tree-sitter grammars, every one fixed to an exact upstream commit** (checked against
+upstream 2026-09-26; `THIRD-PARTY-NOTICES.md` carries the commits and the detail):
 
-| Grammar | Why vendored |
-|---|---|
-| YAML | Upstream's manifest decides whether to compile `scanner.c` with a *relative* `fileExists`, false when it is a dependency, so the external scanner is silently dropped and its symbols go undefined at link |
-| Markdown (block and inline) | Upstream's block `serialize()` copies every open block into a fixed 1024-byte buffer unbounded — heap corruption reachable by opening a deeply-nested markdown file. The bound is restored in our copy |
-| SQL | Upstream's `serialize()` frees and nils `start_tag`, consuming the state it was asked to snapshot, and `deserialize` overwrites the pointer without freeing or checking it. Still present on upstream HEAD |
+| Grammar | How | Why |
+|---|---|---|
+| JSON, Bash, TOML, HTML, Go, C | pinned dependency (`revision:`) | upstream's manifest builds it correctly |
+| YAML | vendored, scanner patched | upstream's manifest drops `scanner.c` when it is a dependency (a relative `fileExists`); the scanner also carries a bounds fix (pen H-2) |
+| Markdown | vendored, scanner patched | unbounded copy into a 1024-byte buffer in `serialize()` (pen H-1) |
+| Markdown inline | vendored, unmodified | same repository and commit as Markdown |
+| SQL | vendored, scanner patched | `serialize()` consumes its own state (pen M-5); still on upstream HEAD |
+| Python, JavaScript, Rust, PHP | vendored, unmodified | upstream's manifest compiles `parser.c` and not `scanner.c` |
+| Swift | vendored, generated `parser.c` | upstream publishes no generated parser |
+| XML | vendored, one include path changed | upstream's shared header sits outside the grammar's directory |
 
-Both markdown and SQL were **pinned** for a day and the patches were lost with the switch; the
-markdown one was aborting a whole test target for that day without anyone noticing, because a
-crashed target prints no failure line and no count (rule 25). Bash, TOML and JSON are stock and
-pinned.
+Markdown and SQL were once pinned for a day and the patches were lost with the switch; the markdown
+one aborted a whole test target that day without anyone noticing, because a crashed target prints no
+failure line and no count (rule 25). `ScannerOverflowPenTests` guards the markdown and YAML fixes.
 
-**Sixteen grammars as of 2026-09-19.** HTML is the newest, **pinned** at
-`tree-sitter/tree-sitter-html@73a3947324f6efddf9e17c0ea58d454843590cc0`: upstream's manifest
-compiles `parser.c` and `scanner.c` unconditionally, which is exactly the thing YAML's gets wrong,
-so it can be a dependency rather than a copy. Swift, XML, Rust, JavaScript, PHP and Python remain
-vendored because their manifests cannot be consumed at the pinned commit.
+**Licences and acknowledgements** (2026-09-26): `Tools/Licenses/components.json` lists every
+third-party component; `Tools/Licenses/generate-acknowledgements.py` copies each pin's licence and
+NOTICE files into `Documentation/ThirdPartyLicenses/<id>/` and writes
+`Sources/GlassShell/Resources/Acknowledgements.json`, shown at Settings ▸ About ▸ Acknowledgements.
+`Tools/Mermaid/update-mermaid.sh` lists the licences of every package inside a new Mermaid and
+refuses the update if one is of a kind not yet reviewed. `AcknowledgementsTests` fails when a pin, a
+vendored package or the Mermaid version is not covered, and when the two `Package.resolved` files
+disagree.
 
 **`.git` is 13 MB.** SQL's generated `parser.c` is 41 MB in the working tree and **2.6 MB**
 committed, which is the measurement that reversed a recommendation to fork rather than vendor.
@@ -311,3 +318,12 @@ be measured headless with an `ImageRenderer` probe — `Tools/ChartProbe` is the
   GridScrollTimingTests` (real view, real SQLite in the managed folder; needs the Mac to itself).
   `NSTableView` remains the proposed next step if numbers require it.
 - **Terminal renderer:** SwiftTerm's Metal renderer on the Mac and iPhone; CoreGraphics on Vision Pro.
+
+## Release and hosting, 2026-09-25 (D38, D39)
+
+Not built yet. Mac releases: Developer ID + notarization + Sparkle (macOS-only dependency), feed
+`https://glasspowertools.com/appcast.xml`; `aps-environment` must be `production` in release builds
+(`Platforms/macOS/macOS.entitlements` says `development`); a Developer ID profile must carry the
+CloudKit container, App Group and Keychain group. iOS, iPadOS, visionOS: TestFlight, then the App
+Store. The site is static, built into `_site/`; where and how it is hosted is kept out of this repository
+(private infrastructure notes).

@@ -4,7 +4,7 @@ Read-only survey of `~/Software/glass/glassdb` performed 2026-09-11 for the Glas
 Purpose: porting checklist. Every feature below must have a destination in the merged product or be
 an explicit, recorded decision to drop.
 
-All citations are `file:line` relative to `/Users/ann/Software/glass/glassdb`.
+All citations are `file:line` relative to `~/Software/glass/glassdb`.
 
 ---
 

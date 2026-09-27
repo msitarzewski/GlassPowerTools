@@ -5,7 +5,7 @@ simulator, iOS UI suite green on a copy of the tree. Not committed.**
 
 ## Root cause (evidence)
 
-The user's iPhone showed `juliet / Terminal` and `juliet / Desktop` as two rows. The shared
+The user's iPhone showed `bravo / Terminal` and `bravo / Desktop` as two rows. The shared
 catalog was written by three apps that never shared host identity:
 
 - `../GlassConnectionKit/Sources/GlassHostCatalog/HostCatalogStore.swift:91-125`
@@ -19,8 +19,8 @@ catalog was written by three apps that never shared host identity:
   (`../glassDT/Sources/GlassDesktopUI/DesktopAppModel.swift:227,262-264`).
 - So one machine saved in glas.sh and in glassDT is two records with the same name and alias and
   different ids. The only thing that ever merged them was explicit pairing in the UI. The Vision
-  Pro's `oscar`, which shows as one host with two services, is a record that *was* paired there;
-  the iPhone's `oscar` was not. Both shapes exist in real data.
+  Pro's `alpha`, which shows as one host with two services, is a record that *was* paired there;
+  the iPhone's `alpha` was not. Both shapes exist in real data.
 
 ## Design
 
@@ -101,8 +101,8 @@ for every consolidated host once, then drop the grouping to a plain identity map
 |---|---|
 | `swift build --build-system native` (whole package) | Build complete |
 | `swift test --build-system native --filter GlassShellTests` | **29 tests, 5 suites, passed** (9 consolidation + 2 hook tests new; consolidation: same name different case; alias overlap; unrelated + loopback; already-single record untouched; preferences migrate; delete all members; add→canonical / remove→owner; picker + connect hands owning record; consolidateRecords) |
-| visionOS Simulator (Vision Pro, OS 27.0), app seeded `juliet:ssh\|juliet:rdp\|oscar:rdp+ssh`, `simctl io screenshot` | `scratchpad/shots/vision-consolidated-row.png`: **two rows** (juliet, oscar), each "Desktop · Terminal" with two icons, an icon-only Connect and "Never" on one line; no wrapping |
-| iOS Simulator (iPhone 17 Pro Max, iOS 27.0) UI suite `GlassShellLibraryUITests` | **6/6 passed** across two runs on a verbatim copy of the tree excluding another worker's in-progress `UITests/GlassTerminalUITests.swift` (which does not compile at :291, main-actor key path — not mine): appearance, favorites, search, smoke and the new `testSameMachineRecordsAreOneRowWithAllServiceIcons` (one row each for `juliet` and `oscar`, two `host-service-ssh` and two `host-service-rdp` icons); `testAddHostAddServiceConnectPlaceholder` re-pointed and passing (below) |
+| visionOS Simulator (Vision Pro, OS 27.0), app seeded `bravo:ssh\|bravo:rdp\|alpha:rdp+ssh`, `simctl io screenshot` | `scratchpad/shots/vision-consolidated-row.png`: **two rows** (the Mac, the Linux server), each "Desktop · Terminal" with two icons, an icon-only Connect and "Never" on one line; no wrapping |
+| iOS Simulator (iPhone 17 Pro Max, iOS 27.0) UI suite `GlassShellLibraryUITests` | **6/6 passed** across two runs on a verbatim copy of the tree excluding another worker's in-progress `UITests/GlassTerminalUITests.swift` (which does not compile at :291, main-actor key path — not mine): appearance, favorites, search, smoke and the new `testSameMachineRecordsAreOneRowWithAllServiceIcons` (one row each for `bravo` and `alpha`, two `host-service-ssh` and two `host-service-rdp` icons); `testAddHostAddServiceConnectPlaceholder` re-pointed and passing (below) |
 | Stage 2 side effect found | `testAddHostAddServiceConnectPlaceholder` expected the placeholder after Connect on an SSH service, but since `5f12575` the app registers `GlassTerminalCapability` for `.ssh`, so Connect opens the terminal's server form. The placeholder contract is for kinds no capability owns; the test now seeds a `database` service (`--ui-testing-seed-hosts "dbhost:database"`) into a fresh isolated store for that step. Seeded relaunches must use a new `runID`: the seeder fills only an empty catalog |
 | macOS / iOS device rows | not run |
 

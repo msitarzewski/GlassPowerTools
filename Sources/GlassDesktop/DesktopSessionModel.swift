@@ -282,7 +282,7 @@ public final class DesktopSessionModel {
             let initial = matchWindow ? (windowSize ?? value.desktop) : value.desktop
             // **The scale goes with the size, from the first frame.** The size alone gave a Retina
             // window a 4K desktop laid out at 100% — a login screen of tiny type — until the
-            // display channel's first monitor layout carried the 200% (2026-09-22, oscar). The
+            // display channel's first monitor layout carried the 200% (2026-09-22, a GNOME server). The
             // client core data has a field for it (MS-RDPBCGR 2.2.1.3.2), so it is asked for at
             // connect. The first monitor layout still repeats it, for a server that only reads
             // the display channel: `lastRequestedScaleFactor` stays nil until that layout is sent.
@@ -717,7 +717,7 @@ public final class DesktopSessionModel {
 
     /// **The server can change its own size.** GNOME's login screen takes the window's size, and
     /// the session that starts after logging in comes up at 640 × 480 — a desktop this client never
-    /// asked for, that stayed until the user nudged the window by a pixel (2026-09-22, oscar).
+    /// asked for, that stayed until the user nudged the window by a pixel (2026-09-22, a GNOME server).
     /// `scheduleResize` drops a request for the size already asked for, which is right while the
     /// server keeps that size and wrong the moment it does not. A frame at a size other than the
     /// one requested, arriving after a frame at some other size again, is the server having changed

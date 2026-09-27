@@ -34,17 +34,17 @@ struct SSHKeyRecordStoreTests {
     @Test("A record round-trips, and saving again replaces rather than duplicates")
     func roundTripAndReplace() throws {
         defer { cleanup() }
-        var record = key("oscar")
+        var record = key("alpha")
         try SSHKeyRecordStore.save(record, config: config)
 
-        #expect(try SSHKeyRecordStore.all(config: config).map(\.name) == ["oscar"])
+        #expect(try SSHKeyRecordStore.all(config: config).map(\.name) == ["alpha"])
 
-        record.name = "oscar renamed"
+        record.name = "alpha renamed"
         try SSHKeyRecordStore.save(record, config: config)
 
         let all = try SSHKeyRecordStore.all(config: config)
         #expect(all.count == 1, "a rename created a second record instead of replacing one")
-        #expect(all.first?.name == "oscar renamed")
+        #expect(all.first?.name == "alpha renamed")
         #expect(all.first?.id == record.id)
     }
 

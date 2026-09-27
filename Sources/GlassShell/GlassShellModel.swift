@@ -1153,7 +1153,7 @@ public final class GlassShellModel: GlassServiceStore {
     ///
     /// Written for Stage 6 and held back while the three source applications still read
     /// `hosts.json` by their own record ids. They are obsolete now, and on 2026-09-21 the phone
-    /// showed why holding back cost something: eleven records named oscar at one address from
+    /// showed why holding back cost something: eleven records for one server at one address from
     /// three devices, two of them fully configured, grouped into one row whose detail listed the
     /// Mac's Terminal and the phone's Terminal, the Mac's Desktop and the phone's Desktop. So
     /// this runs on its own now — `consolidateDuplicateHosts()` after every load and sync — and
@@ -1229,7 +1229,7 @@ public final class GlassShellModel: GlassServiceStore {
     /// The record a group folds into: **the most recently updated member**, ties to the smallest
     /// id. Not the group's canonical (oldest) record.
     ///
-    /// On 2026-09-21 folding into the oldest emptied oscar off the Mac. The oldest live record
+    /// On 2026-09-21 folding into the oldest left a server with no services on the Mac. The oldest live record
     /// in a group is exactly the one most likely to be a tombstone already on another device —
     /// old duplicates are what other devices cleaned up first — and a tombstone beats a live
     /// record in the merge whatever the dates. Every service moved into it went with it. The
@@ -1334,7 +1334,7 @@ public final class GlassShellModel: GlassServiceStore {
 
     /// UI tests seed the isolated catalog through a launch argument, because the runner cannot
     /// reach the app's container on iOS or visionOS:
-    /// `--ui-testing-seed-hosts "juliet:ssh|juliet:rdp|oscar:ssh+database"` creates one record
+    /// `--ui-testing-seed-hosts "bravo:ssh|bravo:rdp|alpha:ssh+database"` creates one record
     /// per `|` entry, named before the colon, with one service per `+`-separated kind; a name may
     /// carry the host's address after `@` (`scratch@192.0.2.6:ssh`). Only honoured alongside
     /// `--ui-testing`, only into a catalog that is not under a real Group Container, and only when

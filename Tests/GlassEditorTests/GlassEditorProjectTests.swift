@@ -197,34 +197,34 @@ struct GlassEditorProjectTests {
         #expect(reach == .thisMachine)
     }
 
-    /// The user's scenario: juliet is an SSH connection from the headset, and the same machine
+    /// The user's scenario: bravo is an SSH connection from the headset, and the same machine
     /// when you are sitting at it.
     @Test func theSameFolderIsLocalHereAndRemoteThere() {
-        let julietKey = "SHA256:juliet-host-key"
+        let bravoKey = "SHA256:bravo-host-key"
 
-        // Sitting at juliet: its host key is this machine's host key.
+        // Sitting at bravo: its host key is this machine's host key.
         let atTheMachine = GlassMachineIdentity.reach(
-            hostName: "juliet", isLocalHostRecord: false,
-            remoteFingerprints: [julietKey], hasTerminalService: true,
-            localFingerprints: [julietKey])
+            hostName: "bravo", isLocalHostRecord: false,
+            remoteFingerprints: [bravoKey], hasTerminalService: true,
+            localFingerprints: [bravoKey])
         #expect(atTheMachine == .thisMachine)
 
         // In the headset: same project, same host record, reached over SSH.
         let inTheHeadset = GlassMachineIdentity.reach(
-            hostName: "juliet", isLocalHostRecord: false,
-            remoteFingerprints: [julietKey], hasTerminalService: true,
+            hostName: "bravo", isLocalHostRecord: false,
+            remoteFingerprints: [bravoKey], hasTerminalService: true,
             localFingerprints: [])
-        #expect(inTheHeadset == .overSSH(host: "juliet"))
+        #expect(inTheHeadset == .overSSH(host: "bravo"))
     }
 
     /// A machine with no terminal service is named as unreachable rather than silently falling back
     /// to reading this device's own disk at that path — which would open the wrong files.
     @Test func aMachineWithNoWayInSaysSo() {
-        let reach = GlassMachineIdentity.reach(hostName: "oscar", isLocalHostRecord: false,
-                                               remoteFingerprints: ["SHA256:oscar"],
+        let reach = GlassMachineIdentity.reach(hostName: "alpha", isLocalHostRecord: false,
+                                               remoteFingerprints: ["SHA256:alpha"],
                                                hasTerminalService: false,
                                                localFingerprints: ["SHA256:thismac"])
-        #expect(reach == .unreachable(host: "oscar"))
+        #expect(reach == .unreachable(host: "alpha"))
     }
 
     /// Reading a real `/etc/ssh` must not throw or hang on a device that has none.

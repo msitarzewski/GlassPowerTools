@@ -199,8 +199,8 @@ public final class GlassEditorProjectLibrary {
 
             | Machine | Services |
             |---|---|
-            | oscar | 3 |
-            | juliet | 3 |
+            | alpha | 3 |
+            | bravo | 3 |
 
             ```mermaid
             graph LR

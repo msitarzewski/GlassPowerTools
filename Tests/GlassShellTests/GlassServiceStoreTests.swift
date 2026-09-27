@@ -37,16 +37,16 @@ struct GlassServiceStoreTests {
         let store = GlassInMemoryServiceStore()
         let endpoint = EndpointID()
 
-        try await store.setConfiguration(encoding: Record(name: "oscar", port: 22), for: endpoint)
+        try await store.setConfiguration(encoding: Record(name: "alpha", port: 22), for: endpoint)
 
-        #expect(store.configuration(Record.self, for: endpoint) == Record(name: "oscar", port: 22))
+        #expect(store.configuration(Record.self, for: endpoint) == Record(name: "alpha", port: 22))
     }
 
     /// The exact shape that recursed: the value handed in *is* `Data`.
     @Test func storingRawDataTerminatesAndStoresThoseBytes() async throws {
         let store = GlassInMemoryServiceStore()
         let endpoint = EndpointID()
-        let bytes = try JSONEncoder().encode(Record(name: "juliet", port: 2222))
+        let bytes = try JSONEncoder().encode(Record(name: "bravo", port: 2222))
 
         try await store.setConfiguration(bytes, for: endpoint)
 
@@ -70,7 +70,7 @@ struct GlassServiceStoreTests {
     @Test func clearingAConfigurationRemovesIt() async throws {
         let store = GlassInMemoryServiceStore()
         let endpoint = EndpointID()
-        try await store.setConfiguration(encoding: Record(name: "oscar", port: 22), for: endpoint)
+        try await store.setConfiguration(encoding: Record(name: "alpha", port: 22), for: endpoint)
 
         try await store.setConfiguration(nil, for: endpoint)
 

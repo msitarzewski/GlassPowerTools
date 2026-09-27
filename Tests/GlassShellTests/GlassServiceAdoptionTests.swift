@@ -35,11 +35,11 @@ struct GlassServiceAdoptionTests {
         defer { try? FileManager.default.removeItem(at: root) }
         await model.load()
 
-        let endpoint = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                    address: "oscar.example", serviceName: "Terminal")
+        let endpoint = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                    address: "alpha.example", serviceName: "Terminal")
 
-        let host = try #require(model.catalogHosts.first { $0.displayName == "oscar" })
-        #expect(host.address == "oscar.example")
+        let host = try #require(model.catalogHosts.first { $0.displayName == "alpha" })
+        #expect(host.address == "alpha.example")
         #expect(host.services.map(\.endpointID) == [endpoint])
         #expect(host.services.first?.kind == .ssh)
     }
@@ -49,19 +49,19 @@ struct GlassServiceAdoptionTests {
         defer { try? FileManager.default.removeItem(at: root) }
         await model.load()
 
-        let first = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                 address: "oscar.example", serviceName: "Terminal")
+        let first = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                 address: "alpha.example", serviceName: "Terminal")
         // Same machine, named differently and cased differently — importing an `ssh_config` that
         // already has an alias for a known address must not stand a second barn beside it.
-        let second = try await model.adoptService(kind: .ssh, hostName: "oscar-alias",
-                                                  address: "OSCAR.Example", serviceName: "Terminal")
+        let second = try await model.adoptService(kind: .ssh, hostName: "alpha-alias",
+                                                  address: "ALPHA.Example", serviceName: "Terminal")
 
         // `catalogHosts` groups records that share an address into one row, so counting rows
         // would pass even if a second record had been created. Count the records themselves.
         #expect(model.records.filter { $0.deletedAt == nil }.count == 1,
                 "a second host record was created for an address already in the library")
         let host = try #require(model.catalogHosts.first)
-        #expect(host.displayName == "oscar", "the existing machine keeps its name")
+        #expect(host.displayName == "alpha", "the existing machine keeps its name")
         #expect(Set(host.services.map(\.endpointID)) == [first, second])
     }
 
@@ -70,10 +70,10 @@ struct GlassServiceAdoptionTests {
         defer { try? FileManager.default.removeItem(at: root) }
         await model.load()
 
-        _ = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                         address: "oscar.example", serviceName: "Terminal")
-        _ = try await model.adoptService(kind: .ssh, hostName: "juliet",
-                                         address: "juliet.example", serviceName: "Terminal")
+        _ = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                         address: "alpha.example", serviceName: "Terminal")
+        _ = try await model.adoptService(kind: .ssh, hostName: "bravo",
+                                         address: "bravo.example", serviceName: "Terminal")
 
         #expect(model.catalogHosts.count == 2)
     }
@@ -83,8 +83,8 @@ struct GlassServiceAdoptionTests {
         defer { try? FileManager.default.removeItem(at: root) }
         await model.load()
 
-        let endpoint = try await model.adoptService(kind: .ssh, hostName: "oscar",
-                                                    address: "oscar.example", serviceName: "Terminal")
+        let endpoint = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                    address: "alpha.example", serviceName: "Terminal")
         #expect(model.catalogHosts.count == 1)
 
         // The capability failed to save its own record, so the machine must not survive: this is
