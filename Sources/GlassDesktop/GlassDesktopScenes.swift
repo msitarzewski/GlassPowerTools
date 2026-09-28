@@ -28,6 +28,11 @@ public struct GlassDesktopScenes: Scene {
         #if os(visionOS)
         .windowStyle(.plain)
         #endif
+        #if os(macOS)
+        // File ▸ Import RDP File… (⇧⌘I), glassDT's menu item. Aimed by the library toolbar's
+        // import button, so it works where that button is: the library window.
+        .commands { DesktopImportCommands() }
+        #endif
         #if !os(iOS)
         .defaultSize(width: 1280, height: 800)
         .restorationBehavior(.disabled)
@@ -43,7 +48,14 @@ struct DesktopSessionHost: View {
     let runtime: GlassDesktopRuntime
     let endpointID: EndpointID?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openWindow) private var openWindow
     @State private var loaded = false
+
+    /// The ⚡ in this window: bring the library forward on its Active list.
+    private var showActive: (@MainActor () -> Void)? {
+        guard let show = runtime.showActiveConnections else { return nil }
+        return { openWindow(id: "main"); show() }
+    }
 
     var body: some View {
         // `maxWidth/maxHeight: .infinity` is load-bearing, not decoration
@@ -59,7 +71,8 @@ struct DesktopSessionHost: View {
             if let endpointID, let connection = runtime.connection(for: endpointID) {
                 DesktopSessionView(connection: connection, app: runtime.app,
                                    onOutcome: { runtime.reportOutcome($0, for: endpointID) },
-                                   onClose: { dismiss() })
+                                   onClose: { dismiss() },
+                                   showActiveConnections: showActive)
             } else if loaded {
                 ContentUnavailableView(
                     "Desktop Not Found",
@@ -118,12 +131,7 @@ public struct GlassDesktopBootstrap<Content: View>: View {
         content
             .fullScreenCover(item: $activeDesktop) { connection in
                 NavigationStack {
-                    DesktopSessionView(
-                        connection: connection,
-                        app: runtime.app,
-                        onOutcome: { runtime.reportOutcome($0, for: connection.id) },
-                        onClose: { activeDesktop = nil }
-                    )
+                    coverSession(connection)
                     .toolbar {
                         // A chevron, so the machine's name is the only wording in the bar —
                         // `glassDT`'s decision, kept.
@@ -145,6 +153,13 @@ public struct GlassDesktopBootstrap<Content: View>: View {
         #else
         content
         #endif
+    }
+
+    @ViewBuilder
+    private func coverSession(_ connection: DesktopConnection) -> some View {
+        DesktopSessionView(connection: connection, app: runtime.app,
+                           onOutcome: { runtime.reportOutcome($0, for: connection.id) },
+                           onClose: { activeDesktop = nil })
     }
 
     private func drain() {

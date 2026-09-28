@@ -36,9 +36,12 @@ struct DesktopGlassAppearanceControls: View {
     }
 }
 
+/// Settings ▸ Desktops: what glassDT's own Settings window held that the shell's pages do not.
+/// Privacy and About are the shell's now, so only General and (on the headset) Appearance remain,
+/// as one page. Until 2026-09-27 this view moved in with the capability and nothing showed it, so
+/// connection-failure notices could not be switched on.
 public struct DesktopSettingsView: View {
     @State private var notices = DesktopNotices.shared
-    @State private var selectedPage = Page.general
     #if os(visionOS)
     @AppStorage(DesktopGlassPreferenceKey.opacity) private var opacity = 1.0
     @AppStorage(DesktopGlassPreferenceKey.material) private var frost = 0.25
@@ -47,110 +50,36 @@ public struct DesktopSettingsView: View {
     public init() {}
 
     public var body: some View {
-        Group {
-            #if os(iOS)
-            List {
-                ForEach(pages, id: \.self) { page in
-                    NavigationLink {
-                        settingsForm(page).navigationTitle(page.title)
-                    } label: {
-                        Label(page.title, systemImage: page.symbol)
-                    }
-                }
-            }
-            #elseif os(visionOS)
-            GlassSettingsSections(selection: $selectedPage, options: pages,
-                title: { $0.title }, pickerIdentifier: "desktop.settings.section") { page in
-                settingsForm(page)
-            }
-            #else
-            TabView {
-                ForEach(pages, id: \.self) { page in
-                    settingsForm(page)
-                        .tabItem { Label(page.title, systemImage: page.symbol) }
-                }
-            }.accessibilityIdentifier("desktop.settings.tabs")
-                .frame(width: 760, height: 560)
-            #endif
-        }.navigationTitle("Settings")
-        #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
-    }
-
-    private var pages: [Page] {
-        #if os(visionOS)
-        [.general, .appearance, .privacy, .about]
-        #else
-        [.general, .privacy, .about]
-        #endif
-    }
-
-    @ViewBuilder private func settingsForm(_ page: Page) -> some View {
         Form {
-            switch page {
-            case .general:
-                Section {
-                    Toggle("Important Session Notices", isOn: Binding(
-                        get: { notices.isEnabled },
-                        set: { enabled in Task { await notices.setEnabled(enabled) } }
-                    )).disabled(notices.isRequestingAuthorization)
-                        .accessibilityIdentifier("settings.notifications")
-                    if let status = notices.statusMessage {
-                        Text(status).font(.caption).foregroundStyle(.secondary)
-                    }
-                } header: {
-                    Text("Notifications")
-                } footer: {
-                    Text("Receive a system notification when a connection needs attention. Notices omit host names, account details, and server diagnostics.")
+            Section {
+                Toggle("Important Session Notices", isOn: Binding(
+                    get: { notices.isEnabled },
+                    set: { enabled in Task { await notices.setEnabled(enabled) } }
+                )).disabled(notices.isRequestingAuthorization)
+                    .accessibilityIdentifier("settings.notifications")
+                if let status = notices.statusMessage {
+                    Text(status).font(.caption).foregroundStyle(.secondary)
                 }
-                Section {
-                    Text("Edit a saved desktop to change its account, credential storage, clipboard, and audio settings.")
-                        .foregroundStyle(.secondary)
-                } header: {
-                    Text("Connections")
-                }
-            case .appearance:
-                #if os(visionOS)
-                DesktopGlassAppearanceControls(opacity: $opacity, frost: $frost)
-                Section {
-                    Button("Reset Appearance") { opacity = 1; frost = 0.25 }
-                } footer: {
-                    Text("These choices are saved on this device. Background removal and remote resolution are available in each desktop's settings.")
-                }
-                #else
-                EmptyView()
-                #endif
-            case .privacy:
-                Section {
-                    Text("Passwords are stored in Keychain. iCloud Keychain can sync eligible credentials according to your Apple Account and device settings.")
-                        .foregroundStyle(.secondary)
-                } header: {
-                    Text("Credentials")
-                }
-                Section {
-                    Text("Saved desktops, appearance settings, and service pairings stay on this device. Pairing services does not share their passwords or grant access to another account.")
-                        .foregroundStyle(.secondary)
-                } header: {
-                    Text("Saved Settings")
-                }
-            case .about:
-                Section("Desktop") {
-                    LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development")
-                    LabeledContent("Remote Desktop Protocol", value: "RDP")
-                    LabeledContent("App License", value: "MIT")
-                }
+            } header: {
+                Text("Notifications")
+            } footer: {
+                Text("Receive a system notification when a remote desktop connection needs attention. Notices omit host names, account details, and server diagnostics.")
             }
-        }.formStyle(.grouped).padding()
-    }
-
-    private enum Page: Hashable {
-        case general, appearance, privacy, about
-        var title: String {
-            switch self { case .general: "General"; case .appearance: "Appearance"; case .privacy: "Privacy"; case .about: "About" }
+            #if os(visionOS)
+            DesktopGlassAppearanceControls(opacity: $opacity, frost: $frost)
+            Section {
+                Button("Reset Appearance") { opacity = 1; frost = 0.25 }
+            } footer: {
+                Text("These choices are saved on this device. Background removal and remote resolution are available in each desktop's settings.")
+            }
+            #endif
+            Section {
+                Text("Edit a desktop service in the library to change its account, credential storage, clipboard, and audio settings.")
+                    .foregroundStyle(.secondary)
+            } header: {
+                Text("Connections")
+            }
         }
-        var symbol: String {
-            switch self { case .general: "gearshape"; case .appearance: "paintbrush"; case .privacy: "hand.raised"; case .about: "info.circle" }
-        }
+        .formStyle(.grouped)
     }
 }

@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 import GlassRDPTransport
 import GlassConnectionUI
+import GlassShell
 #if os(macOS)
 import AppKit
 #else
@@ -75,18 +76,26 @@ public struct DesktopSessionView: View {
     /// when the session actually reaches a state, never at presentation time.
     private let onOutcome: (@MainActor (GlassRDPState) -> Void)?
 
+    /// The ⚡: back to the library's Active list, from a window that is otherwise only the
+    /// desktop. Every session window carries it (`GlassActiveConnections.swift`); the desktop's
+    /// window did not until 2026-09-27 — *"the Desktop window itself doesn't link back"*.
+    private let showActiveConnections: (@MainActor () -> Void)?
+
     public init(connection: DesktopConnection, app: DesktopAppModel,
                 onOutcome: (@MainActor (GlassRDPState) -> Void)? = nil,
-                onClose: (@MainActor () -> Void)? = nil) {
+                onClose: (@MainActor () -> Void)? = nil,
+                showActiveConnections: (@MainActor () -> Void)? = nil) {
         self.onClose = onClose
         self.onOutcome = onOutcome
+        self.showActiveConnections = showActiveConnections
         _session = State(initialValue: DesktopSessionModel(connection: connection, app: app))
     }
 
     #if DEBUG && os(visionOS) && targetEnvironment(simulator)
-    init(previewSession: DesktopSessionModel) {
+    init(previewSession: DesktopSessionModel, showActiveConnections: (@MainActor () -> Void)? = nil) {
         onClose = nil
         onOutcome = nil
+        self.showActiveConnections = showActiveConnections
         _session = State(initialValue: previewSession)
     }
     #endif
@@ -178,7 +187,14 @@ public struct DesktopSessionView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         #if !os(visionOS)
-        .toolbar { ToolbarItemGroup(placement: .primaryAction) { sessionActions } }
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) { sessionActions }
+            if let showActiveConnections {
+                ToolbarItem(placement: .primaryAction) {
+                    GlassActiveConnectionsButton { session.releaseInput(); showActiveConnections() }
+                }
+            }
+        }
         #endif
         .onChange(of: session.failurePresentation, initial: false) { _, failure in
             // A panel the user must read should not be hidden behind the keyboard.
@@ -333,6 +349,10 @@ public struct DesktopSessionView: View {
     #if os(visionOS)
     private var nativeControls: some View {
         HStack(spacing: 16) {
+            if let showActiveConnections {
+                GlassActiveConnectionsButton { session.releaseInput(); showActiveConnections() }
+                Divider().frame(height: 24)
+            }
             sessionActions
             Divider().frame(height: 24)
             Button("Escape", systemImage: "escape") { session.sendKey(0x01) }

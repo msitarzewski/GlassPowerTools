@@ -57,6 +57,9 @@ struct DesktopImportCommand: View {
             Text(failure ?? "")
         }
         .onDisappear { importTask?.cancel() }
+        #if os(macOS)
+        .focusedSceneValue(\.desktopImportAction, reading ? nil : { choosingFile = true })
+        #endif
     }
 
     private func read(_ url: URL) {
