@@ -273,6 +273,19 @@ struct TerminalConnectFlow: ViewModifier {
             }
         case .openWorkgroup(let preset):
             openWorkgroup(preset)
+        #if DEBUG
+        case .demoReplay(let name, let output):
+            // No SSHConnection is ever started: the sinks swallow typing and resizes, and the
+            // transcript goes straight to the emulator, queued until the window's view attaches.
+            let server = ServerConfiguration(name: name, host: "192.0.2.10", username: "ann")
+            let session = TerminalSession(server: server,
+                                          terminalWriteSink: { _ in },
+                                          terminalResizeSink: { _, _ in })
+            sessionManager.registerSession(session)
+            session.state = .connected
+            session.feedTerminalData(output)
+            presentTerminalWindow(for: session)
+        #endif
         case .addServer(let draft):
             addServerDraft = AddServerRequest(draft: draft)
         case .editServer(let server, let hostContext):

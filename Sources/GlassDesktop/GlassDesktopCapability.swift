@@ -42,6 +42,11 @@ public final class GlassDesktopRuntime {
     private(set) var requestSerial = 0
     private var pendingRequests: [Request] = []
 
+    #if DEBUG
+    /// Screenshot demo sessions (`requestDemoDesktop`): a still frame, no host behind it.
+    var demoSessions: [EndpointID: DesktopSessionModel] = [:]
+    #endif
+
     /// The one layering state, shared with the shell so no second material system exists.
     public let layers: GlassLayerStore
 

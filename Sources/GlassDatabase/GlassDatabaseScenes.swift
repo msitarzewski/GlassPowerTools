@@ -156,6 +156,20 @@ public struct GlassDatabaseBootstrap<Content: View>: View {
             present(DatabaseWorkspaceWindowRequest.primary(sessionID: sessionID))
         case .showFailure(let message):
             failureMessage = message
+        #if DEBUG
+        case .demoConnect(let config):
+            Task {
+                do {
+                    let sessionID = try await runtime.sessionManager.connect(config: config, password: "", openForward: nil)
+                    // Straight to a table: the grid is the shot, and the overview would show the
+                    // simulator's file path.
+                    present(DatabaseWorkspaceWindowRequest.additional(
+                        sessionID: sessionID, initialSelection: .table(database: "main", table: "orders"), id: sessionID))
+                } catch {
+                    failureMessage = DatabaseConnectionFailure.message(for: error, config: config)
+                }
+            }
+        #endif
         }
     }
 

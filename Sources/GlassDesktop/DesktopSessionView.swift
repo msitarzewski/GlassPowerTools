@@ -91,7 +91,8 @@ public struct DesktopSessionView: View {
         _session = State(initialValue: DesktopSessionModel(connection: connection, app: app))
     }
 
-    #if DEBUG && os(visionOS) && targetEnvironment(simulator)
+    /// A session built elsewhere: the simulator fixture, and the screenshot demo.
+    #if DEBUG
     init(previewSession: DesktopSessionModel, showActiveConnections: (@MainActor () -> Void)? = nil) {
         onClose = nil
         onOutcome = nil

@@ -48,6 +48,10 @@ public final class GlassDatabaseRuntime {
         case openQueryEditor(sessionID: UUID)
         /// Show the failure alert with this message (a link with nothing behind it).
         case showFailure(String)
+        #if DEBUG
+        /// Screenshots (App/GlassDemoMode.swift): connect to this configuration without saving it.
+        case demoConnect(DatabaseConnectionConfig)
+        #endif
     }
     private(set) var requestSerial = 0
     private var pendingRequests: [Request] = []
@@ -78,6 +82,20 @@ public final class GlassDatabaseRuntime {
         // and a terminal canvas.
         settingsManager = SettingsManager(loadImmediately: false, layers: resolvedLayers)
     }
+
+    #if DEBUG
+    /// Screenshots only: the real SQLite engine on a demo file, in a workspace, with nothing saved
+    /// to the library. The file is imported the way a person's own would be.
+    public func requestDemoDatabase(file: URL, name: String) {
+        do {
+            let imported = try SQLiteFileImporter.importFile(at: file)
+            enqueue(.demoConnect(DatabaseConnectionConfig(name: name, engine: .sqlite, host: imported.path,
+                                                          port: 0, username: "")))
+        } catch {
+            enqueue(.showFailure("The demo database could not be opened: \(error.localizedDescription)"))
+        }
+    }
+    #endif
 
     func enqueue(_ request: Request) {
         pendingRequests.append(request)

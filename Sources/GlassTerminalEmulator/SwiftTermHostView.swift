@@ -1777,6 +1777,12 @@ private final class SwiftTermEngine: TerminalEngine {
     }
 
     func focusIfActive() -> Bool {
+        #if DEBUG
+        // Screenshots (App/GlassDemoMode.swift): focus raises the on-screen keyboard over the shot.
+        // `--demo-keyboard` keeps it, for checking the layout with the keyboard up.
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("--demo-open"), !arguments.contains("--demo-keyboard") { return false }
+        #endif
         guard let window = terminalView.window, window.isKeyWindow else { return false }
         if terminalView.isFirstResponder {
             applyConfiguredCaretTheme()

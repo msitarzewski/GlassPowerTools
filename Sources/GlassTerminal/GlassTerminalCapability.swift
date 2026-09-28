@@ -60,6 +60,11 @@ public final class GlassTerminalRuntime {
         case showWorkgroup(workgroupID: UUID)
         /// Show the connect flow's failure alert with this message (a link with nothing behind it).
         case showFailure(String)
+        #if DEBUG
+        /// Screenshots (App/GlassDemoMode.swift): a session that connects to nothing, showing a
+        /// recorded transcript in the real terminal window. Typing goes nowhere.
+        case demoReplay(name: String, output: Data)
+        #endif
     }
     private(set) var requestSerial = 0
     private var pendingRequests: [Request] = []
@@ -189,6 +194,10 @@ public final class GlassTerminalRuntime {
         pendingLocalShellReports.removeFirst()(outcome)
     }
     public func requestShowWorkgroups() { enqueue(.showWorkgroups) }
+    #if DEBUG
+    /// Screenshots only: a terminal window on `name` showing `output`, with no connection behind it.
+    public func requestDemoReplay(name: String, output: Data) { enqueue(.demoReplay(name: name, output: output)) }
+    #endif
     public func requestShowTailscale() { enqueue(.showTailscale) }
 
     func enqueue(_ request: Request) {

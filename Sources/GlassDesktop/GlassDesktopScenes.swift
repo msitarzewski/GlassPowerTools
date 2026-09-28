@@ -63,7 +63,20 @@ struct DesktopSessionHost: View {
         // branch is showing — the failure panel or the spinner — so a session that cannot connect
         // opens a ~640-point window, the toolbar collapses into an overflow chevron and every
         // label truncates. Observed 2026-09-14.
-        content.frame(maxWidth: .infinity, maxHeight: .infinity)
+        demoOrContent.frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private var demoOrContent: some View {
+        #if DEBUG
+        if let endpointID, let demo = runtime.demoSessions[endpointID] {
+            DesktopSessionView(previewSession: demo, showActiveConnections: showActive)
+        } else {
+            content
+        }
+        #else
+        content
+        #endif
     }
 
     private var content: some View {
@@ -157,9 +170,19 @@ public struct GlassDesktopBootstrap<Content: View>: View {
 
     @ViewBuilder
     private func coverSession(_ connection: DesktopConnection) -> some View {
+        #if DEBUG
+        if let demo = runtime.demoSessions[connection.id] {
+            DesktopSessionView(previewSession: demo)
+        } else {
+            DesktopSessionView(connection: connection, app: runtime.app,
+                               onOutcome: { runtime.reportOutcome($0, for: connection.id) },
+                               onClose: { activeDesktop = nil })
+        }
+        #else
         DesktopSessionView(connection: connection, app: runtime.app,
                            onOutcome: { runtime.reportOutcome($0, for: connection.id) },
                            onClose: { activeDesktop = nil })
+        #endif
     }
 
     private func drain() {
@@ -192,6 +215,11 @@ public struct GlassDesktopBootstrap<Content: View>: View {
                 } else if let connection = runtime.connection(for: connectionID) {
                     activeDesktop = connection
                 }
+                #if DEBUG
+                if !GlassWindowPresentation.canOpenWindows, let demo = runtime.demoSessions[connectionID] {
+                    activeDesktop = demo.connection
+                }
+                #endif
             case let .showFailure(message):
                 failure = message
             }
