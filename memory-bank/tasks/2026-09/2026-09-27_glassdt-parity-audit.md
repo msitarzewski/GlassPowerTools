@@ -89,3 +89,12 @@ failures were compared against the last commit under the same lock and are ident
 full suite unlocked. Also: private names in test fixtures (the owner's username, two machine
 names) replaced with neutral ones; private-range addresses and database names in older notes are
 left for the pre-publication scrub.
+
+## 2026-09-28: the headset's stale library reached iCloud (fixed)
+The Vision Pro, last installed at 0.4.123, got 0.4.241; its upgrade re-stamped its old records and
+newest-wins published them: 10 sent, three long-deleted machines resurrected in iCloud without
+configurations. The Mac was quit before syncing; `GLASS_SYNC_DRY_RUN=1` showed the account record by
+record. Merge now: tombstones final; a configuration is never lost to a copy without one;
+corrections stamped past both copies; duplicate and rounding-error records settle. Mac took 13 and
+sent 3, then 0/0. All three devices on 0.4.247. The headset's list is inset grouped.
+**Before letting a device with an old install sync, dry-run it or update everything first.**
