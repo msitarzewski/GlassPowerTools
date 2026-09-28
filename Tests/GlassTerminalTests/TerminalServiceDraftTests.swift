@@ -36,7 +36,7 @@ struct TerminalServiceDraftTests {
         let key = StoredSSHKey(name: "k", algorithm: "ssh-ed25519")
         settings.sshKeys = [key]
         let draft = TerminalServiceDraft(serverManager: servers, settingsManager: settings)
-        draft.username = " michael "
+        draft.username = " casey "
         draft.port = "2222"
         draft.authMethod = .sshKey
         draft.sshKeyID = key.id
@@ -47,18 +47,18 @@ struct TerminalServiceDraftTests {
         draft.initialTerminalRows = 40
         draft.name = ""
         let id = UUID()
-        let configuration = try #require(draft.configuration(id: id, address: "192.0.2.6", name: draft.serviceDisplayName(hostName: "scratch")))
+        let configuration = try #require(draft.configuration(id: id, address: "192.0.2.6", name: draft.serviceDisplayName(hostName: "golf")))
         #expect(configuration.id == id && configuration.host == "192.0.2.6" && configuration.port == 2222)
-        #expect(configuration.username == "michael" && configuration.name == "Terminal on scratch")
+        #expect(configuration.username == "casey" && configuration.name == "Terminal on golf")
         #expect(configuration.authMethod == .sshKey && configuration.sshKeyID == key.id)
         #expect(configuration.legacyAlgorithmsEnabled && configuration.colorTag == .green)
         #expect(configuration.initialTerminalColumns == 132 && configuration.initialTerminalRows == 40)
 
         let reloaded = TerminalServiceDraft(editing: configuration, serverManager: servers, settingsManager: settings)
-        #expect(reloaded.username == "michael" && reloaded.port == "2222" && reloaded.authMethod == .sshKey)
+        #expect(reloaded.username == "casey" && reloaded.port == "2222" && reloaded.authMethod == .sshKey)
         #expect(reloaded.sshKeyID == key.id && reloaded.allowLegacyAlgorithms && reloaded.colorTag == .green)
         #expect(!reloaded.usesAppDefaultTerminalSize && reloaded.initialTerminalColumns == 132 && reloaded.initialTerminalRows == 40)
-        #expect(reloaded.name == "Terminal on scratch" && reloaded.isEditing)
+        #expect(reloaded.name == "Terminal on golf" && reloaded.isEditing)
     }
 
     @Test("Validation as the shell sees it: no name needed, the host's address stands in, user and credential required")
@@ -90,14 +90,14 @@ struct TerminalServiceDraftTests {
         let key = StoredSSHKey(name: "k", algorithm: "ssh-ed25519")
         settings.sshKeys = [key]
         let draft = TerminalServiceDraft(serverManager: servers, settingsManager: settings)
-        draft.username = "michael"
+        draft.username = "casey"
         draft.authMethod = .sshKey
         draft.sshKeyID = key.id
         let endpoint = EndpointID()
-        let host = try HostProfile(displayName: "scratch", address: "192.0.2.6")
+        let host = try HostProfile(displayName: "golf", address: "192.0.2.6")
         try await draft.commit(endpointID: endpoint, host: host, address: "192.0.2.6")
         let saved = try #require(servers.server(for: endpoint.rawValue))
-        #expect(saved.host == "192.0.2.6" && saved.username == "michael" && saved.name == "Terminal on scratch")
+        #expect(saved.host == "192.0.2.6" && saved.username == "casey" && saved.name == "Terminal on golf")
 
         // Editing commits under the same id and keeps it one server.
         let edit = TerminalServiceDraft(editing: saved, serverManager: servers, settingsManager: settings)

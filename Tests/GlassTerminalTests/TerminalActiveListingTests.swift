@@ -12,7 +12,7 @@ import GlassShell
 @MainActor
 struct TerminalActiveListingTests {
     private func session(named name: String) -> TerminalSession {
-        TerminalSession(server: ServerConfiguration(name: name, host: "example.invalid", port: 22, username: "michael"))
+        TerminalSession(server: ServerConfiguration(name: name, host: "example.invalid", port: 22, username: "casey"))
     }
 
     @Test("A lone session is one row, on its server's endpoint; grouped, it is the workgroup's row")

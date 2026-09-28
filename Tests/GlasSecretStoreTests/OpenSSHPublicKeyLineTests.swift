@@ -35,7 +35,7 @@ struct OpenSSHPublicKeyLineTests {
     /// re-exporting it would look like a different key to whoever is comparing.
     @Test func ignoresTheComment() {
         let noComment = Self.line.replacingOccurrences(of: " glass-test", with: "")
-        let otherComment = noComment + " michael@somewhere-else"
+        let otherComment = noComment + " casey@somewhere-else"
         #expect(OpenSSHPublicKeyLine.sha256Fingerprint(in: noComment) == Self.fingerprint)
         #expect(OpenSSHPublicKeyLine.sha256Fingerprint(in: otherComment) == Self.fingerprint)
     }

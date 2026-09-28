@@ -20,7 +20,7 @@ struct DesktopSessionResizeTests {
                 .appendingPathComponent("DesktopResize-\(UUID().uuidString)", isDirectory: true)
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
             app = DesktopAppModel(storageDirectory: root, credentialAccess: .inMemory())
-            connection = DesktopConnection(name: "alpha", host: "alpha.local", username: "michael")
+            connection = DesktopConnection(name: "alpha", host: "alpha.local", username: "casey")
         }
 
         func clean() { try? FileManager.default.removeItem(at: root) }
@@ -44,7 +44,7 @@ struct DesktopSessionResizeTests {
         /// Connected, with the display channel open, the window reported at a Retina 1330 × 813
         /// points and that request acknowledged: the state of a session at the login screen.
         func atTheLoginScreen(_ model: DesktopSessionModel) async throws -> DesktopSize {
-            try await model.connect(username: "michael", domain: nil, password: "test secret")
+            try await model.connect(username: "casey", domain: nil, password: "test secret")
             await model.receive(.state(.connected), attempt: model.attemptID, connection: connection)
             await model.receive(.displayCapabilities(.init(maximumMonitors: 1, maximumArea: UInt64(DesktopSize.maximumPixels))),
                                 attempt: model.attemptID, connection: connection)
@@ -112,7 +112,7 @@ struct DesktopSessionResizeTests {
         let model = fixture.model()
         // The view reports its size during layout, before the session starts.
         model.resize(width: 1330, height: 813, displayScale: 2)
-        try await model.connect(username: "michael", domain: nil, password: "test secret")
+        try await model.connect(username: "casey", domain: nil, password: "test secret")
         let rdp = try #require(fixture.connects.last)
         #expect(rdp.width == 2660 && rdp.height == 1626, "two pixels per point")
         #expect(rdp.desktopScaleFactor == 200, "and laid out at 200%, from the first frame")

@@ -53,10 +53,10 @@ struct D26SetupSheetSaveTests {
         await model.load()
 
         let setup = GlassShellSetupModel(model: model, mode: .addHost)
-        setup.name = "scratch"
+        setup.name = "golf"
         setup.address = "192.0.2.6"
         let draft = try #require(setup.draft(for: .ssh) as? TerminalServiceDraft)
-        draft.username = "michael"
+        draft.username = "casey"
         draft.port = "22"
         // Key auth, because the password path writes to the real Keychain and this suite is about
         // the order the link and the record are created in, not about credentials.
@@ -79,7 +79,7 @@ struct D26SetupSheetSaveTests {
         let endpoint = try #require(services.first).endpointID
         #expect(model.configuration(for: endpoint) != nil,
                 "the link has no configuration behind it")
-        #expect(runtime.sessionManager.serverManager.server(for: endpoint.rawValue)?.username == "michael")
+        #expect(runtime.sessionManager.serverManager.server(for: endpoint.rawValue)?.username == "casey")
     }
 
     /// Adding a second service to a machine that already exists, which is the other door in.
@@ -92,7 +92,7 @@ struct D26SetupSheetSaveTests {
 
         let setup = GlassShellSetupModel(model: model, mode: .addService(host, .ssh))
         let draft = try #require(setup.draft(for: .ssh) as? TerminalServiceDraft)
-        draft.username = "michael"
+        draft.username = "casey"
         draft.port = "22"
         // Key auth, because the password path writes to the real Keychain and this suite is about
         // the order the link and the record are created in, not about credentials.
@@ -117,7 +117,7 @@ struct D26SetupSheetSaveTests {
         await model.load()
 
         let setup = GlassShellSetupModel(model: model, mode: .addHost)
-        setup.name = "scratch"
+        setup.name = "golf"
         setup.address = "192.0.2.6"
         let draft = try #require(setup.draft(for: .ssh) as? TerminalServiceDraft)
         draft.username = ""          // required; the draft refuses to commit

@@ -14,7 +14,7 @@
 //  unconfigured run prints NOT RUN, because a test that passes by not running is worse than no
 //  test (rule 25 and the verification-scope lesson).
 //
-//      GPT_SSH_TEST_HOST=192.0.2.6 GPT_SSH_TEST_USER=michael \
+//      GPT_SSH_TEST_HOST=192.0.2.6 GPT_SSH_TEST_USER=casey \
 //      GPT_SSH_TEST_KEY_PATH=$HOME/.ssh/<test VM key> swift test --filter LiveRemoteEditing
 //
 //  Writes only inside a directory it creates under /tmp and removes afterwards.

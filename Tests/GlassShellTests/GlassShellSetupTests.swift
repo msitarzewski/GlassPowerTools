@@ -80,7 +80,7 @@ struct GlassShellSetupTests {
         model.registry.register(ssh)
         let setup = GlassShellSetupModel(model: model, mode: .addHost)
         #expect(setup.isAvailable(.ssh) && !setup.isAvailable(.database), "unregistered kinds are disabled tabs")
-        setup.name = "scratch"
+        setup.name = "golf"
         setup.address = "192.0.2.6"
         setup.select(.database)
         #expect(setup.selection == nil, "a kind without a capability cannot be selected")
@@ -89,13 +89,13 @@ struct GlassShellSetupTests {
 
         let id = try #require(await setup.save())
         let host = try #require(model.host(id))
-        #expect(host.displayName == "scratch" && host.address == "192.0.2.6")
+        #expect(host.displayName == "golf" && host.address == "192.0.2.6")
         #expect(host.services.map(\.kind) == [.ssh])
         let draft = try #require(ssh.made.first)
         #expect(draft.commits.count == 1)
         #expect(draft.commits.first?.2 == "192.0.2.6", "the draft is committed with the host's address")
         #expect(draft.commits.first?.0 == host.services.first?.endpointID, "the link carries the endpoint id the capability committed under")
-        #expect(host.services.first?.displayName == "ssh on scratch")
+        #expect(host.services.first?.displayName == "ssh on golf")
     }
 
     @Test("Validation: host fields first, then each enabled draft; the first problem is focused")
@@ -174,7 +174,7 @@ struct GlassShellSetupTests {
         setup.name = "box"
         setup.address = "box.example"
         let draft = try #require(setup.draft(for: .ssh) as? FakeDraft)
-        draft.username = "michael"
+        draft.username = "casey"
         let id = try #require(await setup.save())
         #expect(model.services(for: id).count == 1)
     }

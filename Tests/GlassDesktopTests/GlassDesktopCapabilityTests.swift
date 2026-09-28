@@ -19,7 +19,7 @@ private func makeRuntime() async throws -> (GlassDesktopRuntime, URL) {
     return (GlassDesktopRuntime(app: app), root)
 }
 
-private func host(_ name: String = "beast", address: String = "10.0.0.9") throws -> HostProfile {
+private func host(_ name: String = "foxtrot", address: String = "10.0.0.9") throws -> HostProfile {
     try HostProfile(id: HostID(rawValue: UUID()), displayName: name, address: address)
 }
 
@@ -34,10 +34,10 @@ struct GlassDesktopCapabilityTests {
         let capability = GlassDesktopCapability(runtime: runtime)
         #expect(capability.openSessions().isEmpty)
 
-        let connection = DesktopConnection(name: "alpha", host: "alpha.local", username: "michael")
+        let connection = DesktopConnection(name: "alpha", host: "alpha.local", username: "casey")
         let session = DesktopSessionModel(connection: connection, app: runtime.app)
         // No host to reach: the attempt fails at once, and a failed desktop is still on screen.
-        try? await session.connect(username: "michael", domain: nil, password: "x")
+        try? await session.connect(username: "casey", domain: nil, password: "x")
         let rows = capability.openSessions()
         #expect(rows.map(\.id) == [GlassDesktopCapability.sessionID(connectionID: connection.id)])
         #expect(rows.first?.title == "alpha")
@@ -67,7 +67,7 @@ struct GlassDesktopCapabilityTests {
         let endpoint = EndpointID(rawValue: UUID())
 
         let draft = try #require(capability.makeSetupDraft() as? DesktopServiceDraft)
-        draft.username = "michael"
+        draft.username = "casey"
         draft.password = "correct-horse"
         #expect(draft.validate(address: machine.address ?? "").isEmpty)
         try await draft.commit(endpointID: endpoint, host: machine, address: "10.0.0.9")
@@ -153,12 +153,12 @@ struct GlassDesktopCapabilityTests {
         let machine = try host()
         let endpoint = EndpointID(rawValue: UUID())
         let draft = try #require(capability.makeSetupDraft() as? DesktopServiceDraft)
-        draft.username = "michael"
+        draft.username = "casey"
         draft.password = "correct-horse"
         try await draft.commit(endpointID: endpoint, host: machine, address: "10.0.0.9")
         #expect(runtime.connection(for: endpoint) != nil)
 
-        let link = HostServiceLink(endpointID: endpoint, kind: .rdp, displayName: "beast", credentialID: nil)
+        let link = HostServiceLink(endpointID: endpoint, kind: .rdp, displayName: "foxtrot", credentialID: nil)
         try await capability.removeService(link, host: machine)
         #expect(runtime.connection(for: endpoint) == nil, "the record goes with the host")
     }
@@ -187,12 +187,12 @@ struct GlassDesktopCapabilityTests {
         let machine = try host()
         let endpoint = EndpointID(rawValue: UUID())
         let draft = try #require(capability.makeSetupDraft() as? DesktopServiceDraft)
-        draft.username = "michael"
+        draft.username = "casey"
         draft.password = "correct-horse"
         try await draft.commit(endpointID: endpoint, host: machine, address: "10.0.0.9")
 
         var outcome: GlassCapabilityOutcome?
-        let link = HostServiceLink(endpointID: endpoint, kind: .rdp, displayName: "beast", credentialID: nil)
+        let link = HostServiceLink(endpointID: endpoint, kind: .rdp, displayName: "foxtrot", credentialID: nil)
         capability.open(service: link, host: machine) { outcome = $0 }
         // The request is queued and the report held: nothing has connected yet.
         #expect(outcome == nil, "opening a window is not connecting")
@@ -221,12 +221,12 @@ struct GlassDesktopCapabilityTests {
         let capability = GlassDesktopCapability(runtime: runtime)
         let endpoint = EndpointID(rawValue: UUID())
         let draft = try #require(capability.makeSetupDraft() as? DesktopServiceDraft)
-        draft.username = "michael"
+        draft.username = "casey"
         draft.password = "correct-horse"
         var machine = try host()
         try await draft.commit(endpointID: endpoint, host: machine, address: "10.0.0.9")
 
-        machine.services = [HostServiceLink(endpointID: endpoint, kind: .rdp, displayName: "beast", credentialID: nil)]
+        machine.services = [HostServiceLink(endpointID: endpoint, kind: .rdp, displayName: "foxtrot", credentialID: nil)]
         capability.hostAddressDidChange(host: machine, address: "10.0.0.22")
         // The capability persists on a task; give it one turn to land.
         try await Task.sleep(for: .milliseconds(200))

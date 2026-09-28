@@ -27,18 +27,18 @@ struct D26DesktopCatalogTests {
     }
 
     private func connection(_ name: String) -> DesktopConnection {
-        DesktopConnection(name: name, host: "\(name).example", username: "michael")
+        DesktopConnection(name: name, host: "\(name).example", username: "casey")
     }
 
     @Test func aSavedDesktopIsWrittenOntoItsServiceLink() async throws {
         let (model, store) = await makeModel()
-        let value = connection("beast")
+        let value = connection("foxtrot")
 
         try await model.save(value, password: nil)
 
         let stored = try #require(store.configuration(DesktopConnection.self, for: value.id))
-        #expect(stored.host == "beast.example")
-        #expect(stored.username == "michael")
+        #expect(stored.host == "foxtrot.example")
+        #expect(stored.username == "casey")
     }
 
     @Test func aFreshModelReadsThemBackOutOfTheCatalog() async throws {
@@ -56,7 +56,7 @@ struct D26DesktopCatalogTests {
 
     @Test func deletingRemovesTheConfigurationFromTheLink() async throws {
         let (model, store) = await makeModel()
-        let value = connection("beast")
+        let value = connection("foxtrot")
         try await model.save(value, password: nil)
         #expect(store.configuration(for: value.id) != nil)
 
@@ -75,7 +75,7 @@ struct D26DesktopCatalogTests {
                                     credentialAccess: .inMemory())
 
         await #expect(throws: DesktopError.libraryUnavailable) {
-            try await model.save(connection("beast"), password: nil)
+            try await model.save(connection("foxtrot"), password: nil)
         }
     }
 }

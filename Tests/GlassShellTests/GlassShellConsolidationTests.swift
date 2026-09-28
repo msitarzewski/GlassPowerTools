@@ -77,7 +77,7 @@ struct GlassShellConsolidationTests {
     func aliasOverlapGroups() async throws {
         let (model, root, sibling) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
-        try await sibling.upsert(try record("Max Beast", aliases: ["10.0.0.5"], kinds: [.ssh], createdAt: t0))
+        try await sibling.upsert(try record("Max Foxtrot", aliases: ["10.0.0.5"], kinds: [.ssh], createdAt: t0))
         try await sibling.upsert(try record("bravo-desktop", aliases: ["10.0.0.5"], kinds: [.rdp], createdAt: t0.addingTimeInterval(1)))
         await model.load()
         #expect(model.catalogHosts.count == 1)

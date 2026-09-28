@@ -124,7 +124,7 @@ struct GlassShellLocalHostTests {
         let (model, root) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
         await model.load()
-        _ = try await model.addService(kind: .database, displayName: "scratch.sqlite", to: GlassLocalHost.id)
+        _ = try await model.addService(kind: .database, displayName: "golf.sqlite", to: GlassLocalHost.id)
         try await model.updateHost(GlassLocalHost.id, displayName: "My Mac", aliases: [], tags: ["Work"])
 
         let relaunched = GlassShellModel(storageDirectory: root.appendingPathComponent("app"),
@@ -135,7 +135,7 @@ struct GlassShellLocalHostTests {
         let local = try #require(relaunched.localHost)
         #expect(local.displayName == "My Mac")
         #expect(local.tags == ["Work"])
-        #expect(local.services.map(\.displayName) == ["scratch.sqlite"])
+        #expect(local.services.map(\.displayName) == ["golf.sqlite"])
     }
 
     @Test("It never merges with a catalog machine that shares its name")

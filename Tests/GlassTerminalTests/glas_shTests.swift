@@ -1602,7 +1602,7 @@ struct glas_shTests {
         let input = """
         Host devbox
           HostName dev.internal
-          User michael
+          User casey
           Port 2222
           IdentityFile ~/.ssh/id_ed25519
         """
@@ -1612,7 +1612,7 @@ struct glas_shTests {
         #expect(entries.count == 1)
         #expect(entries.first?.alias == "devbox")
         #expect(entries.first?.hostName == "dev.internal")
-        #expect(entries.first?.user == "michael")
+        #expect(entries.first?.user == "casey")
         #expect(entries.first?.port == 2222)
         #expect(entries.first?.identityFile == "~/.ssh/id_ed25519")
         #expect(warnings.isEmpty)
@@ -4822,13 +4822,13 @@ struct glas_shTests {
 
     @Test func sftpClipboardURLContainsOnlyRemoteReferenceMetadata() throws {
         let url = try #require(SFTPBrowserView.remoteClipboardURL(
-            username: "michael",
+            username: "casey",
             host: "example.com",
             port: 22,
             path: "/var/www/My File#1.txt"
         ))
 
-        #expect(url.absoluteString == "sftp://michael@example.com:22/var/www/My%20File%231.txt")
+        #expect(url.absoluteString == "sftp://casey@example.com:22/var/www/My%20File%231.txt")
         #expect(url.password == nil)
     }
 

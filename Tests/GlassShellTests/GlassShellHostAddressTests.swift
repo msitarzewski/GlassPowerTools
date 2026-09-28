@@ -44,9 +44,9 @@ struct GlassShellHostAddressTests {
     func addressIsOnTheHost() async throws {
         let (model, root) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
-        let created = try await model.addHost(displayName: "scratch", address: " Scratch.Example.COM ")
-        #expect(created.address == "scratch.example.com")
-        #expect(model.host(created.id)?.address == "scratch.example.com")
+        let created = try await model.addHost(displayName: "golf", address: " Scratch.Example.COM ")
+        #expect(created.address == "golf.example.com")
+        #expect(model.host(created.id)?.address == "golf.example.com")
         let blank = try await model.addHost(displayName: "noaddr", address: "   ")
         #expect(blank.address == nil, "blank means unset, not an invalid empty address")
         await #expect(throws: HostProfileError.invalidAddress) {
@@ -59,7 +59,7 @@ struct GlassShellHostAddressTests {
                                        resolveSharedContainer: false, accessGroup: "TEST.sh.glas.shared",
                                        layers: GlassLayerStore())
         await reloaded.load()
-        #expect(reloaded.host(created.id)?.address == "scratch.example.com")
+        #expect(reloaded.host(created.id)?.address == "golf.example.com")
     }
 
     @Test("Editing the address tells every capability with a service on the host, once per member record")

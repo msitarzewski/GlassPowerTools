@@ -65,14 +65,14 @@ struct D26CatalogStoreTests {
         let adopted = try await manager.adoptedIdentity(hostName: "alpha", address: "alpha.example",
                                                     serviceName: "Terminal")
         try await manager.addServerOrThrow(
-            ServerConfiguration(id: adopted.id, name: "alpha", host: "alpha.example", username: "michael"))
+            ServerConfiguration(id: adopted.id, name: "alpha", host: "alpha.example", username: "casey"))
 
         // The catalog holds it, under the endpoint id the link uses — the invariant every
         // capability already relied on and D26 makes load-bearing.
         let stored = try #require(model.configuration(ServerConfiguration.self,
                                                       for: EndpointID(rawValue: adopted.id)))
         #expect(stored.name == "alpha")
-        #expect(stored.username == "michael")
+        #expect(stored.username == "casey")
     }
 
     @Test func aFreshManagerReadsEveryServerBackOutOfTheCatalog() async throws {
@@ -125,13 +125,13 @@ struct D26CatalogStoreTests {
         var server = ServerConfiguration(id: adopted.id, name: "alpha", host: "alpha.example", username: "m")
         try await manager.addServerOrThrow(server)
 
-        server.username = "michael"
+        server.username = "casey"
         try await manager.updateServerOrThrow(server)
 
         #expect(model.catalogHosts.flatMap(\.services).count == 1)
         let stored = try #require(model.configuration(ServerConfiguration.self,
                                                       for: EndpointID(rawValue: adopted.id)))
-        #expect(stored.username == "michael")
+        #expect(stored.username == "casey")
     }
 
     /// Reported 2026-09-17: a terminal service set up on the iPhone arrived on the Mac as a link
@@ -162,7 +162,7 @@ struct D26CatalogStoreTests {
         // list on one link.
         try await model.setConfiguration(
             encoding: ServerConfiguration(id: adopted.id, name: "bravo",
-                                          host: "192.0.2.20", username: "michael"),
+                                          host: "192.0.2.20", username: "casey"),
             for: EndpointID(rawValue: adopted.id))
 
         // The shell's notification after a later load. Before the fix this was a no-op and the
@@ -227,7 +227,7 @@ struct D26CatalogStoreTests {
         let mine = try await manager.adoptedIdentity(hostName: "alpha", address: "alpha.example",
                                                      serviceName: "Terminal")
         try await manager.addServerOrThrow(
-            ServerConfiguration(id: mine.id, name: "alpha", host: "alpha.example", username: "michael"))
+            ServerConfiguration(id: mine.id, name: "alpha", host: "alpha.example", username: "casey"))
 
         // Another device adds its own terminal service and configuration; D19 delivers it into the
         // catalog. This device has not looked again.
@@ -236,7 +236,7 @@ struct D26CatalogStoreTests {
                                                        serviceName: "Terminal")
         try await model.setConfiguration(
             encoding: ServerConfiguration(id: theirs.id, name: "bravo",
-                                          host: "192.0.2.20", username: "michael"),
+                                          host: "192.0.2.20", username: "casey"),
             for: EndpointID(rawValue: theirs.id))
         #expect(model.configuration(ServerConfiguration.self,
                                     for: EndpointID(rawValue: theirs.id)) != nil)
@@ -249,7 +249,7 @@ struct D26CatalogStoreTests {
         // other device's record is in it and survives.
         try await manager.updateServerOrThrow(
             ServerConfiguration(id: mine.id, name: "alpha renamed", host: "alpha.example",
-                                username: "michael"))
+                                username: "casey"))
         #expect(model.configuration(ServerConfiguration.self,
                                     for: EndpointID(rawValue: theirs.id)) != nil,
                 "a save on this device deleted a configuration another device had written")

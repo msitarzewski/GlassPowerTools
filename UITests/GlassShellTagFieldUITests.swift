@@ -186,7 +186,7 @@ final class GlassShellTagFieldUITests: XCTestCase {
         XCTAssertFalse(element("host-editor-tags.tag.1").waitForExistence(timeout: 2), "Backspace removed Lab")
         addTag("Lab", to: "host-editor-tags")
         #endif
-        addTag("Beast", to: "host-editor-aliases")
+        addTag("Foxtrot", to: "host-editor-aliases")
         XCTAssertTrue(element("host-editor-aliases.tag.0").waitForExistence(timeout: 5), "alias chip")
         tap("host-editor-save")
         dismissSystemPasswordPrompt()

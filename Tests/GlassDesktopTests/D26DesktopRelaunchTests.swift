@@ -56,7 +56,7 @@ struct D26DesktopRelaunchTests {
         let endpoint = try await model.adoptService(kind: .rdp, hostName: "alpha",
                                                     address: "192.0.2.10", serviceName: "Desktop on alpha")
         try await desktop.app.save(DesktopConnection(id: endpoint, name: "Desktop on alpha",
-                                                     host: "192.0.2.10", username: "michael"),
+                                                     host: "192.0.2.10", username: "casey"),
                                    password: nil)
         #expect(desktop.app.connections.count == 1)
 
@@ -90,7 +90,7 @@ struct D26DesktopRelaunchTests {
         let endpoint = try await model.adoptService(kind: .rdp, hostName: "alpha",
                                                     address: "192.0.2.10", serviceName: "Desktop on alpha")
         try await desktop.app.save(DesktopConnection(id: endpoint, name: "Desktop on alpha",
-                                                     host: "192.0.2.10", username: "michael"),
+                                                     host: "192.0.2.10", username: "casey"),
                                    password: nil)
 
         // Second launch, and **nobody has called `load()` yet** — the state the deferred task
@@ -119,7 +119,7 @@ struct D26DesktopRelaunchTests {
         let first = try await model.adoptService(kind: .rdp, hostName: "alpha",
                                                  address: "192.0.2.10", serviceName: "Desktop on alpha")
         try await desktop.app.save(DesktopConnection(id: first, name: "Desktop on alpha",
-                                                     host: "192.0.2.10", username: "michael"),
+                                                     host: "192.0.2.10", username: "casey"),
                                    password: nil)
 
         let (relaunched, secondDesktop) = await launch(over: root)
@@ -127,7 +127,7 @@ struct D26DesktopRelaunchTests {
         let second = try await relaunched.adoptService(kind: .rdp, hostName: "bravo",
                                                        address: "10.0.0.9", serviceName: "Desktop on bravo")
         try await secondDesktop.app.save(DesktopConnection(id: second, name: "Desktop on bravo",
-                                                          host: "10.0.0.9", username: "michael"),
+                                                          host: "10.0.0.9", username: "casey"),
                                          password: nil)
 
         #expect(secondDesktop.app.connections.map(\.name).sorted()

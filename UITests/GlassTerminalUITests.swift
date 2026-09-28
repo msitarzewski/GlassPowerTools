@@ -637,8 +637,8 @@ final class GlassTerminalUITests: XCTestCase {
         let fixture = try fixture()
         app = launch()
 
-        try addHost(named: "scratch", address: fixture.host, terminal: fixture)
-        openDetail(of: "scratch")
+        try addHost(named: "golf", address: fixture.host, terminal: fixture)
+        openDetail(of: "golf")
 
         // Files is a tool on the service, not a service of its own: `host-tool-open-files-<id>`.
         let files = app.descendants(matching: .any)
@@ -675,13 +675,13 @@ final class GlassTerminalUITests: XCTestCase {
         snap("01-library")
 
         // Host and terminal in one sheet: name, address, then the Terminal tab's fields.
-        try addHost(named: "scratch", address: fixture.host, terminal: fixture)
-        openDetail(of: "scratch")
+        try addHost(named: "golf", address: fixture.host, terminal: fixture)
+        openDetail(of: "golf")
         XCTAssertTrue(element("host-service-connect-ssh").waitForExistence(timeout: 10), "the terminal exists after the one save")
         connectFromDetail()
         acceptTrustPromptIfShown()
 
-        let live = waitForLiveTerminal(serverName: "scratch")
+        let live = waitForLiveTerminal(serverName: "golf")
         snap(live ? "06-terminal-live" : "06-terminal-not-live")
         if !live {
             dumpTree("not-live")

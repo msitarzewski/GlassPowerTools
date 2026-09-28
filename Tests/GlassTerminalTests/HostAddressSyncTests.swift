@@ -6,7 +6,7 @@ import GlassConnectionKit
 @Suite("Host address follows the shell's host")
 struct HostAddressSyncTests {
     private func host(services: [HostServiceLink], address: String? = nil) throws -> HostProfile {
-        try HostProfile(displayName: "scratch", address: address, services: services)
+        try HostProfile(displayName: "golf", address: address, services: services)
     }
 
     @Test("Only the host's own SSH services follow, and only when they differ")
@@ -17,14 +17,14 @@ struct HostAddressSyncTests {
             HostServiceLink(endpointID: desktop, kind: .rdp, displayName: "Desktop"),
         ])
         let servers = [
-            ServerConfiguration(id: owned.rawValue, name: "scratch", host: "old.example", username: "michael"),
-            ServerConfiguration(id: other.rawValue, name: "elsewhere", host: "old.example", username: "michael"),
-            ServerConfiguration(id: desktop.rawValue, name: "desktop-shaped", host: "old.example", username: "michael"),
+            ServerConfiguration(id: owned.rawValue, name: "golf", host: "old.example", username: "casey"),
+            ServerConfiguration(id: other.rawValue, name: "elsewhere", host: "old.example", username: "casey"),
+            ServerConfiguration(id: desktop.rawValue, name: "desktop-shaped", host: "old.example", username: "casey"),
         ]
         let updated = GlassTerminalHostAddressSync.servers(servers, following: host, address: "192.0.2.6")
         #expect(updated.map(\.id) == [owned.rawValue])
         #expect(updated.first?.host == "192.0.2.6")
-        #expect(updated.first?.username == "michael" && updated.first?.port == 22, "only the address changes")
+        #expect(updated.first?.username == "casey" && updated.first?.port == 22, "only the address changes")
         #expect(GlassTerminalHostAddressSync.servers(updated, following: host, address: "192.0.2.6").isEmpty, "already current: nothing to do")
     }
 
@@ -38,8 +38,8 @@ struct HostAddressSyncTests {
         manager.loadServersIfNeeded()
         let owned = EndpointID()
         let host = try host(services: [HostServiceLink(endpointID: owned, kind: .ssh, displayName: "Terminal")])
-        try await manager.addServerOrThrow(ServerConfiguration(id: owned.rawValue, name: "scratch", host: "old.example",
-                                                         username: "michael", authMethod: .sshKey))
+        try await manager.addServerOrThrow(ServerConfiguration(id: owned.rawValue, name: "golf", host: "old.example",
+                                                         username: "casey", authMethod: .sshKey))
 
         #expect(await GlassTerminalHostAddressSync.apply(nil, to: host, in: manager).isEmpty)
         #expect(manager.server(for: owned.rawValue)?.host == "old.example")

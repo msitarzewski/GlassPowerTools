@@ -46,8 +46,8 @@ struct GlassActiveConnectionsTests {
         let alphaDatabase = HostServiceLink(endpointID: EndpointID(), kind: .database, displayName: "MySQL on alpha")
         let beastTerminal = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on bravo")
         let alpha = try HostProfile(displayName: "alpha", address: "10.0.0.1", services: [alphaTerminal, alphaDatabase])
-        let beast = try HostProfile(displayName: "bravo", address: "10.0.0.2", services: [beastTerminal])
-        try await store.upsert(alpha); try await store.upsert(beast)
+        let foxtrot = try HostProfile(displayName: "bravo", address: "10.0.0.2", services: [beastTerminal])
+        try await store.upsert(alpha); try await store.upsert(foxtrot)
 
         let terminal = StubCapability(kind: .ssh, displayName: "Terminal")
         terminal.sessions = [session("terminal:1", title: "alpha", endpoints: [alphaTerminal.endpointID]),

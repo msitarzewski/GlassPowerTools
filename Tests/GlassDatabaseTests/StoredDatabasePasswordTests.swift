@@ -19,7 +19,7 @@ struct StoredDatabasePasswordTests {
 
     @Test("A stored password is the stored password; a Keychain that cannot be read is reported")
     func storedAndUnreadable() throws {
-        let config = DatabaseConnectionConfig(name: "MySQL on alpha", username: "michael")
+        let config = DatabaseConnectionConfig(name: "MySQL on alpha", username: "casey")
         #expect(try DatabaseSessionManager.storedDatabasePassword(for: config) { _ in "secret" } == "secret")
         struct Locked: Error {}
         #expect(throws: Locked.self) {
