@@ -8,9 +8,9 @@ import GlassConnectionUI
 /// Identical in all three source applications: glas.sh `MacTerminalWindowPolicy.apply`
 /// (`Platforms/macOS/MacTerminalWindowPolicy.swift:248-256`), glassdb
 /// `MacDatabaseWorkspaceWindowPolicy.apply` (`Constants.swift:633-652`), glassDT
-/// `DesktopMetalSurface.viewDidMoveToWindow` (`DesktopMetalSurface.swift:244-249`). The
-/// addition here is that the passive title bar material follows `frost`, so the title bar
-/// background is as transparent as the rest of the window.
+/// `DesktopMetalSurface.viewDidMoveToWindow` (`DesktopMetalSurface.swift:244-249`). The passive
+/// title bar material stays at full strength: frost and opacity are for the content, not for the
+/// band that names the window.
 @MainActor
 public enum GlassWindowLayerPolicy {
     public static func apply(_ window: NSWindow, state: GlassLayerState) {
@@ -20,9 +20,15 @@ public enum GlassWindowLayerPolicy {
         window.backgroundColor = .clear
         window.titlebarAppearsTransparent = true
         GlassWindowChrome.installTitlebarMaterial(in: window, materialStyle: .sidebar)
+        // **The title band keeps its full material, whatever the frost.** It used to follow `frost`,
+        // so at 0.67 a third of the window behind showed through the title, sharp, and at 0 it
+        // vanished — the band that says which machine this is became the one part of the window
+        // you could not read (2026-09-28, "our terminal title bar has reverted to full
+        // transparency"). Rule 50: chrome that says where you are does not become see-through.
+        // Frost and opacity still decide the content below it.
         if let material = titlebarMaterial(in: window) {
-            material.alphaValue = state.frost
-            material.isHidden = state.frost == 0
+            material.alphaValue = 1
+            material.isHidden = false
         }
     }
 
