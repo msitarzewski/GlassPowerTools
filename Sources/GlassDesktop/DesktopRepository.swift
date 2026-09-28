@@ -45,6 +45,13 @@ public struct DesktopRepository {
             .sorted { ($0.name, $0.id.rawValue.uuidString) < ($1.name, $1.id.rawValue.uuidString) }
     }
 
+    /// Stored desktops this build will not accept — decoded, but refused by `validated()` — which
+    /// every write leaves exactly as stored. `load()` hides them; a reconcile against what
+    /// `load()` returned would delete them, which is not something the user asked for (2026-09-27).
+    private func rejected() -> Set<EndpointID> {
+        Set(records.all().values.filter { (try? $0.validated()) == nil }.map(\.id))
+    }
+
     /// One saved desktop, straight out of the catalog.
     ///
     /// The catalog is the record (D26), so this asks it rather than asking whoever happens to have
@@ -73,13 +80,13 @@ public struct DesktopRepository {
         let index = current.firstIndex { $0.id == value.id }
         if compare, index.map({ current[$0] }) != expected { throw DesktopError.connectionChanged }
         if let index { current[index] = value } else { current.append(value) }
-        try await records.replaceAll(with: current)
+        try await records.replaceAll(with: current, preserving: rejected())
         return try load()
     }
 
     public func delete(_ id: EndpointID) async throws -> [DesktopConnection] {
         let remaining = try load().filter { $0.id != id }
-        try await records.replaceAll(with: remaining)
+        try await records.replaceAll(with: remaining, preserving: rejected())
         return try load()
     }
 
@@ -103,7 +110,7 @@ public struct DesktopRepository {
         }
         // `max` because a reconnect that finished out of order must not move the stamp backwards.
         current[index].lastConnectedAt = max(existing.lastConnectedAt ?? date, date)
-        try await records.replaceAll(with: current)
+        try await records.replaceAll(with: current, preserving: rejected())
         return try load()
     }
 }

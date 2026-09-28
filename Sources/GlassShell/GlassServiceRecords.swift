@@ -44,7 +44,7 @@ public struct GlassServiceRecords<Record: Codable> {
     /// "nothing saved" — see `replaceAll(with:)`.
     public var isCatalogLoaded: Bool { store.isCatalogLoaded }
 
-    /// Makes the stored set match `records`.
+    /// Makes the stored set match `records`, leaving alone any stored record this build cannot read.
     ///
     /// Three rules, in this order and for reasons:
     ///
@@ -53,26 +53,51 @@ public struct GlassServiceRecords<Record: Codable> {
     ///   both exist.
     /// - **Unchanged records are skipped, not rewritten.** Every write publishes, so rewriting a
     ///   record nobody edited churns the catalog for every other device on the account.
-    /// - **Encode once per record**, compared as bytes against what is stored, so "changed" means
-    ///   the stored bytes differ rather than some type's idea of equality.
+    /// - **Encode once per record**, compared as JSON values against what is stored, so "changed"
+    ///   means the stored value differs rather than some type's idea of equality — or key order.
     /// - **Refused before the catalog has been read.** This reconcile deletes whatever is stored
     ///   and missing from `records`, so running it against a list built from an unread catalog
     ///   deletes everything the user has. It is the one call in D26 that can destroy data by doing
     ///   exactly what it was asked, which is why the guard lives here, at the door all three
     ///   capabilities go through, rather than in each of them.
-    public func replaceAll(with records: [Record]) async throws {
+    ///
+    /// - Parameter preserving: stored records the caller could read but will not vouch for — the
+    ///   desktop's records that fail its validation — which are neither deleted nor rewritten.
+    public func replaceAll(with records: [Record], preserving: Set<EndpointID> = []) async throws {
         guard store.isCatalogLoaded else { throw GlassServiceRecordsError.catalogNotRead }
         let wanted = Dictionary(records.map { (identify($0), $0) }, uniquingKeysWith: { first, _ in first })
         let current = store.configurations(ofKind: kind)
+        // **Only what this build can read can have been removed by the caller.** Every caller
+        // builds `records` from `all()`, which skips a record it cannot decode — one written by a
+        // newer build, with a field or an enum case this one does not know. Absent from the list
+        // is not deleted by the user: it was never shown to them. Removing it here made every save,
+        // favorite, "last connected" stamp and delete erase the newer build's records, and the
+        // erasure synced to every device (2026-09-27). glassDT refused to write instead.
+        let readable = Set(all().keys)
 
-        for endpointID in current.keys where wanted[endpointID] == nil {
+        for endpointID in current.keys
+        where wanted[endpointID] == nil && readable.contains(endpointID) && !preserving.contains(endpointID) {
             try await store.setConfiguration(nil, for: endpointID)
         }
-        for (endpointID, record) in wanted {
-            let encoded = try JSONEncoder().encode(record)
-            guard current[endpointID] != encoded else { continue }
+        let encoder = JSONEncoder()
+        // Sorted, so the same record always encodes to the same bytes.
+        encoder.outputFormatting = .sortedKeys
+        for (endpointID, record) in wanted where !preserving.contains(endpointID) {
+            let encoded = try encoder.encode(record)
+            if let stored = current[endpointID], Self.sameJSON(stored, encoded) { continue }
             try await store.setConfiguration(encoded, for: endpointID)
         }
+    }
+
+    /// Whether two encodings hold the same value. Bytes alone are not enough: `JSONEncoder` does
+    /// not keep key order stable, even within one process, so an unchanged record could compare
+    /// as changed, be rewritten and be published to every device for nothing (2026-09-27).
+    static func sameJSON(_ lhs: Data, _ rhs: Data) -> Bool {
+        if lhs == rhs { return true }
+        guard let left = try? JSONSerialization.jsonObject(with: lhs, options: [.fragmentsAllowed]) as? NSObject,
+              let right = try? JSONSerialization.jsonObject(with: rhs, options: [.fragmentsAllowed]) as? NSObject
+        else { return false }
+        return left.isEqual(right)
     }
 }
 
