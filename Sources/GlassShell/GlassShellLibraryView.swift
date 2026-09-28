@@ -90,6 +90,9 @@ public struct GlassShellLibraryView: View {
             // for exactly what a launch asks for, at the moment the user wants it rather than the
             // moment a push happens to arrive.
             .refreshAction { await model.load() }
+            // The library's iCloud state, pinned to the foot of the sidebar where Apple's own
+            // apps keep theirs (2026-09-27, the owner: "sync status locked here in footer").
+            .sidebarFooter { GlassICloudStatusFooter(model: model) }
             #if os(macOS)
             .sidebarActions { addHostButton }
             #endif

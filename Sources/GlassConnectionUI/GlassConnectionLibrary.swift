@@ -24,6 +24,9 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
     /// What a pull-to-refresh runs. Nil leaves the gesture off entirely rather than offering one
     /// that does nothing.
     private var refreshAction: (() async -> Void)?
+    /// A status row pinned to the foot of the sidebar — the library's iCloud state, where Apple's
+    /// own apps keep theirs.
+    private var sidebarFooter: () -> AnyView = { AnyView(EmptyView()) }
     private var presentationAnchor: () -> AnyView = { AnyView(EmptyView()) }
     /// Surfaces that are not lists of hosts — Workgroups, Network — in sidebar order.
     private var panels: [GlassLibraryPanel] = []
@@ -193,6 +196,14 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
         return copy
     }
 
+    /// A row pinned to the bottom of the sidebar, on every platform: under the sidebar on the Mac
+    /// and iPad, at the foot of the phone's root list, under the headset's first column.
+    public func sidebarFooter<Footer: View>(@ViewBuilder _ footer: @escaping () -> Footer) -> Self {
+        var copy = self
+        copy.sidebarFooter = { AnyView(footer()) }
+        return copy
+    }
+
     /// Pull the list down to refresh the library.
     public func refreshAction(_ action: @escaping () async -> Void) -> Self {
         var copy = self
@@ -281,6 +292,7 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
                                    onSelect: { openPanelID = nil },
                                    extras: { panelSidebarSections },
                                    libraryExtras: { librarySectionPanelRows })
+                .safeAreaInset(edge: .bottom, spacing: 0) { sidebarFooter() }
                 .navigationSplitViewColumnWidth(min: GlassLibraryColumnLayout.navigationMinimum,
                                                  ideal: GlassLibraryColumnLayout.navigationIdeal,
                                                  max: GlassLibraryColumnLayout.navigationMaximum)
@@ -332,7 +344,8 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
                                            compactPath = [.results]
                                        },
                                        extras: { panelSidebarSections },
-                                       libraryExtras: { librarySectionPanelRows }),
+                                       libraryExtras: { librarySectionPanelRows })
+                    .safeAreaInset(edge: .bottom, spacing: 0) { sidebarFooter() },
                 active: compactPath.isEmpty && selection == nil)
             .navigationDestination(for: CompactDestination.self) { destination in
                 switch destination {
@@ -390,6 +403,7 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
                                     .buttonStyle(.plain)
                             }
                             .navigationTitle("Collections")
+                            .safeAreaInset(edge: .bottom, spacing: 0) { sidebarFooter() }
                         } content: {
                             results.navigationSplitViewColumnWidth(min: 320, ideal: 360, max: 460)
                         } detail: { withLibraryToolbar(detail(selection), active: activeTab == .category(category)) }
@@ -399,7 +413,9 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
                             // at the system default and the row's contents were shrunk to fit it,
                             // which is backwards: on a platform aimed with the eyes the column
                             // gives way, not the target.
-                            results.navigationSplitViewColumnWidth(min: 320, ideal: 360, max: 460)
+                            results
+                                .safeAreaInset(edge: .bottom, spacing: 0) { sidebarFooter() }
+                                .navigationSplitViewColumnWidth(min: 320, ideal: 360, max: 460)
                         } detail: { withLibraryToolbar(detail(selection), active: activeTab == .category(category)) }
                     }
                 }
