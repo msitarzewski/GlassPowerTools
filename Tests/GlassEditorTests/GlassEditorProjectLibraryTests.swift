@@ -156,7 +156,7 @@ struct GlassEditorProjectLibraryStoreTests {
     /// pollution this project already had to clean up once.
     private func makeLibrary() -> (GlassEditorProjectLibrary, UserDefaults, String) {
         let name = "com.glasspowertools.tests.projects.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: name)!
+        let defaults = UserDefaults.forTest(suiteName: name)!
         return (GlassEditorProjectLibrary(defaults: defaults), defaults, name)
     }
 
@@ -229,7 +229,7 @@ struct GlassEditorProjectLibraryStoreTests {
     @Test("storage that cannot be read leaves an empty list rather than a crash")
     func corruptStorageIsSurvivable() {
         let name = "com.glasspowertools.tests.projects.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: name)!
+        let defaults = UserDefaults.forTest(suiteName: name)!
         defer { UserDefaults().removePersistentDomain(forName: name) }
 
         defaults.set(Data("not a payload".utf8), forKey: GlassEditorProjectLibrary.defaultsKey)
@@ -338,7 +338,7 @@ struct GlassEditorRemoteDirectoryReaderTests {
 struct GlassEditorRemoteProjectTests {
 
     private func workspace() -> GlassEditorWorkspace {
-        GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.remote.\(UUID().uuidString)")!)
+        GlassEditorWorkspace(defaults: UserDefaults.forTest(suiteName: "editor.remote.\(UUID().uuidString)")!)
     }
 
     private func access(_ entries: [String: [GlassEditorDirectoryEntry]] = [:],
@@ -425,7 +425,7 @@ struct GlassEditorFileAccessTests {
     }
 
     private func workspace() -> GlassEditorWorkspace {
-        GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.access.\(UUID().uuidString)")!)
+        GlassEditorWorkspace(defaults: UserDefaults.forTest(suiteName: "editor.access.\(UUID().uuidString)")!)
     }
 
     /// A machine in memory. The same object answers listing, reading, writing and stat, which is
@@ -678,7 +678,7 @@ struct GlassEditorVerifiedWriteTests {
     }
 
     private func workspace() -> GlassEditorWorkspace {
-        GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.verified.\(UUID().uuidString)")!)
+        GlassEditorWorkspace(defaults: UserDefaults.forTest(suiteName: "editor.verified.\(UUID().uuidString)")!)
     }
 
     private func openRemote(_ machine: Machine, into workspace: GlassEditorWorkspace) async throws

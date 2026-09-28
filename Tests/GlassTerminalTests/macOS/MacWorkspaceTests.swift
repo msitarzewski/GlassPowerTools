@@ -163,7 +163,7 @@ struct MacWorkspaceTests {
 
     @Test @MainActor func previewDoesNotCreateRuntimeOrAlterWorkspace() throws {
         let suite = "overview-no-side-effects-\(UUID())"
-        let defaults = try #require(UserDefaults(suiteName: suite))
+        let defaults = try #require(UserDefaults.forTest(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let controller = MacWorkspaceController(workspaceID: UUID(), defaults: defaults)
         let before = controller.state
@@ -388,7 +388,7 @@ struct MacWorkspaceTests {
         let broker = MacStartupCommandBroker()
         let request = try MacWorkgroupLauncher.launch(preset: preset, broker: broker, openWindow: { _ in })[0]
         let suite = "WorkspaceCaptureTests.\(UUID())"
-        let defaults = UserDefaults(suiteName: suite)!
+        let defaults = UserDefaults.forTest(suiteName: suite)!
         defer { defaults.removePersistentDomain(forName: suite) }
         let live = MacWorkspaceWindowController(request: request, startupCommandBroker: broker, defaults: defaults)
         let paneID = try #require(live.selectedTab.focusedPaneID)
@@ -459,7 +459,7 @@ struct MacWorkspaceTests {
         #expect(first.windowID != second.windowID)
         #expect(first.tabs[0].initialState?.root?.paneIDs != second.tabs[0].initialState?.root?.paneIDs)
         #expect(!String(decoding: try JSONEncoder().encode(first), as: UTF8.self).contains("UNIQUE_STARTUP_COMMAND"))
-        let defaults = UserDefaults(suiteName: "WorkspacePresetTests.\(UUID())")!
+        let defaults = UserDefaults.forTest(suiteName: "WorkspacePresetTests.\(UUID())")!
         let controller = MacWorkspaceController(request: first, startupCommandBroker: broker, defaults: defaults)
         let pane = try #require(controller.state.root?.panes.first)
         #expect(controller.claimStartupCommand(for: pane.id)?.command == "echo UNIQUE_STARTUP_COMMAND")
@@ -531,7 +531,7 @@ struct MacWorkspaceTests {
 
     @Test func legacyMacDefaultsMigrationCopiesOnlyAllowlistedNonsecretValues() throws {
         let suiteName = "sh.glas.legacy-migration-tests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let defaults = try #require(UserDefaults.forTest(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.removePersistentDomain(forName: suiteName)
 
@@ -581,7 +581,7 @@ struct MacWorkspaceTests {
 
     @Test func legacyMacDefaultsMigrationPreservesExistingDestinationValuesAndRunsOnce() throws {
         let suiteName = "sh.glas.legacy-migration-tests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let defaults = try #require(UserDefaults.forTest(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.removePersistentDomain(forName: suiteName)
         defaults.set(0.75, forKey: UserDefaultsKeys.windowOpacity)
@@ -606,7 +606,7 @@ struct MacWorkspaceTests {
     /// for a connection, and the new build reads nothing old — so there is nothing to retry.
     @Test func legacyMacDefaultsMigrationIgnoresAnUnreadableServerCatalogAndStillCompletes() throws {
         let suiteName = "sh.glas.legacy-migration-tests.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let defaults = try #require(UserDefaults.forTest(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.removePersistentDomain(forName: suiteName)
 
@@ -2520,7 +2520,7 @@ private struct WorkspaceDefaultsFixture {
 
     init() throws {
         suiteName = "sh.glas.mac-workspace-tests.\(UUID().uuidString)"
-        defaults = try #require(UserDefaults(suiteName: suiteName))
+        defaults = try #require(UserDefaults.forTest(suiteName: suiteName))
         defaults.removePersistentDomain(forName: suiteName)
     }
 

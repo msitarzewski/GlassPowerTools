@@ -28,7 +28,7 @@ struct GlassEditorWorkspaceTests {
     }
 
     private func makeWorkspace() -> GlassEditorWorkspace {
-        GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.tests.\(UUID().uuidString)")!)
+        GlassEditorWorkspace(defaults: UserDefaults.forTest(suiteName: "editor.tests.\(UUID().uuidString)")!)
     }
 
     private func write(_ text: String, named name: String, in root: URL) throws -> URL {
@@ -225,7 +225,7 @@ struct GlassEditorWindowIsolationTests {
     }
 
     private func makeRuntime() -> GlassEditorRuntime {
-        GlassEditorRuntime(defaults: UserDefaults(suiteName: "editor.windows.\(UUID().uuidString)")!)
+        GlassEditorRuntime(defaults: UserDefaults.forTest(suiteName: "editor.windows.\(UUID().uuidString)")!)
     }
 
     private func makeFile(_ name: String) throws -> URL {

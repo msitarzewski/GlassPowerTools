@@ -8,7 +8,7 @@ final class DefaultsFixture: @unchecked Sendable {
     let defaults: UserDefaults
     init() {
         name = "GlassLayersTests.\(UUID().uuidString)"
-        defaults = UserDefaults(suiteName: name)!
+        defaults = UserDefaults.forTest(suiteName: name)!
     }
     deinit { defaults.removePersistentDomain(forName: name) }
 }

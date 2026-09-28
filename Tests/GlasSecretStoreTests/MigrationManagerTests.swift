@@ -18,7 +18,7 @@ struct MigrationManagerTests {
             legacyServiceNamePrefixes: []
         )
         suiteName = "test.MigrationDefaults.\(UUID().uuidString.prefix(8))"
-        defaults = UserDefaults(suiteName: suiteName)!
+        defaults = UserDefaults.forTest(suiteName: suiteName)!
     }
 
     private func cleanupKeychain() {

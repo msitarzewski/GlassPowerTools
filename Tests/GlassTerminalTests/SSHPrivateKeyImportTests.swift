@@ -77,7 +77,7 @@ import GlasSecretStore
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
         let (text, _) = try SSHPrivateKeyImport.read(from: url)
         let suiteName = "sh.glas.tests.keyimport.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let defaults = try #require(UserDefaults.forTest(suiteName: suiteName))
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
         var stored: [UUID: SSHKeyMaterial] = [:]

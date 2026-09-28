@@ -68,7 +68,7 @@ private final class SessionFixture {
             RDPCredential(username: "alice", password: "test secret")
         }, save: { _, _, _ in }, delete: { _, _ in }, availability: { _, _ in .available }, migrate: { _, _, _ in })
         app = DesktopAppModel(storageDirectory: directory, credentialAccess: access,
-                              notices: DesktopNotices(defaults: UserDefaults(suiteName: directory.lastPathComponent)!,
+                              notices: DesktopNotices(defaults: UserDefaults.forTest(suiteName: directory.lastPathComponent)!,
                                   delivery: .init(authorize: { false }, failure: { _ in false })))
     }
     func prepare() async throws {

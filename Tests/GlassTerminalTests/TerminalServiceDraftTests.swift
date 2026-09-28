@@ -12,7 +12,7 @@ struct TerminalServiceDraftTests {
     /// An in-memory password store so the draft's persistence runs without the keychain.
     private func managers() -> (ServerManager, SettingsManager, String) {
         let suiteName = "sh.glas.test.draft.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         final class Passwords: @unchecked Sendable { var values: [UUID: String] = [:] }
         let passwords = Passwords()
         let store = ServerPasswordStore(

@@ -14,7 +14,7 @@ import Testing
 @MainActor @Suite("Important session notices") struct DesktopNoticesTests {
     @Test func consentDenialOptOutAndDuplicateFailures() async {
         let key = "gpt-desktop-notice-test-\(UUID())"
-        let defaults = UserDefaults(suiteName: key)!
+        let defaults = UserDefaults.forTest(suiteName: key)!
         defer { defaults.removePersistentDomain(forName: key) }
         var allowed = false
         var deliveries: [UUID] = []
@@ -40,7 +40,7 @@ import Testing
 
     @Test func revokedSystemPermissionDisablesFurtherNotices() async {
         let key = "gpt-desktop-notice-test-\(UUID())"
-        let defaults = UserDefaults(suiteName: key)!
+        let defaults = UserDefaults.forTest(suiteName: key)!
         defer { defaults.removePersistentDomain(forName: key) }
         var count = 0
         let notices = DesktopNotices(defaults: defaults, delivery: .init(authorize: { true }, failure: { _ in

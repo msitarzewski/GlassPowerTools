@@ -32,7 +32,7 @@ struct HostAddressSyncTests {
     @MainActor
     func applyPersistsAndClearedAddressIsIgnored() async throws {
         let suiteName = "sh.glas.test.host-address.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let manager = ServerManager(loadImmediately: false, defaults: defaults)
         manager.loadServersIfNeeded()

@@ -13,7 +13,7 @@ import Foundation
 struct GlassEditorSessionLifetimeTests {
     private func runtime(phone: Bool) -> GlassEditorRuntime {
         let runtime = GlassEditorRuntime(
-            defaults: UserDefaults(suiteName: "glass-editor-lifetime-\(UUID().uuidString)")!)
+            defaults: UserDefaults.forTest(suiteName: "glass-editor-lifetime-\(UUID().uuidString)")!)
         runtime.closesWorkspaceWithItsWindow = !phone
         return runtime
     }

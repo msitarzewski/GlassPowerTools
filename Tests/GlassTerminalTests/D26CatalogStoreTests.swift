@@ -45,7 +45,7 @@ struct D26CatalogStoreTests {
 
     private func makeManager(_ model: GlassShellModel) -> ServerManager {
         let manager = ServerManager(loadImmediately: false,
-                                    defaults: UserDefaults(suiteName: "d26.\(UUID().uuidString)")!,
+                                    defaults: UserDefaults.forTest(suiteName: "d26.\(UUID().uuidString)")!,
                                     passwordStore: stubPasswords)
         manager.adoptHost = { hostName, address, serviceName in
             try await model.adoptService(kind: .ssh, hostName: hostName, address: address,

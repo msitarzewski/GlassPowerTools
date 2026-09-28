@@ -14,7 +14,7 @@ struct GlassEditorProjectKeepingTests {
     }
 
     private func runtime() -> GlassEditorRuntime {
-        let defaults = UserDefaults(suiteName: "glass-editor-keeping-\(UUID().uuidString)")!
+        let defaults = UserDefaults.forTest(suiteName: "glass-editor-keeping-\(UUID().uuidString)")!
         return GlassEditorRuntime(defaults: defaults)
     }
 

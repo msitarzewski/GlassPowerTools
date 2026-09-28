@@ -46,7 +46,7 @@ struct ServerPersistenceTests {
         landing: @escaping @Sendable (Int, Data) -> Data?
     ) async throws -> (manager: ServerManager, defaults: UserDefaults, suite: String, writes: Writes) {
         let suite = "sh.glas.test.server-persistence.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
+        let defaults = try #require(UserDefaults.forTest(suiteName: suite))
         defaults.set(try JSONEncoder().encode(existing), forKey: UserDefaultsKeys.servers)
 
         let writes = Writes()

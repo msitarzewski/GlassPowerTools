@@ -8,7 +8,7 @@ import Testing
 @Suite("Query history redaction")
 struct QueryHistoryRedactionTests {
     private func defaults() -> UserDefaults {
-        UserDefaults(suiteName: "query-history-redaction.\(UUID().uuidString)")!
+        UserDefaults.forTest(suiteName: "query-history-redaction.\(UUID().uuidString)")!
     }
 
     @Test("an install that never chose redacts")

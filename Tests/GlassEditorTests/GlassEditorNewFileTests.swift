@@ -40,7 +40,7 @@ struct GlassEditorNewFileTests {
     }
 
     private func workspace(with server: Server) -> GlassEditorWorkspace {
-        let workspace = GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.newfile.\(UUID().uuidString)")!)
+        let workspace = GlassEditorWorkspace(defaults: UserDefaults.forTest(suiteName: "editor.newfile.\(UUID().uuidString)")!)
         workspace.openProject(GlassEditorProject(hostID: HostID(), path: "/srv/app"),
                               access: server.access(), reach: .overSSH(host: "bravo"))
         return workspace
@@ -115,7 +115,7 @@ struct GlassEditorNewFileTests {
             .appendingPathComponent("NewFile-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
-        let workspace = GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.newfile.\(UUID().uuidString)")!)
+        let workspace = GlassEditorWorkspace(defaults: UserDefaults.forTest(suiteName: "editor.newfile.\(UUID().uuidString)")!)
         let project = try #require(workspace.openProject(root))
 
         let document = try #require(try await workspace.createFile(named: "main.swift", inFolder: project.path))

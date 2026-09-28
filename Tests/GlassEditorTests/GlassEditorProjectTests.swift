@@ -47,7 +47,7 @@ struct GlassEditorProjectTests {
 
     @Test func aProjectReadsItsRootFoldersFirstAndSkipsMachinery() async throws {
         let root = try makeTree(); defer { try? FileManager.default.removeItem(at: root) }
-        let workspace = GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.project.\(UUID().uuidString)")!)
+        let workspace = GlassEditorWorkspace(defaults: UserDefaults.forTest(suiteName: "editor.project.\(UUID().uuidString)")!)
 
         let project = try #require(workspace.openProject(root))
         let node = try #require(workspace.projectRoots[project.id])
@@ -62,7 +62,7 @@ struct GlassEditorProjectTests {
     /// editor earns a beachball, so a folder is read when it is opened and not before.
     @Test func foldersAreReadOnlyWhenTheyAreExpanded() async throws {
         let root = try makeTree(); defer { try? FileManager.default.removeItem(at: root) }
-        let workspace = GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.project.\(UUID().uuidString)")!)
+        let workspace = GlassEditorWorkspace(defaults: UserDefaults.forTest(suiteName: "editor.project.\(UUID().uuidString)")!)
         let project = try #require(workspace.openProject(root))
         let node = try #require(workspace.projectRoots[project.id])
         await settle(node)
@@ -75,7 +75,7 @@ struct GlassEditorProjectTests {
 
     @Test func openingTheSameFolderTwiceIsOneProject() throws {
         let root = try makeTree(); defer { try? FileManager.default.removeItem(at: root) }
-        let workspace = GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.project.\(UUID().uuidString)")!)
+        let workspace = GlassEditorWorkspace(defaults: UserDefaults.forTest(suiteName: "editor.project.\(UUID().uuidString)")!)
         let first = try #require(workspace.openProject(root))
         let second = try #require(workspace.openProject(root))
         #expect(first.id == second.id)
@@ -84,7 +84,7 @@ struct GlassEditorProjectTests {
 
     @Test func aFileIsNotAProject() throws {
         let root = try makeTree(); defer { try? FileManager.default.removeItem(at: root) }
-        let workspace = GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.project.\(UUID().uuidString)")!)
+        let workspace = GlassEditorWorkspace(defaults: UserDefaults.forTest(suiteName: "editor.project.\(UUID().uuidString)")!)
         #expect(workspace.openProject(root.appendingPathComponent("README.md")) == nil)
         #expect(workspace.message?.contains("not a folder") == true)
     }
@@ -95,7 +95,7 @@ struct GlassEditorProjectTests {
     /// the first time and not again.
     @Test func expandingAFolderReadsItOnceAndTheModelRemembers() async throws {
         let root = try makeTree(); defer { try? FileManager.default.removeItem(at: root) }
-        let workspace = GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.project.\(UUID().uuidString)")!)
+        let workspace = GlassEditorWorkspace(defaults: UserDefaults.forTest(suiteName: "editor.project.\(UUID().uuidString)")!)
         let project = try #require(workspace.openProject(root))
         let node = try #require(workspace.projectRoots[project.id])
         await settle(node)
@@ -116,7 +116,7 @@ struct GlassEditorProjectTests {
     /// it beside that file, which is what every file browser means by "here".
     @Test func theCurrentFolderFollowsTheSelection() async throws {
         let root = try makeTree(); defer { try? FileManager.default.removeItem(at: root) }
-        let workspace = GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.project.\(UUID().uuidString)")!)
+        let workspace = GlassEditorWorkspace(defaults: UserDefaults.forTest(suiteName: "editor.project.\(UUID().uuidString)")!)
         let project = try #require(workspace.openProject(root))
         let node = try #require(workspace.projectRoots[project.id])
         await settle(node)
@@ -136,7 +136,7 @@ struct GlassEditorProjectTests {
     /// Selecting a document keeps the detail pane in step — one selection, not two that can differ.
     @Test func selectingADocumentSelectsIt() async throws {
         let root = try makeTree(); defer { try? FileManager.default.removeItem(at: root) }
-        let workspace = GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.project.\(UUID().uuidString)")!)
+        let workspace = GlassEditorWorkspace(defaults: UserDefaults.forTest(suiteName: "editor.project.\(UUID().uuidString)")!)
         let opened1 = await workspace.open(root.appendingPathComponent("README.md"))
         let document = try #require(opened1)
         workspace.sidebarSelection = .document(document.id)
@@ -149,7 +149,7 @@ struct GlassEditorProjectTests {
     /// that are not on screen and cannot be reached.
     @Test func closingAProjectForgetsItsNodes() async throws {
         let root = try makeTree(); defer { try? FileManager.default.removeItem(at: root) }
-        let workspace = GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.project.\(UUID().uuidString)")!)
+        let workspace = GlassEditorWorkspace(defaults: UserDefaults.forTest(suiteName: "editor.project.\(UUID().uuidString)")!)
         let project = try #require(workspace.openProject(root))
         let node = try #require(workspace.projectRoots[project.id])
         await settle(node)

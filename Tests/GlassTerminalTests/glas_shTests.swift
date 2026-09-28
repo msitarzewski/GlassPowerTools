@@ -579,7 +579,7 @@ private final class HostTrustStoreProbe {
 struct glas_shTests {
     @Test @MainActor func localSSHSubstitutionIsDeviceLocalAndInvalidatedWhenSourceChanges() throws {
         let suite = "ssh-substitution-\(UUID())"
-        let defaults = try #require(UserDefaults(suiteName: suite))
+        let defaults = try #require(UserDefaults.forTest(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let settings = SettingsManager(loadImmediately: false, settingsDefaults: defaults)
         let source = LayoutPreset.SessionIntent(kind: .local, label: "Build", startupCommand: "pwd", localDirectory: "/Mac/project")
@@ -794,7 +794,7 @@ struct glas_shTests {
 
     @Test func settingsManagerMigratesOnlyExactCorruptedGlassColorsAndPersistsRepair() throws {
         let suiteName = "sh.glas.test.theme-migration.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let id = UUID()
         let background = CodableColor(sRGBRed: 0.15, green: 0.25, blue: 0.35, alpha: 0.45)
@@ -824,7 +824,7 @@ struct glas_shTests {
 
     @Test func settingsManagerPreservesCustomizedLegacyNamedTheme() throws {
         let suiteName = "sh.glas.test.theme-custom.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         var custom = makeCorruptedLegacyGlassTheme()
         custom.red = CodableColor(sRGBRed: 0.9, green: 0.1, blue: 0.2)
@@ -841,7 +841,7 @@ struct glas_shTests {
 
     @Test func settingsManagerMigratesSingleThemeIntoVersionedLibrary() throws {
         let suiteName = "sh.glas.test.theme-library-migration.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let legacy = TerminalTheme.default.reidentified(name: "Existing Theme")
         defaults.set(try JSONEncoder().encode(legacy), forKey: UserDefaultsKeys.theme)
@@ -864,7 +864,7 @@ struct glas_shTests {
     /// loads under the new one, stays selected, and is saved that way once.
     @Test func builtInThemeLegacyIdentifierIsRewrittenAndSaved() throws {
         let suiteName = "sh.glas.test.theme-legacy-id.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let legacyBuiltIn = TerminalTheme.default.reidentified(id: TerminalTheme.legacyDefaultID)
         let custom = TerminalTheme.default.reidentified(id: UUID(), name: "Mine")
@@ -913,7 +913,7 @@ struct glas_shTests {
 
     @Test func newerThemeLibrarySchemaIsPreservedReadOnly() throws {
         let suiteName = "sh.glas.test.theme-library-future.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         var futureLibrary = TerminalThemeLibrary.initial()
         futureLibrary.schemaVersion = TerminalThemeLibrary.currentSchemaVersion + 1
@@ -930,7 +930,7 @@ struct glas_shTests {
 
     @Test func themeLibraryCRUDProtectsBuiltInAndRetainsDeletionTombstone() throws {
         let suiteName = "sh.glas.test.theme-library-crud.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let settings = SettingsManager(loadImmediately: false, settingsDefaults: defaults)
         settings.loadTheme()
@@ -1111,8 +1111,8 @@ struct glas_shTests {
     @Test @MainActor func macImportedThemeAndPortableAppearanceApplyAfterICloudMerge() async throws {
         let sourceSuite = "sh.glas.test.icloud-source.\(UUID().uuidString)"
         let destinationSuite = "sh.glas.test.icloud-destination.\(UUID().uuidString)"
-        let sourceDefaults = try #require(UserDefaults(suiteName: sourceSuite))
-        let destinationDefaults = try #require(UserDefaults(suiteName: destinationSuite))
+        let sourceDefaults = try #require(UserDefaults.forTest(suiteName: sourceSuite))
+        let destinationDefaults = try #require(UserDefaults.forTest(suiteName: destinationSuite))
         defer {
             sourceDefaults.removePersistentDomain(forName: sourceSuite)
             destinationDefaults.removePersistentDomain(forName: destinationSuite)
@@ -1255,7 +1255,7 @@ struct glas_shTests {
 
     @Test @MainActor func disabledICloudSyncDoesNotObserveOrWrite() {
         let suiteName = "sh.glas.test.icloud-disabled.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.set(false, forKey: UserDefaultsKeys.iCloudSettingsSyncEnabled)
         let store = FakeICloudSettingsStore()
@@ -1379,7 +1379,7 @@ struct glas_shTests {
 
     @Test @MainActor func settingsManagerTreatsStoppedICloudPushAsExpectedCancellation() async throws {
         let suiteName = "sh.glas.test.icloud-push-cancellation.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let defaults = try #require(UserDefaults.forTest(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.set(true, forKey: UserDefaultsKeys.iCloudSettingsSyncEnabled)
         let store = FakeICloudSettingsStore()
@@ -1416,7 +1416,7 @@ struct glas_shTests {
 
     @Test @MainActor func iCloudSyncRetriesTransientStoreFailure() async throws {
         let suiteName = "sh.glas.test.icloud-retry.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.set(true, forKey: UserDefaultsKeys.iCloudSettingsSyncEnabled)
         let store = FakeICloudSettingsStore()
@@ -1445,7 +1445,7 @@ struct glas_shTests {
 
     @Test @MainActor func iCloudSyncWaitsForAccountChangeWithoutPolling() async throws {
         let suiteName = "sh.glas.test.icloud-account.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.set(true, forKey: UserDefaultsKeys.iCloudSettingsSyncEnabled)
         let store = FakeICloudSettingsStore()
@@ -1639,7 +1639,7 @@ struct glas_shTests {
 
     @Test func userDefaultsKeysAreConsistent() {
         // Verify keys don't have typos by checking they round-trip through UserDefaults
-        let testSuite = UserDefaults(suiteName: "sh.glas.test.constants")!
+        let testSuite = UserDefaults.forTest(suiteName: "sh.glas.test.constants")!
         defer { testSuite.removePersistentDomain(forName: "sh.glas.test.constants") }
 
         testSuite.set(true, forKey: UserDefaultsKeys.autoReconnect)
@@ -2303,7 +2303,7 @@ struct glas_shTests {
 
     @Test func serverDeletionPersistsMetadataFirstAndRestoresItOnKeychainFailure() async throws {
         let suiteName = "sh.glas.test.server-delete.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let server = migrationServer()
         let passwordProbe = ServerPasswordProbe()
@@ -2342,7 +2342,7 @@ struct glas_shTests {
     #if DEBUG
     @Test func uiTestFixturePurgeRemovesProfileAndSharedCredentialOnly() async throws {
         let suiteName = "sh.glas.test.ui-fixture-purge.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let probe = SharedServerCredentialProbe()
         let fixture = ServerConfiguration(
@@ -2447,7 +2447,7 @@ struct glas_shTests {
 
     @Test func serverPasswordCreateRestoresExactPriorUUIDSecretWhenMetadataReadbackFails() async throws {
         let suiteName = "sh.glas.test.server-create-rollback.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.set(try JSONEncoder().encode([ServerConfiguration]()), forKey: UserDefaultsKeys.servers)
 
@@ -2478,7 +2478,7 @@ struct glas_shTests {
 
     @Test func serverPasswordCreateRemovesNewCrossAppRecordsWhenMetadataReadbackFails() async throws {
         let suiteName = "sh.glas.test.server-create-shared-rollback.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let defaults = try #require(UserDefaults.forTest(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.set(try JSONEncoder().encode([ServerConfiguration]()), forKey: UserDefaultsKeys.servers)
 
@@ -2510,7 +2510,7 @@ struct glas_shTests {
 
     @Test func failedEndpointEditRestoresExistingGlassDBCredentialExactly() async throws {
         let suiteName = "sh.glas.test.server-edit-shared-rollback.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let defaults = try #require(UserDefaults.forTest(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let original = migrationServer(host: "old.example.com")
@@ -2551,7 +2551,7 @@ struct glas_shTests {
 
     @Test func serverPasswordEditRestoresExactOldSecretWhenMetadataReadbackFails() async throws {
         let suiteName = "sh.glas.test.server-edit-rollback.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let server = migrationServer()
@@ -2585,7 +2585,7 @@ struct glas_shTests {
 
     @Test func passwordAuthChangeRestoresProfileAndSecretWhenDeletionFails() async throws {
         let suiteName = "sh.glas.test.password-auth-rollback.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let server = migrationServer()
         defaults.set(try JSONEncoder().encode([server]), forKey: UserDefaultsKeys.servers)
@@ -2626,7 +2626,7 @@ struct glas_shTests {
 
     @Test func serverDeletionRecoveryPreservesLiveProfileWhenCrashPrecedesMetadataCommit() throws {
         let suiteName = "sh.glas.test.server-delete-precommit.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let server = migrationServer()
         defaults.set(try JSONEncoder().encode([server]), forKey: UserDefaultsKeys.servers)
@@ -2653,7 +2653,7 @@ struct glas_shTests {
 
     @Test func serverDeletionRecoveryRemovesOrphanWhenCrashFollowsMetadataCommit() throws {
         let suiteName = "sh.glas.test.server-delete-postcommit.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let server = migrationServer()
         defaults.set(try JSONEncoder().encode([ServerConfiguration]()), forKey: UserDefaultsKeys.servers)
@@ -2680,7 +2680,7 @@ struct glas_shTests {
 
     @Test func passwordAuthChangeRecoveryPreservesSecretWhenCrashPrecedesMetadataCommit() throws {
         let suiteName = "sh.glas.test.password-auth-precommit.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let server = migrationServer()
         defaults.set(try JSONEncoder().encode([server]), forKey: UserDefaultsKeys.servers)
@@ -2711,7 +2711,7 @@ struct glas_shTests {
 
     @Test func passwordAuthChangeRecoveryRemovesOrphanWhenCrashFollowsMetadataCommit() throws {
         let suiteName = "sh.glas.test.password-auth-postcommit.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         var server = migrationServer()
         let serverID = server.id
@@ -2753,7 +2753,7 @@ struct glas_shTests {
 
         for (label, catalogData) in fixtures {
             let suiteName = "sh.glas.test.server-catalog-\(label).\(UUID().uuidString)"
-            let defaults = UserDefaults(suiteName: suiteName)!
+            let defaults = UserDefaults.forTest(suiteName: suiteName)!
             defer { defaults.removePersistentDomain(forName: suiteName) }
             if let catalogData {
                 defaults.set(catalogData, forKey: UserDefaultsKeys.servers)
@@ -2793,7 +2793,7 @@ struct glas_shTests {
 
         for (label, persistedValue) in fixtures {
             let suiteName = "sh.glas.test.server-fail-closed-\(label).\(UUID().uuidString)"
-            let defaults = UserDefaults(suiteName: suiteName)!
+            let defaults = UserDefaults.forTest(suiteName: suiteName)!
             defer { defaults.removePersistentDomain(forName: suiteName) }
             defaults.set(persistedValue, forKey: UserDefaultsKeys.servers)
 
@@ -3053,7 +3053,7 @@ struct glas_shTests {
 
         for (label, persistedValue) in fixtures {
             let suiteName = "sh.glas.test.ssh-key-fail-closed-\(label).\(UUID().uuidString)"
-            let defaults = UserDefaults(suiteName: suiteName)!
+            let defaults = UserDefaults.forTest(suiteName: suiteName)!
             defer { defaults.removePersistentDomain(forName: suiteName) }
             defaults.set(persistedValue, forKey: UserDefaultsKeys.sshKeys)
 
@@ -3121,7 +3121,7 @@ struct glas_shTests {
 
     @Test func importedSSHKeyCreationVerifiesCatalogAndDeletesSecretOnRollback() throws {
         let suiteName = "sh.glas.test.ssh-key-create-rollback.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.set(try JSONEncoder().encode([StoredSSHKey]()), forKey: UserDefaultsKeys.sshKeys)
 
@@ -3175,8 +3175,8 @@ struct glas_shTests {
     @Test func sshKeyDeletionPersistsMetadataFirstAndRestoresSecretAndReferencesOnFailure() async throws {
         let keySuiteName = "sh.glas.test.ssh-key-delete.\(UUID().uuidString)"
         let serverSuiteName = "sh.glas.test.ssh-key-server-delete.\(UUID().uuidString)"
-        let keyDefaults = UserDefaults(suiteName: keySuiteName)!
-        let serverDefaults = UserDefaults(suiteName: serverSuiteName)!
+        let keyDefaults = UserDefaults.forTest(suiteName: keySuiteName)!
+        let serverDefaults = UserDefaults.forTest(suiteName: serverSuiteName)!
         defer {
             keyDefaults.removePersistentDomain(forName: keySuiteName)
             serverDefaults.removePersistentDomain(forName: serverSuiteName)
@@ -3253,7 +3253,7 @@ struct glas_shTests {
 
     @Test func sshKeyDeletionJournalRollsForwardPartialArtifactsAfterSimulatedRestart() throws {
         let suiteName = "sh.glas.test.ssh-key-delete-restart.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let key = StoredSSHKey(
@@ -3306,7 +3306,7 @@ struct glas_shTests {
 
     @Test func sshKeyDeletionRetainsActionableJournalWhenSecretRestoreReadbackDiffers() async throws {
         let suiteName = "sh.glas.test.ssh-key-delete-restore-mismatch.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let key = StoredSSHKey(
@@ -3381,7 +3381,7 @@ struct glas_shTests {
 
     @Test func sshKeyDeletionRollbackPreservesConcurrentSecretReplacement() async throws {
         let suiteName = "sh.glas.test.ssh-key-delete-concurrent-replacement.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let key = StoredSSHKey(
@@ -3443,7 +3443,7 @@ struct glas_shTests {
 
     @Test func legacySecureEnclaveDeletionRollbackNeverDowngradesToImportedStorage() async throws {
         let suiteName = "sh.glas.test.ssh-key-delete-legacy-se.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let key = StoredSSHKey(
@@ -3494,7 +3494,7 @@ struct glas_shTests {
 
     @Test func legacySecureEnclaveDeletionAcceptsOnlyVerifiedHardwareBackedRecovery() async throws {
         let suiteName = "sh.glas.test.ssh-key-delete-legacy-se-verified.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let key = StoredSSHKey(
@@ -3546,7 +3546,7 @@ struct glas_shTests {
 
     @Test func sshKeyDeletionRemovesPartialArtifactsWhenMaterialRetrievalIsNil() async throws {
         let suiteName = "sh.glas.test.ssh-key-delete-partial.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let key = StoredSSHKey(
@@ -3587,7 +3587,7 @@ struct glas_shTests {
 
     @Test func sshKeyDeletionFailureWithUnrecoverablePartialArtifactsFailsClosed() async throws {
         let suiteName = "sh.glas.test.ssh-key-delete-partial-failure.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let key = StoredSSHKey(
@@ -3632,7 +3632,7 @@ struct glas_shTests {
 
     @Test func sshKeyDeletionJournalAbortsBeforeMetadataCommitAndPreservesSecret() throws {
         let suiteName = "sh.glas.test.ssh-key-delete-ambiguous.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         let key = StoredSSHKey(
@@ -3685,7 +3685,7 @@ struct glas_shTests {
     @Test func sshKeyDeletionJournalTreatsMissingOrMalformedCatalogAsAmbiguous() throws {
         for catalogData in [nil, Data("{".utf8)] as [Data?] {
             let suiteName = "sh.glas.test.ssh-key-delete-catalog-ambiguous.\(UUID().uuidString)"
-            let defaults = UserDefaults(suiteName: suiteName)!
+            let defaults = UserDefaults.forTest(suiteName: suiteName)!
             defer { defaults.removePersistentDomain(forName: suiteName) }
             let key = StoredSSHKey(
                 id: UUID(),
@@ -3756,7 +3756,7 @@ struct glas_shTests {
 
     private func migrationDefaults(_ suffix: String) -> (name: String, defaults: UserDefaults) {
         let name = "sh.glas.test.host-trust.\(suffix).\(UUID().uuidString)"
-        return (name, UserDefaults(suiteName: name)!)
+        return (name, UserDefaults.forTest(suiteName: name)!)
     }
 
     private func migrationReport(from defaults: UserDefaults) throws -> HostTrustMigrationReport {
@@ -4060,7 +4060,7 @@ struct glas_shTests {
 
     @Test @MainActor func serverManagerToggleFavorite() async {
         let suiteName = "sh.glas.test.server-manager.toggle-favorite.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let manager = ServerManager(loadImmediately: false, defaults: defaults)
         #if os(macOS)
@@ -4086,7 +4086,7 @@ struct glas_shTests {
 
     @Test @MainActor func serverManagerUpdateServer() async {
         let suiteName = "sh.glas.test.server-manager.update.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let manager = ServerManager(loadImmediately: false, defaults: defaults)
         let server = ServerConfiguration(
@@ -4144,7 +4144,7 @@ struct glas_shTests {
 
     @Test func tailscaleCredentialPresenceDistinguishesAbsentAndUnavailableStores() {
         let suiteName = "sh.glas.test.tailscale-credential-presence.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.set(TailscaleAuthMethod.apiKey.rawValue, forKey: UserDefaultsKeys.tailscaleAuthMethod)
 
@@ -6987,7 +6987,7 @@ struct glas_shTests {
 
     @Test @MainActor func appearanceSettingsRoundTripCanonicalGlobalAndSessionValues() throws {
         let suiteName = "sh.glas.tests.appearance.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let defaults = try #require(UserDefaults.forTest(suiteName: suiteName))
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
@@ -7025,7 +7025,7 @@ struct glas_shTests {
 
     @Test @MainActor func appearanceMigrationPrefersCanonicalOpacityAndMigratesBooleanOrNumericBlur() throws {
         let booleanSuite = "sh.glas.tests.appearance.boolean.\(UUID().uuidString)"
-        let booleanDefaults = try #require(UserDefaults(suiteName: booleanSuite))
+        let booleanDefaults = try #require(UserDefaults.forTest(suiteName: booleanSuite))
         booleanDefaults.removePersistentDomain(forName: booleanSuite)
         defer { booleanDefaults.removePersistentDomain(forName: booleanSuite) }
         booleanDefaults.set(0.2, forKey: UserDefaultsKeys.windowOpacity)
@@ -7042,7 +7042,7 @@ struct glas_shTests {
         #expect(SettingsManager.resolvedBlurBackground(false) == 0)
 
         let numericSuite = "sh.glas.tests.appearance.numeric.\(UUID().uuidString)"
-        let numericDefaults = try #require(UserDefaults(suiteName: numericSuite))
+        let numericDefaults = try #require(UserDefaults.forTest(suiteName: numericSuite))
         numericDefaults.removePersistentDomain(forName: numericSuite)
         defer { numericDefaults.removePersistentDomain(forName: numericSuite) }
         numericDefaults.set(0.42, forKey: UserDefaultsKeys.blurBackground)
@@ -8394,7 +8394,7 @@ struct glas_shTests {
 
     @Test @MainActor func terminalGeometryDefaultsPersistAndConnectionOverrideWins() throws {
         let suiteName = "sh.glas.tests.terminal-geometry.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let defaults = try #require(UserDefaults.forTest(suiteName: suiteName))
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
@@ -8572,7 +8572,7 @@ struct glas_shTests {
 
     @Test @MainActor func sshConfigImportSkipsUnresolvedIdentityWithoutChangingSavedProfile() async throws {
         let suite = "sh.glas.tests.ssh-import.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
+        let defaults = try #require(UserDefaults.forTest(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let settings = SettingsManager(loadImmediately: false, settingsDefaults: defaults)
         let manager = ServerManager(defaults: defaults)
@@ -8596,7 +8596,7 @@ struct glas_shTests {
 
     @Test @MainActor func sshConfigImportReportsPersistenceFailureWithoutPublishingProfile() async throws {
         let suite = "sh.glas.tests.ssh-import-failure.\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
+        let defaults = try #require(UserDefaults.forTest(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let settings = SettingsManager(loadImmediately: false, settingsDefaults: defaults)
         let manager = ServerManager(defaults: defaults, serverDataWriter: { _ in })

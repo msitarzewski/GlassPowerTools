@@ -16,7 +16,7 @@ struct GlassEditorPreviewTabTests {
     }
 
     private func workspace() -> GlassEditorWorkspace {
-        GlassEditorWorkspace(defaults: UserDefaults(suiteName: "glass-preview-\(UUID().uuidString)")!)
+        GlassEditorWorkspace(defaults: UserDefaults.forTest(suiteName: "glass-preview-\(UUID().uuidString)")!)
     }
 
     @Test func oneClickAfterAnotherReusesTheSameTab() async throws {

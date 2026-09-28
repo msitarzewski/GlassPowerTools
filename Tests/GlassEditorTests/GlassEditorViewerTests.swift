@@ -30,7 +30,7 @@ struct GlassEditorViewerTests {
     }
 
     private func workspace() -> GlassEditorWorkspace {
-        GlassEditorWorkspace(defaults: UserDefaults(suiteName: "glass-viewer-\(UUID().uuidString)")!)
+        GlassEditorWorkspace(defaults: UserDefaults.forTest(suiteName: "glass-viewer-\(UUID().uuidString)")!)
     }
 
     private func localFile(_ name: String, _ data: Data) throws -> URL {
@@ -140,7 +140,7 @@ struct GlassEditorVeryLongLineTests {
 
     @Test("Over the limit: wrapped, as this file's own setting; under it: the global setting")
     func wrapsOnlyTheLongOne() async throws {
-        let workspace = GlassEditorWorkspace(defaults: UserDefaults(suiteName: "glass-longline-\(UUID().uuidString)")!)
+        let workspace = GlassEditorWorkspace(defaults: UserDefaults.forTest(suiteName: "glass-longline-\(UUID().uuidString)")!)
         let long = try file("<svg><path d=\"" + String(repeating: "L1 2 ", count: 30_000) + "\"/></svg>")
         let short = try file("<svg><path d=\"M0 0\"/></svg>")
         let wide = try #require(await workspace.open(long))

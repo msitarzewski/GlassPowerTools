@@ -17,7 +17,7 @@ import GlassDBKit
 @MainActor
 private func scratchDefaults(_ function: String = #function) -> UserDefaults {
     let suite = "com.glasspowertools.tests.audit.\(UUID().uuidString)"
-    let defaults = UserDefaults(suiteName: suite)!
+    let defaults = UserDefaults.forTest(suiteName: suite)!
     defaults.removePersistentDomain(forName: suite)
     return defaults
 }

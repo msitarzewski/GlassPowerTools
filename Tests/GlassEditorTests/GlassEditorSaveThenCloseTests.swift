@@ -38,7 +38,7 @@ struct GlassEditorSaveThenCloseTests {
 
     private func edited(on server: Server) async throws -> (GlassEditorWorkspace, GlassEditorDocument) {
         server.files["/srv/app/notes.md"] = Data("one\n".utf8)
-        let workspace = GlassEditorWorkspace(defaults: UserDefaults(suiteName: "editor.savethenclose.\(UUID().uuidString)")!)
+        let workspace = GlassEditorWorkspace(defaults: UserDefaults.forTest(suiteName: "editor.savethenclose.\(UUID().uuidString)")!)
         workspace.openProject(GlassEditorProject(hostID: HostID(), path: "/srv/app"),
                               access: server.access(), reach: .overSSH(host: "bravo"))
         let document = try #require(await workspace.open(path: "/srv/app/notes.md"))
