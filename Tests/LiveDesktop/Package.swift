@@ -6,12 +6,18 @@ import PackageDescription
 let package = Package(
     name: "GlassLiveDesktopProbes",
     platforms: [.macOS("26.0")],
-    dependencies: [.package(path: "../..")],
+    dependencies: [.package(name: "GlassPowerTools", path: "../..")],
     targets: [
         .executableTarget(name: "GlassWindowsRDPProbe",
                           dependencies: [.product(name: "GlassRDPTransport", package: "GlassPowerTools")]),
         .executableTarget(name: "GlassVNCProbe",
                           dependencies: [.product(name: "GlassRDPTransport", package: "GlassPowerTools"),
-                                         .product(name: "GlassVNCTransport", package: "GlassPowerTools")])
+                                         .product(name: "GlassVNCTransport", package: "GlassPowerTools")]),
+        // Functional probes run by Docker/xrdp/run.sh and Docker/tigervnc/run.sh against disposable
+        // local fixtures: they assert side effects (input, resize, clipboard, reconnect), not just a frame.
+        .executableTarget(name: "GlassRDPFunctionalProbe",
+                          dependencies: [.product(name: "GlassRDPTransport", package: "GlassPowerTools")]),
+        .executableTarget(name: "GlassVNCFunctionalProbe",
+                          dependencies: [.product(name: "VNCKit", package: "GlassPowerTools")])
     ]
 )
