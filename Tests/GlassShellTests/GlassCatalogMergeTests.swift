@@ -141,4 +141,79 @@ struct GlassCatalogMergeTests {
         #expect(outcome.toPublish.count == 1)
         #expect(outcome.toPublish.first?.displayName == "newer")
     }
+
+    // MARK: - A stale device restamped its old library (2026-09-28)
+    //
+    // A headset last used months ago ran the new build, whose upgrade re-stamped its old records
+    // with the time of the upgrade. Newest-wins then let those copies beat the account's: three
+    // machines deleted long before came back alive, and live machines' services arrived with no
+    // configuration ("Not set up"). The catalog store has always said tombstones cannot be
+    // resurrected; the sync's merge did not.
+
+    @Test("A deletion wins over a later live copy, whichever side holds it")
+    func deletionIsFinal() throws {
+        let id = HostID()
+        let tombstone = try host("gone", id: id, updated: 10, deleted: 10)
+        let restamped = try host("gone", id: id, updated: 99)
+        #expect(GlassCatalogMerge.winner(local: tombstone, remote: restamped).deletedAt != nil)
+        #expect(GlassCatalogMerge.winner(local: restamped, remote: tombstone).deletedAt != nil)
+    }
+
+    @Test("A local deletion the account holds alive is sent back")
+    func localTombstoneIsRepublished() throws {
+        let id = HostID()
+        let tombstone = try host("gone", id: id, updated: 10, deleted: 10)
+        let resurrected = try host("gone", id: id, updated: 99)
+        let outcome = GlassCatalogMerge.reconcile(local: [tombstone], remote: [resurrected])
+        #expect(outcome.toPublish.map(\.id) == [id])
+        #expect(outcome.toPublish.first?.deletedAt != nil)
+        // Stamped past the resurrected copy, so a device still on newest-wins takes it too.
+        #expect((outcome.toPublish.first?.updatedAt ?? .distantPast) > resurrected.updatedAt)
+    }
+
+    @Test("A newer copy without a service's configuration keeps the configuration the other had")
+    func configurationSurvivesAStaleRestamp() throws {
+        let id = HostID(), endpoint = EndpointID()
+        let setup = Data(#"{"port":22}"#.utf8)
+        var configured = try host("alpha", id: id, updated: 10)
+        configured.services = [HostServiceLink(endpointID: endpoint, kind: .ssh, displayName: "Terminal", configuration: setup)]
+        var bare = try host("alpha", id: id, updated: 99)
+        bare.services = [HostServiceLink(endpointID: endpoint, kind: .ssh, displayName: "Terminal")]
+
+        // The configured copy is local, the bare one arrives newer: apply, but keep the setup, and
+        // send the repaired record back so the account stops carrying the bare one.
+        let incoming = GlassCatalogMerge.reconcile(local: [configured], remote: [bare])
+        #expect(incoming.toApplyLocally.first?.services.first?.configuration == setup)
+        #expect(incoming.toPublish.first?.services.first?.configuration == setup)
+
+        // The other way round: the bare copy is local and newer; the account's setup is kept.
+        let outgoing = GlassCatalogMerge.reconcile(local: [bare], remote: [configured])
+        #expect(outgoing.toApplyLocally.first?.services.first?.configuration == setup)
+        #expect(outgoing.toPublish.first?.services.first?.configuration == setup)
+    }
+
+    /// CloudKit's paged answer can list one record twice. The second copy found this device's
+    /// record already matched and treated it as a host this device had never seen, applying it on
+    /// every sync (seen 2026-09-28 in a dry run of a settled library).
+    @Test("A record the account lists twice is reconciled once")
+    func duplicateRemoteRecordsAreReconciledOnce() throws {
+        let id = HostID()
+        let settled = try host("gone", id: id, updated: 10, deleted: 10)
+        let outcome = GlassCatalogMerge.reconcile(local: [settled], remote: [settled, settled])
+        #expect(outcome.toApplyLocally.isEmpty)
+        #expect(outcome.toPublish.isEmpty)
+    }
+
+    /// A date that has been through JSON and CloudKit comes back a rounding error away — seen as
+    /// 1.2e-7 s on a corrected record — and "newer by a rounding error" applied it on every sync.
+    @Test("Times a rounding error apart are the same moment")
+    func roundingErrorsAreNotNewer() throws {
+        let id = HostID()
+        let mine = try host("gone", id: id, updated: 10, deleted: 10)
+        var theirs = mine
+        theirs.updatedAt = mine.updatedAt.addingTimeInterval(1.2e-7)
+        let outcome = GlassCatalogMerge.reconcile(local: [mine], remote: [theirs])
+        #expect(outcome.toApplyLocally.isEmpty)
+        #expect(outcome.toPublish.isEmpty)
+    }
 }
