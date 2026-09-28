@@ -76,10 +76,6 @@ public final class GlassDesktopRuntime {
     public init(layers: GlassLayerStore? = nil, app: DesktopAppModel? = nil) {
         self.layers = layers ?? GlassLayerStore()
         self.app = app ?? DesktopAppModel()
-        // Banners while the app is in front, as glassDT set at launch (`glassDTApp.swift:10`).
-        // Without a delegate the system drops a notice for the foreground app, which is where the
-        // user is when a desktop window fails.
-        DesktopNotices.shared.configurePresentation()
     }
 
     func enqueue(_ request: Request) {

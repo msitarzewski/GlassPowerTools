@@ -117,6 +117,10 @@ struct GlassPowerToolsApp: App {
         // VNC/Screen Sharing, because the protocol is a field on the saved desktop rather than a
         // service kind — glassDT's model, which is why the catalog needs no fourth kind.
         let desktop = GlassDesktopRuntime(layers: layers)
+        // Desktop notices show as banners while the app is in front, as glassDT set at launch
+        // (`glassDTApp.swift:10`). Here, in the app, not in the runtime: a test process has no
+        // bundle, and the notification centre throws there.
+        DesktopNotices.shared.configurePresentation()
         desktop.hostAccess = { [weak model] host in
             model?.hostAccess(for: host.id) ?? GlassCapabilityHostAccess(address: host.address)
         }
