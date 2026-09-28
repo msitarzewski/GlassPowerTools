@@ -44,7 +44,7 @@ struct GlassShellHostAddressTests {
     func addressIsOnTheHost() async throws {
         let (model, root) = try makeModel()
         defer { try? FileManager.default.removeItem(at: root) }
-        let created = try await model.addHost(displayName: "golf", address: " Scratch.Example.COM ")
+        let created = try await model.addHost(displayName: "golf", address: " Golf.Example.COM ")
         #expect(created.address == "golf.example.com")
         #expect(model.host(created.id)?.address == "golf.example.com")
         let blank = try await model.addHost(displayName: "noaddr", address: "   ")
