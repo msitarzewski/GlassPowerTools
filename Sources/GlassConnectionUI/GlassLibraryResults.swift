@@ -86,6 +86,14 @@ public struct GlassLibraryResults<ID: Hashable & Sendable, Row: View>: View {
         // Touch and gaze pull the list down to sync; the Mac has no such gesture, and
         // `refreshable` is simply inert there rather than needing an `#if`.
         .refreshable { await onRefresh?() }
+        #if os(visionOS)
+        // **A list, on the headset too.** The default style drew each machine as a floating card
+        // with a gap between — no platter, no separators, a large rounded highlight on the chosen
+        // one (2026-09-28: "the list of connections needs to look more like a list"). Inset
+        // grouped is the platform's own list: rows in one glass platter with hairlines, the same
+        // shape as the detail's Services beside it.
+        .listStyle(.insetGrouped)
+        #endif
         .defaultScrollAnchor(.top)
         #if os(macOS)
         .contentMargins(.top, 10, for: .scrollContent)
