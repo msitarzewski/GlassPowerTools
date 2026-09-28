@@ -1583,6 +1583,13 @@ private final class ReviewingTerminalView: TerminalView {
         onWindowAttachmentChanged?()
     }
 
+    /// The height of one row, or 0 before the font is measured.
+    var rowHeight: CGFloat {
+        let rows = getTerminal().rows
+        guard rows > 0 else { return 0 }
+        return getOptimalFrameSize().height / CGFloat(rows)
+    }
+
     @objc override func paste(_ sender: Any?) {
         guard let text = UIPasteboard.general.string, !text.isEmpty else { return }
         onPasteRequest?(text, getTerminal().bracketedPasteMode)
@@ -1638,7 +1645,19 @@ private final class TerminalHardwareKeyContainerView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        terminalView?.frame = bounds
+        guard let terminalView else { return }
+        // **A whole number of rows, top-aligned.** SwiftTerm fits `floor(height / row)` rows and
+        // then pins its scroll offset to the content's bottom edge, but draws from the first
+        // visible row's top — so the spare fraction of a row pushed every line down by that much
+        // and the last one, the prompt, went under the keyboard's accessory bar, out of reach of
+        // scrolling (2026-09-27, on the phone with the keyboard up: 370pt, 21 rows of 17pt, the
+        // prompt 13pt low). Sized to whole rows the two agree; the spare points stay blank below.
+        var frame = bounds
+        let row = terminalView.rowHeight
+        if row > 0, bounds.height >= row {
+            frame.size.height = (bounds.height / row).rounded(.down) * row
+        }
+        terminalView.frame = frame
     }
 
     override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
