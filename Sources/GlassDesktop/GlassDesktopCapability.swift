@@ -151,6 +151,25 @@ public final class GlassDesktopCapability: GlassCapability {
         }
     }
 
+    /// Open in Screen Sharing, on the Mac, for a VNC desktop (`DesktopScreenSharing`).
+    public func serviceTools(service: HostServiceLink, host: HostProfile) -> [GlassServiceTool] {
+        #if os(macOS)
+        guard let connection = runtime.connection(for: service.endpointID),
+              DesktopScreenSharing.url(for: connection) != nil else { return [] }
+        let runtime = self.runtime
+        return [
+            GlassServiceTool(id: "screen-sharing-\(service.endpointID.rawValue.uuidString.lowercased())",
+                             title: "Screen Sharing",
+                             symbolName: "macwindow.on.rectangle",
+                             subtitle: "Open this desktop in the Mac's Screen Sharing app") {
+                DesktopScreenSharing.open(connection) { runtime.enqueue(.showFailure($0)) }
+            }
+        ]
+        #else
+        return []
+        #endif
+    }
+
     public var settingsPages: [GlassCapabilitySettingsPage] {
         [GlassCapabilitySettingsPage(id: "desktop.general", title: "Desktops", systemImage: "display") {
             AnyView(DesktopSettingsView())
