@@ -28,7 +28,9 @@ import GlassConnectionKit
 /// it — is testable without a network, an iCloud account or a second device, none of which a unit
 /// test has.
 public protocol GlassCatalogSyncBackend: Sendable {
-    /// Records changed since `token`, and the token to resume from next time.
+    /// Records changed since `token`, and the token to resume from next time. With a nil token,
+    /// **every** record in the account, across however many pages the store answers in: the sync
+    /// asks with nil, and its merge is only correct against a complete answer.
     func fetchChanges(since token: Data?) async throws -> (profiles: [HostProfile], token: Data?)
     /// Publishes local records. Implementations are expected to be idempotent.
     func save(_ profiles: [HostProfile]) async throws
@@ -39,6 +41,16 @@ public protocol GlassCatalogSyncBackend: Sendable {
 
 public extension GlassCatalogSyncBackend {
     func subscribeToChanges() async throws {}
+}
+
+/// What one completed sync did, in counts a person can check against another device.
+public struct GlassCatalogSyncSummary: Equatable, Sendable {
+    /// Records the account holds, tombstones included.
+    public let inAccount: Int
+    /// Records this device took from the account.
+    public let received: Int
+    /// Records this device sent to the account.
+    public let sent: Int
 }
 
 public enum GlassCatalogSyncStatus: Equatable, Sendable {

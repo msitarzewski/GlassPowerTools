@@ -68,27 +68,46 @@ public struct GlassCloudKitCatalogBackend: GlassCatalogSyncBackend {
     public func fetchChanges(since token: Data?) async throws -> (profiles: [HostProfile], token: Data?) {
         try await ensureZone()
 
-        let previous: CKServerChangeToken? = token.flatMap {
+        var cursor: CKServerChangeToken? = token.flatMap {
             try? NSKeyedUnarchiver.unarchivedObject(ofClass: CKServerChangeToken.self, from: $0)
         }
-        let result = try await database.recordZoneChanges(inZoneWith: zoneID, since: previous)
-
         var profiles: [HostProfile] = []
-        for modification in result.modificationResultsByID.values {
-            guard let record = try? modification.get().record,
-                  let data = record[Self.payloadKey] as? Data else { continue }
-            // A record this build cannot decode is skipped, not fatal: a newer device may have
-            // written a schema this one does not know, and stalling the whole sync over one host
-            // would be worse than carrying on without it.
-            guard let profile = try? JSONDecoder().decode(HostProfile.self, from: data) else {
-                Logger.catalogSync.error("Skipped a host record this build could not decode")
+        // **Every page.** CloudKit answers in batches and says `moreComing`; reading only the
+        // first returned part of the account, and the merge then published this device's copies
+        // of everything missing from that part over the account's own (2026-09-27).
+        var pages = 0
+        repeat {
+            let result: (modificationResultsByID: [CKRecord.ID: Result<CKDatabase.RecordZoneChange.Modification, any Error>],
+                         deletions: [CKDatabase.RecordZoneChange.Deletion],
+                         changeToken: CKServerChangeToken, moreComing: Bool)
+            do {
+                result = try await database.recordZoneChanges(inZoneWith: zoneID, since: cursor)
+            } catch let error as CKError where error.code == .changeTokenExpired && cursor != nil {
+                // An expired token is not a failure: start again from the beginning.
+                cursor = nil
+                profiles.removeAll()
                 continue
             }
-            profiles.append(profile)
-        }
+            for modification in result.modificationResultsByID.values {
+                guard let record = try? modification.get().record,
+                      let data = record[Self.payloadKey] as? Data else { continue }
+                // A record this build cannot decode is skipped, not fatal: a newer device may have
+                // written a schema this one does not know, and stalling the whole sync over one
+                // host would be worse than carrying on without it.
+                guard let profile = try? JSONDecoder().decode(HostProfile.self, from: data) else {
+                    Logger.catalogSync.error("Skipped a host record this build could not decode")
+                    continue
+                }
+                profiles.append(profile)
+            }
+            cursor = result.changeToken
+            pages += 1
+            guard result.moreComing, pages < 1_000 else { break }
+        } while true
 
-        let nextToken = try? NSKeyedArchiver.archivedData(withRootObject: result.changeToken,
-                                                          requiringSecureCoding: true)
+        let nextToken = cursor.flatMap {
+            try? NSKeyedArchiver.archivedData(withRootObject: $0, requiringSecureCoding: true)
+        }
         return (profiles, nextToken)
     }
 
@@ -134,8 +153,19 @@ public struct GlassCloudKitCatalogBackend: GlassCatalogSyncBackend {
         // device holds the newer version, so a save must not fail merely because the server has a
         // different one. Losing that argument here would mean re-running the merge to reach the
         // same answer.
-        _ = try await database.modifyRecords(saving: records, deleting: [],
-                                             savePolicy: .changedKeys, atomically: false)
+        let result = try await database.modifyRecords(saving: records, deleting: [],
+                                                      savePolicy: .changedKeys, atomically: false)
+        // Non-atomic, so each record succeeds or fails on its own — and a failure was thrown
+        // away here, leaving the device sure it had published (2026-09-27). One refused record is
+        // now a failed sync, said in the status, rather than a silent gap on every other device.
+        let refused = result.saveResults.compactMap { _, outcome -> (any Error)? in
+            if case .failure(let error) = outcome { return error } else { return nil }
+        }
+        if let first = refused.first {
+            Logger.catalogSync.error(
+                "Sync: \(refused.count, privacy: .public) of \(records.count, privacy: .public) record(s) refused: \(String(describing: first), privacy: .public)")
+            throw first
+        }
     }
 }
 

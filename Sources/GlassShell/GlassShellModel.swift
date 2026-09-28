@@ -329,9 +329,15 @@ public final class GlassShellModel: GlassServiceStore {
     /// The remote half of the library. Nil until `enableCatalogSync` supplies one, so a build or a
     /// test that has no business talking to CloudKit does not.
     private var catalogBackend: (any GlassCatalogSyncBackend)?
-    private var catalogSyncToken: Data?
     private var remoteChangeTask: Task<Void, Never>?
     public private(set) var catalogSyncStatus: GlassCatalogSyncStatus = .idle
+    /// What the last completed sync moved, for the iCloud status: how many records the account
+    /// holds, how many were taken here, how many were sent from here.
+    public private(set) var catalogSyncSummary: GlassCatalogSyncSummary?
+    /// One sync at a time. The library's first load and its return to the foreground each ask for
+    /// one, and two interleaved merges each publish from a snapshot the other is changing.
+    private var catalogSyncRunning = false
+    private var catalogSyncRequestedAgain = false
 
     /// Starts syncing the library through `backend`.
     ///
@@ -375,10 +381,28 @@ public final class GlassShellModel: GlassServiceStore {
     /// device have that the account does not, and vice versa. `GlassCatalogMerge.reconcile` decides;
     /// nothing here does.
     public func synchronizeCatalog() async {
+        guard catalogBackend != nil else { return }
+        if catalogSyncRunning { catalogSyncRequestedAgain = true; return }
+        catalogSyncRunning = true
+        defer { catalogSyncRunning = false }
+        repeat {
+            catalogSyncRequestedAgain = false
+            await synchronizeCatalogOnce()
+        } while catalogSyncRequestedAgain
+    }
+
+    private func synchronizeCatalogOnce() async {
         guard let catalogBackend else { return }
         catalogSyncStatus = .syncing
         do {
-            let (remote, token) = try await catalogBackend.fetchChanges(since: catalogSyncToken)
+            // **The whole account, every time** (2026-09-27). A fetch since a token returns only
+            // what changed, and the merge reads "not in what came back" as "the account has never
+            // seen this" and publishes it. Against a delta that was every unchanged record, sent
+            // over whatever the account held, newer or not: a phone with copies from before the
+            // Mac's collections overwrote them on every foreground and read its own copies back,
+            // while saying "Synced". The library is tens of records; reading all of them is the
+            // only reading under which the merge's rule is true.
+            let (remote, _) = try await catalogBackend.fetchChanges(since: nil)
             // `includeDeleted: true`: a tombstone is a record, and publishing the library without
             // them would let a host deleted here come back from a device that never heard.
             let local = try await catalog.snapshot(includeDeleted: true)
@@ -428,7 +452,9 @@ public final class GlassShellModel: GlassServiceStore {
                 try await catalogBackend.save(redactingDeviceBoundServices(outcome.toPublish))
                 Logger.catalogSync.info("Sync: published \(outcome.toPublish.count, privacy: .public) record(s)")
             }
-            catalogSyncToken = token
+            catalogSyncSummary = GlassCatalogSyncSummary(
+                inAccount: remote.count, received: outcome.toApplyLocally.count,
+                sent: outcome.toPublish.count)
 
             if !outcome.toApplyLocally.isEmpty {
                 records = try await catalog.snapshot()
