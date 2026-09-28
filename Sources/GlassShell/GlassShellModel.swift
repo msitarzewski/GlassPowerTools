@@ -232,10 +232,12 @@ public final class GlassShellModel: GlassServiceStore {
             // Preferences keyed on a member record move to the canonical id **while the group
             // still lists its members** — a moment later they are one record and the member id
             // is a tombstone nobody can look up.
-            migratePreferencesToCanonicalHosts()
-            // Two devices that each set the same machine up become one record here, not two
-            // rows' worth of services under one name (2026-09-21).
-            await consolidateDuplicateHosts()
+            if !Self.isSyncDryRun {
+                migratePreferencesToCanonicalHosts()
+                // Two devices that each set the same machine up become one record here, not two
+                // rows' worth of services under one name (2026-09-21).
+                await consolidateDuplicateHosts()
+            }
             isLoaded = true
             errorMessage = nil
             // Only now can a capability read its own records honestly: until `isLoaded`, every
@@ -391,6 +393,45 @@ public final class GlassShellModel: GlassServiceStore {
         } while catalogSyncRequestedAgain
     }
 
+    /// `GLASS_SYNC_DRY_RUN=1`: fetch the account, compare it with this device record by record,
+    /// log the comparison, and change nothing — no apply, no publish, none of the launch tidy-ups
+    /// that write to the local library. For diagnosing what another device put in the account
+    /// before this one takes it (2026-09-28: a headset with a months-old library sent 10 records).
+    nonisolated static var isSyncDryRun: Bool {
+        ProcessInfo.processInfo.environment["GLASS_SYNC_DRY_RUN"] == "1"
+    }
+
+    private func logDryRun(local: [HostProfile], remote: [HostProfile], outcome: GlassCatalogMerge.Outcome) {
+        let localByID = Dictionary(local.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let remoteByID = Dictionary(remote.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        func describe(_ h: HostProfile?) -> String {
+            guard let h else { return "absent" }
+            let configured = h.services.filter { $0.configuration != nil }.count
+            return "updated=\(h.updatedAt.timeIntervalSince1970) deleted=\(h.deletedAt != nil) services=\(h.services.count) configured=\(configured) writer=\(h.lastWriterID.rawValue.uuidString.prefix(8))"
+        }
+        let apply = Set(outcome.toApplyLocally.map(\.id)), publish = Set(outcome.toPublish.map(\.id))
+        for id in Set(localByID.keys).union(remoteByID.keys).sorted(by: { $0.rawValue.uuidString < $1.rawValue.uuidString }) {
+            let name = (localByID[id] ?? remoteByID[id])?.displayName ?? "?"
+            let action = apply.contains(id) ? "WOULD-APPLY" : publish.contains(id) ? "WOULD-SEND" : "same"
+            var differing: [String] = []
+            if let l = localByID[id], let r = remoteByID[id], l != r {
+                let pairs: [(String, Bool)] = [
+                    ("name", l.displayName != r.displayName), ("address", l.address != r.address),
+                    ("aliases", l.aliases != r.aliases), ("services", l.services != r.services),
+                    ("tags", l.tags != r.tags), ("created", l.createdAt != r.createdAt),
+                    ("updated", l.updatedAt != r.updatedAt), ("deleted", l.deletedAt != r.deletedAt),
+                    ("writer", l.lastWriterID != r.lastWriterID), ("version", l.schemaVersion != r.schemaVersion)]
+                differing = pairs.filter(\.1).map(\.0)
+                if l.updatedAt != r.updatedAt {
+                    differing.append("Δupdated=\(l.updatedAt.timeIntervalSinceReferenceDate - r.updatedAt.timeIntervalSinceReferenceDate)")
+                }
+            }
+            Logger.catalogSync.info("DRY diff \(id.rawValue.uuidString.prefix(8), privacy: .public): \(differing.joined(separator: ","), privacy: .public)")
+            Logger.catalogSync.info("DRY \(action, privacy: .public) \(id.rawValue.uuidString.prefix(8), privacy: .public) \(name, privacy: .public) | local: \(describe(localByID[id]), privacy: .public) | account: \(describe(remoteByID[id]), privacy: .public)")
+        }
+        Logger.catalogSync.info("DRY summary: \(local.count, privacy: .public) local, \(remote.count, privacy: .public) in account, \(apply.count, privacy: .public) would apply, \(publish.count, privacy: .public) would send")
+    }
+
     private func synchronizeCatalogOnce() async {
         guard let catalogBackend else { return }
         catalogSyncStatus = .syncing
@@ -407,6 +448,11 @@ public final class GlassShellModel: GlassServiceStore {
             // them would let a host deleted here come back from a device that never heard.
             let local = try await catalog.snapshot(includeDeleted: true)
             let outcome = GlassCatalogMerge.reconcile(local: local, remote: remote)
+            if Self.isSyncDryRun {
+                logDryRun(local: local, remote: remote, outcome: outcome)
+                catalogSyncStatus = .failed("Dry run: nothing applied or sent")
+                return
+            }
 
             // What the incoming records take away, captured before they are applied: afterwards
             // there is nothing left to ask. A tombstone removes every service on the record; an
