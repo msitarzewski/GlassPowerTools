@@ -68,3 +68,24 @@ top-aligned. Seen fixed on the simulator; installed on the phone as 0.4.239. The
 itself measures to the HIG (44pt targets, margins aligned with the navigation bar, centred).
 The iCloud status moved from the toolbar to a footer row pinned under the library sidebar
 (`GlassConnectionLibrary.sidebarFooter`), at the owner's request.
+
+## The three open items, fixed (2026-09-27, the owner: "Fix all three")
+1. **Records a newer build wrote survive writes.** `GlassServiceRecords.replaceAll` deletes only
+   records it can read, compares by JSON value (key order is not stable in `JSONEncoder`, so
+   unchanged records were rewritten and republished) and writes sorted keys; `preserving:` leaves
+   the desktop's validation-rejected records untouched. Red first: `GlassServiceRecordsUnreadableTests`
+   and `DesktopUnreadableRecordTests` failed on the old code.
+2. **Open in Screen Sharing** is a tool row on a Mac VNC desktop's host detail
+   (`DesktopScreenSharing`, endpoint only, IPv6 bracketed), with tests.
+3. **glassDT's tests ported**: 124 of 137 app-level tests (13 dropped, each for a mechanism GPT
+   removed on purpose: connections.json, journals, pairing); the xrdp and TigerVNC Docker rigs
+   moved into `Tests/LiveDesktop` and run — xrdp 6/6 checks, TigerVNC 5/5 (the VNC probe gained
+   real assertions; glassDT's only printed).
+Porting found two real defects, fixed: the notification delegate set in the desktop runtime's
+init crashed any test process (moved to the app root, where glassDT had it); saving a desktop
+before the library loaded wrote a Keychain credential and then deleted it (now refused first).
+Validation: the Mac's screen was locked, so protected-file tests fail; the shell and terminal
+failures were compared against the last commit under the same lock and are identical. Rerun the
+full suite unlocked. Also: private names in test fixtures (the owner's username, two machine
+names) replaced with neutral ones; private-range addresses and database names in older notes are
+left for the pre-publication scrub.
