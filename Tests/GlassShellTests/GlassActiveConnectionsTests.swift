@@ -44,14 +44,14 @@ struct GlassActiveConnectionsTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let alphaTerminal = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on alpha")
         let alphaDatabase = HostServiceLink(endpointID: EndpointID(), kind: .database, displayName: "MySQL on alpha")
-        let beastTerminal = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on bravo")
+        let foxtrotTerminal = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on bravo")
         let alpha = try HostProfile(displayName: "alpha", address: "10.0.0.1", services: [alphaTerminal, alphaDatabase])
-        let foxtrot = try HostProfile(displayName: "bravo", address: "10.0.0.2", services: [beastTerminal])
+        let foxtrot = try HostProfile(displayName: "bravo", address: "10.0.0.2", services: [foxtrotTerminal])
         try await store.upsert(alpha); try await store.upsert(foxtrot)
 
         let terminal = StubCapability(kind: .ssh, displayName: "Terminal")
         terminal.sessions = [session("terminal:1", title: "alpha", endpoints: [alphaTerminal.endpointID]),
-                             session("terminal:2", title: "bravo", endpoints: [beastTerminal.endpointID])]
+                             session("terminal:2", title: "bravo", endpoints: [foxtrotTerminal.endpointID])]
         let database = StubCapability(kind: .database, displayName: "Database")
         database.sessions = [session("database:1", title: "MySQL on alpha", endpoints: [alphaDatabase.endpointID])]
         model.registry.register(terminal); model.registry.register(database)
