@@ -159,6 +159,11 @@ public final class DesktopAppModel {
         defer { releaseMutation() }
         try Task.checkCancellation()
         var value = try connection.validated()
+        // Refused **before** the Keychain is touched, as glassDT refused. The repository would
+        // refuse the write anyway, but only after a new credential had been saved — and deleted
+        // again, a round trip iCloud Keychain syncs, orphaned if the delete fails (found porting
+        // glassDT's storage tests, 2026-09-27).
+        guard try requireRepository().isCatalogLoaded else { throw DesktopError.libraryUnavailable }
         let current = try await requireRepository().load()
         let previous = current.first { $0.id == value.id }
         if let previous {
