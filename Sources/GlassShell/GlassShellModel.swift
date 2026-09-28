@@ -1362,7 +1362,8 @@ public final class GlassShellModel: GlassServiceStore {
     /// reach the app's container on iOS or visionOS:
     /// `--ui-testing-seed-hosts "bravo:ssh|bravo:rdp|alpha:ssh+database"` creates one record
     /// per `|` entry, named before the colon, with one service per `+`-separated kind; a name may
-    /// carry the host's address after `@` (`scratch@192.0.2.6:ssh`). Only honoured alongside
+    /// carry the host's address after `@` (`bravo@192.0.2.6:ssh`) and its collections after `#`,
+    /// comma-separated (`alpha#Production,Home:ssh`). Only honoured alongside
     /// `--ui-testing`, only into a catalog that is not under a real Group Container, and only when
     /// that catalog is empty.
     private func seedForUITestingIfRequested() async throws {
@@ -1377,7 +1378,10 @@ public final class GlassShellModel: GlassServiceStore {
         guard try await catalog.snapshot().isEmpty else { return }
         for (offset, entry) in arguments[index + 1].split(separator: "|").enumerated() {
             let parts = entry.split(separator: ":", maxSplits: 1)
-            guard let nameAndAddress = parts.first.map(String.init), !nameAndAddress.isEmpty else { continue }
+            guard let head = parts.first.map(String.init), !head.isEmpty else { continue }
+            let headParts = head.split(separator: "#", maxSplits: 1).map(String.init)
+            let nameAndAddress = headParts[0]
+            let tags = headParts.count > 1 ? headParts[1].split(separator: ",").map(String.init) : []
             let nameParts = nameAndAddress.split(separator: "@", maxSplits: 1).map(String.init)
             let name = nameParts[0]
             let address = nameParts.count > 1 ? nameParts[1] : nil
@@ -1387,8 +1391,10 @@ public final class GlassShellModel: GlassServiceStore {
                 HostServiceLink(endpointID: EndpointID(), kind: $0, displayName: "\(GlassServicePresentation.displayName(for: $0)) on \(name)")
             }
             let created = Date(timeIntervalSince1970: 1_700_000_000 + Double(offset))
-            try await catalog.upsert(try HostProfile(displayName: name, address: address, aliases: [], services: services,
-                                                     createdAt: created, updatedAt: created, lastWriterID: writerID))
+            var host = try HostProfile(displayName: name, address: address, aliases: [], services: services,
+                                       createdAt: created, updatedAt: created, lastWriterID: writerID)
+            host.tags = tags
+            try await catalog.upsert(host)
         }
     }
     #endif
