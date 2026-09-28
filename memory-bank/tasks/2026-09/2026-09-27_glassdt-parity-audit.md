@@ -1,0 +1,70 @@
+# glassDT → Glass Power Tools: remote desktop parity audit — 2026-09-27
+
+**State:** QA (read-only audit) → awaiting the owner's choice of fixes. Asked by the owner: "evaluate
+the glassDT code base against our Desktop implementation … anything missing? Be diligent." Five
+read-only agents (rendering, input, model/trust, engines, docs); every headline finding below was
+re-checked by the coordinator against the source. Nothing edited.
+
+## Moved intact
+RDPKit engine (only GPT additions: desktop scale factor, whole-chain TLS trust; `Examples/` dropped),
+VNCKit and GlassVNCTransport byte-identical, GlassRDPTransport plus scale factor only. Input,
+Metal, cursor, audio, keyboard maps, trust prompts, credential rules, `.rdp` import: same code.
+
+## Findings (verified)
+1. **Data loss, shared by all three capabilities.** `GlassServiceRecords.replaceAll`
+   (`Sources/GlassShell/GlassServiceRecords.swift:63-75`) deletes every stored configuration missing
+   from the given list, but callers build the list from `all()`, which skips records this build
+   cannot decode. Any desktop save/favourite/last-connected/delete (`DesktopRepository.swift:76,82,106`),
+   and terminal/database saves (`ServerManager.swift:100`, `ConnectionManager.swift:61`), erase
+   records written by a newer build, and the erasure syncs. glassDT refused (`invalidDocument`).
+2. **Desktop settings unreachable.** `DesktopSettingsView` has no caller; the capability declares no
+   `settingsPages`. Consequence: "Important Session Notices" can never be enabled, so
+   `DesktopNotices.connectionFailed` never posts; `configurePresentation()` never called.
+3. **Open in Screen Sharing (macOS, VNC)** missing, unrecorded (glassDT `DesktopLibraryView.swift:274,310`).
+4. **⇧⌘I Import RDP File…** not registered in any `.commands` (`DesktopImportCommands.swift`).
+5. **Tests:** of glassDT's 142 app-level desktop tests only the 9 import tests moved. Input,
+   trackpad, GPU presentation, colour key, notices and 46 session-regression tests have no
+   counterpart. The Docker xrdp/TigerVNC functional harnesses (input, clipboard, resize) did not
+   move; `Tests/LiveDesktop` probes check negotiation and frames only. The 14 glassDT UI workflow
+   tests did not move; the stage-4 parity sweep has no completion record.
+6. Smaller: visionOS session window lacks `defaultWindowPlacement` beside the library; shell
+   Appearance does not reach desktop windows (own `display.glass.*` keys); VNC shows RDP-only size
+   fields; `ConnectionEditor.swift` is dead code; logger subsystems still `app.glassdt.*`;
+   RDP+VNC on one host with default names may collide in host merge (unreproduced); app-wide ⌘
+   menu shortcuts probably keep ⌘K/⌘O/⌘T etc. from reaching the remote (unverified at runtime).
+7. Docs: progress.md/D31 say desktops contribute no switcher sessions — stale;
+   CAPABILITY-LEDGER row on post-login desktop stale.
+
+## Not regressions (absent in glassDT too)
+File/drive/printer/USB redirection, drag and drop, Gateway, VeNCrypt/Tight, `.rdp` document type.
+
+## Next
+Owner chooses which to fix. Suggested order: 1 (with a red-first test), 2, 3/4, then tests.
+
+## Also found: library sync republished stale copies (2026-09-27, fixed, uncommitted)
+Owner: collections made on the Mac never reached the phone, whose status said "Synced". Cause
+(`GlassShellModel.synchronizeCatalog`): every sync after the first fetched a delta since a token,
+and `GlassCatalogMerge.reconcile` publishes whatever the fetch did not return — so each sync
+re-sent every unchanged record with `.changedKeys`, overwriting newer account copies. The CloudKit
+backend also read only the first page (`moreComing` ignored) and discarded per-record save
+failures. Fix: every sync reads the whole account (nil token); the backend pages through
+everything, restarts on `changeTokenExpired`, and throws on a refused record; syncs are serialised
+(launch ran two at once). Red first: `D19StaleRepublishTests.aSecondSyncWithNoChangesPublishesNothing`
+failed on the old code; all 27 sync tests pass after. New: `GlassICloudStatusButton` in the library
+toolbar (Apple's icloud symbols, popover with last sync, counts, Sync Now), and
+`--ui-testing-seed-hosts` accepts `name#Tag1,Tag2`.
+
+Desktop fixes in the same tree: Settings ▸ Desktops page (notices toggle, visionOS glass),
+notification presentation delegate, ⇧⌘I in File, ⚡ in desktop windows (Mac/iPad toolbar,
+visionOS control bar).
+
+## Also fixed: iPhone terminal's last line under the keyboard bar (2026-09-27, uncommitted)
+Measured with a temporary layout probe on the iPhone 17 Pro simulator (`--demo-open terminal
+--demo-keyboard`, a new DEBUG switch that keeps the keyboard up in a demo run): terminal 370pt,
+21 rows of 17pt; SwiftTerm pinned its offset to the content's bottom (259) but drew from
+`yDisp × row` (272), so every row sat 13pt low and the prompt went under the accessory bar,
+unreachable by scrolling. Fix: `TerminalHardwareKeyContainerView` sizes the terminal to whole rows,
+top-aligned. Seen fixed on the simulator; installed on the phone as 0.4.239. The accessory bar
+itself measures to the HIG (44pt targets, margins aligned with the navigation bar, centred).
+The iCloud status moved from the toolbar to a footer row pinned under the library sidebar
+(`GlassConnectionLibrary.sidebarFooter`), at the owner's request.

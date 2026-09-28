@@ -62,9 +62,13 @@ profile, notarization, deploying the site), the behaviour findings listed in `ac
 
 - A database workspace's tabs do not survive leaving and returning on a phone; its session and SQL
   drafts do.
-- The desktop contributes no sessions to the switcher, by decision (D31).
+- Desktops are listed in Active (`GlassDesktopCapability.openSessions`); the D31 line saying they
+  contribute none is superseded.
 - `configurations(ofKind:)` skips undecodable records without logging.
 - VNC sessions are unencrypted after sign-in (no VeNCrypt, no tunnel); the setup form says so.
 - tree-sitter 0.27 and swift-crypto 5 wait on upstream releases (`techContext.md`).
 - The legacy `SFTPRemoteEditorView` sheet remains as a fallback; the owner has been asked whether to
   delete it.
+- **Backlog (owner, 2026-09-27):** let Glass Power Tools be set as the Mac's default text editor
+  (declare editable document types so Finder's "Open With ▸ Change All" and `open` reach the editor).
+- glassDT parity audit findings: `tasks/2026-09/2026-09-27_glassdt-parity-audit.md`.
