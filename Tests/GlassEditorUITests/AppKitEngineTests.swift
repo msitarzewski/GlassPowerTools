@@ -429,6 +429,37 @@ struct AppKitEngineTests {
         #expect(engine.scrollView.frame.minX == EditorMetrics.gutterWidth)
     }
 
+    /// **In a window, the number sits beside its line.** Reported 2026-09-29 from the database's
+    /// SQL pane: the query on line 1 and the "1" a line below it. Hosted in a real window the
+    /// text view's frame sits above its clip view, offset by the clip view's scroll, and the
+    /// gutter summed offsets that assumed the frame started at zero: 50 points against the
+    /// text's 12 here, before the fix. Both the editor's own settings and the SQL pane's
+    /// (horizontally resizable, with a horizontal scroller) are checked.
+    @Test("in a window, line 1's number is level with line 1", arguments: [false, true])
+    func gutterNumberIsLevelWithItsLineInAWindow(sqlPaneSettings: Bool) throws {
+        let engine = makeEngine("SELECT name FROM items LIMIT 10;")
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 140),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        let content = try #require(window.contentView)
+        engine.containerView.frame = content.bounds
+        content.addSubview(engine.containerView)
+        if sqlPaneSettings {
+            engine.scrollView.hasHorizontalScroller = true
+            engine.textView.isHorizontallyResizable = true
+        }
+        engine.containerView.layoutSubtreeIfNeeded()
+        let layoutManager = try #require(engine.textView.layoutManager)
+        layoutManager.ensureLayout(for: try #require(engine.textView.textContainer))
+        let gutter = try #require(engine.gutter)
+
+        let label = try #require(gutterLabels(engine).first)
+        let drawnY = label.frame.minY - gutter.verticalOffset(textView: engine.textView)
+        var line = layoutManager.lineFragmentRect(forGlyphAt: 0, effectiveRange: nil)
+        line.origin.y += engine.textView.textContainerOrigin.y
+        let lineY = gutter.convert(line, from: engine.textView).minY
+        #expect(abs(drawnY - lineY) < 0.5, "drawn at \(drawnY), the line is at \(lineY)")
+    }
+
     @Test("turning line numbers off collapses the gutter instead of tearing it down")
     func gutterVisibility() async {
         var configuration = GlassEditorConfiguration()

@@ -141,18 +141,16 @@ public final class GlassLineNumberGutter: NSView {
 
     /// Layout-space y of this view's top edge.
     ///
-    /// Three coordinate spaces meet here: the gutter's own, the text view's and
-    /// the text container's — `layoutFragmentFrame` is in the last.
-    /// `textContainerOrigin` is the offset between the second and the third,
-    /// and is the right accessor rather than `textContainerInset` because it
-    /// also accounts for a container narrower than the view being centred. The
-    /// content inset is the third term: the clip view starts that far below the
-    /// scroll view's top edge, and the gutter's top is the scroll view's top.
-    private func verticalOffset(textView: GlassTextView) -> CGFloat {
-        guard let scrollView else { return 0 }
-        return scrollView.contentView.bounds.origin.y
-            - textView.textContainerOrigin.y
-            - scrollView.contentInsets.top
+    /// Asked of the views themselves: where the text container's origin lands in this view,
+    /// negated. It used to be summed — the clip view's scroll position, less the container
+    /// origin and the top content inset — which assumes the text view's frame starts at zero
+    /// inside the clip view. It does not always: in the database's SQL pane the frame sat
+    /// above its clip view by the same amount the clip view was scrolled, so the text was at
+    /// the top and every number a line or more below it (2026-09-29). A conversion counts
+    /// every term, including ones nobody thought to add.
+    func verticalOffset(textView: GlassTextView) -> CGFloat {
+        let origin = convert(NSPoint(x: 0, y: textView.textContainerOrigin.y), from: textView)
+        return -origin.y
     }
 
     @objc private func clipViewDidScroll(_ notification: Notification) {
