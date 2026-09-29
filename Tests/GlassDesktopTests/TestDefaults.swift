@@ -13,7 +13,9 @@
 
 import Foundation
 
-enum TestDefaults {
+/// `nonisolated` because the exit handler runs outside any actor: a target that defaults to the
+/// main actor made it main-actor-isolated, and the process trapped on exit (signal 5).
+nonisolated enum TestDefaults {
     private static let lock = NSLock()
     nonisolated(unsafe) private static var names: Set<String> = []
     nonisolated(unsafe) private static var armed = false
@@ -74,7 +76,7 @@ enum TestDefaults {
     }
 }
 
-extension UserDefaults {
+nonisolated extension UserDefaults {
     /// A suite for tests, removed with its file when the test process exits.
     static func forTest(suiteName name: String) -> UserDefaults? {
         TestDefaults.register(name)
