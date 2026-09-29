@@ -27,16 +27,37 @@ anything touching real servers (SSH and database tests use the disposable test V
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
+## Paused 2026-09-28 (evening) — where to pick up
+
+All work below is committed locally (nothing pushed). Mac 0.4.249, iPhone 0.4.249, Vision Pro 0.4.251.
+Detail: `tasks/2026-09/2026-09-27_glassdt-parity-audit.md` (desktop parity, sync repairs, list sweep).
+
+**Next, in the owner's order when they return:**
+1. **visionOS unwind, pass 2** — proposed, awaiting the owner's go-ahead. Owner's direction (2026-09-28):
+   *leave it to Apple to define what spatial is best.* The list rows are done (`glassSpatialList`,
+   `glassSpatialListRow`; rows never add gaze highlight or padding). Still ours: `GlassSpatialMetrics`
+   type/size scale (24 uses), custom window frames (`GlassNativeWindowFrame`, `GlassCanvasBackdrop`,
+   `GlassLayeredWindow`/`Panel`, 8 `.windowStyle(.plain)` scenes), 4 hand-built ornaments, 7 custom
+   glass backgrounds, the split Connect capsule. Keep: terminal/desktop transparency and the desktop's
+   colour key, and the desktop control bar. Proposed order: library window first, judged on the headset.
+2. **Stats in the empty library detail** (total machines, services per machine, connection timeline,
+   availability) and **status dots as an option** (like SQL Studio Pro's, for every service). Two
+   questions pending: keep per-device connection history for the timeline? probe ports (connect only,
+   never a login) while the library is open?
+3. **Richer clipboard** (owner wants it): plan given — RDP text/rich text/images, then RDP files,
+   then Files (SFTP) ⌘C/⌘V and drag with Finder, then VNC Extended Clipboard. Awaiting order.
+4. Desktops in Active "a little wonky" — cause not yet described by the owner.
+
+**Before letting any device with an old install sync:** dry-run the Mac first
+(`GLASS_SYNC_DRY_RUN=1`, see the audit note's sync sections).
+
 ## Open questions for the owner
 
 - Delete the legacy `SFTPRemoteEditorView` sheet? (Recommended.)
 - Take SwiftTerm 1.19, which adds a build-tool plugin Xcode must be told to trust?
-- The Vision Pro needs re-pairing with the Mac before anything new can be seen on it.
-- Rerun `swift test` with the screen unlocked (the night's runs were under a locked screen).
 - Behaviour and design findings from the help audit, not changed: the widget reads data the app no
   longer writes (fix or drop for 1.0?); local editor projects sync to devices that cannot open them;
-  the Editor off the Mac has no Find, no way to close a lone document, no blank editor; database and
-  desktop settings pages are unreachable; the database "Rows per page" field does nothing; a mistyped
+  the Editor off the Mac has no Find, no way to close a lone document, no blank editor; the database settings page may be unreachable (the desktop's is fixed); the database "Rows per page" field does nothing; a mistyped
   terminal password is saved before sign-in is tried (fix: save only on success); no way to view or
   forget a trusted host key; imported desktops default to device-only passwords.
 

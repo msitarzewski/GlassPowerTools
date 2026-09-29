@@ -98,3 +98,20 @@ record. Merge now: tombstones final; a configuration is never lost to a copy wit
 corrections stamped past both copies; duplicate and rounding-error records settle. Mac took 13 and
 sent 3, then 0/0. All three devices on 0.4.247. The headset's list is inset grouped.
 **Before letting a device with an old install sync, dry-run it or update everything first.**
+
+## 2026-09-28 (evening): sync repairs, round 2, and the headset's lists
+- The first merge rules still let machines vanish: the stale headset folded the Mac's live records
+  into old copies, then "deletion is final" deleted those. Now (`caa10cb`): pairwise decision, then no
+  set-up service may end live nowhere — the record holding it is revived, iCloud's live copy
+  preferred so devices converge; the catalog store dates a deletion by its statement (`updatedAt`);
+  refused records are retried one by one and counted in the status. Mac revived the two machines
+  (3/3 each), then 0/0. The Sept 21 protection (folded services never lost) is kept and tested.
+- Test cleanup trapped the terminal test process on exit (main-actor default); fixed (`0ef580d`).
+  Check `swift test` logs for `signal code|exited with`, not only result lines.
+- Headset lists (`172d16a`, `d3af0ac`): every list uses `glassSpatialList()` / `glassSpatialListRow()`
+  — the database schema list's shape, one system capsule per row. Removed our nested gaze highlights
+  and spatial padding from connections, projects, file tree, keys, Active, SFTP, sidebar panels.
+  SFTP rows show the Mac's columns; the database window's toolbar (⚡, back) attaches to the detail
+  column on visionOS; the results bar scrolls instead of wrapping.
+- Owner's verdict on the cause: nearly all of it was ours, not Apple's defaults. Direction: leave
+  spatial design to Apple. Pass 2 of the unwind is proposed (see activeContext).

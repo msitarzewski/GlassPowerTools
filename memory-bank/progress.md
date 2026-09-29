@@ -72,3 +72,8 @@ profile, notarization, deploying the site), the behaviour findings listed in `ac
 - **Backlog (owner, 2026-09-27):** let Glass Power Tools be set as the Mac's default text editor
   (declare editable document types so Finder's "Open With ▸ Change All" and `open` reach the editor).
 - glassDT parity audit findings: `tasks/2026-09/2026-09-27_glassdt-parity-audit.md`.
+- Library sync (2026-09-28): whole-account fetch, deletions dated by statement, no set-up service can
+  vanish through a merge, per-record apply with visible failures, dry-run mode. Proven on the Mac
+  against the real account (0/0 after repair); the phone and headset received 0.4.249.
+- visionOS: lists unwound to the platform's own (2026-09-28); window frames, metrics and ornaments
+  still custom — pass 2 pending the owner's go-ahead.
