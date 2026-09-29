@@ -97,6 +97,16 @@ public enum GlassCatalogMerge {
         return remote.updatedAt > local.updatedAt ? remote : local
     }
 
+    /// The winner by time alone — the rule every earlier build used, and still what a device's
+    /// catalog store applies: the later statement wins, and at the same instant the tombstone.
+    static func newestWins(local: HostProfile, remote: HostProfile) -> HostProfile {
+        if sameInstant(local.updatedAt, remote.updatedAt) {
+            if remote.deletedAt != nil && local.deletedAt == nil { return remote }
+            return local
+        }
+        return remote.updatedAt > local.updatedAt ? remote : local
+    }
+
     /// Within half a millisecond. A date that has been through JSON and CloudKit comes back a
     /// rounding error away (1.2e-7 s, seen 2026-09-28), and a rounding error is not a newer write.
     static func sameInstant(_ a: Date, _ b: Date) -> Bool {
@@ -119,44 +129,89 @@ public enum GlassCatalogMerge {
     /// result is applied here if it differs from this device's copy and sent if it differs from the
     /// account's — so an unchanged library settles instead of ping-ponging.
     public static func reconcile(local: [HostProfile], remote: [HostProfile]) -> Outcome {
-        var localByID = Dictionary(local.map { ($0.id, $0) }, uniquingKeysWith: { a, b in
+        let localByID = Dictionary(local.map { ($0.id, $0) }, uniquingKeysWith: { a, b in
             a.updatedAt >= b.updatedAt ? a : b
         })
-        var outcome = Outcome(toApplyLocally: [], toPublish: [])
         // One copy per record, the newest. CloudKit's paged answer can list a record twice, and
         // the second copy, finding this device's record already matched, read as a host this
         // device had never seen and was applied on every sync.
-        let remote = Dictionary(remote.map { ($0.id, $0) }, uniquingKeysWith: { a, b in
+        let remoteByID = Dictionary(remote.map { ($0.id, $0) }, uniquingKeysWith: { a, b in
             winner(local: a, remote: b)
-        }).values.sorted { $0.id.rawValue.uuidString < $1.id.rawValue.uuidString }
+        })
 
-        for incoming in remote {
-            guard let mine = localByID[incoming.id] else {
-                outcome.toApplyLocally.append(incoming)
-                continue
-            }
-            localByID.removeValue(forKey: incoming.id)
-            let mineWins = winner(local: mine, remote: incoming) == mine
-            let first = mineWins ? mine : incoming
-            var merged = keepingConfigurations(first, from: mineWins ? incoming : mine)
-            let restoredSetup = merged != first
-            // This device's deletion overriding a live copy the account holds.
-            let deletionOverrides = mineWins && mine.deletedAt != nil && incoming.deletedAt == nil
-            if restoredSetup || deletionOverrides {
-                // A correction the account does not hold. It must read as newer than both copies,
-                // or a device still on the old newest-wins rule keeps the copy being corrected.
-                merged.updatedAt = max(mine.updatedAt, incoming.updatedAt).addingTimeInterval(0.001)
-                outcome.toApplyLocally.append(merged)
-                outcome.toPublish.append(merged)
-            } else if !mineWins {
-                if incoming != mine { outcome.toApplyLocally.append(incoming) }
-            } else if mine.updatedAt > incoming.updatedAt, !sameInstant(mine.updatedAt, incoming.updatedAt) {
-                outcome.toPublish.append(mine)
+        // Phase 1: each record on its own.
+        var final: [HostID: HostProfile] = [:]
+        var apply: Set<HostID> = [], publish: Set<HostID> = []
+        for id in Set(localByID.keys).union(remoteByID.keys) {
+            switch (localByID[id], remoteByID[id]) {
+            case let (mine?, nil):
+                final[id] = mine; publish.insert(id)
+            case let (nil, incoming?):
+                final[id] = incoming; apply.insert(id)
+            case let (mine?, incoming?):
+                let newest = newestWins(local: mine, remote: incoming)
+                let decided = winner(local: mine, remote: incoming)
+                let mineDecided = decided == mine
+                var merged = keepingConfigurations(decided, from: mineDecided ? incoming : mine)
+                // The rules overrode "newest wins", or a setup was restored: a correction.
+                if (merged.deletedAt != nil) != (newest.deletedAt != nil) || merged != decided {
+                    // Stamped past both copies, so every device's catalog — and any device still
+                    // on the old newest-wins rule — takes it rather than the copy it corrects.
+                    merged.updatedAt = max(mine.updatedAt, incoming.updatedAt).addingTimeInterval(0.001)
+                    final[id] = merged; apply.insert(id); publish.insert(id)
+                } else if !mineDecided {
+                    final[id] = incoming
+                    if incoming != mine { apply.insert(id) }
+                } else {
+                    final[id] = mine
+                    if mine.updatedAt > incoming.updatedAt, !sameInstant(mine.updatedAt, incoming.updatedAt) {
+                        publish.insert(id)
+                    }
+                }
+            case (nil, nil):
+                break
             }
         }
 
-        // Whatever the remote has never seen.
-        outcome.toPublish.append(contentsOf: localByID.values)
+        // Phase 2: **no set-up service disappears through a merge** (2026-09-28). A deletion is
+        // final for a record, but a service set up on a live copy on either side must still be
+        // live somewhere afterwards. A stale device folded a machine's live record into an old
+        // copy of its own and the old copy was then deleted, leaving the machine nowhere; the
+        // record that held the setup is revived instead. iCloud's copy is preferred, so every
+        // device revives the same record and they converge.
+        var holders: [EndpointID: [HostProfile]] = [:]
+        for host in Array(remoteByID.values) + Array(localByID.values) where host.deletedAt == nil {
+            for service in host.services where service.configuration != nil {
+                holders[service.endpointID, default: []].append(host)
+            }
+        }
+        func liveAfter() -> Set<EndpointID> {
+            Set(final.values.filter { $0.deletedAt == nil }
+                .flatMap { $0.services.filter { $0.configuration != nil }.map(\.endpointID) })
+        }
+        var alive = liveAfter()
+        for endpoint in holders.keys.sorted(by: { $0.rawValue.uuidString < $1.rawValue.uuidString })
+        where !alive.contains(endpoint) {
+            guard let source = holders[endpoint]?.first else { continue }
+            let id = source.id
+            let mine = localByID[id], theirs = remoteByID[id]
+            var revived = keepingConfigurations(source, from: (source == theirs ? mine : theirs) ?? source)
+            if revived == theirs {
+                // iCloud's own live copy: adopt it as it is; there is nothing to send.
+                publish.remove(id)
+            } else {
+                // A copy iCloud lacks or holds deleted: stamped past both, and sent.
+                let stamps = [mine?.updatedAt, theirs?.updatedAt].compactMap { $0 }
+                revived.updatedAt = (stamps.max() ?? revived.updatedAt).addingTimeInterval(0.001)
+                publish.insert(id)
+            }
+            final[id] = revived
+            if revived != mine { apply.insert(id) } else { apply.remove(id) }
+            alive = liveAfter()
+        }
+
+        var outcome = Outcome(toApplyLocally: apply.compactMap { final[$0] },
+                              toPublish: publish.compactMap { final[$0] })
         outcome.toPublish.sort { $0.updatedAt < $1.updatedAt }
         outcome.toApplyLocally.sort { $0.updatedAt < $1.updatedAt }
         return outcome

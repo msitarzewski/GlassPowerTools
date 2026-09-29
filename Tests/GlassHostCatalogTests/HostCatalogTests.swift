@@ -335,6 +335,19 @@ struct HostCatalogTombstoneMergeTests {
         #expect(try await store.snapshot().contains { $0.id == id } == false)
     }
 
+    /// 2026-09-28: a sync re-states a deletion to override a copy a stale device restamped. The
+    /// statement is newer than the restamp even though the machine went long before; dated by
+    /// `deletedAt`, the store refused it and the headset kept showing the machine.
+    @Test("A deletion is dated by when it was stated, not when the machine first went")
+    func restatedDeletionBeatsARestamp() async throws {
+        let store = try store()
+        let id = HostID()
+        try await store.merge([try alpha(deletedAt: nil, updatedAt: Date(timeIntervalSince1970: 500), id: id)])
+        try await store.merge([try alpha(deletedAt: Date(timeIntervalSince1970: 100),
+                                         updatedAt: Date(timeIntervalSince1970: 600), id: id)])
+        #expect(try await store.snapshot().contains { $0.id == id } == false)
+    }
+
     @Test("At the same instant the tombstone wins, so a stale echo cannot undo a delete")
     func tieKeepsTheTombstone() async throws {
         let store = try store()

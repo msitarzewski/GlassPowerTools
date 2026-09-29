@@ -216,4 +216,82 @@ struct GlassCatalogMergeTests {
         #expect(outcome.toApplyLocally.isEmpty)
         #expect(outcome.toPublish.isEmpty)
     }
+
+    private func configured(_ host: HostProfile, endpoint: EndpointID = EndpointID()) -> HostProfile {
+        var host = host
+        host.services = [HostServiceLink(endpointID: endpoint, kind: .ssh, displayName: "Terminal",
+                                         configuration: Data(#"{"port":22}"#.utf8))]
+        return host
+    }
+
+    @Test("A live copy holding set-ups nothing else holds survives an older deletion")
+    func uniqueSetupsSurviveADeletion() throws {
+        // 2026-09-21: a phone folded a machine's duplicates into a record whose id the Mac had
+        // deleted days earlier. Its services existed nowhere else; losing them lost the machine.
+        let id = HostID()
+        let tombstone = try host("folded", id: id, updated: 10, deleted: 10)
+        let folded = configured(try host("folded", id: id, updated: 20))
+        let outcome = GlassCatalogMerge.reconcile(local: [tombstone], remote: [folded])
+        #expect(outcome.toApplyLocally.map(\.deletedAt) == [nil])
+        #expect(outcome.toPublish.isEmpty)
+    }
+
+    @Test("A restamped stale copy newer than a deletion is corrected past both")
+    func restampedStaleCopyIsCorrected() throws {
+        let id = HostID()
+        let stale = try host("old", id: id, updated: 30)
+        let tombstone = try host("old", id: id, updated: 20, deleted: 20)
+        let outcome = GlassCatalogMerge.reconcile(local: [stale], remote: [tombstone])
+        let correction = try #require(outcome.toApplyLocally.first)
+        #expect(correction.deletedAt != nil)
+        #expect(correction.updatedAt > stale.updatedAt)
+        #expect(outcome.toPublish.first?.deletedAt != nil)
+    }
+
+    @Test("A deletion stated after a restamp is simply taken")
+    func laterDeletionStatementIsTaken() throws {
+        let id = HostID()
+        let stale = try host("old", id: id, updated: 30)
+        let restated = try host("old", id: id, updated: 40, deleted: 10)
+        let outcome = GlassCatalogMerge.reconcile(local: [stale], remote: [restated])
+        #expect(outcome.toApplyLocally == [restated])
+        #expect(outcome.toPublish.isEmpty)
+    }
+
+    // MARK: - Two devices folded one machine into different records (2026-09-28)
+    //
+    // The Mac held the machine as record M. A stale headset held an old record D for the same
+    // machine, folded M's set-up service into D and deleted M, and D was itself deleted by the
+    // sync: the machine was live nowhere. Whichever device syncs, the service must survive, and
+    // both must end on the same record.
+
+    @Test("The device holding the only live copy revives it and sends it")
+    func onlyLiveCopyIsRevivedAndSent() throws {
+        let m = HostID(), d = HostID(), endpoint = EndpointID()
+        let myM = configured(try host("machine", id: m, updated: 10), endpoint: endpoint)
+        let myD = try host("machine", id: d, updated: 5, deleted: 5)
+        let theirM = try host("machine", id: m, updated: 30, deleted: 30)
+        let theirD = try host("machine", id: d, updated: 31, deleted: 5)
+        let outcome = GlassCatalogMerge.reconcile(local: [myM, myD], remote: [theirM, theirD])
+        let sent = try #require(outcome.toPublish.first { $0.id == m })
+        #expect(sent.deletedAt == nil)
+        #expect(sent.services.first?.configuration != nil)
+        #expect(sent.updatedAt > theirM.updatedAt)
+    }
+
+    @Test("The other device adopts the account's live copy and the two converge")
+    func otherDeviceAdoptsTheAccountsCopy() throws {
+        let m = HostID(), d = HostID(), endpoint = EndpointID()
+        // The headset: its old D live with the folded service, M deleted.
+        let myD = configured(try host("machine", id: d, updated: 40), endpoint: endpoint)
+        let myM = try host("machine", id: m, updated: 30, deleted: 30)
+        // The account after the Mac's revival: M live with the service, D deleted.
+        let theirM = configured(try host("machine", id: m, updated: 41), endpoint: endpoint)
+        let theirD = try host("machine", id: d, updated: 31, deleted: 5)
+        let outcome = GlassCatalogMerge.reconcile(local: [myD, myM], remote: [theirM, theirD])
+        let applied = Dictionary(outcome.toApplyLocally.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        #expect(applied[m]?.deletedAt == nil, "the account's live copy is adopted")
+        #expect(applied[d]?.deletedAt != nil, "the old copy stays deleted")
+        #expect(!outcome.toPublish.contains { $0.id == m }, "nothing to send for the adopted copy")
+    }
 }

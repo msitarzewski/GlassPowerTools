@@ -486,13 +486,26 @@ public final class GlassShellModel: GlassServiceStore {
             // silently stopped publishing altogether: a database added on the Mac never reached the
             // phone. `merge` is the API for incoming records and always was — deletion precedence,
             // revision time and writer id, tested in the catalog's own suite.
+            // Applying and publishing are two directions, not one transaction. Incoming records
+            // this device cannot take must not cost it the ability to send its own — and one
+            // record the catalog refuses must not cost it the rest: the merge is all-or-nothing,
+            // so a refused batch is retried one record at a time. What still fails is counted and
+            // said in the status, not only logged (2026-09-28: a headset said "Synced" while
+            // taking nothing).
+            let incoming = reattachingDeviceBoundServices(outcome.toApplyLocally, local: local)
+            var unapplied = 0
             do {
-                try await catalog.merge(reattachingDeviceBoundServices(outcome.toApplyLocally, local: local))
+                try await catalog.merge(incoming)
             } catch {
-                // Applying and publishing are two directions, not one transaction. Incoming
-                // records this device cannot take must not cost it the ability to send its own.
                 Logger.catalogSync.error(
-                    "Sync: could not apply incoming records: \(String(describing: error), privacy: .public)")
+                    "Sync: could not apply incoming records together: \(String(describing: error), privacy: .public)")
+                for record in incoming {
+                    do { try await catalog.merge([record]) } catch {
+                        unapplied += 1
+                        Logger.catalogSync.error(
+                            "Sync: could not apply \(record.id.rawValue.uuidString.prefix(8), privacy: .public): \(String(describing: error), privacy: .public)")
+                    }
+                }
             }
             if !outcome.toPublish.isEmpty {
                 try await catalogBackend.save(redactingDeviceBoundServices(outcome.toPublish))
@@ -512,7 +525,10 @@ public final class GlassShellModel: GlassServiceStore {
                 // because a person is watching; nobody is watching this.
                 try? await cascadeRemoval(of: departed)
             }
-            catalogSyncStatus = .synced(Date())
+            catalogSyncStatus = unapplied == 0
+                ? .synced(Date())
+                : .failed(unapplied == 1 ? "1 record from iCloud could not be applied on this device"
+                                         : "\(unapplied) records from iCloud could not be applied on this device")
         } catch {
             // Signed out of iCloud, restricted, or offline: all normal, none the user's mistake,
             // and none worth an alert. The library on this device is complete without the others.

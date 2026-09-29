@@ -332,7 +332,10 @@ public actor HostCatalogStore {
         if (lhs.deletedAt != nil) != (rhs.deletedAt != nil) {
             let live = lhs.deletedAt == nil ? lhs : rhs
             let dead = lhs.deletedAt == nil ? rhs : lhs
-            let deathBeatsLife = dead.deletedAt! >= live.updatedAt
+            // Dated by when the deletion was *stated* (`updatedAt`), not when the machine first
+            // went: a sync that re-states a deletion to override a restamped stale copy stamps the
+            // statement, and must be taken (2026-09-28). A fresh delete sets both to the same time.
+            let deathBeatsLife = dead.updatedAt >= live.updatedAt
             // `rhs` replaces `lhs` when it is the winner.
             return (rhs.deletedAt != nil) == deathBeatsLife
         }
