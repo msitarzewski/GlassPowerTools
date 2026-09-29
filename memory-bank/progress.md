@@ -75,5 +75,7 @@ profile, notarization, deploying the site), the behaviour findings listed in `ac
 - Library sync (2026-09-28): whole-account fetch, deletions dated by statement, no set-up service can
   vanish through a merge, per-record apply with visible failures, dry-run mode. Proven on the Mac
   against the real account (0/0 after repair); the phone and headset received 0.4.249.
-- visionOS: lists unwound to the platform's own (2026-09-28); window frames, metrics and ornaments
-  still custom — pass 2 pending the owner's go-ahead.
+- visionOS: lists unwound to the platform's own (2026-09-28). D40 narrowed (2026-09-29): all window
+  transparency stays; only list formats and non-Glass chrome change. The database results bar is
+  done (icons + More); verified on the Mac, not yet on the headset.
+- Two terminal tests fail intermittently in full-suite runs only (see `activeContext.md`).

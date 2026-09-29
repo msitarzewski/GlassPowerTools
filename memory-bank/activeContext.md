@@ -29,11 +29,12 @@ anything touching real servers (SSH and database tests use the disposable test V
 
 ## Paused 2026-09-28 (evening) — where to pick up
 
-All work below is committed locally (nothing pushed). Mac 0.4.249, iPhone 0.4.249, Vision Pro 0.4.251.
+All work below is committed locally (nothing pushed). Mac 0.4.253, iPhone 0.4.249, Vision Pro 0.4.251
+(the headset was unreachable on 2026-09-29; it needs 0.4.253 for the results bar).
 Detail: `tasks/2026-09/2026-09-27_glassdt-parity-audit.md` (desktop parity, sync repairs, list sweep).
 
 **Next, in the owner's order when they return:**
-1. **visionOS unwind, pass 2** — **approved (D40): full unwind, library window first.** Owner's direction (2026-09-28):
+1. **visionOS unwind, pass 2** — **approved (D40), narrowed 2026-09-28:** all window transparency stays; only list formats and non-Glass custom chrome change; database: only the results tool bar (in progress: icon buttons + More menu). Owner's direction (2026-09-28):
    *leave it to Apple to define what spatial is best.* The list rows are done (`glassSpatialList`,
    `glassSpatialListRow`; rows never add gaze highlight or padding). Still ours: `GlassSpatialMetrics`
    type/size scale (24 uses), custom window frames (`GlassNativeWindowFrame`, `GlassCanvasBackdrop`,
@@ -46,6 +47,14 @@ Detail: `tasks/2026-09/2026-09-27_glassdt-parity-audit.md` (desktop parity, sync
 3. **Richer clipboard** — **approved (D42), in order:** RDP text/rich text/images, RDP files,
    Files (SFTP) ⌘C/⌘V and drag with Finder, VNC Extended Clipboard.
 4. Desktops in Active "a little wonky" — cause not yet described by the owner.
+
+**2026-09-29 (Mac 0.4.253, committed):** database results bar as icon buttons + a More menu (not the
+iPhone's pager); "Statement Completed" fills the pane so the pager stays at its foot; the Mac gutter's
+offset is a view conversion (the SQL pane's "1" sat a line low); a sync request arriving mid-pass
+waits for the pass; ⌘W → Discard on an editor's last document hides the window at once and closes it
+once the sheet has gone — the owner confirmed it on the Mac. Flaky only in full-suite runs, not
+investigated (terminal, outside the owner's scope): `macImportedThemeAndPortableAppearanceApplyAfterICloudMerge`,
+`abandonedStartupCommandTicketExpires`; both pass alone.
 
 **Before letting any device with an old install sync:** dry-run the Mac first
 (`GLASS_SYNC_DRY_RUN=1`, see the audit note's sync sections).

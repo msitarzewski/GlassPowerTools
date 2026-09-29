@@ -115,3 +115,20 @@ sent 3, then 0/0. All three devices on 0.4.247. The headset's list is inset grou
   column on visionOS; the results bar scrolls instead of wrapping.
 - Owner's verdict on the cause: nearly all of it was ours, not Apple's defaults. Direction: leave
   spatial design to Apple. Pass 2 of the unwind is proposed (see activeContext).
+
+## 2026-09-29 — the database results bar, the gutter, the editor's last ⌘W
+
+- **Results bar** (`TableDetailView.gridControls`): thirteen controls in four styles became Mail's
+  shape — Filter and the sort summary leading; Format, Analyze, Columns, Copy, Export, Delete as icons
+  with help text; Compare Rows, Extend Selection, Paste Rows, Import TSV… and "First Row Is Column
+  Names" in a More menu. Paste Rows reads the clipboard directly (the system asks on iOS/visionOS).
+  The bar fits without scrolling on the headset; the Mac keeps `.small`.
+- **Pager**: `statementCompletedView` fills the results pane, so the pager stays at the foot.
+- **Gutter** (`GlassLineNumberGutter.verticalOffset`): in a window the text view's frame is offset
+  inside its clip view, and the summed offset drew every number a line or more low. Now a view
+  conversion. Test `gutterNumberIsLevelWithItsLineInAWindow` fails on the old sum (50 pt against 12).
+- **Sync**: `synchronizeCatalog` callers arriving mid-pass now await the running pass (a stored task)
+  instead of returning at once; that race flaked two shell tests.
+- **Editor ⌘W → Discard**: `performClose` is refused while the question's sheet is attached, which
+  left the window on "No Document". The window now orders out immediately and is closed when the
+  sheet has gone. Confirmed by the owner on the Mac (0.4.253).

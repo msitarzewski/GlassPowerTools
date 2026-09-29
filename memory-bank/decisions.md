@@ -1092,6 +1092,11 @@ that felt wrong was our own addition (nested gaze highlights, spatial padding, c
 toolbar ornaments; keep only terminal/desktop transparency (incl. the desktop's colour key) and the
 desktop control bar. Order: library window, then database, editor, terminal, desktop, each judged
 on the headset before the next. Lists are already done (`glassSpatialList`/`glassSpatialListRow`).
+**Narrowed by the owner, 2026-09-28 (supersedes the order above):** the terminal, database, Files,
+editor and desktop transparency all stay. Change only list formats and anything that does not serve
+the "Glass" (window transparency). Priority: visionOS, Apple-native HIG patterns, familiar from Mail
+and Safari so nobody has to learn it. The database window is right as it is except the tool bar above
+the results (wrapping, mixed button styles); touch nothing else there.
 
 ## D41 — Library overview and service availability — Approved 2026-09-28
 **Overview:** the library's empty detail shows counts (machines, services by kind, per machine,
