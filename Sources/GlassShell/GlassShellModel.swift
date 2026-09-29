@@ -338,7 +338,7 @@ public final class GlassShellModel: GlassServiceStore {
     public private(set) var catalogSyncSummary: GlassCatalogSyncSummary?
     /// One sync at a time. The library's first load and its return to the foreground each ask for
     /// one, and two interleaved merges each publish from a snapshot the other is changing.
-    private var catalogSyncRunning = false
+    private var catalogSyncTask: Task<Void, Never>?
     private var catalogSyncRequestedAgain = false
 
     /// Starts syncing the library through `backend`.
@@ -384,13 +384,23 @@ public final class GlassShellModel: GlassServiceStore {
     /// nothing here does.
     public func synchronizeCatalog() async {
         guard catalogBackend != nil else { return }
-        if catalogSyncRunning { catalogSyncRequestedAgain = true; return }
-        catalogSyncRunning = true
-        defer { catalogSyncRunning = false }
-        repeat {
-            catalogSyncRequestedAgain = false
-            await synchronizeCatalogOnce()
-        } while catalogSyncRequestedAgain
+        // One pass at a time. A caller that arrives mid-pass asks for one more round and waits for
+        // it: returning at once (as this did on 2026-09-28) let Sync Now, and any test, read the
+        // library before the sync it asked for had happened.
+        if let running = catalogSyncTask {
+            catalogSyncRequestedAgain = true
+            await running.value
+            return
+        }
+        let task = Task { @MainActor in
+            repeat {
+                catalogSyncRequestedAgain = false
+                await synchronizeCatalogOnce()
+            } while catalogSyncRequestedAgain
+            catalogSyncTask = nil
+        }
+        catalogSyncTask = task
+        await task.value
     }
 
     /// `GLASS_SYNC_DRY_RUN=1`: fetch the account, compare it with this device record by record,
