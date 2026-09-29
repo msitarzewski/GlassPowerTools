@@ -13,6 +13,8 @@ import GlassEditorUI
 import GlassLayers
 #if os(macOS)
 import AppKit
+#else
+import UIKit
 #endif
 
 extension DatabaseValue {
@@ -2239,6 +2241,9 @@ struct DataTabView: View {
                 executionTime: result.executionTime
             ))
         }
+        // Fill the results pane, as the grid and the error card do, so the pager stays at its
+        // foot instead of riding up under the message (2026-09-29).
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     static func statementCompletionSummary(
@@ -2392,16 +2397,10 @@ struct DataTabView: View {
             .accessibilityLabel("SQL result controls")
         }
         #else
-        // The headset drew the bar bare, so it was squeezed to the window and every label broke
-        // onto two lines ("For mat", "Ana lyze", 2026-09-28). It scrolls, as the Mac's does, and
-        // each label keeps to one line.
-        ScrollView(.horizontal) {
-            gridControls
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
-        }
-        .scrollIndicators(.automatic)
-        .accessibilityLabel("SQL result controls")
+        // Icons only, so the row fits the window as Mail's does; nothing scrolls or wraps.
+        gridControls
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("SQL result controls")
         #endif
     }
 
@@ -2458,26 +2457,21 @@ struct DataTabView: View {
     }
     #endif
 
+    /// The bar above the results, in Mail's shape: one row of icon buttons with their names in
+    /// the help and accessibility labels, and the occasional tools behind More. It was thirteen
+    /// controls in four styles — labelled buttons, a bare "Compare", four arrow buttons, a paste
+    /// capsule and a "Header" switch — that wrapped and looked unlike anything else on the
+    /// headset (2026-09-28).
     private var gridControls: some View {
         HStack(spacing: 8) {
             Button {
-                formatQuery()
-            } label: {
-                Label("Format", systemImage: "text.alignleft")
-            }
-            .help("Format the selected SQL, or the whole query when nothing is selected")
-            .disabled(queryText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-            Button {
                 beginFilterEditing()
             } label: {
-                Label(
-                    activeFilterCount == 0 ? "Filter" : "Filter \(activeFilterCount)",
-                    systemImage: activeFilterCount == 0
-                        ? "line.3.horizontal.decrease.circle"
-                        : "line.3.horizontal.decrease.circle.fill"
-                )
+                Label("Filter", systemImage: activeFilterCount == 0
+                    ? "line.3.horizontal.decrease.circle"
+                    : "line.3.horizontal.decrease.circle.fill")
             }
+            .accessibilityValue(activeFilterCount == 0 ? "" : "\(activeFilterCount) active")
             .help(activeFilterCount == 0
                 ? (isTableContext
                     ? "Choose rows to show using a server query or the currently loaded page"
@@ -2493,6 +2487,14 @@ struct DataTabView: View {
             }
 
             Spacer()
+
+            Button {
+                formatQuery()
+            } label: {
+                Label("Format", systemImage: "text.alignleft")
+            }
+            .help("Format the selected SQL, or the whole query when nothing is selected")
+            .disabled(queryText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
             Menu {
                 Menu("Group Columns") {
@@ -2519,31 +2521,13 @@ struct DataTabView: View {
                     Button("Clear Analysis") { clearAnalysis() }
                 }
             } label: {
-                Label(
-                    aggregates.isEmpty ? "Analyze" : "Analyze \(aggregates.count)",
-                    systemImage: "function"
-                )
+                Label("Analyze", systemImage: "function")
             }
+            .accessibilityValue(aggregates.isEmpty ? "" : "\(aggregates.count) aggregates")
             .disabled(!isTableContext)
             .help(isTableContext
                 ? "Group and aggregate this table through a bounded server query"
                 : "Server-backed analysis is available from a table tab")
-
-            Button("Compare") { compareSelectedRows() }
-                .disabled(!canCompareSelectedRows)
-
-            ControlGroup {
-                Button { moveSelection(rowDelta: 0, columnDelta: -1) } label: { Image(systemName: "arrow.left") }
-                    .accessibilityLabel("Extend selection left")
-                Button { moveSelection(rowDelta: 0, columnDelta: 1) } label: { Image(systemName: "arrow.right") }
-                    .accessibilityLabel("Extend selection right")
-                Button { moveSelection(rowDelta: -1, columnDelta: 0) } label: { Image(systemName: "arrow.up") }
-                    .accessibilityLabel("Extend selection up")
-                Button { moveSelection(rowDelta: 1, columnDelta: 0) } label: { Image(systemName: "arrow.down") }
-                    .accessibilityLabel("Extend selection down")
-            }
-            .help("Adjust the selected cell range")
-            .disabled(result?.rows.isEmpty != false)
 
             Button {
                 beginColumnManagement()
@@ -2557,15 +2541,8 @@ struct DataTabView: View {
             } label: {
                 Label("Copy", systemImage: "doc.on.doc")
             }
+            .help("Copy the selected cells")
             .disabled(selectedRectangle == nil && selectedRowIndices.isEmpty)
-
-            Button(role: .destructive) {
-                requestDeleteSelectedRows()
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-            .disabled(!canDeleteSelectedRows)
-            .help(deleteControlHelp)
 
             Menu {
                 ForEach(GridExportFormat.allCases) { format in
@@ -2580,36 +2557,75 @@ struct DataTabView: View {
             .disabled(exportResult?.rows.isEmpty != false)
             .help("Export the selected rows, or all displayed rows when nothing is selected")
 
-            PasteButton(payloadType: String.self) { values in
-                guard let value = values.first, !value.isEmpty else { return }
-                do {
-                    try GridImportPolicy.validate(text: value)
-                    pendingPasteTSV = value
-                } catch {
-                    inputErrorMessage = "The paste was not staged. \(error.localizedDescription)"
-                }
+            Button(role: .destructive) {
+                requestDeleteSelectedRows()
+            } label: {
+                Label("Delete", systemImage: "trash")
             }
-            .labelStyle(.iconOnly)
-            .accessibilityLabel("Paste tab-separated values")
-            .help("Paste a tab-separated range at the selected cell")
-            .disabled(!isTableContext || selectionAnchor == nil || isAnalysisActive)
+            .disabled(!canDeleteSelectedRows)
+            .help(deleteControlHelp)
 
-            Button { showTSVImporter = true } label: {
-                Label("Import TSV", systemImage: "square.and.arrow.down")
+            moreGridControls
+        }
+        .labelStyle(.iconOnly)
+        .menuIndicator(.hidden)
+        #if !os(visionOS)
+        .controlSize(.small)
+        #endif
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+    }
+
+    /// The tools used now and then, as menu items: comparing rows, nudging the selection, and
+    /// staging pasted or imported rows.
+    private var moreGridControls: some View {
+        Menu {
+            Button("Compare Rows", systemImage: "rectangle.split.2x1") { compareSelectedRows() }
+                .disabled(!canCompareSelectedRows)
+
+            Menu("Extend Selection", systemImage: "arrow.up.left.and.arrow.down.right") {
+                Button("Left", systemImage: "arrow.left") { moveSelection(rowDelta: 0, columnDelta: -1) }
+                Button("Right", systemImage: "arrow.right") { moveSelection(rowDelta: 0, columnDelta: 1) }
+                Button("Up", systemImage: "arrow.up") { moveSelection(rowDelta: -1, columnDelta: 0) }
+                Button("Down", systemImage: "arrow.down") { moveSelection(rowDelta: 1, columnDelta: 0) }
             }
-            .help("Choose a UTF-8 TSV file to stage at the selected cell")
-            .disabled(!isTableContext || selectionAnchor == nil || isAnalysisActive)
+            .disabled(result?.rows.isEmpty != false)
 
-            Toggle("Header", isOn: .init(
+            Divider()
+
+            Button("Paste Rows", systemImage: "doc.on.clipboard") { stagePastedRows() }
+                .disabled(!isTableContext || selectionAnchor == nil || isAnalysisActive)
+            Button("Import TSV…", systemImage: "square.and.arrow.down") { showTSVImporter = true }
+                .disabled(!isTableContext || selectionAnchor == nil || isAnalysisActive)
+            Toggle("First Row Is Column Names", isOn: .init(
                 get: { pasteMappingMode == .headerRow },
                 set: { pasteMappingMode = $0 ? .headerRow : .positional }
             ))
-            .help("Treat the first pasted row as exact table column names")
             .disabled(!isTableContext || isAnalysisActive)
+        } label: {
+            Label("More", systemImage: "ellipsis.circle")
         }
-        .controlSize(.small)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .help("Compare rows, extend the selection, and paste or import rows")
+    }
+
+    /// Stages tab-separated text from the clipboard at the selected cell. On iOS and visionOS the
+    /// system asks before the app may read what another app copied, as it does for Safari.
+    private func stagePastedRows() {
+        #if os(macOS)
+        let value = NSPasteboard.general.string(forType: .string)
+        #else
+        let value = UIPasteboard.general.string
+        #endif
+        guard let value, !value.isEmpty else {
+            inputErrorMessage = "The clipboard has no text to paste."
+            return
+        }
+        do {
+            try GridImportPolicy.validate(text: value)
+            pendingPasteTSV = value
+        } catch {
+            inputErrorMessage = "The paste was not staged. \(error.localizedDescription)"
+        }
     }
 
     private var filterEditor: some View {
