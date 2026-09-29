@@ -1084,3 +1084,25 @@ product page per capability and a help centre. Plan and models:
 
 **Status.** Approved by the user 2026-09-25 (accepting this plan in conversation and asking for all of
 these decisions to be documented). Nothing built.
+
+## D40 — Leave spatial design to Apple: the visionOS unwind — Approved 2026-09-28
+**Owner:** "I would leave it Apple to define what spatial is best." Almost every visionOS surface
+that felt wrong was our own addition (nested gaze highlights, spatial padding, custom frames).
+**Decision:** full unwind, surface by surface — system windows, text styles, control sizes and
+toolbar ornaments; keep only terminal/desktop transparency (incl. the desktop's colour key) and the
+desktop control bar. Order: library window, then database, editor, terminal, desktop, each judged
+on the headset before the next. Lists are already done (`glassSpatialList`/`glassSpatialListRow`).
+
+## D41 — Library overview and service availability — Approved 2026-09-28
+**Overview:** the library's empty detail shows counts (machines, services by kind, per machine,
+favourites/collections) and a connection timeline, from connection history kept **on this device
+only** (when, which service; nothing else). **Availability dots:** a setting, **off by default**
+(Settings ▸ General ▸ "Show service availability"); when on, green/orange/red per service from a TCP
+connect to its port — never a login — only while the library is visible, at most once a minute,
+results kept on this device. Every service kind, not only databases (SQL Studio Pro's idea, widened).
+
+## D42 — Richer clipboard, in order — Approved 2026-09-28
+1) RDP text, rich text and images, both ways; 2) RDP files both ways, streamed with progress and
+cancel; 3) Files (SFTP) ⌘C/⌘V and drag with Finder; 4) VNC Extended Clipboard (TigerVNC-class
+servers). All behind the existing per-desktop clipboard switch; transfers need a user action.
+Proven on the Docker xrdp/TigerVNC rigs; Windows needs the Windows 11 VM.

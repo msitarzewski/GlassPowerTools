@@ -33,7 +33,7 @@ All work below is committed locally (nothing pushed). Mac 0.4.249, iPhone 0.4.24
 Detail: `tasks/2026-09/2026-09-27_glassdt-parity-audit.md` (desktop parity, sync repairs, list sweep).
 
 **Next, in the owner's order when they return:**
-1. **visionOS unwind, pass 2** — proposed, awaiting the owner's go-ahead. Owner's direction (2026-09-28):
+1. **visionOS unwind, pass 2** — **approved (D40): full unwind, library window first.** Owner's direction (2026-09-28):
    *leave it to Apple to define what spatial is best.* The list rows are done (`glassSpatialList`,
    `glassSpatialListRow`; rows never add gaze highlight or padding). Still ours: `GlassSpatialMetrics`
    type/size scale (24 uses), custom window frames (`GlassNativeWindowFrame`, `GlassCanvasBackdrop`,
@@ -41,11 +41,10 @@ Detail: `tasks/2026-09/2026-09-27_glassdt-parity-audit.md` (desktop parity, sync
    glass backgrounds, the split Connect capsule. Keep: terminal/desktop transparency and the desktop's
    colour key, and the desktop control bar. Proposed order: library window first, judged on the headset.
 2. **Stats in the empty library detail** (total machines, services per machine, connection timeline,
-   availability) and **status dots as an option** (like SQL Studio Pro's, for every service). Two
-   questions pending: keep per-device connection history for the timeline? probe ports (connect only,
-   never a login) while the library is open?
-3. **Richer clipboard** (owner wants it): plan given — RDP text/rich text/images, then RDP files,
-   then Files (SFTP) ⌘C/⌘V and drag with Finder, then VNC Extended Clipboard. Awaiting order.
+   availability) and **status dots as an option** — **approved (D41): counts + timeline from
+   on-device history; dots a setting, off by default, TCP connect only.**
+3. **Richer clipboard** — **approved (D42), in order:** RDP text/rich text/images, RDP files,
+   Files (SFTP) ⌘C/⌘V and drag with Finder, VNC Extended Clipboard.
 4. Desktops in Active "a little wonky" — cause not yet described by the owner.
 
 **Before letting any device with an old install sync:** dry-run the Mac first
