@@ -198,12 +198,14 @@ public struct GlassLibraryConnectionRow<Accessory: View, Badges: View>: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             accessory()
         }
-        .padding(.vertical, GlassSpatialMetrics.isSpatial ? 10 : 4)
+        // The list's own row insets are the padding on the headset; 10 pt more here, and 8 more
+        // from the spatial row metrics, made rows twice the height of Safari's (2026-09-28).
+        .padding(.vertical, GlassSpatialMetrics.isSpatial ? 2 : 4)
         // A floor, so the row is never shorter than the control inside it. A host with no badges
         // yet — the device's own, before its built-in services are known — measured 24pt against a
         // 51pt neighbour, and a bordered-prominent Connect button does not fit in 24pt: it was
         // drawn clipped at the separator. The floor costs nothing on a row that is already taller.
-        .frame(minHeight: GlassSpatialMetrics.isSpatial ? 56 : 36)
+        .frame(minHeight: GlassSpatialMetrics.isSpatial ? 44 : 36)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)

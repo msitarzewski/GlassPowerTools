@@ -54,12 +54,17 @@ public struct GlassLibraryResults<ID: Hashable & Sendable, Row: View>: View {
                 .listRowSeparator(.hidden)
             } else {
                 ForEach(items) { item in
-                    // Spatial rows are taller and respond to gaze; on every other platform both
-                    // modifiers are no-ops and the Mac's own row metrics are untouched.
+                    // **One shape per row, the list's own.** On the headset these rows also carried
+                    // spatial padding and a hover effect of their own, so gaze lit a rectangle
+                    // inside the list's row inside nothing — "a nested CSS cluster that eye
+                    // tracking reveals layer by layer" (2026-09-28). The list's row is the target.
                     row(item).tag(item.id)
-                        .glassSpatialRowMetrics()
                         .contentShape(Rectangle())
-                        .glassGazeHighlight()
+                        #if os(visionOS)
+                        // The sidebar style's own vertical insets, tightened: the rows read as a
+                        // list rather than spaced-out tiles ("way too much padding", 2026-09-28).
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 12))
+                        #endif
                         .onTapGesture { selection = item.id }
                         #if os(macOS)
                         .simultaneousGesture(TapGesture(count: 2).onEnded {
@@ -87,12 +92,9 @@ public struct GlassLibraryResults<ID: Hashable & Sendable, Row: View>: View {
         // `refreshable` is simply inert there rather than needing an `#if`.
         .refreshable { await onRefresh?() }
         #if os(visionOS)
-        // **A list, on the headset too.** The default style drew each machine as a floating card
-        // with a gap between — no platter, no separators, a large rounded highlight on the chosen
-        // one (2026-09-28: "the list of connections needs to look more like a list"). Inset
-        // grouped is the platform's own list: rows in one glass platter with hairlines, the same
-        // shape as the detail's Services beside it.
-        .listStyle(.insetGrouped)
+        // **Safari's bookmark list** (2026-09-28): the sidebar style, one capsule per row that the
+        // system draws for gaze and selection, and nothing of ours stacked inside it.
+        .listStyle(.sidebar)
         #endif
         .defaultScrollAnchor(.top)
         #if os(macOS)

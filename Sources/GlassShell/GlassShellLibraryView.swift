@@ -170,9 +170,10 @@ public struct GlassShellLibraryView: View {
             serviceIcons(for: item.id)
         } accessory: {
             #if os(visionOS)
+            // No hover on the whole capsule: each half has its own (`splitControl`), inside the
+            // list row's one shape.
             GlassShellConnectControl(model: model, hostID: item.id, compact: true)
                 .fixedSize(horizontal: true, vertical: false)
-                .glassGazeHighlight()
             #else
             GlassShellConnectControl(model: model, hostID: item.id)
             #endif
@@ -553,6 +554,9 @@ public struct GlassShellConnectControl: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            #if os(visionOS)
+            .hoverEffect(.highlight)
+            #endif
             .accessibilityLabel("Connect all services")
             .accessibilityIdentifier("host-connect")
 
@@ -572,6 +576,9 @@ public struct GlassShellConnectControl: View {
             .glassMenuOnFilled()
             .menuIndicator(.hidden)
             .fixedSize()
+            #if os(visionOS)
+            .hoverEffect(.highlight)
+            #endif
             .accessibilityLabel("Choose a service")
             .accessibilityIdentifier("host-connect-menu")
         }
@@ -611,7 +618,7 @@ public struct GlassShellConnectControl: View {
         // on, which is why the row's Connect button read as a speck. The spatial sidebar is given
         // the width to carry these instead (`GlassConnectionLibrary.visionNavigation`).
         if prominent { return Metrics(playPadding: 20, chevronPadding: 14, verticalPadding: 12, font: .body) }
-        if compact { return Metrics(playPadding: 14, chevronPadding: 10, verticalPadding: 9, font: .body) }
+        if compact { return Metrics(playPadding: 12, chevronPadding: 9, verticalPadding: 6, font: .body) }
         return Metrics(playPadding: 16, chevronPadding: 12, verticalPadding: 10, font: .body)
         #else
         if prominent { return Metrics(playPadding: 16, chevronPadding: 11, verticalPadding: 9, font: .body) }
