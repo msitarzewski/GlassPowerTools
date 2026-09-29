@@ -115,6 +115,7 @@ struct GlassActiveConnectionsList: View {
                 }
             }
         }
+        .glassSpatialList()
         .navigationTitle("Active")
         .accessibilityIdentifier("active-connections")
     }
@@ -145,7 +146,8 @@ struct GlassActiveSessionRow: View {
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .glassGazeHighlight()
+        // A button row in a list is highlighted by the list; ours nested inside it (2026-09-28).
+        .glassSpatialListRow()
         .swipeActions(edge: .trailing) {
             Button("Close", systemImage: "xmark", role: .destructive) { session.close() }
         }

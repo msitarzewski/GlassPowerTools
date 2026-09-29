@@ -119,6 +119,7 @@ public struct GlassEditorProjectsPanel: View {
             ForEach(projects) { project in
                 row(project)
                     .tag(project.id)
+                    .glassSpatialListRow()
                     .contextMenu {
                         Button("Open", systemImage: "arrow.up.forward.app") { open(project) }
                         Button("Rename", systemImage: "pencil") { beginRenaming(project) }
@@ -128,6 +129,7 @@ public struct GlassEditorProjectsPanel: View {
                     }
             }
         }
+        .glassSpatialList()
         .scrollContentBackground(.hidden)
         .searchable(text: $panel.searchQuery, prompt: "Search Projects")
         .toolbar {
@@ -158,8 +160,6 @@ public struct GlassEditorProjectsPanel: View {
         } accessory: {
             EmptyView()
         }
-        .glassSpatialRowMetrics()
-        .glassGazeHighlight()
         .accessibilityIdentifier("project-\(project.id.uuidString.lowercased())")
     }
 

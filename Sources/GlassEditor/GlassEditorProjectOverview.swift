@@ -172,10 +172,16 @@ struct GlassEditorProjectOverview: View {
                 Text(name)
                 Spacer(minLength: 0)
             }
+            // Room for the gaze highlight, and no more: the spatial row metrics made each file a
+            // tall tile with wide gaps (2026-09-28). Not in a list, so the button keeps its own.
+            .padding(.vertical, GlassSpatialMetrics.isSpatial ? 6 : 0)
+            .padding(.horizontal, GlassSpatialMetrics.isSpatial ? 8 : 0)
+            #if os(visionOS)
+            .contentShape(.hoverEffect, .rect(cornerRadius: 10))
+            #endif
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .glassSpatialRowMetrics()
         .glassGazeHighlight()
         .accessibilityIdentifier("editor-overview-\(name)")
     }

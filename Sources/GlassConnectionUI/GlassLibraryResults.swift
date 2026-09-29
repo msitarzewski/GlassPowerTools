@@ -60,11 +60,7 @@ public struct GlassLibraryResults<ID: Hashable & Sendable, Row: View>: View {
                     // tracking reveals layer by layer" (2026-09-28). The list's row is the target.
                     row(item).tag(item.id)
                         .contentShape(Rectangle())
-                        #if os(visionOS)
-                        // The sidebar style's own vertical insets, tightened: the rows read as a
-                        // list rather than spaced-out tiles ("way too much padding", 2026-09-28).
-                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 12))
-                        #endif
+                        .glassSpatialListRow()
                         .onTapGesture { selection = item.id }
                         #if os(macOS)
                         .simultaneousGesture(TapGesture(count: 2).onEnded {
@@ -91,11 +87,8 @@ public struct GlassLibraryResults<ID: Hashable & Sendable, Row: View>: View {
         // Touch and gaze pull the list down to sync; the Mac has no such gesture, and
         // `refreshable` is simply inert there rather than needing an `#if`.
         .refreshable { await onRefresh?() }
-        #if os(visionOS)
-        // **Safari's bookmark list** (2026-09-28): the sidebar style, one capsule per row that the
-        // system draws for gaze and selection, and nothing of ours stacked inside it.
-        .listStyle(.sidebar)
-        #endif
+        // Safari's bookmark list on the headset: see `glassSpatialList()`.
+        .glassSpatialList()
         .defaultScrollAnchor(.top)
         #if os(macOS)
         .contentMargins(.top, 10, for: .scrollContent)

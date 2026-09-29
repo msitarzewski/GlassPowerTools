@@ -56,7 +56,35 @@ public enum GlassSpatialMetrics {
 }
 
 public extension View {
+    /// **The family's list on the headset: the database schema list's shape** (2026-09-28). A
+    /// sidebar-style `List(selection:)` whose rows the system draws — one capsule per row for gaze
+    /// and selection, nothing of ours stacked inside it. Every list of rows in the app uses this
+    /// and `glassSpatialListRow()`; rows in a list never add `glassGazeHighlight` or
+    /// `glassSpatialRowMetrics`, which made "a nested CSS cluster that eye tracking reveals layer by
+    /// layer". A no-op off visionOS.
+    @ViewBuilder
+    func glassSpatialList() -> some View {
+        #if os(visionOS)
+        self.listStyle(.sidebar)
+        #else
+        self
+        #endif
+    }
+
+    /// A row of a `glassSpatialList()`: the system's row, on tight vertical insets so rows read as
+    /// a list rather than spaced-out tiles. A no-op off visionOS.
+    @ViewBuilder
+    func glassSpatialListRow() -> some View {
+        #if os(visionOS)
+        self.listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 12))
+        #else
+        self
+        #endif
+    }
+
     /// Makes a view respond to being looked at, on the platform where that is the aiming method.
+    /// **For controls standing on their own, never for rows in a list** — a list draws its rows'
+    /// highlight, and a second one inside it is the nesting `glassSpatialList()` exists to end.
     ///
     /// A visionOS control that does not highlight under gaze reads as disabled, because looking at
     /// something *is* how a user asks "can I press this?". The modifier is a no-op elsewhere, so a

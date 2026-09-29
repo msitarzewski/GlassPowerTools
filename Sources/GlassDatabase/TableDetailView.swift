@@ -2392,7 +2392,16 @@ struct DataTabView: View {
             .accessibilityLabel("SQL result controls")
         }
         #else
-        gridControls
+        // The headset drew the bar bare, so it was squeezed to the window and every label broke
+        // onto two lines ("For mat", "Ana lyze", 2026-09-28). It scrolls, as the Mac's does, and
+        // each label keeps to one line.
+        ScrollView(.horizontal) {
+            gridControls
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        .scrollIndicators(.automatic)
+        .accessibilityLabel("SQL result controls")
         #endif
     }
 

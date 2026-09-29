@@ -168,7 +168,6 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
             }
         }
         .contentShape(Rectangle())
-        .glassGazeHighlight()
         // The list's selection is what highlights the row (`GlassLibrarySidebarSelection`); the
         // tap is still needed on a compact stack, where selection alone does not navigate.
         .tag(GlassLibrarySidebarSelection.panel(panel.id))

@@ -306,7 +306,8 @@ public struct GlassEditorWorkspaceView: View {
             // the path to it beneath. `~` for home, because a header is not the place to read
             // someone's user name back to them.
             .glassPathHeader(abbreviated(node.path))
-            .safeAreaInset(edge: .bottom, spacing: 0) { projectFooter }
+            .glassSpatialList()
+        .safeAreaInset(edge: .bottom, spacing: 0) { projectFooter }
             .searchable(text: $filter, prompt: "Filter")
             // The dismissal chevron belongs to the first screen only; every screen after it has
             // the stack's own back button, and two back controls in one bar is a puzzle.
@@ -1378,9 +1379,8 @@ private struct GlassEditorFileRow: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassSpatialRowMetrics()
-        .glassGazeHighlight()
         .contentShape(Rectangle())
+        .glassSpatialListRow()
         .contextMenu {
             Button(node.isDirectory ? "Open Folder" : "Open") { open(node) }
             // Local or on a server, through the project's own access (2026-09-26: the editor had

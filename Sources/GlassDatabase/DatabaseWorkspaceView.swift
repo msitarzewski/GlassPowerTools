@@ -721,9 +721,18 @@ struct DatabaseWorkspaceView: View {
         } detail: {
             detailSurface
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                #if os(visionOS)
+                // On the headset a split view's own toolbar is not drawn; a column's is. Attached
+                // here, the way back and the ⚡ appear beside the detail's own controls
+                // (2026-09-28: "there's no active connections icon in the database manager").
+                .toolbar { workspaceToolbar }
+                .glassActiveConnectionsToolbar(show: runtime?.showActiveConnections, dismissCurrent: { showConnections() })
+                #endif
         }
+        #if !os(visionOS)
         .toolbar { workspaceToolbar }
         .glassActiveConnectionsToolbar(show: runtime?.showActiveConnections, dismissCurrent: { showConnections() })
+        #endif
     }
 
     #if os(iOS)

@@ -147,6 +147,7 @@ public struct GlassKeyManagerPanel: View {
             ForEach(keys) { key in
                 row(key)
                     .tag(key.id)
+                    .glassSpatialListRow()
                     .contextMenu {
                         Button("Rename", systemImage: "pencil") { panel.renaming = key }
                         Button("Copy Public Key", systemImage: "doc.on.doc") { copyPublicKey(key) }
@@ -154,6 +155,7 @@ public struct GlassKeyManagerPanel: View {
                     }
             }
         }
+        .glassSpatialList()
         .scrollContentBackground(.hidden)
         .searchable(text: $panel.searchQuery, prompt: "Search Keys")
         .toolbar {
@@ -188,8 +190,7 @@ public struct GlassKeyManagerPanel: View {
         } accessory: {
             usageBadge(for: key)
         }
-        .glassSpatialRowMetrics()
-        .glassGazeHighlight()
+
         .accessibilityIdentifier("key-\(key.id.uuidString.lowercased())")
     }
 
@@ -292,7 +293,7 @@ public struct GlassKeyManagerPanel: View {
                     }
                     Spacer(minLength: 8)
                 }
-                .glassSpatialRowMetrics()
+                .glassSpatialListRow()
                 .accessibilityElement(children: .combine)
             }
             // Not decoration. A configuration written by a newer build is skipped rather than

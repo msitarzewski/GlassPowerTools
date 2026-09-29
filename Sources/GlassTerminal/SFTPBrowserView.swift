@@ -1055,7 +1055,11 @@ struct SFTPBrowserView: View {
             }
             #endif
         }
+        #if os(visionOS)
+        .glassSpatialList()
+        #else
         .listStyle(.plain)
+        #endif
         // **The list paints no surface of its own.** A `List` and a `Table` both fill themselves
         // with the system's content background, which sat opaque over the window's glass — the
         // browser looked like a different application beside the library (2026-09-18).
@@ -1326,6 +1330,7 @@ struct SFTPBrowserView: View {
 
         ForEach(sortedEntries) { entry in
             outlineNameCell(for: entry)
+                .glassSpatialListRow()
                 .contextMenu {
                     selectionContextMenu(
                         for: contextEntries(for: entry),
@@ -1651,6 +1656,27 @@ struct SFTPBrowserView: View {
                 .foregroundStyle(isDir ? .blue : .secondary)
                 .frame(width: 28)
 
+            #if os(visionOS)
+            // **The Mac's columns** (2026-09-28): the headset has the width, so size, modified and
+            // permissions sit in fixed columns as they do in the Mac's table rather than stacked
+            // under the name.
+            Text(entry.filename)
+                .font(.body)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(entry.attributes.size.flatMap { isDir ? nil : formattedFileSize($0) } ?? "—")
+                .font(.callout.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .frame(width: 90, alignment: .trailing)
+            Text(entry.attributes.accessModificationTime.map { formattedDate($0.modificationTime) } ?? "—")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .frame(width: 150, alignment: .leading)
+            Text(entry.attributes.permissions.map { formattedPermissions($0) } ?? "")
+                .font(.callout.monospaced())
+                .foregroundStyle(.tertiary)
+                .frame(width: 108, alignment: .leading)
+            #else
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.filename)
                     .font(.body)
@@ -1680,13 +1706,12 @@ struct SFTPBrowserView: View {
             }
 
             Spacer()
+            #endif
 
+            // No chevron of our own: a folder row is a disclosure group, which draws one — ours
+            // beside it read as "> >" on the headset (2026-09-28).
             if isDir {
-                #if !os(iOS)
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                #endif
+                EmptyView()
             } else {
                 Button {
                     beginRemoteEdit(entry)
