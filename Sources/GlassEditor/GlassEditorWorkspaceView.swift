@@ -1101,7 +1101,25 @@ private struct MacEditorWindowBehaviour: ViewModifier {
             .onChange(of: documentCount) { _, count in
                 guard count == 0, closesWindowWhenEmptied else { return }
                 closesWindowWhenEmptied = false
-                windowHolder.window?.performClose(nil)
+                guard let window = windowHolder.window else { return }
+                // After the unsaved-changes question the document goes while its sheet is still
+                // leaving, and a window with a sheet attached will not close: it beeps and stays,
+                // on "No Document" (2026-09-29, Discard after ⌘W). Waiting for the sheet fixed that
+                // but showed the empty window for a moment, where Mail's goes the instant you
+                // choose. So it leaves the screen now, and is closed once the sheet has let go.
+                guard window.attachedSheet != nil else {
+                    window.performClose(nil)
+                    return
+                }
+                window.orderOut(nil)
+                Task { @MainActor in
+                    var turns = 0
+                    while window.attachedSheet != nil, turns < 50 {
+                        try? await Task.sleep(for: .milliseconds(20))
+                        turns += 1
+                    }
+                    window.close()
+                }
             }
             // Cancel — in the question, or in the Save panel it led to — leaves the window. Save
             // and Discard do not: the document goes, and the window with it.
