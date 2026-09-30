@@ -29,7 +29,8 @@ anything touching real servers (SSH and database tests use the disposable test V
 
 ## Paused 2026-09-28 (evening) — where to pick up
 
-All work below is committed locally (nothing pushed). Mac 0.4.253, iPhone 0.4.249, Vision Pro 0.4.254.
+All work below is committed locally (nothing pushed). Mac 0.4.262, iPhone 0.4.249, Vision Pro 0.4.254
+(0.4.255+ built, not installed — the headset was unreachable).
 Detail: `tasks/2026-09/2026-09-27_glassdt-parity-audit.md` (desktop parity, sync repairs, list sweep).
 
 **Next, in the owner's order when they return:**
@@ -63,6 +64,14 @@ bar expands for its own window). Proposed, awaiting the owner's go: the database
 Data/Structure/DDL/Indexes/Foreign Keys as a segmented control on visionOS, leaving the library as
 the only tab bar; test with the windows apart to tell our setup from a visionOS bug. Also open: the
 remote desktop is slow on the headset (connecting vs live session not yet described).
+
+**2026-09-30:** D43 schema diagram built (task note `2026-09-30_schema-diagram.md`); one
+Connections window on visionOS; every ⚡ opens Active; five help pages corrected; README and the
+databases page list the diagram. Committed on the owner's word.
+
+**Authorized 2026-09-30 (owner):** "create a plan and build your list in the order you see fit. DRY
+and KISS, reuse code." The plan and order: `tasks/2026-09/2026-09-30_backlog-run.md`. The slow
+headset desktop: the owner suspects a flaky connection that never dropped to a streaming mode.
 
 **Before letting any device with an old install sync:** dry-run the Mac first
 (`GLASS_SYNC_DRY_RUN=1`, see the audit note's sync sections).

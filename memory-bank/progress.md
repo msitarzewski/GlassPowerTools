@@ -79,3 +79,5 @@ profile, notarization, deploying the site), the behaviour findings listed in `ac
   transparency stays; only list formats and non-Glass chrome change. The database results bar is
   done (icons + More); verified on the Mac, not yet on the headset.
 - Two terminal tests fail intermittently in full-suite runs only (see `activeContext.md`).
+- Schema diagram (D43, 2026-09-30): built; unit + live MySQL/PostgreSQL tests pass; in use on the
+  Mac; seen in the visionOS and iPad simulators; not yet on the physical headset or the iPhone.

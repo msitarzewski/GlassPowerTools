@@ -1111,3 +1111,10 @@ results kept on this device. Every service kind, not only databases (SQL Studio 
 cancel; 3) Files (SFTP) ⌘C/⌘V and drag with Finder; 4) VNC Extended Clipboard (TigerVNC-class
 servers). All behind the existing per-desktop clipboard switch; transfers need a user action.
 Proven on the Docker xrdp/TigerVNC rigs; Windows needs the Windows 11 VM.
+
+## D43 — Schema diagram, in 3D on Vision Pro — Approved 2026-09-30
+**Owner:** "2 please. In 3D, in space on VP if possible. … this was a major miss and is an expected
+feature." The first exception to the 2026-09-26 feature freeze. **Decision:** a native, interactive
+diagram of a database's tables, columns and foreign keys, read live from the connection: a 2D canvas
+on Mac, iPad and iPhone; a RealityKit volume on Vision Pro. Plan and evidence:
+`tasks/2026-09/2026-09-30_schema-diagram.md`.
