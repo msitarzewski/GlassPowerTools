@@ -297,6 +297,8 @@ class SessionManager {
 
         if session.state == .connected {
             recordSuccessfulConnection(for: session)
+        } else {
+            settlePasswordTrialIfFailed(session)
         }
     }
 
@@ -408,9 +410,18 @@ class SessionManager {
 
         if session.state == .connected {
             recordSuccessfulConnection(for: session)
+        } else {
+            settlePasswordTrialIfFailed(session)
         }
 
         return session
+    }
+
+    /// A sign-in that ended in an error settles a typed password's trial against it. One waiting on
+    /// a host-key answer has not been tried yet, and stays on trial.
+    private func settlePasswordTrialIfFailed(_ session: TerminalSession) {
+        guard case .error = session.state, session.pendingHostKeyChallenge == nil else { return }
+        serverManager.settlePasswordTrial(for: session.server.id, succeeded: false)
     }
 
     private func reusableConnection(for server: ServerConfiguration, jumpHostChain: [ServerConfiguration]) -> SSHConnection? {
@@ -811,6 +822,7 @@ class SessionManager {
     /// catalog write. What the user sees is unchanged; only the ordering of a "last connected"
     /// stamp against the next frame is, and nothing reads it synchronously.
     private func recordSuccessfulConnection(for session: TerminalSession) {
+        serverManager.settlePasswordTrial(for: session.server.id, succeeded: true)
         if serverManager.server(for: session.server.id) != nil {
             let serverManager = self.serverManager
             let serverID = session.server.id

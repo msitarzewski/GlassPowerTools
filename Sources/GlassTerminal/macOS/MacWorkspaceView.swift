@@ -561,7 +561,7 @@ private struct MacWorkspaceTabContent: View {
                         return "This connection or terminal pane is no longer available."
                     }
                     do {
-                        try await sessionManager.serverManager.updateServerOrThrow(current, password: password)
+                        try await sessionManager.serverManager.tryPassword(password, for: current)
                         controller.retryPane(prompt.paneID)
                         return nil
                     } catch {

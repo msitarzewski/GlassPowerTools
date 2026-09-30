@@ -165,7 +165,7 @@ struct TerminalConnectFlow: ViewModifier {
                             return "This saved connection is no longer available."
                         }
                         do {
-                            try await serverManager.updateServerOrThrow(current, password: password)
+                            try await serverManager.tryPassword(password, for: current)
                             workgroupPasswordWasSaved = true
                             return nil
                         } catch {
@@ -791,7 +791,8 @@ struct TerminalConnectFlow: ViewModifier {
     ) async -> String? {
         if let savedServer = serverManager.server(for: server.id) {
             do {
-                try await serverManager.updateServerOrThrow(savedServer, password: password)
+                // On trial: kept only if this sign-in succeeds.
+                try await serverManager.tryPassword(password, for: savedServer)
                 connectToServer(savedServer, purpose: pendingConnectionPurpose)
                 return nil
             } catch {

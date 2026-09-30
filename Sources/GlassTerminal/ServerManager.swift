@@ -554,6 +554,33 @@ class ServerManager {
         }
     }
 
+    // MARK: Passwords typed at a prompt
+
+    /// Passwords saved on trial: what was stored before, kept until a sign-in settles the trial.
+    private var passwordTrials: [UUID: ServerCredentialRollback] = [:]
+
+    /// Saves a password typed at a prompt **on trial**. The connection reads the Keychain, so the
+    /// password has to be there to be tried; what was stored before is kept aside, and the next
+    /// sign-in settles it (`settlePasswordTrial`). A mistyped password used to replace a working
+    /// one outright (help audit, 2026-09-27). A second try keeps the first snapshot, so the
+    /// password restored is the one there before any typing.
+    func tryPassword(_ password: String, for server: ServerConfiguration) async throws {
+        let rollback = try passwordTrials[server.id] ?? passwordStore.prepareRollback(server)
+        try await updateServerOrThrow(server, password: password)
+        passwordTrials[server.id] = rollback
+    }
+
+    /// A sign-in finished: keep the password on trial when it succeeded, restore what was there
+    /// before when it did not. No trial, nothing to do.
+    func settlePasswordTrial(for serverID: UUID, succeeded: Bool) {
+        guard let rollback = passwordTrials.removeValue(forKey: serverID), !succeeded else { return }
+        do {
+            try rollback.restore()
+        } catch {
+            Logger.servers.error("A password that did not sign in could not be taken back: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
     func password(for server: ServerConfiguration) throws -> String {
         try ensureServerCatalogAvailable()
         return try passwordStore.retrieve(server)
