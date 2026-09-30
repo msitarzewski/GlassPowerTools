@@ -161,6 +161,27 @@ struct ClientTests {
         #expect(collected.frames.last?.2.count == 36)
     }
 
+    /// The next update is requested as soon as an update begins, not after it is decoded: the
+    /// request is on the wire even though this update's only rectangle is rejected.
+    @Test func theNextUpdateIsRequestedBeforeThisOneIsDecoded() async throws {
+        var server: [UInt8] = Array("RFB 003.008\n".utf8)
+        server += [1, 1]
+        server += UInt32(0).bigEndianBytes
+        server += serverInit(width: 2, height: 2, name: "")
+        server += [0, 0, 0, 1]
+        server += rectHeader(1, 0, 2, 1, 0)   // outside the framebuffer: decoding fails
+        let sink = MemoryByteSink()
+        await #expect(throws: RFBError.self) {
+            try await VNCClient(configuration: VNCConfiguration(host: "x", password: ""), callbacks: VNCClientCallbacks(),
+                                source: MemoryByteSource(server), sink: sink).run()
+        }
+        let written = await sink.written
+        let requests = stride(from: 0, to: written.count - 9, by: 1).filter {
+            written[$0] == 3 && Array(written[($0 + 2)..<($0 + 10)]) == [0, 0, 0, 0, 0, 2, 0, 2]
+        }.map { written[$0 + 1] }
+        #expect(requests == [0, 1], "the first full request, then the incremental one sent before the rectangle")
+    }
+
     @Test func malformedServerMessagesFail() async throws {
         var base: [UInt8] = Array("RFB 003.008\n".utf8)
         base += [1, 1]

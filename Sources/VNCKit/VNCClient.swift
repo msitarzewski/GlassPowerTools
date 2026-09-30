@@ -250,6 +250,12 @@ public final class VNCClient: Sendable {
             case 0:
                 _ = try await source.u8()
                 let count = Int(try await source.u16())
+                // **Ask for the next update now, not after decoding this one.** The request used to
+                // follow the decode and the frame's hand-off, so every frame waited a full round
+                // trip plus its own decode, and a slow link crawled (2026-09-30). One request is
+                // always queued at the server while this one decodes; one per update received, so
+                // never more than two are outstanding. (RFB 7.5.3 allows several.)
+                try await sendFramebufferUpdateRequest(incremental: true, framebuffer: framebuffer)
                 var changed = false
                 rectangles: for _ in 0..<count {
                     let header = try await source.read(12)
@@ -309,7 +315,6 @@ public final class VNCClient: Sendable {
                     }
                 }
                 if changed { callbacks.frame(framebuffer.width, framebuffer.height, framebuffer.snapshot()) }
-                try await sendFramebufferUpdateRequest(incremental: true, framebuffer: framebuffer)
             case 1:
                 _ = try await source.u8()
                 _ = try await source.u16()
