@@ -25,7 +25,7 @@ The host takes the file's name (without `.rdp`) as its name, and the file's serv
 | `redirectclipboard` | **Share clipboard text**. |
 | `audiomode` | **Remote audio**: on when the file plays sound on this computer. |
 
-Every imported service uses **Network Level (NLA)** authentication and the system's certificate trust, whatever the file says. Other settings are ignored. An imported service starts with **Credential storage** set to **This device only**; change it under **Advanced** before you choose **Add** if you want the password in iCloud Keychain.
+Every imported service uses **Network Level (NLA)** authentication and the system's certificate trust, whatever the file says. Other settings are ignored. An imported service starts with **Credential storage** set to **iCloud Keychain**, like any other; choose **This device only** under **Advanced** before you choose **Add** to keep the password on this device.
 
 The notices you can see in **Imported with changes** are:
 

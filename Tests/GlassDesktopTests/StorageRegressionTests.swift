@@ -126,7 +126,10 @@ private final class StorageFixture {
         return app
     }
     func seed() async throws -> DesktopConnection {
-        let connection = DesktopConnection(name: "Workstation", host: "work.example", username: "alice")
+        var connection = DesktopConnection(name: "Workstation", host: "work.example", username: "alice")
+        // Device-only on purpose: the mobility tests move it to iCloud Keychain, which is now the
+        // default a new connection starts with.
+        connection.mobility = .deviceOnly
         _ = try await repository.save(connection)
         credentials.seed(connection)
         return connection

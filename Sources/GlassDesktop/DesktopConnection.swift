@@ -53,7 +53,10 @@ public struct DesktopConnection: Identifiable, Codable, Equatable, Sendable {
         self.username = username
         self.domain = domain
         self.credentialID = credentialID
-        self.mobility = .deviceOnly
+        // D21: credentials sync through iCloud Keychain unless someone chooses otherwise. This was
+        // device-only, so a desktop imported from an .rdp file (the one path that does not set it)
+        // kept its password on one device while every other credential synced (help audit).
+        self.mobility = .iCloudKeychain
         self.authentication = .networkLevel
         self.tags = []
         self.isFavorite = false

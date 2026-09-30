@@ -60,7 +60,9 @@ struct RDPFileImportTests {
         """)
         #expect(result.connection.authentication == .networkLevel)
         #expect(result.connection.certificateSHA256 == nil)
-        #expect(result.connection.mobility == .deviceOnly)
+        // Mobility governs the password typed after importing, never anything from the file, so it
+        // takes D21's default like every other credential (it was device-only; help audit).
+        #expect(result.connection.mobility == .iCloudKeychain)
         #expect(!result.connection.clipboardEnabled && !result.connection.audioEnabled)
         let saved = String(decoding: try JSONEncoder().encode(result.connection), as: UTF8.self)
         #expect(!saved.contains("IMPORT-SECRET") && !saved.contains("IMPORT-SIGNATURE"))
