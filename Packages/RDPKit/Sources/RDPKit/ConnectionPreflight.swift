@@ -4304,16 +4304,11 @@ private func performRDPAutoDetectExchange(
     timeoutSeconds: Int
 ) throws -> RDPAutoDetectExchangeResult {
     var request = initialRequest
-    var measuredByteCount: UInt32 = 0
+    var meter = RDPAutoDetectMeter()
     var lastResponse: Data?
 
     while true {
-        if request.resetsMeasuredByteCount {
-            measuredByteCount = 0
-        }
-        measuredByteCount = measuredByteCount.addingAutoDetectBytes(request.measuredByteCountContribution)
-
-        if let responsePDU = request.response(measuredByteCount: measuredByteCount) {
+        if let responsePDU = meter.respond(to: request) {
             let responseChannelID = request.channelID != 0
                 ? request.channelID
                 : fallbackMessageChannelID ?? 0
@@ -4359,13 +4354,6 @@ private func performRDPAutoDetectExchange(
             }
             request = nextRequest
         }
-    }
-}
-
-private extension UInt32 {
-    func addingAutoDetectBytes(_ bytes: UInt32) -> UInt32 {
-        let (value, overflow) = addingReportingOverflow(bytes)
-        return overflow ? UInt32.max : value
     }
 }
 
@@ -5930,6 +5918,7 @@ private func receiveRDPGraphicsUpdateBatch(
         maximumBufferedByteCount: maximumFastPathFragmentByteCount
     )
     var staticChannelReassembler = RDPStaticVirtualChannelReassembler()
+    var autoDetectMeter = RDPAutoDetectMeter()
     let clearCodec = RDPClearCodecDecoder()
     let surfaceCompositor = RDPGFXSurfaceCompositor(
         capabilitySet: graphicsCapabilitySet,
@@ -6219,6 +6208,20 @@ private func receiveRDPGraphicsUpdateBatch(
                    result.graphicsFrames.count >= targetFrameCount
                 {
                     return
+                }
+                continue
+            }
+            // A server keeps measuring the link during the session (MS-RDPBCGR 2.2.14): round
+            // trips and bandwidth, which it uses to choose quality. Answered here as during
+            // connection; they went unanswered, so a server never learned the link had slowed.
+            // A malformed probe is skipped, never fatal.
+            if let request = try? RDPServerAutoDetectRequest.parseIfPresent(fromTPKT: packet),
+               request.channelID != 0 {
+                if let response = autoDetectMeter.respond(to: request) {
+                    try sendApplicationPacket(
+                        response.encodedTPKT(userChannelID: userChannelID, messageChannelID: request.channelID),
+                        on: channel
+                    )
                 }
                 continue
             }

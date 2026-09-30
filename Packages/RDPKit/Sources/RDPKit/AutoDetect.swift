@@ -55,19 +55,22 @@ struct RDPServerAutoDetectRequest: Equatable, Sendable {
         }
     }
 
-    func response(measuredByteCount: UInt32? = nil) -> RDPClientAutoDetectResponsePDU? {
+    func response(measuredByteCount: UInt32? = nil,
+                  measuredMilliseconds: UInt32 = 1) -> RDPClientAutoDetectResponsePDU? {
         switch requestType {
         case 0x002B:
             return RDPClientAutoDetectResponsePDU(
                 sequenceNumber: sequenceNumber,
                 responseType: RDPClientAutoDetectResponsePDU.ResponseType.bandwidthMeasureResults,
-                bandwidthByteCount: measuredByteCount ?? measuredByteCountContribution
+                bandwidthByteCount: measuredByteCount ?? measuredByteCountContribution,
+                bandwidthMilliseconds: measuredMilliseconds
             )
         case 0x0429:
             return RDPClientAutoDetectResponsePDU(
                 sequenceNumber: sequenceNumber,
                 responseType: RDPClientAutoDetectResponsePDU.ResponseType.continuousBandwidthMeasureResults,
-                bandwidthByteCount: measuredByteCount ?? measuredByteCountContribution
+                bandwidthByteCount: measuredByteCount ?? measuredByteCountContribution,
+                bandwidthMilliseconds: measuredMilliseconds
             )
         case 0x0001:
             return RDPClientAutoDetectResponsePDU(sequenceNumber: sequenceNumber)
@@ -174,6 +177,36 @@ private extension ByteCursor {
         }
         _ = try readData(count: payloadByteCount)
         return payloadByteCount
+    }
+}
+
+/// Measures what the server's bandwidth test actually took (MS-RDPBCGR 2.2.14.1.5 and 2.2.14.2.2):
+/// the bytes of payload between a measure-start and a measure-stop, and the time between them.
+///
+/// The time was always reported as one millisecond, whatever the link, which tells a server the
+/// connection is extraordinarily fast; it then sends its heaviest, highest-quality stream, and a
+/// slow or flaky link drowns in it (2026-09-30, a desktop "terribly slow" on Vision Pro).
+struct RDPAutoDetectMeter {
+    private var byteCount: UInt32 = 0
+    private var startedAt: ContinuousClock.Instant?
+
+    /// Takes the next request and returns the response it calls for, if any. `now` is when the
+    /// request arrived.
+    mutating func respond(to request: RDPServerAutoDetectRequest,
+                          now: ContinuousClock.Instant = .now) -> RDPClientAutoDetectResponsePDU? {
+        if request.resetsMeasuredByteCount {
+            byteCount = 0
+            startedAt = now
+        }
+        let (sum, overflow) = byteCount.addingReportingOverflow(request.measuredByteCountContribution)
+        byteCount = overflow ? UInt32.max : sum
+        var milliseconds: UInt32 = 1
+        if let startedAt {
+            let elapsed = now - startedAt
+            let ms = Double(elapsed.components.seconds) * 1000 + Double(elapsed.components.attoseconds) / 1e15
+            milliseconds = UInt32(min(Double(UInt32.max), max(1, ms.rounded())))
+        }
+        return request.response(measuredByteCount: byteCount, measuredMilliseconds: milliseconds)
     }
 }
 

@@ -287,3 +287,22 @@ import Testing
         0x00, 0x00, 0x00, 0x00,
     ]))
 }
+
+/// The bandwidth result reports the time the test really took, not one millisecond: a server told
+/// every link is that fast sends its heaviest stream down a slow one (2026-09-30).
+@Test func bandwidthResultReportsTheMeasuredTime() {
+    func request(_ type: UInt16, bytes: Int = 0) -> RDPServerAutoDetectRequest {
+        RDPServerAutoDetectRequest(channelID: 1003, sequenceNumber: 7, requestType: type, payloadByteCount: bytes)
+    }
+    var meter = RDPAutoDetectMeter()
+    let start = ContinuousClock.now
+    #expect(meter.respond(to: request(0x1014), now: start)?.payload == .networkCharacteristicsSync(bandwidth: 0, rtt: 0))
+    #expect(meter.respond(to: request(0x0002, bytes: 15_000), now: start + .milliseconds(20)) == nil)
+    let stop = meter.respond(to: request(0x002B, bytes: 1_000), now: start + .milliseconds(120))
+    #expect(stop?.payload == .bandwidth(byteCount: 15_008 + 1_008, milliseconds: 120))
+
+    // A new measurement starts its own clock and count.
+    _ = meter.respond(to: request(0x0014), now: start + .seconds(5))
+    let second = meter.respond(to: request(0x002B, bytes: 92), now: start + .seconds(5) + .milliseconds(40))
+    #expect(second?.payload == .bandwidth(byteCount: 100, milliseconds: 40))
+}
