@@ -29,8 +29,7 @@ anything touching real servers (SSH and database tests use the disposable test V
 
 ## Paused 2026-09-28 (evening) — where to pick up
 
-All work below is committed locally (nothing pushed). Mac 0.4.253, iPhone 0.4.249, Vision Pro 0.4.251
-(the headset was unreachable on 2026-09-29; it needs 0.4.253 for the results bar).
+All work below is committed locally (nothing pushed). Mac 0.4.253, iPhone 0.4.249, Vision Pro 0.4.254.
 Detail: `tasks/2026-09/2026-09-27_glassdt-parity-audit.md` (desktop parity, sync repairs, list sweep).
 
 **Next, in the owner's order when they return:**
@@ -55,6 +54,15 @@ waits for the pass; ⌘W → Discard on an editor's last document hides the wind
 once the sheet has gone — the owner confirmed it on the Mac. Flaky only in full-suite runs, not
 investigated (terminal, outside the owner's scope): `macImportedThemeAndPortableAppearanceApplyAfterICloudMerge`,
 `abandonedStartupCommandTicketExpires`; both pass alone.
+
+**2026-09-29, headset round (Vision Pro 0.4.254):** the editor's panel has square corners; Files hides
+its selection circles until Select… or a swipe (as on iOS); the library's iCloud row is plain text
+with only the cloud as a button. **Open:** looking at one window's tab bar expanded the library's and
+the database table's tab bars too (owner's capture). Nothing documented explains it (HIG says a tab
+bar expands for its own window). Proposed, awaiting the owner's go: the database table's
+Data/Structure/DDL/Indexes/Foreign Keys as a segmented control on visionOS, leaving the library as
+the only tab bar; test with the windows apart to tell our setup from a visionOS bug. Also open: the
+remote desktop is slow on the headset (connecting vs live session not yet described).
 
 **Before letting any device with an old install sync:** dry-run the Mac first
 (`GLASS_SYNC_DRY_RUN=1`, see the audit note's sync sections).
