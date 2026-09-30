@@ -48,9 +48,10 @@ enum GlassDemoMode {
             await openEditor(editor, preview: surface == "preview")
         case "terminal":
             terminal.requestDemoReplay(name: "alpha", output: Data(terminalTranscript.utf8))
-        case "database":
+        case "database", "diagram":
             // Put there by Tools/Screenshots/shoot.sh, from make-demo-db.py.
-            database.requestDemoDatabase(file: URL.documentsDirectory.appending(path: "demo-shop.sqlite"), name: "shop")
+            database.requestDemoDatabase(file: URL.documentsDirectory.appending(path: "demo-shop.sqlite"), name: "shop",
+                                         showsDiagram: surface == "diagram")
         case "desktop":
             let renderer = ImageRenderer(content: DemoRemoteScreen())
             renderer.scale = 1

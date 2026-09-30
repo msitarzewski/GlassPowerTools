@@ -66,6 +66,17 @@ class DatabaseSessionManager {
         return request.id
     }
 
+    /// Schema diagram windows (D43), keyed like workspaces: the scene's value is a plain UUID.
+    private(set) var diagramRequests: [UUID: SchemaDiagramRequest] = [:]
+
+    @discardableResult
+    func registerDiagram(_ request: SchemaDiagramRequest) -> UUID {
+        diagramRequests[request.id] = request
+        return request.id
+    }
+
+    func diagramRequest(for windowID: UUID) -> SchemaDiagramRequest? { diagramRequests[windowID] }
+
     /// Supports windows opened by older builds, where the scene UUID was the
     /// database session UUID and the workspace always used its default tab.
     func workspaceRequest(for windowID: UUID) -> DatabaseWorkspaceWindowRequest {

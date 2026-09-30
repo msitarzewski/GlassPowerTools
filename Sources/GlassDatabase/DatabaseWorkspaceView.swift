@@ -1478,7 +1478,7 @@ struct DatabaseWorkspaceView: View {
 
 /// Composites passthrough blur behind the database canvas independently from
 /// its opaque fill. A zero blur amount emits no material backing.
-private struct DatabaseWorkspaceBackground: ViewModifier {
+struct DatabaseWorkspaceBackground: ViewModifier {
     let material: Material
     let fillOpacity: Double
     let blurAmount: Double

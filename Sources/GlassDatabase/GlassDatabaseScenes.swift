@@ -62,6 +62,25 @@ public struct GlassDatabaseScenes: Scene {
         }
         #endif
 
+        // The schema diagram (D43): a volume on the headset, a window elsewhere.
+        WindowGroup(id: "database-diagram", for: UUID.self) { $diagramID in
+            SchemaDiagramWindow(diagramID: diagramID)
+                .environment(runtime)
+                .environment(sessionManager)
+                .environment(settingsManager)
+                .glassLayers(runtime.layers)
+        }
+        #if os(visionOS)
+        .windowStyle(.volumetric)
+        .defaultSize(width: 1.4, height: 1.0, depth: 1.0, in: .meters)
+        #elseif os(macOS)
+        .defaultSize(width: 1200, height: 800)
+        #endif
+        #if !os(iOS)
+        .restorationBehavior(.disabled)
+        .defaultLaunchBehavior(.suppressed)
+        #endif
+
         // Detached result grids — pin a result beside the query that produced it.
         WindowGroup(id: "database-results", for: UUID.self) { $resultSetID in
             if let resultSetID {
@@ -157,10 +176,15 @@ public struct GlassDatabaseBootstrap<Content: View>: View {
         case .showFailure(let message):
             failureMessage = message
         #if DEBUG
-        case .demoConnect(let config):
+        case .demoConnect(let config, let showsDiagram):
             Task {
                 do {
                     let sessionID = try await runtime.sessionManager.connect(config: config, password: "", openForward: nil)
+                    if showsDiagram {
+                        let request = SchemaDiagramRequest(sessionID: sessionID, database: "main", focusTable: "orders")
+                        openWindow(id: "database-diagram", value: runtime.sessionManager.registerDiagram(request))
+                        return
+                    }
                     // Straight to a table: the grid is the shot, and the overview would show the
                     // simulator's file path.
                     present(DatabaseWorkspaceWindowRequest.additional(
@@ -222,5 +246,34 @@ public struct GlassDatabaseBootstrap<Content: View>: View {
         }
         #endif
         openWindow(id: "database-workspace", value: windowID)
+    }
+}
+
+/// A diagram window's content: the registered request, and Open Table as a workspace window on
+/// the same connection, the way "Open in New Window" opens one.
+struct SchemaDiagramWindow: View {
+    let diagramID: UUID?
+    @Environment(DatabaseSessionManager.self) private var sessionManager
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        if let diagramID, let request = sessionManager.diagramRequest(for: diagramID) {
+            let openTable: (String) -> Void = { table in
+                let workspace = DatabaseWorkspaceWindowRequest.additional(
+                    sessionID: request.sessionID,
+                    initialSelection: .table(database: request.database, table: table))
+                openWindow(id: "database-workspace", value: sessionManager.registerWorkspace(workspace))
+            }
+            #if os(visionOS)
+            SchemaDiagramVolume(request: request, openTable: openTable)
+            #else
+            NavigationStack {
+                SchemaDiagramView(request: request, openTable: openTable)
+            }
+            #endif
+        } else {
+            ContentUnavailableView("Diagram Not Found", systemImage: "point.3.connected.trianglepath.dotted",
+                                   description: Text("Show a database's diagram from its menu in the sidebar."))
+        }
     }
 }

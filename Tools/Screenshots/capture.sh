@@ -8,7 +8,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 OUT="${OUT:-site/static/shots}"
 DD="${DERIVED_DATA:-${TMPDIR:-/tmp}/glass-shots-dd}"
-SURFACES="library editor preview terminal database desktop"
+SURFACES="${SURFACES:-library editor preview terminal database diagram desktop}"
 mkdir -p "$OUT"
 
 simulator() {  # the first available simulator with this exact name

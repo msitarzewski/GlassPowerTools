@@ -69,6 +69,8 @@ struct SchemaBrowserView: View {
     @State private var exactCountTask: Task<Void, Never>?
     @State private var destructiveOperation: String?
     @State private var operationError: String?
+    /// Set by Show Diagram / Show in Diagram; the presenter opens the window or the sheet.
+    @State private var diagramRequest: SchemaDiagramRequest?
     @State private var showingMutationAudit = false
 
     private var session: DatabaseSession? {
@@ -133,6 +135,9 @@ struct SchemaBrowserView: View {
         .sheet(isPresented: $showingMutationAudit) {
             MutationAuditView(connectionID: session?.connectionConfig.id,
                               connectionName: session?.connectionConfig.name)
+        }
+        .schemaDiagramPresenter($diagramRequest) { request, table in
+            onOpenSelection?(.table(database: request.database, table: table))
         }
         .task {
             await loadDatabases()
@@ -261,6 +266,9 @@ struct SchemaBrowserView: View {
                 Button("Open SQL Editor", systemImage: "text.page") {
                     onOpenSelection?(.query(id: UUID()))
                 }
+                Button("Show Diagram", systemImage: "point.3.connected.trianglepath.dotted") {
+                    diagramRequest = SchemaDiagramRequest(sessionID: sessionID, database: database)
+                }
                 Button("Refresh Tables", systemImage: "arrow.clockwise") {
                     Task { await refreshDatabase(database) }
                 }
@@ -334,6 +342,7 @@ struct SchemaBrowserView: View {
     #endif
 
     private var schemaTree: some View {
+        ScrollViewReader { reader in
         List(selection: schemaSelection) {
             ForEach(filteredDatabases, id: \.self) { database in
                 DisclosureGroup(
@@ -350,8 +359,13 @@ struct SchemaBrowserView: View {
                     )
                 ) {
                     if let tables = filteredTables(for: database) {
-                        ForEach(tables, id: \.self) { table in
-                            tableRow(table, database: database)
+                        // Identified by the same value the sidebar scrolls to. A separate `.id` on
+                        // the row gave it two identities, and the Mac's list drew it twice,
+                        // one over the other (2026-09-30).
+                        ForEach(tables.map { WorkspaceSelection.table(database: database, table: $0) }, id: \.self) { row in
+                            if case .table(_, let table) = row {
+                                tableRow(table, database: database)
+                            }
                         }
                     } else if let error = loadErrors[database] {
                         Label(error, systemImage: "exclamationmark.triangle")
@@ -387,6 +401,23 @@ struct SchemaBrowserView: View {
             }
         }
         .databaseLookScrollEnabled()
+        // **The sidebar follows the tab.** A table shown any other way — from the diagram, a
+        // Follow Reference, a new window — is disclosed and scrolled to, as if navigated to here
+        // (owner, 2026-09-30: double-clicking a diagram card opened the table and left its
+        // database collapsed).
+        .task(id: selection) {
+            guard case .table(let database, let table) = selection else { return }
+            if !expandedDatabases.contains(database) {
+                expandedDatabases.insert(database)
+                await loadTables(for: database)
+            }
+            try? await Task.sleep(for: .milliseconds(80))
+            guard !Task.isCancelled else { return }
+            // No anchor: the least scroll that shows the row, so a click on a visible row moves
+            // nothing. No animation: the rows have only just been inserted.
+            reader.scrollTo(WorkspaceSelection.table(database: database, table: table))
+        }
+        }
     }
 
     private func tableRow(_ table: String, database: String) -> some View {
@@ -458,6 +489,10 @@ struct SchemaBrowserView: View {
         Button("Open SQL Editor", systemImage: "text.page") {
             onOpenSelection?(.query(id: UUID()))
         }
+        Button("Show Diagram", systemImage: "point.3.connected.trianglepath.dotted") {
+            diagramRequest = SchemaDiagramRequest(sessionID: sessionID, database: database)
+        }
+        .help("See \(database)'s tables and the keys between them")
         Button("Open in New Window", systemImage: "macwindow.badge.plus") {
             let request = DatabaseWorkspaceWindowRequest.additional(
                 sessionID: sessionID,
@@ -479,6 +514,9 @@ struct SchemaBrowserView: View {
     private func tableActionMenu(_ table: String, database: String) -> some View {
         Button("Browse Data", systemImage: "tablecells") {
             onOpenSelection?(.table(database: database, table: table))
+        }
+        Button("Show in Diagram", systemImage: "point.3.connected.trianglepath.dotted") {
+            diagramRequest = SchemaDiagramRequest(sessionID: sessionID, database: database, focusTable: table)
         }
         Button("Copy Table Name", systemImage: "doc.on.doc") {
             guard let connection = session?.connection else { return }

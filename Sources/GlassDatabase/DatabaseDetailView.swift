@@ -597,6 +597,7 @@ struct DatabaseDetailView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var statisticsCapturedAt: Date?
+    @State private var diagramRequest: SchemaDiagramRequest?
 
     private var session: DatabaseSession? {
         sessionManager.session(for: sessionID)
@@ -763,7 +764,14 @@ struct DatabaseDetailView: View {
             } label: {
                 Label("SQL Editor", systemImage: "text.page")
             }
+            Button {
+                diagramRequest = SchemaDiagramRequest(sessionID: sessionID, database: database)
+            } label: {
+                Label("View Diagram", systemImage: "point.3.connected.trianglepath.dotted")
+            }
+            .help("See \(database)'s tables and the keys between them")
         }
+        .schemaDiagramPresenter($diagramRequest) { _, table in onOpenTable?(table) }
     }
 
     // MARK: - Charts

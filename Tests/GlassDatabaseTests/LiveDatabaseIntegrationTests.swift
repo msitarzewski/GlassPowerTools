@@ -274,6 +274,24 @@ struct LiveDatabaseIntegrationTests {
         #expect(!toTeams.referencedColumn.isEmpty)
     }
 
+    @Test("The schema diagram reads the seeded tables and draws members → teams", .enabled(if: LiveDB.hasMySQL || LiveDB.hasPostgres),
+          arguments: [DatabaseEngineType.mysql, .postgresql])
+    func schemaDiagramOnRealServers(engine: DatabaseEngineType) async throws {
+        guard engine == .mysql ? LiveDB.hasMySQL : LiveDB.hasPostgres else { return }
+        let (manager, sessionID, connection) = try await connect(engine)
+        defer { Task { await manager.disconnect(sessionID: sessionID) } }
+        let namespace = engine == .postgresql ? "public" : LiveDB.fixtureNamespace(.mysql)
+
+        let diagram = try await SchemaDiagramLoader.load(connection: connection, database: namespace)
+        #expect(diagram.table(named: "teams") != nil && diagram.table(named: "members") != nil)
+        let key = try #require(diagram.relationships.first { $0.fromTable == "members" && $0.toTable == "teams" })
+        #expect(!key.fromColumns.isEmpty && key.fromColumns.count == key.toColumns.count)
+        #expect(key.toColumns.allSatisfy { !$0.isEmpty && $0 != "NULL" })
+        let members = try #require(diagram.table(named: "members"))
+        #expect(members.columns.contains { $0.isForeignKey && key.fromColumns.contains($0.name) })
+        #expect(diagram.table(named: "teams")?.columns.contains(where: \.isPrimaryKey) == true)
+    }
+
     @Test("PostgreSQL: databases() reports schemas, and the foreign key is visible in `public`",
           .enabled(if: LiveDB.hasPostgres))
     func postgresSchemaAndForeignKey() async throws {
