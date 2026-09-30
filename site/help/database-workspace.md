@@ -66,3 +66,12 @@ If the server closes the connection, the workspace shows **Disconnected** and ke
 - **File ▸ Close Active Tab** (⇧⌘W). ⌘W also closes the active tab rather than the window.
 - **File ▸ New Connections Window** (⇧⌘N).
 - **Command Palette…** (⇧⌘P or ⌘K). Type `connect:` to connect a saved database, or a connected service's name and a period to step into its databases and tables.
+
+## Database settings
+
+Open **Settings** and choose **Databases**:
+
+- **Result row limit** and **Query history limit** keep memory use bounded.
+- **Redact literals in query history** replaces quoted strings and numbers before a statement is kept in history. It never changes what is sent to the database.
+- **Notify when a query fails** shows a private notification with no SQL, schema names or server details.
+- **SQL editor text** and **Results grid text** set their text sizes, with line numbers and JSON formatting in the record editor.

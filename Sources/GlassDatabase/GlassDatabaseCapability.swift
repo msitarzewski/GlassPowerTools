@@ -141,6 +141,15 @@ public final class GlassDatabaseCapability: GlassCapability {
 
     public init(runtime: GlassDatabaseRuntime) { self.runtime = runtime }
 
+    /// Settings ▸ Databases. The page existed (glassdb's settings window) and nothing presented it,
+    /// so query limits, history and the editor's settings could not be changed (help audit).
+    public var settingsPages: [GlassCapabilitySettingsPage] {
+        let settings = runtime.settingsManager
+        return [GlassCapabilitySettingsPage(id: "database.general", title: "Databases", systemImage: "cylinder.split.1x2") {
+            AnyView(SettingsView(isShellPage: true).environment(settings))
+        }]
+    }
+
     // MARK: Open sessions (D1)
 
     /// One row per live session, by connection name.

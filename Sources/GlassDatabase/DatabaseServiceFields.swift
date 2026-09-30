@@ -339,7 +339,7 @@ struct DatabaseAdvancedFields: View {
         DatabaseFormTextField(label: "Rows per page", text: $draft.rowPageSize, field: .rowPageSize,
                               identifier: "\(identifierPrefix)-row-page-size", isRequired: false,
                               message: draft.message(for: .rowPageSize, in: issues),
-                              focus: $focusedField, prompt: "App setting") {}
+                              focus: $focusedField, prompt: "100") {}
     }
 }
 

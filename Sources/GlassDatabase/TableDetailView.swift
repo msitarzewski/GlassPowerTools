@@ -3769,7 +3769,14 @@ struct DataTabView: View {
         guard let connectionID = session?.connectionConfig.id else { return }
         let key = GridQueryState.storageKey(connectionID: connectionID, database: database, table: table)
         guard let data = UserDefaults.standard.data(forKey: key),
-              let state = try? JSONDecoder().decode(GridQueryState.self, from: data) else { return }
+              let state = try? JSONDecoder().decode(GridQueryState.self, from: data) else {
+            // A table not opened before starts at the service's own Rows per page. The setting
+            // was saved and validated, then never read: every grid began at 100 (help audit).
+            if let preferred = session?.connectionConfig.rowPageSize {
+                pageSize = DatabaseConnectionConfig.clampedRowPageSize(preferred)
+            }
+            return
+        }
         filters = state.filters
         sorts = state.sorts
         groupColumns = state.groupColumns

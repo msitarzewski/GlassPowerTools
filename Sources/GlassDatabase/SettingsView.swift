@@ -12,19 +12,20 @@ import GlassDBKit
 
 struct SettingsView: View {
     @Environment(SettingsManager.self) private var settingsManager
-
+    /// A page in the shell's Settings: the sections only. The shell owns the window, its About and
+    /// its Privacy; this view's own tabs and About (with a version from glassdb) are for the
+    /// workspace's gear, which opens it standalone.
+    var isShellPage = false
 
     var body: some View {
         @Bindable var settings = settingsManager
 
         Group {
-            #if os(macOS)
-            macSettings
-            #elseif os(iOS)
-            iOSSettings
-            #else
-            spatialSettings
-            #endif
+            if isShellPage {
+                shellPage
+            } else {
+                standalone
+            }
         }
         .onChange(of: settings.resultRowLimit) { _, _ in settingsManager.saveSettings() }
         .onChange(of: settings.maxQueryHistoryItems) { _, _ in settingsManager.saveSettings() }
@@ -34,6 +35,29 @@ struct SettingsView: View {
         .onChange(of: settings.showLineNumbers) { _, _ in settingsManager.saveSettings() }
         .onChange(of: settings.autoFormatJSONInRecordEditor) { _, _ in settingsManager.saveSettings() }
         .onChange(of: settings.showSidebarByDefault) { _, _ in settingsManager.saveSettings() }
+    }
+
+    private var shellPage: some View {
+        Form {
+            querySection
+            editorSection
+            #if os(iOS)
+            iOSWorkspaceSection
+            #endif
+        }
+        .formStyle(.grouped)
+    }
+
+    @ViewBuilder private var standalone: some View {
+        Group {
+            #if os(macOS)
+            macSettings
+            #elseif os(iOS)
+            iOSSettings
+            #else
+            spatialSettings
+            #endif
+        }
     }
 
     #if os(macOS)

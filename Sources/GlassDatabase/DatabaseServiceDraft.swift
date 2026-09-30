@@ -229,7 +229,7 @@ final class DatabaseServiceDraft: GlassServiceDraft {
         let trimmed = Self.normalized(rowPageSize)
         guard !trimmed.isEmpty else { return }
         if Int(trimmed).map({ (1...10_000).contains($0) }) != true {
-            issues[.rowPageSize] = "Enter a page size from 1 through 10000, or leave it blank to use the app's setting."
+            issues[.rowPageSize] = "Enter a page size from 1 through 10000, or leave it blank for 100."
         }
     }
 

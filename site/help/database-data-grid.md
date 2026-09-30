@@ -30,7 +30,7 @@ A value that cannot fit the column's type is reported before the query runs. The
 
 ## Page through rows
 
-The bar under the grid shows the rows loaded, the total when known, and the time taken. Use the arrows to change page, and type a value from 1 through 10,000 in **Per page:** (100 by default). Choose **Calculate Total…** to run an exact count, stopped after 30 seconds.
+The bar under the grid shows the rows loaded, the total when known, and the time taken. Use the arrows to change page, and type a value from 1 through 10,000 in **Per page:**. A table you have not opened before starts at the service's **Rows per page**, set when you add or edit the database, or 100. Choose **Calculate Total…** to run an exact count, stopped after 30 seconds.
 
 ## Choose, freeze and resize columns
 

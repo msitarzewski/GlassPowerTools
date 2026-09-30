@@ -1,6 +1,6 @@
 # Settings and window appearance
 
-Settings for the whole app are in one place. This page covers opening Settings, the **General**, **Appearance**, **Privacy** and **About** pages, and how to make windows more or less transparent. The pages after **About** (**Connections**, **Terminal**, **Snippets** and **Editor**) are described in the help for those features.
+Settings for the whole app are in one place. This page covers opening Settings, the **General**, **Appearance**, **Privacy** and **About** pages, and how to make windows more or less transparent. The pages after **About** (**Connections**, **Terminal**, **Snippets**, **Databases**, **Desktops** and **Editor**) are described in the help for those features.
 
 ## Open Settings
 
