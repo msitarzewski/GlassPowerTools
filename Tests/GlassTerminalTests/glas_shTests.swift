@@ -1162,7 +1162,10 @@ struct glas_shTests {
         source.blinkingCursor = false
         source.saveSettings()
 
-        let syncDeadline = ContinuousClock.now + .seconds(5)
+        // 30 s, not 5: the push runs on the main actor, which the full suite's editor-layout tests
+        // hold for seconds at a time; both waits expired there (2026-09-29). Polling stops the
+        // moment the sync lands, so a passing run is no slower.
+        let syncDeadline = ContinuousClock.now + .seconds(30)
         while sourceService.acceptedEnvelope?.payload.selectedThemeID != importedID,
               ContinuousClock.now < syncDeadline {
             try await Task.sleep(for: .milliseconds(50))
@@ -1175,7 +1178,7 @@ struct glas_shTests {
             iCloudSettingsSyncService: destinationService
         )
 
-        let destinationSyncDeadline = ContinuousClock.now + .seconds(5)
+        let destinationSyncDeadline = ContinuousClock.now + .seconds(30)
         while destination.selectedThemeID != importedID,
               ContinuousClock.now < destinationSyncDeadline {
             try await Task.sleep(for: .milliseconds(50))

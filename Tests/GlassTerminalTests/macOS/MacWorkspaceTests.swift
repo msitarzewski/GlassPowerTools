@@ -751,6 +751,15 @@ struct MacWorkspaceTests {
         #expect(broker.pendingCount == 0)
     }
 
+    /// The clock decides, not the tidy-up task: with the main thread held past the deadline the
+    /// task cannot have run, and the ticket must still be refused.
+    @Test @MainActor func expiredTicketIsRefusedEvenBeforeItIsTidiedAway() throws {
+        let broker = MacStartupCommandBroker(capacity: 1, expiration: .milliseconds(10))
+        let ticketID = try #require(broker.issue(command: "echo late"))
+        Thread.sleep(forTimeInterval: 0.03)
+        #expect(broker.claim(ticketID) == nil)
+    }
+
     @Test @MainActor func liveSessionBrokerIsBoundedAndClaimsExactlyOnce() throws {
         let broker = MacLiveSessionBroker(capacity: 1)
         let first = TerminalSession(

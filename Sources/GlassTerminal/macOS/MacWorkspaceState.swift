@@ -571,6 +571,10 @@ final class MacStartupCommandBroker {
 
     private struct Entry {
         let ticket: TerminalStartupCommandTicket
+        /// When the ticket stops being claimable. `claim` checks it, so expiry follows the clock;
+        /// the task below only tidies up. A ticket used to stay claimable until that task happened
+        /// to run, late whenever the main thread was busy (a flaky test, 2026-09-29).
+        let deadline: ContinuousClock.Instant
         let expirationTask: Task<Void, Never>
     }
 
@@ -603,7 +607,7 @@ final class MacStartupCommandBroker {
             }
             self?.discard(id)
         }
-        entriesByID[id] = Entry(ticket: ticket, expirationTask: expirationTask)
+        entriesByID[id] = Entry(ticket: ticket, deadline: .now + expiration, expirationTask: expirationTask)
         insertionOrder.append(ticket.id)
         return ticket.id
     }
@@ -612,7 +616,7 @@ final class MacStartupCommandBroker {
         insertionOrder.removeAll { $0 == id }
         guard let entry = entriesByID.removeValue(forKey: id) else { return nil }
         entry.expirationTask.cancel()
-        return entry.ticket
+        return ContinuousClock.now < entry.deadline ? entry.ticket : nil
     }
 
     func discard(_ id: UUID) {
