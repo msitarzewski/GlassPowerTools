@@ -35,8 +35,8 @@ The rows are deleted in one transaction. If any of them changed since the page l
 ## Paste or import a range
 
 1. Select the cell where the range should start.
-2. Choose the paste button to use the clipboard, or **Import TSV** to choose a UTF-8 tab-separated file of up to 10 MB.
-3. Turn on **Header** when the first line holds column names. Otherwise columns are matched from the selected cell.
+2. Choose **More** (…) **▸ Paste Rows** to use the clipboard, or **More ▸ Import TSV…** to choose a UTF-8 tab-separated file of up to 10 MB. **On iPad and Vision Pro**, the system asks before the app reads what another app copied.
+3. Turn on **More ▸ First Row Is Column Names** when the first line holds column names. Otherwise columns are matched from the selected cell.
 4. Choose **Stage Paste** after checking the preview, then **Commit**.
 
 A pasted range updates rows already loaded, starting at the selected cell; it does not add rows. It must fit the loaded rows and visible columns.

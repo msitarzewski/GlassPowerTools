@@ -26,7 +26,7 @@ In a table, sorting asks the server for the rows in that order. Sorts, filters a
 3. Choose a **Column** and a **Condition** (**Equals**, **Does Not Equal**, **Greater Than**, **Less Than**, **Is NULL** or **Is Not NULL**), enter a **Value**, and choose **Add Condition**. Each column can have one condition.
 4. Choose **Done**.
 
-A value that cannot fit the column's type is reported before the query runs. The **Filter** button shows how many conditions are active.
+A value that cannot fit the column's type is reported before the query runs. The **Filter** button's icon fills in while conditions are active, and VoiceOver reads how many.
 
 ## Page through rows
 
@@ -39,9 +39,9 @@ Choose **Columns** to open **Manage Columns**. Turn **Visible** and **Frozen** o
 ## Select, copy and compare
 
 - Select a cell to select it; select a row number to select the whole row. **On Mac:** Shift-click a row number to extend the selection and Command-click to add or remove a row.
-- The arrow buttons extend a cell selection left, right, up or down.
+- **More** (…) **▸ Extend Selection** extends a cell selection left, right, up or down.
 - **Copy** copies the selection as tab-separated text.
-- **Compare** lists the differences between exactly two selected rows.
+- **More** (…) **▸ Compare Rows** lists the differences between exactly two selected rows.
 
 ## Analyze
 

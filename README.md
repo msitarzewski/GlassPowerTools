@@ -21,8 +21,9 @@ in the room. The Mac, iPad and iPhone apps are the same app, adapted to each.
   Secure Enclave), tabs, themes, workgroups, port forwarding, and an SFTP file browser. A local
   shell on the Mac.
 - **Databases:** MySQL, PostgreSQL and SQLite — browse, filter and edit rows, follow foreign keys,
-  write and explain queries, reach a database directly with TLS or through the machine's own SSH
-  connection, or mark it read-only.
+  see a live diagram of every table and key (in three dimensions on Vision Pro), write and explain
+  queries, reach a database directly with TLS or through the machine's own SSH connection, or mark
+  it read-only.
 - **Remote desktops:** RDP and VNC, with the remote resolution following the window, audio and
   clipboard.
 - **Editor:** files on this device or on a server, projects with a file tree, syntax highlighting

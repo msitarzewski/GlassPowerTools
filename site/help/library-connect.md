@@ -41,7 +41,7 @@ Choose a session in **Active** to switch to it. The open session comes back to t
 
 Every session has **Active Connections** (⚡) in its top toolbar, and the library has one too.
 
-- **On Vision Pro, Mac and iPad:** ⚡ brings the library window forward and opens **Active**.
+- **On Vision Pro, Mac and iPad:** ⚡ brings the library window forward and opens **Active**. **On Vision Pro** there is only ever one library window, and a desktop's ⚡ is first in its control bar.
 - **On iPhone:** ⚡ leaves the session screen and opens **Active** in the library.
 
 ## Close a session

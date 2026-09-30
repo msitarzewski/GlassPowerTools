@@ -29,6 +29,10 @@ If you are not signed in to iCloud, or iCloud is unavailable, the library on thi
 
 ## Check the sync status
 
+The foot of the library's sidebar shows the iCloud status, for example **Synced with iCloud** and a time. Choose it (**on Vision Pro**, the cloud) for the details: when the last sync finished, how many records are in iCloud and how many were received and sent, and **Sync Now**.
+
+Settings shows the same status:
+
 1. Open **Settings** and choose **Privacy**.
 2. Under **On your other devices**, read **Host library**:
    - **Synced** followed by a time: the last sync finished then.
@@ -39,7 +43,7 @@ If you are not signed in to iCloud, or iCloud is unavailable, the library on thi
 ## When two devices disagree
 
 - If you edit the same host on two devices, the most recent edit wins for the whole host.
-- If you delete a host on one device, it is deleted on the others, together with its services' saved settings and passwords. A deletion wins over an edit made at the same moment.
+- If you delete a host on one device, it is deleted on the others, together with its services' saved settings and passwords. A deletion is final: an edit made on another device, even a later one, does not bring the host back.
 - If two devices each set up the same machine, with the same name and the same address, the two are combined into one host the next time the library syncs. Where both have a service of the same kind and name, one is kept.
 
 > [!TIP]

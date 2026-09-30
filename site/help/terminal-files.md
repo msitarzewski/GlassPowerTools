@@ -53,7 +53,7 @@ Right-click an item, or touch and hold it, for its menu.
 > [!NOTE]
 > Delete removes a folder only when it is empty. Delete the folder's contents first.
 
-To act on several items at once, select them; **Select All** (⌘A) in the ellipsis (…) menu selects everything. **On iPhone and iPad**, choose **Select…** in that menu first, or swipe right on a file. While items are selected, a bar at the bottom offers **Download**, **Delete** and **Deselect All**.
+To act on several items at once, select them; **Select All** (⌘A) in the ellipsis (…) menu selects everything. **On Vision Pro, iPhone and iPad**, choose **Select…** in that menu first, or swipe right on a file. While items are selected, a bar at the bottom offers **Download**, **Delete** and **Deselect All**.
 
 **Get Info** shows a file's size, modification date, read-only permissions and SFTP address.
 
