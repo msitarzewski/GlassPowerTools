@@ -399,15 +399,32 @@ final class SQLiteDatabaseConnection: DatabaseConnection, @unchecked Sendable {
             "PRAGMA \(quotedIdentifier(database)).foreign_key_list(\(quotedIdentifier(table)))",
             parameters: []
         )
-        return result.rows.map { row in
-            ForeignKeyInfo(
+        // `REFERENCES customers` with no column list names the target's primary key, and the
+        // pragma reports that as a NULL `to` column. It was passed on as a column called "NULL",
+        // so the Foreign Keys view showed "NULL" and Follow Reference filtered on a column that
+        // does not exist (found by the schema diagram's tests, 2026-09-30).
+        var primaryKeys: [String: [String]] = [:]
+        var keys: [ForeignKeyInfo] = []
+        for row in result.rows {
+            let target = row[safe: 2]?.displayString ?? ""
+            let sequence = Int(row[safe: 1]?.displayString ?? "0") ?? 0
+            var referenced = row[safe: 4].flatMap { $0.isNull ? nil : $0.displayString }
+            if referenced == nil {
+                if primaryKeys[target] == nil {
+                    primaryKeys[target] = try await columns(in: target, database: database)
+                        .filter(\.isPrimaryKey).map(\.name)
+                }
+                referenced = primaryKeys[target].flatMap { $0.indices.contains(sequence) ? $0[sequence] : nil }
+            }
+            keys.append(ForeignKeyInfo(
                 constraintName: "fk_\(row[safe: 0]?.displayString ?? "0")",
                 columnName: row[safe: 3]?.displayString ?? "",
-                referencedTable: row[safe: 2]?.displayString ?? "",
-                referencedColumn: row[safe: 4]?.displayString ?? "",
-                ordinalPosition: (Int(row[safe: 1]?.displayString ?? "0") ?? 0) + 1
-            )
+                referencedTable: target,
+                referencedColumn: referenced ?? "",
+                ordinalPosition: sequence + 1
+            ))
         }
+        return keys
     }
 
     func tableStatus(in database: String) async throws -> [TableStatus] {
