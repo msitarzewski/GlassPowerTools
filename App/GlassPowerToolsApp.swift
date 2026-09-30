@@ -300,31 +300,13 @@ struct GlassPowerToolsApp: App {
     /// (`../glas.sh/glas.sh/glas_shApp.swift:99-113`): without a default size the window opened
     /// at the sidebar's ideal height and clipped the detail.
     private var mainScene: some Scene {
-        let group = WindowGroup("Connections", id: "main") {
-            GlassTerminalBootstrap(runtime: terminal) {
-                GlassDatabaseBootstrap(runtime: database) {
-                    GlassDesktopBootstrap(runtime: desktop) {
-                        GlassEditorBootstrap(runtime: editor) {
-                            GlassShellLibraryView(model: model)
-                        }
-                    }
-                }
-            }
-            .glassLayers(layers)
-            // The registry reaches every session's own chrome from here: the switcher's control
-            // is drawn inside a terminal, a workspace or an editor, and each of those is a view
-            // in this scene (or a cover presented from it), not something the shell can reach.
-            .environment(model.registry)
-            .trackWindowPresence(key: "main", recovery: windowRecovery)
-            #if os(macOS)
-            .onAppear { terminal.attach(to: appDelegate) }
-            #endif
-            #if DEBUG
-            // Screenshots: `--demo-open <surface>` in a `--ui-testing` run (GlassDemoMode.swift).
-            // After the bootstraps mount, so each surface's request is drained where it always is.
-            .task { await GlassDemoMode.run(editor: editor, terminal: terminal, database: database, desktop: desktop, layers: layers) }
-            #endif
-        }
+        #if os(visionOS)
+        // **One Connections window on the headset** (owner, 2026-09-29). A window group made a new
+        // one for every bolt and every "show Connections"; a `Window` scene is opened once and
+        // brought forward after that, whoever asks.
+        return Window("Connections", id: "main") { mainContent }
+        #else
+        let group = WindowGroup("Connections", id: "main") { mainContent }
         #if os(macOS)
         return group
             .defaultSize(width: 1180, height: 720)
@@ -341,6 +323,34 @@ struct GlassPowerToolsApp: App {
             }
         #else
         return group
+        #endif
+        #endif
+    }
+
+    /// The library, inside every capability's bootstrap, as each Connections window shows it.
+    private var mainContent: some View {
+        GlassTerminalBootstrap(runtime: terminal) {
+            GlassDatabaseBootstrap(runtime: database) {
+                GlassDesktopBootstrap(runtime: desktop) {
+                    GlassEditorBootstrap(runtime: editor) {
+                        GlassShellLibraryView(model: model)
+                    }
+                }
+            }
+        }
+        .glassLayers(layers)
+        // The registry reaches every session's own chrome from here: the switcher's control
+        // is drawn inside a terminal, a workspace or an editor, and each of those is a view
+        // in this scene (or a cover presented from it), not something the shell can reach.
+        .environment(model.registry)
+        .trackWindowPresence(key: "main", recovery: windowRecovery)
+        #if os(macOS)
+        .onAppear { terminal.attach(to: appDelegate) }
+        #endif
+        #if DEBUG
+        // Screenshots: `--demo-open <surface>` in a `--ui-testing` run (GlassDemoMode.swift).
+        // After the bootstraps mount, so each surface's request is drained where it always is.
+        .task { await GlassDemoMode.run(editor: editor, terminal: terminal, database: database, desktop: desktop, layers: layers) }
         #endif
     }
 

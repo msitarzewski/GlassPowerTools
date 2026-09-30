@@ -463,7 +463,7 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
 
     /// Attached to every platform's navigation so the ⚡ works on each.
     private func honouringPanelRequests<Content: View>(_ content: Content) -> some View {
-        content.onChange(of: panelToOpen.wrappedValue) { _, wanted in
+        content.onChange(of: panelToOpen.wrappedValue, initial: true) { _, wanted in
             guard let wanted, panels.contains(where: { $0.id == wanted }) else { return }
             open(wanted)
             panelToOpen.wrappedValue = nil

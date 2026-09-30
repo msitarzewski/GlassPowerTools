@@ -227,11 +227,21 @@ public struct GlassActiveConnectionsToolbarModifier: ViewModifier {
 /// window-or-dismiss decision — it is already where the bolt goes.
 public struct GlassActiveConnectionsButton: View {
     private let action: () -> Void
+    @Environment(\.openWindow) private var openWindow
 
     public init(action: @escaping () -> Void) { self.action = action }
 
     public var body: some View {
-        Button(action: action) {
+        Button {
+            #if os(visionOS)
+            // Every bolt on the headset brings the one Connections window forward (a `Window`
+            // scene there, so this reuses it) and opens Active in it. The desktop's control-bar
+            // bolt only asked for Active, which did nothing while Connections was closed
+            // (2026-09-29).
+            openWindow(id: "main")
+            #endif
+            action()
+        } label: {
             Label("Active Connections", systemImage: "bolt.fill")
         }
         .labelStyle(.iconOnly)

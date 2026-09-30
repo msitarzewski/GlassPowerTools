@@ -107,7 +107,9 @@ public struct GlassShellLibraryView: View {
             model.hostToShow = nil
         }
         // The ⚡ from anywhere in the app: the model says which panel, the library opens it.
-        .onChange(of: model.panelToShow) { _, wanted in
+        // `initial`: a bolt that brought the window back from closed asked before this view
+        // existed, and a plain onChange never sees a value that was already there.
+        .onChange(of: model.panelToShow, initial: true) { _, wanted in
             guard let wanted else { return }
             panelRequest = wanted
             model.panelToShow = nil
