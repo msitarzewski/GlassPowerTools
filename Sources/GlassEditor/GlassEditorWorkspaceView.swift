@@ -226,7 +226,7 @@ public struct GlassEditorWorkspaceView: View {
                                                 max: GlassLibraryColumnLayout.navigationMaximum)
                 .glassLibraryColumnAutosave("com.glasspowertools.editor.columns")
         } detail: {
-            GlassLayeredPanel(role: .embedded) { detail }
+            GlassLayeredPanel(cornerRadius: 0, role: .embedded) { detail }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .toolbar { toolbarContent(includingDismissal: true) }
@@ -323,7 +323,7 @@ public struct GlassEditorWorkspaceView: View {
     }
 
     private var documentScreen: some View {
-        GlassLayeredPanel(role: .embedded) { detail }
+        GlassLayeredPanel(cornerRadius: 0, role: .embedded) { detail }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .toolbar { toolbarContent(includingDismissal: compactPath.isEmpty) }
             .glassActiveConnectionsToolbar(show: runtime?.showActiveConnections, dismissCurrent: dismissal?.action)
