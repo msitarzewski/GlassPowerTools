@@ -21,6 +21,36 @@ public struct GlassICloudStatusFooter: View {
     public init(model: GlassShellModel) { self.model = model }
 
     public var body: some View {
+        #if os(visionOS)
+        // On the headset a row-wide button lights up as a platter wherever the eyes land, which
+        // reads as a big button rather than a status line (2026-09-29). The words are plain text,
+        // as Mail's "Updated" line is; only the cloud is a button, and only it highlights.
+        HStack(spacing: 8) {
+            Button {
+                showingDetails = true
+            } label: {
+                Image(systemName: symbol)
+                    .symbolEffect(.rotate, isActive: isSyncing)
+                    .foregroundStyle(isProblem ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+            }
+            .buttonStyle(.borderless)
+            .buttonBorderShape(.circle)
+            .help(model.catalogSyncStatusDescription)
+            .accessibilityLabel("iCloud")
+            .accessibilityValue(model.catalogSyncStatusDescription)
+            .accessibilityIdentifier("library-icloud-status")
+            .popover(isPresented: $showingDetails) {
+                GlassICloudStatusDetails(model: model)
+            }
+            Text(shortStatus)
+                .lineLimit(1)
+                .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
+            Spacer(minLength: 0)
+        }
+        .font(.footnote)
+        .padding(.horizontal, 16).padding(.vertical, 10)
+        #else
         Button {
             showingDetails = true
         } label: {
@@ -39,11 +69,9 @@ public struct GlassICloudStatusFooter: View {
         }
         .buttonStyle(.plain)
         // The list scrolls under it, so it needs a surface of its own: the bar material, with the
-        // hairline Apple's footers draw above it. The headset's window is already glass.
-        #if !os(visionOS)
+        // hairline Apple's footers draw above it.
         .background(.bar)
         .overlay(alignment: .top) { Divider() }
-        #endif
         .help(model.catalogSyncStatusDescription)
         .accessibilityLabel("iCloud")
         .accessibilityValue(model.catalogSyncStatusDescription)
@@ -52,6 +80,7 @@ public struct GlassICloudStatusFooter: View {
             GlassICloudStatusDetails(model: model)
                 .presentationCompactAdaptation(.popover)
         }
+        #endif
     }
 
     /// One line that fits a sidebar; the popover has the rest.
