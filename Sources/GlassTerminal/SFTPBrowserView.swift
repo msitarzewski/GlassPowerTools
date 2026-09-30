@@ -513,7 +513,7 @@ struct SFTPBrowserView: View {
     @State private var isSelectingFiles = false
 
     private var showsSelectionControls: Bool {
-        #if os(iOS)
+        #if os(iOS) || os(visionOS)
         isSelectingFiles
         #else
         true
@@ -1345,7 +1345,7 @@ struct SFTPBrowserView: View {
                         Label("Delete", systemImage: "trash")
                     }
                 }
-                #if os(iOS)
+                #if os(iOS) || os(visionOS)
                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
                     if !isDirectory(entry) {
                         Button {
@@ -2274,7 +2274,7 @@ struct SFTPBrowserView: View {
 
         ToolbarItem(placement: .primaryAction) {
             Menu {
-                #if os(iOS)
+                #if os(iOS) || os(visionOS)
                 Button {
                     isSelectingFiles.toggle()
                     if !isSelectingFiles { selectedFilenames.removeAll() }
