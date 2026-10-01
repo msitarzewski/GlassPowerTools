@@ -730,6 +730,12 @@ enum KeychainManager {
         try SSHHostTrustKeychainStore.allPinnedHosts(config: hostTrustConfig)
     }
 
+    /// Forgets every key trusted for `host`:`port`; the next connection asks again (Ask mode) or is
+    /// refused (Strict).
+    static func forgetHostKeys(host: String, port: Int) throws {
+        try SSHHostTrustKeychainStore.delete(host: host, port: port, config: hostTrustConfig)
+    }
+
     static func trustedHostKeyBase64Set(host: String, port: Int) throws -> Set<String> {
         let records = try SSHHostTrustKeychainStore.authorizedRecords(host: host, port: port, config: hostTrustConfig)
         return Set(records.map { $0.publicKeyData.base64EncodedString() })

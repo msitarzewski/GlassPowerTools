@@ -113,6 +113,8 @@ struct GeneralSettingsView: View {
                 }
             }
 
+            TrustedHostKeysSection()
+
             Section("Tailscale") {
                 TextField("Tailnet name", text: $settings.tailscaleTailnet)
                     .terminalTextInputDefaults()
@@ -1732,4 +1734,84 @@ private let relativeDateFormatter: RelativeDateTimeFormatter = {
     TerminalSettingsView()
         .environment(SettingsManager())
         .environment(SessionManager(loadImmediately: false))
+}
+
+/// The host keys this app trusts, and a way to forget one (help audit: there was none). One row per
+/// host and port, with each active key's type and fingerprint.
+private struct TrustedHostKeysSection: View {
+    @State private var keys: [PinnedSSHHostKey] = []
+    @State private var loadError: String?
+    @State private var forgetting: Endpoint?
+
+    private struct Endpoint: Identifiable, Hashable {
+        var host: String
+        var port: Int
+        var id: String { "\(host):\(port)" }
+    }
+
+    private var endpoints: [(Endpoint, [PinnedSSHHostKey])] {
+        let active = keys.filter { $0.state == .active }
+        let grouped = Dictionary(grouping: active) { Endpoint(host: $0.host, port: $0.port) }
+        return grouped.sorted { $0.key.id.localizedStandardCompare($1.key.id) == .orderedAscending }
+    }
+
+    var body: some View {
+        Section {
+            if let loadError {
+                Label(loadError, systemImage: "exclamationmark.triangle").foregroundStyle(.orange)
+            } else if endpoints.isEmpty {
+                Text("No host keys are trusted yet. A key is trusted the first time you accept it when connecting.")
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(endpoints, id: \.0) { endpoint, hostKeys in
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(endpoint.port == 22 ? endpoint.host : "\(endpoint.host):\(endpoint.port)")
+                            .fontWeight(.medium)
+                        ForEach(hostKeys) { key in
+                            Text("\(key.algorithm)  \(key.sha256Fingerprint)")
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                            Text("Last seen \(key.lastSeenAt.formatted(date: .abbreviated, time: .shortened))")
+                                .font(.caption2).foregroundStyle(.tertiary)
+                        }
+                    }
+                    Spacer()
+                    Button("Forget…", role: .destructive) { forgetting = endpoint }
+                        .accessibilityLabel("Forget the host key for \(endpoint.host)")
+                }
+            }
+        } header: {
+            Text("Trusted Host Keys")
+        } footer: {
+            Text("Trusted keys sync to your other devices through iCloud Keychain. Forgetting one forgets it everywhere; the next connection asks you to check the key again.")
+        }
+        .task { reload() }
+        .confirmationDialog("Forget this host key?", isPresented: Binding(get: { forgetting != nil },
+                                                                          set: { if !$0 { forgetting = nil } }),
+                            titleVisibility: .visible, presenting: forgetting) { endpoint in
+            Button("Forget", role: .destructive) {
+                do {
+                    try KeychainManager.forgetHostKeys(host: endpoint.host, port: endpoint.port)
+                } catch {
+                    loadError = "The key could not be forgotten. \(error.localizedDescription)"
+                }
+                forgetting = nil
+                reload()
+            }
+            Button("Cancel", role: .cancel) { forgetting = nil }
+        } message: { endpoint in
+            Text("\(endpoint.host) will have to show its key again, on every device, before it is trusted.")
+        }
+    }
+
+    private func reload() {
+        do {
+            keys = try KeychainManager.allPinnedHostKeys()
+            loadError = nil
+        } catch {
+            loadError = "Trusted host keys could not be read. \(error.localizedDescription)"
+        }
+    }
 }
