@@ -1,6 +1,6 @@
 # Remote desktops on Apple Vision Pro
 
-On Apple Vision Pro a remote desktop is a window you can place, resize and see through. This page covers the window's controls, how input works in the headset, and the glass and background-removal settings. Background removal also works on Mac, iPad and iPhone.
+On Apple Vision Pro a remote desktop is a window you can place, resize and see through. This page covers the window's controls, how input works in the headset, and the glass and background-removal settings. Glass also works on Mac; background removal works on Mac, iPad and iPhone.
 
 ## The desktop window
 
@@ -31,7 +31,7 @@ In **Desktop Settings** > **Appearance**, the **Glass** section changes how the 
 - **Background Frost** changes the material behind it, from clear to frosted.
 - **Clear** and **Frosted** set the frost in one step.
 
-Set both to 0% for a clear canvas; the controls stay visible. These choices are remembered on this device and apply to the next desktop you open.
+Set both to 0% for a clear canvas; the controls stay visible. These choices are remembered on this device and apply to the next desktop you open. **On Mac** the same **Glass** section is in each desktop's **Desktop Settings** > **Appearance** and in **Settings** > **Desktops**: the desktop window fades over a frosted or clear backdrop showing what is behind it.
 
 > [!NOTE]
 > When Reduce Transparency is on in Accessibility settings, the glass controls are unavailable and the desktop is shown opaque with **Original** presentation.

@@ -47,7 +47,8 @@ public struct DesktopSessionView: View {
     @State private var showDisplayOptions = false
     @State private var settingsSection = DesktopSessionSettingsSection.appearance
     @State private var requestWallpaperAfterDisplay = false
-    #if os(visionOS)
+    // The desktop's glass, saved on this device: the headset's and, since 2026-09-30, the Mac's.
+    #if os(visionOS) || os(macOS)
     @AppStorage(DesktopGlassPreferenceKey.material) private var glassAmount = 0.25
     @AppStorage(DesktopGlassPreferenceKey.opacity) private var savedOpacity = 1.0
     @AppStorage("display.glass.mode") private var savedMode = TransparencyMode.original.rawValue
@@ -165,7 +166,17 @@ public struct DesktopSessionView: View {
             .background {
                 // visionOS uses the shared frost behind the image, including
                 // letterboxing. An opaque backing would defeat desktop opacity.
-                #if !os(visionOS)
+                #if os(macOS)
+                // The Mac's window is clear (`DesktopMetalSurface`), so it gets the same glass as the
+                // headset whenever the desktop is see-through: faded, or with a colour removed. An
+                // opaque desktop keeps its black letterbox (owner, 2026-09-30: "I don't have a
+                // transparency setting here?").
+                if session.frame == nil || (session.presentation.mode == .original && session.presentation.opacity >= 1) {
+                    Color.black
+                } else {
+                    GlassCanvasBackdrop(blurAmount: reduceTransparency ? 1 : glassAmount)
+                }
+                #elseif !os(visionOS)
                 if session.frame == nil || session.presentation.mode == .original { Color.black }
                 #endif
             }
@@ -208,7 +219,7 @@ public struct DesktopSessionView: View {
             session.pointerMode = DesktopPointerMode(rawValue: savedPointerMode)
                 ?? .standard(forCompactScreen: horizontalSizeClass == .compact)
             #endif
-            #if os(visionOS)
+            #if os(visionOS) || os(macOS)
             if !restoredPresentation {
                 restoreGlassPresentation()
                 restoredPresentation = true
@@ -249,7 +260,7 @@ public struct DesktopSessionView: View {
             .frame(width: 760, height: 560)
             #endif
         }
-        #if os(visionOS)
+        #if os(visionOS) || os(macOS)
         .onChange(of: savedOpacity) { _, value in
             if restoredPresentation && !reduceTransparency { session.presentation.opacity = value }
         }
@@ -278,7 +289,7 @@ public struct DesktopSessionView: View {
             }
         }
         .onChange(of: reduceTransparency, initial: true) { _, reduced in
-            #if os(visionOS)
+            #if os(visionOS) || os(macOS)
             if reduced {
                 session.presentation.mode = .original
                 session.presentation.opacity = 1
@@ -371,7 +382,9 @@ public struct DesktopSessionView: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("session.controls")
     }
+    #endif
 
+    #if os(visionOS) || os(macOS)
     private func restoreGlassPresentation() {
         session.presentation.opacity = reduceTransparency ? 1 : savedOpacity
         session.presentation.keyColor = SIMD3(Float(savedRed), Float(savedGreen), Float(savedBlue))
@@ -508,7 +521,7 @@ public struct DesktopSessionView: View {
 
     private var appearanceSettings: some View {
         Form {
-            #if os(visionOS)
+            #if os(visionOS) || os(macOS)
             DesktopGlassAppearanceControls(opacity: $session.presentation.opacity, frost: $glassAmount)
             #endif
             Section {
@@ -649,7 +662,7 @@ public struct DesktopSessionView: View {
             Section {
                 Button("Reset Presentation") {
                     session.presentation = PresentationSettings()
-                    #if os(visionOS)
+                    #if os(visionOS) || os(macOS)
                     glassAmount = 0.25
                     #endif
                 }.accessibilityIdentifier("display.reset")

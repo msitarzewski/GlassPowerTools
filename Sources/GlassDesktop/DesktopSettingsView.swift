@@ -37,12 +37,12 @@ struct DesktopGlassAppearanceControls: View {
 }
 
 /// Settings ▸ Desktops: what glassDT's own Settings window held that the shell's pages do not.
-/// Privacy and About are the shell's now, so only General and (on the headset) Appearance remain,
+/// Privacy and About are the shell's now, so only General and (on the headset and the Mac) Appearance remain,
 /// as one page. Until 2026-09-27 this view moved in with the capability and nothing showed it, so
 /// connection-failure notices could not be switched on.
 public struct DesktopSettingsView: View {
     @State private var notices = DesktopNotices.shared
-    #if os(visionOS)
+    #if os(visionOS) || os(macOS)
     @AppStorage(DesktopGlassPreferenceKey.opacity) private var opacity = 1.0
     @AppStorage(DesktopGlassPreferenceKey.material) private var frost = 0.25
     #endif
@@ -65,7 +65,7 @@ public struct DesktopSettingsView: View {
             } footer: {
                 Text("Receive a system notification when a remote desktop connection needs attention. Notices omit host names, account details, and server diagnostics.")
             }
-            #if os(visionOS)
+            #if os(visionOS) || os(macOS)
             DesktopGlassAppearanceControls(opacity: $opacity, frost: $frost)
             Section {
                 Button("Reset Appearance") { opacity = 1; frost = 0.25 }
