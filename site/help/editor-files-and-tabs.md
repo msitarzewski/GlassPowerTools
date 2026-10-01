@@ -24,7 +24,7 @@ Opening a file that is already open selects its tab instead of opening a second 
 
 ## Work with tabs
 
-When two or more documents are open, they appear as tabs above the text. Choose a tab to show it, or its close button to close it. A tab whose document has unsaved changes shows a dot after its name. Hold the pointer over a tab to see its folder, and the machine it is on when that is not this device.
+When two or more documents are open, they appear as tabs above the text. Choose a tab to show it, or its close button to close it. **On iPhone, iPad and Vision Pro**, **Close Document** (×) in the toolbar closes the document in front, including when it is the only one, and **Find** (magnifying glass, or ⌘F with a keyboard) opens the find bar. **On Mac**, use **File** ▸ **Close** (⌘W) and **Edit** ▸ **Find** (⌘F). A tab whose document has unsaved changes shows a dot after its name. Hold the pointer over a tab to see its folder, and the machine it is on when that is not this device.
 
 **On Mac:** the window's subtitle shows the project name and its folder, or the folder of a file opened on its own.
 

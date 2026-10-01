@@ -770,6 +770,23 @@ public struct GlassEditorWorkspaceView: View {
                 .disabled(workspace.selectedDocument?.isDirty != true)
                 .accessibilityIdentifier("editor-save")
         }
+        #if !os(macOS)
+        // **Find, and Close, off the Mac** (help audit): the Mac has both in its menu bar (⌘F, ⌘W);
+        // here the find bar had no way in, and with one document open there is no tab strip, so no
+        // close button either. The same actions the Mac's menu calls.
+        if let document = workspace.selectedDocument {
+            ToolbarItem(placement: .primaryAction) {
+                Button("Find", systemImage: "magnifyingglass") { workspace.findIsPresented.toggle() }
+                    .disabled(document.viewer != nil)
+                    .keyboardShortcut("f", modifiers: .command)
+                    .accessibilityIdentifier("editor-find")
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button("Close Document", systemImage: "xmark") { requestClose(document) }
+                    .accessibilityIdentifier("editor-close-document")
+            }
+        }
+        #endif
     }
 
     /// A phone has no room for the text and its preview side by side.
