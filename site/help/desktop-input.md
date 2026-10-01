@@ -1,6 +1,6 @@
 # Keyboard, pointer, clipboard and audio
 
-This page covers typing into a remote desktop, pointing and clicking on each device, exchanging clipboard text, and hearing the remote computer's sound.
+This page covers typing into a remote desktop, pointing and clicking on each device, sharing the clipboard, and hearing the remote computer's sound.
 
 ## Type on the remote computer
 
@@ -36,16 +36,17 @@ Buttons for keys that are hard to type:
 
 In both modes, two fingers scroll the remote desktop, and a connected trackpad or mouse moves the pointer when you hover. Your choice is remembered on this device.
 
-## Exchange clipboard text
+## Share the clipboard
 
-Turn on **Share clipboard text** in the service's **Advanced** settings to exchange clipboard text. It is off by default. Clipboard text moves only when you ask, from the **Clipboard** menu in the desktop window:
+Turn on **Share clipboard** in the service's **Advanced** settings to share the clipboard with the remote computer. It is off by default.
 
-- **Send Clipboard** — puts the text on this device's clipboard onto the remote computer's clipboard. Then paste on the remote computer as usual.
-- **Copy Remote Clipboard** — copies the text most recently copied on the remote computer to this device's clipboard. It is unavailable until the remote computer has copied something.
+- **Over RDP**, a copy carries its text, formatting (HTML and rich text) and images, both ways. Something copied on the remote computer is on this device's clipboard straight away.
+- **On Mac**, something you copy here reaches the remote computer when its window becomes active, and whenever you copy again while it is. **On iPhone, iPad and Vision Pro**, choose **Send Clipboard** in the **Clipboard** menu, because the system asks before an app reads another app's copy.
+- **Copy Remote Clipboard** in the **Clipboard** menu puts the remote computer's latest copy on this device's clipboard again.
 
-With **Share clipboard text** off, the menu offers **Type Clipboard Text** instead, which types this device's clipboard text into the remote computer as keystrokes.
+With **Share clipboard** off, the menu offers **Type Clipboard Text** instead, which types this device's clipboard text into the remote computer as keystrokes.
 
-Only text is exchanged; files and images are not. Over VNC, clipboard text is limited to Western European (Latin-1) characters, and other characters are dropped.
+Files are not shared through the clipboard. Over VNC only text is shared, limited to Western European (Latin-1) characters; other characters are dropped.
 
 ## Hear the remote computer (RDP)
 

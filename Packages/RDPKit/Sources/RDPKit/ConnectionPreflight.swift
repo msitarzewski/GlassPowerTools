@@ -5702,6 +5702,8 @@ private func handleClipboardPacket(
         session.sendFormatListResponse(ok: true)
         if let fileGroupDescriptorWFormatID = formatList.fileGroupDescriptorWFormatID {
             session.requestFileGroupDescriptorW(formatID: fileGroupDescriptorWFormatID)
+        } else if session.beginRemoteFetch(formatList) {
+            // Text, HTML, RTF and an image, one request at a time (D42a).
         } else if formatList.formatIDs.contains(RDPClipboardFormatID.unicodeText) {
             session.requestUnicodeText()
         }
@@ -5731,7 +5733,12 @@ private func handleClipboardPacket(
                 try onClipboardText?(response.decodedUnicodeText())
             case .fileGroupDescriptorW:
                 try onClipboardFileGroupDescriptor?(response.decodedFileGroupDescriptorW())
+            case .rich(let format):
+                session.receiveRemoteFormat(format, response: response)
             }
+        } else if case .rich(let format) = pendingResponse {
+            // A format the server listed and then could not give: skip it, keep the rest.
+            session.receiveRemoteFormat(format, response: response)
         }
         return true
     }

@@ -29,7 +29,7 @@ enum ProbeError: Error, CustomStringConvertible {
                 switch event {
                 case .certificate(let value): certificate = value
                 case .displayCapabilities(let value): capabilities = value
-                case .clipboard(let value): clipboard = value
+                case .clipboard(let value): clipboard = value.text
                 case .state(.connected): connected = true
                 case .state(.failed(let value)): failure = value
                 default: break

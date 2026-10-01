@@ -346,7 +346,8 @@ import Testing
     let fittingResponse = try #require(RDPClipboardFormatDataResponsePDU.unicodeTextIfEncodable(fittingText))
 
     #expect(RDPClipboardLimits.canPublishUnicodeText(fittingText))
-    #expect(RDPStaticVirtualChannelPDU.canEncodeSinglePayload(fittingResponse.encoded()))
+    // Several chunks carry it now; the limit is the clipboard's, not one chunk's (2026-09-30).
+    #expect(fittingResponse.data.count <= RDPClipboardFormatDataResponsePDU.maximumDataByteCount)
 
     let oversizedText = fittingText + "a"
 

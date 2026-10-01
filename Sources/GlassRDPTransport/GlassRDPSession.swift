@@ -147,11 +147,12 @@ public actor GlassRDPSession {
                                         desktopScaleFactor: UInt32(desktopScale), deviceScaleFactor: 100)
     }
 
-    public func sendClipboard(_ text: String) throws {
+    public func sendClipboard(_ content: GlassClipboardContent) throws {
         guard let clipboard = controls?.snapshot.clipboard else {
             throw GlassRDPError.unsupported("Clipboard sharing is disabled or was not negotiated.")
         }
-        clipboard.publishLocalUnicodeText(text)
+        clipboard.publishLocalContent(RDPClipboardRichContent(text: content.text, html: content.html,
+                                                              rtf: content.rtf, png: content.png))
     }
 
     private func readyInput() throws -> RDPInputSession {
@@ -219,8 +220,15 @@ public actor GlassRDPSession {
                 controls.setDisplay(display)
                 events.yield(.displayCapabilities(capabilities(display.capabilities)))
             },
-            onClipboardReady: { controls.setClipboard($0) },
-            onClipboardText: { events.yield(.clipboard($0)) },
+            onClipboardReady: { clipboard in
+                // Every format the server offers, not only its text (D42a).
+                clipboard.setRemoteContentHandler { rich in
+                    events.yield(.clipboard(GlassClipboardContent(text: rich.text, html: rich.html,
+                                                                  rtf: rich.rtf, png: rich.png)))
+                }
+                controls.setClipboard(clipboard)
+            },
+            onClipboardText: { events.yield(.clipboard(GlassClipboardContent(text: $0))) },
             onAudioSample: { sample in
                 if sample.format.isPCM16Bit {
                     events.yield(.audio(.init(sampleRate: Double(sample.format.samplesPerSecond),

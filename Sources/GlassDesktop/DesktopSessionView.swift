@@ -105,6 +105,7 @@ public struct DesktopSessionView: View {
         #if os(visionOS)
         GlassNativeWindowFrame {
             sessionContent
+                .modifier(DesktopClipboardBridge(session: session))
                 .padding(10)
                 .background {
                     GlassCanvasBackdrop(blurAmount: reduceTransparency ? 1 : glassAmount)
@@ -120,6 +121,7 @@ public struct DesktopSessionView: View {
         .frame(minWidth: 800, minHeight: 440)
         #else
         sessionContent
+            .modifier(DesktopClipboardBridge(session: session))
             #if os(macOS)
             .frame(minWidth: DesktopWindowSizing.floor.width, minHeight: DesktopWindowSizing.floor.height)
             .background { DesktopWindowSizer(desktop: session.connection.desktop) }
@@ -728,20 +730,11 @@ public struct DesktopSessionView: View {
     }
 
     private func sendClipboard() {
-        #if os(macOS)
-        let text = NSPasteboard.general.string(forType: .string)
-        #else
-        let text = UIPasteboard.general.string
-        #endif
-        if let text { session.pasteClipboard(text) }
+        if let content = DesktopPasteboard.read() { session.pasteClipboard(content) }
     }
     private func copyRemoteClipboard() {
-        guard session.isConnected, let text = session.remoteClipboard else { return }
-        #if os(macOS)
-        NSPasteboard.general.clearContents(); NSPasteboard.general.setString(text, forType: .string)
-        #else
-        UIPasteboard.general.string = text
-        #endif
+        guard session.isConnected, let content = session.remoteClipboard else { return }
+        DesktopPasteboard.write(content)
     }
 
 }

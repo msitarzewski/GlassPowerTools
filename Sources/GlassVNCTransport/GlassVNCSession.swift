@@ -83,7 +83,7 @@ public actor GlassVNCSession: GlassDesktopTransport {
             guard let image else { eventSink.yield(.cursor(.hidden)); return }
             if let converted = Self.cursorImage(image) { eventSink.yield(.cursor(.image(converted))) }
         }
-        callbacks.cutText = { eventSink.yield(.clipboard($0)) }
+        callbacks.cutText = { eventSink.yield(.clipboard(GlassClipboardContent(text: $0))) }
         callbacks.screens = { screens in
             eventSink.yield(.screens(screens.map {
                 // RFB does not mark a primary screen; the one at the framebuffer origin is treated as it.
@@ -226,7 +226,9 @@ public actor GlassVNCSession: GlassDesktopTransport {
         catch let error as RFBError { throw GlassRDPError.unsupported(error.localizedDescription) }
     }
 
-    public func sendClipboard(_ text: String) async throws {
+    /// VNC's clipboard is text: the copy's text goes, its other forms do not.
+    public func sendClipboard(_ content: GlassClipboardContent) async throws {
+        guard let text = content.text else { return }
         let client = try readyClient()
         do { try await client.sendCutText(text) }
         catch let error as RFBError { throw GlassRDPError.unsupported(error.localizedDescription) }

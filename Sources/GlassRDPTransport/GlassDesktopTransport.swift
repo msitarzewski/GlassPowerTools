@@ -15,7 +15,7 @@ public protocol GlassDesktopTransport: Actor {
     func releaseInputs() async
     func synchronize(capsLock: Bool, numLock: Bool, scrollLock: Bool) async throws
     func resize(width: Int, height: Int, desktopScale: Int) async throws
-    func sendClipboard(_ text: String) async throws
+    func sendClipboard(_ content: GlassClipboardContent) async throws
 }
 
 public extension GlassDesktopTransport {

@@ -126,12 +126,29 @@ public struct GlassRDPAudioSample: Sendable, Equatable {
     public let data: Data
 }
 
+/// One copy, in every form the source had (D42a): text, and where present HTML, RTF and an image as
+/// PNG. RDP carries all of them; VNC carries the text.
+public struct GlassClipboardContent: Sendable, Equatable, ExpressibleByStringLiteral {
+    public var text: String?
+    public var html: String?
+    public var rtf: Data?
+    public var png: Data?
+
+    public init(text: String? = nil, html: String? = nil, rtf: Data? = nil, png: Data? = nil) {
+        self.text = text; self.html = html; self.rtf = rtf; self.png = png
+    }
+
+    public init(stringLiteral value: String) { self.init(text: value) }
+
+    public var isEmpty: Bool { text == nil && html == nil && rtf == nil && png == nil }
+}
+
 public enum GlassRDPEvent: Sendable, Equatable {
     case state(GlassRDPState)
     case certificate(GlassRDPCertificate)
     case displayCapabilities(GlassRDPDisplayCapabilities)
     case cursor(GlassRDPCursor)
-    case clipboard(String)
+    case clipboard(GlassClipboardContent)
     case audio(GlassRDPAudioSample)
     /// The displays inside the remote framebuffer. Empty means the host published no layout.
     case screens([GlassRemoteScreen])

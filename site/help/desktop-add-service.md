@@ -29,7 +29,7 @@ Open **Advanced** for everything optional. The RDP-only rows are hidden when you
 | **Domain** (RDP) | The Windows domain for the account, for example `EXAMPLE`. Optional. |
 | **Authentication** (RDP) | **Network Level (NLA)** requires Network Level Authentication. **Allow TLS fallback** also accepts servers that offer only TLS. See [Sign in and trust a remote computer](desktop-sign-in-and-trust.md). |
 | **Desktop size** | Width and height in pixels, 1920 × 1080 by default. Each side must be from 200 to 8192, and the width must be even. |
-| **Share clipboard text** | Lets you exchange clipboard text with the remote computer. Off by default. See [Keyboard, pointer, clipboard and audio](desktop-input.md). |
+| **Share clipboard** | Shares the clipboard with the remote computer: text, formatting and images over RDP, text over VNC. Off by default. See [Keyboard, pointer, clipboard and audio](desktop-input.md). |
 | **Remote audio** (RDP) | Plays the remote computer's sound on this device. Off by default. |
 | **Credential storage** | **iCloud Keychain** (the default) syncs the password to your other devices through iCloud Keychain. **This device only** keeps it here. |
 

@@ -75,7 +75,9 @@ public final class DesktopSessionModel {
     public var selectedScreenID: UInt32? {
         didSet { if selectedScreenID != oldValue { updateCursorImage() } }
     }
-    public private(set) var remoteClipboard: String?
+    /// The server's latest copy, in every form it offered; the session view puts it on the local
+    /// clipboard (D42a).
+    public private(set) var remoteClipboard: GlassClipboardContent?
     public var presentation = PresentationSettings()
     public var matchWindow = true { didSet { if matchWindow != oldValue { cancelResize() } } }
     public var needsCredentials = false
@@ -570,11 +572,12 @@ public final class DesktopSessionModel {
     }
 
     public func sendText(_ text: String) { sendInput { try await $0.sendText(text) } }
-    public func pasteClipboard(_ text: String) {
+    /// Shares a local copy with the remote clipboard, or, with clipboard sharing off, types its text.
+    public func pasteClipboard(_ content: GlassClipboardContent) {
         let clipboardEnabled = connection.clipboardEnabled
         sendInput { target in
-            if clipboardEnabled { try await target.sendClipboard(text) }
-            else { try await target.sendText(text) }
+            if clipboardEnabled { try await target.sendClipboard(content) }
+            else if let text = content.text { try await target.sendText(text) }
         }
     }
     public func sendKey(_ code: UInt16, extended: Bool = false) {

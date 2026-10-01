@@ -150,7 +150,7 @@ struct DesktopAdvancedFields: View {
                                      identifier: "\(identifierPrefix)-desktop-validation")
 
             // VNC has no audio channel, so the toggle is not offered for it.
-            Toggle("Share clipboard text", isOn: $draft.clipboardEnabled)
+            Toggle("Share clipboard", isOn: $draft.clipboardEnabled)
                 .accessibilityIdentifier("\(identifierPrefix)-clipboard")
             if draft.showsRDPOnlyFields {
                 Toggle("Remote audio", isOn: $draft.audioEnabled)
