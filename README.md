@@ -24,10 +24,12 @@ in the room. The Mac, iPad and iPhone apps are the same app, adapted to each.
   see a live diagram of every table and key (in three dimensions on Vision Pro), write and explain
   queries, reach a database directly with TLS or through the machine's own SSH connection, or mark
   it read-only.
-- **Remote desktops:** RDP and VNC, with the remote resolution following the window, audio and
-  clipboard.
+- **Remote desktops:** RDP and VNC, with the remote resolution following the window, image quality
+  that adapts to the link, audio, a shared clipboard with formatting and images, and see-through
+  glass on Mac and Vision Pro.
 - **Editor:** files on this device or on a server, projects with a file tree, syntax highlighting
-  for fifteen languages, and previews for Markdown (with Mermaid diagrams), HTML, SVG and CSV.
+  for fifteen languages, and previews for Markdown (with Mermaid diagrams), HTML, SVG and CSV. On the
+  Mac it can be your default text editor.
 - **Everywhere you are:** the library syncs through iCloud, and credentials through iCloud
   Keychain. Keys made in the Secure Enclave stay on their device.
 

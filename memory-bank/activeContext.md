@@ -29,8 +29,8 @@ anything touching real servers (SSH and database tests use the disposable test V
 
 ## Paused 2026-09-28 (evening) — where to pick up
 
-All work below is committed locally (nothing pushed). Mac 0.4.262, iPhone 0.4.249, Vision Pro 0.4.254
-(0.4.255+ built, not installed — the headset was unreachable).
+All work below is committed locally (nothing pushed). Mac 0.4.266, iPhone 0.4.249, Vision Pro 0.4.254
+(the headset was unreachable; its next build must be cut fresh — 0.4.264 predates Mac glass).
 Detail: `tasks/2026-09/2026-09-27_glassdt-parity-audit.md` (desktop parity, sync repairs, list sweep).
 
 **Next, in the owner's order when they return:**
@@ -72,6 +72,11 @@ databases page list the diagram. Committed on the owner's word.
 **Backlog run, 2026-09-30 (owner: "create a plan and build your list"):** all eleven items built and
 committed — see `tasks/2026-09/2026-09-30_backlog-run.md` for each commit and its evidence. Owed: an
 install on the Mac and headset, RDP autodetect against Windows, Open With from the Finder.
+
+**After the run (owner on the Mac, 0.4.265–0.4.266):** Settings on the Mac sizes itself to its tabs
+(Editor was lost in the toolbar's overflow); desktop glass (Opacity, Background Frost) now on the
+Mac too — glassDT had it on the headset only. README and the desktops page list both, with adaptive
+streaming.
 
 **Before letting any device with an old install sync:** dry-run the Mac first
 (`GLASS_SYNC_DRY_RUN=1`, see the audit note's sync sections).

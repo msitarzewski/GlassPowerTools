@@ -87,3 +87,5 @@ profile, notarization, deploying the site), the behaviour findings listed in `ac
   with the Finder; library overview and availability dots; default text editor; trusted host keys;
   editor Find/close off the Mac. Unit-tested; VNC and RDP clipboard checked live against the Docker
   fixtures; Windows, the Finder's Open With and the headset not yet.
+- Desktop glass on the Mac (2026-09-30): Opacity and Background Frost as on the headset; seen by the
+  owner on 0.4.266. Settings on the Mac sizes itself to its ten tabs.

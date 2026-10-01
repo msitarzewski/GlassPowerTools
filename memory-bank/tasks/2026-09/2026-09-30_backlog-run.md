@@ -79,3 +79,8 @@ Info.plists; `onOpenURL` → editor open + present. Not yet opened from the Find
 **State:** all eleven built and committed; nothing pushed. Mac build 0.4.263 contains items 1–10 (not
 installed: the owner was using the Mac); item 11 is after it. Live checks still owed: RDP autodetect
 against Windows; the default-editor Open With from the Finder; the headset for everything since 0.4.254.
+
+**After the run, with the owner on the Mac:** `5512901` Settings' width follows its tab count (ten pages
+overflowed the fixed 640 pt and Editor was unreachable); `ef1765e` desktop glass on the Mac — the same
+Opacity and Frost as the headset, saved on the device, the frosted backdrop behind a see-through
+desktop, black kept for an opaque one (glassDT had none on the Mac). Owner: "Oh, wow, that's nice."
