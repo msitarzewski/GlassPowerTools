@@ -69,9 +69,9 @@ remote desktop is slow on the headset (connecting vs live session not yet descri
 Connections window on visionOS; every ⚡ opens Active; five help pages corrected; README and the
 databases page list the diagram. Committed on the owner's word.
 
-**Authorized 2026-09-30 (owner):** "create a plan and build your list in the order you see fit. DRY
-and KISS, reuse code." The plan and order: `tasks/2026-09/2026-09-30_backlog-run.md`. The slow
-headset desktop: the owner suspects a flaky connection that never dropped to a streaming mode.
+**Backlog run, 2026-09-30 (owner: "create a plan and build your list"):** all eleven items built and
+committed — see `tasks/2026-09/2026-09-30_backlog-run.md` for each commit and its evidence. Owed: an
+install on the Mac and headset, RDP autodetect against Windows, Open With from the Finder.
 
 **Before letting any device with an old install sync:** dry-run the Mac first
 (`GLASS_SYNC_DRY_RUN=1`, see the audit note's sync sections).
@@ -82,9 +82,9 @@ headset desktop: the owner suspects a flaky connection that never dropped to a s
 - Take SwiftTerm 1.19, which adds a build-tool plugin Xcode must be told to trust?
 - Behaviour and design findings from the help audit, not changed: the widget reads data the app no
   longer writes (fix or drop for 1.0?); local editor projects sync to devices that cannot open them;
-  the Editor off the Mac has no Find, no way to close a lone document, no blank editor; the database settings page may be unreachable (the desktop's is fixed); the database "Rows per page" field does nothing; a mistyped
-  terminal password is saved before sign-in is tried (fix: save only on success); no way to view or
-  forget a trusted host key; imported desktops default to device-only passwords.
+  the Editor off the Mac has no Find, no way to close a lone document, no blank editor; the database settings page may be unreachable (the desktop's is fixed); the database "Rows per page" field does nothing; the terminal
+  password, trusted host keys, imported-desktop mobility, Rows per page, the database settings page
+  and the editor's Find/close were fixed on 2026-09-30.
 
 ## Working rules that matter right now
 

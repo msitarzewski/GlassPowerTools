@@ -52,3 +52,30 @@ grid; the database's settings view is a shell page (`isShellPage`). Test: the pa
 - Found, not fixed: MockKRDP early-authorization tests fail 3 in 4 runs on unchanged code; RDP on
   Vision Pro requests about 2× pixels ("Automatic" scale uses displayScale); every frame is copied
   whole and uploaded whole to Metal.
+
+**6. D42a — RDP clipboard** — `b2cccec` long messages travel as chunks and are reassembled (sends over
+one chunk were refused; receives were parsed chunk by chunk); `be08840` rich content: text, HTML
+("HTML Format"), RTF and images (CF_DIB/DIBV5/PNG ↔ PNG) both ways, fetched one format at a time;
+`GlassClipboardContent` in the transport; remote copies land on the clipboard; the Mac sends local
+copies on activation and change; "Share clipboard". Live: xrdp probe clipboard both ways passes; the
+probe's resize step flakes ~1 in 3 on the previous commit too.
+
+**7. D42c — Files with the Finder** — `55bea2c`. ⌘C: sftp:// links at once, then the files downloaded
+(existing promise routine) and put on the clipboard for the Finder; ⌘V: Finder copies uploaded via
+`SFTPIncomingDrop` on the general pasteboard. Mac only.
+
+**8. D41 — library overview** — `a0b8ee1` counts + 30-day timeline + most used, from on-device
+`connectionHistory` in the shell preferences (90 days, 2,000 max); `6106f22` availability dots
+(Settings ▸ General, off by default; TCP only, 8 at a time, once a minute, while the library is shown;
+`knownPort` hook per capability; none for SQLite, tunnelled databases or the local shell).
+
+**9. Default text editor** — `28a0b6e`. Alternate editor for text/source/JSON/XML/Markdown/YAML in both
+Info.plists; `onOpenURL` → editor open + present. Not yet opened from the Finder (needs install).
+
+**10. Trusted host keys** — `ba35cf8`, help `d137b9e`. Settings ▸ Connections lists and forgets.
+
+**11. Editor off the Mac** — `c4970fc`. Find and Close Document in the toolbar; New Document existed.
+
+**State:** all eleven built and committed; nothing pushed. Mac build 0.4.263 contains items 1–10 (not
+installed: the owner was using the Mac); item 11 is after it. Live checks still owed: RDP autodetect
+against Windows; the default-editor Open With from the Finder; the headset for everything since 0.4.254.

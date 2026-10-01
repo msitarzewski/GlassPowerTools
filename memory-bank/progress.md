@@ -81,3 +81,9 @@ profile, notarization, deploying the site), the behaviour findings listed in `ac
 - Two terminal tests fail intermittently in full-suite runs only (see `activeContext.md`).
 - Schema diagram (D43, 2026-09-30): built; unit + live MySQL/PostgreSQL tests pass; in use on the
   Mac; seen in the visionOS and iPad simulators; not yet on the physical headset or the iPhone.
+- Backlog run (2026-09-30): typed passwords on trial; startup tickets by the clock; imported desktop
+  mobility; Rows per page and Settings ▸ Databases; RDP autodetect timed and answered in session; VNC
+  pipelining and Tight+JPEG with adaptive quality; RDP clipboard chunking and rich content; Files ⌘C/⌘V
+  with the Finder; library overview and availability dots; default text editor; trusted host keys;
+  editor Find/close off the Mac. Unit-tested; VNC and RDP clipboard checked live against the Docker
+  fixtures; Windows, the Finder's Open With and the headset not yet.
