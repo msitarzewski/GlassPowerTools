@@ -1078,6 +1078,10 @@ struct SFTPBrowserView: View {
         .onDrop(of: SFTPIncomingDrop.acceptedTypes, isTargeted: $isReceivingFileDrop) { providers in
             beginIncomingFileDrop(providers)
         }
+        #if os(macOS)
+        // ⌘V with files copied in Finder uploads them here, as a drop does (D42c).
+        .onPasteCommand(of: [.fileURL]) { _ in pasteFilesFromFinder() }
+        #endif
         .overlay {
             if isReceivingFileDrop && canAcceptFileDrop {
                 RoundedRectangle(cornerRadius: 12)
@@ -2044,10 +2048,61 @@ struct SFTPBrowserView: View {
         #if os(macOS)
         NSPasteboard.general.clearContents()
         NSPasteboard.general.writeObjects(urls as [NSURL])
+        copyFilesForFinder(targetEntries.filter { !isDirectory($0) }, links: urls,
+                           changeCount: NSPasteboard.general.changeCount)
         #elseif os(iOS) || os(visionOS)
         UIPasteboard.general.urls = urls
         #endif
     }
+
+    #if os(macOS)
+    /// ⌘C, then ⌘V in Finder (D42c). The `sftp://` links go on the clipboard at once, so pasting into
+    /// text works as before; the files themselves are downloaded to a folder of their own, with the
+    /// browser's usual progress, and then put on the clipboard as files — unless something else was
+    /// copied meanwhile. Only the latest copy's folder is kept.
+    private func copyFilesForFinder(_ files: [SFTPBrowserEntry], links: [URL], changeCount: Int) {
+        guard !files.isEmpty, let client = sftpClient else { return }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("Glass Power Tools Clipboard", isDirectory: true)
+        try? FileManager.default.removeItem(at: root)
+        let folder = root.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let serverID = session?.server.id ?? sessionID
+        let filePromiseTransfers = filePromiseTransfers
+        let transferActivity = transferActivity
+        Task { @MainActor in
+            do {
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                var copied: [URL] = []
+                for file in files {
+                    let activityID = UUID()
+                    await transferActivity.enqueue(id: activityID, kind: .finderDownload,
+                                                   filename: file.filename, totalBytes: file.attributes.size)
+                    await transferActivity.begin(activityID)
+                    let destination = folder.appendingPathComponent(file.filename)
+                    do {
+                        try await filePromiseTransfers.perform {
+                            try await Self.writePromisedRemoteFile(client: client, serverID: serverID, remotePath: file.id,
+                                                                   sourceName: file.filename, destinationURL: destination) {
+                                transferActivity.apply($0, to: activityID)
+                            }
+                        }
+                        await transferActivity.complete(activityID)
+                        copied.append(destination)
+                    } catch {
+                        await transferActivity.fail(activityID, detail: error.localizedDescription)
+                        throw error
+                    }
+                }
+                let board = NSPasteboard.general
+                guard board.changeCount == changeCount else { return }
+                board.clearContents()
+                board.writeObjects(copied as [NSURL])
+                board.setString(links.map(\.absoluteString).joined(separator: "\n"), forType: .string)
+            } catch {
+                self.error = "Could not copy files for Finder: \(error.localizedDescription)"
+            }
+        }
+    }
+    #endif
 
     private func beginRemoteOperation(
         _ kind: SFTPRemoteOperationKind,
@@ -2237,6 +2292,21 @@ struct SFTPBrowserView: View {
     private func beginIncomingFileDrop(_ providers: [NSItemProvider], destination: String? = nil) -> Bool {
         isReceivingFileDrop = false
         guard canAcceptFileDrop, let incoming = SFTPIncomingDrop(providers: providers) else { return false }
+        beginIncoming(incoming, destination: destination)
+        return true
+    }
+
+    #if os(macOS)
+    /// Files copied in Finder (or file promises another app copied), uploaded to this folder: the
+    /// drop path reading the general pasteboard instead of the drag one.
+    private func pasteFilesFromFinder() {
+        guard canAcceptFileDrop,
+              let incoming = SFTPIncomingDrop(providers: [], pasteboard: .general) else { return }
+        beginIncoming(incoming, destination: nil)
+    }
+    #endif
+
+    private func beginIncoming(_ incoming: SFTPIncomingDrop, destination: String?) {
         let destination = destination ?? currentPath
         operationInProgress = "Receiving dropped files…"
         transferTask = Task {
@@ -2255,7 +2325,6 @@ struct SFTPBrowserView: View {
                 transferTask = nil
             }
         }
-        return true
     }
 
     // MARK: - Toolbar

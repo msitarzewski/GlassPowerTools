@@ -37,7 +37,7 @@ Only files can be uploaded, not folders. An upload never replaces a file on the 
 
 If the folder already has a file with that name, the download gets a number instead of replacing it. Folders cannot be downloaded; select the files inside them.
 
-**On Mac:** you can also drag a file from the table to the Finder.
+**On Mac:** you can also drag a file from the table to the Finder, or select files, choose **Copy** (⌘C) and paste them in the Finder (⌘V). The copy downloads the files first, with its progress in the browser; until it finishes, pasting gives the files' `sftp://` addresses. To upload, copy files in the Finder and press ⌘V in the browser.
 
 The bar at the bottom shows each transfer's progress. Its cancel button stops the current batch; **Clear History** removes finished items.
 
