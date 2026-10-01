@@ -118,7 +118,10 @@ public struct GlassShellSettingsView: View {
         }
         .accessibilityIdentifier("settings-sections")
         #if os(macOS)
-        .frame(width: 640)
+        // Wide enough for every tab. A fixed 640 held eight; with Databases and Desktops the last
+        // pages fell into the toolbar's overflow and Editor could not be reached (2026-09-30).
+        // Toolbar tabs do not scroll, so the window follows the count.
+        .frame(width: max(640, CGFloat(options.count) * 84))
         #endif
     }
 
