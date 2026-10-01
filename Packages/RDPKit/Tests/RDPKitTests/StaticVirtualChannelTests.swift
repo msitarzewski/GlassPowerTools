@@ -325,3 +325,26 @@ private extension UInt32 {
     static let first = RDPStaticVirtualChannelFlags.first
     static let last = RDPStaticVirtualChannelFlags.last
 }
+
+/// A message longer than one chunk goes as several, each carrying the whole length, first and last
+/// marked, and the reassembler gives back exactly the message (2026-09-30: clipboard sends over one
+/// chunk were refused, and clipboard receives were parsed chunk by chunk).
+@Test func longMessagesTravelAsChunksAndComeBackWhole() throws {
+    let message = Data((0..<4_000).map { UInt8($0 % 251) })
+    let chunks = RDPStaticVirtualChannelPDU.chunks(for: message, chunkByteCount: 1_600)
+    #expect(chunks.map(\.payload.count) == [1_600, 1_600, 800])
+    #expect(chunks.allSatisfy { $0.totalLength == 4_000 })
+    #expect(chunks.map { $0.flags & RDPStaticVirtualChannelFlags.first != 0 } == [true, false, false])
+    #expect(chunks.map { $0.flags & RDPStaticVirtualChannelFlags.last != 0 } == [false, false, true])
+
+    var reassembler = RDPStaticVirtualChannelReassembler()
+    var whole: RDPStaticVirtualChannelPDU?
+    for chunk in chunks {
+        let parsed = try RDPStaticVirtualChannelPDU.parse(fromUserData: chunk.encodedUserData())
+        whole = try reassembler.append(parsed)
+    }
+    #expect(whole?.payload == message)
+
+    let short = RDPStaticVirtualChannelPDU.chunks(for: Data([1, 2, 3]))
+    #expect(short.count == 1 && short[0].isComplete)
+}

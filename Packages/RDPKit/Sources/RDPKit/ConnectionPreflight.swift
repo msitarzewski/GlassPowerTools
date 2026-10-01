@@ -4006,6 +4006,7 @@ private func performMCSConnectionSequence(
                                     onClipboardText: onClipboardText,
                                     onClipboardFileGroupDescriptor: onClipboardFileGroupDescriptor,
                                     onClipboardFileContents: onClipboardFileContents,
+                   maximumChunkByteCount: demandActive.serverVirtualChannelChunkSize ?? RDPStaticVirtualChannelPDU.maximumPayloadByteCount,
                                     messageData: &clipboardMessageData,
                                     messages: &clipboardMessages
                                 )
@@ -4675,6 +4676,7 @@ private func performRDPGraphicsDynamicChannelHandshake(
                        onClipboardText: onClipboardText,
                        onClipboardFileGroupDescriptor: onClipboardFileGroupDescriptor,
                        onClipboardFileContents: onClipboardFileContents,
+                   maximumChunkByteCount: maximumStaticVirtualChannelChunkSize,
                        messageData: &result.clipboardMessageData,
                        messages: &result.clipboardMessages
                    )
@@ -5658,20 +5660,24 @@ private func handleClipboardPacket(
     onClipboardText: RDPClipboardTextHandler?,
     onClipboardFileGroupDescriptor: RDPClipboardFileGroupDescriptorHandler?,
     onClipboardFileContents: RDPClipboardFileContentsHandler?,
+    maximumChunkByteCount: Int = RDPStaticVirtualChannelPDU.maximumPayloadByteCount,
     messageData: inout [Data],
     messages: inout [RDPClipboardMessageSummary]
 ) throws -> Bool {
-    guard let staticPDU = try RDPStaticVirtualChannelPDU.parseIfPresent(
+    guard let chunk = try RDPStaticVirtualChannelPDU.parseIfPresent(
         fromTPKT: packet,
-        channelID: session.staticChannelID
+        channelID: session.staticChannelID,
+        maximumChunkByteCount: maximumChunkByteCount
     ) else {
         return false
     }
-    guard staticPDU.canDispatchPayload else {
-        if staticPDU.isFlowControl {
-            return true
-        }
-        throw RDPDecodeError.invalidStaticVirtualChannelPDU
+    if chunk.isFlowControl {
+        return true
+    }
+    // A large clipboard arrives in several chunks; nothing is parsed until the last one.
+    guard let staticPDU = try session.reassemble(chunk, maximumChunkByteCount: maximumChunkByteCount) else {
+        messageData.append(packet)
+        return true
     }
 
     let clipboardPDU = try RDPClipboardPDU.parse(from: staticPDU.payload)
@@ -6233,6 +6239,7 @@ private func receiveRDPGraphicsUpdateBatch(
                    onClipboardText: onClipboardText,
                    onClipboardFileGroupDescriptor: onClipboardFileGroupDescriptor,
                    onClipboardFileContents: onClipboardFileContents,
+                   maximumChunkByteCount: maximumStaticVirtualChannelChunkSize,
                    messageData: &result.clipboardMessageData,
                    messages: &result.clipboardMessages
                )

@@ -73,6 +73,31 @@ struct RDPStaticVirtualChannelPDU: Equatable, Sendable {
         payload.count <= maximumPayloadByteCount
     }
 
+    /// A message of any length as the chunks a static channel carries (MS-RDPBCGR 3.1.5.2.2.1):
+    /// each holds the whole message's length; the first and last say so. A message that fits is one
+    /// chunk marked both. Clipboard sends refused anything over one chunk, so copying more than about
+    /// 800 characters to a remote desktop silently did nothing (2026-09-30).
+    static func chunks(for payload: Data, chunkByteCount: Int = maximumPayloadByteCount,
+                       extraFlags: UInt32 = RDPStaticVirtualChannelFlags.showProtocol) -> [RDPStaticVirtualChannelPDU] {
+        precondition(chunkByteCount > 0 && payload.count <= Int(UInt32.max))
+        let total = UInt32(payload.count)
+        guard !payload.isEmpty else {
+            return [RDPStaticVirtualChannelPDU(totalLength: 0, flags: RDPStaticVirtualChannelFlags.first
+                | RDPStaticVirtualChannelFlags.last | extraFlags, payload: Data())]
+        }
+        var chunks: [RDPStaticVirtualChannelPDU] = []
+        var offset = payload.startIndex
+        while offset < payload.endIndex {
+            let end = payload.index(offset, offsetBy: chunkByteCount, limitedBy: payload.endIndex) ?? payload.endIndex
+            var flags = extraFlags
+            if offset == payload.startIndex { flags |= RDPStaticVirtualChannelFlags.first }
+            if end == payload.endIndex { flags |= RDPStaticVirtualChannelFlags.last }
+            chunks.append(RDPStaticVirtualChannelPDU(totalLength: total, flags: flags, payload: Data(payload[offset..<end])))
+            offset = end
+        }
+        return chunks
+    }
+
     func encodedUserData() -> Data {
         var data = Data()
         data.appendLittleEndianUInt32(totalLength)

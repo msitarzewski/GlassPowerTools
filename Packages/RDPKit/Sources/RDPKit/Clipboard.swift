@@ -1292,32 +1292,37 @@ public final class RDPClipboardSession: @unchecked Sendable {
         lock.unlock()
     }
 
+    /// The clipboard channel's own reassembler: a large clipboard arrives in several chunks, and
+    /// was parsed chunk by chunk, so a partial one threw (and could end the session).
+    private var inbound = RDPStaticVirtualChannelReassembler()
+
+    func reassemble(_ pdu: RDPStaticVirtualChannelPDU, maximumChunkByteCount: Int) throws -> RDPStaticVirtualChannelPDU? {
+        lock.lock()
+        defer { lock.unlock() }
+        return try inbound.append(pdu, maximumChunkByteCount: maximumChunkByteCount)
+    }
+
     @discardableResult
     private func send(_ payload: Data) -> Bool {
-        guard RDPStaticVirtualChannelPDU.canEncodeSinglePayload(payload) else {
-            return false
-        }
-
-        let packet = RDPStaticVirtualChannelPDU(
-            payload: payload,
-            flags: RDPStaticVirtualChannelFlags.first
-                | RDPStaticVirtualChannelFlags.last
-                | RDPStaticVirtualChannelFlags.showProtocol
-        )
-            .encodedTPKT(initiator: userChannelID, channelID: staticChannelID)
+        let packets = RDPStaticVirtualChannelPDU.chunks(for: payload)
+            .map { $0.encodedTPKT(initiator: userChannelID, channelID: staticChannelID) }
         if let sentMessageHandler,
-           let pdu = try? RDPClipboardPDU.parse(from: payload)
+           let pdu = try? RDPClipboardPDU.parse(from: payload),
+           let first = packets.first
         {
-            sentMessageHandler(.summarize(pdu), packet)
+            sentMessageHandler(.summarize(pdu), first)
         }
         guard channel.isActive else { return false }
         channel.eventLoop.execute {
             guard self.channel.isActive else {
                 return
             }
-            var buffer = self.channel.allocator.buffer(capacity: packet.count)
-            buffer.writeBytes(packet)
-            self.channel.writeAndFlush(buffer, promise: nil)
+            for packet in packets {
+                var buffer = self.channel.allocator.buffer(capacity: packet.count)
+                buffer.writeBytes(packet)
+                self.channel.write(buffer, promise: nil)
+            }
+            self.channel.flush()
         }
         return true
     }
