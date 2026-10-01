@@ -55,3 +55,7 @@ To never be asked, and instead refuse any key you have not already trusted:
 2. Under **Security**, set **Host key verification** to **Strict**.
 
 In **Strict** mode, a new or changed key stops the connection and says why. No trust decision is recorded. **Ask** is the default.
+
+## See and forget trusted host keys
+
+Open **Settings** ▸ **Connections**. **Trusted Host Keys** lists every machine whose key you have accepted, with the key's type, its SHA-256 fingerprint and when it was last seen. Choose **Forget…** to forget a machine's key; the next connection asks you to check it again, or, in **Strict** mode, is refused until you do. Trusted keys sync through iCloud Keychain, so forgetting one forgets it on your other devices too.
