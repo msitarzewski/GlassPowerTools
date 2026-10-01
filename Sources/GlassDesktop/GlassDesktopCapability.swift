@@ -226,6 +226,11 @@ public final class GlassDesktopCapability: GlassCapability {
         return address.isEmpty ? nil : address
     }
 
+    /// The desktop's RDP or VNC port, for the availability dot.
+    public func knownPort(service: HostServiceLink, host: HostProfile) -> Int? {
+        runtime.connection(for: service.endpointID).map { Int($0.port) }
+    }
+
     /// The machine's address changed in the shell: every saved desktop that is a service of that
     /// host follows it, so the machine's identity is edited once.
     public func hostAddressDidChange(host: HostProfile, address: String?) {

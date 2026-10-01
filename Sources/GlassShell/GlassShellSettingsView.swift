@@ -187,7 +187,18 @@ public struct GlassShellSettingsView: View {
         }
     }
 
+    @AppStorage(GlassAvailabilityMonitor.settingKey) private var showsAvailability = false
+
     private var general: some View {
+        Group {
+        Section {
+            Toggle("Show service availability", isOn: $showsAvailability)
+                .accessibilityIdentifier("settings-show-availability")
+        } header: {
+            Text("Library")
+        } footer: {
+            Text("A dot beside each service: green when it answers, orange when it answers slowly, red when it does not. This device opens a connection to each service's port about once a minute while the library is on screen, and closes it at once. It never signs in.")
+        }
         Section("Host Library") {
             LabeledContent("Storage", value: model.hasSharedContainer ? "App group container" : "This app's container")
             Text(model.hostLibraryStatus).font(.footnote).foregroundStyle(.secondary)
@@ -213,6 +224,7 @@ public struct GlassShellSettingsView: View {
             } else {
                 LabeledContent("This device", value: "Kept in this app only, never shared")
             }
+        }
         }
     }
 

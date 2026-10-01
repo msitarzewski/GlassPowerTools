@@ -29,7 +29,9 @@ These settings also apply to terminal windows. They are kept on each device.
 
 ## General
 
-**General** shows the state of your host library on this device under **Host Library**: how many **Hosts** it has and whether **This device** is kept on this device only. If the file that holds favorites and recent hosts cannot be read, an orange message here explains why, and favorites and **Recent** cannot be changed until it can.
+Under **Library**, **Show service availability** (off by default) puts a dot beside each service in the library: green when it answers, orange when it answers slowly, red when it does not. While the library is on screen, this device opens a connection to each service's port about once a minute and closes it at once; it never signs in. A database reached through its machine's SSH connection, and this Mac's own terminal, have no dot.
+
+**General** also shows the state of your host library on this device under **Host Library**: how many **Hosts** it has and whether **This device** is kept on this device only. If the file that holds favorites and recent hosts cannot be read, an orange message here explains why, and favorites and **Recent** cannot be changed until it can.
 
 ## Privacy
 

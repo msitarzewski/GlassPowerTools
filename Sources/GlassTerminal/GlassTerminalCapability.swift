@@ -401,6 +401,12 @@ public final class GlassTerminalCapability: GlassCapability {
         return address.isEmpty ? nil : address
     }
 
+    /// The saved server's SSH port, for the availability dot; none for this Mac's own shell.
+    public func knownPort(service: HostServiceLink, host: HostProfile) -> Int? {
+        guard service.endpointID != Self.localShellEndpointID else { return nil }
+        return runtime.sessionManager.serverManager.server(for: service.endpointID.rawValue)?.port
+    }
+
     public func open(service: HostServiceLink, host: HostProfile, hostAccess: GlassCapabilityHostAccess,
                      report: @escaping GlassCapabilityReport) {
         if service.endpointID == Self.localShellEndpointID {

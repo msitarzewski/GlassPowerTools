@@ -924,6 +924,19 @@ public final class GlassShellModel: GlassServiceStore {
     /// An address one of the host's capabilities already stores for a service of the host — a
     /// record saved by the source app before hosts carried an address. Nil when none, or when
     /// the capabilities disagree (that is for the user to settle, not for the shell to guess).
+    /// Every service with an address and a port to probe, for the availability dots (D41).
+    public func availabilityTargets() -> [GlassAvailabilityMonitor.Target] {
+        hosts.flatMap { host -> [GlassAvailabilityMonitor.Target] in
+            guard let address = host.address ?? knownAddress(for: host) else { return [] }
+            return host.services.compactMap { service in
+                guard let owner = host.record(owning: service.endpointID),
+                      let port = registry.capability(for: service.kind)?.knownPort(service: service, host: owner)
+                else { return nil }
+                return .init(endpointID: service.endpointID, host: address, port: port)
+            }
+        }
+    }
+
     func knownAddress(for host: GlassShellHost) -> String? {
         var found = Set<String>()
         for member in host.members {

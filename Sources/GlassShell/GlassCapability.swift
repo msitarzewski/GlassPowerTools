@@ -250,6 +250,10 @@ public protocol GlassCapability: AnyObject {
     /// source app before hosts carried an address. The shell adopts it onto the host so the
     /// machine's identity is defined once, at the host. Default: nil.
     func knownAddress(service: HostServiceLink, host: HostProfile) -> String?
+    /// The TCP port `service` listens on, for the library's availability dots (D41); nil when there
+    /// is none to probe directly (a local shell, a file, a service reached through a tunnel).
+    /// Default: nil.
+    func knownPort(service: HostServiceLink, host: HostProfile) -> Int?
 
     /// A draft for a new service of this kind, composed into the shell's host sheet. A service
     /// is created complete — configuration and credentials with it — so no capability may
@@ -385,6 +389,7 @@ public extension GlassCapability {
     func catalogDidLoad() {}
     func setupDraft(importing configuration: Data) -> (any GlassServiceDraft)? { nil }
     func knownAddress(service: HostServiceLink, host: HostProfile) -> String? { nil }
+    func knownPort(service: HostServiceLink, host: HostProfile) -> Int? { nil }
     /// A capability that has not adopted the setup contract yet: the sheet shows why and Save
     /// refuses, so no half-made service can be created through it.
     func makeSetupDraft() -> any GlassServiceDraft { GlassUnavailableServiceDraft(kind: kind, capabilityName: displayName) }

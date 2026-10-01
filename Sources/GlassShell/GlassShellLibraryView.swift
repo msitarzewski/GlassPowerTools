@@ -22,6 +22,9 @@ public struct GlassShellLibraryView: View {
     @State private var showSettings = false
     /// The ⚡'s request, handed to the library as a binding it clears once the panel is open.
     @State private var panelRequest: String?
+    /// D41: service availability dots, off unless chosen in Settings ▸ General.
+    @AppStorage(GlassAvailabilityMonitor.settingKey) private var showsAvailability = false
+    @State private var availabilityMonitor = GlassAvailabilityMonitor()
     @Environment(\.scenePhase) private var scenePhase
 
     public init(model: GlassShellModel) { self.model = model }
@@ -115,6 +118,15 @@ public struct GlassShellLibraryView: View {
             model.hostToShow = nil
         }
         // The ⚡ from anywhere in the app: the model says which panel, the library opens it.
+        // Probed only while the library is on screen (the task ends with the view), at most once
+        // a minute, and only when the owner has turned the dots on.
+        .task(id: showsAvailability) {
+            guard showsAvailability else { return }
+            while !Task.isCancelled {
+                await availabilityMonitor.refresh(model.availabilityTargets())
+                try? await Task.sleep(for: .seconds(GlassAvailabilityMonitor.interval))
+            }
+        }
         // `initial`: a bolt that brought the window back from closed asked before this view
         // existed, and a plain onChange never sees a value that was already there.
         .onChange(of: model.panelToShow, initial: true) { _, wanted in
@@ -210,12 +222,30 @@ public struct GlassShellLibraryView: View {
     private func serviceIcons(for id: HostID) -> some View {
         HStack(spacing: 4) {
             ForEach(model.serviceKinds(for: id), id: \.self) { kind in
+                let availability = showsAvailability ? availability(of: kind, on: id) : nil
                 GlassServiceIcon(GlassServicePresentation.symbol(for: kind))
                     .foregroundStyle(.secondary)
+                    .overlay(alignment: .bottomTrailing) {
+                        if let availability {
+                            Circle()
+                                .fill(availability == .reachable ? Color.green : availability == .slow ? .orange : .red)
+                                .frame(width: 6, height: 6)
+                                .offset(x: 2, y: 2)
+                        }
+                    }
                     .accessibilityLabel(GlassServicePresentation.displayName(for: kind))
+                    .accessibilityValue(availability.map {
+                        $0 == .reachable ? "Answering" : $0 == .slow ? "Answering slowly" : "Not answering"
+                    } ?? "")
                     .accessibilityIdentifier("host-service-\(kind.rawValue)")
             }
         }
+    }
+
+    /// The worst state among the host's services of `kind`; nil until one has been probed.
+    private func availability(of kind: HostServiceKind, on id: HostID) -> GlassServiceAvailability? {
+        let services = model.host(id)?.services.filter { $0.kind == kind } ?? []
+        return GlassServiceAvailability.worst(services.compactMap { availabilityMonitor.states[$0.endpointID] })
     }
 
     // MARK: Detail

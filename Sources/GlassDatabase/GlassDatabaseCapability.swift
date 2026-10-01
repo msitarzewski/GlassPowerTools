@@ -243,6 +243,14 @@ public final class GlassDatabaseCapability: GlassCapability {
         return address.isEmpty ? nil : address
     }
 
+    /// The server's port, for the availability dot. None for SQLite (a file) or for a database
+    /// reached through the machine's SSH tunnel, whose port is not meant to answer from here.
+    public func knownPort(service: HostServiceLink, host: HostProfile) -> Int? {
+        guard let config = runtime.connectionManager.connection(for: service.endpointID.rawValue),
+              config.engine != .sqlite, !config.usesHostTunnel else { return nil }
+        return config.port
+    }
+
     /// The machine's address changed in the shell: every saved connection that is a service of
     /// that host follows it, so the machine's identity is edited once. SQLite records are left
     /// alone — their `host` is a managed file path.
