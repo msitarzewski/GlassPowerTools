@@ -66,14 +66,23 @@ public enum RFBEncoding: Int32, Sendable {
     case rre = 2
     case hextile = 5
     case zlib = 6
+    case tight = 7
     case zrle = 16
     case cursor = -239
     case desktopSize = -223
     case lastRect = -224
     case extendedDesktopSize = -308
 
-    static let advertised: [RFBEncoding] = [.zrle, .hextile, .zlib, .copyRect, .rre, .raw,
+    static let advertised: [RFBEncoding] = [.tight, .zrle, .hextile, .zlib, .copyRect, .rre, .raw,
                                             .cursor, .desktopSize, .extendedDesktopSize, .lastRect]
+
+    /// The SetEncodings list: the encodings above, then, when the link calls for it, Tight's JPEG
+    /// quality level (-32 + 0…9). Without a quality level a server keeps Tight lossless.
+    static func setEncodingsValues(jpegQuality: Int?) -> [Int32] {
+        var values = advertised.map(\.rawValue)
+        if let jpegQuality { values.append(-32 + Int32(min(9, max(0, jpegQuality)))) }
+        return values
+    }
 }
 
 public struct RFBRectangle: Equatable, Sendable {
@@ -211,4 +220,37 @@ public extension UInt32 {
 
 public extension Int32 {
     var bigEndianBytes: [UInt8] { UInt32(bitPattern: self).bigEndianBytes }
+}
+
+/// Chooses Tight's JPEG quality from how fast update data actually arrives, as TigerVNC's viewer
+/// does: a fast link stays lossless, a slower one trades fidelity for frames. The rate is measured
+/// over updates large enough to mean something, and a new quality is chosen only after three
+/// measurements agree, so a single burst does not flip the picture back and forth.
+struct RFBLinkQualityGovernor: Sendable {
+    /// nil = lossless.
+    private(set) var jpegQuality: Int? = 8
+    private var pendingQuality: Int??
+    private var agreeing = 0
+
+    static func quality(forKilobitsPerSecond rate: Double) -> Int? {
+        switch rate {
+        case 16_000...: nil
+        case 4_000..<16_000: 8
+        case 1_000..<4_000: 6
+        default: 4
+        }
+    }
+
+    /// One update: its bytes and how long reading it took. Returns the new quality when it changes.
+    mutating func observe(bytes: Int, seconds: Double) -> Int?? {
+        guard bytes >= 16 * 1024, seconds > 0.001 else { return nil }
+        let wanted = Self.quality(forKilobitsPerSecond: Double(bytes) * 8 / 1000 / seconds)
+        guard wanted != jpegQuality else { pendingQuality = nil; agreeing = 0; return nil }
+        if pendingQuality == .some(wanted) { agreeing += 1 } else { pendingQuality = .some(wanted); agreeing = 1 }
+        guard agreeing >= 3 else { return nil }
+        jpegQuality = wanted
+        pendingQuality = nil
+        agreeing = 0
+        return .some(wanted)
+    }
 }

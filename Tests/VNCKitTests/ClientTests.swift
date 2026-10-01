@@ -76,7 +76,11 @@ struct ClientTests {
         #expect(Array(written[30..<50]) == [0, 0, 0, 0] + RFBPixelFormat.client.wireBytes)
         #expect(written[50] == 2)
         let encodingCount = Int(written[52]) << 8 | Int(written[53])
-        #expect(encodingCount == RFBEncoding.advertised.count)
+        // Tight first, and JPEG quality 8 until the link has been measured.
+        let expectedEncodings = RFBEncoding.setEncodingsValues(jpegQuality: 8)
+        #expect(encodingCount == expectedEncodings.count)
+        #expect(Array(written[54..<58]) == Int32(7).bigEndianBytes)
+        #expect(Array(written[(54 + (encodingCount - 1) * 4)..<(54 + encodingCount * 4)]) == Int32(-24).bigEndianBytes)
         let requestOffset = 54 + encodingCount * 4
         #expect(Array(written[requestOffset..<(requestOffset + 10)]) == [3, 0, 0, 0, 0, 0, 0, 4, 0, 2])
         #expect(Array(written[(requestOffset + 10)..<(requestOffset + 20)]) == [3, 1, 0, 0, 0, 0, 0, 4, 0, 2])

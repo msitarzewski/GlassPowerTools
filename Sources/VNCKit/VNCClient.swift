@@ -191,10 +191,10 @@ public final class VNCClient: Sendable {
         try await sink.write([0, 0, 0, 0] + RFBPixelFormat.client.wireBytes)
     }
 
-    private func sendSetEncodings() async throws {
-        let encodings = RFBEncoding.advertised
-        var message: [UInt8] = [2, 0] + UInt16(encodings.count).bigEndianBytes
-        for encoding in encodings { message += encoding.rawValue.bigEndianBytes }
+    private func sendSetEncodings(jpegQuality: Int? = RFBLinkQualityGovernor().jpegQuality) async throws {
+        let values = RFBEncoding.setEncodingsValues(jpegQuality: jpegQuality)
+        var message: [UInt8] = [2, 0] + UInt16(values.count).bigEndianBytes
+        for value in values { message += value.bigEndianBytes }
         try await sink.write(message)
     }
 
@@ -243,6 +243,7 @@ public final class VNCClient: Sendable {
 
     private func updateLoop(framebuffer: RFBFramebuffer) async throws {
         let decoder = RFBRectangleDecoder()
+        var governor = RFBLinkQualityGovernor()
         while true {
             try checkCancelled()
             let type = try await source.u8()
@@ -256,6 +257,8 @@ public final class VNCClient: Sendable {
                 // always queued at the server while this one decodes; one per update received, so
                 // never more than two are outstanding. (RFB 7.5.3 allows several.)
                 try await sendFramebufferUpdateRequest(incremental: true, framebuffer: framebuffer)
+                let started = ContinuousClock.now
+                var updateBytes = 0
                 var changed = false
                 rectangles: for _ in 0..<count {
                     let header = try await source.read(12)
@@ -310,11 +313,18 @@ public final class VNCClient: Sendable {
                         }
                     default:
                         let validated = try rect.validated(in: framebuffer.width, framebuffer.height)
-                        try await decoder.decode(validated, encoding: encoding, from: source, into: framebuffer)
+                        updateBytes += try await decoder.decode(validated, encoding: encoding, from: source, into: framebuffer)
                         changed = true
                     }
                 }
                 if changed { callbacks.frame(framebuffer.width, framebuffer.height, framebuffer.snapshot()) }
+                // The link's speed, from what this update took to arrive, sets Tight's JPEG quality.
+                let elapsed = ContinuousClock.now - started
+                let seconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+                if let quality = governor.observe(bytes: updateBytes, seconds: seconds) {
+                    Self.logger.notice("event=quality jpeg=\(quality.map(String.init) ?? "lossless", privacy: .public)")
+                    try await sendSetEncodings(jpegQuality: quality)
+                }
             case 1:
                 _ = try await source.u8()
                 _ = try await source.u16()

@@ -5,22 +5,30 @@ import Foundation
 final class RFBRectangleDecoder {
     private var zlibStream: ZlibInflater?
     private var zrleStream: ZlibInflater?
+    private let tight = RFBTightDecoder()
 
     init() {}
 
+    /// Decodes one rectangle and returns about how many bytes it took on the wire, for the
+    /// client's measure of the link (RRE and Hextile, read piecemeal, report 0).
+    @discardableResult
     func decode(_ rect: RFBRectangle, encoding: RFBEncoding, from source: any RFBByteSource,
-                into framebuffer: RFBFramebuffer) async throws {
+                into framebuffer: RFBFramebuffer) async throws -> Int {
         switch encoding {
         case .raw:
             let bytes = try await source.read(rect.width * rect.height * 4)
             try framebuffer.storeRaw(rect, source: bytes[...])
+            return bytes.count
         case .copyRect:
             let sourceX = Int(try await source.u16()), sourceY = Int(try await source.u16())
             try framebuffer.copy(from: sourceX, sourceY, to: rect)
+            return 4
         case .rre:
             try await decodeRRE(rect, from: source, into: framebuffer)
+            return 0
         case .hextile:
             try await decodeHextile(rect, from: source, into: framebuffer)
+            return 0
         case .zlib:
             let length = Int(try await source.u32())
             guard length <= RFBLimits.maximumEncodedRectangleBytes else {
@@ -30,6 +38,7 @@ final class RFBRectangleDecoder {
             if zlibStream == nil { zlibStream = try ZlibInflater() }
             let raw = try zlibStream!.inflate(compressed, expectedOutput: rect.width * rect.height * 4)
             try framebuffer.storeRaw(rect, source: raw[...])
+            return 4 + length
         case .zrle:
             let length = Int(try await source.u32())
             guard length <= RFBLimits.maximumEncodedRectangleBytes else {
@@ -39,6 +48,9 @@ final class RFBRectangleDecoder {
             if zrleStream == nil { zrleStream = try ZlibInflater() }
             let tiles = try zrleStream!.inflateAll(compressed)
             try Self.decodeZRLETiles(tiles, rect: rect, into: framebuffer)
+            return 4 + length
+        case .tight:
+            return try await tight.decode(rect, from: source, into: framebuffer)
         case .cursor, .desktopSize, .lastRect, .extendedDesktopSize:
             throw RFBError.protocolViolation("Pseudo-encodings are handled by the client, not the rectangle decoder.")
         }
