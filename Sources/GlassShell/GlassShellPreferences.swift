@@ -16,9 +16,36 @@ public struct GlassShellPreferences: Codable, Equatable, Sendable {
         public init() {}
     }
 
+    /// One connection made on this device: when, to which machine, which kind of service — nothing
+    /// else (D41). Kept here because these preferences never leave the device.
+    public struct ConnectionEvent: Codable, Equatable, Sendable {
+        public var date: Date
+        public var hostID: HostID
+        public var kind: HostServiceKind
+        public init(date: Date, hostID: HostID, kind: HostServiceKind) {
+            self.date = date; self.hostID = hostID; self.kind = kind
+        }
+    }
+
+    /// Bounds on the history: the overview looks back 90 days.
+    public static let historyLimit = 2_000
+    public static let historyWindow: TimeInterval = 90 * 24 * 60 * 60
+
     public var version = Self.currentVersion
     public var writerID = WriterID()
     public var hosts: [HostID: HostRecord] = [:]
+    /// Optional so a file written before the history existed still decodes.
+    public var connectionHistory: [ConnectionEvent]?
+
+    /// Adds a connection, dropping what falls outside the window or over the limit.
+    public mutating func recordConnection(_ event: ConnectionEvent) {
+        var history = connectionHistory ?? []
+        history.append(event)
+        let cutoff = event.date.addingTimeInterval(-Self.historyWindow)
+        history.removeAll { $0.date < cutoff }
+        if history.count > Self.historyLimit { history.removeFirst(history.count - Self.historyLimit) }
+        connectionHistory = history
+    }
 
     public init() {}
 

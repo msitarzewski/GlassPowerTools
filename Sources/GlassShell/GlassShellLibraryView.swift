@@ -36,7 +36,15 @@ public struct GlassShellLibraryView: View {
                 // Embedded in the layered window's own column: paints only on visionOS (rounded
                 // panel); on macOS and iOS the column is flat and the window paints once.
                 GlassLayeredPanel(role: .embedded) {
-                    if let id, let host = model.host(id) { detail(host) } else { emptyDetail }
+                    if let id, let host = model.host(id) {
+                        detail(host)
+                    } else if model.hosts.isEmpty {
+                        emptyDetail
+                    } else {
+                        // D41: the library at a glance, and how this device has used it.
+                        GlassLibraryOverview(statistics: .make(hosts: model.hosts, isFavorite: { model.isFavorite($0) },
+                                                               history: model.connectionHistory)) { selection = $0 }
+                    }
                 }
                 // Fills the column so the layered surface behind it does too. **No opaque
                 // background of its own**: painting one here was an attempt to hide the seams by

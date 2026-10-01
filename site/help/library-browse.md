@@ -48,3 +48,9 @@ The first host in the list is the device you are using: **This Mac**, **This iPa
 
 > [!NOTE]
 > This device's host is never copied to your other devices. Each device has its own.
+
+## The library at a glance
+
+With no host selected, the library's detail shows an overview: how many machines, services, favorites and collections you have, the services of each kind, the connections this device made in the last 30 days, and the machines it used most. Choose one of those machines to select it.
+
+The connection history is kept on this device only. It records when you connected and to which kind of service on which machine, and nothing else. It never syncs, and it keeps 90 days.

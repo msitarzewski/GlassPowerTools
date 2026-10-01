@@ -722,6 +722,16 @@ public final class GlassShellModel: GlassServiceStore {
     }
 
     public func isFavorite(_ id: HostID) -> Bool { preferences[host: canonicalID(for: id)].isFavorite }
+
+    /// Connections made on this device, oldest first, each mapped to its host as the library shows
+    /// it now (a host folded into another counts as that one). Never synced (D41).
+    public var connectionHistory: [GlassShellPreferences.ConnectionEvent] {
+        (preferences.connectionHistory ?? []).map {
+            var event = $0
+            event.hostID = canonicalID(for: $0.hostID)
+            return event
+        }
+    }
     public func lastConnected(_ id: HostID) -> Date? { preferences[host: canonicalID(for: id)].lastConnected }
     public func lastUsedService(for id: HostID) -> HostServiceLink? {
         guard let endpointID = preferences[host: canonicalID(for: id)].lastUsedEndpointID else { return nil }
@@ -1416,7 +1426,9 @@ public final class GlassShellModel: GlassServiceStore {
         let hostID = host.id
         capability.open(service: service, host: owner, hostAccess: hostAccess(for: hostID)) { [weak self] outcome in
             guard let self, case .connected = outcome else { return }
-            self.preferences[host: hostID].lastConnected = Date()
+            let now = Date()
+            self.preferences[host: hostID].lastConnected = now
+            self.preferences.recordConnection(.init(date: now, hostID: hostID, kind: service.kind))
             do { try self.persistPreferences() } catch { self.errorMessage = GlassShellError.message(for: error) }
         }
     }
