@@ -344,6 +344,12 @@ struct GlassPowerToolsApp: App {
         // in this scene (or a cover presented from it), not something the shell can reach.
         .environment(model.registry)
         .trackWindowPresence(key: "main", recovery: windowRecovery)
+        // A text file opened from the Finder (Open With, or this app as its default editor) or
+        // handed over by another app: into the editor, in the window in front or a new one.
+        .onOpenURL { url in
+            guard url.isFileURL else { return }
+            if let windowID = editor.open(url) { editor.present(windowID) }
+        }
         #if os(macOS)
         .onAppear { terminal.attach(to: appDelegate) }
         #endif

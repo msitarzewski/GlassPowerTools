@@ -2,6 +2,26 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Text</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.plain-text</string>
+				<string>public.source-code</string>
+				<string>public.json</string>
+				<string>public.xml</string>
+				<string>net.daringfireball.markdown</string>
+				<string>public.yaml</string>
+			</array>
+		</dict>
+	</array>
 	<key>GlasKeychainAccessGroup</key>
 	<string>$(AppIdentifierPrefix)$(GPT_KEYCHAIN_GROUP_SUFFIX)</string>
 	<key>GlassAppGroup</key>

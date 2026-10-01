@@ -48,3 +48,7 @@ On Apple Vision Pro and iPad, close the editor window as you close any window.
 
 > [!NOTE]
 > There is no Close Project command. Closing the editor window closes its project. On iPhone, ending the session in **Active** closes it.
+
+## Open text files from the Finder
+
+**On Mac:** Glass Power Tools is offered for plain text, source code, JSON, XML, Markdown and YAML files. Open the file's context menu in the Finder and choose **Open With** ▸ **Glass Power Tools**. To open every file of that kind in Glass Power Tools, choose **Get Info**, pick **Glass Power Tools** under **Open with**, then **Change All…**. The file opens in the editor window in front, or a new one.
