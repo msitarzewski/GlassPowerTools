@@ -36,6 +36,12 @@ public struct GlassOpenSession: Identifiable {
     public let activate: @MainActor @Sendable () -> Void
     /// End it. The switcher's swipe action; never offered for the session being viewed.
     public let close: @MainActor @Sendable () -> Void
+    /// What ending it is called here, and its symbol. "Close" unless the session goes on without
+    /// this device — a terminal in tmux is detached, not closed (D44, 2026-10-02: *"It should
+    /// recognise the connection type and present the correct action words, even if they do the
+    /// same technical thing"*).
+    public let closeTitle: String
+    public let closeSymbolName: String
     /// What the session looks like right now, when the capability can cheaply draw it.
     ///
     /// **Optional by design, and genuinely optional in practice.** The terminal has rendered
@@ -56,6 +62,7 @@ public struct GlassOpenSession: Identifiable {
                 endpointIDs: [EndpointID] = [], hostID: HostID? = nil,
                 activate: @escaping @MainActor @Sendable () -> Void,
                 close: @escaping @MainActor @Sendable () -> Void,
+                closeTitle: String = "Close", closeSymbolName: String = "xmark",
                 snapshot: (@MainActor () -> Image?)? = nil) {
         self.id = id
         self.title = title
@@ -65,7 +72,39 @@ public struct GlassOpenSession: Identifiable {
         self.hostID = hostID
         self.activate = activate
         self.close = close
+        self.closeTitle = closeTitle
+        self.closeSymbolName = closeSymbolName
         self.snapshot = snapshot
+    }
+}
+
+/// D44: a session that lives on a host rather than in this app — a tmux session, today — which
+/// this device is not showing. It may be detached, or open on another device. Active lists these
+/// under their machine so work started anywhere can be picked up here.
+public struct GlassRunningSession: Identifiable {
+    /// Unique across capabilities; prefix it with the contributor, as `GlassOpenSession.id` is.
+    public let id: String
+    public let title: String
+    public let subtitle: String?
+    public let symbolName: String
+    /// The service it runs through; the library turns it into the machine.
+    public let endpointID: EndpointID
+    /// Another client is attached right now — another device, or a terminal outside Glass.
+    public let isAttachedElsewhere: Bool
+    /// Open it here. Alongside any other client.
+    public let open: @MainActor () -> Void
+    /// Open it here and detach every other client.
+    public let takeOver: @MainActor () -> Void
+    /// End it on the host. Whatever is running in it stops.
+    public let end: @MainActor () async throws -> Void
+
+    public init(id: String, title: String, subtitle: String? = nil, symbolName: String,
+                endpointID: EndpointID, isAttachedElsewhere: Bool,
+                open: @escaping @MainActor () -> Void, takeOver: @escaping @MainActor () -> Void,
+                end: @escaping @MainActor () async throws -> Void) {
+        self.id = id; self.title = title; self.subtitle = subtitle; self.symbolName = symbolName
+        self.endpointID = endpointID; self.isAttachedElsewhere = isAttachedElsewhere
+        self.open = open; self.takeOver = takeOver; self.end = end
     }
 }
 
@@ -77,6 +116,10 @@ public extension GlassCapability {
     /// registers the dependency — the same rule `GlassLibraryPanel.count` learned the hard way
     /// when a stored count said five with four things in the list.
     func openSessions() -> [GlassOpenSession] { [] }
+
+    /// Sessions running on hosts that this device is not showing (D44). Default: none. Asked when
+    /// Active appears or is refreshed — it may reach out to hosts, so never from a view body.
+    func runningSessions() async -> [GlassRunningSession] { [] }
 }
 
 public extension GlassCapabilityRegistry {
@@ -85,6 +128,13 @@ public extension GlassCapabilityRegistry {
     /// Call this **inside a view body**. See `openSessions()` above for why.
     func openSessions() -> [GlassOpenSession] {
         registered.flatMap { $0.openSessions() } + standaloneSessions()
+    }
+
+    /// Every capability's running sessions (D44). Each capability asks its own hosts together.
+    func runningSessions() async -> [GlassRunningSession] {
+        var all: [GlassRunningSession] = []
+        for capability in registered { all += await capability.runningSessions() }
+        return all
     }
 
     /// The rows to offer from inside `currentSessionID`: everything open except the session

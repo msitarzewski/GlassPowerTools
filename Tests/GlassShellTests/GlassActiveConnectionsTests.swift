@@ -16,10 +16,42 @@ struct GlassActiveConnectionsTests {
         let displayName: String
         let symbolName = "circle"
         var sessions: [GlassOpenSession] = []
+        var running: [GlassRunningSession] = []
         init(kind: HostServiceKind, displayName: String) { self.kind = kind; self.displayName = displayName }
         func open(service: HostServiceLink, host: HostProfile,
                   report: @escaping @MainActor (GlassCapabilityOutcome) -> Void) { report(.dismissed) }
         func openSessions() -> [GlassOpenSession] { sessions }
+        func runningSessions() async -> [GlassRunningSession] { running }
+    }
+
+    private func running(_ id: String, on endpoint: EndpointID) -> GlassRunningSession {
+        GlassRunningSession(id: id, title: id, symbolName: "terminal", endpointID: endpoint,
+                            isAttachedElsewhere: false, open: {}, takeOver: {}, end: {})
+    }
+
+    @Test("D44: sessions running on a machine join its group, and a machine with nothing open here still appears")
+    func runningSessionsJoinTheirMachine() async throws {
+        let (model, root, store) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let alphaTerminal = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on alpha")
+        let bravoTerminal = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on bravo")
+        try await store.upsert(try HostProfile(displayName: "alpha", address: "10.0.0.1", services: [alphaTerminal]))
+        try await store.upsert(try HostProfile(displayName: "bravo", address: "10.0.0.2", services: [bravoTerminal]))
+        let terminal = StubCapability(kind: .ssh, displayName: "Terminal")
+        terminal.sessions = [session("terminal:1", title: "alpha", endpoints: [alphaTerminal.endpointID])]
+        terminal.running = [running("tmux:glass-2", on: alphaTerminal.endpointID),
+                            running("tmux:glass-1", on: bravoTerminal.endpointID),
+                            running("tmux:nowhere", on: EndpointID())]
+        model.registry.register(terminal)
+        await model.load()
+
+        #expect(model.activeMachines().flatMap(\.running).isEmpty, "nothing until Active asks")
+        await model.refreshRunningSessions()
+        let machines = model.activeMachines()
+        #expect(machines.map(\.name) == ["alpha", "bravo"])
+        #expect(machines[0].sessions.map(\.id) == ["terminal:1"] && machines[0].running.map(\.id) == ["tmux:glass-2"])
+        #expect(machines[1].sessions.isEmpty && machines[1].running.map(\.id) == ["tmux:glass-1"])
+        #expect(model.activeSessionCount() == 1, "the sidebar counts what is open here")
     }
 
     private func makeModel() throws -> (GlassShellModel, URL, HostCatalogStore) {

@@ -88,6 +88,10 @@ public final class GlassShellModel: GlassServiceStore {
     /// A library panel something asked to be shown — the ⚡ asking for **Active**. The library
     /// view observes it, opens the panel, and clears it. Same shape as `hostToShow`.
     public var panelToShow: String?
+    /// Sessions running on hosts that this device is not showing (D44), as last asked. Active
+    /// asks when it appears and when it is refreshed.
+    public internal(set) var runningSessions: [GlassRunningSession] = []
+    public internal(set) var isCheckingRunningSessions = false
 
     public func showHost(_ id: HostID) { hostToShow = id }
 

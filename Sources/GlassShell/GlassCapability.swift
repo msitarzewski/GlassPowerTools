@@ -325,6 +325,10 @@ public protocol GlassCapability: AnyObject {
     /// `GlassOpenSessionTests` before it reached a device.
     func openSessions() -> [GlassOpenSession]
 
+    /// Sessions running on hosts that this device is not showing (D44). Default: none. A
+    /// requirement for the same reason as `openSessions()`.
+    func runningSessions() async -> [GlassRunningSession]
+
     /// Surfaces the capability contributes to the library's sidebar, beside Collections.
     ///
     /// For things that span the whole fleet rather than belonging to one machine — Workgroups,

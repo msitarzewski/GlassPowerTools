@@ -29,6 +29,8 @@ public struct GlassActiveMachine: Identifiable {
     public let id: String
     public let name: String
     public let sessions: [GlassOpenSession]
+    /// Running on the machine and not shown here (D44): detached, or open on another device.
+    public var running: [GlassRunningSession] = []
 }
 
 public extension GlassShellModel {
@@ -50,7 +52,25 @@ public extension GlassShellModel {
             if grouped[key] == nil { order.append(key); grouped[key] = (name, []) }
             grouped[key]?.sessions.append(session)
         }
-        return order.map { GlassActiveMachine(id: $0, name: grouped[$0]!.name, sessions: grouped[$0]!.sessions) }
+        var machines = order.map { GlassActiveMachine(id: $0, name: grouped[$0]!.name, sessions: grouped[$0]!.sessions) }
+        for session in runningSessions {
+            guard let owner = host(owningEndpoint: session.endpointID) else { continue }
+            let key = owner.id.rawValue.uuidString
+            if let index = machines.firstIndex(where: { $0.id == key }) {
+                machines[index].running.append(session)
+            } else {
+                machines.append(GlassActiveMachine(id: key, name: owner.displayName, sessions: [], running: [session]))
+            }
+        }
+        return machines
+    }
+
+    /// Asks every capability what is running on its hosts (D44). One pass at a time.
+    func refreshRunningSessions() async {
+        guard !isCheckingRunningSessions else { return }
+        isCheckingRunningSessions = true
+        defer { isCheckingRunningSessions = false }
+        runningSessions = await registry.runningSessions()
     }
 
     /// How many sessions are live, for the sidebar row. Zero when there are none: *"Active needs
@@ -100,14 +120,23 @@ struct GlassActiveConnectionsList: View {
                     set: { expanded in if expanded { collapsed.remove(machine.id) } else { collapsed.insert(machine.id) } }
                 )) {
                     ForEach(machine.sessions) { session in
-                        GlassActiveSessionRow(session: session)
+                        GlassActiveSessionRow(session: session) {
+                            // A detached session is still running on its machine: list it there.
+                            // The client takes a moment to leave, so ask once it has.
+                            guard session.closeTitle != "Close" else { return }
+                            try? await Task.sleep(for: .seconds(1))
+                            await model.refreshRunningSessions()
+                        }
+                    }
+                    ForEach(machine.running) { session in
+                        GlassRunningSessionRow(session: session) { await model.refreshRunningSessions() }
                     }
                 } label: {
                     HStack {
                         Label(machine.name, systemImage: "server.rack")
                             .font(.headline)
                         Spacer()
-                        Text(machine.sessions.count, format: .number)
+                        Text(machine.sessions.count + machine.running.count, format: .number)
                             .foregroundStyle(.secondary)
                     }
                     .accessibilityElement(children: .combine)
@@ -118,12 +147,92 @@ struct GlassActiveConnectionsList: View {
         .glassSpatialList()
         .navigationTitle("Active")
         .accessibilityIdentifier("active-connections")
+        .task { await model.refreshRunningSessions() }
+        .refreshable { await model.refreshRunningSessions() }
+        .toolbar {
+            ToolbarItem {
+                if model.isCheckingRunningSessions {
+                    ProgressView().controlSize(.small)
+                        .accessibilityLabel("Checking machines for running sessions")
+                } else {
+                    Button("Check Machines", systemImage: "arrow.clockwise") {
+                        Task { await model.refreshRunningSessions() }
+                    }
+                    .help("Look for sessions running on your machines")
+                }
+            }
+        }
+    }
+}
+
+/// A session running on the machine that this device is not showing (D44). Choosing it opens
+/// it here; Take Over also detaches whoever else has it; End stops it on the machine.
+struct GlassRunningSessionRow: View {
+    let session: GlassRunningSession
+    let didEnd: @MainActor () async -> Void
+    @State private var confirmingEnd = false
+    @State private var endFailure: String?
+
+    var body: some View {
+        Button {
+            session.open()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: session.symbolName)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 22)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(session.title)
+                    Text(session.subtitle ?? (session.isAttachedElsewhere ? "Open elsewhere" : "Running on the machine"))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "arrow.down.right.circle")
+                    .foregroundStyle(.tertiary)
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .glassSpatialListRow()
+        .swipeActions(edge: .trailing) {
+            Button("End", systemImage: "stop.circle", role: .destructive) { confirmingEnd = true }
+        }
+        .contextMenu {
+            Button("Open Here", systemImage: "arrow.down.right.circle") { session.open() }
+            if session.isAttachedElsewhere {
+                Button("Take Over", systemImage: "arrow.down.right.and.arrow.up.left") { session.takeOver() }
+            }
+            Button("End Session…", systemImage: "stop.circle", role: .destructive) { confirmingEnd = true }
+        }
+        .confirmationDialog("End \(session.title)?", isPresented: $confirmingEnd, titleVisibility: .visible) {
+            Button("End Session", role: .destructive) {
+                Task {
+                    do { try await session.end() } catch { endFailure = error.localizedDescription }
+                    await didEnd()
+                }
+            }
+        } message: {
+            Text("Everything running in it stops, on every device.")
+        }
+        .alert("Couldn't End the Session", isPresented: Binding(get: { endFailure != nil }, set: { if !$0 { endFailure = nil } })) {
+        } message: {
+            Text(endFailure ?? "")
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("Opens this session here")
+        .accessibilityIdentifier("active-running-\(session.id)")
     }
 }
 
 /// One live session. Choosing it switches to it; the swipe ends it.
 struct GlassActiveSessionRow: View {
     let session: GlassOpenSession
+    var didClose: @MainActor () async -> Void = {}
+
+    private func close() {
+        session.close()
+        Task { await didClose() }
+    }
 
     var body: some View {
         Button {
@@ -149,11 +258,11 @@ struct GlassActiveSessionRow: View {
         // A button row in a list is highlighted by the list; ours nested inside it (2026-09-28).
         .glassSpatialListRow()
         .swipeActions(edge: .trailing) {
-            Button("Close", systemImage: "xmark", role: .destructive) { session.close() }
+            Button(session.closeTitle, systemImage: session.closeSymbolName, role: .destructive) { close() }
         }
         .contextMenu {
             Button("Switch To", systemImage: "arrow.right.circle") { session.activate() }
-            Button("Close", systemImage: "xmark", role: .destructive) { session.close() }
+            Button(session.closeTitle, systemImage: session.closeSymbolName, role: .destructive) { close() }
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(session.title), \(session.subtitle ?? "")")
