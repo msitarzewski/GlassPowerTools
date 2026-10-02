@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import GlassShell
+import GlassConnectionKit
 import GlasSecretStore
 @testable import GlassDesktop
 
@@ -46,8 +47,26 @@ struct DesktopCredentialCleanupTests {
         #expect(app.errorMessage == nil)
     }
 
-    @Test("a new password replaces the old credential rather than adding one")
-    func newPasswordReplacesCredential() async throws {
+    @Test("removing a duplicate that shares the survivor's password leaves the password")
+    func removingDuplicateKeepsSharedCredential() async throws {
+        let keychain = Keychain()
+        let app = await model(keychain)
+        try await app.save(DesktopConnection(name: "Desktop on alpha", host: "192.0.2.10", username: "ann"), password: "one")
+        let survivor = try #require(app.connections.first)
+        var duplicate = survivor
+        duplicate.id = EndpointID()
+        try await app.save(duplicate, password: nil)
+        #expect(app.connections.count == 2)
+
+        await app.delete(try #require(app.connections.first { $0.id == duplicate.id }))
+
+        #expect(app.connections.map(\.id) == [survivor.id])
+        #expect(keychain.values[survivor.credentialID.rawValue] != nil, "the survivor can still connect")
+        #expect(app.errorMessage == nil)
+    }
+
+    @Test("a new password replaces the old one under the same credential, so other devices still find it")
+    func newPasswordKeepsCredential() async throws {
         let keychain = Keychain()
         let app = await model(keychain)
         try await app.save(DesktopConnection(name: "Desktop on alpha", host: "192.0.2.10", username: "ann"), password: "one")
@@ -56,8 +75,8 @@ struct DesktopCredentialCleanupTests {
         try await app.save(first, password: "two")
 
         let second = try #require(app.connections.first)
+        #expect(second.credentialID == first.credentialID, "the synced record's pointer does not move")
         #expect(keychain.values.count == 1)
-        #expect(keychain.values[second.credentialID.rawValue] != nil)
-        #expect(keychain.values[first.credentialID.rawValue] == nil, "the old credential is gone")
+        #expect(keychain.values[second.credentialID.rawValue]?.password.toUTF8String() == "two")
     }
 }

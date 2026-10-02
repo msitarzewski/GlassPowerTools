@@ -185,15 +185,23 @@ public final class DesktopAppModel {
         // keeps whatever host the record already belongs to; a new record is placed by the
         // capability, which is the only thing that knows which host the shell is adding it to.
         value.hostID = value.hostID ?? previous?.hostID
+        // A password typed for a saved desktop replaces the one under the desktop's existing
+        // credential ID; only a new desktop gets a new ID. Changing the ID moved the record's
+        // pointer, which syncs: every other device then looked for a credential it did not have —
+        // never, for a device-only password, and not until iCloud Keychain caught up for a synced
+        // one — and asked for the password again (2026-10-01, two desktops on the headset).
         var newCredentialID: UUID?
+        var replaced: RDPCredential??
         if let password {
-            value.credentialID = CredentialID()
+            if previous == nil { value.credentialID = CredentialID() }
+            let id = value.credentialID.rawValue, config = configuration(for: value)
+            if previous != nil { replaced = .some(try? credentials.retrieve(id, config, nil)) }
             let credential = RDPCredential(username: value.credentialAccountName, domain: value.domain, password: password)
-            do { try credentials.save(credential, value.credentialID.rawValue, configuration(for: value)) }
+            do { try credentials.save(credential, id, config) }
             catch SecretStoreError.unableToSave {
                 throw AppStorageError.recovery("The password could not be saved in Keychain, so these desktop changes were not saved. Unlock the device and retry. If it still fails, check that this build has access to its configured Keychain group.")
             }
-            newCredentialID = value.credentialID.rawValue
+            newCredentialID = id
         } else if let previous, previous.mobility != value.mobility {
             // No availability preflight: locked/missing/failed migration must
             // abort the metadata update instead of silently losing access.
@@ -201,16 +209,19 @@ public final class DesktopAppModel {
         }
         do {
             connections = try await requireRepository().save(value, replacing: previous)
-            // A new password replaced the old credential: remove the old one, or every password
-            // change would leave a copy in the Keychain (and, synced, on every device). Best
-            // effort — the record already points at the new credential.
-            if newCredentialID != nil, let previous, previous.credentialID != value.credentialID {
+            // A new password saved under a different storage choice leaves the old item behind
+            // (synced and device-only items are separate Keychain entries): remove it. Best
+            // effort — the record already says where the password is.
+            if newCredentialID != nil, let previous, previous.mobility != value.mobility {
                 try? credentials.delete(previous.credentialID.rawValue, configuration(for: previous))
             }
         } catch {
             if let newCredentialID {
-                do { try credentials.delete(newCredentialID, configuration(for: value)) }
-                catch { throw AppStorageError.recovery("The connection could not be saved and its new credential could not be cleaned up. The previous connection and credential were preserved.") }
+                // Put back what the new password overwrote; a new desktop's credential just goes.
+                do {
+                    if case .some(.some(let old)) = replaced { try credentials.save(old, newCredentialID, configuration(for: value)) }
+                    else { try credentials.delete(newCredentialID, configuration(for: value)) }
+                } catch { throw AppStorageError.recovery("The connection could not be saved, and the password typed for it could not be undone. Enter the password again before connecting.") }
             }
             throw error
         }
@@ -238,6 +249,15 @@ public final class DesktopAppModel {
             // Keychain — synced, on every device — with nothing pointing at it. Deleting an item
             // another device already removed is not an error.
             // A failure here does not undo the removal the person asked for; it is logged.
+            //
+            // **Unless another saved desktop still points at it.** Copies of a record made by an
+            // older sync share one credential; when the library folds a duplicate away, deleting
+            // "its" password deleted the survivor's — synced, so on every device, and every
+            // desktop on that machine asked for its password again (2026-10-01).
+            if connections.contains(where: { $0.credentialID == connection.credentialID && $0.mobility == connection.mobility }) {
+                errorMessage = nil
+                return
+            }
             do { try credentials.delete(connection.credentialID.rawValue, configuration(for: connection)) }
             catch { Self.logger.error("Removed desktop \(connection.id.rawValue, privacy: .public) but not its credential: \(error.localizedDescription, privacy: .public)") }
             errorMessage = nil

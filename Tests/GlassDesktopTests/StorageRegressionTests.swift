@@ -260,7 +260,7 @@ struct StorageRegressionTests {
         #expect(fixture.credentials.saved.isEmpty)
     }
 
-    @Test func failedProfileWriteCleansOnlyNewCredential() async throws {
+    @Test func failedProfileWriteRestoresTheReplacedPassword() async throws {
         let fixture = try StorageFixture()
         defer { fixture.clean() }
         _ = try await fixture.seed()
@@ -271,10 +271,26 @@ struct StorageRegressionTests {
         edited.username = "bob"
         await #expect(throws: DesktopStorageTestFailure.write) { try await app.save(edited, password: "new secret") }
         #expect(try fixture.repository.load() == [previous])
-        #expect(fixture.credentials.saved.count == 1)
-        #expect(fixture.credentials.deleted == fixture.credentials.saved)
-        #expect(!fixture.credentials.deleted.contains(previous.credentialID.rawValue))
+        #expect(fixture.credentials.deleted.isEmpty)
         #expect(fixture.credentials.items.count == 1)
+        let restored = try #require(fixture.credentials.items[.init(id: previous.credentialID.rawValue, policy: previous.mobility)])
+        #expect(restored.username == "alice" && restored.password.toUTF8String() == "test secret",
+                "the password the failed save overwrote is put back")
+    }
+
+    @Test func newPasswordWithNewStorageRemovesTheOldItem() async throws {
+        let fixture = try StorageFixture()
+        defer { fixture.clean() }
+        _ = try await fixture.seed()
+        let app = await fixture.model()
+        await app.load()
+        let previous = try #require(try fixture.repository.load().first)
+        var edited = previous
+        edited.mobility = .iCloudKeychain
+        try await app.save(edited, password: "new secret")
+        let saved = try #require(try fixture.repository.load().first)
+        #expect(saved.credentialID == previous.credentialID)
+        #expect(fixture.credentials.items.keys.map(\.policy) == [.iCloudKeychain])
     }
 
     /// Was `profileDeletionRetriesCatalogAndPreservesOtherServices`. The retry half tested the
