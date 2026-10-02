@@ -21,13 +21,13 @@ This page covers terminal windows and tabs, the session's tools menu, text size,
 | Go to tab 1–9 | | ⌘1–⌘9 |
 | All tabs as a grid or carousel | **Terminal Grid**, **Terminal Carousel** | ⌘G, ⌥⌘G |
 
-**Move Tab to New Window** is under **Tab Actions** in the toolbar. Closing a tab that has an SSH session, a recording, a connection in progress or running commands asks first. Closing a tab never changes a saved Workgroup.
+**Move Tab to New Window** is under **Tab Actions** in the toolbar. Closing a tab that has an SSH session, a recording, a connection in progress or running commands asks first. A terminal kept in tmux doesn't count: closing it leaves it running, and **Active** lists it (see [Keep terminals running with tmux](terminal-tmux.md)). Closing a tab never changes a saved Workgroup.
 
 **On iPad and iPhone:** the plus button (**New Terminal Tab**) adds a terminal to the current set. iPad shows the terminals as tabs; iPhone lists them in a menu at the top.
 
 ## The session's tools menu
 
-Each SSH terminal has a tools menu: the gear button in its toolbar on Mac, or in its bottom bar on Vision Pro. It holds **Search**, **Clear**, **Snippets**, **Start Recording…**, **Recordings**, **Duplicate Session**, **Reconnect**, **Disconnect**, and **Settings** for this session's appearance and port forwards.
+Each SSH terminal has a tools menu: the gear button in its toolbar on Mac, or in its bottom bar on Vision Pro. It holds **Search**, **Clear**, **Snippets**, **Start Recording…**, **Recordings**, **Duplicate Session**, **Reconnect**, **Disconnect** (**Detach** for a terminal kept in tmux), and **Settings** for this session's appearance and port forwards.
 
 **On iPhone and iPad:** the tools menu and the buttons below are in **Tools**, at the bottom of the terminal and on the bar above the on-screen keyboard.
 

@@ -1118,3 +1118,14 @@ feature." The first exception to the 2026-09-26 feature freeze. **Decision:** a 
 diagram of a database's tables, columns and foreign keys, read live from the connection: a 2D canvas
 on Mac, iPad and iPhone; a RealityKit volume on Vision Pro. Plan and evidence:
 `tasks/2026-09/2026-09-30_schema-diagram.md`.
+
+## D44 — Terminals that outlive the device: tmux, and Active across devices — Approved 2026-10-01
+**Owner:** "tmux support when connecting to hosts that support it" … "we have the Active tab. We could
+use that to move between machines. There are instances where I want two to 5 terminals on a given
+host. Maybe a few DB connections, too." … "Let's knock out that amazing tmux vision!" **Decision:**
+a per-server setting keeps each terminal in its own tmux session (`glass-1`, `glass-2`, …), so it
+survives a suspended app or a dropped network and can be picked up on another device. Active lists,
+under each machine, the tmux sessions running on the host that this device is not showing — detached,
+or attached elsewhere — to attach, take over or end. Stage 2 (later, not approved yet): a synced
+"open the same set here" for a host's terminals and databases. Plan and evidence:
+`tasks/2026-10/2026-10-01_tmux-sessions.md`.

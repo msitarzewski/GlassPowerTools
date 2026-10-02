@@ -14,6 +14,7 @@
       {"slug": "terminal-connect", "title": "Connect to a machine over SSH", "summary": "Set up a Terminal service, connect, enter passwords, route through jump hosts, allow legacy algorithms, and recover from dropped connections."},
       {"slug": "terminal-keys-and-trust", "title": "Sign in with keys and trust host keys", "summary": "Sign in with an SSH or Secure Enclave key, install your public key, and trust or refuse a machine's host key."},
       {"slug": "terminal-sessions", "title": "Work in a terminal", "summary": "Terminal windows, tabs and splits, the tools menu, text size, search, paste review, snippets, recording and the Mac's local shell."},
+      {"slug": "terminal-tmux", "title": "Keep terminals running with tmux", "summary": "Keep each terminal in its own tmux session, reconnect to it, pick it up from Active on another device, and end it."},
       {"slug": "terminal-files", "title": "Browse and transfer files over SFTP", "summary": "Open the file browser, upload and download, create, rename, move and delete items, and edit remote files in the Editor."},
       {"slug": "terminal-port-forwarding", "title": "Forward ports through an SSH session", "summary": "Add local, remote and SOCKS5 port forwards to a live SSH session, start and stop them, and fix common failures."},
       {"slug": "terminal-workgroups", "title": "Save and open terminal Workgroups", "summary": "Create Workgroups of terminal tabs with startup commands, open them on each platform, and swap in SSH for Mac-only local tabs."},

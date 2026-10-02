@@ -31,7 +31,7 @@ The host's **Last connected** time and its place in **Recent** change only when 
 - **On Vision Pro:** choose the **Active** tab beside the library window.
 - **On Mac, iPad and iPhone:** choose **Active** in the sidebar's **Library** section. The number beside it is how many sessions are open.
 
-Sessions are grouped under the host they belong to, with a count for each host. Sessions that belong to no host in the library are grouped under **Elsewhere**. Collapse a host's group with its disclosure arrow. When nothing is open, **Active** says **Nothing Is Open**.
+Sessions are grouped under the host they belong to, with a count for each host. A host whose Terminal service keeps sessions running with tmux also lists the tmux sessions running there that this device isn't showing; see [Keep terminals running with tmux](terminal-tmux.md). Sessions that belong to no host in the library are grouped under **Elsewhere**. Collapse a host's group with its disclosure arrow. When nothing is open, **Active** says **Nothing Is Open**.
 
 ## Switch to a session
 
@@ -47,6 +47,8 @@ Every session has **Active Connections** (⚡) in its top toolbar, and the libra
 ## Close a session
 
 In **Active**, swipe left on a session and choose **Close**, or right-click it (touch and hold on touch devices) and choose **Close**.
+
+A terminal kept in tmux says so under its name, and its action is **Detach** instead: it leaves the session running on the machine, where **Active** then lists it as **Detached**.
 
 ## Bring the library back on Vision Pro
 

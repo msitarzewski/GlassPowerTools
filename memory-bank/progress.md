@@ -20,6 +20,7 @@ All four capabilities and the shell are built and in daily use on the owner's Ma
 | Remote desktops: RDP (RDPKit) and VNC (VNCKit), certificate policy, resize following the window, audio, clipboard | built | unit (RDPKit 1,015 tests), server (Windows 11 with NLA — 2026-09-14 and again 2026-09-27; a GNOME RDP server), device (Mac, iPhone) |
 | Editor: documents, projects on this device and over SFTP, New File, first save into a project, viewers, Markdown preview with Mermaid, 16 grammars, TextKit 1 on the Mac (D36) | built | unit, UI on iPhone simulator, server (7 live remote-editing tests), device (Mac) |
 | Acknowledgements and licence notices (generated, guarded by tests) | built | unit |
+| Terminals kept in tmux sessions; Active lists sessions running on hosts (D44 stage 1, 2026-10-01) | built | unit, server (scratch: create, leave, reattach, end; missing-tmux path); not yet on a device |
 
 Package suite: about **1,790 tests**. The last full run with the screen unlocked passed (1,777, early
 2026-09-27); the night's later runs were under a locked screen, where file-protected stores cannot be

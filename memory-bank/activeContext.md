@@ -27,6 +27,19 @@ anything touching real servers (SSH and database tests use the disposable test V
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
+## 2026-10-01 — desktop passwords and tmux (D44)
+
+Installed: Mac, Vision Pro and iPhone 0.4.272 (2026-10-02). Nothing pushed.
+- **Desktop passwords lost on every device:** most likely the library folding a duplicate desktop
+  link whose record shared the survivor's credential; removing it deleted the shared, synced
+  password. Removal now keeps a credential another record still uses, and a changed password
+  keeps its credential ID. The owner re-enters the lost passwords once. No log evidence (the Mac
+  keeps errors only), so the cause is inferred from the code and the symptoms.
+- **D44 stage 1 built:** per-server "Keep Sessions Running with tmux", one session per terminal,
+  reattach on reconnect, Active lists sessions running on hosts (open, take over, end). Live test
+  passes on scratch (tmux 3.6). Stage 2 (synced "open the same set here") not started.
+  Detail: `tasks/2026-10/2026-10-01_tmux-sessions.md`.
+
 ## Paused 2026-09-28 (evening) — where to pick up
 
 All work below is committed locally (nothing pushed). Mac 0.4.266, iPhone 0.4.249, Vision Pro 0.4.254
