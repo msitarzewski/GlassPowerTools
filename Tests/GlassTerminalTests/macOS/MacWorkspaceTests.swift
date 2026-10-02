@@ -346,6 +346,7 @@ struct MacWorkspaceTests {
                 _ serverID: UUID,
                 settingsManager: SettingsManager,
                 startupCommand: String? = nil,
+                tmux: TerminalTmuxAttachment? = nil,
                 initialTerminalPresentation: TerminalSession.InitialTerminalPresentationRequest? = nil
             ) async throws -> AuthorizedSessionLaunch {
                 receivedCommands.append(startupCommand)
@@ -495,7 +496,7 @@ struct MacWorkspaceTests {
         let coordinator = MacTerminalWindowReader.Coordinator()
         var cleanupCount = 0
         coordinator.observeWindowClose(window) { cleanupCount += 1 }
-        coordinator.interceptWindowClose(window, shouldConfirm: { false })
+        coordinator.interceptWindowClose(window, shouldConfirm: { nil })
 
         #expect(window.delegate === coordinator)
         #expect(!coordinator.windowShouldClose(window))
@@ -517,8 +518,8 @@ struct MacWorkspaceTests {
         let coordinator = MacTerminalWindowReader.Coordinator()
         var confirmationEnabled = true
         coordinator.observeWindowClose(window, action: {})
-        coordinator.interceptWindowClose(window, shouldConfirm: { confirmationEnabled })
-        #expect(coordinator.requiresCloseConfirmation)
+        coordinator.interceptWindowClose(window, shouldConfirm: { confirmationEnabled ? "message" : nil })
+        #expect(coordinator.requiresCloseConfirmation && coordinator.closeConfirmationMessage == "message")
         confirmationEnabled = false
         #expect(!coordinator.requiresCloseConfirmation)
         coordinator.restoreWindowDelegate()
@@ -1050,7 +1051,8 @@ struct MacWorkspaceTests {
         let originalIDs = source.tabs.map(\.workspaceID)
         let request = try #require(source.transferSelectedTab())
 
-        try await Task.sleep(for: .milliseconds(30))
+        // Waits for the expiry rather than a fixed 30 ms, which a loaded full-suite run outlasted.
+        for _ in 0..<200 where transferBroker.pendingCount != 0 { try await Task.sleep(for: .milliseconds(10)) }
         #expect(transferBroker.pendingCount == 0)
         #expect(source.tabs.map(\.workspaceID) == originalIDs)
         #expect(source.selectedTabID == originalIDs[1])

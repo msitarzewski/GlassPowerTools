@@ -45,11 +45,13 @@ public final class MacTerminalAppDelegate: NSObject, NSApplicationDelegate {
         let windows = MacTerminalWindowReader.Coordinator.active.allObjects
         let sessions = sessionManager?.sessions ?? []
         let needsConfirmation = windows.contains { $0.requiresCloseConfirmation }
-            || (settingsManager?.confirmBeforeClosing == true && !sessions.isEmpty)
+            || (settingsManager?.confirmBeforeClosing == true && sessions.contains(where: \.closeStopsWork))
         if needsConfirmation {
             let alert = NSAlert()
             alert.messageText = "Quit \(GlassProduct.displayName)?"
-            alert.informativeText = "Running terminal sessions will be disconnected."
+            alert.informativeText = sessions.contains(where: \.survivesClose)
+                ? "Terminals that aren't kept in tmux will be disconnected. Those in tmux keep running, and Active lists them."
+                : "Running terminal sessions will be disconnected."
             alert.alertStyle = .warning
             alert.addButton(withTitle: "Quit")
             alert.addButton(withTitle: "Cancel")

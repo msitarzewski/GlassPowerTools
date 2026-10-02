@@ -219,7 +219,7 @@ struct MacWorkspaceView: View {
                     }
                 },
                 shouldConfirmClose: {
-                    settingsManager.confirmBeforeClosing && !windowController.isEmpty
+                    settingsManager.confirmBeforeClosing ? windowController.closeConfirmationMessage : nil
                 },
                 opensSidebarInitially: !showingOverview && columnVisibility == .all,
                 overviewPresented: showingOverview
@@ -830,7 +830,7 @@ private struct MacWorkspaceTabContent: View {
             addLocalPane: { controller.addPane(intent: .local, axis: $0) },
             requestSSHPane: { controller.requestSSHPane(axis: $0) },
             closeFocusedPane: {
-                if settingsManager.confirmBeforeClosing {
+                if settingsManager.confirmBeforeClosing && controller.focusedPaneCloseStopsWork {
                     showingPaneCloseConfirmation = true
                 } else {
                     controller.removeFocusedPane(sessionManager: sessionManager)

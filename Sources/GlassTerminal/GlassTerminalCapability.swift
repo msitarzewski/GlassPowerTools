@@ -41,7 +41,9 @@ public final class GlassTerminalRuntime {
     /// legacy-algorithm confirmation, trust prompt and password fallback exist exactly once.
     enum Request {
         /// `report` is the shell's outcome callback (nil for the terminal's own callers).
-        case connect(serverID: UUID, purpose: TerminalSession.Purpose, report: GlassCapabilityReport?)
+        /// `tmux` names a session already running on the host to attach to (D44, Active).
+        case connect(serverID: UUID, purpose: TerminalSession.Purpose, report: GlassCapabilityReport?,
+                     tmux: TerminalTmuxAttachment? = nil)
         case quickConnect(ServerConfiguration, password: String)
         case openWorkgroup(LayoutPreset)
         case addServer(draft: ServerConfiguration?)
@@ -242,7 +244,7 @@ public final class GlassTerminalCapability: GlassCapability {
     public let kind: HostServiceKind = .ssh
     public let displayName = "Terminal"
     public let symbolName = "terminal"
-    private let runtime: GlassTerminalRuntime
+    let runtime: GlassTerminalRuntime
 
     public init(runtime: GlassTerminalRuntime) { self.runtime = runtime }
 
@@ -271,11 +273,13 @@ public final class GlassTerminalCapability: GlassCapability {
             GlassOpenSession(
                 id: Self.sessionID(sessionID: session.id),
                 title: session.purpose == .sftp ? "SFTP on \(session.server.name)" : session.server.name,
-                subtitle: session.state.displayName,
+                subtitle: Self.subtitle(for: [session]),
                 symbolName: session.purpose == .sftp ? "folder" : symbolName,
                 endpointIDs: [EndpointID(rawValue: session.server.id)],
                 activate: { Self.reveal(session, in: manager) },
                 close: { Self.close(session, in: manager) },
+                closeTitle: Self.closeTitle(for: [session]),
+                closeSymbolName: Self.closeSymbolName(for: [session]),
                 snapshot: { Self.preview(of: session) }
             )
         }
@@ -308,12 +312,14 @@ public final class GlassTerminalCapability: GlassCapability {
             return GlassOpenSession(
                 id: Self.sessionID(workgroupID: workgroup.id),
                 title: workgroup.name,
-                subtitle: live.count == 1 ? live[0].state.displayName : "\(live.count) terminals",
+                subtitle: Self.subtitle(for: live),
                 symbolName: symbolName,
                 // The machines this workgroup is on: its servers are the shell's endpoints (D26).
                 endpointIDs: live.map { EndpointID(rawValue: $0.server.id) },
                 activate: { [runtime] in runtime.enqueue(.showWorkgroup(workgroupID: workgroup.id)) },
                 close: { manager.closeWorkgroup(workgroup.id) },
+                closeTitle: Self.closeTitle(for: live),
+                closeSymbolName: Self.closeSymbolName(for: live),
                 // The card shows the terminal the workgroup has selected — the one you would be
                 // looking at if you went back to it. Drawn by the emulator, which has been able
                 // to do this since glas.sh's overview; nothing new was needed.
@@ -323,6 +329,27 @@ public final class GlassTerminalCapability: GlassCapability {
                 }
             )
         }
+    }
+
+    /// D44: a row says when its terminals are in tmux, and ending it is a detach when they all
+    /// are — the sessions go on running on the machine, and Active lists them there.
+    static func subtitle(for live: [TerminalSession]) -> String {
+        let inTmux = live.filter(\.survivesClose)
+        if live.count == 1 {
+            guard let name = inTmux.first?.tmuxSessionName else { return live[0].state.displayName }
+            let label = TerminalTmux.glassNumber(name).map { "Terminal \($0)" } ?? name
+            return "\(live[0].state.displayName) · in tmux (\(label))"
+        }
+        if inTmux.isEmpty { return "\(live.count) terminals" }
+        return inTmux.count == live.count ? "\(live.count) terminals in tmux" : "\(live.count) terminals, \(inTmux.count) in tmux"
+    }
+
+    static func closeTitle(for live: [TerminalSession]) -> String {
+        !live.isEmpty && live.allSatisfy(\.survivesClose) ? "Detach" : "Close"
+    }
+
+    static func closeSymbolName(for live: [TerminalSession]) -> String {
+        closeTitle(for: live) == "Detach" ? "eject" : "xmark"
     }
 
     /// A still of a terminal, in whatever image type this platform uses. 800px wide is the

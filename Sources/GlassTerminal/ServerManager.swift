@@ -674,28 +674,44 @@ class ServerManager {
     #endif
 
     func updateLastConnected(_ serverID: UUID) async {
-        do {
-            try ensureServerCatalogAvailable()
-            guard let index = servers.firstIndex(where: { $0.id == serverID }) else { return }
-            var candidateServers = servers
-            candidateServers[index].lastConnected = Date()
-            try await persistServerMutation(candidateServers)
-        } catch {
-            Logger.servers.error("Failed to update recent server metadata: \(error.localizedDescription)")
-        }
+        await updateMetadata(serverID, "recent") { $0.lastConnected = Date() }
+    }
+
+    /// D44: what a connection learned about tmux on a server, and the owner's answer to the offer.
+    func updateTmux(_ serverID: UUID, _ change: @escaping (inout ServerConfiguration) -> Void) async {
+        await updateMetadata(serverID, "tmux", change)
     }
 
     func toggleFavorite(_ server: ServerConfiguration) async {
-        do {
-            try ensureServerCatalogAvailable()
-            guard let index = servers.firstIndex(where: { $0.id == server.id }) else { return }
-            var candidateServers = servers
-            candidateServers[index].isFavorite.toggle()
-            try await persistServerMutation(candidateServers)
-        } catch {
-            Logger.servers.error("Failed to update favorite server metadata: \(error.localizedDescription)")
-        }
+        await updateMetadata(server.id, "favorite") { $0.isFavorite.toggle() }
     }
+
+    /// Best-effort metadata on one server: last connected, favorite, tmux. **One at a time, each
+    /// from the servers as the previous one left them.** Each used to copy the list, await the
+    /// save and then set it, so two in flight — a connect stamps "last connected" and records
+    /// what it found about tmux in the same moment — interleaved, and the later wrote a stale copy
+    /// over the earlier (an answered tmux offer came back unanswered; `TerminalTmuxOfferTests`).
+    private func updateMetadata(_ serverID: UUID, _ what: String,
+                                _ change: @escaping (inout ServerConfiguration) -> Void) async {
+        let previous = metadataUpdateChain
+        let update = Task { @MainActor in
+            await previous?.value
+            do {
+                try self.ensureServerCatalogAvailable()
+                guard let index = self.servers.firstIndex(where: { $0.id == serverID }) else { return }
+                var candidateServers = self.servers
+                change(&candidateServers[index])
+                guard candidateServers[index] != self.servers[index] else { return }
+                try await self.persistServerMutation(candidateServers)
+            } catch {
+                Logger.servers.error("Failed to update \(what, privacy: .public) server metadata: \(error.localizedDescription)")
+            }
+        }
+        metadataUpdateChain = update
+        await update.value
+    }
+
+    private var metadataUpdateChain: Task<Void, Never>?
 
     func trustHostKey(_ challenge: HostKeyTrustChallenge, for serverID: UUID) async throws {
         try ensureServerCatalogAvailable()

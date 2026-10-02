@@ -37,7 +37,7 @@ nonisolated enum LiveRemoteEnvironment {
     static var isConfigured: Bool { host != nil && user != nil && (keyPath != nil || password != nil) }
 }
 
-private struct LiveCredentialResolver: SSHCredentialResolver {
+struct LiveCredentialResolver: SSHCredentialResolver {
     func resolve(_ reference: SSHCredentialReference,
                  for endpoint: SSHEndpoint) async throws -> SSHResolvedCredential {
         if let keyPath = LiveRemoteEnvironment.keyPath {
@@ -53,7 +53,7 @@ private struct LiveCredentialResolver: SSHCredentialResolver {
     }
 }
 
-private struct TrustThisRun: SSHHostTrustDecider {
+struct TrustThisRun: SSHHostTrustDecider {
     func decide(_ challenge: SSHHostTrustChallenge) async -> SSHHostTrustDecision { .trust(remember: false) }
 }
 

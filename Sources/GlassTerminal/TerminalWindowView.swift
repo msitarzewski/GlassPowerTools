@@ -392,6 +392,13 @@ struct TerminalWindowView: View {
                 onPaste: { text in terminalHostModel.resolvePendingPaste(approvedText: text) }
             )
         }
+        // D44: the first connection that finds tmux on a server asks once, for every device.
+        .alert("Keep Terminals Running with tmux?", isPresented: $session.tmuxOffer) {
+            Button("Turn On") { Task { await sessionManager.answerTmuxOffer(for: session, turnOn: true) } }
+            Button("Not Now", role: .cancel) { Task { await sessionManager.answerTmuxOffer(for: session, turnOn: false) } }
+        } message: {
+            Text("\(session.server.name) has tmux. With it on, each terminal you open there runs in its own tmux session, keeps going when you disconnect, and can be picked up from Active on any device. Starts with the next terminal you open. You can change this in the server's Advanced settings.")
+        }
         .alert("Close Connection?", isPresented: $showingCloseConfirmation) {
             Button("Disconnect", role: .destructive) {
                 closeTerminalSession()
@@ -1456,13 +1463,15 @@ struct TerminalWindowView: View {
                     }
                 } else {
                     Button(role: .destructive) {
-                        if settingsManager.confirmBeforeClosing && session.state == .connected {
+                        if settingsManager.confirmBeforeClosing && session.closeStopsWork {
                             showingCloseConfirmation = true
                         } else {
                             closeTerminalSession()
                         }
                     } label: {
-                        Label("Disconnect", systemImage: "xmark.circle")
+                        // In tmux the session goes on running: this leaves it, it does not end it.
+                        Label(session.survivesClose ? "Detach" : "Disconnect",
+                              systemImage: session.survivesClose ? "eject" : "xmark.circle")
                     }
                     .disabled(session.state == .disconnected)
                 }

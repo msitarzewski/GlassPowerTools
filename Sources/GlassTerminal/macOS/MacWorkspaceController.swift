@@ -158,6 +158,20 @@ final class MacWorkspaceController {
         )
     }
     var focusedPaneID: UUID? { state.focusedPaneID }
+
+    /// D44: closing this tab would stop something — a local shell, a pane still opening, or an
+    /// SSH terminal not kept in tmux. Terminals in tmux keep running, so they do not count.
+    var closeStopsWork: Bool {
+        !localRuntimesByPaneID.isEmpty || !loadingPaneIDs.isEmpty
+            || sessionsByPaneID.values.contains(where: \.closeStopsWork)
+    }
+    var hasTerminalsInTmux: Bool { sessionsByPaneID.values.contains(where: \.survivesClose) }
+
+    /// The same, for the focused pane alone.
+    var focusedPaneCloseStopsWork: Bool {
+        guard let id = focusedPaneID else { return false }
+        return localRuntimesByPaneID[id] != nil || loadingPaneIDs.contains(id) || sessionsByPaneID[id]?.closeStopsWork == true
+    }
     var focusedPane: MacWorkspacePane? {
         guard let focusedPaneID else { return nil }
         return state.root?.pane(id: focusedPaneID)
@@ -881,6 +895,14 @@ final class MacWorkspaceWindowController {
 
     var isEmpty: Bool {
         tabs.allSatisfy(\.isEmpty)
+    }
+
+    /// What closing this window should ask, or nil when nothing would stop (D44).
+    var closeConfirmationMessage: String? {
+        guard tabs.contains(where: \.closeStopsWork) else { return nil }
+        return tabs.contains(where: \.hasTerminalsInTmux)
+            ? "Terminals in this window that aren't kept in tmux will be disconnected. Those in tmux keep running, and Active lists them."
+            : "Running terminal sessions in this window will be disconnected."
     }
     var canAddTab: Bool {
         tabs.count < MacWorkspaceWindowRestorationState.maximumTabCount

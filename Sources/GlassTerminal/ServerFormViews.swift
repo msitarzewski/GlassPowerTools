@@ -160,6 +160,9 @@ final class TerminalServiceDraft: GlassServiceDraft {
     var tags: [String]
     var isFavorite: Bool
     var allowLegacyAlgorithms: Bool
+    var keepsSessionsInTmux: Bool
+    /// What the last connection found (D44); nil before any. Read-only here.
+    let tmuxAvailable: Bool?
     var jumpHostIDs: [UUID]
     var usesAppDefaultTerminalSize: Bool
     var initialTerminalColumns: Int
@@ -190,6 +193,8 @@ final class TerminalServiceDraft: GlassServiceDraft {
         tags = source?.tags ?? []
         isFavorite = source?.isFavorite ?? false
         allowLegacyAlgorithms = source?.legacyAlgorithmsEnabled ?? false
+        keepsSessionsInTmux = source?.keepsSessionsInTmux ?? false
+        tmuxAvailable = source?.tmuxAvailable
         jumpHostIDs = source?.resolvedJumpHostIDs ?? []
         let hasTerminalSize = source?.initialTerminalColumns != nil && source?.initialTerminalRows != nil
         usesAppDefaultTerminalSize = !hasTerminalSize
@@ -378,6 +383,7 @@ final class TerminalServiceDraft: GlassServiceDraft {
             updated.tags = tags
             updated.isFavorite = isFavorite
             updated.allowLegacyAlgorithms = allowLegacyAlgorithms
+            updated.tmux = keepsSessionsInTmux
             updated.jumpHostID = jumpHostIDs.first
             updated.jumpHostIDs = jumpHostIDs.isEmpty ? nil : jumpHostIDs
             updated.initialTerminalColumns = usesAppDefaultTerminalSize ? nil : initialTerminalColumns
@@ -404,6 +410,7 @@ final class TerminalServiceDraft: GlassServiceDraft {
                 initialTerminalRows: usesAppDefaultTerminalSize ? nil : initialTerminalRows
             )
             server.allowLegacyAlgorithms = allowLegacyAlgorithms
+            server.tmux = keepsSessionsInTmux
             try await serverManager.addServerOrThrow(server, password: authMethod == .password ? password : nil)
         }
     }
@@ -419,6 +426,7 @@ final class TerminalServiceDraft: GlassServiceDraft {
                                          initialTerminalColumns: usesAppDefaultTerminalSize ? nil : initialTerminalColumns,
                                          initialTerminalRows: usesAppDefaultTerminalSize ? nil : initialTerminalRows)
         server.allowLegacyAlgorithms = allowLegacyAlgorithms
+        server.tmux = keepsSessionsInTmux
         return server
     }
 
@@ -604,6 +612,15 @@ struct TerminalRequiredFields: View {
 
 /// Everything optional: the shell's "Advanced" disclosure and the standalone form's sections.
 struct TerminalAdvancedFields: View {
+    /// What the tmux setting needs, in the state the last connection left it.
+    static func tmuxFootnote(available: Bool?) -> String {
+        switch available {
+        case true?: "Each terminal runs in its own tmux session on this host, so it keeps going when you disconnect, and you can pick it up from Active on any device."
+        case false?: "tmux wasn't installed on this host when you last connected. Install it there, connect again, and this becomes available."
+        case nil: "Connect to this host once and Glass Power Tools checks whether it has tmux."
+        }
+    }
+
     @Bindable var draft: TerminalServiceDraft
     /// The shell's sheet offers the service name here (optional, defaulted from the host); the
     /// standalone form has it up top as a required field.
@@ -643,6 +660,15 @@ struct TerminalAdvancedFields: View {
             .font(.footnote)
             .foregroundStyle(draft.allowLegacyAlgorithms ? .orange : .secondary)
             .accessibilityIdentifier("\(identifierPrefix)-legacy-algorithms-warning")
+
+            // D44: only offered where a connection has found tmux; always free to turn off.
+            Toggle("Keep Sessions Running with tmux", isOn: $draft.keepsSessionsInTmux)
+                .disabled(draft.tmuxAvailable != true && !draft.keepsSessionsInTmux)
+                .accessibilityIdentifier("\(identifierPrefix)-tmux")
+            Text(Self.tmuxFootnote(available: draft.tmuxAvailable))
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("\(identifierPrefix)-tmux-note")
 
             #if os(macOS)
             serverFormLabeledContent("Route") { routingEditor.serverFormControlPresentation() }

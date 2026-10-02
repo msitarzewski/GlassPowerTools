@@ -149,6 +149,7 @@ class SessionManager {
         settingsManager: SettingsManager,
         purpose: TerminalSession.Purpose = .terminal,
         startupCommand: String? = nil,
+        tmux: TerminalTmuxAttachment? = nil,
         initialTerminalPresentation: TerminalSession.InitialTerminalPresentationRequest? = nil
     ) async throws -> AuthorizedSessionLaunch {
         guard let currentServer = serverManager.server(for: server.id) else {
@@ -161,6 +162,7 @@ class SessionManager {
             purpose: purpose,
             providedPassword: nil,
             startupCommand: startupCommand,
+            tmux: tmux,
             initialTerminalPresentation: initialTerminalPresentation
         )
     }
@@ -191,6 +193,7 @@ class SessionManager {
         purpose: TerminalSession.Purpose = .terminal,
         providedPassword: String?,
         startupCommand: String?,
+        tmux: TerminalTmuxAttachment? = nil,
         initialTerminalPresentation: TerminalSession.InitialTerminalPresentationRequest?
     ) async throws -> AuthorizedSessionLaunch {
         if startupCommand != nil,
@@ -223,6 +226,7 @@ class SessionManager {
             settingsManager: settingsManager,
             purpose: purpose,
             startupCommand: startupCommand,
+            tmux: tmux,
             initialTerminalPresentation: initialTerminalPresentation
         )
         if case .error = session.state,
@@ -237,6 +241,7 @@ class SessionManager {
         _ serverID: UUID,
         settingsManager: SettingsManager,
         startupCommand: String? = nil,
+        tmux: TerminalTmuxAttachment? = nil,
         initialTerminalPresentation: TerminalSession.InitialTerminalPresentationRequest? = nil
     ) async throws -> AuthorizedSessionLaunch {
         guard let server = serverManager.server(for: serverID) else {
@@ -244,8 +249,11 @@ class SessionManager {
         }
         return try await createAuthorizedSession(
             for: server,
+            origin: .savedProfile(server.id),
             settingsManager: settingsManager,
+            providedPassword: nil,
             startupCommand: startupCommand,
+            tmux: tmux,
             initialTerminalPresentation: initialTerminalPresentation
         )
     }
@@ -380,6 +388,7 @@ class SessionManager {
         settingsManager: SettingsManager,
         purpose: TerminalSession.Purpose,
         startupCommand: String?,
+        tmux: TerminalTmuxAttachment?,
         initialTerminalPresentation: TerminalSession.InitialTerminalPresentationRequest?
     ) async -> TerminalSession {
         let session = TerminalSession(
@@ -392,6 +401,16 @@ class SessionManager {
         }
         if let startupCommand {
             _ = session.installStartupCommand(startupCommand)
+        }
+        if let tmux {
+            session.tmuxSessionName = tmux.name
+            session.tmuxTakesOver = tmux.takeOver
+        }
+        if purpose == .terminal, case .savedProfile = origin {
+            session.tmuxAvailabilityObserved = { [weak self, weak session] available in
+                guard let self, let session else { return }
+                self.noteTmuxAvailability(available, on: session)
+            }
         }
         session.jumpHostChain = jumpHostChain
         session.connectionPreparation = prepared?.authentication
@@ -821,8 +840,35 @@ class SessionManager {
     /// failures and never throws — so the reconnect callback that calls this does not wait for the
     /// catalog write. What the user sees is unchanged; only the ordering of a "last connected"
     /// stamp against the next frame is, and nothing reads it synchronously.
+    /// D44: records whether the host has tmux and, the first time it does on a server where the
+    /// setting is off and nobody has answered yet, asks this terminal's owner.
+    /// Returns the save it started, if any, for a caller that needs it finished.
+    @discardableResult
+    func noteTmuxAvailability(_ available: Bool, on session: TerminalSession) -> Task<Void, Never>? {
+        guard let server = serverManager.server(for: session.server.id) else { return nil }
+        if available, !server.keepsSessionsInTmux, server.tmuxOffered != true { session.tmuxOffer = true }
+        guard server.tmuxAvailable != available else { return nil }
+        let serverManager = self.serverManager
+        return Task { await serverManager.updateTmux(server.id) { $0.tmuxAvailable = available } }
+    }
+
+    /// The owner's answer to the offer. Either way they are not asked again, on any device.
+    func answerTmuxOffer(for session: TerminalSession, turnOn: Bool) async {
+        session.tmuxOffer = false
+        await serverManager.updateTmux(session.server.id) { server in
+            server.tmuxOffered = true
+            if turnOn { server.tmux = true }
+        }
+        if let updated = serverManager.server(for: session.server.id) {
+            for other in sessions where other.server.id == updated.id {
+                other.tmuxOffer = false
+            }
+        }
+    }
+
     private func recordSuccessfulConnection(for session: TerminalSession) {
         serverManager.settlePasswordTrial(for: session.server.id, succeeded: true)
+        guard session.purpose != .probe else { return }
         if serverManager.server(for: session.server.id) != nil {
             let serverManager = self.serverManager
             let serverID = session.server.id

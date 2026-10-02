@@ -163,6 +163,14 @@ struct ServerConfiguration: Identifiable, Codable, Hashable {
     /// must be absent; macOS fits the initial window before creating the PTY.
     var initialTerminalColumns: Int?
     var initialTerminalRows: Int?
+    /// D44: keep each terminal in its own tmux session on the host. Absent on every record saved
+    /// before 2026-10-01, which reads as off.
+    var tmux: Bool?
+    /// Whether the host had tmux when a terminal last connected; nil until one has. The setting
+    /// above can only be turned on when it did.
+    var tmuxAvailable: Bool?
+    /// The owner has answered "keep terminals running with tmux?" for this server, on any device.
+    var tmuxOffered: Bool?
     
     init(
         id: UUID = UUID(),
@@ -216,6 +224,8 @@ struct ServerConfiguration: Identifiable, Codable, Hashable {
     var legacyAlgorithmsEnabled: Bool {
         allowLegacyAlgorithms == true
     }
+
+    var keepsSessionsInTmux: Bool { tmux == true }
 }
 
 enum ServerColorTag: String, Codable, CaseIterable, Hashable, Sendable {
@@ -317,7 +327,9 @@ struct TerminalStartupCommandTicket: Identifiable, Equatable, Sendable {
 @MainActor
 @Observable
 class TerminalSession: Identifiable, Hashable {
-    enum Purpose { case terminal, sftp }
+    /// `probe`: a short, unseen connection that only runs commands — Active asking a host which
+    /// tmux sessions it has (D44). No shell, no window, not listed, not "last connected".
+    enum Purpose { case terminal, sftp, probe }
     let purpose: Purpose
     typealias TerminalWriteSink = @MainActor (Data) async throws -> Void
     typealias TerminalResizeSink = @MainActor (_ rows: Int, _ columns: Int) async throws -> Void
@@ -339,7 +351,7 @@ class TerminalSession: Identifiable, Hashable {
     var state: SessionState = .disconnected {
         didSet {
             if oldValue != .connected, state == .connected {
-                dispatchStartupCommandIfNeeded()
+                if usesTmux { attachTmux() } else { dispatchStartupCommandIfNeeded(); checkTmuxAvailability() }
             }
         }
     }
@@ -390,6 +402,27 @@ class TerminalSession: Identifiable, Hashable {
     private var lifecycleCleanupTask: Task<Void, Never>?
     private var startupCommandTicket: TerminalStartupCommandTicket?
 
+    // MARK: tmux (D44)
+    /// The tmux session this terminal lives in. Chosen on the first connect, or given by Active
+    /// when attaching to a session already running; every reconnect attaches to it again.
+    var tmuxSessionName: String?
+    /// The first attach detaches any other client — Active's "Take Over".
+    var tmuxTakesOver = false
+    /// The host had no tmux when this terminal connected: it is an ordinary shell.
+    private(set) var tmuxUnavailable = false
+    /// Told what each connection found: whether the host has tmux. Installed by the session
+    /// manager, which records it on the server and decides whether to offer the setting.
+    var tmuxAvailabilityObserved: (@MainActor (Bool) -> Void)?
+    /// Ask this terminal's owner whether to keep terminals on this server in tmux (D44).
+    var tmuxOffer = false
+    /// Runs a command on the host and returns its output. Tests replace it; otherwise an exec
+    /// channel on this session's own transport.
+    var tmuxCommandRunner: (@MainActor (String) async throws -> String)?
+    private var tmuxTask: Task<Void, Never>?
+    /// Names chosen on this device and not yet visible in the host's list, per server, so two
+    /// terminals opening at once do not both choose `glass-1`.
+    private static var reservedTmuxNames: [UUID: Set<String>] = [:]
+
     init(
         server: ServerConfiguration,
         purpose: Purpose = .terminal,
@@ -420,6 +453,7 @@ class TerminalSession: Identifiable, Hashable {
         terminalWriteTask?.cancel()
         terminalResizeTask?.cancel()
         reconnectTask?.cancel()
+        tmuxTask?.cancel()
         initialTerminalGeometryContinuation.finish()
     }
 
@@ -743,6 +777,92 @@ class TerminalSession: Identifiable, Hashable {
         // same consented input-recording path as keyboard bytes.
         recorder?.recordInput(data)
         enqueueTerminalWrite(data, presentsFailure: true)
+    }
+
+    var usesTmux: Bool {
+        purpose == .terminal && !tmuxUnavailable && (tmuxSessionName != nil || server.keepsSessionsInTmux)
+    }
+
+    /// Types the attach line once the shell is up, after choosing a name the first time. The
+    /// workgroup's startup command, when there is one, follows it — inside the new tmux session.
+    private func attachTmux() {
+        tmuxTask?.cancel()
+        tmuxTask = Task { [weak self] in
+            guard let self else { return }
+            if tmuxSessionName == nil {
+                var taken = Self.reservedTmuxNames[server.id] ?? []
+                do {
+                    switch TerminalTmux.parse(try await runTmuxCommand(TerminalTmux.listCommand)) {
+                    case .unavailable:
+                        guard state == .connected, !Task.isCancelled else { return }
+                        tmuxAvailabilityObserved?(false)
+                        tmuxUnavailable = true
+                        showLocalNotice("tmux isn't installed on \(server.name), so this terminal stops when you disconnect. "
+                            + "Install tmux there to keep it running, or turn off Keep Sessions Running with tmux for this server.")
+                        dispatchStartupCommandIfNeeded()
+                        return
+                    case .sessions(let sessions):
+                        tmuxAvailabilityObserved?(true)
+                        taken.formUnion(sessions.map(\.name))
+                    }
+                } catch {
+                    // The list is only for choosing a free name. The attach line is harmless
+                    // without tmux, so go ahead with the names this device knows about.
+                    Logger.ssh.error("tmux list failed: \(error.localizedDescription, privacy: .public)")
+                }
+                guard state == .connected, !Task.isCancelled else { return }
+                let name = TerminalTmux.nextName(avoiding: taken)
+                Self.reservedTmuxNames[server.id, default: []].insert(name)
+                tmuxSessionName = name
+            }
+            guard state == .connected, !Task.isCancelled, let name = tmuxSessionName else { return }
+            let data = Data((TerminalTmux.attachLine(name: name, takeOver: tmuxTakesOver) + "\n").utf8)
+            tmuxTakesOver = false
+            recorder?.recordInput(data)
+            enqueueTerminalWrite(data, presentsFailure: true)
+            dispatchStartupCommandIfNeeded()
+        }
+    }
+
+    /// A terminal without the setting still asks whether the host has tmux, once per connection,
+    /// so the server form knows whether the setting can be offered (D44). Nothing is typed.
+    private func checkTmuxAvailability() {
+        guard purpose == .terminal, tmuxAvailabilityObserved != nil else { return }
+        tmuxTask?.cancel()
+        tmuxTask = Task { [weak self] in
+            guard let self, let output = try? await runTmuxCommand(TerminalTmux.listCommand),
+                  !Task.isCancelled, state == .connected else { return }
+            tmuxAvailabilityObserved?(TerminalTmux.parse(output) != .unavailable)
+        }
+    }
+
+    /// Closing this terminal leaves its work running on the host: it is attached to a tmux
+    /// session, which outlives the connection and is listed in Active (D44).
+    var survivesClose: Bool { usesTmux && tmuxSessionName != nil }
+
+    /// Closing this terminal would stop something: it is connected, or connecting, and not in tmux.
+    /// The one rule every "close?" question asks.
+    var closeStopsWork: Bool {
+        switch state {
+        case .connected, .connecting, .reconnecting: !survivesClose
+        default: false
+        }
+    }
+
+    /// Waits for the attach in progress, if any — for tests and for callers that act after it.
+    func waitForTmuxAttach() async { await tmuxTask?.value }
+
+    func runTmuxCommand(_ command: String) async throws -> String {
+        if let tmuxCommandRunner { return try await tmuxCommandRunner(command) }
+        guard let sshConnection else { throw SSHError.notConnected }
+        return try await sshConnection.executeRemoteCommand(command, maxResponseBytes: 256 * 1024,
+                                                            executionTimeout: .seconds(15))
+    }
+
+    /// A line shown in this terminal only; nothing is sent to the host.
+    private func showLocalNotice(_ text: String) {
+        flushPendingTerminalOutputNow()
+        emitTerminalChunk(Data("\r\n\u{1B}[2m\(text)\u{1B}[0m\r\n".utf8))
     }
 
     private func dispatchStartupCommandIfNeeded() {
