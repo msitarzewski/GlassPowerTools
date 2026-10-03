@@ -220,23 +220,19 @@ public struct GlassShellLibraryView: View {
     }
 
     private func serviceIcons(for id: HostID) -> some View {
-        HStack(spacing: 4) {
+        let connected = model.connectedEndpoints()
+        let services = model.host(id)?.services ?? []
+        return HStack(spacing: 4) {
             ForEach(model.serviceKinds(for: id), id: \.self) { kind in
+                let isConnected = services.contains { $0.kind == kind && connected.contains($0.endpointID) }
                 let availability = showsAvailability ? availability(of: kind, on: id) : nil
                 GlassServiceIcon(GlassServicePresentation.symbol(for: kind))
                     .foregroundStyle(.secondary)
                     .overlay(alignment: .bottomTrailing) {
-                        if let availability {
-                            Circle()
-                                .fill(availability == .reachable ? Color.green : availability == .slow ? .orange : .red)
-                                .frame(width: 6, height: 6)
-                                .offset(x: 2, y: 2)
-                        }
+                        GlassServiceStatusDot(isConnected: isConnected, availability: availability)
                     }
                     .accessibilityLabel(GlassServicePresentation.displayName(for: kind))
-                    .accessibilityValue(availability.map {
-                        $0 == .reachable ? "Answering" : $0 == .slow ? "Answering slowly" : "Not answering"
-                    } ?? "")
+                    .accessibilityValue(GlassServiceStatusDot.description(isConnected: isConnected, availability: availability))
                     .accessibilityIdentifier("host-service-\(kind.rawValue)")
             }
         }
@@ -410,9 +406,15 @@ public struct GlassShellLibraryView: View {
     private func serviceRow(_ service: HostServiceLink, host: GlassShellHost) -> some View {
         let suffix = Self.identifierSuffix(for: service, in: host)
         let isBuiltIn = host.isBuiltIn(service.endpointID)
+        let isConnected = model.connectedEndpoints().contains(service.endpointID)
+        let availability = showsAvailability ? availabilityMonitor.states[service.endpointID] : nil
         let identity = HStack(spacing: 10) {
             GlassServiceIcon(GlassServicePresentation.symbol(for: service.kind))
                 .foregroundStyle(.secondary)
+                .overlay(alignment: .bottomTrailing) {
+                    GlassServiceStatusDot(isConnected: isConnected, availability: availability)
+                }
+                .accessibilityValue(GlassServiceStatusDot.description(isConnected: isConnected, availability: availability))
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 2) {
                 Text(service.displayName).lineLimit(1).truncationMode(.tail)

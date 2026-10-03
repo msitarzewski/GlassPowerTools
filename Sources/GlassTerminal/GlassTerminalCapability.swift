@@ -269,7 +269,8 @@ public final class GlassTerminalCapability: GlassCapability {
     /// window that holds it, which the overview's registry already knows.
     private func loneSessions(_ manager: SessionManager) -> [GlassOpenSession] {
         let grouped = Set(manager.workgroups.flatMap(\.sessionIDs))
-        return manager.sessions.filter { !grouped.contains($0.id) }.map { session in
+        // A probe (D44) is a few seconds of Active asking a host about tmux: never a row.
+        return manager.sessions.filter { !grouped.contains($0.id) && $0.purpose != .probe }.map { session in
             GlassOpenSession(
                 id: Self.sessionID(sessionID: session.id),
                 title: session.purpose == .sftp ? "SFTP on \(session.server.name)" : session.server.name,
@@ -280,6 +281,7 @@ public final class GlassTerminalCapability: GlassCapability {
                 close: { Self.close(session, in: manager) },
                 closeTitle: Self.closeTitle(for: [session]),
                 closeSymbolName: Self.closeSymbolName(for: [session]),
+                isConnected: session.state == .connected,
                 snapshot: { Self.preview(of: session) }
             )
         }
@@ -320,6 +322,7 @@ public final class GlassTerminalCapability: GlassCapability {
                 close: { manager.closeWorkgroup(workgroup.id) },
                 closeTitle: Self.closeTitle(for: live),
                 closeSymbolName: Self.closeSymbolName(for: live),
+                connectedEndpointIDs: live.filter { $0.state == .connected }.map { EndpointID(rawValue: $0.server.id) },
                 // The card shows the terminal the workgroup has selected — the one you would be
                 // looking at if you went back to it. Drawn by the emulator, which has been able
                 // to do this since glas.sh's overview; nothing new was needed.

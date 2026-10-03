@@ -57,12 +57,17 @@ public struct GlassOpenSession: Identifiable {
     /// The machine, said directly, for a session that is not through a service: an editor with
     /// a project on this device (`GlassLocalHost.id`) or on another machine.
     public let hostID: HostID?
+    /// The services this session is connected through right now — the library's green dot,
+    /// like DBeaver's connected marker (2026-10-03). A session still connecting, reconnecting or
+    /// failed is open but not connected; a workgroup is connected only through its live terminals.
+    public let connectedEndpointIDs: [EndpointID]
 
     public init(id: String, title: String, subtitle: String? = nil, symbolName: String,
                 endpointIDs: [EndpointID] = [], hostID: HostID? = nil,
                 activate: @escaping @MainActor @Sendable () -> Void,
                 close: @escaping @MainActor @Sendable () -> Void,
                 closeTitle: String = "Close", closeSymbolName: String = "xmark",
+                isConnected: Bool = true, connectedEndpointIDs: [EndpointID]? = nil,
                 snapshot: (@MainActor () -> Image?)? = nil) {
         self.id = id
         self.title = title
@@ -72,6 +77,7 @@ public struct GlassOpenSession: Identifiable {
         self.hostID = hostID
         self.activate = activate
         self.close = close
+        self.connectedEndpointIDs = connectedEndpointIDs ?? (isConnected ? endpointIDs : [])
         self.closeTitle = closeTitle
         self.closeSymbolName = closeSymbolName
         self.snapshot = snapshot

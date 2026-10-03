@@ -65,6 +65,19 @@ public extension GlassShellModel {
         return machines
     }
 
+    /// Opens a running session here, or takes it over. It leaves the list at once — it is about
+    /// to be open on this device, where Active lists it as open — and the hosts are asked again
+    /// once the attach has had time to land. Until 2026-10-03 the row stayed, "Detached", under
+    /// the same terminal's open row until something else refreshed the list.
+    func open(_ session: GlassRunningSession, takingOver: Bool = false) {
+        runningSessions.removeAll { $0.id == session.id }
+        if takingOver { session.takeOver() } else { session.open() }
+        Task {
+            try? await Task.sleep(for: .seconds(3))
+            await refreshRunningSessions()
+        }
+    }
+
     /// Asks every capability what is running on its hosts (D44). One pass at a time.
     func refreshRunningSessions() async {
         guard !isCheckingRunningSessions else { return }
@@ -76,6 +89,12 @@ public extension GlassShellModel {
     /// How many sessions are live, for the sidebar row. Zero when there are none: *"Active needs
     /// a 0 like the others when nothing is connected"* (2026-09-22) — Favorites and Workgroups
     /// say 0, and a row that says nothing looks like a row that has not counted.
+    /// The services connected right now, for the library's green dots. Read in a view body, for
+    /// the same reason as `activeMachines()`.
+    func connectedEndpoints() -> Set<EndpointID> {
+        Set(registry.openSessions().flatMap(\.connectedEndpointIDs))
+    }
+
     func activeSessionCount() -> Int {
         registry.openSessions().count
     }
@@ -129,7 +148,9 @@ struct GlassActiveConnectionsList: View {
                         }
                     }
                     ForEach(machine.running) { session in
-                        GlassRunningSessionRow(session: session) { await model.refreshRunningSessions() }
+                        GlassRunningSessionRow(session: session,
+                                               open: { model.open(session, takingOver: $0) },
+                                               didEnd: { await model.refreshRunningSessions() })
                     }
                 } label: {
                     HStack {
@@ -169,13 +190,15 @@ struct GlassActiveConnectionsList: View {
 /// it here; Take Over also detaches whoever else has it; End stops it on the machine.
 struct GlassRunningSessionRow: View {
     let session: GlassRunningSession
+    /// Opens it here; `true` takes it over.
+    let open: @MainActor (Bool) -> Void
     let didEnd: @MainActor () async -> Void
     @State private var confirmingEnd = false
     @State private var endFailure: String?
 
     var body: some View {
         Button {
-            session.open()
+            open(false)
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: session.symbolName)
@@ -198,9 +221,9 @@ struct GlassRunningSessionRow: View {
             Button("End", systemImage: "stop.circle", role: .destructive) { confirmingEnd = true }
         }
         .contextMenu {
-            Button("Open Here", systemImage: "arrow.down.right.circle") { session.open() }
+            Button("Open Here", systemImage: "arrow.down.right.circle") { open(false) }
             if session.isAttachedElsewhere {
-                Button("Take Over", systemImage: "arrow.down.right.and.arrow.up.left") { session.takeOver() }
+                Button("Take Over", systemImage: "arrow.down.right.and.arrow.up.left") { open(true) }
             }
             Button("End Session…", systemImage: "stop.circle", role: .destructive) { confirmingEnd = true }
         }

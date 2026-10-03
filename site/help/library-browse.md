@@ -55,4 +55,6 @@ With no host selected, the library's detail shows an overview: how many machines
 
 The connection history is kept on this device only. It records when you connected and to which kind of service on which machine, and nothing else. It never syncs, and it keeps 90 days.
 
+A green dot on a service's icon means it's **connected** right now: a terminal, database or desktop session through it is open and connected, on this device. The dot appears on the host's row and beside the service in the host's detail, and goes when you disconnect. A session still connecting or reconnecting has no dot yet.
+
 To see at a glance which services are answering, turn on **Settings** ▸ **General** ▸ **Show service availability**. See [Settings](library-settings.md#general).

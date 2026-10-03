@@ -146,7 +146,8 @@ public final class GlassDesktopCapability: GlassCapability {
                 symbolName: symbolName,
                 endpointIDs: [connection.id],
                 activate: { [runtime] in runtime.enqueue(.show(connectionID: connection.id)) },
-                close: { _ = session.close() }
+                close: { _ = session.close() },
+                isConnected: session.isConnected
             )
         }
     }

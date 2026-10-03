@@ -29,6 +29,26 @@ struct GlassActiveConnectionsTests {
                             isAttachedElsewhere: false, open: {}, takeOver: {}, end: {})
     }
 
+    @Test("The green dot: services with a connected session, not ones still connecting or failed")
+    func connectedEndpoints() async throws {
+        let (model, root, _) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let live = EndpointID(), connecting = EndpointID(), workgroupLive = EndpointID(), workgroupDown = EndpointID()
+        let database = StubCapability(kind: .database, displayName: "Database")
+        database.sessions = [
+            GlassOpenSession(id: "database:1", title: "a", symbolName: "circle", endpointIDs: [live], activate: {}, close: {}),
+            GlassOpenSession(id: "database:2", title: "b", symbolName: "circle", endpointIDs: [connecting],
+                             activate: {}, close: {}, isConnected: false),
+        ]
+        let terminal = StubCapability(kind: .ssh, displayName: "Terminal")
+        terminal.sessions = [GlassOpenSession(id: "terminal:1", title: "w", symbolName: "circle",
+                                              endpointIDs: [workgroupLive, workgroupDown], activate: {}, close: {},
+                                              connectedEndpointIDs: [workgroupLive])]
+        model.registry.register(database); model.registry.register(terminal)
+        await model.load()
+        #expect(model.connectedEndpoints() == [live, workgroupLive])
+    }
+
     @Test("D44: sessions running on a machine join its group, and a machine with nothing open here still appears")
     func runningSessionsJoinTheirMachine() async throws {
         let (model, root, store) = try makeModel()
@@ -52,6 +72,12 @@ struct GlassActiveConnectionsTests {
         #expect(machines[0].sessions.map(\.id) == ["terminal:1"] && machines[0].running.map(\.id) == ["tmux:glass-2"])
         #expect(machines[1].sessions.isEmpty && machines[1].running.map(\.id) == ["tmux:glass-1"])
         #expect(model.activeSessionCount() == 1, "the sidebar counts what is open here")
+
+        // Opening one takes it off the list at once: it is about to be open here instead.
+        let chosen = try #require(model.runningSessions.first { $0.id == "tmux:glass-1" })
+        model.open(chosen)
+        #expect(!model.runningSessions.contains { $0.id == "tmux:glass-1" })
+        #expect(model.activeMachines().flatMap(\.running).map(\.id) == ["tmux:glass-2"])
     }
 
     private func makeModel() throws -> (GlassShellModel, URL, HostCatalogStore) {

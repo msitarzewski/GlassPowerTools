@@ -179,7 +179,8 @@ public final class GlassDatabaseCapability: GlassCapability {
                     symbolName: symbolName,
                     endpointIDs: [EndpointID(rawValue: config.id)],
                     activate: { [runtime] in runtime.enqueue(.openQueryEditor(sessionID: sessionID)) },
-                    close: { Task { await manager.disconnect(sessionID: sessionID) } }
+                    close: { Task { await manager.disconnect(sessionID: sessionID) } },
+                    isConnected: session.state.isConnected
                 )
             }
     }

@@ -10,6 +10,7 @@
 
 import Foundation
 import Network
+import SwiftUI
 import os
 import Observation
 import GlassConnectionKit
@@ -93,5 +94,45 @@ public final class GlassAvailabilityMonitor {
             DispatchQueue.global().asyncAfter(deadline: .now() + Double(timeout.components.seconds)) { finish(.unreachable) }
         }
         return outcome
+    }
+}
+
+/// The dot on a service's icon in the library. **Green: connected now** — a session through it is
+/// open and connected, like DBeaver's connected marker (2026-10-03), shown whatever the
+/// availability setting. Otherwise, with Show Service Availability on, whether it answers:
+/// green, orange when slow, red when not. Connected wins: a live session answers by definition.
+struct GlassServiceStatusDot: View {
+    let isConnected: Bool
+    let availability: GlassServiceAvailability?
+
+    var body: some View {
+        if let color {
+            Circle()
+                .fill(color)
+                .overlay(Circle().strokeBorder(.background, lineWidth: isConnected ? 1 : 0))
+                .frame(width: isConnected ? 7 : 6, height: isConnected ? 7 : 6)
+                .offset(x: 2, y: 2)
+                .accessibilityHidden(true)
+        }
+    }
+
+    private var color: Color? {
+        if isConnected { return .green }
+        switch availability {
+        case .reachable?: return .green
+        case .slow?: return .orange
+        case .unreachable?: return .red
+        case nil: return nil
+        }
+    }
+
+    static func description(isConnected: Bool, availability: GlassServiceAvailability?) -> String {
+        if isConnected { return "Connected" }
+        switch availability {
+        case .reachable?: return "Answering"
+        case .slow?: return "Answering slowly"
+        case .unreachable?: return "Not answering"
+        case nil: return ""
+        }
     }
 }
