@@ -2460,13 +2460,17 @@ struct MacWorkspaceTests {
         )
         window.isReleasedWhenClosed = false
         window.contentView = hostingView
+        // The process starts when SwiftUI first builds the view. A window never put on screen is
+        // laid out whenever AppKit gets round to it, which under a full parallel run was
+        // sometimes not within the wait: the shell never started. Lay it out now.
+        hostingView?.layoutSubtreeIfNeeded()
 
-        #expect(await waitForCondition(seconds: 3) {
+        #expect(await waitForCondition(seconds: 10) {
             terminationCount == 1 && processState.exitCode == 7
-        })
+        }, "started \(readyCount) times, terminated \(terminationCount), running \(processState.isRunning)")
         #expect(readyCount == 1)
         #expect(processState.restart(configuration))
-        #expect(await waitForCondition(seconds: 3) {
+        #expect(await waitForCondition(seconds: 10) {
             terminationCount == 2 && processState.exitCode == 7
         })
         #expect(readyCount == 2)
