@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import GlassShell
 import UniformTypeIdentifiers
 import GlassDBKit
 import GlassEditorUI
@@ -70,6 +71,7 @@ struct TableDetailView: View {
                   request.table == table else { return }
             selectedTab = .data
         }
+        .glassActiveConnectionsLastInToolbar(isActive: isWorkspaceActive)
         .toolbar {
             if isWorkspaceActive {
                 #if os(macOS)

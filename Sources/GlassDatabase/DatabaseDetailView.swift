@@ -68,6 +68,7 @@ struct ConnectionOverviewView: View {
         }
         .databaseLookScrollEnabled()
         #if os(macOS)
+        .glassActiveConnectionsLastInToolbar(isActive: isWorkspaceActive)
         .toolbar {
             if isWorkspaceActive {
                 ToolbarSpacer(.flexible, placement: databaseToolbarPlacement)
@@ -634,6 +635,7 @@ struct DatabaseDetailView: View {
         }
         .databaseLookScrollEnabled()
         #if os(macOS)
+        .glassActiveConnectionsLastInToolbar(isActive: isWorkspaceActive)
         .toolbar {
             if isWorkspaceActive {
                 ToolbarSpacer(.flexible, placement: databaseToolbarPlacement)
@@ -963,6 +965,7 @@ struct TableStatisticsPreviewView: View {
         }
         .databaseLookScrollEnabled()
         #if os(macOS)
+        .glassActiveConnectionsLastInToolbar()
         .toolbar {
             ToolbarSpacer(.flexible, placement: databaseToolbarPlacement)
             DatabasePersistentToolbar {

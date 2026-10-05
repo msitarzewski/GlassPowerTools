@@ -729,7 +729,13 @@ struct DatabaseWorkspaceView: View {
                 .glassActiveConnectionsToolbar(show: runtime?.showActiveConnections, dismissCurrent: { showConnections() })
                 #endif
         }
-        #if !os(visionOS)
+        #if os(macOS)
+        .toolbar { workspaceToolbar }
+        // The panes put the ⚡ last in their own toolbars (`glassActiveConnectionsLastInToolbar`):
+        // added here it landed before their flexible spacer, on the left beside Back.
+        .environment(\.glassActiveConnectionsRoute,
+                     runtime?.showActiveConnections.map { GlassActiveConnectionsRoute(show: $0, dismissCurrent: { showConnections() }) })
+        #elseif !os(visionOS)
         .toolbar { workspaceToolbar }
         .glassActiveConnectionsToolbar(show: runtime?.showActiveConnections, dismissCurrent: { showConnections() })
         #endif

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import GlassShell
 import GlassDBKit
 import UniformTypeIdentifiers
 import GlassLayers
@@ -541,6 +542,7 @@ struct QueryEditorView: View {
                 )
             }
         }
+        .glassActiveConnectionsLastInToolbar(isActive: isWorkspaceActive)
         .toolbar {
             if isWorkspaceActive {
                 #if os(macOS)

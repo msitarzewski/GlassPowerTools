@@ -321,12 +321,82 @@ struct GlassActiveConnectionsDetail: View {
 
 // MARK: - The bolt
 
+public extension View {
+    /// On the Mac, ends this view's toolbar with the ⚡ from the environment's route. **Apply it
+    /// directly before the view's own `.toolbar`**: SwiftUI orders the inner modifier's items
+    /// last, after the view's flexible spacer and its buttons. A window whose panes split their
+    /// toolbar with a spacer — the database's — drew a ⚡ added at window level on the left,
+    /// beside Back (2026-10-05, measured with an off-screen toolbar probe). Elsewhere: nothing.
+    ///
+    /// `isActive`: a window that keeps several panes alive and shows one must add the ⚡ from the
+    /// shown pane only, as it adds that pane's own buttons, or there is a ⚡ per open tab.
+    @ViewBuilder func glassActiveConnectionsLastInToolbar(isActive: Bool = true) -> some View {
+        #if os(macOS)
+        toolbar { if isActive { GlassActiveConnectionsToolbarContent() } }
+        #else
+        self
+        #endif
+    }
+}
+
 /// The ⚡ in a top toolbar: one control, one meaning, everywhere.
 ///
 /// On a device with windows it brings the library window forward and opens Active there. On a
 /// phone the session is dismissed first — `dismissCurrent`, the same closure the chrome uses for
 /// its own back control — and the library, now on screen, opens Active. Nil `show` means the
 /// composition root offered no destination, and the bolt is not drawn rather than drawn dead.
+/// Where the ⚡ goes and what it dismisses first, handed down to the views whose toolbars end
+/// with it (`glassActiveConnectionsLastInToolbar`).
+public struct GlassActiveConnectionsRoute {
+    public let show: GlassShowActiveConnections
+    public let dismissCurrent: (@MainActor () -> Void)?
+    public init(show: @escaping GlassShowActiveConnections, dismissCurrent: (@MainActor () -> Void)? = nil) {
+        self.show = show
+        self.dismissCurrent = dismissCurrent
+    }
+}
+
+public extension EnvironmentValues {
+    @Entry var glassActiveConnectionsRoute: GlassActiveConnectionsRoute? = nil
+}
+
+/// The ⚡ as toolbar content. Given no action, it takes the route from the environment.
+public struct GlassActiveConnectionsToolbarContent: ToolbarContent {
+    private let explicitShow: GlassShowActiveConnections?
+    private let explicitDismiss: (@MainActor () -> Void)?
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.glassActiveConnectionsRoute) private var route
+
+    public init(show: GlassShowActiveConnections?, dismissCurrent: (@MainActor () -> Void)? = nil) {
+        explicitShow = show
+        explicitDismiss = dismissCurrent
+    }
+
+    /// From the environment's route.
+    public init() {
+        explicitShow = nil
+        explicitDismiss = nil
+    }
+
+    private var show: GlassShowActiveConnections? { explicitShow ?? route?.show }
+    private var dismissCurrent: (@MainActor () -> Void)? { explicitDismiss ?? route?.dismissCurrent }
+
+    public var body: some ToolbarContent {
+        if let show {
+            ToolbarItem(placement: GlassActiveConnectionsToolbarModifier.placement) {
+                GlassActiveConnectionsButton {
+                    if GlassWindowPresentation.canOpenWindows {
+                        openWindow(id: "main")
+                    } else {
+                        dismissCurrent?()
+                    }
+                    show()
+                }
+            }
+        }
+    }
+}
+
 public struct GlassActiveConnectionsToolbarModifier: ViewModifier {
     /// **Always the trailing edge** (2026-10-05). On the Mac `.primaryAction` is the *leading*
     /// edge — the database window drew the ⚡ beside its back button, on the other side from every
@@ -350,20 +420,7 @@ public struct GlassActiveConnectionsToolbarModifier: ViewModifier {
     }
 
     public func body(content: Content) -> some View {
-        content.toolbar {
-            if let show {
-                ToolbarItem(placement: Self.placement) {
-                    GlassActiveConnectionsButton {
-                        if GlassWindowPresentation.canOpenWindows {
-                            openWindow(id: "main")
-                        } else {
-                            dismissCurrent?()
-                        }
-                        show()
-                    }
-                }
-            }
-        }
+        content.toolbar { GlassActiveConnectionsToolbarContent(show: show, dismissCurrent: dismissCurrent) }
     }
 }
 
