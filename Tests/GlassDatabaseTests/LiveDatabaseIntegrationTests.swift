@@ -777,6 +777,44 @@ struct LiveTunnelIntegrationTests {
         return LiveForward(tunnel: tunnel, transport: transport, owner: owner)
     }
 
+    /// A measurement, not a pass mark (2026-10-05: 100 rows of serialized cache values took 9.5 s
+    /// through a tunnel to a production server). 100 rows of 512 KB, read with the app's own MySQL
+    /// path directly and through a real forward, so the app's share of a slow read can be seen.
+    /// Writes only a table of its own in the scratch database, and drops it.
+    @Test("MySQL: large rows, directly and through the tunnel (probe)",
+          .enabled(if: LiveTunnel.isConfigured && LiveDB.hasMySQL && ProcessInfo.processInfo.environment["GPT_DB_PERF_PROBE"] != nil))
+    func mysqlLargeRowsProbe() async throws {
+        let table = "\(LiveDB.mysqlScratchDatabase).gpt_perf_\(UUID().uuidString.prefix(8).lowercased())"
+        let direct = DatabaseSessionManager(loadImmediately: false)
+        let directID = try await direct.connect(config: LiveDB.config(.mysql), password: LiveDB.password(.mysql))
+        let setup = try #require(direct.sessions[directID]?.connection)
+        _ = try await setup.execute("CREATE TABLE \(table) (id INT PRIMARY KEY, value LONGTEXT)", parameters: [])
+        for id in 1...100 {
+            _ = try await setup.execute("INSERT INTO \(table) VALUES (\(id), REPEAT('x', 524288))", parameters: [])
+        }
+        func time(_ connection: any DatabaseConnection) async throws -> (Double, Int) {
+            let result = try await connection.execute("SELECT * FROM \(table) LIMIT 100", parameters: [])
+            return (result.executionTime, result.rows.count)
+        }
+        let (directSeconds, directRows) = try await time(setup)
+
+        let tunnelled = DatabaseSessionManager(loadImmediately: false)
+        nonisolated(unsafe) var opened: (any GlassHostPortForward)?
+        let tunnelID = try await tunnelled.connect(
+            config: LiveDB.config(.mysql, usesHostTunnel: true), password: LiveDB.password(.mysql),
+            openForward: { [self] _, port in let forward = try await openForward(to: port); opened = forward; return forward })
+        let viaTunnel = try #require(tunnelled.sessions[tunnelID]?.connection)
+        let (tunnelSeconds, tunnelRows) = try await time(viaTunnel)
+        print(String(format: "MYSQL 100 x 512 KB — direct %.3f s (%d rows), tunnel %.3f s (%d rows)",
+                     directSeconds, directRows, tunnelSeconds, tunnelRows))
+
+        _ = try await setup.execute("DROP TABLE \(table)", parameters: [])
+        await tunnelled.disconnect(sessionID: tunnelID)
+        await direct.disconnect(sessionID: directID)
+        await opened?.close()
+        #expect(directRows == 100 && tunnelRows == 100)
+    }
+
     @Test("PostgreSQL over a real SSH forward: the driver connects to the local end and returns rows",
           .enabled(if: LiveTunnel.isConfigured && LiveDB.hasPostgres))
     func postgresOverATunnel() async throws {
