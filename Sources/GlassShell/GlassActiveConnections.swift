@@ -328,6 +328,18 @@ struct GlassActiveConnectionsDetail: View {
 /// its own back control — and the library, now on screen, opens Active. Nil `show` means the
 /// composition root offered no destination, and the bolt is not drawn rather than drawn dead.
 public struct GlassActiveConnectionsToolbarModifier: ViewModifier {
+    /// **Always the trailing edge** (2026-10-05). On the Mac `.primaryAction` is the *leading*
+    /// edge — the database window drew the ⚡ beside its back button, on the other side from every
+    /// other window's. `.automatic` is the trailing group there, after the window's own items;
+    /// elsewhere `.primaryAction` is already trailing.
+    public static var placement: ToolbarItemPlacement {
+        #if os(macOS)
+        .automatic
+        #else
+        .primaryAction
+        #endif
+    }
+
     private let show: GlassShowActiveConnections?
     private let dismissCurrent: (@MainActor () -> Void)?
     @Environment(\.openWindow) private var openWindow
@@ -340,7 +352,7 @@ public struct GlassActiveConnectionsToolbarModifier: ViewModifier {
     public func body(content: Content) -> some View {
         content.toolbar {
             if let show {
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItem(placement: Self.placement) {
                     GlassActiveConnectionsButton {
                         if GlassWindowPresentation.canOpenWindows {
                             openWindow(id: "main")

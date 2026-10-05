@@ -204,7 +204,8 @@ public struct DesktopSessionView: View {
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) { sessionActions }
             if let showActiveConnections {
-                ToolbarItem(placement: .primaryAction) {
+                // The trailing edge on every platform, after the session's own controls.
+                ToolbarItem(placement: GlassActiveConnectionsToolbarModifier.placement) {
                     GlassActiveConnectionsButton { session.releaseInput(); showActiveConnections() }
                 }
             }
@@ -363,10 +364,6 @@ public struct DesktopSessionView: View {
     #if os(visionOS)
     private var nativeControls: some View {
         HStack(spacing: 16) {
-            if let showActiveConnections {
-                GlassActiveConnectionsButton { session.releaseInput(); showActiveConnections() }
-                Divider().frame(height: 24)
-            }
             sessionActions
             Divider().frame(height: 24)
             Button("Escape", systemImage: "escape") { session.sendKey(0x01) }
@@ -375,6 +372,11 @@ public struct DesktopSessionView: View {
                 .help("Send Tab").disabled(!session.isConnected)
             Button("Input", systemImage: "keyboard") { session.releaseInput(); showTextInput = true }
                 .help("Send Text").disabled(!session.isConnected)
+            // Last, as the ⚡ is on the trailing edge of every toolbar (2026-10-05).
+            if let showActiveConnections {
+                Divider().frame(height: 24)
+                GlassActiveConnectionsButton { session.releaseInput(); showActiveConnections() }
+            }
         }
         .labelStyle(.iconOnly)
         .padding(.horizontal, 18).padding(.vertical, 10)
