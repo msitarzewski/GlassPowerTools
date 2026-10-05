@@ -849,6 +849,18 @@ class TerminalSession: Identifiable, Hashable {
         }
     }
 
+    /// Where this shell is standing, for the AI assistant and Open Folder Here. Outside tmux, what
+    /// the shell reported over OSC 7. **In tmux those reports stop at tmux**, so the terminal's
+    /// value is wherever the shell was before tmux started — usually home — and the assistant
+    /// suggested commands for the wrong directory (2026-10-03). tmux is asked instead, and an
+    /// unanswered question is "unknown", never the stale value.
+    func workingDirectory(reported: String?) async -> String? {
+        guard survivesClose, let name = tmuxSessionName else { return reported }
+        let path = try? await runTmuxCommand(TerminalTmux.currentPathCommand(name: name))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return path.flatMap { $0.hasPrefix("/") ? $0 : nil }
+    }
+
     /// Waits for the attach in progress, if any — for tests and for callers that act after it.
     func waitForTmuxAttach() async { await tmuxTask?.value }
 

@@ -110,6 +110,8 @@ struct TerminalWindowView: View {
     @State private var showVisualBell = false
     @State private var showingSnippetPicker = false
     @State private var showingAIAssistant = false
+    /// The directory given to the assistant, asked for when it opens (tmux keeps it to itself).
+    @State private var aiAssistantDirectory: String?
     @State private var showingErrorCard = false
     @State private var aiAssistant = AIAssistant()
     @State private var terminalSettingsTab: TerminalSettingsModalTab = .terminal
@@ -379,7 +381,7 @@ struct TerminalWindowView: View {
                 aiAssistant: aiAssistant,
                 host: session.server.host,
                 username: session.server.username,
-                currentDirectory: terminalHostModel.currentDirectory,
+                currentDirectory: aiAssistantDirectory,
                 onRunCommand: { command in
                     session.sendCommand(command)
                 }
@@ -699,7 +701,8 @@ struct TerminalWindowView: View {
                         withAnimation { showingErrorCard = false }
                     }
                 )
-                .padding(.bottom, 14)
+                // Clear of tmux's status line, the bottom row of a terminal in tmux.
+                .padding(.bottom, session.survivesClose ? 34 : 14)
                 .padding(.horizontal, 14)
             }
         }
@@ -1277,7 +1280,10 @@ struct TerminalWindowView: View {
 
             if aiAssistant.isAvailable {
                 Button {
-                    showingAIAssistant = true
+                    Task {
+                        aiAssistantDirectory = await session.workingDirectory(reported: terminalHostModel.currentDirectory)
+                        showingAIAssistant = true
+                    }
                 } label: {
                     toolLabel("AI Assistant", image: "sparkles", inMenu: inMenu)
                 }
@@ -1297,9 +1303,14 @@ struct TerminalWindowView: View {
             // of nothing else. The remote shell reports it over OSC 7 — the same value the AI
             // assistant already uses — so the local and remote halves of the idea behave the same:
             // Finder for a local shell, SFTP for a remote one, both arriving where the user is.
-            if let remoteDirectory = terminalHostModel.currentDirectory, remoteDirectory.hasPrefix("/") {
+            // In tmux the reported directory is stale, so the button is always there and the
+            // directory is asked of tmux when it is pressed.
+            let reported = terminalHostModel.currentDirectory.flatMap { $0.hasPrefix("/") ? $0 : nil }
+            if reported != nil || session.survivesClose {
                 Button {
-                    openFolderHere(remoteDirectory)
+                    Task {
+                        if let directory = await session.workingDirectory(reported: reported) { openFolderHere(directory) }
+                    }
                 } label: {
                     Image(systemName: "folder")
                 }
@@ -1308,7 +1319,7 @@ struct TerminalWindowView: View {
                 #endif
                 .accessibilityLabel("Open Folder Here")
                 .accessibilityIdentifier("terminal-open-folder-here")
-                .help("Open \(remoteDirectory) over SFTP")
+                .help(session.survivesClose ? "Open this shell's folder over SFTP" : "Open \(reported ?? "") over SFTP")
             }
 
 

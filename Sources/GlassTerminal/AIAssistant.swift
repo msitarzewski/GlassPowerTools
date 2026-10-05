@@ -67,6 +67,24 @@ enum AIResponseParser {
         )
     }
 
+    /// Whether a suggested fix is a command a shell could run, or advice written as a sentence.
+    ///
+    /// The model is asked for a bare command and sometimes answers in prose — "Install the LX
+    /// Terminal package or use the correct command for your terminal environment." — which the
+    /// card offered to Review & Run, i.e. to type into the shell (2026-10-04). Advice is shown as
+    /// advice instead. A sentence is: more than one line, a capitalised first word followed by
+    /// more words, or a full stop after a letter at the end. Commands start lower case far more
+    /// often than not; one that does not (`Rscript`, `R`) is still offered for Copy.
+    static func isRunnableCommand(_ fix: String) -> Bool {
+        let text = fix.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !text.contains("\n") else { return false }
+        let words = text.split(separator: " ")
+        if let first = words.first, let initial = first.first, initial.isUppercase,
+           first.dropFirst().allSatisfy(\.isLowercase), words.count > 2 { return false }
+        if text.hasSuffix("."), let before = text.dropLast().last, before.isLetter { return false }
+        return true
+    }
+
     private static func sections(in response: String, labels: [String]) -> [String: String]? {
         guard response.utf8.count <= maximumResponseBytes,
               !response.contains("```") else { return nil }
@@ -338,8 +356,9 @@ final class AIAssistant {
             The user is connected to server \(host) as \(username). \
             Analyze the terminal output below and explain what went wrong. \
             If possible, suggest a fix command. Keep explanations concise. Return exactly \
-            three labeled sections: PROBLEM:, FIX:, and REASONING:. Leave FIX: empty when \
-            there is no safe fix. Do not use Markdown fences.
+            three labeled sections: PROBLEM:, FIX:, and REASONING:. FIX: is one shell command \
+            and nothing else — no sentences; put any advice in REASONING:. Leave FIX: empty when \
+            there is no single safe command. Do not use Markdown fences.
             """
             let session = LanguageModelSession(instructions: systemPrompt)
 
@@ -693,7 +712,13 @@ struct AIErrorCard: View {
                 .buttonStyle(.plain)
             }
 
-            if !error.suggestedFix.isEmpty {
+            if !error.suggestedFix.isEmpty, !AIResponseParser.isRunnableCommand(error.suggestedFix) {
+                // Advice, not a command: read, never run.
+                Text(error.suggestedFix)
+                    .font(.caption)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+            } else if !error.suggestedFix.isEmpty {
                 TextEditor(text: $composedFix)
                     .font(.system(.caption, design: .monospaced))
                     .frame(minHeight: 55, maxHeight: 90)

@@ -84,6 +84,14 @@ enum TerminalTmux {
         " command -v tmux >/dev/null && exec tmux new-session -A\(takeOver ? " -D" : "") -s \(quoted(name))"
     }
 
+    /// The directory the session's active pane is in. tmux keeps the shell's OSC 7 reports to
+    /// itself, so in tmux this is the only accurate answer to "where is this shell?". The target
+    /// is a pane, so the exact session name needs its colon: `=name` alone answers nothing
+    /// (found live on the test VM, tmux 3.6).
+    static func currentPathCommand(name: String) -> String {
+        "sh -c \(quoted("tmux display-message -p -t \(quoted("=" + name + ":")) '#{pane_current_path}'"))"
+    }
+
     static func killCommand(name: String) -> String {
         "sh -c \(quoted("tmux kill-session -t \(quoted("=" + name))"))"
     }

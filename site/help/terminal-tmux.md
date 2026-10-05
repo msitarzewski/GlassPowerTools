@@ -22,6 +22,7 @@ The switch can only be turned on once a connection has found tmux on the machine
 - If the connection drops, **Reconnect**, or the automatic reconnect, goes back into the same session, with everything still running.
 - Closing the terminal leaves its session running on the machine, so closing it, its window, or quitting doesn't ask first (unless other terminals there would stop). To end it, end it from **Active** (below), or type `exit` in it.
 - In **Active**, a terminal in tmux says **in tmux** under its name, and swiping it offers **Detach** rather than **Close**. Its tools menu says **Detach** rather than **Disconnect**. Afterwards **Active** lists it under the machine as **Detached**.
+- **Open Folder Here** and the **AI Assistant** ask tmux which folder the shell is in, so they follow your `cd` inside tmux too.
 - Detaching from tmux yourself (its prefix key, then **d**) closes the terminal and leaves the session running.
 - A Workgroup's startup command runs inside the new session the first time it is created.
 

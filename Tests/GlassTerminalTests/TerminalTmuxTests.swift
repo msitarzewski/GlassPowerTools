@@ -182,6 +182,23 @@ struct TerminalTmuxTests {
         #expect(GlassTerminalCapability.subtitle(for: [inTmux, inTmux]) == "2 terminals in tmux")
     }
 
+    @Test("in tmux the working directory comes from tmux, never the stale report")
+    func workingDirectory() async {
+        var asked: [String] = []
+        let inTmux = session(server(tmux: true), writes: Writes(), listing: "", commands: { asked.append($0) })
+        inTmux.state = .connected
+        await inTmux.waitForTmuxAttach()
+        inTmux.tmuxCommandRunner = { asked.append($0); return "/srv/app\n" }
+        #expect(await inTmux.workingDirectory(reported: "/home/ann") == "/srv/app")
+        #expect(asked.last == TerminalTmux.currentPathCommand(name: "glass-1"))
+        inTmux.tmuxCommandRunner = { _ in "no server running" }
+        #expect(await inTmux.workingDirectory(reported: "/home/ann") == nil, "unknown, not stale")
+
+        let plain = session(server(tmux: false), writes: Writes(), listing: "")
+        plain.state = .connected
+        #expect(await plain.workingDirectory(reported: "/home/ann") == "/home/ann")
+    }
+
     @Test("the form explains the setting for each state of the last check")
     func footnotes() {
         #expect(TerminalAdvancedFields.tmuxFootnote(available: nil).contains("Connect to this host once"))

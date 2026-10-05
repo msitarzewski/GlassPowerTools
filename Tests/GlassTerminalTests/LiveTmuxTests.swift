@@ -67,6 +67,16 @@ struct LiveTmuxTests {
         try await first.sendCommand(attach)
         #expect(try await waitFor(transport) { $0.contains { $0.name == name && $0.attachedClients == 1 } })
 
+        // Where the shell is: tmux keeps OSC 7 to itself, so Glass asks tmux (the AI assistant
+        // and Open Folder Here).
+        try await first.sendCommand("cd /tmp")
+        var path = ""
+        for _ in 0..<50 where path != "/tmp" {
+            path = try await transport.execute(TerminalTmux.currentPathCommand(name: name)).trimmingCharacters(in: .whitespacesAndNewlines)
+            if path != "/tmp" { try await Task.sleep(for: .milliseconds(100)) }
+        }
+        #expect(path == "/tmp")
+
         // Leave: the client goes, the session stays — what Active lists as Detached.
         await first.close()
         #expect(try await waitFor(transport) { $0.contains { $0.name == name && $0.attachedClients == 0 } })
