@@ -19,7 +19,7 @@ if [ "$SURFACE" = "database" ] || [ "$SURFACE" = "diagram" ]; then
   python3 "$(dirname "$0")/make-demo-db.py" "$DATA/Documents/demo-shop.sqlite" >/dev/null
 fi
 xcrun simctl launch "$SIM" com.glasspowertools --ui-testing "$(uuidgen)" \
-  --ui-testing-seed-hosts "$HOSTS" --demo-open "$SURFACE" >/dev/null
+  --ui-testing-seed-hosts "$HOSTS" --demo-open "$SURFACE" ${DEMO_ARGS:-} >/dev/null
 sleep "$SETTLE"
 xcrun simctl io "$SIM" screenshot "$OUT" >/dev/null 2>&1
 echo "shoot: $SURFACE → $OUT"

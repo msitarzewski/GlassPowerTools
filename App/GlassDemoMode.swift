@@ -43,6 +43,14 @@ enum GlassDemoMode {
         // The theme colour behind content, so a window reads against the simulator's bright room.
         // A setting anyone can choose (Settings ▸ Appearance); the default paints none.
         layers.state.opacity = 0.9
+        #if os(iOS)
+        // `--demo-landscape`: the iPhone turned on its side, for checking the landscape layout
+        // without driving the Simulator app's rotate menu.
+        if ProcessInfo.processInfo.arguments.contains("--demo-landscape"),
+           let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight)) { _ in }
+        }
+        #endif
         switch surface {
         case "editor", "preview":
             await openEditor(editor, preview: surface == "preview")

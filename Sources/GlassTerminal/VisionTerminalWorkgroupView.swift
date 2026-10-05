@@ -564,8 +564,11 @@ struct VisionTerminalWorkgroupView: View {
     }
 
     #if os(iOS)
+    /// Every iPhone, in every orientation. A Pro Max on its side reports a regular width, and
+    /// the iPad layout's tab bar then put a session pill under the terminal and rebuilt the
+    /// screen on every rotation (2026-10-04, landscape on a Pro Max).
     private var usesCompactPhoneNavigation: Bool {
-        horizontalSizeClass == .compact && UIDevice.current.userInterfaceIdiom == .phone
+        UIDevice.current.userInterfaceIdiom == .phone
     }
 
     @ToolbarContentBuilder

@@ -139,6 +139,10 @@ struct TerminalWindowView: View {
     #endif
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    #if os(iOS)
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.colorScheme) private var systemColorScheme
+    #endif
 
     init(
         session: TerminalSession,
@@ -337,14 +341,30 @@ struct TerminalWindowView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if !softwareKeyboardVisible {
+            // An iPhone on its side has no height to spare: Tools moves to the top bar instead.
+            if !softwareKeyboardVisible && !isPhoneLandscape {
             bottomStatusBar
                 .controlSize(.small)
                 .glassEffect(.regular, in: .capsule)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
                 .frame(maxWidth: .infinity)
-                .background(.bar)
+                // The terminal's own colour, not the system bar's: a light grey band under a
+                // dark terminal read as a separate panel (2026-10-04).
+                .background(settingsManager.currentTheme.canvasBackgroundColor.color)
+                .environment(\.colorScheme, themeColorScheme ?? systemColorScheme)
+            }
+        }
+        .toolbar {
+            if isPhoneLandscape && isTerminalActive && !softwareKeyboardVisible {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        bottomStatusBarContents(compact: true, inMenu: true)
+                    } label: {
+                        Label("Tools", systemImage: "wrench.and.screwdriver")
+                    }
+                    .accessibilityIdentifier("terminal-landscape-tools")
+                }
             }
         }
         .onAppear { updateKeyboardTools() }
@@ -610,7 +630,7 @@ struct TerminalWindowView: View {
                     session.sendTerminalData(data)
                 },
                 onResize: { cols, rows in
-                    let geometry = TerminalGeometry(rows: rows, columns: cols)
+                    let geometry = TerminalGeometry(measuredRows: rows, columns: cols)
                     #if os(macOS)
                     let configuredGeometry = session.currentTerminalGeometry
                     if !session.hasMeasuredTerminalGeometry,
@@ -1236,6 +1256,21 @@ struct TerminalWindowView: View {
     }
 
     #if os(iOS)
+    /// The terminal theme's own light or dark, so controls drawn on its colour read; nil for an
+    /// automatic theme, which follows the system.
+    private var themeColorScheme: ColorScheme? {
+        switch settingsManager.currentTheme.resolvedAppearance {
+        case .light: .light
+        case .dark: .dark
+        case .automatic: nil
+        }
+    }
+
+    /// An iPhone on its side: compact height.
+    private var isPhoneLandscape: Bool {
+        verticalSizeClass == .compact && UIDevice.current.userInterfaceIdiom == .phone
+    }
+
     private var iOSKeyboardToolsMenu: some View {
         Menu {
                 bottomStatusBarContents(compact: true, inMenu: true)

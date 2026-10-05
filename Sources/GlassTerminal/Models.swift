@@ -119,6 +119,18 @@ nonisolated struct TerminalGeometry: Equatable, Hashable, Sendable {
     static func contains(rows: Int, columns: Int) -> Bool {
         rowRange.contains(rows) && columnRange.contains(columns)
     }
+
+    /// What the view actually holds, for the PTY. The ranges above are for a size someone sets;
+    /// a measured size is the truth, however small. Held to 8 rows, an iPhone on its side with
+    /// the keyboard up showed about 4 while the host drew 8, and the prompt was off screen
+    /// (2026-10-04).
+    static let measuredRowRange = 2...300
+    static let measuredColumnRange = 10...500
+
+    init(measuredRows rows: Int, columns: Int) {
+        self.rows = min(Self.measuredRowRange.upperBound, max(Self.measuredRowRange.lowerBound, rows))
+        self.columns = min(Self.measuredColumnRange.upperBound, max(Self.measuredColumnRange.lowerBound, columns))
+    }
 }
 
 struct ServerConfiguration: Identifiable, Codable, Hashable {
@@ -956,7 +968,7 @@ class TerminalSession: Identifiable, Hashable {
     }
     
     func updateTerminalGeometry(rows: Int, columns: Int) {
-        let measuredGeometry = TerminalGeometry(rows: rows, columns: columns)
+        let measuredGeometry = TerminalGeometry(measuredRows: rows, columns: columns)
         let clampedRows = measuredGeometry.rows
         let clampedColumns = measuredGeometry.columns
         latestTerminalRows = clampedRows
