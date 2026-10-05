@@ -102,6 +102,10 @@ struct DatabaseConnectionConfig: Identifiable, Codable, Hashable {
     /// itself. A service id rather than a machine id, because a service keeps its id when the
     /// library merges duplicate machines.
     var tunnelServiceID: UUID?
+    /// With a tunnel through this machine's own Terminal: where the database is, as this machine
+    /// sees it. Nil: the machine itself (loopback). Set: a database on a private address this
+    /// machine reaches — added to an app server, as the owner did (2026-10-05).
+    var tunnelTargetHost: String?
     /// Refuse every statement that is not a read on this service. Enforced on the connection
     /// itself (`ReadOnlyDatabaseConnection`), not by hiding buttons, because five of the app's
     /// write paths call the driver directly rather than going through `executeQuery`.
@@ -142,6 +146,7 @@ struct DatabaseConnectionConfig: Identifiable, Codable, Hashable {
         defaultDatabase: String? = nil,
         usesHostTunnel: Bool = false,
         tunnelServiceID: UUID? = nil,
+        tunnelTargetHost: String? = nil,
         isReadOnly: Bool = false,
         rowPageSize: Int? = nil,
         databaseCredentialPolicy: CredentialStoragePolicy = .appOnly,
@@ -164,6 +169,7 @@ struct DatabaseConnectionConfig: Identifiable, Codable, Hashable {
         self.defaultDatabase = defaultDatabase
         self.usesHostTunnel = usesHostTunnel
         self.tunnelServiceID = usesHostTunnel ? tunnelServiceID : nil
+        self.tunnelTargetHost = usesHostTunnel && tunnelServiceID == nil ? tunnelTargetHost : nil
         self.isReadOnly = isReadOnly
         self.rowPageSize = rowPageSize.map { Self.clampedRowPageSize($0) }
         self.databaseCredentialPolicy = databaseCredentialPolicy
@@ -181,7 +187,7 @@ struct DatabaseConnectionConfig: Identifiable, Codable, Hashable {
     private enum CodingKeys: String, CodingKey {
         case schemaVersion
         case id, name, engine, host, port, username, defaultDatabase
-        case usesHostTunnel, tunnelServiceID, isReadOnly, rowPageSize
+        case usesHostTunnel, tunnelServiceID, tunnelTargetHost, isReadOnly, rowPageSize
         case databaseCredentialPolicy
         case useTLS, tlsVerification, tlsCertificate
         case isFavorite, colorTag, dateAdded, lastConnected, tags
@@ -206,6 +212,8 @@ struct DatabaseConnectionConfig: Identifiable, Codable, Hashable {
             ?? values.decodeIfPresent(Bool.self, forKey: .useSSHTunnel)
             ?? false
         tunnelServiceID = usesHostTunnel ? try values.decodeIfPresent(UUID.self, forKey: .tunnelServiceID) : nil
+        tunnelTargetHost = usesHostTunnel && tunnelServiceID == nil
+            ? try values.decodeIfPresent(String.self, forKey: .tunnelTargetHost) : nil
         isReadOnly = try values.decodeIfPresent(Bool.self, forKey: .isReadOnly) ?? false
         // Re-clamped on read, not only in the UI: a hand-edited or corrupt value must not
         // become a page size the grid cannot render.
@@ -247,6 +255,7 @@ struct DatabaseConnectionConfig: Identifiable, Codable, Hashable {
         try values.encodeIfPresent(defaultDatabase, forKey: .defaultDatabase)
         try values.encode(usesHostTunnel, forKey: .usesHostTunnel)
         try values.encodeIfPresent(tunnelServiceID, forKey: .tunnelServiceID)
+        try values.encodeIfPresent(tunnelTargetHost, forKey: .tunnelTargetHost)
         try values.encode(isReadOnly, forKey: .isReadOnly)
         try values.encodeIfPresent(rowPageSize, forKey: .rowPageSize)
         try values.encode(databaseCredentialPolicy, forKey: .databaseCredentialPolicy)

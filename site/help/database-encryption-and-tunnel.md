@@ -56,9 +56,11 @@ Most database servers accept connections only from their own machine. The tunnel
 
 The forward goes to `127.0.0.1` at that port, as the host's machine sees it.
 
+If the database is on another server that only this machine can reach — a production database behind an app server — enter that server's address in **Database address**, which appears under **Connect**, as this machine sees it (for example `192.0.2.12`). The machine's Terminal service connects on to it for you. Leave it blank for a database on the machine itself.
+
 ## Reach a database through another machine
 
-Some databases sit on a private network that only one machine can reach — an app server in front of a production database, for example. Connect to that machine over SSH, then to the database's private address from there:
+The database above was added to the machine that reaches it. If you'd rather keep the database server as its own machine in the library, connect through the other machine instead:
 
 1. Add the database server as its own host, with its private address (for example `192.0.2.12`).
 2. Add the database service to it, and open **Advanced**.

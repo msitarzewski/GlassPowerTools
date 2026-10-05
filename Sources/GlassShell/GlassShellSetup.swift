@@ -42,7 +42,10 @@ public final class GlassShellSetupModel {
     private let model: GlassShellModel
 
     public var name: String
-    public var address: String
+    public var address: String {
+        // Service forms that say where they will connect follow the address as it is typed.
+        didSet { for draft in drafts.values { draft.hostAddressDidChange(address) } }
+    }
     public var aliases: [String]
     public var tags: [String]
     /// The kind being added, or nil for "no service". Selecting a tab **is** the decision to add
@@ -218,6 +221,7 @@ public final class GlassShellSetupModel {
             draft = capability.makeSetupDraft()
         }
         drafts[kind] = draft
+        draft?.hostAddressDidChange(address)
         return draft
     }
 

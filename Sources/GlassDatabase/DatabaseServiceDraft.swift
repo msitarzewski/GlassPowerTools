@@ -74,6 +74,16 @@ final class DatabaseServiceDraft: GlassServiceDraft {
         }
     }
 
+    /// The host's address as the sheet holds it, for saying where a tunnel will end.
+    var hostAddress = ""
+    /// Through this machine's own Terminal: the database's address as this machine sees it.
+    /// Blank means the machine itself.
+    var tunnelTargetHost = ""
+
+    func hostAddressDidChange(_ address: String) {
+        hostAddress = Self.normalized(address)
+    }
+
     /// The machine the tunnel goes through, when it is another one.
     var tunnelMachineName: String? {
         tunnelServiceID.flatMap { id in tunnelChoices.first { $0.serviceID.rawValue == id }?.machineName }
@@ -148,6 +158,7 @@ final class DatabaseServiceDraft: GlassServiceDraft {
         tlsCertificate = editing?.tlsCertificate
         usesHostTunnel = editing?.usesHostTunnel ?? false
         tunnelServiceID = editing?.tunnelServiceID
+        tunnelTargetHost = editing?.tunnelTargetHost ?? ""
         isReadOnly = editing?.isReadOnly ?? false
         rowPageSize = editing?.rowPageSize.map(String.init) ?? ""
         colorTag = editing?.colorTag ?? .none
@@ -393,6 +404,7 @@ final class DatabaseServiceDraft: GlassServiceDraft {
             defaultDatabase: isFile ? nil : Self.normalized(database).nilWhenEmpty,
             usesHostTunnel: engine.supportsNetworkTransport && usesHostTunnel,
             tunnelServiceID: engine.supportsNetworkTransport && usesHostTunnel ? tunnelServiceID : nil,
+            tunnelTargetHost: Self.normalized(tunnelTargetHost).nilWhenEmpty,
             isReadOnly: isReadOnly,
             rowPageSize: Int(Self.normalized(rowPageSize)).map(DatabaseConnectionConfig.clampedRowPageSize),
             databaseCredentialPolicy: credentialPolicy,

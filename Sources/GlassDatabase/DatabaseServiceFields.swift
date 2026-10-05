@@ -301,6 +301,27 @@ struct DatabaseAdvancedFields: View {
                 Task { await draft.resolveHostTrustIfPossible() }
             }
         }
+        if draft.route == .thisMachine {
+            // Where the database is, from this machine: blank for the machine itself, or a private
+            // address it reaches — "I don't see where to provide the IP" (2026-10-05).
+            LabeledContent("Database address") {
+                TextField("Database address", text: $draft.tunnelTargetHost, prompt: Text("This machine"))
+                    .labelsHidden()
+                    .multilineTextAlignment(.trailing)
+                    .autocorrectionDisabled()
+                    #if !os(macOS)
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.URL)
+                    #endif
+                    .accessibilityIdentifier("\(identifierPrefix)-tunnel-target")
+            }
+            Text(draft.tunnelTargetHost.trimmingCharacters(in: .whitespaces).isEmpty
+                 ? "Blank: the database is on this machine. For one on a private network this machine reaches, enter its address as this machine sees it."
+                 : "This machine's Terminal service connects on to \(draft.tunnelTargetHost.trimmingCharacters(in: .whitespaces)):\(draft.port.isEmpty ? String(draft.engine.defaultPort) : draft.port) for you.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
         if draft.route == .thisMachine, draft.hostCanForwardPorts == false {
             // Said here rather than discovered at connect time. Not a validation error: the
             // machine may gain a Terminal service before this one is next opened.
@@ -308,10 +329,19 @@ struct DatabaseAdvancedFields: View {
                 message: "This machine has no Terminal service to tunnel through yet. Add one, or turn this off to connect directly.",
                 identifier: "\(identifierPrefix)-host-tunnel-warning")
         } else if let machine = draft.tunnelMachineName {
-            Text("Connects to \(machine) over SSH, then to this database's address from there. Use it for a database on a private network that only \(machine) can reach.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            // Where it ends, said with the address itself: the address is the machine's, typed
+            // under Machine above, and the form never showed it — "I don't see where to provide
+            // the IP" (2026-10-05).
+            if draft.hostAddress.isEmpty {
+                DatabaseValidationMessage(
+                    message: "Enter the database server's private address under Machine › Address above. \(machine) connects to it there.",
+                    identifier: "\(identifierPrefix)-host-tunnel-address")
+            } else {
+                Text("Connects to \(machine) over SSH, then to \(draft.hostAddress):\(draft.port.isEmpty ? String(draft.engine.defaultPort) : draft.port) from there. That is this machine's address, under Machine above, as \(machine) sees it.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             hostTrustCaption
         } else if draft.usesHostTunnel, draft.tunnelServiceID != nil {
             DatabaseValidationMessage(

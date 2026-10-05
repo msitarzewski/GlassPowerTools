@@ -23,3 +23,12 @@
 - Live (scratch): `tunnelReachesANetworkAddressNotOnlyLoopback` — through the VM to its own network
   address, sshd's banner comes back. Not run against the owner's real servers (by rule).
 - Not seen on screen yet: the picker in the setup sheet.
+
+## Follow-up the same day: the address, where the owner looked for it
+- The owner added the database to the app server itself and chose "Through this machine's
+  Terminal" — the natural shape — and found nowhere to give the private IP (the edit-service sheet
+  shows no Machine section). Added `tunnelTargetHost`: with that route, a **Database address** row
+  (blank = the machine itself, loopback). "Through another machine" stays for a database server kept
+  as its own machine; its caption now names the address it will use, or points to Machine › Address
+  (`GlassServiceDraft.hostAddressDidChange`, a requirement with a no-op default).
+- Tests: the address reaches the forward, blank means loopback, saved only for this route.

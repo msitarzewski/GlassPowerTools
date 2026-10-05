@@ -244,6 +244,15 @@ public protocol GlassServiceDraft: AnyObject {
     func commit(endpointID: EndpointID, host: HostProfile, address: String) async throws
     /// Undo a `commit` that created a new service, when a later step of the same save failed.
     func rollback(endpointID: EndpointID) async
+    /// The host's address as the sheet holds it now, while it is typed — for a form that should
+    /// say where it will connect (a database reached through another machine, 2026-10-05). The
+    /// draft still commits the address it is given at `commit`. Default: ignored. A requirement,
+    /// so the sheet's `any GlassServiceDraft` reaches a draft's own version.
+    func hostAddressDidChange(_ address: String)
+}
+
+public extension GlassServiceDraft {
+    func hostAddressDidChange(_ address: String) {}
 }
 
 /// A capability owns one service kind. The shell routes `connect` through it;
