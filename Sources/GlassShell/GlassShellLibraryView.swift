@@ -207,13 +207,19 @@ public struct GlassShellLibraryView: View {
         .accessibilityIdentifier("host-row-\(item.name)")
         #endif
         .contextMenu {
-            Button("Connect") { model.connect(hostID: item.id) }
-            Button("Edit") { if let host = model.host(item.id) { setupMode = .editHost(host) } }
-            Button(item.isFavorite ? "Remove Favorite" : "Add Favorite") { model.toggleFavorite(item.id) }
+            // Icons in every machine menu, as the Connect menu has (2026-10-04).
+            Button("Connect", systemImage: "play.fill") { model.connect(hostID: item.id) }
+                .labelStyle(.titleAndIcon)
+            Button("Edit", systemImage: "pencil") { if let host = model.host(item.id) { setupMode = .editHost(host) } }
+                .labelStyle(.titleAndIcon)
+            Button(item.isFavorite ? "Remove Favorite" : "Add Favorite",
+                   systemImage: item.isFavorite ? "star.slash" : "star") { model.toggleFavorite(item.id) }
+                .labelStyle(.titleAndIcon)
             // The device itself is not a record the user added and is not one they can remove
             // (D8); its services are removed individually from the detail.
             if model.host(item.id)?.isLocal != true {
-                Button("Delete", role: .destructive) { deleting = model.host(item.id) }
+                Button("Delete", systemImage: "trash", role: .destructive) { deleting = model.host(item.id) }
+                    .labelStyle(.titleAndIcon)
                     .accessibilityIdentifier("host-delete")
             }
         }
@@ -294,9 +300,10 @@ public struct GlassShellLibraryView: View {
                             // nothing to remove — and offering the item would only produce an
                             // error the user could not act on.
                             if !host.isBuiltIn(service.endpointID) {
-                                Button("Remove Service", role: .destructive) {
+                                Button("Remove Service", systemImage: "trash", role: .destructive) {
                                     Task { await run { try await model.removeService(service.endpointID, from: host.id) } }
                                 }
+                                .labelStyle(.titleAndIcon)
                             }
                         }
                 }
@@ -685,8 +692,10 @@ public struct GlassShellConnectControl: View {
                 Label {
                     Text(service.displayName)
                 } icon: {
-                    GlassServiceIcon(GlassServicePresentation.symbol(for: service.kind))
+                    GlassServiceIcon.menuImage(GlassServicePresentation.symbol(for: service.kind))
                 }
+                // A Mac menu item shows its title alone unless asked for both.
+                .labelStyle(.titleAndIcon)
             }
             .accessibilityIdentifier("host-connect-menu-\(service.kind.rawValue)"
                                      + (host.map { GlassShellLibraryView.identifierSuffix(for: service, in: $0) } ?? ""))

@@ -28,6 +28,40 @@ public struct GlassServiceIcon: View {
     }
 }
 
+public extension GlassServiceIcon {
+    /// The icon as a plain image, for a menu. Menus — AppKit's on the Mac, the system's elsewhere —
+    /// keep an `Image` and drop any other view, so the drawn database icon vanished from the
+    /// Connect menu while the symbol-based ones stayed (2026-10-04). The shape is drawn once,
+    /// as a template, so the menu tints it like the text beside it.
+    @MainActor static func menuImage(_ symbol: GlassServiceSymbol) -> Image {
+        switch symbol {
+        case .system(let name):
+            return Image(systemName: name)
+        case .circleStack:
+            if let cached = renderedCircleStack { return cached }
+            let side: CGFloat = 16
+            let renderer = ImageRenderer(content: HeroiconCircleStack()
+                .stroke(Color.black, style: StrokeStyle(lineWidth: HeroiconCircleStack.strokeWidth * side / 24,
+                                                       lineCap: .round, lineJoin: .round))
+                .frame(width: side, height: side))
+            renderer.scale = 3
+            #if canImport(AppKit) && !targetEnvironment(macCatalyst)
+            guard let image = renderer.nsImage else { return Image(systemName: "cylinder.split.1x2") }
+            image.isTemplate = true
+            image.size = NSSize(width: side, height: side)
+            let result = Image(nsImage: image)
+            #else
+            guard let image = renderer.uiImage else { return Image(systemName: "cylinder.split.1x2") }
+            let result = Image(uiImage: image.withRenderingMode(.alwaysTemplate))
+            #endif
+            renderedCircleStack = result
+            return result
+        }
+    }
+
+    @MainActor private static var renderedCircleStack: Image?
+}
+
 /// Heroicons v2 `optimized/24/outline/circle-stack.svg`, from Tailwind Labs, MIT licensed.
 /// Its licence is at `Documentation/ThirdPartyLicenses/heroicons/` and in the app's
 /// acknowledgements (tailwindlabs/heroicons v2.2.0). The commands below are
