@@ -5931,7 +5931,8 @@ private func receiveRDPGraphicsUpdateBatch(
         maximumBufferedByteCount: maximumFastPathFragmentByteCount
     )
     var staticChannelReassembler = RDPStaticVirtualChannelReassembler()
-    var autoDetectMeter = RDPAutoDetectMeter()
+    // In the session a bandwidth measurement is the session's own traffic between start and stop.
+    var autoDetectMeter = RDPAutoDetectMeter(countsAllTraffic: true)
     let clearCodec = RDPClearCodecDecoder()
     let surfaceCompositor = RDPGFXSurfaceCompositor(
         capabilitySet: graphicsCapabilitySet,
@@ -6110,6 +6111,7 @@ private func receiveRDPGraphicsUpdateBatch(
                 shouldCancel: shouldCancel,
                 mapRemoteDisconnectToReceiveFailure: false
             )
+            autoDetectMeter.noteReceived(byteCount: packet.count)
         } catch RDPApplicationReceiveError.remoteDisconnected {
             if result.graphicsFrames.isEmpty == false,
                fragment == nil,

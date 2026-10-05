@@ -105,6 +105,11 @@ import GlassRDPTransport
             let nonZero = frame.pixels.contains { $0 != 0 }
             print("first frame   : \(frame.width)x\(frame.height) bytesPerRow=\(frame.bytesPerRow) after \(String(format: "%.2f", elapsed))s")
             print("pixels        : \(frame.pixels.count) bytes, nonZero=\(nonZero), hardwareAccel=\(String(describing: frame.usesHardwareAcceleration))")
+            // GPT_RDP_HOLD=<seconds> stays connected after the first frame, for what a server does
+            // only during a session (Auto-Detect measurements, for one).
+            if let hold = ProcessInfo.processInfo.environment["GPT_RDP_HOLD"].flatMap(Double.init), hold > 0 {
+                try? await Task.sleep(for: .seconds(hold))
+            }
             print("frames seen   : \(await probe.frameCount)")
             await probe.finish()
             print("RESULT: PASS")

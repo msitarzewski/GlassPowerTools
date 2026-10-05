@@ -189,6 +189,23 @@ private extension ByteCursor {
 struct RDPAutoDetectMeter {
     private var byteCount: UInt32 = 0
     private var startedAt: ContinuousClock.Instant?
+    /// Counting every byte received rather than only Bandwidth Measure Payload PDUs.
+    ///
+    /// The results report "the number of bytes received between the Bandwidth Measure Start and
+    /// Stop messages" (MS-RDPBCGR 2.2.14.2.2). During the connection the server fills that
+    /// interval with payload PDUs, and counting them is the whole of it. **During the session it
+    /// sends none** — start, the session's own traffic, stop — so a meter counting payloads
+    /// reported 0 bytes on every measurement, and the server concluded the link had no
+    /// bandwidth (seen live against Windows 11, 2026-10-05: twelve measurements in 30 s, all 0).
+    /// The session loop sets this and reports every packet through `noteReceived(byteCount:)`.
+    var countsAllTraffic = false
+
+    /// A packet arrived. Counted only while a measurement is open and the meter counts traffic.
+    mutating func noteReceived(byteCount count: Int) {
+        guard countsAllTraffic, startedAt != nil else { return }
+        let (sum, overflow) = byteCount.addingReportingOverflow(UInt32(clamping: count))
+        byteCount = overflow ? UInt32.max : sum
+    }
 
     /// Takes the next request and returns the response it calls for, if any. `now` is when the
     /// request arrived.
@@ -198,15 +215,25 @@ struct RDPAutoDetectMeter {
             byteCount = 0
             startedAt = now
         }
-        let (sum, overflow) = byteCount.addingReportingOverflow(request.measuredByteCountContribution)
-        byteCount = overflow ? UInt32.max : sum
+        if !countsAllTraffic {
+            let (sum, overflow) = byteCount.addingReportingOverflow(request.measuredByteCountContribution)
+            byteCount = overflow ? UInt32.max : sum
+        }
         var milliseconds: UInt32 = 1
         if let startedAt {
             let elapsed = now - startedAt
             let ms = Double(elapsed.components.seconds) * 1000 + Double(elapsed.components.attoseconds) / 1e15
             milliseconds = UInt32(min(Double(UInt32.max), max(1, ms.rounded())))
         }
-        return request.response(measuredByteCount: byteCount, measuredMilliseconds: milliseconds)
+        let response = request.response(measuredByteCount: byteCount, measuredMilliseconds: milliseconds)
+        // Metadata only: which measurement the server asked for and what was reported, so a live
+        // run can show the link being measured (2026-10-05: a Windows run logged nothing either way).
+        if case .bandwidth(let bytes, let ms)? = response?.payload {
+            RDPConnectionDiagnostics.logger.notice("event=autodetect request=\(request.requestTypeName, privacy: .public) bytes=\(bytes) ms=\(ms)")
+        } else {
+            RDPConnectionDiagnostics.logger.notice("event=autodetect request=\(request.requestTypeName, privacy: .public) answered=\(response != nil)")
+        }
+        return response
     }
 }
 

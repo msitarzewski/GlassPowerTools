@@ -306,3 +306,28 @@ import Testing
     let second = meter.respond(to: request(0x002B, bytes: 92), now: start + .seconds(5) + .milliseconds(40))
     #expect(second?.payload == .bandwidth(byteCount: 100, milliseconds: 40))
 }
+
+/// During the session a measurement is the session's own traffic: start, ordinary packets, stop
+/// (post-connect, 0x0014 then 0x0429). Counting only payload PDUs reported 0 bytes every time, and
+/// a Windows 11 server judged the link empty (2026-10-05).
+@Test func sessionBandwidthCountsTheTrafficBetweenStartAndStop() {
+    func request(_ type: UInt16) -> RDPServerAutoDetectRequest {
+        RDPServerAutoDetectRequest(channelID: 1003, sequenceNumber: 9, requestType: type, payloadByteCount: 0)
+    }
+    var meter = RDPAutoDetectMeter(countsAllTraffic: true)
+    let start = ContinuousClock.now
+    meter.noteReceived(byteCount: 5_000)                       // before any start: not counted
+    _ = meter.respond(to: request(0x0014), now: start)
+    meter.noteReceived(byteCount: 40_000)
+    meter.noteReceived(byteCount: 24_000)
+    let stop = meter.respond(to: request(0x0429), now: start + .milliseconds(50))
+    #expect(stop?.payload == .bandwidth(byteCount: 64_000, milliseconds: 50))
+
+    // The connect-time meter still counts payload PDUs only.
+    var connectTime = RDPAutoDetectMeter()
+    connectTime.noteReceived(byteCount: 1_000_000)
+    _ = connectTime.respond(to: request(0x0014), now: start)
+    connectTime.noteReceived(byteCount: 1_000_000)
+    #expect(connectTime.respond(to: request(0x002B), now: start + .milliseconds(10))?.payload
+            == .bandwidth(byteCount: 8, milliseconds: 10))
+}
