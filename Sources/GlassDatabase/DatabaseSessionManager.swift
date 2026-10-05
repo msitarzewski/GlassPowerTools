@@ -169,8 +169,10 @@ class DatabaseSessionManager {
                 }
                 session.state = .connecting(stage: .openingHostTunnel)
                 Logger.database.info("Opening a tunnel to the database through the host's Terminal service")
-                // Loopback as the host's machine sees it: the database is on that machine. A
-                // database on a *different* machine is a different host, with its own service.
+                // Loopback as the tunnelling machine sees it: the database is on that machine.
+                // A database tunnelled through *another* machine (`tunnelServiceID`) gets a
+                // forward that ends at its own address instead; the capability builds that one
+                // and ignores the loopback asked for here.
                 let forward = try await openForward("127.0.0.1", config.port)
                 session.hostTunnel = forward
                 tunnelLocalPort = forward.localPort

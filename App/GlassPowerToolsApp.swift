@@ -101,6 +101,11 @@ struct GlassPowerToolsApp: App {
         database.hostAccess = { [weak model] host in
             model?.hostAccess(for: host.id) ?? GlassCapabilityHostAccess(address: host.address)
         }
+        // A database added with a new machine has no host to ask about yet; it can still be
+        // reached through another machine's Terminal service (2026-10-05).
+        database.tunnelAccess = { [weak model] in
+            model?.hostAccess(for: HostID()) ?? GlassCapabilityHostAccess(address: nil)
+        }
         // Leaving a database goes back to **the machine it is on**, not to the top of the list.
         // The catalog is what turns a connection's endpoint into a host, and the database does
         // not hold the catalog — so the answer is supplied from here, like `hostAccess` above.

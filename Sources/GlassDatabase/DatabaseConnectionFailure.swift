@@ -40,6 +40,9 @@ enum DatabaseConnectionFailure {
             message += " Databases are usually set up to accept connections only from the machine "
                 + "they run on. Edit this database and turn on \"Reach it through this machine's "
                 + "Terminal service\" under Advanced."
+        } else if config.tunnelServiceID != nil {
+            message += " The tunnel reached the machine it goes through, so check that the database "
+                + "is running at that address and accepts connections from that machine."
         } else {
             message += " The tunnel reached the machine, so check that the database is running "
                 + "and listening on that port."

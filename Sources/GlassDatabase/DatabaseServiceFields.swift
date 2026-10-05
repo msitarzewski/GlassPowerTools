@@ -14,6 +14,7 @@
 import SwiftUI
 import GlassLayers
 import GlassShell
+import GlassConnectionKit
 
 // MARK: - Required
 
@@ -275,23 +276,53 @@ struct DatabaseAdvancedFields: View {
     /// machine's Terminal service, so there is nothing else to ask for.
     @ViewBuilder
     private var tunnelRow: some View {
-        Toggle("Reach it through this machine's Terminal service", isOn: $draft.usesHostTunnel)
-            .accessibilityIdentifier("\(identifierPrefix)-host-tunnel")
-            // D14: settle the machine's fingerprint here, once, so connecting later just works.
-            .onChange(of: draft.usesHostTunnel) { _, isOn in
-                guard isOn else { draft.hostTrustOutcome = nil; return }
+        // A switch while the only tunnel is this machine's own; a picker once another machine's
+        // Terminal service can carry it — a database on a private address reached from an app
+        // server (2026-10-05).
+        if draft.tunnelChoices.isEmpty {
+            Toggle("Reach it through this machine's Terminal service", isOn: $draft.usesHostTunnel)
+                .accessibilityIdentifier("\(identifierPrefix)-host-tunnel")
+                // D14: settle the machine's fingerprint here, once, so connecting later just works.
+                .onChange(of: draft.usesHostTunnel) { _, isOn in
+                    guard isOn else { draft.hostTrustOutcome = nil; return }
+                    Task { await draft.resolveHostTrustIfPossible() }
+                }
+        } else {
+            Picker("Connect", selection: $draft.route) {
+                Text("Directly").tag(DatabaseServiceDraft.Route.direct)
+                Text("Through this machine's Terminal").tag(DatabaseServiceDraft.Route.thisMachine)
+                ForEach(draft.tunnelChoices) { choice in
+                    Text("Through \(choice.machineName)").tag(DatabaseServiceDraft.Route.through(choice.serviceID.rawValue))
+                }
+            }
+            .accessibilityIdentifier("\(identifierPrefix)-host-tunnel-route")
+            .onChange(of: draft.route) { _, route in
+                guard route != .direct else { draft.hostTrustOutcome = nil; return }
                 Task { await draft.resolveHostTrustIfPossible() }
             }
-        if draft.usesHostTunnel, draft.hostCanForwardPorts == false {
+        }
+        if draft.route == .thisMachine, draft.hostCanForwardPorts == false {
             // Said here rather than discovered at connect time. Not a validation error: the
             // machine may gain a Terminal service before this one is next opened.
             DatabaseValidationMessage(
                 message: "This machine has no Terminal service to tunnel through yet. Add one, or turn this off to connect directly.",
                 identifier: "\(identifierPrefix)-host-tunnel-warning")
+        } else if let machine = draft.tunnelMachineName {
+            Text("Connects to \(machine) over SSH, then to this database's address from there. Use it for a database on a private network that only \(machine) can reach.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            hostTrustCaption
+        } else if draft.usesHostTunnel, draft.tunnelServiceID != nil {
+            DatabaseValidationMessage(
+                message: "The machine this was reached through is no longer in the library. Choose how to reach it.",
+                identifier: "\(identifierPrefix)-host-tunnel-gone")
         } else if draft.usesHostTunnel {
             hostTrustCaption
         } else {
-            Text("For a database that only listens on the machine itself. The connection is forwarded over the machine's own SSH service.")
+            Text(draft.tunnelChoices.isEmpty
+                 ? "For a database that only listens on the machine itself. The connection is forwarded over the machine's own SSH service."
+                 : "Through a Terminal service: this machine's, for a database that only listens on the machine itself, or another machine's, for a database on a private network only it can reach.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -308,7 +339,8 @@ struct DatabaseAdvancedFields: View {
             } else {
                 switch draft.hostTrustOutcome {
                 case .trusted:
-                    Label("This machine's SSH host key is trusted.", systemImage: "checkmark.shield")
+                    Label(draft.tunnelMachineName.map { "\($0)'s SSH host key is trusted." } ?? "This machine's SSH host key is trusted.",
+                          systemImage: "checkmark.shield")
                 case .declined:
                     Text("The host key was not trusted, so the tunnel will not open. You will be asked again the first time you connect.")
                 case .unavailable, nil:

@@ -149,6 +149,29 @@ struct SSHTransportIntegrationTests {
         await transport.close()
     }
 
+    /// A database behind another machine (2026-10-05): the tunnel ends at a network address as the
+    /// SSH machine sees it, not at its loopback. The test host's own address stands in for the
+    /// private database server, so nothing about the network is written here.
+    @Test func tunnelReachesANetworkAddressNotOnlyLoopback() async throws {
+        do { try IntegrationEnvironment.skipUnlessConfigured() } catch { print("NOT RUN:", error); return }
+        let transport = IntegrationTransport.make()
+        try await transport.connect()
+        let consumer = DatabaseTunnelConsumer(transport: transport)
+        let endpoint = try await consumer.localEndpoint(forDatabaseAt: IntegrationEnvironment.host!, port: IntegrationEnvironment.port)
+        let client = try await TCPClient.connect(port: endpoint.port)
+        let banner = try await client.executeThenClose { inbound, _ in
+            var received = Data()
+            for try await chunk in inbound {
+                received.append(contentsOf: chunk.readableBytesView)
+                if received.count >= 8 { break }
+            }
+            return String(decoding: received.prefix(8), as: UTF8.self)
+        }
+        #expect(banner.hasPrefix("SSH-2.0"), "the tunnel reached a service at a network address from the far side")
+        await endpoint.tunnel.close()
+        await transport.close()
+    }
+
     @Test func poolSharesOneConnectedTransportPerRoute() async throws {
         do { try IntegrationEnvironment.skipUnlessConfigured() } catch { print("NOT RUN:", error); return }
         let pool = SSHTransportPool { _ in IntegrationTransport.make() }

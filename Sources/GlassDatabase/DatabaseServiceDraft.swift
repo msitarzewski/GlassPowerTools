@@ -48,6 +48,37 @@ final class DatabaseServiceDraft: GlassServiceDraft {
     var hostTrustOutcome: GlassHostTrustOutcome?
     var isResolvingHostTrust = false
 
+    /// With `usesHostTunnel`: another machine's Terminal service to go through, to this
+    /// database's address as that machine sees it. Nil: this machine's own (2026-10-05).
+    var tunnelServiceID: UUID?
+    /// The machines that can carry the tunnel, for the picker. Empty when none can.
+    let tunnelChoices: [GlassTunnelChoice]
+    /// Settles the chosen machine's host-key trust, as `resolveHostTrust` does for this one.
+    let resolveTrustThrough: (@MainActor @Sendable (EndpointID) async -> GlassHostTrustOutcome)?
+
+    /// How the database is reached, as the picker shows it.
+    enum Route: Hashable {
+        case direct
+        case thisMachine
+        case through(UUID)
+    }
+
+    var route: Route {
+        get { usesHostTunnel ? (tunnelServiceID.map(Route.through) ?? .thisMachine) : .direct }
+        set {
+            switch newValue {
+            case .direct: usesHostTunnel = false; tunnelServiceID = nil
+            case .thisMachine: usesHostTunnel = true; tunnelServiceID = nil
+            case .through(let id): usesHostTunnel = true; tunnelServiceID = id
+            }
+        }
+    }
+
+    /// The machine the tunnel goes through, when it is another one.
+    var tunnelMachineName: String? {
+        tunnelServiceID.flatMap { id in tunnelChoices.first { $0.serviceID.rawValue == id }?.machineName }
+    }
+
     // MARK: Required
 
     var engine: DatabaseEngineType
@@ -98,11 +129,15 @@ final class DatabaseServiceDraft: GlassServiceDraft {
     init(editing: DatabaseConnectionConfig? = nil,
          connectionManager: ConnectionManager,
          hostCanForwardPorts: Bool? = nil,
-         resolveHostTrust: (@MainActor @Sendable () async -> GlassHostTrustOutcome)? = nil) {
+         resolveHostTrust: (@MainActor @Sendable () async -> GlassHostTrustOutcome)? = nil,
+         tunnelChoices: [GlassTunnelChoice] = [],
+         resolveTrustThrough: (@MainActor @Sendable (EndpointID) async -> GlassHostTrustOutcome)? = nil) {
         self.editing = editing
         self.connectionManager = connectionManager
         self.hostCanForwardPorts = hostCanForwardPorts
         self.resolveHostTrust = resolveHostTrust
+        self.tunnelChoices = tunnelChoices
+        self.resolveTrustThrough = resolveTrustThrough
         engine = editing?.engine ?? .mysql
         database = editing?.defaultDatabase ?? ""
         username = editing?.username ?? DatabaseEngineType.mysql.defaultUsername
@@ -112,6 +147,7 @@ final class DatabaseServiceDraft: GlassServiceDraft {
         tlsVerification = editing?.tlsVerification ?? .systemTrust
         tlsCertificate = editing?.tlsCertificate
         usesHostTunnel = editing?.usesHostTunnel ?? false
+        tunnelServiceID = editing?.tunnelServiceID
         isReadOnly = editing?.isReadOnly ?? false
         rowPageSize = editing?.rowPageSize.map(String.init) ?? ""
         colorTag = editing?.colorTag ?? .none
@@ -143,6 +179,7 @@ final class DatabaseServiceDraft: GlassServiceDraft {
         tlsVerification = .systemTrust
         clearCertificate()
         usesHostTunnel = false
+        tunnelServiceID = nil
         if newEngine != .sqlite { discardStagedSQLiteFile() }
     }
 
@@ -156,6 +193,17 @@ final class DatabaseServiceDraft: GlassServiceDraft {
     /// host, its Terminal and its Database created in a single save have no committed SSH
     /// service to challenge yet, so trust is settled at first connect instead.
     func resolveHostTrustIfPossible() async {
+        // Through another machine: that machine's key is the one the tunnel depends on.
+        if let tunnelServiceID {
+            guard let resolveTrustThrough, !isResolvingHostTrust else {
+                if resolveTrustThrough == nil { hostTrustOutcome = .unavailable }
+                return
+            }
+            isResolvingHostTrust = true
+            defer { isResolvingHostTrust = false }
+            hostTrustOutcome = await resolveTrustThrough(EndpointID(rawValue: tunnelServiceID))
+            return
+        }
         guard let resolveHostTrust, !isResolvingHostTrust else {
             if resolveHostTrust == nil { hostTrustOutcome = .unavailable }
             return
@@ -344,6 +392,7 @@ final class DatabaseServiceDraft: GlassServiceDraft {
             username: isFile ? "" : Self.normalized(username),
             defaultDatabase: isFile ? nil : Self.normalized(database).nilWhenEmpty,
             usesHostTunnel: engine.supportsNetworkTransport && usesHostTunnel,
+            tunnelServiceID: engine.supportsNetworkTransport && usesHostTunnel ? tunnelServiceID : nil,
             isReadOnly: isReadOnly,
             rowPageSize: Int(Self.normalized(rowPageSize)).map(DatabaseConnectionConfig.clampedRowPageSize),
             databaseCredentialPolicy: credentialPolicy,

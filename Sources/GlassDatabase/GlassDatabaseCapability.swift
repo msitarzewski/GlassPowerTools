@@ -63,6 +63,9 @@ public final class GlassDatabaseRuntime {
     /// because the shell model owns the brokering and a capability must not hold the model.
     /// Only the setup sheet needs it: `open` is handed a `GlassCapabilityHostAccess` directly.
     public var hostAccess: (@MainActor (HostProfile) -> GlassCapabilityHostAccess)?
+    /// The same, for a database being added with a machine that does not exist yet (the Add Host
+    /// sheet): the machines another could tunnel through, and their trust, but no address.
+    public var tunnelAccess: (@MainActor () -> GlassCapabilityHostAccess)?
 
     /// D26: points the saved-connection store at the shell's catalog. Called once, by the
     /// composition root — the only place that can see both. A method rather than an init parameter
@@ -210,7 +213,10 @@ public final class GlassDatabaseCapability: GlassCapability {
     public func makeSetupDraft() -> any GlassServiceDraft {
         // No host context here: the Add Host sheet has no host yet, so whether a forward is
         // possible is genuinely unknown and the tunnel row says nothing rather than guessing.
-        DatabaseServiceDraft(connectionManager: runtime.connectionManager)
+        let access = runtime.tunnelAccess?()
+        return DatabaseServiceDraft(connectionManager: runtime.connectionManager,
+                                    tunnelChoices: access?.tunnelChoices ?? [],
+                                    resolveTrustThrough: Self.trustThrough(access))
     }
 
     public func setupDraft(for service: HostServiceLink, host: HostProfile) -> (any GlassServiceDraft)? {
@@ -219,13 +225,39 @@ public final class GlassDatabaseCapability: GlassCapability {
         // first connect. The resolver is the shell's, brokered to whichever capability owns
         // `.ssh` — this module still never imports it.
         var resolveTrust: (@MainActor @Sendable () async -> GlassHostTrustOutcome)?
-        if let access = runtime.hostAccess?(host) {
+        let access = runtime.hostAccess?(host)
+        if let access {
             resolveTrust = { await access.resolveHostTrust() }
         }
         return DatabaseServiceDraft(editing: config,
                                     connectionManager: runtime.connectionManager,
                                     hostCanForwardPorts: hostCanForwardPorts(host),
-                                    resolveHostTrust: resolveTrust)
+                                    resolveHostTrust: resolveTrust,
+                                    tunnelChoices: access?.tunnelChoices ?? [],
+                                    resolveTrustThrough: Self.trustThrough(access))
+    }
+
+    /// The forward a connection opens, if it wants one: through this machine's own Terminal
+    /// to loopback, or through another machine's to this database's own address as that machine
+    /// sees it — a private IP behind an app server — whatever host the caller asks for.
+    static func forwardProvider(for config: DatabaseConnectionConfig,
+                                hostAccess: GlassCapabilityHostAccess) -> DatabaseSessionManager.PortForwardProvider? {
+        guard config.usesHostTunnel else { return nil }
+        if let through = config.tunnelServiceID {
+            let address = config.host
+            return { _, port in
+                try await hostAccess.forwardPort(through: EndpointID(rawValue: through), toHost: address, port: port)
+            }
+        }
+        guard hostAccess.canForwardPorts else { return nil }
+        return { remoteHost, port in try await hostAccess.forwardPort(toHost: remoteHost, port: port) }
+    }
+
+    /// Settles another machine's host-key trust, for a database tunnelled through it.
+    private static func trustThrough(_ access: GlassCapabilityHostAccess?)
+    -> (@MainActor @Sendable (EndpointID) async -> GlassHostTrustOutcome)? {
+        guard let access else { return nil }
+        return { service in await access.resolveHostTrust(through: service) }
     }
 
     public func removeService(_ service: HostServiceLink, host: HostProfile) async throws {
@@ -281,12 +313,7 @@ public final class GlassDatabaseCapability: GlassCapability {
         }
         // D7: the forward, when this service wants one, is the host's own SSH service. The
         // shell brokers it; this module never learns which capability served it.
-        var openForward: DatabaseSessionManager.PortForwardProvider?
-        if config.usesHostTunnel, hostAccess.canForwardPorts {
-            openForward = { remoteHost, port in
-                try await hostAccess.forwardPort(toHost: remoteHost, port: port)
-            }
-        }
+        let openForward = Self.forwardProvider(for: config, hostAccess: hostAccess)
         runtime.enqueue(.connect(connectionID: connectionID, openForward: openForward, report: report))
     }
 

@@ -96,6 +96,12 @@ struct DatabaseConnectionConfig: Identifiable, Codable, Hashable {
     /// `host:port` directly — the D7 replacement for glassdb's `useSSHTunnel` plus its five
     /// SSH fields. The forward is brokered by the shell; this module never opens one itself.
     var usesHostTunnel: Bool
+    /// With `usesHostTunnel`: the Terminal service of *another* machine to tunnel through, to
+    /// this database's own address as that machine sees it — a database on a private address
+    /// reached from an app server (2026-10-05). Nil: through this machine's own Terminal, to
+    /// itself. A service id rather than a machine id, because a service keeps its id when the
+    /// library merges duplicate machines.
+    var tunnelServiceID: UUID?
     /// Refuse every statement that is not a read on this service. Enforced on the connection
     /// itself (`ReadOnlyDatabaseConnection`), not by hiding buttons, because five of the app's
     /// write paths call the driver directly rather than going through `executeQuery`.
@@ -135,6 +141,7 @@ struct DatabaseConnectionConfig: Identifiable, Codable, Hashable {
         username: String = "root",
         defaultDatabase: String? = nil,
         usesHostTunnel: Bool = false,
+        tunnelServiceID: UUID? = nil,
         isReadOnly: Bool = false,
         rowPageSize: Int? = nil,
         databaseCredentialPolicy: CredentialStoragePolicy = .appOnly,
@@ -156,6 +163,7 @@ struct DatabaseConnectionConfig: Identifiable, Codable, Hashable {
         self.username = username
         self.defaultDatabase = defaultDatabase
         self.usesHostTunnel = usesHostTunnel
+        self.tunnelServiceID = usesHostTunnel ? tunnelServiceID : nil
         self.isReadOnly = isReadOnly
         self.rowPageSize = rowPageSize.map { Self.clampedRowPageSize($0) }
         self.databaseCredentialPolicy = databaseCredentialPolicy
@@ -173,7 +181,7 @@ struct DatabaseConnectionConfig: Identifiable, Codable, Hashable {
     private enum CodingKeys: String, CodingKey {
         case schemaVersion
         case id, name, engine, host, port, username, defaultDatabase
-        case usesHostTunnel, isReadOnly, rowPageSize
+        case usesHostTunnel, tunnelServiceID, isReadOnly, rowPageSize
         case databaseCredentialPolicy
         case useTLS, tlsVerification, tlsCertificate
         case isFavorite, colorTag, dateAdded, lastConnected, tags
@@ -197,6 +205,7 @@ struct DatabaseConnectionConfig: Identifiable, Codable, Hashable {
         usesHostTunnel = try values.decodeIfPresent(Bool.self, forKey: .usesHostTunnel)
             ?? values.decodeIfPresent(Bool.self, forKey: .useSSHTunnel)
             ?? false
+        tunnelServiceID = usesHostTunnel ? try values.decodeIfPresent(UUID.self, forKey: .tunnelServiceID) : nil
         isReadOnly = try values.decodeIfPresent(Bool.self, forKey: .isReadOnly) ?? false
         // Re-clamped on read, not only in the UI: a hand-edited or corrupt value must not
         // become a page size the grid cannot render.
@@ -237,6 +246,7 @@ struct DatabaseConnectionConfig: Identifiable, Codable, Hashable {
         try values.encode(username, forKey: .username)
         try values.encodeIfPresent(defaultDatabase, forKey: .defaultDatabase)
         try values.encode(usesHostTunnel, forKey: .usesHostTunnel)
+        try values.encodeIfPresent(tunnelServiceID, forKey: .tunnelServiceID)
         try values.encode(isReadOnly, forKey: .isReadOnly)
         try values.encodeIfPresent(rowPageSize, forKey: .rowPageSize)
         try values.encode(databaseCredentialPolicy, forKey: .databaseCredentialPolicy)

@@ -852,10 +852,57 @@ public final class GlassShellModel: GlassServiceStore {
     /// considered and rejected: `makeSetupDraft()` has no host, so it would cover only half the
     /// cases — exactly the one-and-done sheet that creates a host and its services in one save.
     public func hostAccess(for id: HostID) -> GlassCapabilityHostAccess {
-        guard let host = host(id) else { return GlassCapabilityHostAccess(address: nil) }
+        guard let host = host(id) else {
+            return GlassCapabilityHostAccess(address: nil, tunnelChoices: tunnelChoices(excluding: nil),
+                                             openForwardThrough: forwardThroughProvider(),
+                                             resolveTrustThrough: trustThroughResolver())
+        }
         return GlassCapabilityHostAccess(address: host.address,
                                          openForward: portForwardProvider(for: host),
-                                         resolveTrust: hostTrustResolver(for: host))
+                                         resolveTrust: hostTrustResolver(for: host),
+                                         tunnelChoices: tunnelChoices(excluding: host.id),
+                                         openForwardThrough: forwardThroughProvider(),
+                                         resolveTrustThrough: trustThroughResolver())
+    }
+
+    // MARK: Tunnelling through another machine (2026-10-05)
+
+    /// Machines whose Terminal service can carry a tunnel for another: every machine but this
+    /// device and `excluded`, with an SSH service on the record that carries the machine's
+    /// address (`sshMember`, the same rule as this machine's own tunnel). In library order.
+    public func tunnelChoices(excluding excluded: HostID?) -> [GlassTunnelChoice] {
+        guard registry.capability(for: .ssh) != nil else { return [] }
+        return hosts.compactMap { host in
+            guard !host.isLocal, host.id != excluded, let member = sshMember(of: host),
+                  let ssh = member.services.first(where: { $0.kind == .ssh }) else { return nil }
+            return GlassTunnelChoice(serviceID: ssh.endpointID, machineName: host.displayName)
+        }
+    }
+
+    /// The machine record that owns an SSH service, for a tunnel through it. Nil when the
+    /// service is gone, belongs to this device, or is not an SSH service.
+    private func tunnelMember(for service: EndpointID) -> HostProfile? {
+        guard let host = host(owningEndpoint: service), !host.isLocal,
+              let member = host.record(owning: service),
+              member.services.contains(where: { $0.endpointID == service && $0.kind == .ssh }) else { return nil }
+        return member
+    }
+
+    private func forwardThroughProvider()
+    -> (@MainActor @Sendable (EndpointID, String, Int) async throws -> any GlassHostPortForward)? {
+        guard let capability = registry.capability(for: .ssh) else { return nil }
+        return { [weak self] service, remoteHost, port in
+            guard let member = self?.tunnelMember(for: service) else { throw GlassPortForwardError.tunnelMachineGone }
+            return try await capability.openPortForward(host: member, toHost: remoteHost, port: port)
+        }
+    }
+
+    private func trustThroughResolver() -> (@MainActor @Sendable (EndpointID) async -> GlassHostTrustOutcome)? {
+        guard let capability = registry.capability(for: .ssh) else { return nil }
+        return { [weak self] service in
+            guard let member = self?.tunnelMember(for: service) else { return .unavailable }
+            return await capability.resolveHostTrust(host: member)
+        }
     }
 
     /// The forward provider for a host, or nil when there is nothing to borrow: the machine has

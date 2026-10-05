@@ -1129,3 +1129,13 @@ under each machine, the tmux sessions running on the host that this device is no
 or attached elsewhere — to attach, take over or end. Stage 2 (later, not approved yet): a synced
 "open the same set here" for a host's terminals and databases. Plan and evidence:
 `tasks/2026-10/2026-10-01_tmux-sessions.md`.
+
+## D45 — A database reached through another machine — Approved 2026-10-05
+**Owner:** "I have to ssh into a machine, then connect to a DB server on a private IP address from
+that machine. I can't see a way to do that with our current settings." Offered two shapes; the
+owner chose **its own machine**: the database server is a host in the library at its private
+address, and its database service's **Connect** picker chooses "Through <machine>" — another
+machine's Terminal service carries the tunnel to the database's own address. Stored as
+`DatabaseConnectionConfig.tunnelServiceID` (a service id, which survives the library merging
+duplicate machines). The rejected shape: a "database address as seen from this machine" field on
+the jump machine's own service. Evidence: `tasks/2026-10/2026-10-05_db-through-another-machine.md`.

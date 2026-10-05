@@ -29,12 +29,40 @@ public struct GlassCapabilityHostAccess: Sendable {
     /// Supplied by the shell alongside `openForward`, from the same capability.
     private let resolveTrust: (@MainActor @Sendable () async -> GlassHostTrustOutcome)?
 
+    /// Other machines whose Terminal service can carry a tunnel for this one (2026-10-05): a
+    /// database on a private address, reachable only from an app server.
+    public let tunnelChoices: [GlassTunnelChoice]
+    private let openForwardThrough: (@MainActor @Sendable (EndpointID, String, Int) async throws -> any GlassHostPortForward)?
+    private let resolveTrustThrough: (@MainActor @Sendable (EndpointID) async -> GlassHostTrustOutcome)?
+
     public init(address: String?,
                 openForward: (@MainActor @Sendable (String, Int) async throws -> any GlassHostPortForward)? = nil,
-                resolveTrust: (@MainActor @Sendable () async -> GlassHostTrustOutcome)? = nil) {
+                resolveTrust: (@MainActor @Sendable () async -> GlassHostTrustOutcome)? = nil,
+                tunnelChoices: [GlassTunnelChoice] = [],
+                openForwardThrough: (@MainActor @Sendable (EndpointID, String, Int) async throws -> any GlassHostPortForward)? = nil,
+                resolveTrustThrough: (@MainActor @Sendable (EndpointID) async -> GlassHostTrustOutcome)? = nil) {
         self.address = address
         self.openForward = openForward
         self.resolveTrust = resolveTrust
+        self.tunnelChoices = tunnelChoices
+        self.openForwardThrough = openForwardThrough
+        self.resolveTrustThrough = resolveTrustThrough
+    }
+
+    /// Opens a local port that reaches `remoteHost:port` **as the machine owning `service` sees
+    /// it** — that machine's Terminal service carries the tunnel. The caller closes it.
+    public func forwardPort(through service: EndpointID, toHost remoteHost: String,
+                            port: Int) async throws -> any GlassHostPortForward {
+        guard let openForwardThrough else { throw GlassPortForwardError.unavailable }
+        guard (1...65_535).contains(port) else { throw GlassPortForwardError.invalidPort(port) }
+        return try await openForwardThrough(service, remoteHost, port)
+    }
+
+    /// Settles the host-key trust of the machine owning `service`, as `resolveHostTrust()` does
+    /// for this host's own (D14).
+    public func resolveHostTrust(through service: EndpointID) async -> GlassHostTrustOutcome {
+        guard let resolveTrustThrough else { return .unavailable }
+        return await resolveTrustThrough(service)
     }
 
     /// Whether `forwardPort` can succeed at all: the host has an SSH service and a registered
@@ -64,6 +92,17 @@ public struct GlassCapabilityHostAccess: Sendable {
     public func resolveHostTrust() async -> GlassHostTrustOutcome {
         guard let resolveTrust else { return .unavailable }
         return await resolveTrust()
+    }
+}
+
+/// A machine whose Terminal service can carry a tunnel for another: its SSH service and the
+/// machine's name, for a "Reach it through" picker.
+public struct GlassTunnelChoice: Identifiable, Hashable, Sendable {
+    public let serviceID: EndpointID
+    public let machineName: String
+    public var id: EndpointID { serviceID }
+    public init(serviceID: EndpointID, machineName: String) {
+        self.serviceID = serviceID; self.machineName = machineName
     }
 }
 
@@ -143,6 +182,8 @@ public enum GlassPortForwardError: Error, LocalizedError {
     case commitOutcomeUnknown(String)
     /// The host has no SSH service, no capability owns `.ssh`, or the host is this device.
     case unavailable
+    /// The machine chosen to tunnel through, or its Terminal service, is no longer in the library.
+    case tunnelMachineGone
     case invalidPort(Int)
     /// The machine's SSH host key is not trusted yet. A background tunnel must not prompt for a
     /// fingerprint and must never trust one silently, so the user is sent to the Terminal service.
@@ -152,6 +193,8 @@ public enum GlassPortForwardError: Error, LocalizedError {
         switch self {
         case .unavailable:
             "This machine has no Terminal service to tunnel through. Add one, or connect directly."
+        case .tunnelMachineGone:
+            "The machine this database is reached through, or its Terminal service, is no longer in the library. Edit the database and choose how to reach it."
         case .invalidPort(let port):
             "\(port) is not a usable TCP port."
         case .hostNotTrusted(let name):

@@ -50,11 +50,22 @@ Most database servers accept connections only from their own machine. The tunnel
 
 1. Make sure the host has a Terminal service.
 2. Edit the database service and open **Advanced**.
-3. Turn on **Reach it through this machine's Terminal service**.
+3. Turn on **Reach it through this machine's Terminal service**. When other machines in your library have a Terminal service, this is a **Connect** menu instead: choose **Through this machine's Terminal**.
 4. Set **Port** to the port the database listens on, on that machine.
 5. Choose **Save**.
 
-The forward goes to `127.0.0.1` at that port, as the host's machine sees it. A database on another machine belongs to that machine's host.
+The forward goes to `127.0.0.1` at that port, as the host's machine sees it.
+
+## Reach a database through another machine
+
+Some databases sit on a private network that only one machine can reach — an app server in front of a production database, for example. Connect to that machine over SSH, then to the database's private address from there:
+
+1. Add the database server as its own host, with its private address (for example `192.0.2.12`).
+2. Add the database service to it, and open **Advanced**.
+3. In **Connect**, choose **Through** and the machine that can reach it — the app server. That machine needs a Terminal service.
+4. Choose **Save**.
+
+When you connect, the app signs in to the app server with its Terminal service's credential and host-key trust, then opens a tunnel from there to the database's address and port. The database server needs no SSH of its own. If that machine, or its Terminal service, is later removed from the library, the database says so and asks you to choose again.
 
 When you turn the tunnel on for a saved host, the app checks the machine's SSH host key right away. The row then reports one of these:
 
@@ -67,4 +78,4 @@ If the host has no Terminal service, the row says so. You can still save, but co
 While a tunnelled session is open, **Connection Details** shows a **Tunnel** row with the local port in use.
 
 > [!TIP]
-> If a direct connection fails because the server did not answer, the message suggests turning the tunnel on. If a tunnelled connection fails the same way, check that the database is running and listening on the port you entered.
+> If a direct connection fails because the server did not answer, the message suggests turning the tunnel on. If a tunnelled connection fails the same way, check that the database is running and listening on the port you entered. Through another machine, also check that the database accepts connections from that machine.

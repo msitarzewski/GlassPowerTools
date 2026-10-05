@@ -83,6 +83,37 @@ struct GlassShellPortForwardTests {
         #expect(ssh.requests[0].host == "Box")
     }
 
+    @Test("Through another machine: the choices are other machines with a Terminal, and the forward ends at the given address from there")
+    func forwardsThroughAnotherMachine() async throws {
+        let registry = GlassCapabilityRegistry()
+        let ssh = ForwardingCapability()
+        registry.register(ssh)
+        let (model, root) = try makeModel(registry: registry)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let app = try await model.addHost(displayName: "App", address: "203.0.113.5")
+        let appTerminal = try await model.addService(kind: .ssh, displayName: "Terminal", to: app.id)
+        let db = try await model.addHost(displayName: "Production DB", address: "10.0.0.12")
+        _ = try await model.addService(kind: .database, displayName: "MySQL", to: db.id)
+        _ = try await model.addHost(displayName: "No terminal", address: "10.0.0.13")
+
+        let access = model.hostAccess(for: db.id)
+        #expect(!access.canForwardPorts, "the database server has no Terminal of its own")
+        #expect(access.tunnelChoices.map(\.machineName) == ["App"])
+        #expect(access.tunnelChoices.first?.serviceID == appTerminal.endpointID)
+        #expect(model.hostAccess(for: app.id).tunnelChoices.isEmpty, "a machine is not offered as its own way through")
+
+        _ = try await access.forwardPort(through: appTerminal.endpointID, toHost: "10.0.0.12", port: 3_306)
+        #expect(ssh.requests.count == 1)
+        #expect(ssh.requests[0].host == "App" && ssh.requests[0].remoteHost == "10.0.0.12" && ssh.requests[0].port == 3_306)
+
+        // A Terminal service that has gone is said plainly, not tunnelled somewhere else.
+        await #expect(throws: GlassPortForwardError.self) {
+            _ = try await access.forwardPort(through: EndpointID(), toHost: "10.0.0.12", port: 3_306)
+        }
+        #expect(ssh.requests.count == 1)
+    }
+
     @Test("A host with no SSH service cannot forward, and says so instead of failing late")
     func noSSHServiceMeansNoForward() async throws {
         let registry = GlassCapabilityRegistry()
