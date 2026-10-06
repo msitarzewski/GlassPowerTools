@@ -113,11 +113,19 @@ final class DesktopMTKView: MTKView {
         #if !os(macOS)
         if !hasInputGestures {
             addGestureRecognizer(UIHoverGestureRecognizer(target: self, action: #selector(hover(_:))))
+            // Two fingers on the glass.
             let scroll = UIPanGestureRecognizer(target: self, action: #selector(scrollGesture(_:)))
-            scroll.allowedScrollTypesMask = .all
             scroll.minimumNumberOfTouches = 2
             scroll.maximumNumberOfTouches = 2
             addGestureRecognizer(scroll)
+            // Scroll events with no touch at all: a trackpad or mouse wheel on an iPad, and a Mac's
+            // trackpad driving Vision Pro. They carry zero touches, so the two-touch recognizer
+            // above never saw them — a two-finger swipe on a MacBook's trackpad did not scroll the
+            // remote desktop on the headset (2026-10-05). Scroll events only, no touches.
+            let wheel = UIPanGestureRecognizer(target: self, action: #selector(scrollGesture(_:)))
+            wheel.allowedScrollTypesMask = .all
+            wheel.allowedTouchTypes = []
+            addGestureRecognizer(wheel)
             // Pinch zooms this window's own image. It never touches the remote desktop, so it works
             // even on a host that cannot resize, and it runs alongside the two-finger scroll.
             // visionOS is excluded on purpose: there a pinch is the system's select gesture, so
