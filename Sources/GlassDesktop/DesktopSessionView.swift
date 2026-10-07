@@ -138,6 +138,9 @@ public struct DesktopSessionView: View {
                         DesktopMetalSurface(session: session, inputEnabled: remoteInputEnabled)
                         cursor(in: geometry.size)
                     }
+                    #if os(visionOS)
+                    .modifier(DesktopPinchProbe())
+                    #endif
                     #if !os(visionOS)
                     .rotation3DEffect(.degrees(reduceMotion ? 0 : session.presentation.pitch), axis: (x: 1, y: 0, z: 0))
                     .rotation3DEffect(.degrees(reduceMotion ? 0 : session.presentation.yaw), axis: (x: 0, y: 1, z: 0))
