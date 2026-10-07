@@ -191,9 +191,16 @@ extension View {
     }
 
     @ViewBuilder
-    func databaseLookScrollEnabled() -> some View {
+    /// Every database scroll view's platform behaviour: look-to-scroll on Vision Pro, and on the
+    /// Mac a hard top edge. The window hides SwiftUI's toolbar background for its own frosted
+    /// title band, which sits *behind* the content — so content scrolled up drew over the toolbar,
+    /// the overview's big heading printing through the window title (2026-10-05). The hard scroll
+    /// edge effect is the system's answer for content under a bar on macOS.
+    func databaseScrollBehavior() -> some View {
         #if os(visionOS)
         scrollInputBehavior(.enabled, for: .look)
+        #elseif os(macOS)
+        scrollEdgeEffectStyle(.hard, for: .top)
         #else
         self
         #endif

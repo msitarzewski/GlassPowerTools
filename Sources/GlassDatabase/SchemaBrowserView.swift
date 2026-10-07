@@ -400,7 +400,7 @@ struct SchemaBrowserView: View {
                 .tag(WorkspaceSelection.database(database))
             }
         }
-        .databaseLookScrollEnabled()
+        .databaseScrollBehavior()
         // **The sidebar follows the tab.** A table shown any other way — from the diagram, a
         // Follow Reference, a new window — is disclosed and scrolled to, as if navigated to here
         // (owner, 2026-09-30: double-clicking a diagram card opened the table and left its

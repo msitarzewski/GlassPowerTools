@@ -66,7 +66,7 @@ struct ConnectionOverviewView: View {
             }
             .padding(28)
         }
-        .databaseLookScrollEnabled()
+        .databaseScrollBehavior()
         #if os(macOS)
         .glassActiveConnectionsLastInToolbar(isActive: isWorkspaceActive)
         .toolbar {
@@ -633,7 +633,7 @@ struct DatabaseDetailView: View {
             }
             .padding(28)
         }
-        .databaseLookScrollEnabled()
+        .databaseScrollBehavior()
         #if os(macOS)
         .glassActiveConnectionsLastInToolbar(isActive: isWorkspaceActive)
         .toolbar {
@@ -963,7 +963,7 @@ struct TableStatisticsPreviewView: View {
             }
             .padding(28)
         }
-        .databaseLookScrollEnabled()
+        .databaseScrollBehavior()
         #if os(macOS)
         .glassActiveConnectionsLastInToolbar()
         .toolbar {

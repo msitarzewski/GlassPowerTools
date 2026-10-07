@@ -3312,7 +3312,7 @@ struct DataTabView: View {
                     }
                 }
                 .scrollIndicators(.visible)
-                .databaseLookScrollEnabled()
+                .databaseScrollBehavior()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -5467,7 +5467,7 @@ struct StructureTabView: View {
                     }
                     .padding(20)
                 }
-                .databaseLookScrollEnabled()
+                .databaseScrollBehavior()
             }
         }
         .overlay {
@@ -5840,7 +5840,7 @@ struct DDLTabView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                         .padding(20)
                 }
-                .databaseLookScrollEnabled()
+                .databaseScrollBehavior()
             }
         }
         .task(id: "\(database).\(table)") {
@@ -5984,7 +5984,7 @@ struct IndexesTabView: View {
                     }
                     .padding(20)
                 }
-                .databaseLookScrollEnabled()
+                .databaseScrollBehavior()
             }
         }
         .overlay {
@@ -6236,7 +6236,7 @@ struct ForeignKeysTabView: View {
                     }
                     .padding(20)
                 }
-                .databaseLookScrollEnabled()
+                .databaseScrollBehavior()
             }
         }
         .overlay {
