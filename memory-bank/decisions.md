@@ -1139,3 +1139,10 @@ machine's Terminal service carries the tunnel to the database's own address. Sto
 `DatabaseConnectionConfig.tunnelServiceID` (a service id, which survives the library merging
 duplicate machines). The rejected shape: a "database address as seen from this machine" field on
 the jump machine's own service. Evidence: `tasks/2026-10/2026-10-05_db-through-another-machine.md`.
+
+## D46 — Hand gestures for remote desktops on Vision Pro — Proposed 2026-10-06
+**Owner:** "palm up click-drag = scrollwheel" and "pinch hold > [n secs] should be right click maybe".
+**Proposed:** palm-toward-you pinch-drag scrolls; pinch-and-hold still right-clicks; quick pinch clicks,
+pinch-and-move drags. Measured palm direction separates cleanly (task note). The pose needs a SwiftUI
+spatial gesture that takes all input and has no mouse buttons, so the owner's idea — behave by device —
+becomes a hands mode and a trackpad mode switched on what is in use. Not approved or built.

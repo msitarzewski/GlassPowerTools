@@ -20,6 +20,9 @@ All four capabilities and the shell are built and in daily use on the owner's Ma
 | Remote desktops: RDP (RDPKit) and VNC (VNCKit), certificate policy, resize following the window, audio, clipboard | built | unit (RDPKit 1,015 tests), server (Windows 11 with NLA — 2026-09-14 and again 2026-09-27; a GNOME RDP server), device (Mac, iPhone) |
 | Editor: documents, projects on this device and over SFTP, New File, first save into a project, viewers, Markdown preview with Mermaid, 16 grammars, TextKit 1 on the Mac (D36) | built | unit, UI on iPhone simulator, server (7 live remote-editing tests), device (Mac) |
 | Acknowledgements and licence notices (generated, guarded by tests) | built | unit |
+| Database through another machine, or to a private address through its own machine's Terminal (D45, 2026-10-05) | built | unit, server (scratch tunnel to a network address); owner's production server through its app server |
+| RDP in-session bandwidth measurements answered with the bytes received (2026-10-05) | built | unit, server (Windows 11 VM: 0 bytes before, real counts after) |
+| Trackpad scroll events drive the remote desktop on iPad and Vision Pro (2026-10-06) | built | device (owner, Vision Pro with a Mac's trackpad) |
 | Terminals kept in tmux sessions; Active lists sessions running on hosts (D44 stage 1, 2026-10-01) | built | unit, server (scratch: create, leave, reattach, end; missing-tmux path); not yet on a device |
 
 Package suite: about **1,790 tests**. The last full run with the screen unlocked passed (1,777, early
@@ -49,8 +52,10 @@ profile, notarization, deploying the site), the behaviour findings listed in `ac
 
 ## Not verified
 
-- **Vision Pro:** the headset runs 0.4.123; nothing since has been seen on it, including Settings as
-  an ornament tab view. Its pairing with the Mac needs to be restored.
+- **Vision Pro:** runs 0.4.283 (2026-10-06); the owner has used desktops and trackpad scrolling on
+  it. The tmux, database and visionOS window changes since 0.4.254 have not been gone through on it.
+- **Database scroll edge on the Mac** (hard top edge so content does not print through the
+  toolbar): built, not seen — no screen capture without screen-recording permission.
 - **The D26 two-device acceptance run:** add a host with a key on one device, connect from another
   without re-approving trust.
 - **UI tests cannot reach a database or desktop surface:** both need live fixtures that a simulator

@@ -27,18 +27,44 @@ anything touching real servers (SSH and database tests use the disposable test V
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
-## 2026-10-01 — desktop passwords and tmux (D44)
+## 2026-10-07 — where things stand
 
-Installed: Mac, Vision Pro and iPhone 0.4.272 (2026-10-02). Nothing pushed.
-- **Desktop passwords lost on every device:** most likely the library folding a duplicate desktop
-  link whose record shared the survivor's credential; removing it deleted the shared, synced
-  password. Removal now keeps a credential another record still uses, and a changed password
-  keeps its credential ID. The owner re-enters the lost passwords once. No log evidence (the Mac
-  keeps errors only), so the cause is inferred from the code and the symptoms.
-- **D44 stage 1 built:** per-server "Keep Sessions Running with tmux", one session per terminal,
-  reattach on reconnect, Active lists sessions running on hosts (open, take over, end). Live test
-  passes on scratch (tmux 3.6). Stage 2 (synced "open the same set here") not started.
-  Detail: `tasks/2026-10/2026-10-01_tmux-sessions.md`.
+**Installed:** Mac 0.4.281, iPhone 0.4.280, Vision Pro 0.4.283 (the pinch-measuring build; normal
+unless launched with `GLASS_PINCH_PROBE=1`). Everything committed; nothing pushed.
+
+Built and committed 2026-10-01 → 07 (task notes in `tasks/2026-10/`):
+- Desktop passwords lost on every device (inferred: a merged duplicate's shared credential deleted)
+  — fixed; password changes keep their credential ID.
+- **D44 tmux stage 1:** terminals in tmux, offered once per server, reattach on reconnect, Active
+  lists sessions running on hosts, Detach wording, tmux-aware close confirmations, AI assistant and
+  Open Folder Here ask tmux for the directory. Stage 2 (synced "open the same set here") not started.
+- Green "connected" dots on services; an opened running session leaves Active's list.
+- iPhone landscape terminal (phone layout on every iPhone, Tools in the top bar, true row count);
+  AI fixes that are advice are never run; icons in every machine menu.
+- **RDP in-session bandwidth measurements** reported 0 bytes (only payload PDUs counted) — fixed and
+  verified live against the Windows 11 VM; likely part of the owner's slow desktops on the headset.
+- **D45 database through another machine,** and a Database address for a tunnel through the
+  database's own machine (the shape the owner actually used; verified on the owner's server).
+- The Active Connections bolt is last on the right on every Mac toolbar (database panes add it
+  themselves; measured with an off-screen toolbar layout test, confirmed by the owner).
+- Trackpad scroll events reach the remote desktop (a Mac's trackpad driving Vision Pro; confirmed).
+- Database scroll views use a hard top scroll edge on the Mac — **not yet seen by the owner**.
+
+**Open, owner's call:**
+- **D46 (Proposed): palm-up pinch-drag = scroll, pinch-and-hold = right-click on Vision Pro.**
+  Measured: palm direction is the pinch pose's `up` (right hand) / `−up` (left), z toward the viewer;
+  away ≈ −0.8, toward +0.68 (right) / +0.40 (left); threshold +0.2. The pose comes only from a SwiftUI
+  `SpatialEventGesture`, which takes all input and carries no mouse buttons, so the trackpad's
+  two-finger right-click would be lost. Proposed fix: switch between a hands mode and a trackpad
+  mode on what is in use. Pending: does trackpad hover still reach UIKit while the gesture is on?
+- The slow production query (100 rows, 9.5 s): our tunnel and MySQL path measured fast on scratch
+  (50 MB of rows in 0.2 s); the owner was given two queries to split data volume from the server.
+- Vision Pro tab bars expanding together across windows; release steps (Sparkle key, Developer ID
+  profile, site deploy, scrub, history rewrite and first push — owner's word only).
+
+**Headset connection:** it was unreachable for days because a full-tunnel VPN on the Mac blocked local
+network discovery; once LAN access was allowed it appeared. Installing over a running app on the
+headset does not restart it — relaunch with `devicectl device process launch --terminate-existing`.
 
 ## Paused 2026-09-28 (evening) — where to pick up
 

@@ -71,6 +71,7 @@ source applications are obsolete and no longer compile.
 | [Dependencies and the audit's fixes](tasks/2026-09/2026-09-27_release-audit-fixes.md) | What moved and what is blocked upstream; each public-release audit finding, its fix and its proof |
 | [Help, site and updates](tasks/2026-09/2026-09-27_help-site-and-updates.md) | 35 help pages audited from the code, glasspowertools.com and its generator, Sparkle and the release script, and the defects the audit found |
 | [September tasks](tasks/2026-09/README.md) | Monthly index |
+| [October tasks](tasks/2026-10/README.md) | Monthly index: tmux (D44), database through another machine (D45), RDP bandwidth, iPhone landscape, Vision Pro input (D46 proposed) |
 
 This project is `~/Software/glass/GlassPowerTools`. `../GlassEditorKit` was **absorbed on 2026-09-14**
 — it was already in production behind the SQL, record and SFTP editors, so it was never a future
