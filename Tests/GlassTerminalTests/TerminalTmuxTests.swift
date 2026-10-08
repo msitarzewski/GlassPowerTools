@@ -144,21 +144,10 @@ struct TerminalTmuxTests {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("tmux-scroll-\(UUID().uuidString.prefix(8))")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
-        func sh(_ command: String) -> String {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/bin/sh")
-            process.arguments = ["-c", command]
-            // A private tmux server: TMUX_TMPDIR moves its default socket.
-            process.environment = ["TMUX_TMPDIR": folder.path, "PATH": "/usr/bin:/bin"]
-            let pipe = Pipe()
-            process.standardOutput = pipe
-            process.standardError = pipe
-            try? process.run()
-            process.waitUntilExit()
-            return String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-        }
+        // A private tmux server: TMUX_TMPDIR moves its default socket.
+        func sh(_ command: String) -> String { Self.shell(command, ["TMUX_TMPDIR": folder.path, "PATH": "/usr/bin:/bin"]) }
         let tmux = TerminalTmuxTests.tmux!
-        _ = sh("\(tmux) -f /dev/null new-session -d -s glass-7 -x 80 -y 10 'seq 1 200; sleep 30'")
+        _ = sh("\(tmux) -f /dev/null new-session -d -s glass-7 -x 80 -y 10 'seq 1 200; sleep 600'")
         // The private server by its socket: named, tmux never falls back to the default one.
         defer { _ = sh("\(tmux) -S \(folder.path)/tmux-\(getuid())/default kill-server") }
         Thread.sleep(forTimeInterval: 0.3)
@@ -217,7 +206,7 @@ struct TerminalTmuxTests {
         let tmux = TerminalTmuxTests.tmux!
         #expect(TerminalTmux.parse(Self.shell(TerminalTmux.listCommand, environment)) == .sessions([]),
                 "no server running: nothing runs, which is not a failure")
-        _ = Self.shell("\(tmux) -f /dev/null new-session -d -s glass-1 -x 80 -y 10 'sleep 30'", environment)
+        _ = Self.shell("\(tmux) -f /dev/null new-session -d -s glass-1 -x 80 -y 10 'sleep 600'", environment)
         defer { _ = Self.shell("\(tmux) -S \(folder.path)/tmux-\(getuid())/default kill-server", environment) }
         guard case .sessions(let sessions) = TerminalTmux.parse(Self.shell(TerminalTmux.listCommand, environment)) else {
             Issue.record("not read as a list")
@@ -241,16 +230,7 @@ struct TerminalTmuxTests {
     }
 
     nonisolated static func shell(_ command: String, _ environment: [String: String]) -> String {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/sh")
-        process.arguments = ["-c", command]
-        process.environment = environment
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-        try? process.run()
-        process.waitUntilExit()
-        return String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        LiveProcess.run("/bin/sh", ["-c", command], environment: environment, includingErrors: true).output
     }
 
     @Test("when the host's sessions cannot be listed, a new terminal never takes glass-1")
@@ -504,16 +484,24 @@ struct TerminalTmuxTests {
         let environment = ["PATH": "/usr/bin:/bin", "TMUX_TMPDIR": folder.path]
         defer { _ = Self.shell("\(TerminalTmux.quoted(tmux)) -S \(TerminalTmux.quoted(socket)) kill-server", environment) }
 
-        // Each session runs `sleep`, not the login shell and its dotfiles.
+        // Each session runs `sleep`, not the login shell and its dotfiles — long enough to outlast a
+        // slow, busy test run; the teardown ends the server.
         let candidates = TerminalTmux.claimCandidates(avoiding: [])
-        let script = TerminalTmux.claimScript(candidates: candidates, command: ["/bin/sleep", "30"],
+        let script = TerminalTmux.claimScript(candidates: candidates, command: ["/bin/sleep", "600"],
                                               tmux: TerminalTmux.quoted(tmux), serverArguments: server)
-        let answers = await withTaskGroup(of: String.self) { group in
-            for _ in 0..<8 { group.addTask { Self.shell(script, environment) } }
-            var answers: [String] = []
-            for await answer in group { answers.append(answer) }
-            return answers
+        // Real threads, not the task pool: eight blocking waits there queued behind the other live
+        // tests for most of a minute, and the sessions' sleeps ran out (2026-10-08).
+        nonisolated final class Answers: @unchecked Sendable {
+            private let lock = NSLock()
+            private var values: [String] = []
+            func append(_ value: String) { lock.withLock { values.append(value) } }
+            var all: [String] { lock.withLock { values } }
         }
+        let answers = await Task.detached {
+            let answers = Answers()
+            DispatchQueue.concurrentPerform(iterations: 8) { _ in answers.append(Self.shell(script, environment)) }
+            return answers.all
+        }.value
         let claimed = answers.compactMap { answer -> String? in
             if case .created(let name) = TerminalTmux.parseClaim(answer, candidates: candidates) { return name }
             return nil
@@ -521,7 +509,7 @@ struct TerminalTmuxTests {
         #expect(claimed.count == 8 && Set(claimed).count == 8, "\(answers)")
         #expect(Set(claimed) == Set(candidates.prefix(8)), "the lowest numbers, none skipped")
 
-        let one = TerminalTmux.claimScript(candidates: ["glass-1"], command: ["/bin/sleep", "30"],
+        let one = TerminalTmux.claimScript(candidates: ["glass-1"], command: ["/bin/sleep", "600"],
                                            tmux: TerminalTmux.quoted(tmux), serverArguments: server)
         #expect(TerminalTmux.parseClaim(Self.shell(one, environment), candidates: ["glass-1"]) == .exists("glass-1"))
         let listed = Self.shell("\(TerminalTmux.quoted(tmux)) -S \(TerminalTmux.quoted(socket)) list-sessions -F '#{session_name}'", environment)

@@ -250,7 +250,7 @@ struct MacLocalTmuxTests {
         defer { try? FileManager.default.removeItem(at: folder) }
         let environment = ["PATH": "/usr/bin:/bin", "TMUX_TMPDIR": folder.path]
         _ = MacLocalTmux.run(tmux, ["-f", "/dev/null", "new-session", "-d", "-s", "glass-1", "-c", folder.path,
-                                    "-x", "80", "-y", "10", "sleep 30"], environment: environment)
+                                    "-x", "80", "-y", "10", "sleep 600"], environment: environment)
         // The private server by its socket: named, tmux never falls back to the default one.
         defer { _ = MacLocalTmux.run(tmux, ["-S", "\(folder.path)/tmux-\(getuid())/default", "kill-server"], environment: environment) }
         let listing = MacLocalTmux.run("/bin/sh", ["-c", TerminalTmux.listScript(tmux: TerminalTmux.quoted(tmux))],
@@ -390,7 +390,7 @@ struct MacLocalTmuxTests {
         defer { _ = MacLocalTmux.run(tmux, ["-S", socket, "kill-server"], environment: environment) }
         // `sleep` in place of the login shell, so no dotfiles run.
         func claim(_ candidates: [String]) -> TerminalTmux.Claim {
-            let script = TerminalTmux.claimScript(candidates: candidates, directory: launch.directory, command: ["/bin/sleep", "30"],
+            let script = TerminalTmux.claimScript(candidates: candidates, directory: launch.directory, command: ["/bin/sleep", "600"],
                                                   tmux: TerminalTmux.quoted(tmux), serverArguments: ["-S", socket, "-f", "/dev/null"])
             return MacLocalTmux.run("/bin/sh", ["-c", script], environment: environment)
                 .map { TerminalTmux.parseClaim($0, candidates: candidates) } ?? .failed
