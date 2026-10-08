@@ -18,6 +18,8 @@ struct MacLocalTmuxTests {
         private var _killed: [String] = []
         private var _detached: [String] = []
         private var _scrolled: [(String, Int)] = []
+        private var _claims: [(candidates: [String], launch: MacLocalTmux.Launch)] = []
+        private var _takesFirstOffered = false
         var scrolled: [(String, Int)] { lock.withLock { _scrolled } }
         var running: Set<String> {
             get { lock.withLock { _running } }
@@ -25,6 +27,12 @@ struct MacLocalTmuxTests {
         }
         var killed: [String] { lock.withLock { _killed } }
         var detached: [String] { lock.withLock { _detached } }
+        var claims: [(candidates: [String], launch: MacLocalTmux.Launch)] { lock.withLock { _claims } }
+        /// Someone else makes the first name a claim offers just before it runs: after the list.
+        var takesFirstOffered: Bool {
+            get { lock.withLock { _takesFirstOffered } }
+            set { lock.withLock { _takesFirstOffered = newValue } }
+        }
 
         var server: MacLocalTmux.Server {
             MacLocalTmux.Server(
@@ -39,7 +47,22 @@ struct MacLocalTmuxTests {
                     }
                 },
                 detachClients: { name, _ in self.lock.withLock { self._detached.append(name) } },
-                scroll: { name, lines, _ in self.lock.withLock { self._scrolled.append((name, lines)) } }
+                scroll: { name, lines, _ in self.lock.withLock { self._scrolled.append((name, lines)) } },
+                // `new-session -d` refuses a running name; the next is tried.
+                claim: { candidates, launch, _ in
+                    self.lock.withLock {
+                        self._claims.append((candidates, launch))
+                        if self._takesFirstOffered, let first = candidates.first { self._running.insert(first) }
+                        for name in candidates {
+                            if !self._running.contains(name) {
+                                self._running.insert(name)
+                                return "created \(name)\n"
+                            }
+                            if candidates.count == 1 { return "exists \(name)\n" }
+                        }
+                        return "__glass_tmux_failed__\n"
+                    }
+                }
             )
         }
     }
@@ -260,6 +283,127 @@ struct MacLocalTmuxTests {
         defaults.set(false, forKey: UserDefaultsKeys.localTmux)
         #expect(localTab(defaults, id: id).state.root?.panes.first?.intent.localTmuxSession == name,
                 "off, and tmux could not say: the saved session is kept, not dropped")
+    }
+
+    // MARK: Claiming a name (2026-10-08)
+    //
+    // A name chosen from the list was started with `new-session -A`, which joins a session that
+    // took the name in between — or a running `glass-1` when the list could not be read. The
+    // claim makes the session first, and refuses a running name.
+
+    @Test("a name taken after the list was read is skipped, never joined")
+    func takenMidClaim() async throws {
+        try await withFake { fake, defaults in
+            defaults.set(true, forKey: UserDefaultsKeys.localTmux)
+            fake.running = ["glass-1"]
+            fake.takesFirstOffered = true
+            let name = try #require(localTab(defaults).state.root?.panes.first?.intent.localTmuxSession)
+            let claim = try #require(fake.claims.last, "the name is claimed, not just chosen")
+            #expect(!claim.candidates.contains("glass-1"), "the list is read first")
+            #expect(name != claim.candidates[0], "\(claim.candidates[0]) went to someone else in between")
+            #expect(name == claim.candidates[1])
+        }
+    }
+
+    @Test("the claim makes the session with the pane's folder, shell and environment")
+    func claimLaunch() async throws {
+        try await withFake { fake, defaults in
+            defaults.set(true, forKey: UserDefaultsKeys.localTmux)
+            let fish = "/opt/homebrew/bin/fish"
+            _ = MacWorkspaceController(request: MacWorkspaceTabRequest(workspaceID: UUID(), startsEmpty: false,
+                                                                       initialPaneIntent: .local(shell: fish, directory: "/private/tmp")),
+                                       defaults: defaults)
+            let chosen = try #require(fake.claims.last?.launch)
+            #expect(chosen.directory == "/private/tmp" && chosen.command == [fish, "-l"])
+            #expect(chosen.environment.contains("TERM_PROGRAM=GlassPowerTools") && chosen.environment.contains("TERM=xterm-256color"),
+                    "the pane's environment: a claim that starts tmux's server gives it this")
+            #expect(!chosen.environment.contains { $0.hasPrefix("TMUX=") }, "never the app's own terminal's tmux")
+            let pane = MacLocalTerminalConfiguration.resolve(shell: fish, directory: "/private/tmp", tmuxSession: "glass-1",
+                                                             tmux: "/opt/homebrew/bin/tmux")
+            #expect(pane.environment == chosen.environment && pane.currentDirectory == chosen.directory,
+                    "the same as the pane's own new-session would have used")
+
+            // No folder or shell of its own: the Settings ones, as the pane resolves them.
+            defaults.set("/var/tmp", forKey: UserDefaultsKeys.localWorkingDirectory)
+            defaults.set("", forKey: UserDefaultsKeys.localShell)
+            _ = localTab(defaults)
+            let settings = try #require(fake.claims.last?.launch)
+            #expect(settings.directory == "/var/tmp" && settings.command.isEmpty, "tmux runs the login shell")
+        }
+    }
+
+    @Test("a name restored or opened from Active is never given to another pane, running yet or not")
+    func reserving() async throws {
+        try await withFake { fake, defaults in
+            defaults.set(true, forKey: UserDefaultsKeys.localTmux)
+            let sessionManager = SessionManager(loadImmediately: false)
+            // The name the next new pane would take: claimed once, then let go and ended.
+            let first = localTab(defaults)
+            let pane = try #require(first.focusedPaneID)
+            let name = try #require(first.localTmuxSession(for: pane))
+            first.removePane(pane, sessionManager: sessionManager)
+            fake.running.remove(name)
+
+            var intent = MacWorkspacePaneIntent.local
+            intent.localTmuxSession = name
+            let restored = MacWorkspaceController(request: MacWorkspaceTabRequest(workspaceID: UUID(), startsEmpty: false,
+                                                                                  initialPaneIntent: intent),
+                                                  defaults: defaults)
+            #expect(restored.state.root?.panes.first?.intent.localTmuxSession == name)
+            let next = try #require(localTab(defaults).state.root?.panes.first?.intent.localTmuxSession)
+            #expect(next != name, "\(name) belongs to the restored pane, though tmux is not running it yet")
+            #expect(fake.claims.last?.candidates.contains(name) == false)
+            restored.closeAllSessions(sessionManager: sessionManager)
+        }
+    }
+
+    @Test("when the claim cannot run, a new pane still never takes a low number")
+    func claimUnavailable() async throws {
+        let suite = "MacLocalTmuxTests.\(UUID())"
+        let defaults = try #require(UserDefaults.forTest(suiteName: suite))
+        MacLocalTmux.server = MacLocalTmux.Server(
+            executablePath: { "/opt/homebrew/bin/tmux" },
+            listSessions: { _ in "" },
+            kill: { _, _ in }, detachClients: { _, _ in }, scroll: { _, _, _ in })
+        defer {
+            MacLocalTmux.server = .live
+            defaults.removePersistentDomain(forName: suite)
+        }
+        defaults.set(true, forKey: UserDefaultsKeys.localTmux)
+        let name = try #require(localTab(defaults).state.root?.panes.first?.intent.localTmuxSession)
+        #expect((TerminalTmux.glassNumber(name) ?? 0) >= 100, "the pane's own new-session -A makes it: \(name)")
+    }
+
+    /// The claim as the app runs it — `/bin/sh`, the pane's environment — against a private tmux
+    /// server, named by its socket in every call and started with no configuration.
+    @Test("a claim through sh makes the session in the pane's folder, and gives a new server the pane's environment",
+          .enabled(if: TerminalTmuxTests.tmux != nil))
+    func claimLive() throws {
+        let tmux = try #require(TerminalTmuxTests.tmux)
+        let folder = URL(fileURLWithPath: "/tmp/gpt-\(UUID().uuidString.prefix(8))")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let socket = folder.appendingPathComponent("s").path
+        let launch = MacLocalTerminalConfiguration.tmuxLaunch(shell: nil, directory: folder.path)
+        var environment = launch.environmentVariables
+        environment["TMUX_TMPDIR"] = folder.path
+        defer { _ = MacLocalTmux.run(tmux, ["-S", socket, "kill-server"], environment: environment) }
+        // `sleep` in place of the login shell, so no dotfiles run.
+        func claim(_ candidates: [String]) -> TerminalTmux.Claim {
+            let script = TerminalTmux.claimScript(candidates: candidates, directory: launch.directory, command: ["/bin/sleep", "30"],
+                                                  tmux: TerminalTmux.quoted(tmux), serverArguments: ["-S", socket, "-f", "/dev/null"])
+            return MacLocalTmux.run("/bin/sh", ["-c", script], environment: environment)
+                .map { TerminalTmux.parseClaim($0, candidates: candidates) } ?? .failed
+        }
+
+        #expect(claim(["glass-1", "glass-2"]) == .created("glass-1"))
+        #expect(claim(["glass-1", "glass-2"]) == .created("glass-2"), "glass-1 is running: refused, and the next taken")
+        #expect(claim(["glass-1"]) == .exists("glass-1"))
+        let path = MacLocalTmux.run(tmux, ["-S", socket, "display-message", "-p", "-t", "=glass-1:", "#{pane_current_path}"],
+                                    environment: environment)?.trimmingCharacters(in: .newlines)
+        #expect(path.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path } == folder.resolvingSymlinksInPath().path)
+        #expect(MacLocalTmux.run(tmux, ["-S", socket, "show-environment", "-g", "TERM_PROGRAM"], environment: environment)
+                == "TERM_PROGRAM=GlassPowerTools\n", "the server the claim started has the pane's environment")
     }
 
     @Test("with the setting off nothing changes")

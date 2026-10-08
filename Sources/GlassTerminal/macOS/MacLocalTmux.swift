@@ -17,6 +17,8 @@ import Foundation
 import os
 
 enum MacLocalTmux {
+    private nonisolated static let logger = Logger(subsystem: "sh.glas", category: "local-tmux")
+
     /// The tmux the workspace talks to. Tests put a stand-in here.
     struct Server: Sendable {
         var executablePath: @Sendable () -> String?
@@ -27,6 +29,10 @@ enum MacLocalTmux {
         var detachClients: @Sendable (_ name: String, _ tmux: String) -> Void
         /// Scrolls a session's history `lines` toward earlier output, or back when negative.
         var scroll: @Sendable (_ name: String, _ lines: Int, _ tmux: String) -> Void
+        /// Makes a session under the first free name of `candidates`, as the pane would have:
+        /// `TerminalTmux.claimScript`'s answer, as printed; nil when it could not be run. Stand-ins
+        /// that leave it out could not run it.
+        var claim: @Sendable (_ candidates: [String], _ launch: Launch, _ tmux: String) -> String? = { _, _, _ in nil }
 
         nonisolated static let live = Server(
             executablePath: { MacLocalTmux.executablePath() },
@@ -37,8 +43,31 @@ enum MacLocalTmux {
                 guard let arguments = MacLocalTmux.scrollArguments(session: name, lines: lines) else { return }
                 // One queue, so a quick up-then-down arrives in that order.
                 MacLocalTmux.scrollQueue.async { _ = MacLocalTmux.run(tmux, arguments) }
+            },
+            claim: { candidates, launch, tmux in
+                let script = TerminalTmux.claimScript(candidates: candidates, directory: launch.directory,
+                                                      command: launch.command, tmux: TerminalTmux.quoted(tmux))
+                return MacLocalTmux.run("/bin/sh", ["-c", script], environment: launch.environmentVariables)
             }
         )
+    }
+
+    /// What a local pane's session starts with: its folder, the shell someone chose (tmux runs the
+    /// login shell otherwise) and the pane's environment (`MacLocalTerminalConfiguration`). The
+    /// claim that makes the session needs all three: the pane's own `new-session -A` ignores them
+    /// for a session that exists, and a claim that starts the tmux server gives it its environment.
+    struct Launch: Equatable, Sendable {
+        var directory: String
+        var command: [String]
+        /// `NAME=value`, as a process is given them.
+        var environment: [String]
+
+        nonisolated var environmentVariables: [String: String] {
+            Dictionary(environment.compactMap { entry -> (String, String)? in
+                guard let equals = entry.firstIndex(of: "=") else { return nil }
+                return (String(entry[..<equals]), String(entry[entry.index(after: equals)...]))
+            }, uniquingKeysWith: { _, last in last })
+        }
     }
 
     @MainActor static var server = Server.live
@@ -63,15 +92,33 @@ enum MacLocalTmux {
         return enabled ? allocate() : nil
     }
 
-    /// Names chosen in this process and not yet started, so panes opening together do not share one.
+    /// Names a pane in this process holds — claimed, restored from a saved tab, or opened from
+    /// Active — so another pane is never given one, though it may not be running yet.
     @MainActor private static var reserved: Set<String> = []
 
-    /// A free `glass-N` on this Mac's tmux server. When the sessions cannot be read, a number far
-    /// above those in use, as for a host (`TerminalTmux.unlistedName`): `glass-1` may be running,
-    /// and the pane's `new-session -A` would join it.
-    @MainActor static func allocateName(tmux: String) -> String {
-        let name = listing(tmux: tmux).map { TerminalTmux.nextName(avoiding: Set($0.map(\.name)).union(reserved)) }
-            ?? TerminalTmux.unlistedName(avoiding: reserved)
+    /// A pane keeps `name`: no other pane here is given it.
+    @MainActor static func reserve(_ name: String) {
+        reserved.insert(name)
+    }
+
+    /// A new session on this Mac's tmux server, made by a claim (`TerminalTmux.claimScript`)
+    /// with the pane's folder, shell and environment. The lowest free `glass-N` when the
+    /// sessions read, numbers far above those in use when they do not; a name taken after the
+    /// list was read is skipped, never joined. When the claim cannot run, a number nothing is
+    /// likely to hold, which the pane's `new-session -A` makes.
+    /// - Parameter held: names to leave alone though nothing runs them — W4b: workgroups'.
+    @MainActor static func allocateName(tmux: String, launch: Launch, avoiding held: Set<String> = []) -> String {
+        let taken = reserved.union(held)
+        let candidates = listing(tmux: tmux).map { TerminalTmux.claimCandidates(avoiding: taken.union($0.map(\.name))) }
+            ?? TerminalTmux.unlistedCandidates(avoiding: taken)
+        let name: String
+        if case .created(let created)? = server.claim(candidates, launch, tmux)
+            .map({ TerminalTmux.parseClaim($0, candidates: candidates) }) {
+            name = created
+        } else {
+            logger.error("This Mac's tmux would not make a session; the pane will start one itself")
+            name = TerminalTmux.unlistedName(avoiding: taken.union(candidates))
+        }
         reserved.insert(name)
         return name
     }
@@ -125,7 +172,6 @@ enum MacLocalTmux {
     }
 
     @MainActor private static var refusalsLogged: Set<String> = []
-    nonisolated private static let logger = Logger(subsystem: "sh.glas", category: "tmux")
 
     /// What the session's active pane shows: the directory its shell is in, and the title a
     /// program set. tmux keeps both from the terminal outside it, so a tab in tmux asks.
@@ -232,12 +278,18 @@ enum MacLocalTmux {
         posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, "/dev/null", O_WRONLY, 0)
         posix_spawn_file_actions_addclose(&actions, output[0])
         posix_spawn_file_actions_addclose(&actions, output[1])
+        // Nothing else of the app's: a claim can start the tmux server, which keeps whatever its
+        // first client inherited for as long as it runs — another run's pipe, or a pane's terminal.
+        var attributes: posix_spawnattr_t?
+        posix_spawnattr_init(&attributes)
+        defer { posix_spawnattr_destroy(&attributes) }
+        posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT))
         let argv = ([executable] + arguments).map { strdup($0) } + [nil]
         defer { argv.forEach { free($0) } }
         var pid: pid_t = 0
         let envp = spawnEnvironment(environment).map { strdup($0) } + [nil]
         defer { envp.forEach { free($0) } }
-        let spawned = posix_spawn(&pid, executable, &actions, nil, argv, envp)
+        let spawned = posix_spawn(&pid, executable, &actions, &attributes, argv, envp)
         close(output[1])
         let reader = FileHandle(fileDescriptor: output[0], closeOnDealloc: true)
         guard spawned == 0 else { return nil }

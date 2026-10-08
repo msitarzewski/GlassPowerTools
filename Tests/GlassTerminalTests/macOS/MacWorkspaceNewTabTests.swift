@@ -63,11 +63,13 @@ struct MacWorkspaceNewTabTests {
             let window = MacWorkspaceWindowController(
                 request: MacWorkspaceLaunchRequest(initialPaneIntent: .local), defaults: defaults)
             defer { window.closeAllSessions(sessionManager: SessionManager(loadImmediately: false)) }
+            // The claim makes the session, so compare with what ran before "+".
+            let runningBefore = fake.running
             let tab = try #require(window.addTab())
             let pane = try #require(tab.focusedPaneID)
             let name = try #require(tab.localTmuxSession(for: pane), "the new pane runs in tmux")
             #expect(TerminalTmux.glassNumber(name) != nil)
-            #expect(!fake.running.contains(name), "not a session already running on the Mac")
+            #expect(!runningBefore.contains(name), "not a session already running on the Mac")
             let others = window.tabs.filter { $0 !== tab }
                 .flatMap { $0.state.root?.panes.compactMap(\.intent.localTmuxSession) ?? [] }
             #expect(!others.isEmpty && !others.contains(name), "not the session another tab holds")

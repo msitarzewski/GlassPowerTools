@@ -568,15 +568,27 @@ final class MacWorkspaceController {
                         // Unread, a saved session is kept: it may well be running.
                         return unreadable || running?.contains(name) == true
                     },
-                    allocate: { MacLocalTmux.allocateName(tmux: tmux) }
+                    allocate: { MacLocalTmux.allocateName(tmux: tmux, launch: localTmuxLaunch(for: pane)) }
                 )
             }
+            // Restored, or opened from Active: no other pane is given it, running yet or not.
+            if let session { MacLocalTmux.reserve(session) }
             guard session != pane.intent.localTmuxSession else { continue }
             updated = updated.updatingPane(id: pane.id) { $0.intent.localTmuxSession = session }
         }
         guard updated != root else { return false }
         state.root = updated
         return true
+    }
+
+    /// What the pane will start its session with, as `startLocalPanes` and the pane view resolve
+    /// it: the pane's own shell and folder, else the Settings ones (saved in `defaults`), else
+    /// the login shell and Home. A new pane has no shell running yet, so not `localDirectory(for:)`.
+    private func localTmuxLaunch(for pane: MacWorkspacePane) -> MacLocalTmux.Launch {
+        MacLocalTerminalConfiguration.tmuxLaunch(
+            shell: pane.intent.localShell ?? defaults.string(forKey: UserDefaultsKeys.localShell),
+            directory: pane.intent.localDirectory ?? defaults.string(forKey: UserDefaultsKeys.localWorkingDirectory)
+        )
     }
 
     func requestSSHPane(axis: MacWorkspaceSplitAxis) {

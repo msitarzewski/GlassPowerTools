@@ -18,10 +18,50 @@ struct TerminalTmuxTests {
         return server
     }
 
-    private func session(_ server: ServerConfiguration, writes: Writes,
-                         listing: String, commands: (@MainActor (String) -> Void)? = nil) -> TerminalSession {
+    /// A host's tmux, from memory: the list answers `listing`; a claim makes the first name it
+    /// offers that is not running — those listed, and any taken after the list was read.
+    @MainActor private final class Host {
+        var running: Set<String>
+        var takenBeforeClaim: Set<String> = []
+        private(set) var claims: [[String]] = []
+        init(listing: String) {
+            if case .sessions(let sessions) = TerminalTmux.parse(listing) { running = Set(sessions.map(\.name)) } else { running = [] }
+        }
+
+        /// What the claim's `sh` would print.
+        func claim(_ command: String) -> String? {
+            guard let offered = TerminalTmuxTests.offered(in: command) else { return nil }
+            claims.append(offered)
+            running.formUnion(takenBeforeClaim)
+            for name in offered {
+                if !running.contains(name) {
+                    running.insert(name)
+                    return "created \(name)\n"
+                }
+                if offered.count == 1 { return "exists \(name)\n" }
+            }
+            return "__glass_tmux_failed__\n"
+        }
+    }
+
+    /// The names a claim command offers, read back out of its script; nil for any other command.
+    nonisolated static func offered(in command: String) -> [String]? {
+        guard command.hasPrefix("sh -c '"), command.contains("new-session -d") else { return nil }
+        let script = String(command.dropFirst("sh -c '".count).dropLast()).replacingOccurrences(of: #"'\''"#, with: "'")
+        guard let start = script.range(of: "for c in "),
+              let end = script.range(of: "; do ", range: start.upperBound..<script.endIndex) else { return nil }
+        return script[start.upperBound..<end.lowerBound].split(separator: " ")
+            .map { $0.trimmingCharacters(in: CharacterSet(charactersIn: "'")) }
+    }
+
+    private func session(_ server: ServerConfiguration, writes: Writes, listing: String,
+                         host: Host? = nil, commands: (@MainActor (String) -> Void)? = nil) -> TerminalSession {
         let session = TerminalSession(server: server, terminalWriteSink: { writes.receive($0) })
-        session.tmuxCommandRunner = { command in commands?(command); return listing }
+        let host = host ?? Host(listing: listing)
+        session.tmuxCommandRunner = { command in
+            commands?(command)
+            return host.claim(command) ?? listing
+        }
         return session
     }
 
@@ -156,7 +196,8 @@ struct TerminalTmuxTests {
     func utf8() throws {
         let commands = [TerminalTmux.listCommand, TerminalTmux.currentPathCommand(name: "glass-1"),
                         TerminalTmux.scrollCommand(name: "glass-1", lines: 2), TerminalTmux.scrollCommand(name: "glass-1", lines: -2),
-                        TerminalTmux.killCommand(name: "glass-1"), TerminalTmux.attachLine(name: "glass-1", takeOver: true)]
+                        TerminalTmux.killCommand(name: "glass-1"), TerminalTmux.attachLine(name: "glass-1", takeOver: true),
+                        TerminalTmux.claimCommand(candidates: ["glass-1", "glass-2"])]
         let withoutU = try NSRegularExpression(pattern: #"\btmux (?!-u )"#)
         for command in commands {
             let runs = command.replacingOccurrences(of: "command -v tmux", with: "")
@@ -240,7 +281,7 @@ struct TerminalTmuxTests {
         session.state = .connected
         await session.waitForTmuxAttach()
         await session.waitUntilTerminalWritesComplete()
-        #expect(asked == 1)
+        #expect(asked == 2, "the list and the claim, once")
         #expect(writes.lines.count == 2 && writes.lines[0] == writes.lines[1])
         #expect(writes.lines[0].contains("-s 'glass-1'"))
     }
@@ -359,5 +400,131 @@ struct TerminalTmuxTests {
         #expect(TerminalAdvancedFields.tmuxFootnote(available: nil).contains("Connect to this host once"))
         #expect(TerminalAdvancedFields.tmuxFootnote(available: false).contains("wasn't installed"))
         #expect(TerminalAdvancedFields.tmuxFootnote(available: true).contains("keeps going"))
+    }
+
+    // MARK: Claiming a name (2026-10-08)
+    //
+    // A name chosen from a list and attached with `new-session -A` joined whatever took that name
+    // in between: two devices connecting together landed in one session. The claim makes the
+    // session with `new-session -d`, which refuses a running name, and tries the next.
+
+    @Test("the claim script and what it answers")
+    func claimScript() {
+        #expect(TerminalTmux.claimScript(candidates: ["glass-2", "glass-3"], tmux: "tmux")
+                == #"command -v tmux >/dev/null 2>&1 || { echo __glass_no_tmux__; exit 0; }; "#
+                + #"for c in 'glass-2' 'glass-3'; do tmux -u new-session -d -s "$c" </dev/null >/dev/null 2>&1 && { echo "created $c"; exit 0; }; "#
+                + #"tmux -u has-session -t "=$c" >/dev/null 2>&1 || { echo __glass_tmux_failed__; exit 0; }; continue; done; "#
+                + "echo __glass_tmux_failed__; exit 0")
+        let mac = TerminalTmux.claimScript(candidates: ["glass-1"], directory: "/Users/ann/it's", command: ["/bin/zsh", "-l"],
+                                           tmux: "'/opt/homebrew/bin/tmux'")
+        #expect(mac.contains(#"'/opt/homebrew/bin/tmux' -u new-session -d -s "$c" -c '/Users/ann/it'\''s' '/bin/zsh' '-l' </dev/null"#))
+        #expect(mac.contains(#"echo "exists $c"; exit 0; done"#), "one name asked for: running is an answer, not a reason to go on")
+        #expect(TerminalTmux.claimScript(candidates: (1...40).map { "glass-\($0)" }, tmux: "tmux").contains("'glass-32';"),
+                "at most 32 names")
+        #expect(!TerminalTmux.claimScript(candidates: (1...40).map { "glass-\($0)" }, tmux: "tmux").contains("'glass-33'"))
+        #expect(TerminalTmux.claimCommand(candidates: ["glass-1"]).hasPrefix(#"sh -c 'PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; "#))
+
+        let offered = ["glass-2", "glass-3"]
+        #expect(TerminalTmux.parseClaim("created glass-3\n", candidates: offered) == .created("glass-3"))
+        #expect(TerminalTmux.parseClaim("Welcome!\ncreated glass-2\n", candidates: offered) == .created("glass-2"), "a login script's chatter is skipped")
+        #expect(TerminalTmux.parseClaim("created glass-9\n", candidates: offered) == .failed, "a name not offered is no answer")
+        #expect(TerminalTmux.parseClaim("exists glass-2\n", candidates: offered) == .failed, "with several names, running is not an answer")
+        #expect(TerminalTmux.parseClaim("exists work\n", candidates: ["work"]) == .exists("work"))
+        #expect(TerminalTmux.parseClaim("__glass_tmux_failed__\n", candidates: offered) == .failed)
+        #expect(TerminalTmux.parseClaim("__glass_no_tmux__\n", candidates: offered) == .unavailable)
+        #expect(TerminalTmux.claimCandidates(avoiding: ["glass-1", "glass-3", "work"], count: 3) == ["glass-2", "glass-4", "glass-5"])
+        var sequence = [512, 512, 4_000].makeIterator()
+        #expect(TerminalTmux.unlistedCandidates(avoiding: [], count: 2, random: { sequence.next()! }) == ["glass-512", "glass-4000"])
+    }
+
+    @Test("a name taken between the list and the claim is skipped, never joined")
+    func takenMidClaim() async throws {
+        let writes = Writes()
+        let host = Host(listing: "glass-1\t1\t1\t0\n")
+        host.takenBeforeClaim = ["glass-2"]
+        let session = session(server(tmux: true), writes: writes, listing: "glass-1\t1\t1\t0\n", host: host)
+        _ = session.installStartupCommand("htop")
+        session.state = .connected
+        await session.waitForTmuxAttach()
+        await session.waitUntilTerminalWritesComplete()
+        #expect(host.claims.first?.first == "glass-2", "the claim starts from the list")
+        #expect(session.tmuxSessionName == "glass-3", "glass-2 went to someone else in between")
+        #expect(writes.lines == [" command -v tmux >/dev/null && exec tmux -u new-session -A -s 'glass-3'\n", "htop\n"],
+                "made for this terminal: the startup command follows")
+    }
+
+    @Test("a session this terminal joins never has the startup command typed into it")
+    func startupOnlyWhenCreated() async {
+        let attach = " command -v tmux >/dev/null && exec tmux -u new-session -A -s 'work'\n"
+
+        // Active: joined on purpose, and not claimed.
+        var asked: [String] = []
+        let writes = Writes()
+        let active = session(server(tmux: true), writes: writes, listing: "work\t1\t1\t0\n", commands: { asked.append($0) })
+        active.tmuxSessionName = "work"
+        _ = active.installStartupCommand("htop")
+        active.state = .connected
+        await active.waitForTmuxAttach()
+        active.state = .reconnecting
+        active.state = .connected
+        await active.waitForTmuxAttach()
+        await active.waitUntilTerminalWritesComplete()
+        #expect(asked.isEmpty, "Active's choice is not claimed")
+        #expect(writes.lines == [attach, attach], "the attach line alone, then again on reconnecting")
+        #expect(!active.hasPendingStartupCommand)
+
+        // A name kept from before: claimed. Running, it is joined; ended, it is made again.
+        for (running, expected) in [(true, [attach]), (false, [attach, "htop\n"])] {
+            let writes = Writes()
+            let host = Host(listing: running ? "work\t0\t1\t0\n" : "")
+            let kept = session(server(tmux: true), writes: writes, listing: "", host: host)
+            kept.tmuxSessionName = "work"
+            kept.tmuxClaimsGivenName = true
+            _ = kept.installStartupCommand("htop")
+            kept.state = .connected
+            await kept.waitForTmuxAttach()
+            await kept.waitUntilTerminalWritesComplete()
+            #expect(host.claims == [["work"]])
+            #expect(writes.lines == expected, running ? "exists: the attach line only" : "created: the attach line, then the command")
+        }
+    }
+
+    /// Eight claims at once through `sh` against a private tmux server — named by its socket in
+    /// every call, and started with no configuration, so neither the real server nor the owner's
+    /// `~/.tmux.conf` is ever touched.
+    @Test("eight claims at once take eight names; a claim for one running name answers exists",
+          .enabled(if: TerminalTmuxTests.tmux != nil))
+    func claimingLive() async throws {
+        let tmux = try #require(TerminalTmuxTests.tmux)
+        let folder = URL(fileURLWithPath: "/tmp/gpt-\(UUID().uuidString.prefix(8))")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let socket = folder.appendingPathComponent("s").path
+        let server = ["-S", socket, "-f", "/dev/null"]
+        let environment = ["PATH": "/usr/bin:/bin", "TMUX_TMPDIR": folder.path]
+        defer { _ = Self.shell("\(TerminalTmux.quoted(tmux)) -S \(TerminalTmux.quoted(socket)) kill-server", environment) }
+
+        // Each session runs `sleep`, not the login shell and its dotfiles.
+        let candidates = TerminalTmux.claimCandidates(avoiding: [])
+        let script = TerminalTmux.claimScript(candidates: candidates, command: ["/bin/sleep", "30"],
+                                              tmux: TerminalTmux.quoted(tmux), serverArguments: server)
+        let answers = await withTaskGroup(of: String.self) { group in
+            for _ in 0..<8 { group.addTask { Self.shell(script, environment) } }
+            var answers: [String] = []
+            for await answer in group { answers.append(answer) }
+            return answers
+        }
+        let claimed = answers.compactMap { answer -> String? in
+            if case .created(let name) = TerminalTmux.parseClaim(answer, candidates: candidates) { return name }
+            return nil
+        }
+        #expect(claimed.count == 8 && Set(claimed).count == 8, "\(answers)")
+        #expect(Set(claimed) == Set(candidates.prefix(8)), "the lowest numbers, none skipped")
+
+        let one = TerminalTmux.claimScript(candidates: ["glass-1"], command: ["/bin/sleep", "30"],
+                                           tmux: TerminalTmux.quoted(tmux), serverArguments: server)
+        #expect(TerminalTmux.parseClaim(Self.shell(one, environment), candidates: ["glass-1"]) == .exists("glass-1"))
+        let listed = Self.shell("\(TerminalTmux.quoted(tmux)) -S \(TerminalTmux.quoted(socket)) list-sessions -F '#{session_name}'", environment)
+        #expect(listed.split(separator: "\n").count == 8, "exists made nothing")
     }
 }

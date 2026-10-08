@@ -91,4 +91,31 @@ struct WorkgroupsSyncTests {
         await eventually { !mac.layoutPresets.contains { $0.id == preset.id } }
         #expect(!mac.layoutPresets.contains { $0.id == preset.id }, "deleting travels")
     }
+
+    /// D51's clock was never written: after a relaunch every workgroup counted from when it was
+    /// made, so an edit not yet sent could lose to an older copy from another device.
+    @Test("when a workgroup was last saved survives a relaunch, and stays its sync clock")
+    func savedTimeSurvivesRelaunch() throws {
+        var preset = LayoutPreset(name: "Builds", serverIDs: [UUID()], createdAt: Date(timeIntervalSince1970: 1_000))
+        preset.modifiedAt = Date(timeIntervalSince1970: 2_000.25)
+        let decoded = try JSONDecoder().decode(LayoutPreset.self, from: JSONEncoder().encode(preset))
+        #expect(decoded.modifiedAt == preset.modifiedAt)
+        var old = try JSONSerialization.jsonObject(with: JSONEncoder().encode(preset)) as! [String: Any]
+        old.removeValue(forKey: "modifiedAt")
+        #expect(try JSONDecoder().decode(LayoutPreset.self, from: JSONSerialization.data(withJSONObject: old)).modifiedAt == nil,
+                "a workgroup saved before it had one still reads, counting from createdAt")
+
+        let suite = "WorkgroupsSync.\(UUID())"
+        let defaults = try #require(UserDefaults.forTest(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = SettingsManager(loadImmediately: false, settingsDefaults: defaults)
+        settings.upsertLayoutPreset(preset)
+        let saved = try #require(settings.layoutPresets.first?.modifiedAt)
+        #expect(saved > preset.createdAt)
+
+        let relaunched = SettingsManager(loadImmediately: false, settingsDefaults: defaults)
+        relaunched.loadLayoutPresets()
+        #expect(relaunched.layoutPresets.first?.modifiedAt == saved)
+        #expect(relaunched.workgroupsPayload.records.first?.changedAt == saved, "not createdAt")
+    }
 }

@@ -91,4 +91,55 @@ struct LiveTmuxTests {
         #expect(try await waitFor(transport) { !$0.contains { $0.name == name } })
         await second.close()
     }
+
+    /// W4a (2026-10-08): a new terminal's session is made by a claim over the exec channel, not by
+    /// the line typed into its shell. When that claim starts the host's tmux server, the server
+    /// takes the exec channel's environment. Two private servers (`-L`), each started one way;
+    /// the shell inside each writes what it sees, and the two should agree.
+    @Test func claimedSessionSeesWhatATypedOneSees() async throws {
+        guard let transport = try await transport() else { return }
+        defer { Task { await transport.close() } }
+        guard case .sessions = try await sessions(transport) else {
+            print("tmux is not installed on the test host: nothing to compare")
+            return
+        }
+        let id = UUID().uuidString.prefix(8).lowercased()
+        let claimed = "gpt-claim-\(id)", typed = "gpt-typed-\(id)"
+        func run(_ script: String) async throws -> String {
+            try await transport.execute("sh -c " + TerminalTmux.quoted(#"PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; "# + script + "; exit 0"))
+        }
+        func tmux(_ label: String) -> String { "tmux -u -L \(label)" }
+
+        let claim = try await run(TerminalTmux.claimScript(candidates: ["glass-1"], tmux: "tmux", serverArguments: ["-L", claimed]))
+        #expect(TerminalTmux.parseClaim(claim, candidates: ["glass-1"]) == .created("glass-1"))
+        let shell = try await transport.openShell(pty: SSHPTYRequest(columns: 100, rows: 30))
+        try await shell.sendCommand(" command -v tmux >/dev/null && exec \(tmux(typed)) new-session -A -s glass-1")
+        for _ in 0..<50 {
+            if try await run("\(tmux(typed)) has-session -t '=glass-1' 2>/dev/null && echo up") == "up\n" { break }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+
+        var seen: [String: String] = [:]
+        for label in [claimed, typed] {
+            let file = "/tmp/\(label).env"
+            _ = try await run("\(tmux(label)) send-keys -t '=glass-1:' -l 'env > \(file)' && \(tmux(label)) send-keys -t '=glass-1:' Enter")
+            for _ in 0..<100 where seen[label]?.isEmpty != false {
+                seen[label] = try await run("cat \(file) 2>/dev/null")
+                if seen[label]?.isEmpty != false { try await Task.sleep(for: .milliseconds(100)) }
+            }
+            _ = try await run("rm -f \(file); \(tmux(label)) kill-server")
+        }
+        await shell.close()
+        func variables(_ env: String?) -> [String: String] {
+            Dictionary((env ?? "").split(separator: "\n").map(String.init).compactMap { line -> (String, String)? in
+                guard let equals = line.firstIndex(of: "="),
+                      ["PATH", "LANG", "LC_ALL", "LC_CTYPE"].contains(String(line[..<equals])) else { return nil }
+                return (String(line[..<equals]), String(line[line.index(after: equals)...]))
+            }, uniquingKeysWith: { _, last in last })
+        }
+        let fromClaim = variables(seen[claimed]), fromTyped = variables(seen[typed])
+        print("claimed: \(fromClaim)\ntyped:   \(fromTyped)")
+        #expect(!fromTyped.isEmpty, "the typed session's shell answered")
+        #expect(fromClaim == fromTyped, "PATH and locale inside a claimed session match a typed one")
+    }
 }

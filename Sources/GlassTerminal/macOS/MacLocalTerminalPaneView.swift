@@ -674,14 +674,12 @@ enum MacLocalTerminalConfiguration {
             ?? FileManager.default.homeDirectoryForCurrentUser.path
         let processEnvironment = environment(from: ProcessInfo.processInfo.environment)
         if let tmuxSession, let tmux = tmux ?? MacLocalTmux.executablePath() {
-            // tmux runs the login shell itself; a shell someone chose is passed as the session's
-            // command, which tmux uses only when it creates the session.
+            let launch = tmuxLaunch(shell: shell, directory: directory)
             return SwiftTermLocalProcessConfiguration(
                 executable: tmux,
-                arguments: MacLocalTmux.arguments(session: tmuxSession, directory: currentDirectory)
-                    + (requestedShell.map { [$0, "-l"] } ?? []),
-                environment: processEnvironment,
-                currentDirectory: currentDirectory
+                arguments: MacLocalTmux.arguments(session: tmuxSession, directory: launch.directory) + launch.command,
+                environment: launch.environment,
+                currentDirectory: launch.directory
             )
         }
         return SwiftTermLocalProcessConfiguration(
@@ -689,6 +687,17 @@ enum MacLocalTerminalConfiguration {
             arguments: ["-l"],
             environment: processEnvironment,
             currentDirectory: currentDirectory
+        )
+    }
+
+    /// What a pane's tmux session starts with (D47): the pane's folder, and the environment below.
+    /// tmux runs the login shell itself; a shell someone chose is the session's command, which tmux
+    /// uses only when it creates the session — so the claim that creates it passes the same.
+    static func tmuxLaunch(shell: String?, directory: String?) -> MacLocalTmux.Launch {
+        MacLocalTmux.Launch(
+            directory: expandedPath(directory) ?? FileManager.default.homeDirectoryForCurrentUser.path,
+            command: expandedPath(shell).map { [$0, "-l"] } ?? [],
+            environment: environment(from: ProcessInfo.processInfo.environment)
         )
     }
 

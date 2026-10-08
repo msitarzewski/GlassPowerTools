@@ -415,7 +415,7 @@ class TerminalSession: Identifiable, Hashable {
     private var startupCommandTicket: TerminalStartupCommandTicket?
 
     // MARK: tmux (D44)
-    /// The tmux session this terminal lives in. Chosen on the first connect, or given by Active
+    /// The tmux session this terminal lives in. Claimed on the first connect, or given by Active
     /// when attaching to a session already running; every reconnect attaches to it again.
     var tmuxSessionName: String?
     /// The first attach detaches any other client — Active's "Take Over".
@@ -431,9 +431,14 @@ class TerminalSession: Identifiable, Hashable {
     /// channel on this session's own transport.
     var tmuxCommandRunner: (@MainActor (String) async throws -> String)?
     private var tmuxTask: Task<Void, Never>?
-    /// Names chosen on this device and not yet visible in the host's list, per server, so two
-    /// terminals opening at once do not both choose `glass-1`.
-    private static var reservedTmuxNames: [UUID: Set<String>] = [:]
+    /// `tmuxSessionName` was kept from before — W4b: a workgroup's saved session — rather than
+    /// chosen in Active to join: the first attach claims it, making it again if it has ended.
+    var tmuxClaimsGivenName = false
+    /// Names a new session never takes, though the host may not be running them — W4b: those
+    /// saved workgroups hold.
+    var tmuxNamesHeld: (@MainActor () -> Set<String>)?
+    /// The session was made for this terminal and the startup command has not followed yet.
+    private var tmuxSessionIsNew = false
 
     init(
         server: ServerConfiguration,
@@ -828,52 +833,114 @@ class TerminalSession: Identifiable, Hashable {
         purpose == .terminal && !tmuxUnavailable && (tmuxSessionName != nil || server.keepsSessionsInTmux)
     }
 
-    /// Types the attach line once the shell is up, after choosing a name the first time. The
-    /// workgroup's startup command, when there is one, follows it — inside the new tmux session.
+    /// Types the attach line once the shell is up, after claiming a name the first time. The
+    /// workgroup's startup command, when there is one, follows it — only into a session made for
+    /// this terminal. One it joins is running something already, and the command would be typed
+    /// into that (2026-10-08).
     private func attachTmux() {
         tmuxTask?.cancel()
         tmuxTask = Task { [weak self] in
             guard let self else { return }
             if tmuxSessionName == nil {
-                var taken = Self.reservedTmuxNames[server.id] ?? []
-                var listed = false
-                do {
-                    switch TerminalTmux.parse(try await listTmuxSessionsRetryingOnce()) {
-                    case .unavailable:
-                        guard state == .connected, !Task.isCancelled else { return }
-                        tmuxAvailabilityObserved?(false)
-                        tmuxUnavailable = true
-                        showLocalNotice("tmux isn't installed on \(server.name), so this terminal stops when you disconnect. "
-                            + "Install tmux there to keep it running, or turn off Keep Sessions Running with tmux for this server.")
-                        dispatchStartupCommandIfNeeded()
-                        return
-                    case .sessions(let sessions):
-                        tmuxAvailabilityObserved?(true)
-                        taken.formUnion(sessions.map(\.name))
-                        listed = true
-                    case .failed:
-                        tmuxAvailabilityObserved?(true)
-                        Logger.ssh.error("tmux answered the session list with something other than a list")
-                    }
-                } catch {
-                    Logger.ssh.error("tmux list failed: \(error.localizedDescription, privacy: .public)")
-                }
-                guard state == .connected, !Task.isCancelled else { return }
-                // Without the host's list, `glass-1` may well be running — and the attach line
-                // joins a session of that name, so a new terminal landed in someone's work
-                // (2026-10-08, a Vision Pro opening a Mac's terminal). Unlisted, take a number
-                // nothing is likely to hold.
-                let name = listed ? TerminalTmux.nextName(avoiding: taken) : TerminalTmux.unlistedName(avoiding: taken)
-                Self.reservedTmuxNames[server.id, default: []].insert(name)
-                tmuxSessionName = name
+                guard await claimNewTmuxSession() else { return }
+            } else if tmuxClaimsGivenName, let given = tmuxSessionName {
+                guard await claimGivenTmuxSession(given) else { return }
             }
             guard state == .connected, !Task.isCancelled, let name = tmuxSessionName else { return }
             let data = Data((TerminalTmux.attachLine(name: name, takeOver: tmuxTakesOver) + "\n").utf8)
             tmuxTakesOver = false
             recorder?.recordInput(data)
             enqueueTerminalWrite(data, presentsFailure: true)
-            dispatchStartupCommandIfNeeded()
+            if tmuxSessionIsNew {
+                tmuxSessionIsNew = false
+                dispatchStartupCommandIfNeeded()
+            } else {
+                startupCommandTicket = nil
+            }
         }
+    }
+
+    /// Claims a name for a new terminal: the lowest free `glass-N` when the host's list reads,
+    /// numbers far above those in use when it does not. Without the claim, two devices choosing
+    /// from one list both attached to the same name (2026-10-08). False when the attach should
+    /// not follow: tmux is missing, or the terminal went away.
+    private func claimNewTmuxSession() async -> Bool {
+        let held = tmuxNamesHeld?() ?? []
+        var candidates: [String]?
+        do {
+            switch TerminalTmux.parse(try await listTmuxSessionsRetryingOnce()) {
+            case .unavailable:
+                guard state == .connected, !Task.isCancelled else { return false }
+                hostHasNoTmux()
+                return false
+            case .sessions(let sessions):
+                tmuxAvailabilityObserved?(true)
+                candidates = TerminalTmux.claimCandidates(avoiding: held.union(sessions.map(\.name)))
+            case .failed:
+                tmuxAvailabilityObserved?(true)
+                Logger.ssh.error("tmux answered the session list with something other than a list")
+                candidates = TerminalTmux.unlistedCandidates(avoiding: held)
+            }
+        } catch {
+            Logger.ssh.error("tmux list failed: \(error.localizedDescription, privacy: .public)")
+        }
+        guard state == .connected, !Task.isCancelled else { return false }
+        if let candidates {
+            if case .created(let name) = await claimTmuxSession(candidates) {
+                tmuxSessionName = name
+                tmuxSessionIsNew = true
+                return true
+            }
+            guard state == .connected, !Task.isCancelled else { return false }
+        }
+        // The host could not be asked, or would not say: a number nothing is likely to hold,
+        // which the attach line makes. New all the same, so the startup command follows.
+        tmuxSessionName = TerminalTmux.unlistedName(avoiding: held.union(candidates ?? []))
+        tmuxSessionIsNew = true
+        return true
+    }
+
+    /// Claims a name this terminal kept: made again when it has ended — and only then does the
+    /// startup command run — joined when it is still running.
+    private func claimGivenTmuxSession(_ name: String) async -> Bool {
+        tmuxClaimsGivenName = false
+        let claim = await claimTmuxSession([name])
+        guard state == .connected, !Task.isCancelled else { return false }
+        switch claim {
+        case .created:
+            tmuxAvailabilityObserved?(true)
+            tmuxSessionIsNew = true
+        case .exists:
+            tmuxAvailabilityObserved?(true)
+        case .unavailable:
+            hostHasNoTmux()
+            return false
+        case .failed:
+            // Unknown whether it runs: attach (`-A` makes it if not), and type nothing into it.
+            break
+        }
+        return true
+    }
+
+    private func claimTmuxSession(_ candidates: [String]) async -> TerminalTmux.Claim {
+        do {
+            let output = try await runTmuxCommand(TerminalTmux.claimCommand(candidates: candidates))
+            let claim = TerminalTmux.parseClaim(output, candidates: candidates)
+            if claim == .failed { Logger.ssh.error("tmux would not make a session under any name it was offered") }
+            return claim
+        } catch {
+            Logger.ssh.error("tmux claim failed: \(error.localizedDescription, privacy: .public)")
+            return .failed
+        }
+    }
+
+    /// The host has no tmux: this terminal is an ordinary shell, and its startup command runs there.
+    private func hostHasNoTmux() {
+        tmuxAvailabilityObserved?(false)
+        tmuxUnavailable = true
+        showLocalNotice("tmux isn't installed on \(server.name), so this terminal stops when you disconnect. "
+            + "Install tmux there to keep it running, or turn off Keep Sessions Running with tmux for this server.")
+        dispatchStartupCommandIfNeeded()
     }
 
     /// A terminal without the setting still asks whether the host has tmux, once per connection,
@@ -2351,6 +2418,7 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
         case serverIDs
         case createdAt
         case lastUsed
+        case modifiedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -2360,6 +2428,7 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
         colorTag = try container.decodeIfPresent(ServerColorTag.self, forKey: .colorTag) ?? .blue
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         lastUsed = try container.decodeIfPresent(Date.self, forKey: .lastUsed)
+        modifiedAt = try container.decodeIfPresent(Date.self, forKey: .modifiedAt)
         workspaceLayout = try container.decodeIfPresent(WorkspaceLayout.self, forKey: .workspaceLayout)
         openingView = try container.decodeIfPresent(OpeningView.self, forKey: .openingView) ?? .tabs
         autoFocusOnActivity = try container.decodeIfPresent(Bool.self, forKey: .autoFocusOnActivity) ?? false
@@ -2389,5 +2458,6 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
         try container.encodeIfPresent(gridCardWidth, forKey: .gridCardWidth)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encodeIfPresent(lastUsed, forKey: .lastUsed)
+        try container.encodeIfPresent(modifiedAt, forKey: .modifiedAt)
     }
 }
