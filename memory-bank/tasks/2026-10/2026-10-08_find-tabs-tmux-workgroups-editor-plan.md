@@ -507,7 +507,29 @@ commit. The coordinator brings each tested diff over, runs every suite, and owns
 | W5 editor: one project per window, one Open… | 50f6cae | 15 routing tests plus menu-owner checks; iOS and visionOS compile |
 | W4a claimed tmux names; startup command only when created; D51 `modifiedAt` | 7054c63 | 11 new tests, including 8 concurrent live claims giving 8 names; iOS compiles |
 
-After W4a: terminal 498, shell 212, editor 132 and editor UI 114 tests pass. Release 0.4.301 (W0) is installed. 0.4.302 (all of the above) is built and waits for the owner's word.
+| W1 find: one bar, tmux's own search, Edit ▸ Find with ⌘F/⌘G/⇧⌘G; Grid ⌥⌘G, Carousel ⌥⇧⌘G | a2a3d6f | 14 tests, including live tmux in emacs and vi `mode-keys`; iOS and visionOS compile |
+| Live tests spawn without leaking descriptors (rule 63) | fa3a746 | terminal suite back from 87 s to 11 s; the "known flaky" theme test now passes every run |
+| W7b layouts survive a crash; running sessions offered back at launch | ca5af94 | 16 restoration tests; six loss paths reproduced and fixed |
+| W7c a tmux pane detached from elsewhere stays and offers Reattach | 5cc28db | policy test proven to fail without it |
+| W7a no Workgroups window (D52); SwiftUI alone owns split views (rule 62) | fde5940 | crash not reproduced in a stand-in or the real window under programmatic resizing; the exception is SwiftUI removing a toolbar observer twice inside a re-entered layout |
+
+Installed: 0.4.301 (W0) at 13:08, then **0.4.304** at 14:12 (everything up to W7c), on the owner's
+word: "I can't use the app... the windows won't load at all". At launch it offered the 14 running
+sessions back, and the owner reopened them all: "They may not be organized the way I had them
+(workgroups and so on) but they're OPEN!" **0.4.305** (W7a) is built and waits for the owner's word.
+All suites pass: terminal 531, shell 221, editor 132, editor UI 114, database 307, connection UI 30,
+connection kit 23.
+
+**State loss, the owner's answers:** no tabs closed by themselves; no Take Over from another
+device; Move Tab to New Window was used today. That matches W7b's path B: the window lost its moved
+tab after a crash and saved itself empty. It does not account for every tab record having gone.
+Nothing in the installed build deletes tab records, so the remainder is unexplained. The new
+logging would show it next time.
+
+**In progress:** W4b, workgroups keep their sessions (owner's next step: arrange windows, then save
+them as workgroups). **Then:** W6 (Active shows what runs; sessions browser), and D53's spike if
+approved. **Seen at 0.4.304's launch, not yet looked at:** "FocusedValue update tried to update
+multiple times per frame". W1's `\.glassFindItem` publishes a focused value, so check it first.
 
 **Crash, 13:01–13:05 (0.4.300, four reports, same stack).** An `NSRangeException` came from AppKit when SwiftUI removed a window's toolbar (`setToolbar:` → `_showHideToolbar`) inside a constraint pass. The toolbar's removal handed the first responder back, so a layout ran inside the constraint update. The owner's trigger: Window ▸ Workgroups, then resizing that window. That is a `NavigationSplitView` with a searchable sidebar, whose split view our column autosave also renames on every update, so it has two owners. **W7a:** reproduce outside the owner's app, give each split view one owner, and fold the standalone Workgroups window into Connections. The owner: "It's weird that we have a separate window for that anyway… It's inline in the connections window".
 

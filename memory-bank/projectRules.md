@@ -482,3 +482,18 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     a code name needs a decoder, and a decoder is the same leak kept somewhere else. Describe events
     in plain words — "the Linux server", "the Mac" — and keep genuinely private working details in
     a git-ignored location, never in tracked files. The repository is public (2026-09-26).
+62. **SwiftUI owns the windows and split views it makes.** Do not set AppKit properties on them:
+    no `autosaveName` on a `NavigationSplitView`'s split view, and no toolbar visibility changed
+    from AppKit as well as from SwiftUI. The library's column autosave renamed SwiftUI's split
+    views. AppKit then restored layouts SwiftUI had not asked for, such as a collapsed sidebar
+    SwiftUI thought was shown. A window whose toolbar SwiftUI swapped in the middle of a layout
+    crashed the app four times in four minutes (2026-10-08, `fde5940`). One owner, every time.
+63. **A test's tmux never reaches the default server, and never inherits the test's descriptors.**
+    When `TMUX_TMPDIR` names a folder that does not exist, tmux silently uses the default server,
+    which holds the owner's live sessions. Create a short folder (`/tmp/gpt-<hex>`) first, and name
+    the socket with `-S` on every command that changes state and on every teardown. Spawn through
+    `LiveProcess.run` (`posix_spawn` with `POSIX_SPAWN_CLOEXEC_DEFAULT`), never `Process`: a tmux
+    server keeps every descriptor it inherits for its whole life. One test's server held another
+    test's pipe, the read waited a minute on the main actor, and the whole suite slowed from 11 s to
+    87 s with timing failures (2026-10-08, `fa3a746`). The app's own tmux runs spawn the same way
+    (`MacLocalTmux.run`).

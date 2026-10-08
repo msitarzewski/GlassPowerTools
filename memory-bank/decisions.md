@@ -1202,3 +1202,22 @@ deletion leaves a dated tombstone (kept 90 days) so it travels; on a tie the wor
 deletion. When it was last opened and its per-device SSH substitutions stay on the device, so opening
 one sends nothing.
 
+
+## D52 — Workgroups live in Connections; no separate window — Implemented 2026-10-08
+**Owner:** the app crashed while resizing the separate Workgroups window. "It's weird that we have a
+separate window for that anyway, isn't it? It's inline in the connections window?" The window was
+glas.sh's, kept through the merge. **Decision:** removed on macOS and visionOS. Window ▸ Workgroups
+and Library ▸ Workgroups bring the Connections window forward on Workgroups, opening one if none is
+open (`fde5940`). The library's column autosave went with it (rule 62). Column widths now come from
+SwiftUI's own per-window autosave.
+
+## D53 — Workgroups as tmux sessions through control mode — Proposed 2026-10-08
+**Owner:** "Is there a way to provide a nice Apple polished interface to tmux sessions on a given
+host?" and "can we use [tmux windows] to attach tmux sessions to our workgroup tabs?"
+**Proposed, not approved:** the app becomes a tmux control-mode client (`tmux -CC`), as iTerm2 is.
+A workgroup on one host is one tmux session, its tabs that session's windows, and its splits the
+windows' panes, all drawn natively, with native scrollback, find and selection. The layout lives on
+the host, so a crash or another device brings it back as it was. Limit: a session lives on one
+host, so a workgroup spanning hosts is one session per host. **Before deciding:** a spike against
+the scratch VM. **Near term instead:** W4b (each tab remembers its own session) and a sessions
+browser per host in Active (W6).

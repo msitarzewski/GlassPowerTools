@@ -29,7 +29,7 @@ anything touching real servers (SSH and database tests use the disposable test V
 
 ## 2026-10-08 — where things stand
 
-**Installed:** Mac 0.4.300, iPhone 0.4.296, Vision Pro 0.4.296. Everything committed; nothing pushed.
+**Installed:** Mac 0.4.304 (2026-10-08 14:12; 0.4.305 built, waiting), iPhone 0.4.296, Vision Pro 0.4.296. Everything committed; nothing pushed.
 **The owner works in Claude Code inside a local tmux tab in the app** (`glass-1`): a Mac install no
 longer ends the session, and the app reopens tmux windows after a quit. **Standing permission: install
 Mac builds as soon as they are built** (detached installer); iPhone and Vision Pro on the owner's word.
