@@ -263,3 +263,15 @@ Three reports from the headset (`devicectl … --domain-type systemCrashLogs`):
   drawing of Claude Code's constant redraws.
 - Owner's idea, not started: drag terminal tabs between windows to consolidate them.
 
+## Draggable tabs, and Active not listing the Mac until connected (2026-10-08, ~02:00)
+
+- 0.4.296 installed on all three (the Mac reattached on its own; the headset has the normal build back).
+- Draggable tabs built and committed (51d585f): sidebar rows drag a private type; `onInsert` on the
+  tab list takes them; `MacWorkspaceWindowController.acceptDroppedTab/moveTab/detachTabForMove/
+  adoptTab`; a window whose last tab leaves keeps a placeholder and closes. 461 terminal tests pass.
+  Mac 0.4.297 built, not installed. Not yet tried by hand.
+- Owner: the Mac's tmux session "doesn't show in Active until I connect manually". Expected only if
+  the headset cannot sign in without asking (password not saved there, or host key not yet trusted):
+  Active's probe never prompts and skips silently. To check: whether the Mac's Terminal service has a
+  saved credential on the headset; Active should say why a machine was skipped.
+
