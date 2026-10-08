@@ -496,7 +496,7 @@ struct MacWorkspaceTests {
         let coordinator = MacTerminalWindowReader.Coordinator()
         var cleanupCount = 0
         coordinator.observeWindowClose(window) { cleanupCount += 1 }
-        coordinator.interceptWindowClose(window, shouldConfirm: { nil })
+        coordinator.interceptWindowClose(window, shouldConfirm: { _ in nil })
 
         #expect(window.delegate === coordinator)
         #expect(!coordinator.windowShouldClose(window))
@@ -518,10 +518,13 @@ struct MacWorkspaceTests {
         let coordinator = MacTerminalWindowReader.Coordinator()
         var confirmationEnabled = true
         coordinator.observeWindowClose(window, action: {})
-        coordinator.interceptWindowClose(window, shouldConfirm: { confirmationEnabled ? "message" : nil })
-        #expect(coordinator.requiresCloseConfirmation && coordinator.closeConfirmationMessage == "message")
+        coordinator.interceptWindowClose(window, shouldConfirm: { quitting in
+            confirmationEnabled ? (quitting ? "quit" : "message") : nil
+        })
+        #expect(coordinator.closeConfirmationMessage == "message")
+        #expect(coordinator.quitConfirmationMessage == "quit")
         confirmationEnabled = false
-        #expect(!coordinator.requiresCloseConfirmation)
+        #expect(coordinator.closeConfirmationMessage == nil && coordinator.quitConfirmationMessage == nil)
         coordinator.restoreWindowDelegate()
         coordinator.stopObservingWindowClose()
         window.close()

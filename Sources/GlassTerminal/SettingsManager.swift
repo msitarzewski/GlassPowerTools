@@ -155,6 +155,8 @@ class SettingsManager {
     // Device-local paths deliberately stay out of portable iCloud preferences.
     var localShell: String = ""
     var localWorkingDirectory: String = ""
+    /// D47: local terminals run in this Mac's tmux, so quitting or updating the app leaves them running.
+    var localTmux: Bool = false
     var bellEnabled: Bool = false
     var visualBell: Bool = true
     var hostKeyVerificationMode: String = HostKeyVerificationMode.ask.rawValue
@@ -274,6 +276,7 @@ class SettingsManager {
         hasLoadedPersistentState = true
         localShell = settingsDefaults.string(forKey: UserDefaultsKeys.localShell) ?? ""
         localWorkingDirectory = settingsDefaults.string(forKey: UserDefaultsKeys.localWorkingDirectory) ?? ""
+        localTmux = settingsDefaults.bool(forKey: UserDefaultsKeys.localTmux)
 
         if settingsDefaults.object(forKey: UserDefaultsKeys.autoReconnect) != nil {
             autoReconnect = settingsDefaults.bool(forKey: UserDefaultsKeys.autoReconnect)
@@ -381,6 +384,7 @@ class SettingsManager {
         settingsDefaults.set(initialTerminalRows, forKey: UserDefaultsKeys.initialTerminalRows)
         settingsDefaults.set(localShell, forKey: UserDefaultsKeys.localShell)
         settingsDefaults.set(localWorkingDirectory, forKey: UserDefaultsKeys.localWorkingDirectory)
+        settingsDefaults.set(localTmux, forKey: UserDefaultsKeys.localTmux)
         settingsDefaults.set(bellEnabled, forKey: UserDefaultsKeys.bellEnabled)
         settingsDefaults.set(visualBell, forKey: UserDefaultsKeys.visualBell)
         settingsDefaults.set(hostKeyVerificationMode, forKey: UserDefaultsKeys.hostKeyVerificationMode)

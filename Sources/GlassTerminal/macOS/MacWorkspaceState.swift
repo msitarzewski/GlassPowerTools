@@ -52,6 +52,10 @@ struct MacWorkspacePaneIntent: Codable, Hashable, Sendable {
     var localDirectory: String? = nil
     var label: String? = nil
     var sourceSessionIndex: Int? = nil
+    /// D47: the tmux session a local pane runs in — Glass's `glass-N`, or one of the user's own
+    /// opened from Active — so the pane reattaches after the app quits. Absent for a plain shell,
+    /// and always for an SSH pane.
+    var localTmuxSession: String? = nil
 
     static let local = MacWorkspacePaneIntent(kind: .local, serverID: nil)
     static func local(shell: String?, directory: String?) -> Self {
@@ -89,6 +93,11 @@ struct MacWorkspacePaneIntent: Codable, Hashable, Sendable {
         self.localDirectory = try container.decodeIfPresent(String.self, forKey: .localDirectory)
         self.label = try container.decodeIfPresent(String.self, forKey: .label)
         self.sourceSessionIndex = try container.decodeIfPresent(Int.self, forKey: .sourceSessionIndex)
+        let tmuxSession = try container.decodeIfPresent(String.self, forKey: .localTmuxSession)
+        guard tmuxSession == nil || (kind == .local && TerminalTmux.isValidSessionName(tmuxSession!)) else {
+            throw MacWorkspaceStateError.invalidPaneIntent
+        }
+        self.localTmuxSession = tmuxSession
     }
 }
 
@@ -204,6 +213,19 @@ indirect enum MacWorkspaceNode: Codable, Hashable, Sendable {
                     second: second
                 ))
             }
+        }
+    }
+
+    func updatingPane(id paneID: UUID, _ update: (inout MacWorkspacePane) -> Void) -> MacWorkspaceNode {
+        switch self {
+        case .pane(var pane):
+            guard pane.id == paneID else { return self }
+            update(&pane)
+            return .pane(pane)
+        case .split(var split):
+            split.first = split.first.updatingPane(id: paneID, update)
+            split.second = split.second.updatingPane(id: paneID, update)
+            return .split(split)
         }
     }
 

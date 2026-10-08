@@ -52,7 +52,8 @@ public final class GlassTerminalRuntime {
         case editServer(ServerConfiguration, hostContext: ServerFormHostContext?)
         case serverInfo(ServerConfiguration)
         case deleteServer(ServerConfiguration)
-        case localTerminal
+        /// `tmux` names a session on this Mac to attach to — Active's Open (D47).
+        case localTerminal(tmux: String? = nil)
         case showWorkgroups
         // (`localTerminal` carries no report: the outcome is claimed by the pane that actually
         // starts a shell — see `expectLocalShell`.)
@@ -172,7 +173,7 @@ public final class GlassTerminalRuntime {
         enqueue(.deleteServer(server))
     }
     /// macOS: a new workspace window with a local shell. Elsewhere this is a no-op.
-    public func requestLocalTerminal() { enqueue(.localTerminal) }
+    public func requestLocalTerminal() { enqueue(.localTerminal()) }
 
     // MARK: The device's own shell (D8)
 

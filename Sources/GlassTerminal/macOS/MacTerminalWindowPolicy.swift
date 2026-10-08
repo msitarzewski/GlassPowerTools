@@ -15,8 +15,9 @@ struct MacTerminalWindowReader: NSViewRepresentable {
     let tabbingIdentifier: String
     var onWindow: (NSWindow) -> Void
     var onClose: () -> Void
-    /// What to ask before the window closes, or nil to close without asking.
-    var shouldConfirmClose: () -> String?
+    /// What to ask before the window closes — or, with `quitting`, before the app quits — or nil
+    /// to go without asking.
+    var shouldConfirmClose: (_ quitting: Bool) -> String?
     var opensSidebarInitially: Bool
     var overviewPresented: Bool
 
@@ -24,7 +25,7 @@ struct MacTerminalWindowReader: NSViewRepresentable {
         tabbingIdentifier: String,
         onWindow: @escaping (NSWindow) -> Void = { _ in },
         onClose: @escaping () -> Void = {},
-        shouldConfirmClose: @escaping () -> String? = { nil },
+        shouldConfirmClose: @escaping (_ quitting: Bool) -> String? = { _ in nil },
         opensSidebarInitially: Bool = false,
         overviewPresented: Bool = false
     ) {
@@ -79,7 +80,7 @@ struct MacTerminalWindowReader: NSViewRepresentable {
         static let active = NSHashTable<Coordinator>.weakObjects()
         private weak var observedWindow: NSWindow?
         private var closeAction: (() -> Void)?
-        private var shouldConfirmClose: (() -> String?)?
+        private var shouldConfirmClose: ((_ quitting: Bool) -> String?)?
         // AppKit performs delegate discovery/forwarding on its main thread, but
         // NSObject's Objective-C forwarding overrides are nonisolated in Swift.
         nonisolated(unsafe) private weak var originalWindowDelegate: (any NSWindowDelegate)?
@@ -178,7 +179,7 @@ struct MacTerminalWindowReader: NSViewRepresentable {
 
         func interceptWindowClose(
             _ window: NSWindow,
-            shouldConfirm: @escaping () -> String?
+            shouldConfirm: @escaping (_ quitting: Bool) -> String?
         ) {
             self.shouldConfirmClose = shouldConfirm
             guard observedWindow === window, window.delegate !== self else { return }
@@ -207,8 +208,8 @@ struct MacTerminalWindowReader: NSViewRepresentable {
             return super.forwardingTarget(for: selector)
         }
 
-        var closeConfirmationMessage: String? { shouldConfirmClose?() ?? nil }
-        var requiresCloseConfirmation: Bool { closeConfirmationMessage != nil }
+        var closeConfirmationMessage: String? { shouldConfirmClose?(false) ?? nil }
+        var quitConfirmationMessage: String? { shouldConfirmClose?(true) ?? nil }
 
         func finishSessions() {
             guard !didRunCloseAction else { return }

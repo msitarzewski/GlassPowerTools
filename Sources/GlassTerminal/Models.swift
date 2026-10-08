@@ -458,6 +458,39 @@ class TerminalSession: Identifiable, Hashable {
             columns: latestTerminalColumns
         )
         self.sshConnection = connection
+        terminalHostModel.onAlternateScreenScroll = { [weak self] deltaY, precise in
+            self?.scrollTmux(deltaY: deltaY, precise: precise) ?? false
+        }
+    }
+
+    // MARK: Scrolling in tmux (2026-10-08)
+
+    /// tmux draws on the alternate screen, so the terminal has no scrollback of its own and a
+    /// scroll would arrive as arrow keys. A terminal in tmux scrolls tmux's history on the host
+    /// instead, over this connection; scrolling gathered while one command is on its way follows it.
+    private var pendingTmuxScroll: Double = 0
+    private var tmuxScrollInFlight = false
+
+    func scrollTmux(deltaY: CGFloat, precise: Bool) -> Bool {
+        guard survivesClose, state == .connected else { return false }
+        // A trackpad reports points, a mouse wheel lines; a terminal line is about 16 points.
+        pendingTmuxScroll += precise ? Double(deltaY) / 16 : Double(deltaY)
+        sendTmuxScroll()
+        return true
+    }
+
+    private func sendTmuxScroll() {
+        guard !tmuxScrollInFlight, let name = tmuxSessionName else { return }
+        let lines = Int(pendingTmuxScroll.rounded(.towardZero))
+        guard lines != 0 else { return }
+        pendingTmuxScroll -= Double(lines)
+        tmuxScrollInFlight = true
+        Task { [weak self] in
+            _ = try? await self?.runTmuxCommand(TerminalTmux.scrollCommand(name: name, lines: lines))
+            guard let self else { return }
+            tmuxScrollInFlight = false
+            sendTmuxScroll()
+        }
     }
 
     isolated deinit {

@@ -44,20 +44,24 @@ public final class MacTerminalAppDelegate: NSObject, NSApplicationDelegate {
         guard !terminationInProgress else { return .terminateLater }
         let windows = MacTerminalWindowReader.Coordinator.active.allObjects
         let sessions = sessionManager?.sessions ?? []
-        let needsConfirmation = windows.contains { $0.requiresCloseConfirmation }
+        let windowMessage = windows.lazy.compactMap(\.quitConfirmationMessage).first
+        let needsConfirmation = windowMessage != nil
             || (settingsManager?.confirmBeforeClosing == true && sessions.contains(where: \.closeStopsWork))
         if needsConfirmation {
             let alert = NSAlert()
             alert.messageText = "Quit \(GlassProduct.displayName)?"
-            alert.informativeText = sessions.contains(where: \.survivesClose)
+            alert.informativeText = windowMessage ?? (sessions.contains(where: \.survivesClose)
                 ? "Terminals that aren't kept in tmux will be disconnected. Those in tmux keep running, and Active lists them."
-                : "Running terminal sessions will be disconnected."
+                : "Running terminal sessions will be disconnected.")
             alert.alertStyle = .warning
             alert.addButton(withTitle: "Quit")
             alert.addButton(withTitle: "Cancel")
             guard alert.runModal() == .alertFirstButtonReturn else { return .terminateCancel }
         }
         terminationInProgress = true
+        // Before the windows let go of their terminals: which hold local terminals in tmux, to
+        // open again at the next launch (D47).
+        MacLocalTmux.rememberWindowsToReopen()
         // Keep the windows and their saved layouts intact for restoration while
         // finalizing recordings and stopping their local and remote processes.
         for window in windows { window.finishSessions() }

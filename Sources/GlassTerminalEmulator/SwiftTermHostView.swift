@@ -367,6 +367,11 @@ public final class SwiftTermHostModel: ObservableObject {
     public private(set) var terminalTitle: String?
     public var onTerminalTitleChange: (@MainActor (String?) -> Void)?
 
+    /// Scrolling over a full-screen program that asked for no mouse, which a terminal otherwise
+    /// sends as arrow keys — in tmux, Claude Code then steps through its earlier messages. A
+    /// listener that takes it returns true: a local tmux pane scrolls tmux's own history instead
+    /// (2026-10-08). `deltaY` is positive toward earlier output; `precise` means points, else lines.
+    public var onAlternateScreenScroll: (@MainActor (_ deltaY: CGFloat, _ precise: Bool) -> Bool)?
     @Published public private(set) var scrollPosition: Double = 1
     @Published public private(set) var pendingPasteReview: SwiftTermPasteReview?
     @Published public private(set) var pendingExternalLink: SwiftTermExternalLinkRequest?
@@ -2470,15 +2475,18 @@ private final class MacSwiftTermEngine: TerminalEngine {
     private let performanceClock = ContinuousClock()
     private(set) var rendererDiagnostics = SwiftTermRendererDiagnostics.awaitingWindow
     private(set) var performanceDiagnostics = SwiftTermPerformanceDiagnostics()
+    private var scrollWatcher: MacAlternateScreenScrollWatcher?
 
     init(
         delegate: TerminalViewDelegate,
         onPasteRequest: @escaping (String, Bool) -> Void,
         onPasteData: @escaping (Data) -> Void,
         onRendererDiagnostics: @escaping (SwiftTermRendererDiagnostics) -> Void,
-        onOSC52Decision: @escaping (SwiftTermOSC52Decision) -> Void
+        onOSC52Decision: @escaping (SwiftTermOSC52Decision) -> Void,
+        alternateScreenScroll: @escaping () -> (@MainActor (CGFloat, Bool) -> Bool)? = { nil }
     ) {
         terminalView = ReviewingMacTerminalView(frame: .zero)
+        scrollWatcher = MacAlternateScreenScrollWatcher(view: terminalView, handler: alternateScreenScroll)
         self.onPasteData = onPasteData
         self.onRendererDiagnostics = onRendererDiagnostics
         self.onOSC52Decision = onOSC52Decision
@@ -2743,7 +2751,8 @@ public struct SwiftTermHostView: NSViewRepresentable {
             },
             onOSC52Decision: { [weak model] decision in
                 model?.recordOSC52Decision(decision)
-            }
+            },
+            alternateScreenScroll: { [weak model] in model?.onAlternateScreenScroll }
         )
     }
 
@@ -3177,6 +3186,40 @@ private final class MacLocalProcessDelegateProxy:
 }
 
 @MainActor
+/// Scrolls over a terminal view on their way to it (SwiftTerm's `scrollWheel` cannot be overridden
+/// from here): one on the alternate screen, where no program asked for the mouse, goes to the
+/// model's `onAlternateScreenScroll` when something listens and takes it (2026-10-08).
+private final class MacAlternateScreenScrollWatcher {
+    private weak var view: TerminalView?
+    private let handler: () -> (@MainActor (CGFloat, Bool) -> Bool)?
+    private var monitor: Any?
+
+    init(view: TerminalView, handler: @escaping () -> (@MainActor (CGFloat, Bool) -> Bool)?) {
+        self.view = view
+        self.handler = handler
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            // Local monitors run on the main thread.
+            nonisolated(unsafe) let event = event
+            let taken = MainActor.assumeIsolated { self?.takes(event) ?? false }
+            return taken ? nil : event
+        }
+    }
+
+    isolated deinit {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+    }
+
+    private func takes(_ event: NSEvent) -> Bool {
+        guard event.scrollingDeltaY != 0, let view, let handler = handler(),
+              let window = view.window, event.window === window,
+              view.bounds.contains(view.convert(event.locationInWindow, from: nil)) else { return false }
+        let terminal = view.getTerminal()
+        guard terminal.isCurrentBufferAlternate, terminal.mouseMode == .off else { return false }
+        return handler(event.scrollingDeltaY, event.hasPreciseScrollingDeltas)
+    }
+}
+
+@MainActor
 private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcessControlling {
     var isBracketedPasteMode: Bool { terminalView.getTerminal().bracketedPasteMode }
 
@@ -3195,6 +3238,7 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
     private(set) var launchedShell: String?
     private(set) var rendererDiagnostics = SwiftTermRendererDiagnostics.awaitingWindow
     private(set) var performanceDiagnostics = SwiftTermPerformanceDiagnostics()
+    private var scrollWatcher: MacAlternateScreenScrollWatcher?
 
     init(
         hostModel: SwiftTermHostModel,
@@ -3240,6 +3284,9 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
             self?.recordProcessOutput(bytes, duration: duration)
             self?.scheduleWorkingDirectoryCheck()
             self?.delegateProxy.hostModel?.noteOutputActivity()
+        }
+        scrollWatcher = MacAlternateScreenScrollWatcher(view: terminalView) { [weak self] in
+            self?.delegateProxy.hostModel?.onAlternateScreenScroll
         }
         terminalView.onWindowAttachmentChanged = { [weak self] in
             self?.publishRendererDiagnostics()

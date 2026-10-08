@@ -23,6 +23,7 @@ nonisolated enum UserDefaultsKeys {
     static let initialTerminalRows = "initialTerminalRows"
     static let localShell = "localShell"
     static let localWorkingDirectory = "localWorkingDirectory"
+    static let localTmux = "localTmux"
     static let bellEnabled = "bellEnabled"
     static let visualBell = "visualBell"
     static let hostKeyVerificationMode = "hostKeyVerificationMode"

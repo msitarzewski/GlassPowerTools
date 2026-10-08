@@ -64,6 +64,15 @@ struct TerminalConnectFlow: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+        #if os(macOS)
+        // D47: the windows that held local terminals in tmux when the app quit, back on their
+        // sessions. Taken once; macOS's own window restoration, when on, wins.
+        .task {
+            for windowID in MacLocalTmux.takeWindowsToReopen() {
+                openWindow(id: "workspace", value: MacWorkspaceLaunchRequest(windowID: windowID, tabs: []))
+            }
+        }
+        #endif
         .alert(
             trustPromptTitle,
             isPresented: trustPromptBinding,
@@ -299,9 +308,15 @@ struct TerminalConnectFlow: ViewModifier {
             viewingServer = server
         case .deleteServer(let server):
             serverPendingDeletion = server
-        case .localTerminal:
+        case .localTerminal(let tmux):
             #if os(macOS)
-            openWindow(id: "workspace", value: MacWorkspaceLaunchRequest())
+            if let tmux {
+                var intent = MacWorkspacePaneIntent.local
+                intent.localTmuxSession = tmux
+                openWindow(id: "workspace", value: MacWorkspaceLaunchRequest(initialPaneIntent: intent))
+            } else {
+                openWindow(id: "workspace", value: MacWorkspaceLaunchRequest())
+            }
             #endif
         case .showWorkgroups:
             #if os(iOS)

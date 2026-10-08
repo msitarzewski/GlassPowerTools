@@ -34,6 +34,9 @@ struct GeneralSettingsView: View {
     @State private var tailscaleOAuthClientSecret: String = ""
     @State private var tailscaleTestResult: String?
     @State private var tailscaleTestInProgress = false
+    #if os(macOS)
+    @State private var localTmuxPath: String?
+    #endif
     
     var body: some View {
         @Bindable var settings = settingsManager
@@ -79,7 +82,16 @@ struct GeneralSettingsView: View {
                 Text("Use an absolute path or ~. Changes apply to new terminals. Saved Workgroups can override these defaults.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Toggle("Keep local terminals running with tmux", isOn: $settings.localTmux)
+                    .disabled(localTmuxPath == nil && !settings.localTmux)
+                    .onChange(of: settings.localTmux) { _, _ in settings.saveSettings() }
+                Text(localTmuxPath == nil
+                     ? "tmux isn't installed on this Mac. Install it with Homebrew (brew install tmux), then come back here."
+                     : "Quitting or updating the app leaves local terminals running, and each tab picks up where it was when the app opens again. Closing a tab leaves its terminal running too: Active lists it under This Mac, to open again or end.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
+            .task { localTmuxPath = MacLocalTmux.executablePath() }
             #endif
 
             Section("Session Recording") {

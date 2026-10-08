@@ -42,6 +42,8 @@ final class MacWorkspaceController {
     @ObservationIgnored var paneContextInterval: Duration = .milliseconds(500)
     @ObservationIgnored private var pendingPaneContextByPaneID: [UUID: MacWorkspacePaneContext] = [:]
     @ObservationIgnored private var paneContextFlush: Task<Void, Never>?
+    @ObservationIgnored private var pendingScrollByPaneID: [UUID: Double] = [:]
+    @ObservationIgnored private var scrollFlush: Task<Void, Never>?
     /// A terminal in this tab printed something in the last moment: the sidebar's activity wave.
     private(set) var isProducingOutput = false
     @ObservationIgnored private var quietTask: Task<Void, Never>?
@@ -150,10 +152,13 @@ final class MacWorkspaceController {
             }
         }
         startupTicketIDsByPaneID.removeAll()
+        let assignedTmuxSessions = assignLocalTmuxSessions()
         // Unselected tabs may never receive a focus or layout event. Save their
         // fresh trees now so window descriptors can restore every tab later.
         // Existing malformed restoration data is deliberately left untouched.
         if !loaded.hadRestorationData && (request.initialState == nil || acceptedInitialLayout) {
+            persist()
+        } else if loaded.hadRestorationData && assignedTmuxSessions {
             persist()
         }
     }
@@ -173,17 +178,60 @@ final class MacWorkspaceController {
     var focusedPaneID: UUID? { state.focusedPaneID }
 
     /// D44: closing this tab would stop something — a local shell, a pane still opening, or an
-    /// SSH terminal not kept in tmux. Terminals in tmux keep running, so they do not count.
+    /// SSH terminal not kept in tmux. Terminals in tmux, local ones included (D47), keep running,
+    /// so they do not count; the same holds for quitting.
     var closeStopsWork: Bool {
-        !localRuntimesByPaneID.isEmpty || !loadingPaneIDs.isEmpty
+        localRuntimesByPaneID.keys.contains { localTmuxSession(for: $0) == nil }
+            || !loadingPaneIDs.isEmpty
             || sessionsByPaneID.values.contains(where: \.closeStopsWork)
     }
-    var hasTerminalsInTmux: Bool { sessionsByPaneID.values.contains(where: \.survivesClose) }
+    var hasTerminalsInTmux: Bool { sessionsByPaneID.values.contains(where: \.survivesClose) || hasLocalTerminalsInTmux }
+    var hasLocalTerminalsInTmux: Bool { localRuntimesByPaneID.keys.contains { localTmuxSession(for: $0) != nil } }
+
+    func localTmuxSession(for paneID: UUID) -> String? {
+        state.root?.pane(id: paneID)?.intent.localTmuxSession
+    }
+
+    /// Scrolling over a local pane in tmux scrolls tmux's history, rather than arriving as arrow
+    /// keys (2026-10-08). Amounts are gathered for a frame and sent as whole lines.
+    func scrollLocalTmux(_ paneID: UUID, deltaY: CGFloat, precise: Bool) -> Bool {
+        guard localTmuxSession(for: paneID) != nil else { return false }
+        // A trackpad reports points, a mouse wheel lines; a terminal line is about 16 points.
+        pendingScrollByPaneID[paneID, default: 0] += precise ? Double(deltaY) / 16 : Double(deltaY)
+        if scrollFlush == nil {
+            scrollFlush = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(30))
+                self?.flushLocalTmuxScroll()
+            }
+        }
+        return true
+    }
+
+    private func flushLocalTmuxScroll() {
+        scrollFlush = nil
+        let server = MacLocalTmux.server
+        guard let tmux = server.executablePath() else { return pendingScrollByPaneID.removeAll() }
+        for (paneID, amount) in pendingScrollByPaneID {
+            let lines = Int(amount.rounded(.towardZero))
+            pendingScrollByPaneID[paneID] = amount - Double(lines)
+            guard lines != 0, let session = localTmuxSession(for: paneID) else { continue }
+            server.scroll(session, lines, tmux)
+        }
+    }
+
+    /// Where a local pane's shell is. In tmux the process Glass started is the tmux client, whose
+    /// directory never moves, so the answer is the one tmux gave.
+    func localDirectory(for paneID: UUID) -> String? {
+        localTmuxSession(for: paneID) == nil
+            ? localRuntimesByPaneID[paneID]?.currentWorkingDirectory
+            : paneContextByPaneID[paneID]?.directory
+    }
 
     /// The same, for the focused pane alone.
     var focusedPaneCloseStopsWork: Bool {
         guard let id = focusedPaneID else { return false }
-        return localRuntimesByPaneID[id] != nil || loadingPaneIDs.contains(id) || sessionsByPaneID[id]?.closeStopsWork == true
+        return (localRuntimesByPaneID[id] != nil && localTmuxSession(for: id) == nil)
+            || loadingPaneIDs.contains(id) || sessionsByPaneID[id]?.closeStopsWork == true
     }
     var focusedPane: MacWorkspacePane? {
         guard let focusedPaneID else { return nil }
@@ -264,6 +312,22 @@ final class MacWorkspaceController {
             try? await Task.sleep(for: Self.activityLinger)
             guard !Task.isCancelled, let self else { return }
             isProducingOutput = false
+            refreshLocalTmuxContext()
+        }
+    }
+
+    /// D47: tmux keeps a shell's title and directory from the terminal outside it, so a tab in
+    /// tmux asks tmux what its panes show once output settles.
+    private func refreshLocalTmuxContext() {
+        let panes = localRuntimesByPaneID.keys.compactMap { id in localTmuxSession(for: id).map { (id, $0) } }
+        guard !panes.isEmpty, let tmux = MacLocalTmux.executablePath() else { return }
+        Task.detached(priority: .utility) { [weak self] in
+            let contexts = panes.compactMap { paneID, session in
+                MacLocalTmux.context(session: session, tmux: tmux).map { (paneID, $0) }
+            }
+            await MainActor.run { [weak self] in
+                for (paneID, context) in contexts { self?.setPaneContext(context, for: paneID) }
+            }
         }
     }
 
@@ -280,6 +344,7 @@ final class MacWorkspaceController {
     /// The title a pane's shell or program set, and its directory, as they change. A pane in
     /// tmux sees only tmux's own, so its context comes from `refreshLocalTmuxContext` instead.
     func updatePaneContext(title: String?, directory: String?, for paneID: UUID) {
+        guard localTmuxSession(for: paneID) == nil else { return }
         let context = MacWorkspacePaneContext(title: title, directory: directory)
         guard paneContextInterval > .zero else { return setPaneContext(context, for: paneID) }
         // At most twice a second: a program animating its title (Claude Code's spinner) would
@@ -341,6 +406,12 @@ final class MacWorkspaceController {
         let runtime = SwiftTermLocalProcessRuntime()
         localRuntimesByPaneID[paneID] = runtime
         observeOutput(of: runtime.model)
+        if let tmuxSession = localTmuxSession(for: paneID) {
+            MacLocalTmux.noteShown(tmuxSession)
+            runtime.model.onAlternateScreenScroll = { [weak self] deltaY, precise in
+                self?.scrollLocalTmux(paneID, deltaY: deltaY, precise: precise) ?? false
+            }
+        }
         return runtime
     }
 
@@ -363,7 +434,8 @@ final class MacWorkspaceController {
             runtime.start(
                 configuration: MacLocalTerminalConfiguration.resolve(
                     shell: pane.intent.localShell ?? settingsManager.localShell,
-                    directory: pane.intent.localDirectory ?? settingsManager.localWorkingDirectory
+                    directory: pane.intent.localDirectory ?? settingsManager.localWorkingDirectory,
+                    tmuxSession: pane.intent.localTmuxSession
                 ),
                 theme: settingsManager.currentTheme.swiftTermTheme,
                 runtimeSettings: SwiftTermRuntimeSettings(
@@ -410,8 +482,9 @@ final class MacWorkspaceController {
         }) {
             return "This tab has an SSH session. Remote command activity cannot be verified; closing it will disconnect the session."
         }
-        if localRuntimesByPaneID.values.contains(where: {
-            $0.processState.isRunning && $0.hasActiveChildProcesses != false
+        if localRuntimesByPaneID.contains(where: { paneID, runtime in
+            localTmuxSession(for: paneID) == nil
+                && runtime.processState.isRunning && runtime.hasActiveChildProcesses != false
         }) {
             return "This tab has running commands, or its activity could not be verified. Closing it will stop those commands."
         }
@@ -444,6 +517,7 @@ final class MacWorkspaceController {
         guard let root = state.root else {
             state.root = .pane(newPane)
             state.focusedPaneID = newPane.id
+            assignLocalTmuxSessions()
             persist()
             return
         }
@@ -451,7 +525,45 @@ final class MacWorkspaceController {
         guard let targetID else { return }
         state.root = root.splittingPane(id: targetID, axis: axis, newPane: newPane)
         state.focusedPaneID = newPane.id
+        assignLocalTmuxSessions()
         persist()
+    }
+
+    /// D47: give each local pane its tmux session while "Keep local terminals running with tmux"
+    /// is on, and let go of a saved one that is no longer running once it is off. Runs as panes
+    /// enter the tab, so every launch path — `startLocalPanes`, the pane view, a restart — reads
+    /// one saved name. Returns whether anything changed.
+    @discardableResult
+    private func assignLocalTmuxSessions() -> Bool {
+        guard let root = state.root else { return false }
+        let enabled = defaults.bool(forKey: UserDefaultsKeys.localTmux)
+        let panes = root.panes.filter {
+            $0.intent.kind == .local && (enabled || $0.intent.localTmuxSession != nil)
+        }
+        guard !panes.isEmpty else { return false }
+        let server = MacLocalTmux.server
+        let tmux = server.executablePath()
+        var running: Set<String>?
+        var updated = root
+        for pane in panes {
+            let session = tmux.flatMap { tmux in
+                MacLocalTmux.session(
+                    saved: pane.intent.localTmuxSession,
+                    enabled: enabled,
+                    isRunning: { name in
+                        let names = running ?? Set(MacLocalTmux.sessions(tmux: tmux).map(\.name))
+                        running = names
+                        return names.contains(name)
+                    },
+                    allocate: { MacLocalTmux.allocateName(tmux: tmux) }
+                )
+            }
+            guard session != pane.intent.localTmuxSession else { continue }
+            updated = updated.updatingPane(id: pane.id) { $0.intent.localTmuxSession = session }
+        }
+        guard updated != root else { return false }
+        state.root = updated
+        return true
     }
 
     func requestSSHPane(axis: MacWorkspaceSplitAxis) {
@@ -473,8 +585,12 @@ final class MacWorkspaceController {
         removePane(paneID, sessionManager: sessionManager)
     }
 
+    /// A local pane in tmux detaches: its session keeps running, and Active lists it (D47).
     func removePane(_ paneID: UUID, sessionManager: SessionManager) {
-        guard !isClosed, let root = state.root, root.pane(id: paneID) != nil else { return }
+        guard !isClosed, let root = state.root, let pane = root.pane(id: paneID) else { return }
+        if let tmuxSession = pane.intent.localTmuxSession {
+            letGoOfLocalTmuxSession(tmuxSession, wasShown: localRuntimesByPaneID[paneID] != nil)
+        }
         if let session = sessionsByPaneID.removeValue(forKey: paneID) {
             sessionManager.closeSession(session)
         }
@@ -617,6 +733,11 @@ final class MacWorkspaceController {
     }
 
     func closeAllSessions(sessionManager: SessionManager) {
+        // Local terminals in tmux detach: they keep running, for Active or the next launch.
+        for pane in state.root?.panes ?? [] {
+            guard let tmuxSession = pane.intent.localTmuxSession else { continue }
+            letGoOfLocalTmuxSession(tmuxSession, wasShown: localRuntimesByPaneID[pane.id] != nil)
+        }
         isClosed = true
         lifecycleGeneration &+= 1
         let sessions = Array(sessionsByPaneID.values)
@@ -642,6 +763,11 @@ final class MacWorkspaceController {
         for recorder in recorders {
             recorder.finalize()
         }
+    }
+
+    private func letGoOfLocalTmuxSession(_ name: String, wasShown: Bool) {
+        MacLocalTmux.release(name)
+        if wasShown { MacLocalTmux.noteHidden(name) }
     }
 
     func claimStartupCommand(for paneID: UUID) -> TerminalStartupCommandTicket? {
@@ -833,6 +959,9 @@ final class MacWorkspaceWindowController {
     private(set) var tabs: [MacWorkspaceController]
     private(set) var selectedTabID: UUID
 
+    /// Every terminal window open in this process, for what the app does as it quits (D47).
+    static let live = NSHashTable<MacWorkspaceWindowController>.weakObjects()
+
     private let defaults: UserDefaults
     private let startupCommandBroker: MacStartupCommandBroker
     private let liveSessionBroker: MacLiveSessionBroker
@@ -911,6 +1040,12 @@ final class MacWorkspaceWindowController {
         tabs = resolvedTabs
         selectedTabID = resolvedSelectedTabID
         persist()
+        Self.live.add(self)
+    }
+
+    /// Whether this window's tabs are saved, so a launch request with its id restores them.
+    static func hasSavedState(windowID: UUID, defaults: UserDefaults = .standard) -> Bool {
+        load(windowID: windowID, defaults: defaults) != nil
     }
 
     var selectedTab: MacWorkspaceController {
@@ -957,7 +1092,7 @@ final class MacWorkspaceWindowController {
                                          localShell: intent.kind == .local
                                             ? (tab.localRuntimesByPaneID[pane.id]?.launchedShell ?? intent.localShell ?? defaultLocalShell) : nil,
                                          localDirectory: intent.kind == .local
-                                            ? (tab.localRuntimesByPaneID[pane.id]?.currentWorkingDirectory ?? intent.localDirectory ?? defaultLocalDirectory)
+                                            ? (tab.localDirectory(for: pane.id) ?? intent.localDirectory ?? defaultLocalDirectory)
                                             : nil))
                     return .session(index)
                 case .split(let split):
@@ -995,6 +1130,22 @@ final class MacWorkspaceWindowController {
         return tabs.contains(where: \.hasTerminalsInTmux)
             ? "Terminals in this window that aren't kept in tmux will be disconnected. Those in tmux keep running, and Active lists them."
             : "Running terminal sessions in this window will be disconnected."
+    }
+
+    /// What quitting the app should ask about this window, or nil when nothing would stop. Local
+    /// terminals in tmux keep running through a quit and reattach on the next launch (D47).
+    var quitConfirmationMessage: String? {
+        guard tabs.contains(where: \.closeStopsWork) else { return nil }
+        switch (tabs.contains(where: \.hasTerminalsInTmux), tabs.contains(where: \.hasLocalTerminalsInTmux)) {
+        case (true, true):
+            return "Terminals that aren't kept in tmux will be disconnected. Those in tmux keep running: local ones reopen with the app, and Active lists the rest."
+        case (true, false):
+            return "Terminals that aren't kept in tmux will be disconnected. Those in tmux keep running, and Active lists them."
+        case (false, true):
+            return "Terminals that aren't kept in tmux will be stopped. Local terminals in tmux keep running and reopen with the app."
+        case (false, false):
+            return "Running terminal sessions will be disconnected."
+        }
     }
     var canAddTab: Bool {
         tabs.count < MacWorkspaceWindowRestorationState.maximumTabCount

@@ -265,8 +265,9 @@ struct MacWorkspaceView: View {
                         secureKeyboardEntry.disable(for: tab.workspaceID)
                     }
                 },
-                shouldConfirmClose: {
-                    settingsManager.confirmBeforeClosing ? windowController.closeConfirmationMessage : nil
+                shouldConfirmClose: { quitting in
+                    guard settingsManager.confirmBeforeClosing else { return nil }
+                    return quitting ? windowController.quitConfirmationMessage : windowController.closeConfirmationMessage
                 },
                 opensSidebarInitially: !showingOverview && columnVisibility == .all,
                 overviewPresented: showingOverview
@@ -529,6 +530,8 @@ struct MacWorkspaceView: View {
         // Cleared deliberately: the index identifies a pane inside a *restored workgroup layout*,
         // and this tab is a new one the user asked for, not a restoration of that slot.
         intent.sourceSessionIndex = nil
+        // And the tmux session belongs to the pane that made it: the new tab gets its own.
+        intent.localTmuxSession = nil
         windowController.addTab(
             MacWorkspaceTabRequest(startsEmpty: false, initialPaneIntent: intent)
         )
@@ -721,6 +724,16 @@ private struct MacWorkspaceTabContent: View {
         return true
     }
 
+    /// A local pane is done: its shell ended, or it was closed — in tmux, detached (D47).
+    private func closeLocalPane(_ paneID: UUID) {
+        guard !controller.isClosed else { return }
+        let closesWorkspace = controller.state.root?.panes.count == 1
+        controller.removePane(paneID, sessionManager: sessionManager)
+        if closesWorkspace {
+            onCloseEmptyTab()
+        }
+    }
+
     @ViewBuilder
     private func paneView(_ pane: MacWorkspacePane, showsPaneChrome: Bool) -> some View {
         let isFocused = allowsTerminalFocus && controller.focusedPaneID == pane.id
@@ -734,19 +747,13 @@ private struct MacWorkspaceTabContent: View {
                     workspaceID: controller.workspaceID,
                     shellOverride: pane.intent.localShell,
                     directoryOverride: pane.intent.localDirectory,
+                    tmuxSession: pane.intent.localTmuxSession,
                     isFocused: isFocused,
                     showsPaneChrome: showsPaneChrome,
                     findRequestNonce: findNonce(for: pane.id),
                     claimStartupCommand: { controller.claimStartupCommand(for: pane.id) },
                     onFocus: { controller.focus(pane.id) },
-                    onDisconnect: {
-                        guard !controller.isClosed else { return }
-                        let closesWorkspace = controller.state.root?.panes.count == 1
-                        controller.removePane(pane.id, sessionManager: sessionManager)
-                        if closesWorkspace {
-                            onCloseEmptyTab()
-                        }
-                    },
+                    onDisconnect: { closeLocalPane(pane.id) },
                     onProcessStatusChange: { controller.updateLocalProcessStatus($0, for: pane.id) },
                     onContextChange: { controller.updatePaneContext(title: $0, directory: $1, for: pane.id) },
                     hostModel: runtime.model,

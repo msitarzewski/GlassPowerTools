@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import GlassTerminalEmulator
 @testable import GlassTerminal
 
 /// D44: terminals kept in tmux sessions (2026-10-01).
@@ -51,7 +52,12 @@ struct TerminalTmuxTests {
         #expect(TerminalTmux.attachLine(name: "glass-2", takeOver: false)
                 == " command -v tmux >/dev/null && exec tmux new-session -A -s 'glass-2'")
         #expect(TerminalTmux.attachLine(name: "work", takeOver: true).contains("new-session -A -D -s 'work'"))
-        #expect(TerminalTmux.killCommand(name: "work") == "sh -c 'tmux kill-session -t '\\''=work'\\'''")
+        #expect(TerminalTmux.killCommand(name: "work")
+                == #"sh -c 'PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; tmux kill-session -t '\''=work'\'''"#)
+        // D47: every exec-channel command also looks where Homebrew puts tmux on a Mac.
+        for command in [TerminalTmux.listCommand, TerminalTmux.currentPathCommand(name: "glass-1")] {
+            #expect(command.contains(#"PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; "#))
+        }
     }
 
     @Test("a server saved before tmux reads as off")
@@ -73,6 +79,56 @@ struct TerminalTmuxTests {
         #expect(session.tmuxSessionName == "glass-2")
         #expect(writes.lines == [" command -v tmux >/dev/null && exec tmux new-session -A -s 'glass-2'\n", "htop\n"])
     }
+
+    @Test("scrolling a terminal in tmux scrolls tmux's history on the host, one command at a time")
+    func scrolling() async {
+        #expect(TerminalTmux.scrollCommand(name: "glass-2", lines: 3) == #"sh -c 'PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; tmux copy-mode -e -t '\''=glass-2:'\'' '\'';'\'' send-keys -t '\''=glass-2:'\'' -X -N 3 scroll-up'"#)
+        var asked: [String] = []
+        let session = session(server(tmux: true), writes: Writes(), listing: "", commands: { asked.append($0) })
+        let scroll = session.terminalHostModel.onAlternateScreenScroll
+        #expect(scroll?(32, true) == false, "not attached to tmux yet: the terminal keeps the scroll")
+        session.state = .connected
+        await session.waitForTmuxAttach()
+        asked.removeAll()
+        #expect(scroll?(40, true) == true && scroll?(30, true) == true)
+        for _ in 0..<50 where asked.count < 2 { try? await Task.sleep(for: .milliseconds(10)) }
+        // 40 pt is 2.5 lines: 2 go at once. The half left and 30 pt more (1.875) make 2.375 while
+        // the first travels: 2 follow, and 0.375 waits for the next scroll.
+        #expect(asked == [TerminalTmux.scrollCommand(name: "glass-1", lines: 2), TerminalTmux.scrollCommand(name: "glass-1", lines: 2)],
+                "the first lines go at once; what gathers while they travel follows")
+    }
+
+    /// The command as the host's `sh` runs it: tmux's history moves, and leaves at the bottom.
+    @Test("the scroll command works through sh against a real tmux", .enabled(if: TerminalTmuxTests.tmux != nil))
+    func scrollingLive() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("tmux-scroll-\(UUID().uuidString.prefix(8))")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        func sh(_ command: String) -> String {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/sh")
+            process.arguments = ["-c", command]
+            // A private tmux server: TMUX_TMPDIR moves its default socket.
+            process.environment = ["TMUX_TMPDIR": folder.path, "PATH": "/usr/bin:/bin"]
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = pipe
+            try? process.run()
+            process.waitUntilExit()
+            return String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        }
+        let tmux = TerminalTmuxTests.tmux!
+        _ = sh("\(tmux) -f /dev/null new-session -d -s glass-7 -x 80 -y 10 'seq 1 200; sleep 30'")
+        defer { _ = sh("\(tmux) kill-server") }
+        Thread.sleep(forTimeInterval: 0.3)
+        _ = sh(TerminalTmux.scrollCommand(name: "glass-7", lines: 5))
+        #expect(sh("\(tmux) display-message -p -t '=glass-7:' '#{pane_in_mode} #{scroll_position}'") == "1 5\n")
+        _ = sh(TerminalTmux.scrollCommand(name: "glass-7", lines: -9))
+        #expect(sh("\(tmux) display-message -p -t '=glass-7:' '#{pane_in_mode}'") == "0\n", "past the bottom: out of copy mode")
+    }
+
+    nonisolated static let tmux: String? = ["/opt/homebrew/bin/tmux", "/usr/local/bin/tmux", "/usr/bin/tmux"]
+        .first { FileManager.default.isExecutableFile(atPath: $0) }
 
     @Test("a reconnect attaches to the same session without asking the host again")
     func reconnect() async {

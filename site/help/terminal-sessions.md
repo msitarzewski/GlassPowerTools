@@ -21,7 +21,7 @@ This page covers terminal windows and tabs, the session's tools menu, text size,
 | Go to tab 1–9 | | ⌘1–⌘9 |
 | All tabs as a grid or carousel | **Terminal Grid**, **Terminal Carousel** | ⌘G, ⌥⌘G |
 
-**Move Tab to New Window** is under **Tab Actions** in the toolbar. Closing a tab that has an SSH session, a recording, a connection in progress or running commands asks first. A terminal kept in tmux doesn't count: closing it leaves it running, and **Active** lists it (see [Keep terminals running with tmux](terminal-tmux.md)). Closing a tab never changes a saved Workgroup.
+**Move Tab to New Window** is under **Tab Actions** in the toolbar. Closing a tab that has an SSH session, a recording, a connection in progress or running commands asks first. A terminal kept in tmux doesn't count: closing it leaves it running, and **Active** lists it (see [Keep terminals running with tmux](terminal-tmux.md)). A Mac's local terminals kept in tmux work the same way, listed under This Mac. Closing a tab never changes a saved Workgroup.
 
 **On iPad and iPhone:** the plus button (**New Terminal Tab**) adds a terminal to the current set. iPad shows the terminals as tabs; iPhone lists them in a menu at the top.
 
@@ -73,7 +73,7 @@ While input is recorded, the terminal shows **INPUT REC**. Choose **Stop Recordi
 
 ## The Mac's local shell
 
-**On Mac:** choose **Local Terminal** in the library toolbar, or **Connect** on this Mac's **Local Shell** service. A local pane's tools menu adds **New Local Terminal Window** and, after the shell exits, **Restart**. **Open Folder Here** opens the shell's directory in Finder.
+**On Mac:** choose **Local Terminal** in the library toolbar, or **Connect** on this Mac's **Local Shell** service. A local pane's tools menu adds **New Local Terminal Window** and, after the shell exits, **Restart**. **Open Folder Here** opens the shell's directory in Finder. A local terminal starts with your Mac's environment, as Terminal.app's do (so `ssh` finds your agent), and tells programs it is Glass Power Tools through `TERM_PROGRAM`.
 
 **Secure Keyboard Entry**, in the toolbar and the **Terminal** menu, stops other apps from reading what you type in the focused terminal.
 

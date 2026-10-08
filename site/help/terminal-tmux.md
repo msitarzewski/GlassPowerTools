@@ -44,3 +44,19 @@ Choose a session to open it here. To use it here and disconnect everyone else, r
 ## End a session
 
 In **Active**, swipe left on a running session and choose **End**, or right-click it and choose **End Session…**. Everything running in it stops, on every device.
+
+## Local terminals on a Mac
+
+A Mac's own terminals can be kept in tmux too, so quitting or updating Glass Power Tools doesn't stop what's running in them: a build, a server, a long command.
+
+1. Install tmux, for example `brew install tmux`.
+2. Open Settings, choose **Terminal**, and under **Local Terminal** turn on **Keep local terminals running with tmux**. Until the Mac has tmux, the switch is off and says how to install it.
+
+Each local terminal you open afterwards runs in its own tmux session on the Mac.
+
+- **Quit** the app and the sessions keep running. When it opens again, each tab picks up where it was.
+- **Close** a tab, a pane or a window and its session keeps running, as for a terminal in tmux on any other machine. Its tools menu says **Detach** rather than **Disconnect**.
+- **Active** lists the Mac's sessions under **This Mac**: open one again, take it over from another terminal, or end it (swipe left and choose **End**, or right-click and choose **End Session…**). Typing `exit` in the session ends it too.
+- The tab's name follows the program's title and the folder you `cd` into, as it does without tmux.
+
+To reach these sessions from another device, turn on **Remote Login** on the Mac (System Settings, **General**, **Sharing**) and add the Mac to the library with a Terminal service that keeps sessions running with tmux. **Active** on your other devices then lists the Mac's sessions like any machine's.

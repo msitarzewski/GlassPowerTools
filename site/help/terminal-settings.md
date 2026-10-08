@@ -7,7 +7,7 @@ The terminal adds three pages to Settings: **Connections**, **Terminal** and **S
 - **Auto-reconnect on disconnect**: try again after a dropped connection. On by default.
 - **Confirm before closing active sessions**: ask before disconnecting a connected session. On by default.
 - **Keep scrollback during session** and **Max scrollback lines** (1,000 to 100,000; default 10,000). Scrollback stays in memory and is cleared when the session ends.
-- **On Mac**, **Local Terminal**: the **Shell** and **Working directory** for new local terminals. Leave them empty for your login shell and home folder. A Workgroup's tab can override them.
+- **On Mac**, **Local Terminal**: the **Shell** and **Working directory** for new local terminals. Leave them empty for your login shell and home folder. A Workgroup's tab can override them. **Keep local terminals running with tmux** keeps them running when you quit or update the app; see [Keep terminals running with tmux](terminal-tmux.md#local-terminals-on-a-mac).
 - **Session Recording**: how many recordings you have and the space they use.
 - **Bell enabled** plays a sound when a program rings the bell. It is off by default. **Visual bell** also flashes the terminal, and works only while **Bell enabled** is on.
 - **Host key verification**: **Ask** or **Strict**. See [Sign in with keys and trust host keys](terminal-keys-and-trust.md).

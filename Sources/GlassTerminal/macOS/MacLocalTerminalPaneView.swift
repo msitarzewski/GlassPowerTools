@@ -12,6 +12,8 @@ struct MacLocalTerminalPaneView: View {
     let workspaceID: UUID
     var shellOverride: String? = nil
     var directoryOverride: String? = nil
+    /// D47: the tmux session this pane runs in, or nil for a plain shell.
+    var tmuxSession: String? = nil
     let isFocused: Bool
     let showsPaneChrome: Bool
     let findRequestNonce: UInt64
@@ -35,6 +37,7 @@ struct MacLocalTerminalPaneView: View {
     @State private var searchQuery = ""
     @State private var searchFound: Bool?
     @State private var showingAIAssistant = false
+    @State private var aiAssistantDirectory: String?
     @State private var showingSnippets = false
     @State private var showingRecordings = false
     @State private var showingRecordingConsent = false
@@ -220,7 +223,7 @@ struct MacLocalTerminalPaneView: View {
                 aiAssistant: aiAssistant,
                 host: "localhost",
                 username: NSUserName(),
-                currentDirectory: processState.currentDirectory,
+                currentDirectory: aiAssistantDirectory ?? processState.currentDirectory,
                 onRunCommand: { _ = processState.sendCommand($0) }
             )
         }
@@ -420,12 +423,14 @@ struct MacLocalTerminalPaneView: View {
                 }
             }
 
+            // In tmux this detaches: the session keeps running, and Active lists it (D47). Nothing
+            // stops, so nothing to confirm — as for an SSH terminal kept in tmux (D44).
             Button(
-                processState.isRunning ? "Disconnect" : "Close Pane",
+                processState.isRunning ? (tmuxSession == nil ? "Disconnect" : "Detach") : "Close Pane",
                 systemImage: "xmark.circle",
-                role: .destructive
+                role: tmuxSession == nil ? .destructive : nil
             ) {
-                if settingsManager.confirmBeforeClosing && processState.isRunning {
+                if settingsManager.confirmBeforeClosing && processState.isRunning && tmuxSession == nil {
                     showingDisconnectConfirmation = true
                 } else {
                     disconnectLocalTerminal()
@@ -482,7 +487,17 @@ struct MacLocalTerminalPaneView: View {
 
     private func presentAIAssistant() {
         hostModel.setFocusOwnershipAllowed(false)
+        aiAssistantDirectory = shellDirectory
         showingAIAssistant = true
+    }
+
+    /// Where the shell is. In tmux the process here is the tmux client, which stays where it
+    /// started, so tmux is asked.
+    private var shellDirectory: String? {
+        let tmuxDirectory = tmuxSession.flatMap { session in
+            MacLocalTmux.executablePath().flatMap { MacLocalTmux.context(session: session, tmux: $0)?.directory }
+        }
+        return tmuxDirectory ?? runtime.currentWorkingDirectory
     }
 
     private func presentSnippets() {
@@ -533,8 +548,7 @@ struct MacLocalTerminalPaneView: View {
     }
 
     private func openFolderHere() {
-        let path = runtime.currentWorkingDirectory
-            ?? FileManager.default.homeDirectoryForCurrentUser.path
+        let path = shellDirectory ?? FileManager.default.homeDirectoryForCurrentUser.path
         var isDirectory = ObjCBool(false)
         guard path.hasPrefix("/"),
               FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
@@ -578,7 +592,8 @@ struct MacLocalTerminalPaneView: View {
     private var localConfiguration: SwiftTermLocalProcessConfiguration {
         MacLocalTerminalConfiguration.resolve(
             shell: shellOverride ?? settingsManager.localShell,
-            directory: directoryOverride ?? settingsManager.localWorkingDirectory
+            directory: directoryOverride ?? settingsManager.localWorkingDirectory,
+            tmuxSession: tmuxSession
         )
     }
 
@@ -623,7 +638,10 @@ struct MacLocalTerminalPaneView: View {
 }
 
 enum MacLocalTerminalConfiguration {
-    static func resolve(shell: String?, directory: String?) -> SwiftTermLocalProcessConfiguration {
+    /// - Parameter tmuxSession: D47 — run in this tmux session (attach, or create it) instead of
+    ///   a bare shell. Without tmux on the Mac the pane falls back to the shell.
+    static func resolve(shell: String?, directory: String?, tmuxSession: String? = nil,
+                        tmux: String? = nil) -> SwiftTermLocalProcessConfiguration {
         let requestedShell = expandedPath(shell)
         let loginShell = getpwuid(getuid()).flatMap { entry in
             entry.pointee.pw_shell.map { String(cString: $0) }
@@ -631,13 +649,62 @@ enum MacLocalTerminalConfiguration {
         let fallbackShell = expandedPath(loginShell)
             ?? expandedPath(ProcessInfo.processInfo.environment["SHELL"])
             ?? "/bin/zsh"
+        let currentDirectory = expandedPath(directory)
+            ?? FileManager.default.homeDirectoryForCurrentUser.path
+        let processEnvironment = environment(from: ProcessInfo.processInfo.environment)
+        if let tmuxSession, let tmux = tmux ?? MacLocalTmux.executablePath() {
+            // tmux runs the login shell itself; a shell someone chose is passed as the session's
+            // command, which tmux uses only when it creates the session.
+            return SwiftTermLocalProcessConfiguration(
+                executable: tmux,
+                arguments: MacLocalTmux.arguments(session: tmuxSession, directory: currentDirectory)
+                    + (requestedShell.map { [$0, "-l"] } ?? []),
+                environment: processEnvironment,
+                currentDirectory: currentDirectory
+            )
+        }
         return SwiftTermLocalProcessConfiguration(
             executable: requestedShell ?? fallbackShell,
             arguments: ["-l"],
-            currentDirectory: expandedPath(directory)
-                ?? FileManager.default.homeDirectoryForCurrentUser.path
+            environment: processEnvironment,
+            currentDirectory: currentDirectory
         )
     }
+
+    /// The environment a local terminal starts with: the Mac's own, as Terminal.app passes it —
+    /// SSH_AUTH_SOCK for the ssh agent, TMPDIR for the private temporary folder, and the rest —
+    /// with this terminal's identity in place of whatever terminal or debugger launched the app.
+    /// SwiftTerm's default passed only TERM, COLORTERM, LANG, LOGNAME, USER and HOME (2026-10-07).
+    static func environment(from inherited: [String: String],
+                            version: String? = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String)
+        -> [String] {
+        var environment = inherited.filter { name, _ in
+            !inheritedTerminalNames.contains(name) && !inheritedPrefixes.contains { name.hasPrefix($0) }
+        }
+        environment["TERM"] = "xterm-256color"
+        environment["COLORTERM"] = "truecolor"
+        environment["TERM_PROGRAM"] = "GlassPowerTools"
+        environment["TERM_PROGRAM_VERSION"] = version ?? "0"
+        if environment["LANG"] == nil, environment["LC_ALL"] == nil {
+            environment["LANG"] = "en_US.UTF-8"
+        }
+        return environment.filter { !$0.key.isEmpty && !$0.key.contains("=") }
+            .map { "\($0.key)=\($0.value)" }.sorted()
+    }
+
+    /// Another terminal's identity, when the app was started from one: it would describe that
+    /// terminal, not this one. TMUX in particular would make tmux refuse to start a local session.
+    private static let inheritedTerminalNames: Set<String> = [
+        "TERM", "TERM_PROGRAM", "TERM_PROGRAM_VERSION", "TERM_SESSION_ID", "COLORTERM", "TERMINFO",
+        "TMUX", "TMUX_PANE", "STY", "WINDOWID", "WT_SESSION", "INSIDE_EMACS",
+        "LC_TERMINAL", "LC_TERMINAL_VERSION", "XPC_SERVICE_NAME", "NSUnbufferedIO",
+    ]
+
+    /// Loader and debugger settings Xcode gives the app, and other terminals' own variables.
+    private static let inheritedPrefixes = [
+        "DYLD_", "__XPC_", "OS_ACTIVITY_", "MTL_", "CA_DEBUG", "Malloc",
+        "ITERM_", "KITTY_", "WEZTERM_", "GHOSTTY_", "ALACRITTY_", "VSCODE_", "ZELLIJ",
+    ]
 
     private static func expandedPath(_ value: String?) -> String? {
         guard let value else { return nil }

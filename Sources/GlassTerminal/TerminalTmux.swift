@@ -42,11 +42,27 @@ enum TerminalTmux {
 
     private static let missingMarker = "__glass_no_tmux__"
 
+    /// What `list-sessions` prints for each session, read by `parse`: name, attached clients,
+    /// windows, last activity.
+    static let listFormat = "#{session_name}\t#{session_attached}\t#{session_windows}\t#{session_activity}"
+
+    /// A session name Glass will pass to tmux: tmux rejects `:` and `.` in names, a leading `-`
+    /// would read as an option, and control characters have no business in a tab's record.
+    static func isValidSessionName(_ name: String) -> Bool {
+        !name.isEmpty && name.utf8.count <= 128 && !name.hasPrefix("-")
+            && !name.unicodeScalars.contains { $0 == ":" || $0 == "." || $0.properties.generalCategory == .control }
+    }
+
+    /// An exec channel's `sh -c` has the system PATH only, and a Mac's tmux is usually Homebrew's
+    /// (D47: a Vision Pro reaching a Mac's local tmux sessions over SSH). Appended, so a tmux
+    /// already on the PATH still wins.
+    private static let searchPath = #"PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; "#
+
     /// Lists the host's sessions, or says tmux is missing. Exits 0 either way: "no server running"
     /// is an empty list, not a failure.
     static var listCommand: String {
-        let script = "command -v tmux >/dev/null 2>&1 || { echo \(missingMarker); exit 0; }; "
-            + "tmux list-sessions -F '#{session_name}\t#{session_attached}\t#{session_windows}\t#{session_activity}' "
+        let script = searchPath + "command -v tmux >/dev/null 2>&1 || { echo \(missingMarker); exit 0; }; "
+            + "tmux list-sessions -F '\(listFormat)' "
             + "2>/dev/null; exit 0"
         return "sh -c \(quoted(script))"
     }
@@ -89,11 +105,22 @@ enum TerminalTmux {
     /// is a pane, so the exact session name needs its colon: `=name` alone answers nothing
     /// (found live on the test VM, tmux 3.6).
     static func currentPathCommand(name: String) -> String {
-        "sh -c \(quoted("tmux display-message -p -t \(quoted("=" + name + ":")) '#{pane_current_path}'"))"
+        "sh -c \(quoted(searchPath + "tmux display-message -p -t \(quoted("=" + name + ":")) '#{pane_current_path}'"))"
+    }
+
+    /// Scrolls the session's history `lines` toward earlier output, or back when negative: up
+    /// enters copy mode, which `-e` leaves at the bottom; down outside it is a harmless error.
+    /// tmux's `;` is quoted so that `sh` passes it to tmux rather than ending the command.
+    static func scrollCommand(name: String, lines: Int) -> String {
+        let target = quoted("=" + name + ":")
+        let tmux = lines > 0
+            ? "tmux copy-mode -e -t \(target) ';' send-keys -t \(target) -X -N \(lines) scroll-up"
+            : "tmux send-keys -t \(target) -X -N \(-lines) scroll-down"
+        return "sh -c \(quoted(searchPath + tmux))"
     }
 
     static func killCommand(name: String) -> String {
-        "sh -c \(quoted("tmux kill-session -t \(quoted("=" + name))"))"
+        "sh -c \(quoted(searchPath + "tmux kill-session -t \(quoted("=" + name))"))"
     }
 
     /// POSIX single quoting. `'\''` also reads correctly in fish, where `\'` outside quotes is a quote.

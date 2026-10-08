@@ -18,14 +18,19 @@ import GlassShell
 
 extension GlassTerminalCapability {
     public func runningSessions() async -> [GlassRunningSession] {
+        #if os(macOS)
+        let local = await localTmuxSessions()
+        #else
+        let local: [GlassRunningSession] = []
+        #endif
         let manager = runtime.sessionManager
         let servers = manager.serverManager.servers.filter(\.keepsSessionsInTmux)
-        guard !servers.isEmpty else { return [] }
+        guard !servers.isEmpty else { return local }
         // Every host asked at once; each task is on the main actor and waits on the network.
         let asks = servers.map { server in (server.id, Task { await self.tmuxSessions(on: server) }) }
         var listings: [UUID: [TerminalTmux.Session]] = [:]
         for (id, ask) in asks { listings[id] = await ask.value }
-        return servers.flatMap { server -> [GlassRunningSession] in
+        return local + servers.flatMap { server -> [GlassRunningSession] in
             // Shown here already: a live terminal on this device attached to it.
             let shownHere = Set(manager.sessions.compactMap { session -> String? in
                 guard session.server.id == server.id, session.purpose == .terminal,
@@ -39,17 +44,49 @@ extension GlassTerminalCapability {
         }
     }
 
-    private func runningSession(_ tmux: TerminalTmux.Session, on server: ServerConfiguration) -> GlassRunningSession {
+    #if os(macOS)
+    /// D47: this Mac's own tmux sessions, under This Mac — the local tabs someone closed, and
+    /// sessions started anywhere else. Those a tab here shows are left out, as for a host.
+    private func localTmuxSessions() async -> [GlassRunningSession] {
+        let server = MacLocalTmux.server
+        guard let tmux = server.executablePath() else { return [] }
+        let output = await Task.detached(priority: .userInitiated) { server.listSessions(tmux) }.value
         let runtime = self.runtime
+        return MacLocalTmux.listable(MacLocalTmux.sessions(from: output)).map { session in
+            GlassRunningSession(
+                id: "terminal-tmux:local:\(session.name)",
+                title: session.isGlass ? "Terminal \(TerminalTmux.glassNumber(session.name) ?? 0)" : session.name,
+                subtitle: Self.runningDetails(session),
+                symbolName: "terminal",
+                endpointID: Self.localShellEndpointID,
+                isAttachedElsewhere: session.attachedClients > 0,
+                open: { runtime.enqueue(.localTerminal(tmux: session.name)) },
+                takeOver: {
+                    Task { @MainActor in
+                        await Task.detached { server.detachClients(session.name, tmux) }.value
+                        runtime.enqueue(.localTerminal(tmux: session.name))
+                    }
+                },
+                end: { await Task.detached { server.kill(session.name, tmux) }.value })
+        }
+    }
+    #endif
+
+    static func runningDetails(_ tmux: TerminalTmux.Session) -> String {
         var details: [String] = [tmux.attachedClients > 0 ? "Open elsewhere" : "Detached"]
         if tmux.windows > 1 { details.append("\(tmux.windows) windows") }
         if let activity = tmux.lastActivity {
             details.append("used " + activity.formatted(.relative(presentation: .named)))
         }
+        return details.joined(separator: " · ")
+    }
+
+    private func runningSession(_ tmux: TerminalTmux.Session, on server: ServerConfiguration) -> GlassRunningSession {
+        let runtime = self.runtime
         return GlassRunningSession(
             id: "terminal-tmux:\(server.id.uuidString):\(tmux.name)",
             title: tmux.isGlass ? "Terminal \(TerminalTmux.glassNumber(tmux.name) ?? 0)" : tmux.name,
-            subtitle: details.joined(separator: " · "),
+            subtitle: Self.runningDetails(tmux),
             symbolName: "terminal",
             endpointID: EndpointID(rawValue: server.id),
             isAttachedElsewhere: tmux.attachedClients > 0,
