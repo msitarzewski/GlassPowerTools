@@ -19,7 +19,8 @@ enum MacLocalTmux {
     /// The tmux the workspace talks to. Tests put a stand-in here.
     struct Server: Sendable {
         var executablePath: @Sendable () -> String?
-        /// `list-sessions` in `TerminalTmux.listFormat`, as printed; nil when tmux failed.
+        /// `TerminalTmux.listScript`'s answer, as printed: sessions in `TerminalTmux.listFormat`,
+        /// or its failure marker; nil when it could not be run.
         var listSessions: @Sendable (_ tmux: String) -> String?
         var kill: @Sendable (_ name: String, _ tmux: String) -> Void
         var detachClients: @Sendable (_ name: String, _ tmux: String) -> Void
@@ -28,7 +29,7 @@ enum MacLocalTmux {
 
         nonisolated static let live = Server(
             executablePath: { MacLocalTmux.executablePath() },
-            listSessions: { MacLocalTmux.run($0, ["list-sessions", "-F", MacLocalTmux.listFormat]) },
+            listSessions: { MacLocalTmux.run("/bin/sh", ["-c", TerminalTmux.listScript(tmux: TerminalTmux.quoted($0))]) },
             kill: { MacLocalTmux.kill($0, tmux: $1) },
             detachClients: { MacLocalTmux.detachClients($0, tmux: $1) },
             scroll: { name, lines, tmux in
@@ -64,25 +65,32 @@ enum MacLocalTmux {
     /// Names chosen in this process and not yet started, so panes opening together do not share one.
     @MainActor private static var reserved: Set<String> = []
 
-    /// A free `glass-N` on this Mac's tmux server.
+    /// A free `glass-N` on this Mac's tmux server. When the sessions cannot be read, a number far
+    /// above those in use, as for a host (`TerminalTmux.unlistedName`): `glass-1` may be running,
+    /// and the pane's `new-session -A` would join it.
     @MainActor static func allocateName(tmux: String) -> String {
-        let name = TerminalTmux.nextName(avoiding: Set(sessions(tmux: tmux).map(\.name)).union(reserved))
+        let name = listing(tmux: tmux).map { TerminalTmux.nextName(avoiding: Set($0.map(\.name)).union(reserved)) }
+            ?? TerminalTmux.unlistedName(avoiding: reserved)
         reserved.insert(name)
         return name
     }
 
-    /// The Mac's tmux sessions, in the form D44 reads from a host; none when no server runs.
+    /// The Mac's tmux sessions, in the form D44 reads from a host; none when no server runs, and
+    /// none when they cannot be read — for a list to show. Choosing a name asks `listing`.
     @MainActor static func sessions(tmux: String) -> [TerminalTmux.Session] {
         sessions(from: server.listSessions(tmux))
+    }
+
+    /// The Mac's tmux sessions, or nil when tmux could not be asked or its answer not read.
+    @MainActor static func listing(tmux: String) -> [TerminalTmux.Session]? {
+        guard let output = server.listSessions(tmux), case .sessions(let sessions) = TerminalTmux.parse(output) else { return nil }
+        return sessions
     }
 
     @MainActor static func sessions(from output: String?) -> [TerminalTmux.Session] {
         guard let output, case .sessions(let sessions) = TerminalTmux.parse(output) else { return [] }
         return sessions
     }
-
-    /// `TerminalTmux.listFormat`, readable off the main actor.
-    nonisolated static let listFormat = "#{session_name}\t#{session_attached}\t#{session_windows}\t#{session_activity}"
 
     /// What Active lists under This Mac: every session but those a tab here is showing, Glass's
     /// own first by number, as for any other machine.
@@ -101,9 +109,10 @@ enum MacLocalTmux {
 
     /// What the session's active pane shows: the directory its shell is in, and the title a
     /// program set. tmux keeps both from the terminal outside it, so a tab in tmux asks.
-    nonisolated static func context(session: String, tmux: String) -> MacWorkspacePaneContext? {
-        run(tmux, ["display-message", "-p", "-t", "=" + session + ":",
-                   "#{pane_current_path}\t#{host}\t#{host_short}\t#{pane_title}"]).flatMap(parseContext)
+    nonisolated static func context(session: String, tmux: String,
+                                    environment: [String: String] = ProcessInfo.processInfo.environment) -> MacWorkspacePaneContext? {
+        run(tmux, ["-u", "display-message", "-p", "-t", "=" + session + ":",
+                   "#{pane_current_path}\t#{host}\t#{host_short}\t#{pane_title}"], environment: environment).flatMap(parseContext)
     }
 
     /// tmux titles a pane with the host name until a program sets one; that is not a title.
@@ -125,7 +134,7 @@ enum MacLocalTmux {
 
     /// Ends a session and everything in it — Active's End. A session already gone is not an error.
     nonisolated static func kill(_ name: String, tmux: String) {
-        _ = run(tmux, ["kill-session", "-t", "=" + name])
+        _ = run(tmux, ["-u", "kill-session", "-t", "=" + name])
     }
 
     /// Scrolling a session's history like a terminal's scrollback (2026-10-08): up enters copy
@@ -134,15 +143,15 @@ enum MacLocalTmux {
         guard lines != 0 else { return nil }
         let target = "=" + session + ":"
         return lines > 0
-            ? ["copy-mode", "-e", "-t", target, ";", "send-keys", "-t", target, "-X", "-N", String(lines), "scroll-up"]
-            : ["send-keys", "-t", target, "-X", "-N", String(-lines), "scroll-down"]
+            ? ["-u", "copy-mode", "-e", "-t", target, ";", "send-keys", "-t", target, "-X", "-N", String(lines), "scroll-up"]
+            : ["-u", "send-keys", "-t", target, "-X", "-N", String(-lines), "scroll-down"]
     }
 
     nonisolated static let scrollQueue = DispatchQueue(label: "GlassPowerTools.local-tmux-scroll", qos: .userInteractive)
 
     /// Detaches everyone else from a session — Active's Take Over, before this Mac attaches.
     nonisolated static func detachClients(_ name: String, tmux: String) {
-        _ = run(tmux, ["detach-client", "-s", "=" + name])
+        _ = run(tmux, ["-u", "detach-client", "-s", "=" + name])
     }
 
     /// The process a local pane runs when it is kept in tmux: attach to its session, or create it
@@ -153,7 +162,7 @@ enum MacLocalTmux {
     /// output (DEC 2026), so tmux sends each redraw as one frame, and 24-bit colour, which tmux
     /// otherwise reduces to the 256-colour palette. SwiftTerm supports both.
     nonisolated static func arguments(session: String, directory: String) -> [String] {
-        ["-T", "sync,RGB", "new-session", "-A", "-s", session, "-c", directory]
+        ["-u", "-T", "sync,RGB", "new-session", "-A", "-s", session, "-c", directory]
     }
 
     // MARK: Reopening after a quit
@@ -190,7 +199,8 @@ enum MacLocalTmux {
     /// Runs tmux and returns what it printed, or nil when it failed. `posix_spawn` and `waitpid`
     /// rather than `Process`: `waitUntilExit` spins the caller's run loop, and these queries run
     /// on the main thread while a tab is being set up. tmux answers in milliseconds.
-    nonisolated static func run(_ executable: String, _ arguments: [String]) -> String? {
+    nonisolated static func run(_ executable: String, _ arguments: [String],
+                                environment: [String: String] = ProcessInfo.processInfo.environment) -> String? {
         var output: [Int32] = [-1, -1]
         guard pipe(&output) == 0 else { return nil }
         var actions: posix_spawn_file_actions_t?
@@ -204,7 +214,9 @@ enum MacLocalTmux {
         let argv = ([executable] + arguments).map { strdup($0) } + [nil]
         defer { argv.forEach { free($0) } }
         var pid: pid_t = 0
-        let spawned = posix_spawn(&pid, executable, &actions, nil, argv, environ)
+        let envp = spawnEnvironment(environment).map { strdup($0) } + [nil]
+        defer { envp.forEach { free($0) } }
+        let spawned = posix_spawn(&pid, executable, &actions, nil, argv, envp)
         close(output[1])
         let reader = FileHandle(fileDescriptor: output[0], closeOnDealloc: true)
         guard spawned == 0 else { return nil }
@@ -212,6 +224,17 @@ enum MacLocalTmux {
         var status: Int32 = 0
         while waitpid(pid, &status, 0) == -1, errno == EINTR {}
         return status == 0 ? String(decoding: data, as: UTF8.self) : nil
+    }
+
+    /// The app's environment with a UTF-8 locale when it has none — the app is started by launchd,
+    /// which sets none, and tmux then answered with `_` for every tab (2026-10-08). The same rule
+    /// as a local pane's (`MacLocalTerminalConfiguration.environment`); `-u` covers tmux itself.
+    nonisolated static func spawnEnvironment(_ environment: [String: String]) -> [String] {
+        var environment = environment
+        if environment["LANG"] == nil, environment["LC_ALL"] == nil, environment["LC_CTYPE"] == nil {
+            environment["LANG"] = "en_US.UTF-8"
+        }
+        return environment.map { "\($0.key)=\($0.value)" }.sorted()
     }
 }
 #endif

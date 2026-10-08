@@ -104,7 +104,11 @@ extension GlassTerminalCapability {
     private func tmuxSessions(on server: ServerConfiguration) async -> [TerminalTmux.Session] {
         do {
             let output = try await withTmuxSession(on: server) { try await $0.runTmuxCommand(TerminalTmux.listCommand) }
-            if case .sessions(let sessions) = TerminalTmux.parse(output) { return sessions }
+            switch TerminalTmux.parse(output) {
+            case .sessions(let sessions): return sessions
+            case .failed: Logger.ssh.notice("tmux sessions on a saved server could not be read")
+            case .unavailable: break
+            }
         } catch {
             Logger.ssh.notice("tmux sessions on a saved server not listed: \(error.localizedDescription, privacy: .public)")
         }

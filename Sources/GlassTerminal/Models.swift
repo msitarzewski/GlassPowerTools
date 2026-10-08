@@ -851,6 +851,9 @@ class TerminalSession: Identifiable, Hashable {
                         tmuxAvailabilityObserved?(true)
                         taken.formUnion(sessions.map(\.name))
                         listed = true
+                    case .failed:
+                        tmuxAvailabilityObserved?(true)
+                        Logger.ssh.error("tmux answered the session list with something other than a list")
                     }
                 } catch {
                     Logger.ssh.error("tmux list failed: \(error.localizedDescription, privacy: .public)")

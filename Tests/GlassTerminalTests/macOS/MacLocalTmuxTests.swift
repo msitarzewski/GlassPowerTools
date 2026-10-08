@@ -97,7 +97,7 @@ struct MacLocalTmuxTests {
         let tmux = MacLocalTerminalConfiguration.resolve(shell: nil, directory: "/tmp", tmuxSession: "glass-3",
                                                          tmux: "/opt/homebrew/bin/tmux")
         #expect(tmux.executable == "/opt/homebrew/bin/tmux")
-        #expect(tmux.arguments == ["-T", "sync,RGB", "new-session", "-A", "-s", "glass-3", "-c", "/tmp"],
+        #expect(tmux.arguments == ["-u", "-T", "sync,RGB", "new-session", "-A", "-s", "glass-3", "-c", "/tmp"],
                 "tmux is told this terminal draws synchronized frames and 24-bit colour")
         #expect(tmux.currentDirectory == "/tmp")
 
@@ -201,6 +201,66 @@ struct MacLocalTmuxTests {
         }
     }
 
+    // MARK: tmux in UTF-8 (2026-10-08)
+    //
+    // launchd starts the app with no locale, and tmux without one prints the tabs in its answers
+    // as `_`: the Mac's sessions read as none, a pane's folder as unknown, and a new pane could be
+    // given a `glass-N` already running.
+
+    @Test("this Mac's tmux is always asked in UTF-8")
+    func utf8() throws {
+        #expect(MacLocalTmux.spawnEnvironment(["PATH": "/usr/bin"]).contains("LANG=en_US.UTF-8"))
+        #expect(MacLocalTmux.spawnEnvironment(["LANG": "fr_FR.UTF-8"]) == ["LANG=fr_FR.UTF-8"], "a locale already set is kept")
+        let scroll = try #require(MacLocalTmux.scrollArguments(session: "glass-1", lines: 1))
+        for arguments in [scroll, MacLocalTmux.arguments(session: "glass-1", directory: "/tmp")] {
+            #expect(arguments.first == "-u")
+        }
+    }
+
+    @Test("with the app's environment and no locale, the Mac's sessions and a pane's folder read",
+          .enabled(if: TerminalTmuxTests.tmux != nil))
+    func utf8Live() throws {
+        let tmux = try #require(TerminalTmuxTests.tmux)
+        let folder = URL(fileURLWithPath: "/tmp/gpt-\(UUID().uuidString.prefix(8))")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let environment = ["PATH": "/usr/bin:/bin", "TMUX_TMPDIR": folder.path]
+        _ = MacLocalTmux.run(tmux, ["-f", "/dev/null", "new-session", "-d", "-s", "glass-1", "-c", folder.path,
+                                    "-x", "80", "-y", "10", "sleep 30"], environment: environment)
+        // The private server by its socket: named, tmux never falls back to the default one.
+        defer { _ = MacLocalTmux.run(tmux, ["-S", "\(folder.path)/tmux-\(getuid())/default", "kill-server"], environment: environment) }
+        let listing = MacLocalTmux.run("/bin/sh", ["-c", TerminalTmux.listScript(tmux: TerminalTmux.quoted(tmux))],
+                                       environment: environment)
+        guard case .sessions(let sessions)? = listing.map(TerminalTmux.parse) else {
+            Issue.record("not read as a list: \(listing ?? "nothing")")
+            return
+        }
+        #expect(sessions.map(\.name) == ["glass-1"])
+        let directory = MacLocalTmux.context(session: "glass-1", tmux: tmux, environment: environment)?.directory
+        #expect(directory.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path } == folder.resolvingSymlinksInPath().path)
+    }
+
+    @Test("a list it cannot read never gives a new pane glass-1, and never drops a saved session")
+    func unreadable() async throws {
+        let suite = "MacLocalTmuxTests.\(UUID())"
+        let defaults = try #require(UserDefaults.forTest(suiteName: suite))
+        MacLocalTmux.server = MacLocalTmux.Server(
+            executablePath: { "/opt/homebrew/bin/tmux" },
+            listSessions: { _ in "glass-1_1_1_1790000000\n" },
+            kill: { _, _ in }, detachClients: { _, _ in }, scroll: { _, _, _ in })
+        defer {
+            MacLocalTmux.server = .live
+            defaults.removePersistentDomain(forName: suite)
+        }
+        defaults.set(true, forKey: UserDefaultsKeys.localTmux)
+        let id = UUID()
+        let name = try #require(localTab(defaults, id: id).state.root?.panes.first?.intent.localTmuxSession)
+        #expect((TerminalTmux.glassNumber(name) ?? 0) >= 100, "not glass-1: \(name)")
+        defaults.set(false, forKey: UserDefaultsKeys.localTmux)
+        #expect(localTab(defaults, id: id).state.root?.panes.first?.intent.localTmuxSession == name,
+                "off, and tmux could not say: the saved session is kept, not dropped")
+    }
+
     @Test("with the setting off nothing changes")
     func off() async throws {
         try await withFake { _, defaults in
@@ -273,9 +333,9 @@ struct MacLocalTmuxTests {
     @Test("scrolling over a local tmux pane scrolls tmux's history, in whole lines a frame at a time")
     func scrolling() async throws {
         #expect(MacLocalTmux.scrollArguments(session: "glass-2", lines: 3)
-                == ["copy-mode", "-e", "-t", "=glass-2:", ";", "send-keys", "-t", "=glass-2:", "-X", "-N", "3", "scroll-up"])
+                == ["-u", "copy-mode", "-e", "-t", "=glass-2:", ";", "send-keys", "-t", "=glass-2:", "-X", "-N", "3", "scroll-up"])
         #expect(MacLocalTmux.scrollArguments(session: "glass-2", lines: -2)
-                == ["send-keys", "-t", "=glass-2:", "-X", "-N", "2", "scroll-down"])
+                == ["-u", "send-keys", "-t", "=glass-2:", "-X", "-N", "2", "scroll-down"])
         #expect(MacLocalTmux.scrollArguments(session: "glass-2", lines: 0) == nil)
         try await withFake { fake, defaults in
             defaults.set(true, forKey: UserDefaultsKeys.localTmux)

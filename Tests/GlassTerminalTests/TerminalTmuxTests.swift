@@ -50,10 +50,10 @@ struct TerminalTmuxTests {
     func commands() {
         #expect(TerminalTmux.quoted("it's") == "'it'\\''s'")
         #expect(TerminalTmux.attachLine(name: "glass-2", takeOver: false)
-                == " command -v tmux >/dev/null && exec tmux new-session -A -s 'glass-2'")
+                == " command -v tmux >/dev/null && exec tmux -u new-session -A -s 'glass-2'")
         #expect(TerminalTmux.attachLine(name: "work", takeOver: true).contains("new-session -A -D -s 'work'"))
         #expect(TerminalTmux.killCommand(name: "work")
-                == #"sh -c 'PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; tmux kill-session -t '\''=work'\'''"#)
+                == #"sh -c 'PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; tmux -u kill-session -t '\''=work'\'''"#)
         // D47: every exec-channel command also looks where Homebrew puts tmux on a Mac.
         for command in [TerminalTmux.listCommand, TerminalTmux.currentPathCommand(name: "glass-1")] {
             #expect(command.contains(#"PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; "#))
@@ -77,12 +77,12 @@ struct TerminalTmuxTests {
         await session.waitForTmuxAttach()
         await session.waitUntilTerminalWritesComplete()
         #expect(session.tmuxSessionName == "glass-2")
-        #expect(writes.lines == [" command -v tmux >/dev/null && exec tmux new-session -A -s 'glass-2'\n", "htop\n"])
+        #expect(writes.lines == [" command -v tmux >/dev/null && exec tmux -u new-session -A -s 'glass-2'\n", "htop\n"])
     }
 
     @Test("scrolling a terminal in tmux scrolls tmux's history on the host, one command at a time")
     func scrolling() async {
-        #expect(TerminalTmux.scrollCommand(name: "glass-2", lines: 3) == #"sh -c 'PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; tmux copy-mode -e -t '\''=glass-2:'\'' '\'';'\'' send-keys -t '\''=glass-2:'\'' -X -N 3 scroll-up'"#)
+        #expect(TerminalTmux.scrollCommand(name: "glass-2", lines: 3) == #"sh -c 'PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; tmux -u copy-mode -e -t '\''=glass-2:'\'' '\'';'\'' send-keys -t '\''=glass-2:'\'' -X -N 3 scroll-up'"#)
         var asked: [String] = []
         let session = session(server(tmux: true), writes: Writes(), listing: "", commands: { asked.append($0) })
         let scroll = session.terminalHostModel.onAlternateScreenScroll
@@ -119,7 +119,8 @@ struct TerminalTmuxTests {
         }
         let tmux = TerminalTmuxTests.tmux!
         _ = sh("\(tmux) -f /dev/null new-session -d -s glass-7 -x 80 -y 10 'seq 1 200; sleep 30'")
-        defer { _ = sh("\(tmux) kill-server") }
+        // The private server by its socket: named, tmux never falls back to the default one.
+        defer { _ = sh("\(tmux) -S \(folder.path)/tmux-\(getuid())/default kill-server") }
         Thread.sleep(forTimeInterval: 0.3)
         _ = sh(TerminalTmux.scrollCommand(name: "glass-7", lines: 5))
         #expect(sh("\(tmux) display-message -p -t '=glass-7:' '#{pane_in_mode} #{scroll_position}'") == "1 5\n")
@@ -129,6 +130,87 @@ struct TerminalTmuxTests {
 
     nonisolated static let tmux: String? = ["/opt/homebrew/bin/tmux", "/usr/local/bin/tmux", "/usr/bin/tmux"]
         .first { FileManager.default.isExecutableFile(atPath: $0) }
+
+    // MARK: tmux in UTF-8 (2026-10-08)
+    //
+    // An SSH command on a Mac host has no locale, and tmux without one prints the tabs in its
+    // answers as `_`: every listing read as "no sessions", and a new terminal joined `glass-1`.
+
+    @Test("an answer tmux mangled, or an error, is a failure: never \"no sessions\"")
+    func unreadable() {
+        #expect(TerminalTmux.parse("glass-1_1_1_1700000000\n") == .failed)
+        #expect(TerminalTmux.parse("__glass_tmux_failed__\n") == .failed)
+        #expect(TerminalTmux.parse("\n") == .sessions([]), "nothing printed: no sessions")
+    }
+
+    @Test("a new terminal never takes a name from an answer it could not read")
+    func unreadableConnect() async {
+        let session = session(server(tmux: true), writes: Writes(), listing: "glass-1_1_1_1700000000\n")
+        session.state = .connected
+        await session.waitForTmuxAttach()
+        let name = session.tmuxSessionName
+        #expect(name.flatMap(TerminalTmux.glassNumber).map { $0 >= 100 } == true, "not glass-1: \(name ?? "none")")
+    }
+
+    @Test("every tmux run on a host is told the terminal is UTF-8")
+    func utf8() throws {
+        let commands = [TerminalTmux.listCommand, TerminalTmux.currentPathCommand(name: "glass-1"),
+                        TerminalTmux.scrollCommand(name: "glass-1", lines: 2), TerminalTmux.scrollCommand(name: "glass-1", lines: -2),
+                        TerminalTmux.killCommand(name: "glass-1"), TerminalTmux.attachLine(name: "glass-1", takeOver: true)]
+        let withoutU = try NSRegularExpression(pattern: #"\btmux (?!-u )"#)
+        for command in commands {
+            let runs = command.replacingOccurrences(of: "command -v tmux", with: "")
+            #expect(withoutU.numberOfMatches(in: runs, range: NSRange(runs.startIndex..., in: runs)) == 0, "\(command)")
+        }
+    }
+
+    /// The list command as a Mac host runs it over SSH: `sh`, the system PATH, and no locale.
+    @Test("the list command reads a real tmux with no locale; no server is no sessions; an error is a failure",
+          .enabled(if: TerminalTmuxTests.tmux != nil))
+    func listingLive() throws {
+        // Short: a socket path has a length limit, and some temporary folders are long.
+        let folder = URL(fileURLWithPath: "/tmp/gpt-\(UUID().uuidString.prefix(8))")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let environment = ["TMUX_TMPDIR": folder.path, "PATH": "/usr/bin:/bin"]
+        let tmux = TerminalTmuxTests.tmux!
+        #expect(TerminalTmux.parse(Self.shell(TerminalTmux.listCommand, environment)) == .sessions([]),
+                "no server running: nothing runs, which is not a failure")
+        _ = Self.shell("\(tmux) -f /dev/null new-session -d -s glass-1 -x 80 -y 10 'sleep 30'", environment)
+        defer { _ = Self.shell("\(tmux) -S \(folder.path)/tmux-\(getuid())/default kill-server", environment) }
+        guard case .sessions(let sessions) = TerminalTmux.parse(Self.shell(TerminalTmux.listCommand, environment)) else {
+            Issue.record("not read as a list")
+            return
+        }
+        #expect(sessions.map(\.name) == ["glass-1"])
+    }
+
+    /// A tmux that fails in some way other than "no server running" — never a real one: given a
+    /// folder it cannot use, tmux falls back to the default server.
+    @Test("a tmux that fails for any other reason is a failure, not an empty host")
+    func listingFailure() throws {
+        let folder = URL(fileURLWithPath: "/tmp/gpt-\(UUID().uuidString.prefix(8))")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let tmux = folder.appendingPathComponent("tmux")
+        try Data("#!/bin/sh\necho 'server exited unexpectedly' >&2\nexit 1\n".utf8).write(to: tmux)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: tmux.path)
+        let environment = ["PATH": "\(folder.path):/usr/bin:/bin"]
+        #expect(TerminalTmux.parse(Self.shell(TerminalTmux.listCommand, environment)) == .failed)
+    }
+
+    nonisolated static func shell(_ command: String, _ environment: [String: String]) -> String {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", command]
+        process.environment = environment
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        try? process.run()
+        process.waitUntilExit()
+        return String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+    }
 
     @Test("when the host's sessions cannot be listed, a new terminal never takes glass-1")
     func unlisted() async {

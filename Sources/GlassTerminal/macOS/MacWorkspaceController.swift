@@ -550,6 +550,7 @@ final class MacWorkspaceController {
         let server = MacLocalTmux.server
         let tmux = server.executablePath()
         var running: Set<String>?
+        var unreadable = false
         var updated = root
         for pane in panes {
             let session = tmux.flatMap { tmux in
@@ -557,9 +558,12 @@ final class MacWorkspaceController {
                     saved: pane.intent.localTmuxSession,
                     enabled: enabled,
                     isRunning: { name in
-                        let names = running ?? Set(MacLocalTmux.sessions(tmux: tmux).map(\.name))
-                        running = names
-                        return names.contains(name)
+                        if running == nil, !unreadable {
+                            running = MacLocalTmux.listing(tmux: tmux).map { Set($0.map(\.name)) }
+                            unreadable = running == nil
+                        }
+                        // Unread, a saved session is kept: it may well be running.
+                        return unreadable || running?.contains(name) == true
                     },
                     allocate: { MacLocalTmux.allocateName(tmux: tmux) }
                 )
