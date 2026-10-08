@@ -16,6 +16,9 @@ import GlassLayers
 /// Toolbar entries for the shell's library toolbar.
 public struct GlassTerminalLibraryToolbar: View {
     private let runtime: GlassTerminalRuntime
+    #if os(macOS)
+    @Environment(\.openWindow) private var openWindow
+    #endif
 
     public init(runtime: GlassTerminalRuntime) { self.runtime = runtime }
 
@@ -41,6 +44,16 @@ public struct GlassTerminalLibraryToolbar: View {
         }
         .help("Local Terminal")
         .accessibilityIdentifier("connection-library-local-terminal-toolbar")
+        // The owner's "system tool in the connections window" (W9): every terminal window and its
+        // tabs at once. Its key is Window ▸ Show All Terminals', not this button's (rule 39).
+        Button {
+            MacTerminalExpose.shared.toggle(.init(runtime: runtime, openWindow: openWindow))
+        } label: {
+            Label("Show All Terminals", systemImage: "rectangle.3.group")
+        }
+        .help("Show All Terminals")
+        .disabled(!MacTerminalExpose.shared.isAvailable)
+        .accessibilityIdentifier("connection-library-show-all-terminals")
         #endif
     }
 }
@@ -129,6 +142,15 @@ struct TerminalLibraryCommands: Commands {
         // the owner opens Workgroups from here (2026-10-08).
         CommandGroup(after: .singleWindowList) {
             Button("Workgroups") { runtime.showWorkgroups(openWindow: openWindow) }
+            // ⇧⌘\ is Safari's Show All Tabs; here, every terminal window and its tabs (W9). This
+            // item is its one owner, and it works from any window, Connections included.
+            Button("Show All Terminals") {
+                MacTerminalExpose.shared.toggle(.init(runtime: runtime, openWindow: openWindow))
+            }
+            .keyboardShortcut("\\", modifiers: [.command, .shift])
+            // Never disabled: a Commands body was not seen to follow an observed value (W9), so a
+            // disabled item could stay grey with windows open. With none open it says so, and
+            // still lists the tmux sessions no tab shows.
         }
         #endif
     }

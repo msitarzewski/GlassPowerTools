@@ -351,6 +351,13 @@ struct MacWorkspaceView: View {
                 overviewPresented: showingOverview
             )
         }
+        // A two-finger pinch in shows every terminal (W9). The monitor keeps every pinch in this
+        // window from the terminals, so none is ever zoomed by one.
+        .background {
+            MacTerminalExposePinchMonitor { outcome in
+                if outcome == .pinchedIn { MacTerminalExpose.shared.show(exposeContext) }
+            }
+        }
         // ⌘N, while a terminal workspace is focused, means a new terminal window. The shell owns
         // the one File ▸ New item and each window says what it makes (`GlassShellFileCommands`).
         .focusedSceneValue(\.glassNewItem, GlassNewItemAction(title: "New Terminal Window") {
@@ -475,12 +482,28 @@ struct MacWorkspaceView: View {
     }
 
 
+    /// What Show All Terminals draws with, from this window.
+    private var exposeContext: MacTerminalExpose.Context {
+        MacTerminalExpose.Context(sessionManager: sessionManager, settingsManager: settingsManager,
+                                  openWindow: openWindow)
+    }
+
     @ToolbarContentBuilder
     private func workspaceToolbar(selected: MacWorkspaceController) -> some ToolbarContent {
             ToolbarItem(id: "terminal-overview") {
                 Button("Terminal Overview", systemImage: "square.grid.2x2", action: openOverview)
                     .help("Show all terminal tabs as a grid or carousel")
                     .accessibilityIdentifier("mac-workspace-overview")
+            }
+            .glassKeepVisibleWhenCompact()
+            // Every terminal window and its tabs, not just this one's (W9). ⇧⌘\ is the Window
+            // menu item's, not this button's.
+            ToolbarItem(id: "show-all-terminals") {
+                Button("Show All Terminals", systemImage: "rectangle.3.group") {
+                    MacTerminalExpose.shared.toggle(exposeContext)
+                }
+                .help("Show All Terminals")
+                .accessibilityIdentifier("mac-workspace-show-all-terminals")
             }
             .glassKeepVisibleWhenCompact()
             ToolbarItem(id: "save-workspace") {

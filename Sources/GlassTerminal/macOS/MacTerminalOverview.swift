@@ -13,11 +13,15 @@ final class MacWorkspacePreviewRegistry {
     private final class Entry {
         weak var controller: MacWorkspaceWindowController?
         weak var window: NSWindow?
-        init(_ controller: MacWorkspaceWindowController, window: NSWindow) {
+        /// When the window was first found, for an order that does not change while it is open.
+        let order: Int
+        init(_ controller: MacWorkspaceWindowController, window: NSWindow, order: Int) {
             self.controller = controller
             self.window = window
+            self.order = order
         }
     }
+    @ObservationIgnored private var nextOrder = 0
     private final class Built {
         weak var controller: MacWorkspaceWindowController?
         init(_ controller: MacWorkspaceWindowController) { self.controller = controller }
@@ -32,7 +36,8 @@ final class MacWorkspacePreviewRegistry {
 
     func register(_ controller: MacWorkspaceWindowController, window: NSWindow) {
         guard entries[controller.windowID]?.window !== window else { return }
-        entries[controller.windowID] = Entry(controller, window: window)
+        entries[controller.windowID] = Entry(controller, window: window, order: nextOrder)
+        nextOrder += 1
     }
 
     /// The window has closed: neither it nor its controller is found again, so a window opened
@@ -69,6 +74,23 @@ final class MacWorkspacePreviewRegistry {
     /// The controllers of the terminal windows on screen.
     var shownControllers: [MacWorkspaceWindowController] {
         entries.keys.sorted { $0.uuidString < $1.uuidString }.compactMap(shownController(windowID:))
+    }
+
+    /// A terminal window on screen and the controller it shows.
+    struct ShownWindow {
+        let controller: MacWorkspaceWindowController
+        let window: NSWindow
+    }
+
+    /// The terminal windows on screen, oldest first: Show All Terminals' groups, in an order that
+    /// stays put while windows come and go. A window whose last tab has left is closing, and is
+    /// not one of them.
+    var shownWindows: [ShownWindow] {
+        entries.values.sorted { $0.order < $1.order }.compactMap { entry in
+            guard let controller = entry.controller, let window = entry.window,
+                  !controller.closesAfterLastTabLeft else { return nil }
+            return ShownWindow(controller: controller, window: window)
+        }
     }
 
     /// The ids of terminal windows open or opening: shown, or with a controller made for them

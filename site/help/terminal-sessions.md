@@ -1,6 +1,6 @@
 # Work in a terminal
 
-This page covers terminal windows and tabs, the session's tools menu, text size, search, pasting, snippets, recording, and the Mac's local shell.
+This page covers terminal windows and tabs, Show All Terminals, the session's tools menu, text size, search, pasting, snippets, recording, and the Mac's local shell.
 
 ## Windows and tabs
 
@@ -21,6 +21,7 @@ This page covers terminal windows and tabs, the session's tools menu, text size,
 | Move the selected tabs to a new window | **Move Tab to New Window**, or right-click the tabs | |
 | Go to tab 1–9 | | ⌘1–⌘9 |
 | All tabs as a grid or carousel | **Terminal Grid**, **Terminal Carousel** | ⌥⌘G, ⌥⇧⌘G |
+| Every terminal window and its tabs at once | **Window ▸ Show All Terminals** | ⇧⌘\ |
 | Find in the focused pane | **Edit ▸ Find ▸ Find…**, **Find Next**, **Find Previous** | ⌘F, ⌘G, ⇧⌘G |
 
 A tab is named after what is running in it: the title a program set (Claude Code's task, the file open in vim), or the folder it is in. In your home folder it takes its Workgroup's name, or, in tmux, its session's name as **Active** shows it (**Terminal 1**), or else the shell's. Below the name: where it is, and **in tmux** when it is kept in tmux.
@@ -28,6 +29,29 @@ A tab is named after what is running in it: the title a program set (Claude Code
 To work with several tabs at once, ⌘-click them in the sidebar, or ⇧-click to select a range; the window shows the tab you clicked last. Right-click the selection for **Move 3 Tabs to New Window** (with however many you chose), which opens one window holding them in their order, still running, or **Close 3 Tabs**, which asks first under the same rules as closing one. **Move Tab to New Window**, in the **Terminal** menu and under **Tab Actions** in the toolbar, moves the selected tabs too; when they are every tab in the window, that window closes. To bring windows together, drag a tab from the sidebar onto another terminal window, anywhere on it, sidebar open or not: it moves there with its terminals still running, and a window whose last tab leaves closes. Dropped on the other window's sidebar, it lands where you drop it; dragging a tab within the sidebar reorders it. Double-click a tab, or right-click it, to rename it. Closing a tab that has an SSH session, a recording, a connection in progress or running commands asks first. A terminal kept in tmux doesn't count: closing it leaves it running, and **Active** lists it (see [Keep terminals running with tmux](terminal-tmux.md)). A Mac's local terminals kept in tmux work the same way, listed under This Mac. Closing a tab never changes a saved Workgroup.
 
 **On iPad and iPhone:** the plus button (**New Terminal Tab**) adds a terminal to the current set. iPad shows the terminals as tabs; iPhone lists them in a menu at the top.
+
+## Show All Terminals
+
+**On Mac:** see every terminal window and all of its tabs at once, the way Mission Control shows windows. The screen dims, and each terminal window becomes a group, named like its window, with a live picture of each tab. Busy tabs show the same moving wave as in the sidebar.
+
+To open it, do any of these:
+
+- Press ⇧⌘\, or choose **Window ▸ Show All Terminals**. This works from any window, Connections included.
+- Click **Show All Terminals** in the toolbar of Connections or of a terminal window.
+- Pinch in with two fingers on a terminal window. Pinch out to close it again.
+
+In it:
+
+- Click a terminal, or select it and press Return, to bring its window forward on that tab.
+- Use the arrow keys to move between terminals, across windows.
+- Type to show only the terminals whose name or folder contains what you type. Delete removes the last letter.
+- Hover over a terminal to see its name and folder.
+- Drag a terminal onto another window's group to move that tab there. Its terminals keep running, and a window whose last tab leaves closes.
+- Press Escape, or click outside the groups, to close it.
+
+**Not in a window** lists this Mac's tmux sessions that no tab is showing, the same ones **Active** lists under This Mac. **Reopen** opens one in a new terminal window. The group appears only when there are such sessions.
+
+The pictures are only pictures: nothing is typed into a terminal, and no terminal changes size. A terminal that has not drawn anything yet says **Waiting for terminal preview…** until it does.
 
 ## The session's tools menu
 
