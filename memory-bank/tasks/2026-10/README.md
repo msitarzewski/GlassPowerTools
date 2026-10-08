@@ -18,3 +18,8 @@
   a weekly dependency check (D48); scrolling in tmux everywhere; favourites (D49) and workgroups (D51)
   sync; the headset's Connections-window lockout; D50 proposed. Committed, installed.
 
+- 2026-10-08: [Plan: terminal find, new tabs, tmux names, workgroups, editor windows](2026-10-08_find-tabs-tmux-workgroups-editor-plan.md)
+  — eight owner reports researched by five read-only agents. Root causes: find (output erases the hit;
+  only tmux's visible screen), "+" opens an empty chooser tab, a twin window controller behind the
+  drag "copy", `-A` joining a session by name, workgroups without tmux names, `modifiedAt` never
+  saved (D51 defect), editor projects piling into the front window. Five workstreams; awaiting go.

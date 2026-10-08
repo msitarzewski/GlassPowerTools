@@ -58,12 +58,19 @@ Earlier in October, each in `tasks/2026-10/README.md`: D44 tmux on servers and A
 sessions, desktop passwords kept through merges, connected dots, iPhone landscape, D45 a database
 through another machine, RDP bandwidth reports, the bolt on the right, trackpad scrolling on desktops.
 
+**In progress (2026-10-08, owner's go: recommendations taken, commit each piece as it lands, do not relaunch or install the Mac app until the owner says — it is in use):** eight reports — terminal find, the local
+folder button, "+" opening a blank panel, Connect always new, workgroups and tmux, a second editor,
+⌘O for folders, a dragged tab copying its tmux session. Plan, root causes, five parallel workstreams,
+and decisions: `tasks/2026-10/2026-10-08_find-tabs-tmux-workgroups-editor-plan.md`. Found on the way:
+D51's `modifiedAt` is never saved (`Models.swift:2338`); tmux runs without a UTF-8 locale, which turns its listings into "no sessions" (the folder button opening Home, Connect joining `glass-1`, an empty This Mac in Active). Owner's answers and the revised plan are in the note.
+
 **Open, owner's call:**
 - **Vision Pro SwiftUI layout crash** while a terminal shows this Mac's tmux session running Claude
   Code (Release builds only; an ASan debug build did not crash in 20+ minutes; xrOS 27.2 beta).
-- **Active on the headset does not list the Mac until connected**: likely its probe cannot sign in
-  without asking there; Active should say why it skipped a machine.
-- **Why an SSH tmux listing failed on the headset** (what dropped a new terminal into `glass-1`).
+- **Active on the headset does not list the Mac until connected**, and **why a new SSH terminal
+  dropped into `glass-1`**: cause found on 2026-10-08. tmux run without a UTF-8 locale (SSH exec on
+  a macOS host, and the Mac app itself) prints its listing's tabs as `_`, and the listing reads that
+  as "no sessions". Fix planned as W0 in the 2026-10-08 plan note.
 - **D50 (Proposed):** reach This Mac's terminals from other devices — needs the owner's OK to add a
   key to `~/.ssh/authorized_keys`.
 - **D46 (Proposed): palm-up pinch-drag = scroll, pinch-and-hold = right-click on Vision Pro.**
