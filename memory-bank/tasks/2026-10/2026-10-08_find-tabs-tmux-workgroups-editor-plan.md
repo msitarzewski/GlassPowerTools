@@ -290,7 +290,7 @@ commit. The coordinator brings each tested diff over, runs every suite, and owns
 - The Mac's `run` tells "no server running" from a failure.
 - Only "no server running" (on 3.7c, "error connecting to …") counts as empty. Any other error
   prints a failure marker. A non-empty reply with no parsable line becomes a new `Listing` case,
-  `.unreadable`, which `attachTmux` treats as unlisted (`unlistedName`, never `nextName`).
+  `.failed`, which `attachTmux` treats as unlisted (`unlistedName`, never `nextName`).
   `MacLocalTmux.sessions(from:)` and `allocateName` follow the same rule.
 - Test: a `TerminalSession` whose `tmuxCommandRunner` answers `glass-1_1_1_1700000000` connects to a
   name of `glass-100` or above. Today it gets `glass-1`.
@@ -367,6 +367,12 @@ commit. The coordinator brings each tested diff over, runs every suite, and owns
     dot.
   - The password check stays up front.
 - iPad and Vision Pro open every pane as now; the grid and carousel previews need live sessions.
+- **Reopening after a quit covers SSH tmux tabs too.** The owner held off a relaunch, "uncertain of
+  how the two workgroups I have open would resurface". Today `rememberWindowsToReopen` notes only
+  windows with *local* tmux tabs (`MacLocalTmux.swift:166-174`). With "Close windows when quitting"
+  on, which is the default here, a window of SSH tabs doesn't come back at all. A mixed window comes
+  back, but its SSH tabs start new sessions. Once SSH pane intents carry their names, the reopen
+  record uses `hasTerminalsInTmux`, and an SSH pane reattaches to its own session.
 - This Mac's panes on another device keep the substitution sheet until D50.
 
 **W5 — Editor** (macOS, iPad, iPhone, Vision Pro)
@@ -390,7 +396,7 @@ commit. The coordinator brings each tested diff over, runs every suite, and owns
 
 ## Tests that must fail before each fix
 
-- **W0:**
+- **W0 (done, 2026-10-08):**
   - `parse` of `_`-separated output is a failure, not "no sessions";
   - live: `listCommand` through `env -i sh -c` against a private tmux (`TMUX_TMPDIR`) holding
     `glass-1` lists `glass-1`;
@@ -490,3 +496,21 @@ commit. The coordinator brings each tested diff over, runs every suite, and owns
   the limit.
 - **With tmux on, every "+" leaves a session running** (close detaches), so sessions collect in
   Active.
+
+## Progress (2026-10-08)
+
+| Piece | Commit | Evidence |
+|---|---|---|
+| W0 tmux in UTF-8, honest listings | eca44d1 | 8 new tests, each proven to fail without the fix. Live tests run on private servers; teardown names its socket with `-S`, because a missing `TMUX_TMPDIR` folder makes tmux fall back to the default server (a first draft of a test reached the owner's server this way, read-only). |
+| W3 one controller per window; "+" opens a shell; visible empty tab | 1bfa70e | 9 new tests (twin reproduced in a hosted scene root: 2 controllers before the fix, 1 after) |
+| W2 Open Folder Here | 3c1876e | 8 tests with fakes; the mutation table is in the agent's report |
+| W5 editor: one project per window, one Open… | 50f6cae | 15 routing tests plus menu-owner checks; iOS and visionOS compile |
+| W4a claimed tmux names; startup command only when created; D51 `modifiedAt` | 7054c63 | 11 new tests, including 8 concurrent live claims giving 8 names; iOS compiles |
+
+After W4a: terminal 498, shell 212, editor 132 and editor UI 114 tests pass. Release 0.4.301 (W0) is installed. 0.4.302 (all of the above) is built and waits for the owner's word.
+
+**Crash, 13:01–13:05 (0.4.300, four reports, same stack).** An `NSRangeException` came from AppKit when SwiftUI removed a window's toolbar (`setToolbar:` → `_showHideToolbar`) inside a constraint pass. The toolbar's removal handed the first responder back, so a layout ran inside the constraint update. The owner's trigger: Window ▸ Workgroups, then resizing that window. That is a `NavigationSplitView` with a searchable sidebar, whose split view our column autosave also renames on every update, so it has two owners. **W7a:** reproduce outside the owner's app, give each split view one owner, and fold the standalone Workgroups window into Connections. The owner: "It's weird that we have a separate window for that anyway… It's inline in the connections window".
+
+**State loss.** After the crashes, every saved tab record was `{"id","schemaVersion"}` with no root. Each window opened as "New Terminal". The 14 sessions kept running; workgroups (`layoutPresets`) were intact. **W7b:** trace which path wrote empty records over full ones; never overwrite an undecodable or full record by side effect; keep one previous good generation; offer running sessions back at launch.
+
+**Proposed (not approved):** workgroups as tmux sessions through control mode (`tmux -CC`), as iTerm2 does: tmux windows as native tabs, panes as splits, and the layout kept on the host. Also a sessions browser per host (W6). The owner asked whether tmux windows can back workgroup tabs; answered with the two routes and the one-host-per-session limit.
