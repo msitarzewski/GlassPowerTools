@@ -130,6 +130,23 @@ struct TerminalTmuxTests {
     nonisolated static let tmux: String? = ["/opt/homebrew/bin/tmux", "/usr/local/bin/tmux", "/usr/bin/tmux"]
         .first { FileManager.default.isExecutableFile(atPath: $0) }
 
+    @Test("when the host's sessions cannot be listed, a new terminal never takes glass-1")
+    func unlisted() async {
+        var sequence = [512, 512, 4_000].makeIterator()
+        #expect(TerminalTmux.unlistedName(avoiding: ["glass-512"], random: { sequence.next()! }) == "glass-4000")
+
+        let writes = Writes()
+        let session = TerminalSession(server: server(tmux: true), terminalWriteSink: { writes.receive($0) })
+        var asked = 0
+        session.tmuxCommandRunner = { _ in asked += 1; throw SSHError.notConnected }
+        session.state = .connected
+        await session.waitForTmuxAttach()
+        await session.waitUntilTerminalWritesComplete()
+        #expect(asked == 2, "asked again once")
+        let name = try? #require(session.tmuxSessionName)
+        #expect(name.map { (TerminalTmux.glassNumber($0) ?? 0) >= 100 } == true, "not glass-1: \(name ?? "none")")
+    }
+
     @Test("a reconnect attaches to the same session without asking the host again")
     func reconnect() async {
         let writes = Writes()

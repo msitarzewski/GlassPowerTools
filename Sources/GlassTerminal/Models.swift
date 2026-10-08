@@ -836,8 +836,9 @@ class TerminalSession: Identifiable, Hashable {
             guard let self else { return }
             if tmuxSessionName == nil {
                 var taken = Self.reservedTmuxNames[server.id] ?? []
+                var listed = false
                 do {
-                    switch TerminalTmux.parse(try await runTmuxCommand(TerminalTmux.listCommand)) {
+                    switch TerminalTmux.parse(try await listTmuxSessionsRetryingOnce()) {
                     case .unavailable:
                         guard state == .connected, !Task.isCancelled else { return }
                         tmuxAvailabilityObserved?(false)
@@ -849,14 +850,17 @@ class TerminalSession: Identifiable, Hashable {
                     case .sessions(let sessions):
                         tmuxAvailabilityObserved?(true)
                         taken.formUnion(sessions.map(\.name))
+                        listed = true
                     }
                 } catch {
-                    // The list is only for choosing a free name. The attach line is harmless
-                    // without tmux, so go ahead with the names this device knows about.
                     Logger.ssh.error("tmux list failed: \(error.localizedDescription, privacy: .public)")
                 }
                 guard state == .connected, !Task.isCancelled else { return }
-                let name = TerminalTmux.nextName(avoiding: taken)
+                // Without the host's list, `glass-1` may well be running — and the attach line
+                // joins a session of that name, so a new terminal landed in someone's work
+                // (2026-10-08, a Vision Pro opening a Mac's terminal). Unlisted, take a number
+                // nothing is likely to hold.
+                let name = listed ? TerminalTmux.nextName(avoiding: taken) : TerminalTmux.unlistedName(avoiding: taken)
                 Self.reservedTmuxNames[server.id, default: []].insert(name)
                 tmuxSessionName = name
             }
@@ -908,6 +912,18 @@ class TerminalSession: Identifiable, Hashable {
 
     /// Waits for the attach in progress, if any — for tests and for callers that act after it.
     func waitForTmuxAttach() async { await tmuxTask?.value }
+
+    /// The host's tmux sessions, asked again once after a second if the first ask fails: the
+    /// connection that has just opened is the one the question travels on.
+    private func listTmuxSessionsRetryingOnce() async throws -> String {
+        do {
+            return try await runTmuxCommand(TerminalTmux.listCommand)
+        } catch {
+            Logger.ssh.notice("tmux list failed once, asking again: \(error.localizedDescription, privacy: .public)")
+            try await Task.sleep(for: .seconds(1))
+            return try await runTmuxCommand(TerminalTmux.listCommand)
+        }
+    }
 
     func runTmuxCommand(_ command: String) async throws -> String {
         if let tmuxCommandRunner { return try await tmuxCommandRunner(command) }

@@ -87,6 +87,14 @@ enum TerminalTmux {
         return "\(namePrefix)\(number)"
     }
 
+    /// A name for when the host's sessions could not be listed: a `glass-N` far above the numbers
+    /// in use, so attaching cannot join a session someone already has.
+    static func unlistedName(avoiding taken: Set<String>, random: () -> Int = { Int.random(in: 100...9_999) }) -> String {
+        var name = namePrefix + String(random())
+        while taken.contains(name) { name = namePrefix + String(random()) }
+        return name
+    }
+
     static func glassNumber(_ name: String) -> Int? {
         guard name.hasPrefix(namePrefix) else { return nil }
         return Int(name.dropFirst(namePrefix.count)).flatMap { $0 > 0 ? $0 : nil }

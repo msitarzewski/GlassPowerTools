@@ -1724,6 +1724,60 @@ private final class TerminalHardwareKeyContainerView: UIView {
 }
 
 @MainActor
+/// A scroll over the terminal on the alternate screen, where no program asked for the mouse,
+/// goes to the model's `onAlternateScreenScroll` (2026-10-08). SwiftTerm's iOS view does nothing
+/// with one there — it has no scrollback to move — so in tmux a scroll was lost; this hands it to
+/// the session, which scrolls tmux's history. A finger, a trackpad's two-finger scroll and, on
+/// Vision Pro, a pinch-and-drag all arrive as this pan; anywhere else the gesture never begins.
+private final class UIKitAlternateScreenScrollWatcher: NSObject, UIGestureRecognizerDelegate {
+    private weak var view: TerminalView?
+    private let handler: () -> (@MainActor (CGFloat, Bool) -> Bool)?
+    private var lastTranslation: CGFloat = 0
+
+    init(view: TerminalView, handler: @escaping () -> (@MainActor (CGFloat, Bool) -> Bool)?) {
+        self.view = view
+        self.handler = handler
+        super.init()
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(panned(_:)))
+        pan.allowedScrollTypesMask = .all
+        pan.maximumNumberOfTouches = 2
+        pan.delegate = self
+        view.addGestureRecognizer(pan)
+    }
+
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard let view, handler() != nil,
+              let pan = gestureRecognizer as? UIPanGestureRecognizer else { return false }
+        let terminal = view.getTerminal()
+        guard terminal.isCurrentBufferAlternate, terminal.mouseMode == .off else { return false }
+        // Up and down only: a sideways drag stays the terminal's own.
+        let velocity = pan.velocity(in: view)
+        return abs(velocity.y) >= abs(velocity.x)
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                           shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+        true
+    }
+
+    @objc private func panned(_ pan: UIPanGestureRecognizer) {
+        guard let view else { return }
+        switch pan.state {
+        case .began:
+            lastTranslation = 0
+        case .changed:
+            // Fingers moving down bring earlier output into view, as a scroll view does.
+            let translation = pan.translation(in: view).y
+            let delta = translation - lastTranslation
+            lastTranslation = translation
+            if delta != 0 { _ = handler()?(delta, true) }
+        default:
+            lastTranslation = 0
+        }
+    }
+}
+
+@MainActor
 private final class SwiftTermEngine: TerminalEngine {
     var isBracketedPasteMode: Bool { terminalView.getTerminal().bracketedPasteMode }
 
@@ -1745,7 +1799,8 @@ private final class SwiftTermEngine: TerminalEngine {
         onPasteData: @escaping (Data) -> Void,
         onRendererDiagnostics: @escaping (SwiftTermRendererDiagnostics) -> Void,
         onOSC52Decision: @escaping (SwiftTermOSC52Decision) -> Void,
-        onDismissKeyboard: @escaping @MainActor () -> Void
+        onDismissKeyboard: @escaping @MainActor () -> Void,
+        alternateScreenScroll: @escaping () -> (@MainActor (CGFloat, Bool) -> Bool)? = { nil }
     ) {
         let terminalView = ReviewingTerminalView(frame: .zero)
         let containerView = TerminalHardwareKeyContainerView(frame: .zero)
@@ -1786,7 +1841,10 @@ private final class SwiftTermEngine: TerminalEngine {
             guard let self else { return }
             self.onOSC52Decision(SwiftTermOSC52Policy.evaluate(request))
         }
+        scrollWatcher = UIKitAlternateScreenScrollWatcher(view: terminalView, handler: alternateScreenScroll)
     }
+
+    private var scrollWatcher: UIKitAlternateScreenScrollWatcher?
 
     var identity: ObjectIdentifier { ObjectIdentifier(terminalView) }
     var hostView: UIView { containerView }
@@ -2238,7 +2296,8 @@ public struct SwiftTermHostView: UIViewRepresentable {
             },
             onDismissKeyboard: { [weak model] in
                 model?.dismissInputFocus()
-            }
+            },
+            alternateScreenScroll: { [weak model] in model?.onAlternateScreenScroll }
         )
     }
 
