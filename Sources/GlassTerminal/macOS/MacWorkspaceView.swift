@@ -27,6 +27,10 @@ struct MacWorkspaceView: View {
     @State private var workgroupEditorContext: WorkgroupEditorContext?
     @State private var workspaceSaveError: String?
     @State private var isConfirmingTabClose = false
+    /// The tab being renamed in the sidebar, and the name as typed (2026-10-07).
+    @State private var renamingTabID: UUID?
+    @State private var renameText = ""
+    @FocusState private var renameFieldFocused: Bool
     @State private var pendingWindowClose = false
     @State private var showingOverview = false
     @State private var overviewCarousel = false
@@ -67,8 +71,23 @@ struct MacWorkspaceView: View {
                 )
                     Label {
                         VStack(alignment: .leading, spacing: 1) {
-                            Text(tabIdentity.title)
-                                .lineLimit(1)
+                            if renamingTabID == controller.workspaceID {
+                                // Return saves, Escape cancels, leaving the field saves; blank is
+                                // the automatic name again.
+                                TextField("Tab Name", text: $renameText, prompt: Text(tabIdentity.title))
+                                    .textFieldStyle(.plain)
+                                    .focused($renameFieldFocused)
+                                    .onAppear { renameFieldFocused = true }
+                                    .onSubmit { commitRename() }
+                                    .onExitCommand { renamingTabID = nil }
+                                    .onChange(of: renameFieldFocused) { _, focused in
+                                        if !focused { commitRename() }
+                                    }
+                                    .accessibilityIdentifier("mac-workspace-tab-rename")
+                            } else {
+                                Text(tabIdentity.title)
+                                    .lineLimit(1)
+                            }
                             if let subtitle = tabIdentity.subtitle {
                                 Text(subtitle)
                                     .font(.caption.monospaced())
@@ -84,7 +103,29 @@ struct MacWorkspaceView: View {
                         Image(systemName: "apple.terminal")
                             .foregroundStyle(controller.workgroupColor?.color ?? .secondary)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    // While a terminal in the tab is printing, a wave moves under the row.
+                    .background {
+                        if controller.isProducingOutput {
+                            MacTerminalActivityWave(color: controller.workgroupColor?.color ?? .accentColor)
+                                .padding(.horizontal, -6)
+                                .transition(.opacity)
+                        }
+                    }
+                    .animation(.easeInOut(duration: 0.3), value: controller.isProducingOutput)
                 .tag(controller.workspaceID)
+                // Double-click to rename in place, as Finder's sidebar and Safari's tab groups do.
+                .simultaneousGesture(TapGesture(count: 2).onEnded { beginRename(controller) })
+                .contextMenu {
+                    Button("Rename Tab…", systemImage: "pencil") { beginRename(controller) }
+                        .labelStyle(.titleAndIcon)
+                    if controller.tabLabel != nil {
+                        Button("Use Automatic Name", systemImage: "arrow.uturn.backward") {
+                            windowController.renameTab(controller.workspaceID, to: nil)
+                        }
+                        .labelStyle(.titleAndIcon)
+                    }
+                }
                 .accessibilityLabel(tabIdentity.title)
                 .accessibilityValue(tabIdentity.subtitle ?? "")
                 .accessibilityIdentifier(
@@ -120,7 +161,13 @@ struct MacWorkspaceView: View {
                 onCloseEmptyTab: { closeTab(selected.workspaceID) }
             )
             .id(selected.workspaceID)
-            .navigationTitle(showingOverview && !overviewControlsVisible ? "" : identity.title)
+            // Editable: clicking the window title renames the tab, as the sidebar does.
+            .navigationTitle(Binding(
+                get: { showingOverview && !overviewControlsVisible ? "" : identity.title },
+                set: { name in
+                    guard !(showingOverview && !overviewControlsVisible), name != identity.title else { return }
+                    windowController.renameTab(selected.workspaceID, to: name)
+                }))
             .navigationSubtitle(showingOverview && !overviewControlsVisible ? "" : identity.subtitle ?? "")
             // New Tab leads the content region, immediately after the sidebar — the placement
             // glassdb gives Add Connection (`ConnectionManagerView.swift:327-330`).
@@ -437,6 +484,18 @@ struct MacWorkspaceView: View {
         )
     }
 
+    private func beginRename(_ tab: MacWorkspaceController) {
+        renameText = tab.tabLabel ?? ""
+        renamingTabID = tab.workspaceID
+        renameFieldFocused = true
+    }
+
+    private func commitRename() {
+        guard let id = renamingTabID else { return }
+        renamingTabID = nil
+        windowController.renameTab(id, to: renameText)
+    }
+
     private func addTab() {
         windowController.addTab()
     }
@@ -612,6 +671,10 @@ private struct MacWorkspaceTabContent: View {
                         if let frame = layout.paneFrames[pane.id] {
                             paneView(pane, showsPaneChrome: showsPaneChrome)
                                 .id(pane.id)
+                                // Files dropped from Finder type their paths, as Terminal.app does.
+                                .dropDestination(for: URL.self) { urls, _ in
+                                    dropFiles(urls, on: pane.id)
+                                }
                                 .frame(width: frame.width, height: frame.height)
                                 .position(x: frame.midX, y: frame.midY)
                         }
@@ -648,6 +711,16 @@ private struct MacWorkspaceTabContent: View {
         }
     }
 
+    /// Types the dropped files' paths into the pane's terminal, and makes it the focused pane.
+    private func dropFiles(_ urls: [URL], on paneID: UUID) -> Bool {
+        guard let text = TerminalDroppedPaths.text(for: urls) else { return false }
+        let model = controller.localRuntimesByPaneID[paneID]?.model ?? controller.session(for: paneID)?.terminalHostModel
+        guard let model else { return false }
+        controller.focus(paneID)
+        model.insertDroppedText(text)
+        return true
+    }
+
     @ViewBuilder
     private func paneView(_ pane: MacWorkspacePane, showsPaneChrome: Bool) -> some View {
         let isFocused = allowsTerminalFocus && controller.focusedPaneID == pane.id
@@ -675,6 +748,7 @@ private struct MacWorkspaceTabContent: View {
                         }
                     },
                     onProcessStatusChange: { controller.updateLocalProcessStatus($0, for: pane.id) },
+                    onContextChange: { controller.updatePaneContext(title: $0, directory: $1, for: pane.id) },
                     hostModel: runtime.model,
                     processState: runtime.processState
                 )
@@ -708,7 +782,8 @@ private struct MacWorkspaceTabContent: View {
                         if closesWorkspace {
                             onCloseEmptyTab()
                         }
-                    }
+                    },
+                    onTerminalContextChange: { controller.updatePaneContext(title: $0, directory: $1, for: pane.id) }
                 )
                 .overlay {
                     if showsPaneChrome {

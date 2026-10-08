@@ -19,6 +19,8 @@ struct MacLocalTerminalPaneView: View {
     let onFocus: () -> Void
     let onDisconnect: () -> Void
     let onProcessStatusChange: (String?) -> Void
+    /// The shell's title and directory, as they change — they name the tab (2026-10-07).
+    var onContextChange: (_ title: String?, _ directory: String?) -> Void = { _, _ in }
 
     @Environment(SettingsManager.self) private var settingsManager
     /// Present whenever this pane is inside the app's workspace scene. Used only to answer the
@@ -190,6 +192,9 @@ struct MacLocalTerminalPaneView: View {
         }
         .onChange(of: localProcessStatusText, initial: true) { _, status in
             onProcessStatusChange(status)
+        }
+        .onChange(of: [processState.terminalTitle, processState.currentDirectory], initial: true) { _, context in
+            onContextChange(context[0], context[1])
         }
         .onDisappear {
             hostModel.setFocusOwnershipAllowed(false)

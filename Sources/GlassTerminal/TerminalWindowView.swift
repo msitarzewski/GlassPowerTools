@@ -91,6 +91,8 @@ struct TerminalWindowView: View {
     /// A successful remote shell exit completes the pane instead of presenting
     /// the retry state reserved for disconnect actions and connection failures.
     var onSessionEndedCleanly: (() -> Void)? = nil
+    /// The remote shell's title and directory, as they change — a Mac tab is named by them.
+    var onTerminalContextChange: ((_ title: String?, _ directory: String?) -> Void)? = nil
     @Environment(SessionManager.self) private var sessionManager
     @Environment(SettingsManager.self) private var settingsManager
     #if os(iOS)
@@ -153,7 +155,8 @@ struct TerminalWindowView: View {
         externalSearchRequestNonce: UInt64 = 0,
         onNewTerminalTab: (() -> Void)? = nil,
         onSessionRequestedClose: (() -> Void)? = nil,
-        onSessionEndedCleanly: (() -> Void)? = nil
+        onSessionEndedCleanly: (() -> Void)? = nil,
+        onTerminalContextChange: ((_ title: String?, _ directory: String?) -> Void)? = nil
     ) {
         self.session = session
         self.ownsSessionLifecycle = ownsSessionLifecycle
@@ -164,6 +167,7 @@ struct TerminalWindowView: View {
         self.onNewTerminalTab = onNewTerminalTab
         self.onSessionRequestedClose = onSessionRequestedClose
         self.onSessionEndedCleanly = onSessionEndedCleanly
+        self.onTerminalContextChange = onTerminalContextChange
         _terminalHostModel = ObservedObject(wrappedValue: session.terminalHostModel)
         let initialGeometry = session.currentTerminalGeometry
         _terminalColumns = State(initialValue: initialGeometry.columns)
@@ -172,6 +176,17 @@ struct TerminalWindowView: View {
     
     var body: some View {
         terminalWindowIdentity
+            // The title arrives by callback rather than a published change, so a program
+            // animating it does not re-render this window (2026-10-07).
+            .onChange(of: terminalHostModel.currentDirectory, initial: true) { _, directory in
+                onTerminalContextChange?(terminalHostModel.terminalTitle, directory)
+            }
+            .onAppear {
+                guard let onTerminalContextChange else { return }
+                terminalHostModel.onTerminalTitleChange = { [weak terminalHostModel] title in
+                    onTerminalContextChange(title, terminalHostModel?.currentDirectory)
+                }
+            }
             #if !os(iOS)
             // The Mac menu consumes these closure-valued focused commands.
             // Publishing them through the iOS TabView causes a layout update

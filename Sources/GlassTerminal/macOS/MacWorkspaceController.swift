@@ -34,7 +34,19 @@ final class MacWorkspaceController {
     let workgroupID: UUID?
     let workgroupName: String?
     let workgroupColor: ServerColorTag?
-    let tabLabel: String?
+    /// The name someone gave this tab, or nil for the automatic one (`MacWorkspaceTabNaming`).
+    private(set) var tabLabel: String?
+    /// What each pane's terminal says about itself, for the automatic name.
+    private(set) var paneContextByPaneID: [UUID: MacWorkspacePaneContext] = [:]
+    /// The shortest time between two changes of the automatic name; zero applies every change.
+    @ObservationIgnored var paneContextInterval: Duration = .milliseconds(500)
+    @ObservationIgnored private var pendingPaneContextByPaneID: [UUID: MacWorkspacePaneContext] = [:]
+    @ObservationIgnored private var paneContextFlush: Task<Void, Never>?
+    /// A terminal in this tab printed something in the last moment: the sidebar's activity wave.
+    private(set) var isProducingOutput = false
+    @ObservationIgnored private var quietTask: Task<Void, Never>?
+    /// How long after the last output a tab still counts as busy.
+    static let activityLinger: Duration = .milliseconds(1_200)
 
     init(
         workspaceID: UUID,
@@ -116,6 +128,7 @@ final class MacWorkspaceController {
                 if pane.intent.kind == .ssh,
                    pane.intent.serverID == ticket.session.server.id {
                     sessionsByPaneID[paneID] = ticket.session
+                    observeOutput(of: ticket.session.terminalHostModel)
                 } else {
                     ticket.discard()
                     errorsByPaneID[paneID] = "The prepared terminal session did not match its launch request."
@@ -192,7 +205,8 @@ final class MacWorkspaceController {
 
     func windowIdentity(
         servers: [ServerConfiguration],
-        localUsername: String = NSUserName()
+        localUsername: String = NSUserName(),
+        home: String? = NSHomeDirectory()
     ) -> MacWorkspaceWindowIdentity {
         guard let focusedPane else {
             return MacWorkspaceWindowIdentity(
@@ -203,9 +217,16 @@ final class MacWorkspaceController {
 
         switch focusedPane.intent.kind {
         case .local:
+            // Named, else configured, else what the shell says — its title, else its directory —
+            // else the workgroup, else "Local". The subtitle is where it stands: on this Mac,
+            // "user@localhost" said nothing two local tabs did not share.
+            let context = paneContextByPaneID[focusedPane.id]
+            let place = context?.directory.map { MacWorkspaceTabNaming.abbreviated($0, home: home) }
+                ?? "\(localUsername)@localhost"
             return MacWorkspaceWindowIdentity(
-                title: tabLabel ?? focusedPane.intent.label ?? workgroupName ?? "Local",
-                subtitle: "\(localUsername)@localhost" + (localProcessStatusesByPaneID[focusedPane.id].map { " — \($0)" } ?? "")
+                title: tabLabel ?? focusedPane.intent.label
+                    ?? MacWorkspaceTabNaming.automaticTitle(context, home: home) ?? workgroupName ?? "Local",
+                subtitle: place + (localProcessStatusesByPaneID[focusedPane.id].map { " — \($0)" } ?? "")
             )
         case .ssh:
             let server = session(for: focusedPane.id)?.server
@@ -216,8 +237,11 @@ final class MacWorkspaceController {
                     subtitle: nil
                 )
             }
+            // A remote home is unknown here, so a remote directory is named by its last part.
             return MacWorkspaceWindowIdentity(
-                title: tabLabel ?? focusedPane.intent.label ?? server.name,
+                title: tabLabel ?? focusedPane.intent.label
+                    ?? MacWorkspaceTabNaming.automaticTitle(paneContextByPaneID[focusedPane.id], home: nil)
+                    ?? server.name,
                 subtitle: Self.connectionSubtitle(
                     "\(server.username)@\(server.host):\(server.port)",
                     state: session(for: focusedPane.id)?.state
@@ -229,6 +253,62 @@ final class MacWorkspaceController {
     func focusedSessionState() -> SessionState? {
         guard let focusedPaneID else { return nil }
         return session(for: focusedPaneID)?.state
+    }
+
+    /// Output arrived in one of this tab's terminals: busy now, quiet again once it stops.
+    func noteOutput() {
+        guard !isClosed else { return }
+        if !isProducingOutput { isProducingOutput = true }
+        quietTask?.cancel()
+        quietTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: Self.activityLinger)
+            guard !Task.isCancelled, let self else { return }
+            isProducingOutput = false
+        }
+    }
+
+    private func observeOutput(of model: SwiftTermHostModel) {
+        model.onOutputActivity = { [weak self] in self?.noteOutput() }
+    }
+
+    /// Names the tab; blank goes back to the automatic name. The window saves it with its tabs.
+    func rename(to name: String?) {
+        guard !isClosed else { return }
+        tabLabel = MacWorkspaceChromeText.sanitize(name, maximumLength: MacWorkspaceTabRequest.maximumDisplayTextLength)
+    }
+
+    /// The title a pane's shell or program set, and its directory, as they change. A pane in
+    /// tmux sees only tmux's own, so its context comes from `refreshLocalTmuxContext` instead.
+    func updatePaneContext(title: String?, directory: String?, for paneID: UUID) {
+        let context = MacWorkspacePaneContext(title: title, directory: directory)
+        guard paneContextInterval > .zero else { return setPaneContext(context, for: paneID) }
+        // At most twice a second: a program animating its title (Claude Code's spinner) would
+        // otherwise retitle the window and redraw the sidebar on every frame. The first change
+        // shows at once; the latest one at the end of each interval.
+        guard paneContextFlush != nil else {
+            setPaneContext(context, for: paneID)
+            schedulePaneContextFlush()
+            return
+        }
+        pendingPaneContextByPaneID[paneID] = context
+    }
+
+    private func schedulePaneContextFlush() {
+        paneContextFlush = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: self?.paneContextInterval ?? .zero)
+            guard let self else { return }
+            let pending = pendingPaneContextByPaneID
+            pendingPaneContextByPaneID = [:]
+            paneContextFlush = nil
+            guard !pending.isEmpty else { return }
+            for (paneID, context) in pending { setPaneContext(context, for: paneID) }
+            schedulePaneContextFlush()
+        }
+    }
+
+    private func setPaneContext(_ context: MacWorkspacePaneContext, for paneID: UUID) {
+        guard !isClosed, state.root?.pane(id: paneID) != nil else { return }
+        if paneContextByPaneID[paneID] != context { paneContextByPaneID[paneID] = context }
     }
 
     func updateLocalProcessStatus(_ status: String?, for paneID: UUID) {
@@ -260,6 +340,7 @@ final class MacWorkspaceController {
         }
         let runtime = SwiftTermLocalProcessRuntime()
         localRuntimesByPaneID[paneID] = runtime
+        observeOutput(of: runtime.model)
         return runtime
     }
 
@@ -401,6 +482,7 @@ final class MacWorkspaceController {
         errorsByPaneID.removeValue(forKey: paneID)
         localRuntimesByPaneID.removeValue(forKey: paneID)?.terminate()
         localProcessStatusesByPaneID.removeValue(forKey: paneID)
+        paneContextByPaneID.removeValue(forKey: paneID)
         recordersByPaneID.removeValue(forKey: paneID)?.finalize()
         discardStartupCommand(for: paneID)
         state.root = root.removingPane(id: paneID)
@@ -493,6 +575,7 @@ final class MacWorkspaceController {
                           generation == lifecycleGeneration,
                           state.root?.pane(id: pane.id)?.intent == pane.intent else { return }
                     sessionsByPaneID[pane.id] = pendingSession
+                    observeOutput(of: pendingSession.terminalHostModel)
                     prepareOffscreenRenderer(for: pendingSession, settingsManager: settingsManager)
                 }
             )
@@ -504,6 +587,7 @@ final class MacWorkspaceController {
             }
             if launch.session.state == .connected || launch.session.pendingHostKeyChallenge != nil {
                 sessionsByPaneID[pane.id] = launch.session
+                observeOutput(of: launch.session.terminalHostModel)
             } else {
                 if case .error(let message) = launch.session.state {
                     errorsByPaneID[pane.id] = message
@@ -895,6 +979,14 @@ final class MacWorkspaceWindowController {
 
     var isEmpty: Bool {
         tabs.allSatisfy(\.isEmpty)
+    }
+
+    /// Names a tab, or with a blank name returns it to its automatic one, and saves the window so
+    /// the name survives a relaunch.
+    func renameTab(_ workspaceID: UUID, to name: String?) {
+        guard let tab = tabs.first(where: { $0.workspaceID == workspaceID }) else { return }
+        tab.rename(to: name)
+        persist()
     }
 
     /// What closing this window should ask, or nil when nothing would stop (D44).

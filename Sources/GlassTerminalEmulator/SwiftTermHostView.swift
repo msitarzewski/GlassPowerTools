@@ -345,6 +345,28 @@ public final class SwiftTermHostModel: ObservableObject {
     public static let maximumPendingRendererBytes = 4 * 1_024 * 1_024
 
     @Published public private(set) var currentDirectory: String?
+    /// Told that output arrived, at most four times a second — a tab's activity indicator
+    /// (2026-10-07). Not published: the listener keeps its own state.
+    public var onOutputActivity: (@MainActor () -> Void)?
+    private var lastOutputActivity: ContinuousClock.Instant?
+
+    fileprivate func noteOutputActivity() {
+        guard let onOutputActivity else { return }
+        let now = ContinuousClock.now
+        if let last = lastOutputActivity, now - last < .milliseconds(250) { return }
+        lastOutputActivity = now
+        onOutputActivity()
+    }
+
+    /// The title the remote shell or program set (OSC 0/2): "user@host: ~/src" from Ubuntu's
+    /// default prompt, a file name from vim. Nil until one is set. Names the terminal's tab.
+    ///
+    /// Not published. Programs animate it — Claude Code's spinner changes it several times a
+    /// second — and every published change re-renders each view observing this model: the whole
+    /// terminal window, its toolbar and ornaments. Only a tab that names itself listens.
+    public private(set) var terminalTitle: String?
+    public var onTerminalTitleChange: (@MainActor (String?) -> Void)?
+
     @Published public private(set) var scrollPosition: Double = 1
     @Published public private(set) var pendingPasteReview: SwiftTermPasteReview?
     @Published public private(set) var pendingExternalLink: SwiftTermExternalLinkRequest?
@@ -653,6 +675,14 @@ public final class SwiftTermHostModel: ObservableObject {
         terminalEngine?.commitPaste(approvedText, bracketed: request.bracketedPasteMode)
     }
 
+    /// Text dropped on the terminal — files from Finder, as their paths — typed in the way a paste
+    /// is: bracketed when the program asked for it, and reviewed first when it is long or spans
+    /// lines, by the same rules as ⌘V (2026-10-07).
+    public func insertDroppedText(_ text: String) {
+        guard let engine = terminalEngine else { return }
+        requestPaste(text, bracketed: engine.isBracketedPasteMode)
+    }
+
     public func resolvePendingExternalLink(approved: Bool) -> URL? {
         guard let request = pendingExternalLink else { return nil }
         pendingExternalLink = nil
@@ -680,6 +710,14 @@ public final class SwiftTermHostModel: ObservableObject {
         guard currentDirectory != directory else { return }
         currentDirectory = directory
         appendSemanticEvent(.workingDirectoryChanged(directory: directory))
+    }
+
+    fileprivate func updateTerminalTitle(_ title: String) {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let value = trimmed.isEmpty ? nil : trimmed
+        guard terminalTitle != value else { return }
+        terminalTitle = value
+        onTerminalTitleChange?(value)
     }
 
     fileprivate func updateScrollPosition(_ position: Double) {
@@ -713,6 +751,7 @@ public final class SwiftTermHostModel: ObservableObject {
     public func ingest(data: Data, nonce: UInt64) {
         guard nonce != lastNonce else { return }
         lastNonce = nonce
+        noteOutputActivity()
         guard let terminalEngine,
               pendingFlushTask == nil,
               pendingChunks.isEmpty,
@@ -1005,6 +1044,8 @@ private protocol TerminalEngine: AnyObject {
     func findPrevious(_ term: String) -> Bool
     func clearSearch()
     func commitPaste(_ text: String, bracketed: Bool)
+    /// Whether the program in the terminal asked for bracketed paste.
+    var isBracketedPasteMode: Bool { get }
 }
 
 public enum SwiftTermHardwareKeyPolicy {
@@ -1679,6 +1720,8 @@ private final class TerminalHardwareKeyContainerView: UIView {
 
 @MainActor
 private final class SwiftTermEngine: TerminalEngine {
+    var isBracketedPasteMode: Bool { terminalView.getTerminal().bracketedPasteMode }
+
     let terminalView: ReviewingTerminalView
     private let containerView: TerminalHardwareKeyContainerView
     private let onPasteData: (Data) -> Void
@@ -2251,6 +2294,7 @@ public struct SwiftTermHostView: UIViewRepresentable {
         }
 
         public func setTerminalTitle(source: TerminalView, title: String) {
+            Task { @MainActor [weak model] in model?.updateTerminalTitle(title) }
             onTitleChanged(title)
         }
 
@@ -2322,6 +2366,8 @@ private protocol TerminalEngine: AnyObject {
     func clearSearch()
     func commitPaste(_ text: String, bracketed: Bool)
     func fitHostWindow(columns: Int, rows: Int) -> Bool
+    /// Whether the program in the terminal asked for bracketed paste.
+    var isBracketedPasteMode: Bool { get }
 }
 
 @MainActor
@@ -2415,6 +2461,8 @@ private final class ReviewingMacTerminalView: TerminalView {
 
 @MainActor
 private final class MacSwiftTermEngine: TerminalEngine {
+    var isBracketedPasteMode: Bool { terminalView.getTerminal().bracketedPasteMode }
+
     let terminalView: ReviewingMacTerminalView
     private let onPasteData: (Data) -> Void
     private let onRendererDiagnostics: (SwiftTermRendererDiagnostics) -> Void
@@ -2774,6 +2822,7 @@ public struct SwiftTermHostView: NSViewRepresentable {
         }
 
         public func setTerminalTitle(source: TerminalView, title: String) {
+            model?.updateTerminalTitle(title)
             onTitleChanged(title)
         }
 
@@ -2971,10 +3020,15 @@ public final class SwiftTermLocalProcessState: ObservableObject {
     }
 
     fileprivate func updateTitle(_ title: String) {
-        terminalTitle = title
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let value = trimmed.isEmpty ? nil : trimmed
+        guard terminalTitle != value else { return }
+        terminalTitle = value
     }
 
     fileprivate func updateCurrentDirectory(_ directory: String?) {
+        // Read again after every quiet spell of output, so publish only a change.
+        guard currentDirectory != directory else { return }
         currentDirectory = directory
     }
 }
@@ -3124,6 +3178,8 @@ private final class MacLocalProcessDelegateProxy:
 
 @MainActor
 private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcessControlling {
+    var isBracketedPasteMode: Bool { terminalView.getTerminal().bracketedPasteMode }
+
     static let maximumRecordingCallbackBytes = 64 * 1024
 
     let terminalView: ReviewingMacLocalProcessTerminalView
@@ -3182,6 +3238,8 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
         terminalView.onPasteRequest = onPasteRequest
         terminalView.onProcessOutput = { [weak self] bytes, duration in
             self?.recordProcessOutput(bytes, duration: duration)
+            self?.scheduleWorkingDirectoryCheck()
+            self?.delegateProxy.hostModel?.noteOutputActivity()
         }
         terminalView.onWindowAttachmentChanged = { [weak self] in
             self?.publishRendererDiagnostics()
@@ -3490,6 +3548,24 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
 
     func fitHostWindow(columns: Int, rows: Int) -> Bool {
         fitMacTerminalHostWindow(terminalView, columns: columns, rows: rows)
+    }
+
+    /// The shell's directory, read from the process itself shortly after output settles — a `cd`
+    /// is followed by a new prompt — because macOS's zsh reports it (OSC 7) only to Terminal.app.
+    /// It names the tab when nothing more specific does (2026-10-07). One read per quiet spell,
+    /// never a timer, so a busy or idle shell costs nothing.
+    private var workingDirectoryCheck: Task<Void, Never>?
+
+    private func scheduleWorkingDirectoryCheck() {
+        guard workingDirectoryCheck == nil else { return }
+        workingDirectoryCheck = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard let self, !Task.isCancelled else { return }
+            workingDirectoryCheck = nil
+            if let directory = currentWorkingDirectory {
+                delegateProxy.hostCurrentDirectoryUpdate(source: terminalView, directory: directory)
+            }
+        }
     }
 
     private func recordProcessOutput(_ bytes: ArraySlice<UInt8>, duration: Duration) {
