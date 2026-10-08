@@ -265,12 +265,16 @@ final class MacWorkspaceController {
 
         switch focusedPane.intent.kind {
         case .local:
-            // Named, else configured, else what the shell says — its title, else its directory —
-            // else the workgroup, else "Local". The subtitle is where it stands: on this Mac,
-            // "user@localhost" said nothing two local tabs did not share.
+            // The subtitle is where it stands: on this Mac, "user@localhost" said nothing two
+            // local tabs did not share.
             let context = paneContextByPaneID[focusedPane.id]
+            // Named, else configured, else what the terminal says, else the workgroup, else the
+            // tmux session as Active names it, else the shell.
+            let shell = localRuntimesByPaneID[focusedPane.id]?.launchedShell.map { ($0 as NSString).lastPathComponent }
             let title = tabLabel ?? focusedPane.intent.label
-                ?? MacWorkspaceTabNaming.automaticTitle(context, home: home) ?? workgroupName ?? "Local"
+                ?? MacWorkspaceTabNaming.automaticTitle(context, home: home) ?? workgroupName
+                ?? focusedPane.intent.localTmuxSession.map(MacWorkspaceTabNaming.tmuxDisplayName)
+                ?? (shell == "tmux" ? nil : shell) ?? "Local"
             // The folder, unless the title already says exactly that: "~" over "~" said it twice
             // and nothing else (2026-10-08). Then the machine, as before.
             let directory = context?.directory.map { MacWorkspaceTabNaming.abbreviated($0, home: home) }

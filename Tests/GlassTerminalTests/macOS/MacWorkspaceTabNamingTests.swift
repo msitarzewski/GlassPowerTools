@@ -13,8 +13,11 @@ struct MacWorkspaceTabNamingTests {
         let home = "/Users/ann"
         #expect(MacWorkspaceTabNaming.automaticTitle(.init(title: "vim notes.md", directory: "/Users/ann/src"), home: home) == "vim notes.md")
         #expect(MacWorkspaceTabNaming.automaticTitle(.init(title: "  ", directory: "/Users/ann/src/app"), home: home) == "app")
-        #expect(MacWorkspaceTabNaming.automaticTitle(.init(title: nil, directory: home), home: home) == "~")
-        #expect(MacWorkspaceTabNaming.automaticTitle(.init(title: nil, directory: "/"), home: home) == "/")
+        #expect(MacWorkspaceTabNaming.automaticTitle(.init(title: nil, directory: home), home: home) == nil,
+                "the home folder names nothing")
+        #expect(MacWorkspaceTabNaming.automaticTitle(.init(title: nil, directory: "/"), home: home) == nil)
+        #expect(MacWorkspaceTabNaming.tmuxDisplayName("glass-3") == "Terminal 3")
+        #expect(MacWorkspaceTabNaming.tmuxDisplayName("work") == "work")
         #expect(MacWorkspaceTabNaming.automaticTitle(.init(title: nil, directory: "relative"), home: home) == nil)
         #expect(MacWorkspaceTabNaming.automaticTitle(nil, home: home) == nil)
         #expect(MacWorkspaceTabNaming.abbreviated("/Users/ann/src/app", home: home) == "~/src/app")
@@ -35,8 +38,8 @@ struct MacWorkspaceTabNamingTests {
 
         tab.updatePaneContext(title: nil, directory: "/Users/ann", for: pane)
         #expect(tab.windowIdentity(servers: [], localUsername: "ann", home: "/Users/ann")
-                == MacWorkspaceWindowIdentity(title: "~", subtitle: "ann@localhost"),
-                "the folder is not said twice")
+                == MacWorkspaceWindowIdentity(title: "Local", subtitle: "~"),
+                "home names nothing, so the title falls through; the subtitle says where")
 
         tab.updatePaneContext(title: nil, directory: "/Users/ann/src/app", for: pane)
         #expect(tab.windowIdentity(servers: [], localUsername: "ann", home: "/Users/ann")

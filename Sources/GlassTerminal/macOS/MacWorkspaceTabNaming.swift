@@ -18,16 +18,22 @@ struct MacWorkspacePaneContext: Equatable {
 }
 
 enum MacWorkspaceTabNaming {
-    /// The automatic name, or nil when the terminal has said nothing yet.
+    /// The automatic name, or nil when the terminal has said nothing that names it. The home
+    /// folder and `/` do not: a tab called "~" read as a tab with no name (2026-10-08), so the
+    /// caller goes on to the workgroup, the tmux session or the shell.
     static func automaticTitle(_ context: MacWorkspacePaneContext?, home: String?) -> String? {
         guard let context else { return nil }
         if let title = context.title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
             return title
         }
-        guard let directory = context.directory, directory.hasPrefix("/") else { return nil }
-        if let home, directory == home { return "~" }
-        if directory == "/" { return "/" }
+        guard let directory = context.directory, directory.hasPrefix("/"), directory != "/",
+              directory != home else { return nil }
         return (directory as NSString).lastPathComponent
+    }
+
+    /// A tmux session as Active names it: Glass's `glass-N` is "Terminal N", any other its own name.
+    static func tmuxDisplayName(_ session: String) -> String {
+        TerminalTmux.glassNumber(session).map { "Terminal \($0)" } ?? session
     }
 
     /// A directory as a person writes it: `~/src/app` under the home directory.

@@ -300,13 +300,17 @@ struct MacLocalTmuxTests {
         }
     }
 
-    @Test("a tab in tmux says so under its name")
-    func subtitle() async throws {
+    @Test("a tab in tmux at home is named as Active names its session, and says it is in tmux")
+    func naming() async throws {
         try await withFake { _, defaults in
             defaults.set(true, forKey: UserDefaultsKeys.localTmux)
             let tab = localTab(defaults)
-            #expect(tab.windowIdentity(servers: [], localUsername: "ann", home: "/Users/ann").subtitle
-                    == "ann@localhost · in tmux")
+            let pane = try #require(tab.focusedPaneID)
+            let session = try #require(tab.localTmuxSession(for: pane))
+            tab.paneContextInterval = .zero
+            #expect(tab.windowIdentity(servers: [], localUsername: "ann", home: "/Users/ann")
+                    == MacWorkspaceWindowIdentity(title: MacWorkspaceTabNaming.tmuxDisplayName(session),
+                                                  subtitle: "ann@localhost · in tmux"))
         }
     }
 
