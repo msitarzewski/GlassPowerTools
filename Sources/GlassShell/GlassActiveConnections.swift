@@ -29,8 +29,11 @@ public struct GlassActiveMachine: Identifiable {
     public let id: String
     public let name: String
     public let sessions: [GlassOpenSession]
-    /// Running on the machine and not shown here (D44): detached, or open on another device.
+    /// Running on the machine (D44): detached, open on another device, or open here in a window
+    /// the app lists nowhere else (W6).
     public var running: [GlassRunningSession] = []
+    /// Why the machine's running sessions were not asked for, when they were not (W6).
+    public var notChecked: String? = nil
 }
 
 public extension GlassShellModel {
@@ -53,14 +56,20 @@ public extension GlassShellModel {
             grouped[key]?.sessions.append(session)
         }
         var machines = order.map { GlassActiveMachine(id: $0, name: grouped[$0]!.name, sessions: grouped[$0]!.sessions) }
-        for session in runningSessions {
-            guard let owner = host(owningEndpoint: session.endpointID) else { continue }
+        func machineIndex(owning endpoint: EndpointID) -> Int? {
+            guard let owner = host(owningEndpoint: endpoint) else { return nil }
             let key = owner.id.rawValue.uuidString
-            if let index = machines.firstIndex(where: { $0.id == key }) {
-                machines[index].running.append(session)
-            } else {
-                machines.append(GlassActiveMachine(id: key, name: owner.displayName, sessions: [], running: [session]))
-            }
+            if let index = machines.firstIndex(where: { $0.id == key }) { return index }
+            machines.append(GlassActiveMachine(id: key, name: owner.displayName, sessions: []))
+            return machines.count - 1
+        }
+        for session in runningSessions {
+            guard let index = machineIndex(owning: session.endpointID) else { continue }
+            machines[index].running.append(session)
+        }
+        for unchecked in uncheckedMachines {
+            guard let index = machineIndex(owning: unchecked.endpointID) else { continue }
+            machines[index].notChecked = unchecked.reason
         }
         return machines
     }
@@ -68,8 +77,10 @@ public extension GlassShellModel {
     /// Opens a running session here, or takes it over. It leaves the list at once — it is about
     /// to be open on this device, where Active lists it as open — and the hosts are asked again
     /// once the attach has had time to land. Until 2026-10-03 the row stayed, "Detached", under
-    /// the same terminal's open row until something else refreshed the list.
+    /// the same terminal's open row until something else refreshed the list. A session already
+    /// open here only comes forward, and stays listed (W6).
     func open(_ session: GlassRunningSession, takingOver: Bool = false) {
+        guard !session.isOpenHere else { return session.open() }
         runningSessions.removeAll { $0.id == session.id }
         if takingOver { session.takeOver() } else { session.open() }
         Task {
@@ -83,20 +94,24 @@ public extension GlassShellModel {
         guard !isCheckingRunningSessions else { return }
         isCheckingRunningSessions = true
         defer { isCheckingRunningSessions = false }
-        runningSessions = await registry.runningSessions()
+        let report = await registry.runningReport()
+        runningSessions = report.sessions
+        uncheckedMachines = report.unchecked
     }
 
-    /// How many sessions are live, for the sidebar row. Zero when there are none: *"Active needs
-    /// a 0 like the others when nothing is connected"* (2026-09-22) — Favorites and Workgroups
-    /// say 0, and a row that says nothing looks like a row that has not counted.
     /// The services connected right now, for the library's green dots. Read in a view body, for
     /// the same reason as `activeMachines()`.
     func connectedEndpoints() -> Set<EndpointID> {
         Set(registry.openSessions().flatMap(\.connectedEndpointIDs))
     }
 
+    /// How many sessions Active lists, for the sidebar row: those open here and those running on
+    /// the machines, as last asked (W6) — the badge read 0 while fourteen sessions ran
+    /// (2026-10-08). Nothing is asked to count them. Zero when there are none: *"Active needs a 0
+    /// like the others when nothing is connected"* (2026-09-22) — Favorites and Workgroups say
+    /// 0, and a row that says nothing looks like a row that has not counted.
     func activeSessionCount() -> Int {
-        registry.openSessions().count
+        activeMachines().reduce(0) { $0 + $1.sessions.count + $1.running.count }
     }
 
     /// The ⚡'s destination.
@@ -152,6 +167,13 @@ struct GlassActiveConnectionsList: View {
                                                open: { model.open(session, takingOver: $0) },
                                                didEnd: { await model.refreshRunningSessions() })
                     }
+                    if let reason = machine.notChecked {
+                        Label(reason, systemImage: "info.circle")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .glassSpatialListRow()
+                            .accessibilityIdentifier("active-not-checked-\(machine.id)")
+                    }
                 } label: {
                     HStack {
                         Label(machine.name, systemImage: "server.rack")
@@ -186,8 +208,9 @@ struct GlassActiveConnectionsList: View {
     }
 }
 
-/// A session running on the machine that this device is not showing (D44). Choosing it opens
-/// it here; Take Over also detaches whoever else has it; End stops it on the machine.
+/// A session running on the machine (D44). Choosing it opens it here, or goes to it when a
+/// window here already shows it (W6); Take Over also detaches whoever else has it; End stops it
+/// on the machine.
 struct GlassRunningSessionRow: View {
     let session: GlassRunningSession
     /// Opens it here; `true` takes it over.
@@ -195,6 +218,9 @@ struct GlassRunningSessionRow: View {
     let didEnd: @MainActor () async -> Void
     @State private var confirmingEnd = false
     @State private var endFailure: String?
+
+    /// Open here already: the row goes to it, as an open session's row does.
+    private var openSymbol: String { session.isOpenHere ? "arrow.right.circle" : "arrow.down.right.circle" }
 
     var body: some View {
         Button {
@@ -210,7 +236,7 @@ struct GlassRunningSessionRow: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
-                Image(systemName: "arrow.down.right.circle")
+                Image(systemName: openSymbol)
                     .foregroundStyle(.tertiary)
             }
             .contentShape(.rect)
@@ -221,8 +247,13 @@ struct GlassRunningSessionRow: View {
             Button("End", systemImage: "stop.circle", role: .destructive) { confirmingEnd = true }
         }
         .contextMenu {
-            Button("Open Here", systemImage: "arrow.down.right.circle") { open(false) }
-            if session.isAttachedElsewhere {
+            if session.isOpenHere {
+                Button("Switch To", systemImage: openSymbol) { open(false) }
+            } else {
+                Button("Open Here", systemImage: openSymbol) { open(false) }
+            }
+            // Taking over a session open here would detach this app's own window from it.
+            if session.isAttachedElsewhere && !session.isOpenHere {
                 Button("Take Over", systemImage: "arrow.down.right.and.arrow.up.left") { open(true) }
             }
             Button("End Session…", systemImage: "stop.circle", role: .destructive) { confirmingEnd = true }
@@ -242,7 +273,7 @@ struct GlassRunningSessionRow: View {
             Text(endFailure ?? "")
         }
         .accessibilityElement(children: .combine)
-        .accessibilityHint("Opens this session here")
+        .accessibilityHint(session.isOpenHere ? "Switches to this session" : "Opens this session here")
         .accessibilityIdentifier("active-running-\(session.id)")
     }
 }

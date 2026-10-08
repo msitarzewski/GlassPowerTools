@@ -2,6 +2,9 @@
 import AppKit
 import Foundation
 import Testing
+import GlassConnectionKit
+import GlassLayers
+import GlassShell
 import GlassTerminalEmulator
 @testable import GlassTerminal
 
@@ -20,6 +23,20 @@ struct MacLocalTmuxTests {
         private var _scrolled: [(String, Int)] = []
         private var _claims: [(candidates: [String], launch: MacLocalTmux.Launch)] = []
         private var _takesFirstOffered = false
+        private var _listing: String?
+        private var _givenNames: [(session: String, name: String?)] = []
+        private var _contexts: [String: MacWorkspacePaneContext] = [:]
+        /// What the list answers in place of the running names, in the full format (W6).
+        var listing: String? {
+            get { lock.withLock { _listing } }
+            set { lock.withLock { _listing = newValue } }
+        }
+        var givenNames: [(session: String, name: String?)] { lock.withLock { _givenNames } }
+        /// What each session's active pane shows.
+        var contexts: [String: MacWorkspacePaneContext] {
+            get { lock.withLock { _contexts } }
+            set { lock.withLock { _contexts = newValue } }
+        }
         var scrolled: [(String, Int)] { lock.withLock { _scrolled } }
         var running: Set<String> {
             get { lock.withLock { _running } }
@@ -38,7 +55,7 @@ struct MacLocalTmuxTests {
             MacLocalTmux.Server(
                 executablePath: { "/opt/homebrew/bin/tmux" },
                 listSessions: { _ in
-                    self.running.sorted().map { "\($0)\t0\t1\t1790000000" }.joined(separator: "\n")
+                    self.listing ?? self.running.sorted().map { "\($0)\t0\t1\t1790000000" }.joined(separator: "\n")
                 },
                 kill: { name, _ in
                     self.lock.withLock {
@@ -62,7 +79,9 @@ struct MacLocalTmuxTests {
                         }
                         return "__glass_tmux_failed__\n"
                     }
-                }
+                },
+                setGivenName: { session, name, _ in self.lock.withLock { self._givenNames.append((session, name)) } },
+                context: { session, _ in self.contexts[session] }
             )
         }
     }
@@ -162,14 +181,14 @@ struct MacLocalTmuxTests {
         #expect(launch.environment?.contains("TERM_PROGRAM=GlassPowerTools") == true)
     }
 
-    @Test("what tmux says a pane shows: its host name is not a title")
+    @Test("what tmux says a pane shows: its host name is not a title; the name a tab gave the session comes too")
     func context() {
-        #expect(MacLocalTmux.parseContext("/Users/ann/src\talpha.example.com\talpha\talpha.example.com\n")
+        #expect(MacLocalTmux.parseContext("/Users/ann/src\talpha.example.com\talpha\t\talpha.example.com\n")
                 == MacWorkspacePaneContext(title: nil, directory: "/Users/ann/src"))
-        #expect(MacLocalTmux.parseContext("/Users/ann/src\talpha.example.com\talpha\talpha\n")?.title == nil)
-        #expect(MacLocalTmux.parseContext("/Users/ann/src\talpha.example.com\talpha\t✳ Fix the build\tnow\n")
-                == MacWorkspacePaneContext(title: "✳ Fix the build\tnow", directory: "/Users/ann/src"))
-        #expect(MacLocalTmux.parseContext("relative\th\th\t\n") == MacWorkspacePaneContext(title: nil, directory: nil))
+        #expect(MacLocalTmux.parseContext("/Users/ann/src\talpha.example.com\talpha\t\talpha\n")?.title == nil)
+        #expect(MacLocalTmux.parseContext("/Users/ann/src\talpha.example.com\talpha\tbuild\t✳ Fix the build\tnow\n")
+                == MacWorkspacePaneContext(title: "✳ Fix the build\tnow", directory: "/Users/ann/src", givenName: "build"))
+        #expect(MacLocalTmux.parseContext("relative\th\th\t\t\n") == MacWorkspacePaneContext(title: nil, directory: nil))
         #expect(MacLocalTmux.parseContext("garbage") == nil)
     }
 
@@ -431,16 +450,17 @@ struct MacLocalTmuxTests {
             fake.running = Set(names + ["work"])
             for pane in panes { _ = try #require(tab.localRuntime(for: pane.id)) }
 
-            let shown = MacLocalTmux.listable(MacLocalTmux.sessions(tmux: "tmux")).map(\.name)
-            #expect(shown == ["work"], "sessions a tab here shows are not offered again")
+            // W6: every session is listed, Glass's own first; those a tab here shows are open here.
+            #expect(MacLocalTmux.listable(MacLocalTmux.sessions(tmux: "tmux")).map(\.name) == names + ["work"])
+            #expect(names.map(MacLocalTmux.shownCount) == [1, 1] && MacLocalTmux.shownCount("work") == 0)
 
             tab.removePane(panes[0].id, sessionManager: sessionManager)
-            #expect(MacLocalTmux.listable(MacLocalTmux.sessions(tmux: "tmux")).map(\.name) == [names[0], "work"],
-                    "a closed pane's session is listed, Glass's own first")
+            #expect(names.map(MacLocalTmux.shownCount) == [0, 1], "a closed pane's session is no longer open here")
             tab.closeAllSessions(sessionManager: sessionManager)
             try await Task.sleep(for: .milliseconds(100))
             #expect(fake.killed.isEmpty, "closing never ends a session in tmux")
             #expect(MacLocalTmux.listable(MacLocalTmux.sessions(tmux: "tmux")).map(\.name) == names + ["work"])
+            #expect(names.map(MacLocalTmux.shownCount) == [0, 0])
         }
     }
 
@@ -565,6 +585,218 @@ struct MacLocalTmuxTests {
                 "not in tmux: a shell that exits closes its pane, as before")
         #expect(!MacLocalTerminalExitPolicy.shouldClose(exitCode: nil, tmuxSession: "glass-3", sessionRuns: ended),
                 "a process killed by a signal never closes its pane")
+    }
+
+    // MARK: W6 — Active names sessions as the tabs do, and knows this Mac (2026-10-08)
+
+    /// One session's line in the listing's full format (`TerminalTmux.listFormat`), with no
+    /// activity time, so a row's second line reads the same whenever the test runs.
+    private static func line(_ name: String, attached: Int = 0, server: TerminalTmux.Server, directory: String,
+                                         title: String = "alpha.example.com", given: String = "", command: String = "zsh") -> String {
+        [name, String(attached), "1", "", String(server.pid), String(server.startTime), server.socketPath, command,
+         "alpha.example.com", "alpha", given, directory, title].joined(separator: "\t")
+    }
+
+    /// Waits up to two seconds for `condition`.
+    private func eventually(_ condition: () -> Bool) async -> Bool {
+        for _ in 0..<100 {
+            if condition() { return true }
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        return condition()
+    }
+
+    @MainActor private final class Commands {
+        var all: [String] = []
+    }
+
+    @Test("W6: a host whose sessions come from this Mac's own tmux is this Mac: listed once, under This Mac, named as the tabs are; one a tab here shows is open here, and Open brings that tab forward")
+    func thisMacIsRecognised() async throws {
+        try await withFake { fake, _ in
+            let home = NSHomeDirectory()
+            let thisMac = TerminalTmux.Server(pid: 4242, startTime: 1_790_000_000, socketPath: "/private/tmp/tmux-501/default")
+            // Another Mac, same account and even the same pid: told apart by when its server started.
+            let other = TerminalTmux.Server(pid: 4242, startTime: 1_780_000_000, socketPath: "/private/tmp/tmux-501/default")
+            let listing = [
+                Self.line("glass-1", attached: 1, server: thisMac, directory: home + "/src/shop", title: "✳ Claude Code", command: "claude"),
+                Self.line("glass-2", attached: 1, server: thisMac, directory: home + "/src/notes"),
+                Self.line("glass-3", server: thisMac, directory: home + "/src/shop-task-2"),
+                Self.line("glass-4", server: thisMac, directory: home, given: "build"),
+            ].joined(separator: "\n") + "\n"
+            fake.listing = listing
+            // A tab here shows glass-1.
+            MacLocalTmux.noteShown("glass-1")
+            defer { MacLocalTmux.noteHidden("glass-1") }
+
+            let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+            let capability = GlassTerminalCapability(runtime: runtime)
+            var alpha = ServerConfiguration(name: "alpha", host: "alpha.example.com", username: "ann")
+            alpha.tmux = true
+            var bravo = ServerConfiguration(name: "bravo", host: "bravo.example.com", username: "ann")
+            bravo.tmux = true
+            runtime.sessionManager.serverManager.servers = [alpha, bravo]
+
+            // This Mac reached over SSH as the host alpha: an SSH tab here shows glass-2 that way.
+            let overSSH = TerminalSession(server: alpha, terminalWriteSink: { _ in })
+            overSSH.tmuxSessionName = "glass-2"
+            overSSH.tmuxCommandRunner = { _ in listing }
+            runtime.sessionManager.registerSession(overSSH)
+            overSSH.state = .connected
+            await overSSH.waitForTmuxAttach()
+            // bravo answers over a terminal open to it, which shows none of its sessions.
+            var bravoCopy = bravo
+            bravoCopy.tmux = false
+            let toBravo = TerminalSession(server: bravoCopy, terminalWriteSink: { _ in })
+            let bravoListing = Self.line("glass-1", attached: 1, server: other, directory: "/home/ann/src/app")
+                + "\n__glass_home__\t/home/ann\n"
+            toBravo.tmuxCommandRunner = { _ in bravoListing }
+            runtime.sessionManager.registerSession(toBravo)
+            toBravo.state = .connected
+
+            let revealed = Commands()
+            let reveal = GlassTerminalCapability.revealLocalTmuxSession
+            GlassTerminalCapability.revealLocalTmuxSession = { revealed.all.append($0); return true }
+            defer { GlassTerminalCapability.revealLocalTmuxSession = reveal }
+
+            let rows = await capability.runningReport().sessions
+            let alphaEndpoint = EndpointID(rawValue: alpha.id), bravoEndpoint = EndpointID(rawValue: bravo.id)
+            let underAlpha = rows.filter { $0.endpointID == alphaEndpoint }
+            #expect(underAlpha.isEmpty, "alpha is this Mac: nothing listed twice")
+            let local = rows.filter { $0.endpointID == GlassTerminalCapability.localShellEndpointID }
+            #expect(local.map(\.id) == ["terminal-tmux:local:glass-1", "terminal-tmux:local:glass-3", "terminal-tmux:local:glass-4"],
+                    "glass-2 is open here over SSH, a row of its own under alpha")
+            #expect(local.map(\.title) == ["✳ Claude Code", "shop-task-2", "build"], "named as the tabs name them")
+            #expect(local.map(\.subtitle) == ["~/src/shop · Open here", "~/src/shop-task-2 · Detached", "~ · Detached"])
+            #expect(local.map(\.isOpenHere) == [true, false, false])
+            #expect(local.map(\.isAttachedElsewhere) == [false, false, false], "the client attached is this app's tab")
+
+            let onBravo = rows.filter { $0.endpointID == bravoEndpoint }
+            #expect(onBravo.map(\.title) == ["app"] && onBravo.map(\.subtitle) == ["~/src/app · Open elsewhere"],
+                    "another machine's sessions stay under it, named from its own home")
+
+            _ = runtime.takeRequests()
+            try #require(local.count == 3)
+            local[0].open()
+            #expect(revealed.all == ["glass-1"], "Open brings forward the tab showing it")
+            #expect(runtime.takeRequests().isEmpty, "and never attaches a second client")
+            local[1].open()
+            guard case .localTerminal(let opened)? = runtime.takeRequests().first else {
+                Issue.record("a detached session opens in a new tab")
+                return
+            }
+            #expect(opened == "glass-3")
+            runtime.sessionManager.closeSession(overSSH)
+            runtime.sessionManager.closeSession(toBravo)
+        }
+    }
+
+    @Test("W6: Open for a session open here brings forward the tab showing it, on its pane")
+    func revealsTheTabShowingIt() async throws {
+        try await withFake { _, defaults in
+            defaults.set(true, forKey: UserDefaultsKeys.localTmux)
+            let window = MacWorkspaceWindowController(request: MacWorkspaceLaunchRequest(), defaults: defaults)
+            let shownTab = try #require(window.tabs.first)
+            let pane = try #require(shownTab.focusedPaneID)
+            let session = try #require(shownTab.localTmuxSession(for: pane))
+            _ = try #require(shownTab.localRuntime(for: pane))
+            shownTab.addPane(intent: .local, axis: .horizontal)
+            #expect(shownTab.focusedPaneID != pane)
+            _ = try #require(window.addTab())
+            #expect(window.selectedTabID != shownTab.workspaceID)
+
+            let registry = MacWorkspacePreviewRegistry()
+            let onScreen = NSWindow()
+            onScreen.isReleasedWhenClosed = false
+            registry.register(window, window: onScreen)
+            var presented: [NSWindow] = []
+            #expect(registry.reveal(localTmuxSession: session, present: { presented.append($0) }))
+            #expect(window.selectedTabID == shownTab.workspaceID, "its tab is selected")
+            #expect(shownTab.focusedPaneID == pane, "on the pane showing it")
+            #expect(presented.count == 1 && presented.first === onScreen, "and its window comes forward")
+            #expect(!registry.reveal(localTmuxSession: "glass-999", present: { _ in Issue.record("no tab shows it") }))
+            for tab in window.tabs { tab.closeAllSessions(sessionManager: SessionManager(loadImmediately: false)) }
+        }
+    }
+
+    @Test("W6: naming a tab names its tmux session; going back to the automatic name takes it away")
+    func renamingNamesTheSession() async throws {
+        try await withFake { fake, defaults in
+            defaults.set(true, forKey: UserDefaultsKeys.localTmux)
+            let tab = localTab(defaults)
+            let session = try #require(tab.focusedPaneID.flatMap(tab.localTmuxSession(for:)))
+            tab.rename(to: "shop; \"$HOME\" `id`")
+            tab.rename(to: nil)
+            MacLocalTmux.nameQueue.sync {}
+            #expect(fake.givenNames.map(\.session) == [session, session])
+            #expect(fake.givenNames.map(\.name) == ["shop; \"$HOME\" `id`", nil])
+        }
+    }
+
+    @Test("W6: a tab attaching to a session another tab named takes that name, once; naming it here wins")
+    func attachingTakesTheGivenName() async throws {
+        try await withFake { fake, defaults in
+            defaults.set(true, forKey: UserDefaultsKeys.localTmux)
+            let tab = localTab(defaults)
+            let pane = try #require(tab.focusedPaneID)
+            let session = try #require(tab.localTmuxSession(for: pane))
+            _ = try #require(tab.localRuntime(for: pane))
+            tab.paneContextInterval = .zero
+            fake.contexts = [session: MacWorkspacePaneContext(title: nil, directory: NSHomeDirectory(), givenName: "shop")]
+            tab.refreshLocalTmuxContext()
+            #expect(await eventually { tab.windowIdentity(servers: []).title == "shop" })
+
+            tab.rename(to: nil)
+            tab.refreshLocalTmuxContext()
+            try await Task.sleep(for: .milliseconds(200))
+            #expect(tab.windowIdentity(servers: []).title == MacWorkspaceTabNaming.tmuxDisplayName(session),
+                    "the automatic name, chosen here, is not replaced by the session's old one")
+            tab.closeAllSessions(sessionManager: SessionManager(loadImmediately: false))
+
+            // Chosen before tmux was first asked: the old name, read after, is not taken either.
+            let other = localTab(defaults)
+            let otherPane = try #require(other.focusedPaneID)
+            let otherSession = try #require(other.localTmuxSession(for: otherPane))
+            _ = try #require(other.localRuntime(for: otherPane))
+            other.paneContextInterval = .zero
+            fake.contexts[otherSession] = MacWorkspacePaneContext(title: nil, directory: NSHomeDirectory(), givenName: "shop")
+            other.rename(to: nil)
+            other.refreshLocalTmuxContext()
+            #expect(await eventually { other.paneContextByPaneID[otherPane] != nil }, "tmux was asked")
+            #expect(other.windowIdentity(servers: []).title == MacWorkspaceTabNaming.tmuxDisplayName(otherSession))
+            other.closeAllSessions(sessionManager: SessionManager(loadImmediately: false))
+        }
+    }
+
+    @Test("W6: an SSH tab in tmux takes the name its host's session was given, and naming it names the session there")
+    func sshTabsNameTheirSessions() async throws {
+        try await withFake { _, defaults in
+            var server = ServerConfiguration(name: "alpha", host: "alpha.example.com", username: "ann")
+            server.tmux = true
+            let commands = Commands()
+            let query = TerminalTmux.givenNameQuery(session: "glass-5")
+            let session = TerminalSession(server: server, terminalWriteSink: { _ in })
+            session.tmuxSessionName = "glass-5"
+            session.tmuxCommandRunner = { command in
+                commands.all.append(command)
+                return command == query ? "shop\n" : ""
+            }
+            session.state = .connected
+            await session.waitForTmuxAttach()
+            let broker = MacLiveSessionBroker()
+            let manager = SessionManager(loadImmediately: false)
+            let request = MacLiveSessionWorkspaceRouter.launchRequest(for: session, sessionManager: manager, broker: broker)
+            let tab = MacWorkspaceController(request: request, liveSessionBroker: broker, defaults: defaults)
+            #expect(tab.focusedPaneID.flatMap(tab.session(for:)) === session)
+
+            tab.askForGivenNamesOverSSH()
+            #expect(await eventually { tab.windowIdentity(servers: [server]).title == "shop" })
+            tab.rename(to: "build")
+            tab.rename(to: nil)
+            let named = try #require(TerminalTmux.givenNameCommand(session: "glass-5", name: "build"))
+            let unnamed = try #require(TerminalTmux.givenNameCommand(session: "glass-5", name: nil))
+            #expect(await eventually { commands.all.contains(named) && commands.all.contains(unnamed) })
+            tab.closeAllSessions(sessionManager: manager)
+        }
     }
 }
 #endif

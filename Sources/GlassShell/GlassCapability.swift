@@ -381,6 +381,10 @@ public protocol GlassCapability: AnyObject {
     /// requirement for the same reason as `openSessions()`.
     func runningSessions() async -> [GlassRunningSession]
 
+    /// The running sessions and the machines that could not be asked, with why (W6). Default:
+    /// `runningSessions()` and none unasked. A requirement for the same reason.
+    func runningReport() async -> GlassRunningReport
+
     /// Surfaces the capability contributes to the library's sidebar, beside Collections.
     ///
     /// For things that span the whole fleet rather than belonging to one machine — Workgroups,

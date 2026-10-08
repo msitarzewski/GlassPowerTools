@@ -150,6 +150,35 @@ final class MacWorkspacePreviewRegistry {
         return true
     }
 
+    /// The window, tab and pane showing this Mac's tmux session `name` (W6): one whose terminal
+    /// is running, else one that names it.
+    func locate(localTmuxSession name: String) -> (window: NSWindow, controller: MacWorkspaceWindowController,
+                                                   tab: MacWorkspaceController, paneID: UUID)? {
+        var named: (window: NSWindow, controller: MacWorkspaceWindowController, tab: MacWorkspaceController, paneID: UUID)?
+        for id in entries.keys.sorted(by: { $0.uuidString < $1.uuidString }) {
+            guard let entry = entries[id], let controller = entry.controller, let window = entry.window else { continue }
+            for tab in controller.tabs where !tab.isClosed {
+                for pane in tab.state.root?.panes ?? [] where pane.intent.localTmuxSession == name {
+                    if tab.localRuntimesByPaneID[pane.id] != nil { return (window, controller, tab, pane.id) }
+                    named = named ?? (window, controller, tab, pane.id)
+                }
+            }
+        }
+        return named
+    }
+
+    /// Brings forward the tab showing this Mac's tmux session `name`, on its pane: Active's Open
+    /// for a session open here, which attaching again would mirror (W6).
+    @discardableResult
+    func reveal(localTmuxSession name: String,
+                present: (NSWindow) -> Void = { NSApp.activate(); $0.makeKeyAndOrderFront(nil) }) -> Bool {
+        guard let found = locate(localTmuxSession: name) else { return false }
+        found.controller.select(found.tab.workspaceID)
+        found.tab.focus(found.paneID)
+        present(found.window)
+        return true
+    }
+
     /// Removes the session's pane, closing the session with it, and the window if that was its
     /// last pane. False when no window holds the session, so the caller can close it directly.
     @discardableResult

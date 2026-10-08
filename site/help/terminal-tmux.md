@@ -39,16 +39,21 @@ A session can be open in more than one place at once: on your Mac and your Visio
 
 ## Pick up a session from Active
 
-**Active** lists, under each machine, the tmux sessions running there that this device isn't showing:
+**Active** lists, under each machine, the tmux sessions running there. A session is called what its tab would be called: the name you gave the tab, else the title its program set, else the folder it's in, else **Terminal 1**, **Terminal 2** and so on. Under the name is its folder, unless the name already says it, and then where it's open:
 
 - **Detached**: nobody is attached. It may be one you closed, one from a dropped connection, or one you started on another device.
 - **Open elsewhere**: another device, or a terminal outside Glass Power Tools, is attached.
+- **Open here**: a tab on this Mac shows it. Choosing it brings that tab forward.
 
-Your own tmux sessions, with names you gave them, are listed too.
+A terminal this device has open over SSH is listed with the open sessions instead, so nothing appears twice. Your own tmux sessions, with names you gave them, are listed too.
 
 Choose a session to open it here. To use it here and disconnect everyone else, right-click it (touch and hold on touch devices) and choose **Take Over**.
 
-**Active** checks your machines when it appears. To check again, choose **Check Machines** in its toolbar, or pull down the list on iPhone and iPad. Only machines with the setting on are checked, and only those that can sign in without asking: if a machine's password isn't saved, or its host key hasn't been trusted yet, connect to it once first.
+**Active** checks your machines when it appears. To check again, choose **Check Machines** in its toolbar, or pull down the list on iPhone and iPad. Only machines with the setting on are checked, and only those that can sign in without asking. A machine that wasn't checked says why under its name, for example **Not checked: signing in would need your password.** Save the password, or connect to the machine once (to trust its host key), and check again.
+
+## Names travel with the session
+
+When you rename a tab that runs in tmux, its session keeps the name. **Active** on each of your devices lists the session by that name, and a tab that opens the session later takes the name too. **Use Automatic Name** removes it from the session as well.
 
 ## End a session
 
@@ -65,7 +70,7 @@ Each local terminal you open afterwards runs in its own tmux session on the Mac.
 
 - **Quit** the app and the sessions keep running. When it opens again, each tab picks up where it was. Windows of SSH terminals in tmux come back too, each terminal on its own session.
 - **Close** a tab, a pane or a window and its session keeps running, as for a terminal in tmux on any other machine. Its tools menu says **Detach** rather than **Disconnect**.
-- **Active** lists the Mac's sessions under **This Mac**: open one again, take it over from another terminal, or end it (swipe left and choose **End**, or right-click and choose **End Session…**). Typing `exit` in the session ends it too.
+- **Active** lists the Mac's sessions under **This Mac**. Those a tab shows say **Open here**, and choosing one brings its tab forward. Open the others again, take one over from another terminal, or end one (swipe left and choose **End**, or right-click and choose **End Session…**). Typing `exit` in the session ends it too.
 - The tab's name follows the program's title and the folder you `cd` into, as it does without tmux.
 
-To reach these sessions from another device, turn on **Remote Login** on the Mac (System Settings, **General**, **Sharing**) and add the Mac to the library with a Terminal service that keeps sessions running with tmux. **Active** on your other devices then lists the Mac's sessions like any machine's.
+To reach these sessions from another device, turn on **Remote Login** on the Mac (System Settings, **General**, **Sharing**) and add the Mac to the library with a Terminal service that keeps sessions running with tmux. **Active** on your other devices then lists the Mac's sessions like any machine's. On the Mac itself, **Active** recognizes that machine as this Mac and lists its sessions once, under **This Mac**.

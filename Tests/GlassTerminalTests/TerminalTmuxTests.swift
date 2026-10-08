@@ -515,4 +515,130 @@ struct TerminalTmuxTests {
         let listed = Self.shell("\(TerminalTmux.quoted(tmux)) -S \(TerminalTmux.quoted(socket)) list-sessions -F '#{session_name}'", environment)
         #expect(listed.split(separator: "\n").count == 8, "exists made nothing")
     }
+
+    // MARK: W6 — the listing says what a session shows, and keeps the name its tab was given
+
+    @Test("W6: the listing reads the active pane's title, folder and program, the given name and the server; a title may hold anything")
+    func richListing() throws {
+        let server = TerminalTmux.Server(pid: 4242, startTime: 1_789_990_000, socketPath: "/private/tmp/tmux-501/default")
+        func line(_ fields: [String]) -> String { fields.joined(separator: "\t") }
+        let titled = line(["glass-3", "1", "2", "1790000000", "4242", "1789990000", server.socketPath, "claude",
+                           "alpha.example.com", "alpha", "shop", "/Users/ann/src/shop", "✳ Claude\tCode: fix: the build"])
+        let atHome = line(["glass-4", "0", "1", "1790000200", "4242", "1789990000", server.socketPath, "zsh",
+                           "alpha.example.com", "alpha", "", "/Users/ann", "alpha.example.com"])
+        let older = "work\t0\t1\t1790000100"
+        let output = [titled, older, atHome, "__glass_home__\t/Users/ann"].joined(separator: "\n") + "\n"
+        guard case .sessions(let sessions) = TerminalTmux.parse(output) else {
+            Issue.record("not read as a list")
+            return
+        }
+        try #require(sessions.map(\.name) == ["glass-3", "work", "glass-4"])
+        #expect(sessions[0].title == "✳ Claude\tCode: fix: the build", "everything after the twelfth tab is the title")
+        #expect(sessions[0].directory == "/Users/ann/src/shop" && sessions[0].command == "claude")
+        #expect(sessions[0].givenName == "shop" && sessions[0].displayName == "shop")
+        #expect(sessions[0].server == server && sessions[0].home == "/Users/ann")
+        #expect(sessions[0].attachedClients == 1 && sessions[0].windows == 2)
+        #expect(sessions[2].title == nil, "tmux's default title, the host name, is not a title")
+        #expect(sessions[2].givenName == nil && sessions[2].displayName == "Terminal 4", "untitled, at home: its own name")
+        #expect(sessions[1] == TerminalTmux.Session(name: "work", attachedClients: 0, windows: 1,
+                                                    lastActivity: Date(timeIntervalSince1970: 1_790_000_100)),
+                "an older four-field answer still reads")
+        #expect(TerminalTmux.parse(older + "\n") == .sessions([sessions[1]]))
+        // A title is text a program chose: one that reads like a marker is still a title.
+        let mischief = titled.replacingOccurrences(of: "✳ Claude\tCode: fix: the build", with: "__glass_no_tmux__")
+        guard case .sessions(let marked) = TerminalTmux.parse(mischief + "\n") else {
+            Issue.record("a title that reads like a marker made the listing something else")
+            return
+        }
+        #expect(marked.first?.title == "__glass_no_tmux__")
+    }
+
+    @Test("W6: the command naming a session quotes every word, holds the name to one line, escapes a trailing ;, and with no name unsets it")
+    func givenNameCommand() {
+        let name = "it's \"$HOME\" `id`\nnext;"
+        #expect(TerminalTmux.givenNameArguments(session: "glass-1", name: name)
+                == ["-u", "set-option", "-t", "=glass-1:", "@glass-name", "it's \"$HOME\" `id` next\\;"])
+        #expect(TerminalTmux.givenNameCommand(session: "glass-1", name: name)
+                == #"sh -c 'PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; tmux '\''-u'\'' '\''set-option'\'' '\''-t'\'' '\''=glass-1:'\'' '\''@glass-name'\'' '\''it'\''\'\'''\''s "$HOME" `id` next\;'\'''"#)
+        #expect(TerminalTmux.givenNameCommand(session: "glass-1", name: nil)
+                == #"sh -c 'PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; tmux '\''-u'\'' '\''set-option'\'' '\''-u'\'' '\''-t'\'' '\''=glass-1:'\'' '\''@glass-name'\'''"#)
+        #expect(TerminalTmux.givenNameArguments(session: "glass-1", name: " \n ")
+                == ["-u", "set-option", "-u", "-t", "=glass-1:", "@glass-name"], "a blank name is no name")
+        #expect(TerminalTmux.givenNameCommand(session: "a:b", name: "x") == nil, "a session name tmux would misread")
+        #expect(TerminalTmux.givenNameArguments(session: "-t", name: "x") == nil)
+        #expect(TerminalTmux.givenNameQuery(session: "glass-1")
+                == #"sh -c 'PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; tmux '\''-u'\'' '\''display-message'\'' '\''-p'\'' '\''-t'\'' '\''=glass-1:'\'' '\''#{@glass-name}'\'''"#)
+    }
+
+    /// Against a private tmux server: every run names its socket — through `-S`, the listing's
+    /// server arguments, or a `tmux` on the PATH that adds it — so the default server, which holds
+    /// the owner's sessions, is never reached (rule 63).
+    @Test("W6, live: the listing gives the active pane's title and folder and the server; a name set through each builder reads back",
+          .enabled(if: TerminalTmuxTests.tmux != nil))
+    func namingLive() throws {
+        let tmux = try #require(TerminalTmuxTests.tmux)
+        let folder = URL(fileURLWithPath: "/tmp/gpt-\(UUID().uuidString.prefix(8).lowercased())")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let socket = folder.appendingPathComponent("s").path
+        let work = folder.appendingPathComponent("shop")
+        try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+        // Home as the system reports a process's folder: /tmp is a link to /private/tmp.
+        // (`realpath`: Foundation's resolving gives /tmp back.)
+        let home = try #require(realpath(folder.path, nil).map { resolved in
+            defer { free(resolved) }
+            return String(cString: resolved)
+        })
+        let environment = ["PATH": "/usr/bin:/bin", "HOME": home]
+        @discardableResult func run(_ arguments: [String]) -> (output: String, status: Int32) {
+            LiveProcess.run(tmux, ["-S", socket] + arguments, environment: environment)
+        }
+        defer { run(["kill-server"]) }
+        func listing() -> [TerminalTmux.Session] {
+            let script = TerminalTmux.listScript(tmux: TerminalTmux.quoted(tmux), serverArguments: ["-S", socket])
+            guard case .sessions(let sessions) = TerminalTmux.parse(LiveProcess.run("/bin/sh", ["-c", script], environment: environment).output)
+            else { return [] }
+            return sessions
+        }
+
+        #expect(run(["-u", "-f", "/dev/null", "new-session", "-d", "-s", "glass-1", "-c", work.path, "-x", "80", "-y", "10",
+                     "/bin/sleep", "600"]).status == 0)
+        #expect(run(["-u", "new-session", "-d", "-s", "glass-2", "-c", home, "/bin/sleep", "600"]).status == 0)
+        // A second window, now the active one: a session's line is its active pane's.
+        #expect(run(["-u", "new-window", "-t", "=glass-1:", "-c", "/usr", "/bin/sleep", "600"]).status == 0)
+        #expect(run(["-u", "select-pane", "-t", "=glass-1:", "-T", "✳ Claude Code: fix"]).status == 0)
+
+        let sessions = listing()
+        let first = try #require(sessions.first { $0.name == "glass-1" })
+        #expect(first.title == "✳ Claude Code: fix")
+        #expect(first.directory == "/usr", "the active window's pane, not the first one")
+        #expect(first.command == "sleep")
+        #expect(first.home == home)
+        let pid = Int(run(["display-message", "-p", "#{pid}"]).output.trimmingCharacters(in: .whitespacesAndNewlines))
+        #expect(first.server?.pid == pid && first.server?.socketPath == socket)
+        #expect(Set(sessions.compactMap(\.server)).count == 1, "one server, the same on every line")
+        let second = try #require(sessions.first { $0.name == "glass-2" })
+        #expect(second.title == nil && second.displayName == "Terminal 2", "no program titled it, and it is at home")
+
+        // As a local tab names its session: argv.
+        let name = "it's \"$HOME\" `id` build;"
+        #expect(run(try #require(TerminalTmux.givenNameArguments(session: "glass-1", name: name))).status == 0)
+        #expect(listing().first { $0.name == "glass-1" }?.givenName == name)
+
+        // As an SSH tab does: the exact command, through sh, with a tmux on the PATH that names the socket.
+        let bin = folder.appendingPathComponent("bin")
+        try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+        let shim = bin.appendingPathComponent("tmux")
+        try Data("#!/bin/sh\nexec \(TerminalTmux.quoted(tmux)) -S \(TerminalTmux.quoted(socket)) \"$@\"\n".utf8).write(to: shim)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: shim.path)
+        let throughShim = ["PATH": "\(bin.path):/usr/bin:/bin", "HOME": home]
+        let command = try #require(TerminalTmux.givenNameCommand(session: "glass-2", name: name))
+        #expect(LiveProcess.run("/bin/sh", ["-c", command], environment: throughShim).status == 0)
+        #expect(listing().first { $0.name == "glass-2" }?.givenName == name)
+        let query = try #require(TerminalTmux.givenNameQuery(session: "glass-2"))
+        #expect(LiveProcess.run("/bin/sh", ["-c", query], environment: throughShim).output == name + "\n")
+
+        #expect(run(try #require(TerminalTmux.givenNameArguments(session: "glass-1", name: nil))).status == 0)
+        #expect(listing().first { $0.name == "glass-1" }?.givenName == nil, "the automatic name takes it away")
+    }
 }

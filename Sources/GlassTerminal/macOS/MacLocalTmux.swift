@@ -33,6 +33,10 @@ enum MacLocalTmux {
         /// `TerminalTmux.claimScript`'s answer, as printed; nil when it could not be run. Stand-ins
         /// that leave it out could not run it.
         var claim: @Sendable (_ candidates: [String], _ launch: Launch, _ tmux: String) -> String? = { _, _, _ in nil }
+        /// Gives a session the name its tab was given, or takes it away with nil (W6).
+        var setGivenName: @Sendable (_ session: String, _ name: String?, _ tmux: String) -> Void = { _, _, _ in }
+        /// What a session's active pane shows (`MacLocalTmux.context`); nil when it could not be read.
+        var context: @Sendable (_ session: String, _ tmux: String) -> MacWorkspacePaneContext? = { _, _ in nil }
 
         nonisolated static let live = Server(
             executablePath: { MacLocalTmux.executablePath() },
@@ -48,7 +52,15 @@ enum MacLocalTmux {
                 let script = TerminalTmux.claimScript(candidates: candidates, directory: launch.directory,
                                                       command: launch.command, tmux: TerminalTmux.quoted(tmux))
                 return MacLocalTmux.run("/bin/sh", ["-c", script], environment: launch.environmentVariables)
-            }
+            },
+            setGivenName: { session, name, tmux in
+                guard let arguments = TerminalTmux.givenNameArguments(session: session, name: name) else { return }
+                // Argv, never a shell: the name is whatever someone typed.
+                if MacLocalTmux.run(tmux, arguments) == nil {
+                    MacLocalTmux.logger.notice("tmux would not keep the name given to session \(session, privacy: .public)")
+                }
+            },
+            context: { MacLocalTmux.context(session: $0, tmux: $1) }
         )
     }
 
@@ -140,12 +152,16 @@ enum MacLocalTmux {
         return sessions
     }
 
-    /// What Active lists under This Mac: every session but those a tab here is showing, Glass's
-    /// own first by number, as for any other machine.
+    /// What Active lists under This Mac: every session, Glass's own first by number, as for any
+    /// other machine. Those a tab here shows are listed too, as open here, and Open brings that
+    /// tab forward (W6): left out, fourteen running tabs made an empty This Mac, and the same
+    /// sessions reached over SSH read "Open elsewhere" (2026-10-08).
     @MainActor static func listable(_ sessions: [TerminalTmux.Session]) -> [TerminalTmux.Session] {
-        sessions.filter { shownHere[$0.name, default: 0] == 0 }
-            .sorted { (TerminalTmux.glassNumber($0.name) ?? .max, $0.name) < (TerminalTmux.glassNumber($1.name) ?? .max, $1.name) }
+        sessions.sorted { (TerminalTmux.glassNumber($0.name) ?? .max, $0.name) < (TerminalTmux.glassNumber($1.name) ?? .max, $1.name) }
     }
+
+    /// How many panes here show `name`: open here when one does.
+    @MainActor static func shownCount(_ name: String) -> Int { shownHere[name, default: 0] }
 
     /// Sessions a tab in this app is attached to, by how many panes show each.
     @MainActor private(set) static var shownHere: [String: Int] = [:]
@@ -174,24 +190,38 @@ enum MacLocalTmux {
     @MainActor private static var refusalsLogged: Set<String> = []
 
     /// What the session's active pane shows: the directory its shell is in, and the title a
-    /// program set. tmux keeps both from the terminal outside it, so a tab in tmux asks.
+    /// program set. tmux keeps both from the terminal outside it, so a tab in tmux asks. Also the
+    /// name a tab gave the session (W6), which a tab attaching to it takes.
     nonisolated static func context(session: String, tmux: String,
                                     environment: [String: String] = ProcessInfo.processInfo.environment) -> MacWorkspacePaneContext? {
-        run(tmux, ["-u", "display-message", "-p", "-t", "=" + session + ":",
-                   "#{pane_current_path}\t#{host}\t#{host_short}\t#{pane_title}"], environment: environment).flatMap(parseContext)
+        run(tmux, ["-u", "display-message", "-p", "-t", "=" + session + ":", contextFormat],
+            environment: environment).flatMap(parseContext)
     }
+
+    /// The title last, so that it may hold anything.
+    nonisolated static let contextFormat = "#{pane_current_path}\t#{host}\t#{host_short}\t#{\(TerminalTmux.givenNameOption)}\t#{pane_title}"
 
     /// tmux titles a pane with the host name until a program sets one; that is not a title.
     nonisolated static func parseContext(_ output: String) -> MacWorkspacePaneContext? {
         let fields = output.trimmingCharacters(in: .newlines)
-            .split(separator: "\t", maxSplits: 3, omittingEmptySubsequences: false).map(String.init)
-        guard fields.count == 4 else { return nil }
-        let title = fields[3].trimmingCharacters(in: .whitespaces)
+            .split(separator: "\t", maxSplits: 4, omittingEmptySubsequences: false).map(String.init)
+        guard fields.count == 5 else { return nil }
         return MacWorkspacePaneContext(
-            title: title.isEmpty || title == fields[1] || title == fields[2] ? nil : title,
-            directory: fields[0].hasPrefix("/") ? fields[0] : nil
+            title: TerminalSessionNaming.programTitle(fields[4], hostNames: [fields[1], fields[2]]),
+            directory: fields[0].hasPrefix("/") ? fields[0] : nil,
+            givenName: TerminalSessionNaming.displayText(fields[3])
         )
     }
+
+    /// Gives a session the name its tab was given, or takes it away (W6). Off the main thread,
+    /// on one queue, so a rename and its undo arrive in that order.
+    @MainActor static func shareGivenName(_ name: String?, session: String) {
+        let server = server
+        guard let tmux = server.executablePath() else { return }
+        nameQueue.async { server.setGivenName(session, name, tmux) }
+    }
+
+    nonisolated static let nameQueue = DispatchQueue(label: "GlassPowerTools.local-tmux-name", qos: .utility)
 
     /// A pane is done with its name: the session ended, or it runs on without a tab.
     @MainActor static func release(_ name: String) {

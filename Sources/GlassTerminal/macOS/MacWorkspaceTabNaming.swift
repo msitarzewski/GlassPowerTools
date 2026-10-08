@@ -7,6 +7,9 @@
 //  location of terminal". Terminal.app's answer, in its order: the title the shell or program set,
 //  else where the shell is standing. A name someone gave the tab wins over both.
 //
+//  The rule itself is `TerminalSessionNaming`'s, which Active uses on every device (W6), so a
+//  session is called the same in Active as in the tab that shows it.
+//
 
 import Foundation
 
@@ -15,32 +18,26 @@ import Foundation
 struct MacWorkspacePaneContext: Equatable {
     var title: String?
     var directory: String?
+    /// The name a tab gave the pane's tmux session (`@glass-name`, W6): a tab attaching to it takes
+    /// it as its own. Only tmux answers this; nil everywhere else.
+    var givenName: String? = nil
 }
 
 enum MacWorkspaceTabNaming {
-    /// The automatic name, or nil when the terminal has said nothing that names it. The home
-    /// folder and `/` do not: a tab called "~" read as a tab with no name (2026-10-08), so the
-    /// caller goes on to the workgroup, the tmux session or the shell.
+    /// The automatic name, or nil when the terminal has said nothing that names it. The caller
+    /// goes on to the workgroup, the tmux session or the shell.
     static func automaticTitle(_ context: MacWorkspacePaneContext?, home: String?) -> String? {
         guard let context else { return nil }
-        if let title = context.title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
-            return title
-        }
-        guard let directory = context.directory, directory.hasPrefix("/"), directory != "/",
-              directory != home else { return nil }
-        return (directory as NSString).lastPathComponent
+        return TerminalSessionNaming.automaticName(title: context.title, directory: context.directory, home: home)
     }
 
-    /// A tmux session as Active names it: Glass's `glass-N` is "Terminal N", any other its own name.
+    /// A tmux session as Active names it when nothing else does: `glass-N` is "Terminal N".
     static func tmuxDisplayName(_ session: String) -> String {
-        TerminalTmux.glassNumber(session).map { "Terminal \($0)" } ?? session
+        TerminalSessionNaming.tmuxDisplayName(session)
     }
 
     /// A directory as a person writes it: `~/src/app` under the home directory.
     static func abbreviated(_ directory: String, home: String?) -> String {
-        guard let home, !home.isEmpty, home != "/" else { return directory }
-        if directory == home { return "~" }
-        if directory.hasPrefix(home + "/") { return "~" + directory.dropFirst(home.count) }
-        return directory
+        TerminalSessionNaming.abbreviated(directory, home: home)
     }
 }

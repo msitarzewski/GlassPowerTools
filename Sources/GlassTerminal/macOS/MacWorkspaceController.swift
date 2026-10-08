@@ -347,17 +347,20 @@ final class MacWorkspaceController {
             guard !Task.isCancelled, let self else { return }
             isProducingOutput = false
             refreshLocalTmuxContext()
+            askForGivenNamesOverSSH()
         }
     }
 
     /// D47: tmux keeps a shell's title and directory from the terminal outside it, so a tab in
-    /// tmux asks tmux what its panes show once output settles.
-    private func refreshLocalTmuxContext() {
+    /// tmux asks tmux what its panes show once output settles — and, the first time, the name a
+    /// tab gave its session (W6). Through `MacLocalTmux.server`, which tests replace.
+    func refreshLocalTmuxContext() {
         let panes = localRuntimesByPaneID.keys.compactMap { id in localTmuxSession(for: id).map { (id, $0) } }
-        guard !panes.isEmpty, let tmux = MacLocalTmux.executablePath() else { return }
+        let server = MacLocalTmux.server
+        guard !panes.isEmpty, let tmux = server.executablePath() else { return }
         Task.detached(priority: .utility) { [weak self] in
             let contexts = panes.compactMap { paneID, session in
-                MacLocalTmux.context(session: session, tmux: tmux).map { (paneID, $0) }
+                server.context(session, tmux).map { (paneID, $0) }
             }
             await MainActor.run { [weak self] in
                 for (paneID, context) in contexts { self?.setPaneContext(context, for: paneID) }
@@ -370,9 +373,65 @@ final class MacWorkspaceController {
     }
 
     /// Names the tab; blank goes back to the automatic name. The window saves it with its tabs.
+    /// The name also goes with each tmux session the tab shows, as the session's `@glass-name`
+    /// (W6): Active on every device, and a tab attaching to the session later, call it the same.
+    /// Going back to the automatic name takes it away there too.
     func rename(to name: String?) {
         guard !isClosed else { return }
         tabLabel = MacWorkspaceChromeText.sanitize(name, maximumLength: MacWorkspaceTabRequest.maximumDisplayTextLength)
+        // Named here: a session's earlier name, read after this, is not taken over this one.
+        givenNameGeneration &+= 1
+        givenNameSettledPaneIDs.formUnion(state.root?.paneIDs ?? [])
+        for pane in state.root?.panes ?? [] {
+            if let session = pane.intent.localTmuxSession {
+                MacLocalTmux.shareGivenName(tabLabel, session: session)
+            } else if let terminal = sessionsByPaneID[pane.id], terminal.survivesClose, terminal.state == .connected,
+                      let session = terminal.tmuxSessionName,
+                      let command = TerminalTmux.givenNameCommand(session: session, name: tabLabel) {
+                // One after another, so a rename and its undo reach the host in that order.
+                let previous = givenNameWrite
+                givenNameWrite = Task {
+                    await previous?.value
+                    do { _ = try await terminal.runTmuxCommand(command) } catch {
+                        Logger.ssh.notice("A tab's name didn't reach its tmux session: \(error.localizedDescription, privacy: .public)")
+                    }
+                }
+            }
+        }
+    }
+
+    /// The last name sent to an SSH pane's session; the next one waits for it.
+    @ObservationIgnored private var givenNameWrite: Task<Void, Never>?
+
+    /// Panes whose session's given name is settled: taken once, as the pane attached, or replaced
+    /// by naming the tab here (W6).
+    @ObservationIgnored private var givenNameSettledPaneIDs: Set<UUID> = []
+    /// Counts namings here, so an answer asked for before one is not taken after it.
+    @ObservationIgnored private var givenNameGeneration: UInt64 = 0
+
+    /// A tab attaching to a tmux session takes the name a tab gave that session, once, when it
+    /// has no name of its own.
+    private func adoptGivenName(_ givenName: String?, for paneID: UUID) {
+        guard givenNameSettledPaneIDs.insert(paneID).inserted, !isClosed, tabLabel == nil, let givenName else { return }
+        tabLabel = MacWorkspaceChromeText.sanitize(givenName, maximumLength: MacWorkspaceTabRequest.maximumDisplayTextLength)
+    }
+
+    /// An SSH pane in tmux asks its host, once, for the name a tab gave its session; a local
+    /// pane's comes with what it shows (`refreshLocalTmuxContext`).
+    func askForGivenNamesOverSSH() {
+        guard tabLabel == nil, !isClosed else { return }
+        for (paneID, terminal) in sessionsByPaneID where !givenNameSettledPaneIDs.contains(paneID) {
+            guard terminal.survivesClose, terminal.state == .connected, let session = terminal.tmuxSessionName,
+                  let query = TerminalTmux.givenNameQuery(session: session) else { continue }
+            let generation = givenNameGeneration
+            givenNameSettledPaneIDs.insert(paneID)
+            Task { [weak self] in
+                let answer = try? await terminal.runTmuxCommand(query)
+                guard let self, generation == givenNameGeneration, !isClosed, tabLabel == nil,
+                      let name = answer.flatMap({ TerminalSessionNaming.displayText($0) }) else { return }
+                tabLabel = MacWorkspaceChromeText.sanitize(name, maximumLength: MacWorkspaceTabRequest.maximumDisplayTextLength)
+            }
+        }
     }
 
     /// The title a pane's shell or program set, and its directory, as they change. A pane in
@@ -407,6 +466,8 @@ final class MacWorkspaceController {
 
     private func setPaneContext(_ context: MacWorkspacePaneContext, for paneID: UUID) {
         guard !isClosed, state.root?.pane(id: paneID) != nil else { return }
+        // Only tmux answers for a session; an SSH pane in tmux asks its host instead.
+        if localTmuxSession(for: paneID) != nil { adoptGivenName(context.givenName, for: paneID) }
         if paneContextByPaneID[paneID] != context { paneContextByPaneID[paneID] = context }
     }
 

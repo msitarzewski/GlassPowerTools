@@ -91,6 +91,8 @@ public final class GlassShellModel: GlassServiceStore {
     /// Sessions running on hosts that this device is not showing (D44), as last asked. Active
     /// asks when it appears and when it is refreshed.
     public internal(set) var runningSessions: [GlassRunningSession] = []
+    /// The machines that same ask could not reach without a prompt, and why (W6).
+    public internal(set) var uncheckedMachines: [GlassUncheckedMachine] = []
     public internal(set) var isCheckingRunningSessions = false
 
     public func showHost(_ id: HostID) { hostToShow = id }

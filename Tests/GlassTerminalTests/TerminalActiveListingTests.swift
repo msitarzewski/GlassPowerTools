@@ -36,6 +36,27 @@ struct TerminalActiveListingTests {
         manager.closeWorkgroup(group)
     }
 
+    @Test("W6: a machine skipped because asking would need something says why, in plain words")
+    func skippedMachinesSayWhy() {
+        let server = ServerConfiguration(name: "alpha", host: "alpha.example.com", port: 22, username: "casey")
+        #expect(TerminalListingSkip.classify(SessionOpenError.missingPassword(server: server, location: .target)).reason
+                == "Not checked: signing in would need your password.")
+        #expect(TerminalListingSkip.classify(SessionOpenError.credentialUnavailable(server: server, location: .target)) == .locked)
+        #expect(TerminalListingSkip.classify(SessionOpenError.sshKeyNotFound(server: server, location: .target)) == .keyUnavailable)
+        #expect(TerminalListingSkip.classify(TerminalListingSkip.identityUnconfirmed).reason
+                == "Not checked: connect once to confirm it's the right machine.")
+        #expect(TerminalListingSkip.classify(SSHError.connectionFailed).reason
+                == "Not checked: the connection failed. Connect to it to see why.")
+        #expect(TerminalListingSkip.connectionFailed.errorDescription == "The connection failed. Connect to it to see why.",
+                "ending a session there says the same, without the note's prefix")
+
+        let capability = GlassTerminalCapability(runtime: GlassTerminalRuntime(layers: GlassLayerStore()))
+        let report = capability.runningReport(local: nil, hosts: [(server, .skipped(TerminalListingSkip.needsPassword.reason))])
+        #expect(report.sessions.isEmpty)
+        #expect(report.unchecked.map(\.endpointID) == [EndpointID(rawValue: server.id)])
+        #expect(report.unchecked.first?.reason == "Not checked: signing in would need your password.")
+    }
+
     @Test("Closing a lone session's row ends the session")
     func closeEndsTheSession() {
         let runtime = GlassTerminalRuntime(layers: GlassLayerStore())

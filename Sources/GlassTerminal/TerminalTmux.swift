@@ -25,7 +25,7 @@ import Foundation
 
 enum TerminalTmux {
     /// The prefix of the sessions Glass names. Sessions with other names are the user's own.
-    static let namePrefix = "glass-"
+    nonisolated static let namePrefix = "glass-"
 
     /// One tmux session on a host.
     struct Session: Equatable, Sendable, Identifiable {
@@ -34,8 +34,33 @@ enum TerminalTmux {
         var attachedClients: Int
         var windows: Int
         var lastActivity: Date?
+        /// The tmux server running it: the same for every session of one listing (W6).
+        var server: Server? = nil
+        /// The name a tab gave it (`@glass-name`), held to what a tab can show.
+        var givenName: String? = nil
+        /// What its active pane shows: the title a program set (never tmux's default, the host
+        /// name), the folder it is in, and the program in front.
+        var title: String? = nil
+        var directory: String? = nil
+        var command: String? = nil
+        /// The home folder of the account that listed it, so a folder is named as a tab names it.
+        var home: String? = nil
         var id: String { name }
         var isGlass: Bool { TerminalTmux.glassNumber(name) != nil }
+
+        /// What Active and a tab showing it call it (`TerminalSessionNaming`).
+        var displayName: String {
+            TerminalSessionNaming.name(given: givenName, title: title, directory: directory, home: home, session: name)
+        }
+    }
+
+    /// One tmux server, told apart from every other by its process, when it started and its
+    /// socket. Two listings naming the same server list the same sessions however they were
+    /// reached — this Mac's own, and this Mac reached over SSH as a host in the library (W6).
+    struct Server: Equatable, Hashable, Sendable {
+        var pid: Int
+        var startTime: Int
+        var socketPath: String
     }
 
     enum Listing: Equatable, Sendable {
@@ -50,14 +75,27 @@ enum TerminalTmux {
 
     private nonisolated static let missingMarker = "__glass_no_tmux__"
     private nonisolated static let failedMarker = "__glass_tmux_failed__"
+    /// Starts the line after a listing that says whose home the listing ran in: `sh` knows it, and
+    /// tmux formats cannot read the environment.
+    private nonisolated static let homeMarker = "__glass_home__"
+
+    /// The user option a session's given name is kept in (W6): set when its tab is renamed, read
+    /// by every device's Active and by a tab attaching to it.
+    nonisolated static let givenNameOption = "@glass-name"
 
     /// What `list-sessions` prints for each session, read by `parse`: name, attached clients,
-    /// windows, last activity.
+    /// windows, last activity; then (W6) the server's pid, start time and socket, the active pane's
+    /// program, the host's names (tmux's default pane title), the session's given name, the
+    /// pane's folder, and last its title. Pane variables in a session's line are its active pane's.
+    /// The title is last so that it may hold anything: `parse` splits a bounded number of times.
     nonisolated static let listFormat = "#{session_name}\t#{session_attached}\t#{session_windows}\t#{session_activity}"
+        + "\t#{pid}\t#{start_time}\t#{socket_path}\t#{pane_current_command}\t#{host}\t#{host_short}"
+        + "\t#{\(givenNameOption)}\t#{pane_current_path}\t#{pane_title}"
+    private nonisolated static let listFieldCount = 13
 
     /// A session name Glass will pass to tmux: tmux rejects `:` and `.` in names, a leading `-`
     /// would read as an option, and control characters have no business in a tab's record.
-    static func isValidSessionName(_ name: String) -> Bool {
+    nonisolated static func isValidSessionName(_ name: String) -> Bool {
         !name.isEmpty && name.utf8.count <= 128 && !name.hasPrefix("-")
             && !name.unicodeScalars.contains { $0 == ":" || $0 == "." || $0.properties.generalCategory == .control }
     }
@@ -65,7 +103,7 @@ enum TerminalTmux {
     /// An exec channel's `sh -c` has the system PATH only, and a Mac's tmux is usually Homebrew's
     /// (D47: a Vision Pro reaching a Mac's local tmux sessions over SSH). Appended, so a tmux
     /// already on the PATH still wins.
-    private static let searchPath = #"PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; "#
+    private nonisolated static let searchPath = #"PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; "#
 
     /// Lists the host's sessions, or says tmux is missing. Exits 0 either way: "no server running"
     /// is an empty list, not a failure.
@@ -75,29 +113,90 @@ enum TerminalTmux {
 
     /// The listing as an `sh` script, for the host's tmux or this Mac's (`tmux` is a word or a
     /// quoted path). Only tmux's own "no server" answers count as an empty list; any other
-    /// failure says so, rather than reading as a host with nothing running.
-    nonisolated static func listScript(tmux: String) -> String {
-        "command -v \(tmux) >/dev/null 2>&1 || { echo \(missingMarker); exit 0; }; "
-            + "out=$(\(tmux) -u list-sessions -F '\(listFormat)' 2>/dev/null) && { printf '%s\\n' \"$out\"; exit 0; }; "
-            + "case $(\(tmux) -u list-sessions 2>&1) in "
+    /// failure says so, rather than reading as a host with nothing running. After the sessions,
+    /// one line says whose home this is (W6).
+    /// - Parameter serverArguments: tests only — a private server (`-S socket`), never a real one.
+    nonisolated static func listScript(tmux: String, serverArguments: [String] = []) -> String {
+        let run = ([tmux, "-u"] + serverArguments.map(quoted)).joined(separator: " ")
+        return "command -v \(tmux) >/dev/null 2>&1 || { echo \(missingMarker); exit 0; }; "
+            + "out=$(\(run) list-sessions -F '\(listFormat)' 2>/dev/null) && { printf '%s\\n' \"$out\"; "
+            + "printf '\(homeMarker)\\t%s\\n' \"$HOME\"; exit 0; }; "
+            + "case $(\(run) list-sessions 2>&1) in "
             + "*'no server running'*|*'error connecting to'*'No such file or directory'*|*'error connecting to'*'Connection refused'*) ;; "
             + "*) echo \(failedMarker) ;; esac; exit 0"
     }
 
+    /// Reads a listing. The markers count only as whole lines: a program's title can say anything.
+    /// Lines from an older format — four fields — still read, without what came later.
     static func parse(_ output: String) -> Listing {
-        if output.contains(missingMarker) { return .unavailable }
-        if output.contains(failedMarker) { return .failed }
-        let lines = output.split(whereSeparator: \.isNewline).filter { !$0.allSatisfy(\.isWhitespace) }
-        let sessions = lines.compactMap { line -> Session? in
-            let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
-            guard fields.count >= 4, !fields[0].isEmpty else { return nil }
-            return Session(name: String(fields[0]),
-                           attachedClients: Int(fields[1]) ?? 0,
-                           windows: Int(fields[2]) ?? 1,
-                           lastActivity: TimeInterval(fields[3]).map(Date.init(timeIntervalSince1970:)))
+        var home: String?
+        var lines: [Substring] = []
+        for line in output.split(whereSeparator: \.isNewline) where !line.allSatisfy(\.isWhitespace) {
+            switch line.trimmingCharacters(in: .whitespaces) {
+            case missingMarker: return .unavailable
+            case failedMarker: return .failed
+            default: break
+            }
+            if line.hasPrefix(homeMarker + "\t") {
+                home = String(line.dropFirst(homeMarker.count + 1)).trimmingCharacters(in: .whitespaces)
+            } else {
+                lines.append(line)
+            }
         }
+        let sessions = lines.compactMap { session(from: $0, home: home?.hasPrefix("/") == true ? home : nil) }
         // Lines and not one session: tmux's tabs turned to `_`, or an answer from something else.
         return !lines.isEmpty && sessions.isEmpty ? .failed : .sessions(sessions)
+    }
+
+    private static func session(from line: Substring, home: String?) -> Session? {
+        let fields = line.split(separator: "\t", maxSplits: listFieldCount - 1, omittingEmptySubsequences: false)
+            .map(String.init)
+        guard fields.count >= 4, !fields[0].isEmpty else { return nil }
+        var session = Session(name: fields[0],
+                              attachedClients: Int(fields[1]) ?? 0,
+                              windows: Int(fields[2]) ?? 1,
+                              lastActivity: TimeInterval(fields[3]).map(Date.init(timeIntervalSince1970:)))
+        guard fields.count == listFieldCount else { return session }
+        if let pid = Int(fields[4]), let started = Int(fields[5]), !fields[6].isEmpty {
+            session.server = Server(pid: pid, startTime: started, socketPath: fields[6])
+        }
+        session.command = fields[7].isEmpty ? nil : fields[7]
+        session.givenName = TerminalSessionNaming.displayText(fields[10])
+        session.directory = fields[11].hasPrefix("/") ? fields[11] : nil
+        session.title = TerminalSessionNaming.programTitle(fields[12], hostNames: [fields[8], fields[9]])
+        session.home = home
+        return session
+    }
+
+    // MARK: A session's given name (W6, 2026-10-08)
+
+    /// tmux's argv for giving a session the name its tab was given, or with nil taking it away:
+    /// a session option, so every device's Active and any tab attaching to it see the name. Nil
+    /// for a session name tmux could misread. The name is held to one line, as a tab's is; a
+    /// trailing `;` is escaped, because tmux reads an argument ending in one as the end of a
+    /// command (`build;` was stored as `build`, found live on tmux 3.7c).
+    nonisolated static func givenNameArguments(session: String, name: String?) -> [String]? {
+        guard isValidSessionName(session) else { return nil }
+        let target = "=" + session + ":"
+        guard var value = name.flatMap({ TerminalSessionNaming.displayText($0) }) else {
+            return ["-u", "set-option", "-u", "-t", target, givenNameOption]
+        }
+        if value.hasSuffix(";") { value.insert("\\", at: value.index(before: value.endIndex)) }
+        return ["-u", "set-option", "-t", target, givenNameOption, value]
+    }
+
+    /// The same, for a host: through `sh -c`, every word quoted, as every exec-channel command is.
+    nonisolated static func givenNameCommand(session: String, name: String?) -> String? {
+        givenNameArguments(session: session, name: name).map { arguments in
+            "sh -c \(quoted(searchPath + "tmux " + arguments.map(quoted).joined(separator: " ")))"
+        }
+    }
+
+    /// Asks a host for the name a session was given: the line it prints, empty when none.
+    nonisolated static func givenNameQuery(session: String) -> String? {
+        guard isValidSessionName(session) else { return nil }
+        let arguments = ["-u", "display-message", "-p", "-t", "=" + session + ":", "#{\(givenNameOption)}"]
+        return "sh -c \(quoted(searchPath + "tmux " + arguments.map(quoted).joined(separator: " ")))"
     }
 
     // MARK: Claiming a name (2026-10-08)
@@ -200,7 +299,7 @@ enum TerminalTmux {
         return name
     }
 
-    static func glassNumber(_ name: String) -> Int? {
+    nonisolated static func glassNumber(_ name: String) -> Int? {
         guard name.hasPrefix(namePrefix) else { return nil }
         return Int(name.dropFirst(namePrefix.count)).flatMap { $0 > 0 ? $0 : nil }
     }

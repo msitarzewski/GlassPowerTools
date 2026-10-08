@@ -71,13 +71,75 @@ struct GlassActiveConnectionsTests {
         #expect(machines.map(\.name) == ["alpha", "bravo"])
         #expect(machines[0].sessions.map(\.id) == ["terminal:1"] && machines[0].running.map(\.id) == ["tmux:glass-2"])
         #expect(machines[1].sessions.isEmpty && machines[1].running.map(\.id) == ["tmux:glass-1"])
-        #expect(model.activeSessionCount() == 1, "the sidebar counts what is open here")
+        #expect(model.activeSessionCount() == 3,
+                "W6: the sidebar counts what Active lists — open here, and running on a machine in the library")
 
         // Opening one takes it off the list at once: it is about to be open here instead.
         let chosen = try #require(model.runningSessions.first { $0.id == "tmux:glass-1" })
         model.open(chosen)
         #expect(!model.runningSessions.contains { $0.id == "tmux:glass-1" })
         #expect(model.activeMachines().flatMap(\.running).map(\.id) == ["tmux:glass-2"])
+    }
+
+    /// A capability that reports machines it could not ask, as the terminal does (W6).
+    private final class ReportingCapability: GlassCapability {
+        let kind: HostServiceKind = .ssh
+        let displayName = "Terminal"
+        let symbolName = "circle"
+        var report = GlassRunningReport()
+        func open(service: HostServiceLink, host: HostProfile,
+                  report: @escaping @MainActor (GlassCapabilityOutcome) -> Void) { report(.dismissed) }
+        func runningReport() async -> GlassRunningReport { report }
+    }
+
+    @Test("W6: the badge counts running sessions as well as open ones, from the last listing alone")
+    func badgeCountsRunningSessions() async throws {
+        let (model, root, store) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let terminalOnAlpha = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on alpha")
+        try await store.upsert(try HostProfile(displayName: "alpha", address: "192.0.2.1", services: [terminalOnAlpha]))
+        let terminal = StubCapability(kind: .ssh, displayName: "Terminal")
+        terminal.running = (1...14).map { running("tmux:glass-\($0)", on: terminalOnAlpha.endpointID) }
+        model.registry.register(terminal)
+        await model.load()
+
+        #expect(model.activeSessionCount() == 0, "nothing is asked to count: none listed yet")
+        await model.refreshRunningSessions()
+        #expect(model.activeSessionCount() == 14, "fourteen sessions running: the badge says so")
+        #expect(model.activeConnectionsPanel().count == 14, "and the sidebar row carries it")
+    }
+
+    @Test("W6: a session open here comes forward when chosen and stays listed; a skipped machine says why")
+    func openHereAndUnchecked() async throws {
+        let (model, root, store) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let alphaTerminal = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on alpha")
+        let bravoTerminal = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on bravo")
+        try await store.upsert(try HostProfile(displayName: "alpha", address: "192.0.2.1", services: [alphaTerminal]))
+        try await store.upsert(try HostProfile(displayName: "bravo", address: "192.0.2.2", services: [bravoTerminal]))
+        final class Opened { var names: [String] = [] }
+        let opened = Opened()
+        let capability = ReportingCapability()
+        capability.report = GlassRunningReport(
+            sessions: [GlassRunningSession(id: "tmux:glass-3", title: "shop", symbolName: "terminal",
+                                           endpointID: alphaTerminal.endpointID, isAttachedElsewhere: false, isOpenHere: true,
+                                           open: { opened.names.append("glass-3") }, takeOver: {}, end: {})],
+            unchecked: [GlassUncheckedMachine(endpointID: bravoTerminal.endpointID,
+                                              reason: "Not checked: signing in would need your password.")])
+        model.registry.register(capability)
+        await model.load()
+        await model.refreshRunningSessions()
+
+        let machines = model.activeMachines()
+        #expect(machines.map(\.name) == ["alpha", "bravo"])
+        #expect(machines[1].running.isEmpty && machines[1].notChecked == "Not checked: signing in would need your password.")
+        #expect(machines[0].notChecked == nil)
+        #expect(model.activeSessionCount() == 1, "a note is not a session")
+
+        let chosen = try #require(model.runningSessions.first)
+        model.open(chosen)
+        #expect(opened.names == ["glass-3"], "it goes to the window showing it")
+        #expect(model.runningSessions.map(\.id) == ["tmux:glass-3"], "and stays listed, open here")
     }
 
     private func makeModel() throws -> (GlassShellModel, URL, HostCatalogStore) {

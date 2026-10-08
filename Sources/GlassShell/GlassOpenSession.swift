@@ -97,7 +97,10 @@ public struct GlassRunningSession: Identifiable {
     public let endpointID: EndpointID
     /// Another client is attached right now — another device, or a terminal outside Glass.
     public let isAttachedElsewhere: Bool
-    /// Open it here. Alongside any other client.
+    /// A window here already shows it, though the app lists it nowhere else — a Mac's local tab in
+    /// tmux (W6). Open goes to that window rather than attaching again, and the row stays listed.
+    public let isOpenHere: Bool
+    /// Open it here. Alongside any other client; for a session open here, go to it.
     public let open: @MainActor () -> Void
     /// Open it here and detach every other client.
     public let takeOver: @MainActor () -> Void
@@ -105,12 +108,38 @@ public struct GlassRunningSession: Identifiable {
     public let end: @MainActor () async throws -> Void
 
     public init(id: String, title: String, subtitle: String? = nil, symbolName: String,
-                endpointID: EndpointID, isAttachedElsewhere: Bool,
+                endpointID: EndpointID, isAttachedElsewhere: Bool, isOpenHere: Bool = false,
                 open: @escaping @MainActor () -> Void, takeOver: @escaping @MainActor () -> Void,
                 end: @escaping @MainActor () async throws -> Void) {
         self.id = id; self.title = title; self.subtitle = subtitle; self.symbolName = symbolName
-        self.endpointID = endpointID; self.isAttachedElsewhere = isAttachedElsewhere
+        self.endpointID = endpointID; self.isAttachedElsewhere = isAttachedElsewhere; self.isOpenHere = isOpenHere
         self.open = open; self.takeOver = takeOver; self.end = end
+    }
+}
+
+/// A machine Active could not ask what runs there, and why, in plain words (W6) — "Not checked:
+/// signing in would need your password." Without it, a machine that was skipped looked like one
+/// with nothing running.
+public struct GlassUncheckedMachine: Identifiable {
+    /// The service it would have been asked through; the library turns it into the machine.
+    public let endpointID: EndpointID
+    public let reason: String
+    public var id: EndpointID { endpointID }
+
+    public init(endpointID: EndpointID, reason: String) {
+        self.endpointID = endpointID
+        self.reason = reason
+    }
+}
+
+/// What asking the machines came to: what runs there, and the machines that could not be asked.
+public struct GlassRunningReport {
+    public var sessions: [GlassRunningSession]
+    public var unchecked: [GlassUncheckedMachine]
+
+    public init(sessions: [GlassRunningSession] = [], unchecked: [GlassUncheckedMachine] = []) {
+        self.sessions = sessions
+        self.unchecked = unchecked
     }
 }
 
@@ -126,6 +155,10 @@ public extension GlassCapability {
     /// Sessions running on hosts that this device is not showing (D44). Default: none. Asked when
     /// Active appears or is refreshed — it may reach out to hosts, so never from a view body.
     func runningSessions() async -> [GlassRunningSession] { [] }
+
+    /// The same, with the machines that could not be asked and why (W6). Default: the running
+    /// sessions, and no machine left unasked.
+    func runningReport() async -> GlassRunningReport { GlassRunningReport(sessions: await runningSessions()) }
 }
 
 public extension GlassCapabilityRegistry {
@@ -138,8 +171,17 @@ public extension GlassCapabilityRegistry {
 
     /// Every capability's running sessions (D44). Each capability asks its own hosts together.
     func runningSessions() async -> [GlassRunningSession] {
-        var all: [GlassRunningSession] = []
-        for capability in registered { all += await capability.runningSessions() }
+        await runningReport().sessions
+    }
+
+    /// Every capability's running sessions and the machines it could not ask (W6).
+    func runningReport() async -> GlassRunningReport {
+        var all = GlassRunningReport()
+        for capability in registered {
+            let report = await capability.runningReport()
+            all.sessions += report.sessions
+            all.unchecked += report.unchecked
+        }
         return all
     }
 
