@@ -269,13 +269,15 @@ final class MacWorkspaceController {
             // else the workgroup, else "Local". The subtitle is where it stands: on this Mac,
             // "user@localhost" said nothing two local tabs did not share.
             let context = paneContextByPaneID[focusedPane.id]
-            let place = context?.directory.map { MacWorkspaceTabNaming.abbreviated($0, home: home) }
-                ?? "\(localUsername)@localhost"
-            return MacWorkspaceWindowIdentity(
-                title: tabLabel ?? focusedPane.intent.label
-                    ?? MacWorkspaceTabNaming.automaticTitle(context, home: home) ?? workgroupName ?? "Local",
-                subtitle: place + (localProcessStatusesByPaneID[focusedPane.id].map { " — \($0)" } ?? "")
-            )
+            let title = tabLabel ?? focusedPane.intent.label
+                ?? MacWorkspaceTabNaming.automaticTitle(context, home: home) ?? workgroupName ?? "Local"
+            // The folder, unless the title already says exactly that: "~" over "~" said it twice
+            // and nothing else (2026-10-08). Then the machine, as before.
+            let directory = context?.directory.map { MacWorkspaceTabNaming.abbreviated($0, home: home) }
+            var subtitle = directory.flatMap { $0 == title ? nil : $0 } ?? "\(localUsername)@localhost"
+            if focusedPane.intent.localTmuxSession != nil { subtitle += " · in tmux" }
+            if let status = localProcessStatusesByPaneID[focusedPane.id] { subtitle += " — \(status)" }
+            return MacWorkspaceWindowIdentity(title: title, subtitle: subtitle)
         case .ssh:
             let server = session(for: focusedPane.id)?.server
                 ?? servers.first(where: { $0.id == focusedPane.intent.serverID })

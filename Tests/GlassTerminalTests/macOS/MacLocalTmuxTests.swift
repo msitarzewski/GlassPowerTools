@@ -300,6 +300,16 @@ struct MacLocalTmuxTests {
         }
     }
 
+    @Test("a tab in tmux says so under its name")
+    func subtitle() async throws {
+        try await withFake { _, defaults in
+            defaults.set(true, forKey: UserDefaultsKeys.localTmux)
+            let tab = localTab(defaults)
+            #expect(tab.windowIdentity(servers: [], localUsername: "ann", home: "/Users/ann").subtitle
+                    == "ann@localhost · in tmux")
+        }
+    }
+
     @Test("closing asks only about what it would stop: a local terminal in tmux keeps running")
     func confirming() async throws {
         try await withFake { fake, defaults in

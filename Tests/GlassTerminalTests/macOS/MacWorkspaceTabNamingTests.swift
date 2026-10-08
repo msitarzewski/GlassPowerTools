@@ -33,6 +33,11 @@ struct MacWorkspaceTabNamingTests {
         #expect(tab.windowIdentity(servers: [], localUsername: "ann", home: "/Users/ann")
                 == MacWorkspaceWindowIdentity(title: "Local", subtitle: "ann@localhost"))
 
+        tab.updatePaneContext(title: nil, directory: "/Users/ann", for: pane)
+        #expect(tab.windowIdentity(servers: [], localUsername: "ann", home: "/Users/ann")
+                == MacWorkspaceWindowIdentity(title: "~", subtitle: "ann@localhost"),
+                "the folder is not said twice")
+
         tab.updatePaneContext(title: nil, directory: "/Users/ann/src/app", for: pane)
         #expect(tab.windowIdentity(servers: [], localUsername: "ann", home: "/Users/ann")
                 == MacWorkspaceWindowIdentity(title: "app", subtitle: "~/src/app"))
