@@ -174,26 +174,51 @@ public struct GlassLibraryConnectionRow<Accessory: View, Badges: View>: View {
         self.nameAccessibilityIdentifier = nameAccessibilityIdentifier
     }
 
+    /// The second line's height: a service icon's (`GlassServiceIcon`, 17 pt at body size) or a
+    /// line of subtitle text, whichever is taller, whatever the line holds — or nothing at all.
+    @ScaledMetric(relativeTo: .body) private var serviceIconSide: CGFloat = 17
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    private var secondLineMinimum: CGFloat {
+        max(serviceIconSide, GlassSpatialMetrics.rowSubtitleLineHeight(dynamicTypeSize))
+    }
+
     public var body: some View {
         HStack(spacing: 10) {
-            if let color {
-                Circle().fill(color).frame(width: 8, height: 8).accessibilityHidden(true)
-            }
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(name).font(GlassSpatialMetrics.rowTitleFont).lineLimit(1)
                         .accessibilityIdentifier(nameAccessibilityIdentifier ?? "glass-library-connection-name")
+                    // **After the name, on its line** — where the favourite star already sits.
+                    // In front of the name it pushed a workgroup's name right of where every
+                    // other list puts a name, and centred on the row it fell between the two lines
+                    // (2026-10-07: "items should remain in consistent position between views").
+                    if let color {
+                        Circle().fill(color).frame(width: 8, height: 8).accessibilityHidden(true)
+                    }
                     if isFavorite {
                         Image(systemName: favoriteSymbol).font(GlassSpatialMetrics.rowSubtitleFont)
                             .foregroundStyle(.yellow).accessibilityLabel("Favorite")
                     }
                 }
-                if let subtitle, !subtitle.isEmpty {
-                    Text(subtitle).font(GlassSpatialMetrics.rowSubtitleFont).foregroundStyle(.secondary)
-                        .lineLimit(1).truncationMode(.tail)
+                // **One height for the second line in every list**, so rows do not change height
+                // and names do not move when the column switches from Connections to Workgroups,
+                // Keys or Projects: service icons are taller than a line of caption text, and a row
+                // with neither keeps the space. The hidden text measures a subtitle line at the
+                // current size, so this follows Dynamic Type and the headset's larger fonts.
+                //
+                // A plain minimum height. The first version measured with a hidden text and a
+                // zero-width spacer in a ZStack; the headset then crashed twice inside SwiftUI's
+                // stack layout, with no frame of ours on the stack (2026-10-07), so the row keeps
+                // its layout to the plain stacks it had before.
+                VStack(alignment: .leading, spacing: 2) {
+                    if let subtitle, !subtitle.isEmpty {
+                        Text(subtitle).font(GlassSpatialMetrics.rowSubtitleFont).foregroundStyle(.secondary)
+                            .lineLimit(1).truncationMode(.tail)
+                    }
+                    // Tight to the name: the same leading edge, and only the gap the glyphs need.
+                    badges()
                 }
-                // Tight to the name: the same leading edge, and only the gap the glyphs need.
-                badges()
+                .frame(minHeight: secondLineMinimum, alignment: .leading)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             accessory()

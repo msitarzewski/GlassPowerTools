@@ -151,6 +151,17 @@ struct TerminalWorkgroupsView: View {
         .task { serverManager.loadServersIfNeeded() }
     }
 
+    /// What a workgroup's row says it holds: "1 tab", "5 tabs", "2 live tabs".
+    static func tabCount(_ count: Int, live: Bool = false) -> String {
+        "\(count) \(live ? "live " : "")\(count == 1 ? "tab" : "tabs")"
+    }
+
+    /// The tabs a saved workgroup opens: its Mac layout's tabs when it has one, else its sessions —
+    /// the figure the detail already shows.
+    static func tabTotal(_ preset: LayoutPreset) -> Int {
+        preset.workspaceLayout?.tabs.count ?? preset.sessionIntents.count
+    }
+
     @ViewBuilder
     private func workgroupResults(
         connectionLibrary: ConnectionLibraryProjection
@@ -176,18 +187,10 @@ struct TerminalWorkgroupsView: View {
             if !liveWorkgroups.isEmpty {
                 Section("Live Terminals") {
                     ForEach(Array(liveWorkgroups.reversed())) { workgroup in
-                        HStack(spacing: 10) {
-                            Circle()
-                                .fill(workgroup.colorTag.color)
-                                .frame(width: 10, height: 10)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(workgroup.name)
-                                    .font(.headline)
-                                Text("\(liveSessions(in: workgroup).count) live tabs")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
+                        // The library's row, as Connections draws it (2026-10-07).
+                        GlassLibraryConnectionRow(name: workgroup.name,
+                                                  subtitle: Self.tabCount(liveSessions(in: workgroup).count, live: true),
+                                                  color: workgroup.colorTag.color) {
                             Image(systemName: "waveform.path.ecg")
                                 .foregroundStyle(.green)
                                 .accessibilityHidden(true)
@@ -218,22 +221,15 @@ struct TerminalWorkgroupsView: View {
             if !presets.isEmpty {
                 Section("Saved Workgroups") {
                     ForEach(presets) { preset in
-                    HStack(spacing: 10) {
-                        Circle()
-                            .fill(preset.colorTag.color)
-                            .frame(width: 10, height: 10)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(preset.name)
-                                .font(.headline)
-                            Text("\(preset.sessionIntents.count) tabs")
-                                .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
-                    }
+                    // The library's row, as Connections draws it: the same height, the name in the
+                    // same place, the colour after the name (2026-10-07). The count is the one the
+                    // detail shows — a Mac workgroup's tabs, else its sessions.
+                    GlassLibraryConnectionRow(name: preset.name,
+                                              subtitle: Self.tabCount(Self.tabTotal(preset)),
+                                              color: preset.colorTag.color)
                     .tag(ConnectionWorkgroupSelection.preset(preset.id))
-                    .accessibilityElement(children: .combine)
                     .accessibilityLabel(
-                        "\(preset.name), \(preset.sessionIntents.count) tabs"
+                        "\(preset.name), \(Self.tabCount(Self.tabTotal(preset)))"
                     )
                     .accessibilityHint("Select to show workgroup details")
                     .accessibilityIdentifier(
@@ -260,6 +256,8 @@ struct TerminalWorkgroupsView: View {
                             model.pendingDeletion = preset
                         }
                     }
+                    // Icons in the menu on the Mac too, as every machine menu has (2026-10-04).
+                    .labelStyle(.titleAndIcon)
                 }
                 }
             }
@@ -375,7 +373,7 @@ struct TerminalWorkgroupsView: View {
                             Text(preset.name)
                                 .font(.title2.bold())
                                 .textSelection(.enabled)
-                            Text("\(preset.workspaceLayout?.tabs.count ?? preset.sessionIntents.count) tabs · \(preset.sessionIntents.count) terminals · \(preset.sessionIntents.filter { $0.startupCommand != nil }.count) startup commands")
+                            Text("\(Self.tabCount(Self.tabTotal(preset))) · \(preset.sessionIntents.count) terminals · \(preset.sessionIntents.filter { $0.startupCommand != nil }.count) startup commands")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }

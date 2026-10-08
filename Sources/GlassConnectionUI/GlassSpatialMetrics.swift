@@ -1,4 +1,9 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#else
+import AppKit
+#endif
 
 /// The sizes a spatial surface is read and aimed at.
 ///
@@ -42,6 +47,18 @@ public enum GlassSpatialMetrics {
     /// know this app on sight.
     public static var rowTitleFont: Font { isSpatial ? .title3 : .headline }
     public static var rowSubtitleFont: Font { isSpatial ? .callout : .caption }
+
+    /// The height of one line of `rowSubtitleFont` at a text size, read from the system font
+    /// rather than measured by a hidden view in the row's layout.
+    public static func rowSubtitleLineHeight(_ size: DynamicTypeSize) -> CGFloat {
+        #if canImport(UIKit)
+        let traits = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(size))
+        return ceil(UIFont.preferredFont(forTextStyle: isSpatial ? .callout : .caption1, compatibleWith: traits).lineHeight)
+        #else
+        let font = NSFont.preferredFont(forTextStyle: .caption1)
+        return ceil(font.ascender - font.descender + font.leading)
+        #endif
+    }
 
     /// A section header in a spatial sidebar. `.caption` uppercase is a desktop convention that
     /// disappears at reading distance.
