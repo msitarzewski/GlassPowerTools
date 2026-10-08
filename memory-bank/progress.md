@@ -24,10 +24,15 @@ All four capabilities and the shell are built and in daily use on the owner's Ma
 | RDP in-session bandwidth measurements answered with the bytes received (2026-10-05) | built | unit, server (Windows 11 VM: 0 bytes before, real counts after) |
 | Trackpad scroll events drive the remote desktop on iPad and Vision Pro (2026-10-06) | built | device (owner, Vision Pro with a Mac's trackpad) |
 | Terminals kept in tmux sessions; Active lists sessions running on hosts (D44 stage 1, 2026-10-01) | built | unit, server (scratch: create, leave, reattach, end; missing-tmux path); not yet on a device |
-| Local terminals kept in tmux on the Mac: reattach after a relaunch, end on close, survive a quit (D47, 2026-10-07) | built, uncommitted | unit (fake tmux server; kill policy mutation-checked); tmux queries live on tmux 3.7c (private socket); the app driving it not yet run |
-| SwiftTerm 1.20: answers XTVERSION, so TUIs use synchronized output (D48, 2026-10-07) | built, uncommitted | unit (`TerminalCapabilityProbeTests`), every test target passes, Release builds for macOS, iOS and visionOS; not yet seen on any device |
-| Local terminals get the Mac's environment and `TERM_PROGRAM=GlassPowerTools` (2026-10-07) | built, uncommitted | unit |
-| Dependency update check, on demand and weekly (D48, 2026-10-07) | built, uncommitted | survey run live (8 of 30 pins behind); `--test` run against SwiftTerm 1.18 — see task note |
+| Local terminals kept in tmux on the Mac (D47): reattach after a quit or install, close detaches, Active lists This Mac's sessions, windows reopen after a quit (2026-10-07/08) | built | unit (fake tmux server; policies mutation-checked), tmux commands live on tmux 3.7c, device (the owner's Mac: this session survived and reattached across installs) |
+| SwiftTerm 1.20: answers XTVERSION, so TUIs use synchronized output (D48) | built | unit (`TerminalCapabilityProbeTests`; the XTVERSION test fails on 1.18), device (Mac, the owner using Claude Code) |
+| Local shells get the Mac's environment and `TERM_PROGRAM=GlassPowerTools` | built | unit, device (Mac) |
+| Dependency update check, on demand and weekly (D48) | built | survey live (8 of 30 pins behind); `--test swiftterm@1.18.0` fails as it should; the weekly LaunchAgent installed, first run not yet seen |
+| Mac tabs: names from what runs in them, rename, activity wave, Finder drop, drag between windows and reorder (2026-10-07/08) | built | unit (naming, throttle, drop escaping with a zsh/bash round trip, drag rules), device (Mac: rename, drag between windows confirmed by the owner) |
+| Scrolling in tmux: local and SSH on the Mac, a pan on iPhone, iPad and Vision Pro (2026-10-08) | built | unit, live (commands through `sh` against tmux 3.7c); Mac local confirmed by the owner; iOS/visionOS not yet seen |
+| Library rows one height in every list; Workgroups on the shared row | built | unit (`GlassLibraryRowConsistencyTests`), device (Mac) |
+| Favourites (D49) and workgroups (D51) sync across devices | built | unit (two devices over a shared in-memory store; each fails without its push); not yet seen across real devices |
+| Vision Pro: Connections window as a value-keyed window group (no launch lockout) | built | device (launched cleanly after the lockout) |
 
 Package suite: about **1,790 tests**. The last full run with the screen unlocked passed (1,777, early
 2026-09-27); the night's later runs were under a locked screen, where file-protected stores cannot be
@@ -70,6 +75,11 @@ profile, notarization, deploying the site), the behaviour findings listed in `ac
 
 ## Known and open
 
+- **Vision Pro (2026-10-08):** a SwiftUI stack-layout crash (over-release, garbage pointers) while a
+  terminal shows a Mac's tmux session running Claude Code; Release builds only, not reproduced under
+  Address Sanitizer; the headset runs an xrOS 27.2 beta. Active there skips a machine it cannot sign
+  in to without asking, silently. One SSH tmux listing failed there, cause unknown.
+- A tab-to-new-window drag (outside any window) is not supported; "Move Tab to New Window" covers it.
 - A database workspace's tabs do not survive leaving and returning on a phone; its session and SQL
   drafts do.
 - Desktops are listed in Active (`GlassDesktopCapability.openSessions`); the D31 line saying they

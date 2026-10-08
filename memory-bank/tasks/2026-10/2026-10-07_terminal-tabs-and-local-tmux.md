@@ -1,8 +1,8 @@
 # 2026-10-07 — Terminal tabs: one row shape, names, activity, Finder drop, local tmux (D47)
 
-**Owner:** the owner. **Authorization:** local edits, tests and builds; commits and installs only on
-the owner's word (the owner approved one Mac install "after these changes", D48 below). **State:**
-built and tested, not committed; 0.4.288 built for macOS, iOS and visionOS, on the Vision Pro.
+**Owner:** the owner. **Authorization:** local edits, tests and builds; commits on the owner's word
+(given); Mac builds install as soon as they are built (owner, 2026-10-08); iPhone and Vision Pro on
+the owner's word. **State (2026-10-08):** committed; Mac 0.4.300, iPhone and Vision Pro 0.4.296.
 
 ## What the owner asked
 
@@ -274,4 +274,17 @@ Three reports from the headset (`devicectl … --domain-type systemCrashLogs`):
   the headset cannot sign in without asking (password not saved there, or host key not yet trusted):
   Active's probe never prompts and skips silently. To check: whether the Mac's Terminal service has a
   saved credential on the headset; Active should say why a machine was skipped.
+
+## Last changes in this round (2026-10-08, ~02:00)
+
+- Drag fixes: rows drag through the list's own `itemProvider`, and rename and the menu are the list's
+  `contextMenu(forSelectionType:primaryAction:)` — the tap gesture made selection take several clicks.
+  A tab dropped anywhere on a window joins it (accent border while over it).
+- Names: "~" over "~" fixed; then the home folder and `/` stopped naming a tab at all ("empty name!?"):
+  after a given name, a program title and any other folder, the workgroup, the tmux session as Active
+  shows it ("Terminal 1"), the shell. Subtitle: the folder when the title is something else, else the
+  machine; "in tmux".
+- Help and site: home and terminal pages (tmux, tab names and dragging, workgroups on every device),
+  library sync and favourites (favourites travel; This Mac's stay), workgroups (sync section),
+  terminal settings, Work in a terminal (naming), tmux (scrolling back; one session in several places).
 

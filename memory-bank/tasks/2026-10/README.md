@@ -12,7 +12,9 @@
   and a Database address through the database's own machine.
 - 2026-10-05 → 07: [Vision Pro input, the bolt, and the scroll edge](2026-10-06_visionos-input-and-scroll-edge.md)
   — trackpad scrolling, the Active Connections bolt on the right, pinch-pose measurements for D46.
-- 2026-10-07: [Terminal tabs and local tmux (D47)](2026-10-07_terminal-tabs-and-local-tmux.md) — one
-  row height across library lists, tab names and rename, the activity wave, Finder drop, local
-  terminals kept in tmux. Built and tested; not committed or installed.
+- 2026-10-07 → 08: [Terminal tabs, local tmux and sync](2026-10-07_terminal-tabs-and-local-tmux.md) —
+  one row height across library lists; tab names, rename, activity wave, Finder drop, dragging tabs
+  between windows; local terminals in tmux (D47) that survive installs and reattach; SwiftTerm 1.20 and
+  a weekly dependency check (D48); scrolling in tmux everywhere; favourites (D49) and workgroups (D51)
+  sync; the headset's Connections-window lockout; D50 proposed. Committed, installed.
 

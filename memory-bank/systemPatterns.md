@@ -98,3 +98,17 @@ window). `MenuBarPlacementTests` holds a single-owner guard per key.
 | ⇧⌘E | editor's New Editor Window — opens on a blank document | |
 | ⌥⌘E | database's Explain Plan (moved from ⇧⌘E, 2026-09-25) | |
 | ⌘T | terminal (Mac workspace; visionOS platform commands) | |
+
+## Synced preferences beside the catalog (2026-10-08)
+
+Hosts and services sync through CloudKit (the catalog). Smaller per-person lists sync through the
+shell's iCloud key-value service, `GlassSettingsSyncService<Payload>` (`GlassShellSettingsSync.swift`):
+one store key per payload, a revision envelope, and the payload's own `converged(with:)` merge.
+Users: terminal themes and preferences, the editor's project list, favourites (D49), workgroups (D51).
+The pattern each follows: every item carries its own change time; the newest change per item wins;
+a deletion is a dated tombstone so it travels; fields that describe this device (last opened, last
+used, per-device substitutions, the device's own host) are left out. A payload is used off the main
+actor, so an item whose coding is main-actor-isolated in its module travels as JSON and is decoded
+and validated when applied. Tests drive two "devices" over a shared in-memory store and check the
+test fails without the push.
+

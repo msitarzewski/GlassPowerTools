@@ -27,44 +27,45 @@ anything touching real servers (SSH and database tests use the disposable test V
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
-## 2026-10-07 — where things stand
+## 2026-10-08 — where things stand
 
-**Installed:** Mac 0.4.281, iPhone 0.4.280, Vision Pro 0.4.283 (the pinch-measuring build; normal
-unless launched with `GLASS_PINCH_PROBE=1`). Everything committed; nothing pushed.
+**Installed:** Mac 0.4.300, iPhone 0.4.296, Vision Pro 0.4.296. Everything committed; nothing pushed.
+**The owner works in Claude Code inside a local tmux tab in the app** (`glass-1`): a Mac install no
+longer ends the session, and the app reopens tmux windows after a quit. **Standing permission: install
+Mac builds as soon as they are built** (detached installer); iPhone and Vision Pro on the owner's word.
 
-Built and committed 2026-10-01 → 07 (task notes in `tasks/2026-10/`):
-- Desktop passwords lost on every device (inferred: a merged duplicate's shared credential deleted)
-  — fixed; password changes keep their credential ID.
-- **D44 tmux stage 1:** terminals in tmux, offered once per server, reattach on reconnect, Active
-  lists sessions running on hosts, Detach wording, tmux-aware close confirmations, AI assistant and
-  Open Folder Here ask tmux for the directory. Stage 2 (synced "open the same set here") not started.
-- Green "connected" dots on services; an opened running session leaves Active's list.
-- iPhone landscape terminal (phone layout on every iPhone, Tools in the top bar, true row count);
-  AI fixes that are advice are never run; icons in every machine menu.
-- **RDP in-session bandwidth measurements** reported 0 bytes (only payload PDUs counted) — fixed and
-  verified live against the Windows 11 VM; likely part of the owner's slow desktops on the headset.
-- **D45 database through another machine,** and a Database address for a tunnel through the
-  database's own machine (the shape the owner actually used; verified on the owner's server).
-- The Active Connections bolt is last on the right on every Mac toolbar (database panes add it
-  themselves; measured with an off-screen toolbar layout test, confirmed by the owner).
-- Trackpad scroll events reach the remote desktop (a Mac's trackpad driving Vision Pro; confirmed).
-- Database scroll views use a hard top scroll edge on the Mac — **not yet seen by the owner**.
+Built and committed 2026-10-07 → 08 (task note `tasks/2026-10/2026-10-07_terminal-tabs-and-local-tmux.md`):
+- Library rows keep one height in every list; Workgroups use the shared row.
+- Mac tabs: named after what runs in them (program title, else a folder other than home, else the
+  workgroup, the tmux session as Active shows it, or the shell); rename by double-click, Return, the
+  menu or the window title; an activity wave; Finder drops type escaped paths; **drag tabs between
+  windows** (drop anywhere on the window; a window whose last tab leaves closes) or within one to
+  reorder.
+- **D47 local terminals in tmux:** a Mac setting; tabs reattach after a quit or install; closing
+  detaches; Active lists This Mac's sessions (open, take over, end); scrolling scrolls tmux's history.
+- **D48 SwiftTerm 1.20** (answers XTVERSION, so Claude Code draws in whole frames) and a weekly
+  dependency check (`Tools/Packages/check-updates.py`, LaunchAgent). xcodebuild needs
+  `-skipPackagePluginValidation`.
+- Local shells get the Mac's environment and `TERM_PROGRAM=GlassPowerTools`.
+- Scrolling in tmux over SSH on every device (Mac scroll events; a pan on iPhone, iPad and Vision Pro).
+- A new SSH terminal never joins a running tmux session by guess (list retried; unlisted names high).
+- Vision Pro: the Connections window is a value-keyed window group (a saved-session pair made every
+  launch fatal).
+- **D49 favourites** and **D51 workgroups** sync across devices.
+- Help and the site describe all of it.
 
-**In progress, uncommitted (2026-10-08: 0.4.294 installed on Mac, iPhone and Vision Pro; the owner
-works in a local tmux tab, so Mac installs no longer end the session, and the tab reattaches by
-itself after the install — verified):** Workgroups on the
-shared row with one row height everywhere; tab names from the shell's title or directory and rename
-in the sidebar or title; the activity wave; Finder drop as escaped paths; **D47 local terminals kept
-in tmux** (Settings → Terminal; tmux 3.7c now installed); **D48 SwiftTerm 1.20** (answers XTVERSION,
-so Claude Code uses synchronized output), the Mac's environment in local terminals, and the
-dependency update check (`Tools/Packages/check-updates.py`, weekly LaunchAgent); closing a local tmux
-tab detaches and Active lists This Mac's sessions; scrolling in tmux (local and SSH, Mac) scrolls
-tmux's history; the headset's Connections window can no longer lock the app out (value-keyed window
-group); favourites sync (D49). Proposed: D50, reaching This Mac's terminals from other devices. Task note:
-`tasks/2026-10/2026-10-07_terminal-tabs-and-local-tmux.md`. The owner runs this session inside the
-app, so an install ends it — resume with `claude --continue`. Commit in pieces on the owner's word.
+Earlier in October, each in `tasks/2026-10/README.md`: D44 tmux on servers and Active's running
+sessions, desktop passwords kept through merges, connected dots, iPhone landscape, D45 a database
+through another machine, RDP bandwidth reports, the bolt on the right, trackpad scrolling on desktops.
 
 **Open, owner's call:**
+- **Vision Pro SwiftUI layout crash** while a terminal shows this Mac's tmux session running Claude
+  Code (Release builds only; an ASan debug build did not crash in 20+ minutes; xrOS 27.2 beta).
+- **Active on the headset does not list the Mac until connected**: likely its probe cannot sign in
+  without asking there; Active should say why it skipped a machine.
+- **Why an SSH tmux listing failed on the headset** (what dropped a new terminal into `glass-1`).
+- **D50 (Proposed):** reach This Mac's terminals from other devices — needs the owner's OK to add a
+  key to `~/.ssh/authorized_keys`.
 - **D46 (Proposed): palm-up pinch-drag = scroll, pinch-and-hold = right-click on Vision Pro.**
   Measured: palm direction is the pinch pose's `up` (right hand) / `−up` (left), z toward the viewer;
   away ≈ −0.8, toward +0.68 (right) / +0.40 (left); threshold +0.2. The pose comes only from a SwiftUI
