@@ -1211,6 +1211,76 @@ final class MacWorkspaceWindowController {
         return false
     }
 
+    // MARK: Dragging tabs between windows (2026-10-08)
+
+    /// Set when this window's last tab was dragged into another: its view closes the window. A
+    /// placeholder tab stands in until then, so nothing ever reads an empty list of tabs, and
+    /// closing this window cannot touch the terminals that moved.
+    private(set) var closesAfterLastTabLeft = false
+
+    static func live(windowID: UUID) -> MacWorkspaceWindowController? {
+        autoreleasepool { live.allObjects.first { $0.windowID == windowID } }
+    }
+
+    /// A tab dropped on this window's tab list at `index`: reordered when it is from this window,
+    /// moved here, running, when it is from another. False when it cannot be taken.
+    @discardableResult
+    func acceptDroppedTab(_ drag: MacWorkspaceTabDrag, at index: Int) -> Bool {
+        guard !closesAfterLastTabLeft else { return false }
+        if drag.windowID == windowID {
+            return moveTab(drag.workspaceID, to: index)
+        }
+        guard canAddTab, let source = Self.live(windowID: drag.windowID),
+              let controller = source.detachTabForMove(drag.workspaceID) else { return false }
+        adoptTab(controller, at: index)
+        return true
+    }
+
+    /// Reorders: `index` is where the tab lands in the list as it was before the move.
+    @discardableResult
+    func moveTab(_ workspaceID: UUID, to index: Int) -> Bool {
+        guard let from = tabs.firstIndex(where: { $0.workspaceID == workspaceID }) else { return false }
+        let tab = tabs.remove(at: from)
+        let target = min(max(index, 0), tabs.count + 1)
+        tabs.insert(tab, at: min(target > from ? target - 1 : target, tabs.count))
+        persist()
+        return true
+    }
+
+    /// Lets a tab go to another window, its terminals untouched. The last tab leaves a
+    /// placeholder and closes the window.
+    func detachTabForMove(_ workspaceID: UUID) -> MacWorkspaceController? {
+        guard !closesAfterLastTabLeft,
+              let index = tabs.firstIndex(where: { $0.workspaceID == workspaceID }) else { return nil }
+        cancelPendingTransfer(for: workspaceID)
+        let controller = tabs.remove(at: index)
+        if tabs.isEmpty {
+            let placeholder = MacWorkspaceController(
+                request: MacWorkspaceTabRequest(workspaceID: UUID(), startsEmpty: true),
+                startupCommandBroker: startupCommandBroker,
+                liveSessionBroker: liveSessionBroker,
+                defaults: defaults
+            )
+            tabs = [placeholder]
+            selectedTabID = placeholder.workspaceID
+            closesAfterLastTabLeft = true
+            defaults.removeObject(forKey: Self.defaultsKey(for: windowID))
+            return controller
+        }
+        if selectedTabID == workspaceID {
+            selectedTabID = tabs[min(index, tabs.count - 1)].workspaceID
+        }
+        persist()
+        return controller
+    }
+
+    /// Takes in a tab another window let go of, at `index`, and shows it.
+    func adoptTab(_ controller: MacWorkspaceController, at index: Int) {
+        tabs.insert(controller, at: min(max(index, 0), tabs.count))
+        selectedTabID = controller.workspaceID
+        persist()
+    }
+
     func transferSelectedTab() -> MacWorkspaceLaunchRequest? {
         guard canTransferSelectedTab else { return nil }
         let controller = selectedTab

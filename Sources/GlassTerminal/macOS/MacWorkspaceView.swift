@@ -57,6 +57,96 @@ struct MacWorkspaceView: View {
         )
     }
 
+    /// The sidebar's tabs. Its own property, so the window's body stays within what the type
+    /// checker can solve.
+    private var tabList: some View {
+        List(selection: sidebarSelection) {
+            ForEach(windowController.tabs, id: \.workspaceID) { controller in
+                tabRow(controller)
+            }
+            .onInsert(of: [MacWorkspaceTabDrag.type]) { index, providers in
+                MacWorkspaceTabDrag.load(from: providers) { drag in
+                    windowController.acceptDroppedTab(drag, at: index)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func tabRow(_ controller: MacWorkspaceController) -> some View {
+        let tabIdentity = controller.windowIdentity(
+            servers: sessionManager.serverManager.servers
+        )
+            Label {
+                VStack(alignment: .leading, spacing: 1) {
+                    if renamingTabID == controller.workspaceID {
+                        // Return saves, Escape cancels, leaving the field saves; blank is
+                        // the automatic name again.
+                        TextField("Tab Name", text: $renameText, prompt: Text(tabIdentity.title))
+                            .textFieldStyle(.plain)
+                            .focused($renameFieldFocused)
+                            .onAppear { renameFieldFocused = true }
+                            .onSubmit { commitRename() }
+                            .onExitCommand { renamingTabID = nil }
+                            .onChange(of: renameFieldFocused) { _, focused in
+                                if !focused { commitRename() }
+                            }
+                            .accessibilityIdentifier("mac-workspace-tab-rename")
+                    } else {
+                        Text(tabIdentity.title)
+                            .lineLimit(1)
+                    }
+                    if let subtitle = tabIdentity.subtitle {
+                        Text(subtitle)
+                            .font(.caption.monospaced())
+                            .foregroundStyle(
+                                controller.focusedSessionState().flatMap { state in
+                                    state == .connected ? nil : state.color
+                                } ?? Color.secondary
+                            )
+                            .lineLimit(1)
+                    }
+                }
+            } icon: {
+                Image(systemName: "apple.terminal")
+                    .foregroundStyle(controller.workgroupColor?.color ?? .secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            // While a terminal in the tab is printing, a wave moves under the row.
+            .background {
+                if controller.isProducingOutput {
+                    MacTerminalActivityWave(color: controller.workgroupColor?.color ?? .accentColor)
+                        .padding(.horizontal, -6)
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeInOut(duration: 0.3), value: controller.isProducingOutput)
+        .tag(controller.workspaceID)
+        // Double-click to rename in place, as Finder's sidebar and Safari's tab groups do.
+        .simultaneousGesture(TapGesture(count: 2).onEnded { beginRename(controller) })
+        .contextMenu {
+            Button("Rename Tab…", systemImage: "pencil") { beginRename(controller) }
+                .labelStyle(.titleAndIcon)
+            if controller.tabLabel != nil {
+                Button("Use Automatic Name", systemImage: "arrow.uturn.backward") {
+                    windowController.renameTab(controller.workspaceID, to: nil)
+                }
+                .labelStyle(.titleAndIcon)
+            }
+        }
+        .accessibilityLabel(tabIdentity.title)
+        .accessibilityValue(tabIdentity.subtitle ?? "")
+        .accessibilityIdentifier(
+            "mac-workspace-tab-\(controller.workspaceID.uuidString.lowercased())"
+        )
+        // Drag a tab to another terminal window's sidebar to move it there, running, or
+        // within this one to reorder (2026-10-08).
+        .onDrag {
+            MacWorkspaceTabDrag(windowID: windowController.windowID,
+                                workspaceID: controller.workspaceID).itemProvider()
+        }
+    }
+
     var body: some View {
         let selected = windowController.selectedTab
         let identity = selected.windowIdentity(
@@ -64,75 +154,7 @@ struct MacWorkspaceView: View {
         )
 
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            List(selection: sidebarSelection) {
-            ForEach(windowController.tabs, id: \.workspaceID) { controller in
-                let tabIdentity = controller.windowIdentity(
-                    servers: sessionManager.serverManager.servers
-                )
-                    Label {
-                        VStack(alignment: .leading, spacing: 1) {
-                            if renamingTabID == controller.workspaceID {
-                                // Return saves, Escape cancels, leaving the field saves; blank is
-                                // the automatic name again.
-                                TextField("Tab Name", text: $renameText, prompt: Text(tabIdentity.title))
-                                    .textFieldStyle(.plain)
-                                    .focused($renameFieldFocused)
-                                    .onAppear { renameFieldFocused = true }
-                                    .onSubmit { commitRename() }
-                                    .onExitCommand { renamingTabID = nil }
-                                    .onChange(of: renameFieldFocused) { _, focused in
-                                        if !focused { commitRename() }
-                                    }
-                                    .accessibilityIdentifier("mac-workspace-tab-rename")
-                            } else {
-                                Text(tabIdentity.title)
-                                    .lineLimit(1)
-                            }
-                            if let subtitle = tabIdentity.subtitle {
-                                Text(subtitle)
-                                    .font(.caption.monospaced())
-                                    .foregroundStyle(
-                                        controller.focusedSessionState().flatMap { state in
-                                            state == .connected ? nil : state.color
-                                        } ?? Color.secondary
-                                    )
-                                    .lineLimit(1)
-                            }
-                        }
-                    } icon: {
-                        Image(systemName: "apple.terminal")
-                            .foregroundStyle(controller.workgroupColor?.color ?? .secondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    // While a terminal in the tab is printing, a wave moves under the row.
-                    .background {
-                        if controller.isProducingOutput {
-                            MacTerminalActivityWave(color: controller.workgroupColor?.color ?? .accentColor)
-                                .padding(.horizontal, -6)
-                                .transition(.opacity)
-                        }
-                    }
-                    .animation(.easeInOut(duration: 0.3), value: controller.isProducingOutput)
-                .tag(controller.workspaceID)
-                // Double-click to rename in place, as Finder's sidebar and Safari's tab groups do.
-                .simultaneousGesture(TapGesture(count: 2).onEnded { beginRename(controller) })
-                .contextMenu {
-                    Button("Rename Tab…", systemImage: "pencil") { beginRename(controller) }
-                        .labelStyle(.titleAndIcon)
-                    if controller.tabLabel != nil {
-                        Button("Use Automatic Name", systemImage: "arrow.uturn.backward") {
-                            windowController.renameTab(controller.workspaceID, to: nil)
-                        }
-                        .labelStyle(.titleAndIcon)
-                    }
-                }
-                .accessibilityLabel(tabIdentity.title)
-                .accessibilityValue(tabIdentity.subtitle ?? "")
-                .accessibilityIdentifier(
-                    "mac-workspace-tab-\(controller.workspaceID.uuidString.lowercased())"
-                )
-            }
-            }
+            tabList
                 .listStyle(.sidebar)
                 // A wider ceiling than 360: the sidebar carries a title and a monospaced subtitle
                 // per tab, and a user with long session names could not widen past truncation.
@@ -226,6 +248,12 @@ struct MacWorkspaceView: View {
             guard !showingOverview, sidebarBeforeOverview == nil,
                   visibility == .all || visibility == .detailOnly else { return }
             UserDefaults.standard.set(visibility == .all, forKey: sidebarPreferenceKey)
+        }
+        // Its last tab was dragged into another window: this one is done.
+        .onChange(of: windowController.closesAfterLastTabLeft) { _, closes in
+            guard closes else { return }
+            pendingWindowClose = true
+            terminalWindow?.close()
         }
         .onChange(of: windowController.selectedTab.workgroupID) { _, _ in
             followsActivity = currentWorkgroupPreset?.autoFocusOnActivity ?? false
