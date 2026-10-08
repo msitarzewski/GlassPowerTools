@@ -50,10 +50,15 @@ Open the project in Xcode and run the **GlassPowerTools** scheme, or from the co
 
 ```sh
 xcodebuild -project GlassPowerTools.xcodeproj -scheme GlassPowerTools \
-  -configuration Release -destination 'generic/platform=macOS' build
+  -configuration Release -destination 'generic/platform=macOS' \
+  -skipPackagePluginValidation build
 ```
 
 Use `generic/platform=iOS` or `generic/platform=visionOS` for the other platforms.
+
+SwiftTerm carries a build-tool plugin that runs `git` on SwiftTerm's own checkout to record its
+version in a generated file (it reaches no network). Xcode asks once to trust it (**Trust & Enable**);
+`xcodebuild` needs `-skipPackagePluginValidation`. `swift build` runs it without asking.
 
 The scheme's build pre-action runs `Tools/Mermaid/update-mermaid.sh`, which asks the npm registry for
 the latest Mermaid (used by the editor's Markdown preview), verifies the download's checksum, and

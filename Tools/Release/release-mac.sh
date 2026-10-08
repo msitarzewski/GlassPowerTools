@@ -32,7 +32,7 @@ cd "$ROOT"
 : "${APPLE_TEAM_ID:?set APPLE_TEAM_ID}"
 
 setting() { xcodebuild -project GlassPowerTools.xcodeproj -scheme GlassPowerTools -configuration Release \
-  -destination 'generic/platform=macOS' -showBuildSettings 2>/dev/null | awk -v k="$1" '$1 == k { $1=""; $2=""; sub(/^  /, ""); print; exit }'; }
+  -destination 'generic/platform=macOS' -skipPackagePluginValidation -showBuildSettings 2>/dev/null | awk -v k="$1" '$1 == k { $1=""; $2=""; sub(/^  /, ""); print; exit }'; }
 TEAM="$(setting DEVELOPMENT_TEAM)"
 [ "$TEAM" = "$APPLE_TEAM_ID" ] || { echo "Config/Identity.xcconfig team ($TEAM) doesn't match APPLE_TEAM_ID"; exit 1; }
 [ -n "$(setting GPT_SPARKLE_PUBLIC_KEY)" ] || { echo "GPT_SPARKLE_PUBLIC_KEY is empty: this build would not update itself"; exit 1; }
@@ -65,7 +65,7 @@ echo "==> Glass Power Tools $VERSION ($BUILD), team $TEAM"
 echo "==> archive (Release; push environment production for released copies, D38)"
 xcodebuild -project GlassPowerTools.xcodeproj -scheme GlassPowerTools -configuration Release \
   -destination "generic/platform=macOS" -archivePath "$ARCHIVE" -clonedSourcePackagesDirPath "$PACKAGES" \
-  -packageAuthorizationProvider netrc -allowProvisioningUpdates -quiet \
+  -packageAuthorizationProvider netrc -skipPackagePluginValidation -allowProvisioningUpdates -quiet \
   MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" GPT_APS_ENVIRONMENT=production archive
 
 echo "==> export with Developer ID"

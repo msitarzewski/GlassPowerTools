@@ -33,7 +33,7 @@ for PLATFORM in ${@:-visionos ipad iphone}; do
   echo "capture: building for $NAME"
   xcodebuild -project GlassPowerTools.xcodeproj -scheme GlassPowerTools -configuration Debug \
     -destination "platform=$DEST,id=$SIM" -derivedDataPath "$DD" \
-    -packageAuthorizationProvider netrc build -quiet
+    -packageAuthorizationProvider netrc -skipPackagePluginValidation build -quiet
   APP="$DD/Build/Products/$PRODUCTS/Glass Power Tools.app"
   for SURFACE in $SURFACES; do
     APP="$APP" Tools/Screenshots/shoot.sh "$SIM" "$SURFACE" "$OUT/$PLATFORM-$SURFACE.png" "$SETTLE"
