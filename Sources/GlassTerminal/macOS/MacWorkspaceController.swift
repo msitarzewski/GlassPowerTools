@@ -480,7 +480,10 @@ final class MacWorkspaceController {
                 onProcessTerminated: { [weak self] exitCode in
                     if recorder.isRecording { _ = recorder.stop() }
                     guard let self, !isClosed,
-                          MacLocalTerminalExitPolicy.shouldClose(exitCode: exitCode) else { return }
+                          MacLocalTerminalExitPolicy.shouldClose(exitCode: exitCode,
+                                                                 tmuxSession: localTmuxSession(for: pane.id),
+                                                                 sessionRuns: MacLocalTerminalExitPolicy.localSessionRuns)
+                    else { return }
                     removePane(pane.id, sessionManager: sessionManager)
                     if state.root == nil { onEmpty() }
                 }

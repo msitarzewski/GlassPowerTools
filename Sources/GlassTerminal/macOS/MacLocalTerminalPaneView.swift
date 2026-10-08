@@ -85,12 +85,14 @@ struct MacLocalTerminalPaneView: View {
                 onProcessTerminated: { exitCode in
                     if recorder.isRecording { _ = recorder.stop() }
                     MacSecureKeyboardEntry.shared.disable(for: workspaceID)
-                    if MacLocalTerminalExitPolicy.shouldClose(exitCode: exitCode) {
+                    if MacLocalTerminalExitPolicy.shouldClose(exitCode: exitCode, tmuxSession: tmuxSession,
+                                                              sessionRuns: MacLocalTerminalExitPolicy.localSessionRuns) {
                         onDisconnect()
                     }
                 }
             )
             .overlay(Color.white.opacity(showVisualBell ? 0.3 : 0).allowsHitTesting(false))
+            .overlay(alignment: .bottom) { if isDetachedFromTmux { detachedBanner } }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background {
@@ -313,8 +315,27 @@ struct MacLocalTerminalPaneView: View {
     private var localProcessStatusText: String? {
         if processState.isRunning { return nil }
         if processState.launchError != nil { return "Failed" }
+        if isDetachedFromTmux { return "Detached" }
         if let exitCode = processState.exitCode { return "Exited \(exitCode)" }
         return "Starting"
+    }
+
+    /// The pane's tmux client has gone and the pane stayed: its session runs on (the exit policy
+    /// closes a pane whose session ended), so the pane offers to attach to it again.
+    private var isDetachedFromTmux: Bool {
+        tmuxSession != nil && !processState.isRunning && processState.launchError == nil && processState.exitCode != nil
+    }
+
+    private var detachedBanner: some View {
+        HStack(spacing: 12) {
+            Label("Detached. This session is still running in tmux.", systemImage: "pause.circle")
+            Button("Reattach") { restartLocalTerminal() }
+                .accessibilityIdentifier("terminal-reattach")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.regularMaterial, in: Capsule())
+        .padding(.bottom, 16)
     }
 
     @ViewBuilder
@@ -401,7 +422,7 @@ struct MacLocalTerminalPaneView: View {
             }
 
             if !processState.isRunning {
-                Button("Restart", systemImage: "arrow.clockwise") {
+                Button(tmuxSession == nil ? "Restart" : "Reattach", systemImage: "arrow.clockwise") {
                     restartLocalTerminal()
                 }
             }
@@ -727,6 +748,24 @@ enum MacLocalTerminalExitPolicy {
         // tunnel). A normally exited shell is finished even when it returns 1.
         guard let exitCode else { return false }
         return (0..<128).contains(exitCode)
+    }
+
+    /// A pane kept in tmux closes only once its session has ended. Its tmux client also exits
+    /// normally when it is detached — Take Over from another device, `tmux detach` — while the
+    /// session runs on, and closing the pane then dropped the tab and the record of which session
+    /// it showed (2026-10-08). Unknown keeps the pane: a pane can be closed again, a lost one
+    /// cannot be found.
+    static func shouldClose(exitCode: Int32?, tmuxSession: String?, sessionRuns: (String) -> Bool?) -> Bool {
+        guard shouldClose(exitCode: exitCode) else { return false }
+        guard let tmuxSession else { return true }
+        return sessionRuns(tmuxSession) == false
+    }
+
+    /// Whether this Mac's tmux runs `name`; nil when tmux cannot be asked or its answer read.
+    static func localSessionRuns(_ name: String) -> Bool? {
+        guard let tmux = MacLocalTmux.server.executablePath(),
+              let sessions = MacLocalTmux.listing(tmux: tmux) else { return nil }
+        return sessions.contains { $0.name == name }
     }
 }
 

@@ -549,5 +549,22 @@ struct MacLocalTmuxTests {
             tab.closeAllSessions(sessionManager: SessionManager(loadImmediately: false))
         }
     }
+
+    @Test("a pane in tmux closes when its session ends, not when its client is detached")
+    func detachedPaneStays() {
+        let runs: (String) -> Bool? = { _ in true }
+        let ended: (String) -> Bool? = { _ in false }
+        let unknown: (String) -> Bool? = { _ in nil }
+        #expect(!MacLocalTerminalExitPolicy.shouldClose(exitCode: 0, tmuxSession: "glass-3", sessionRuns: runs),
+                "detached from elsewhere: the session runs on, and so does the pane")
+        #expect(MacLocalTerminalExitPolicy.shouldClose(exitCode: 0, tmuxSession: "glass-3", sessionRuns: ended),
+                "the session ended: the pane goes with it")
+        #expect(!MacLocalTerminalExitPolicy.shouldClose(exitCode: 0, tmuxSession: "glass-3", sessionRuns: unknown),
+                "tmux could not say: the pane stays")
+        #expect(MacLocalTerminalExitPolicy.shouldClose(exitCode: 0, tmuxSession: nil, sessionRuns: runs),
+                "not in tmux: a shell that exits closes its pane, as before")
+        #expect(!MacLocalTerminalExitPolicy.shouldClose(exitCode: nil, tmuxSession: "glass-3", sessionRuns: ended),
+                "a process killed by a signal never closes its pane")
+    }
 }
 #endif
