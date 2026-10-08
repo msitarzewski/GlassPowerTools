@@ -153,6 +153,22 @@ xcodebuild -resolvePackageDependencies -project GlassPowerTools.xcodeproj -schem
 python3 Tools/Licenses/generate-acknowledgements.py
 ```
 
+Pins move only on purpose. To see what is newer, and to test the app against it without touching
+this checkout:
+
+```sh
+python3 Tools/Packages/check-updates.py                     # newer releases, notes, what to review
+python3 Tools/Packages/check-updates.py --test swiftterm    # tests and app builds against the newest
+python3 Tools/Packages/check-updates.py --test newer        # the same for every direct dependency
+sh Tools/Packages/install-weekly-check.sh                   # run it every Monday (--remove to stop)
+```
+
+The report flags what a person should look at before taking a release: a new build-tool plugin,
+binary target, unsafe flag or dependency in its manifest, a changed licence, a new major version.
+`--test` works in a temporary worktree holding this checkout's committed and uncommitted state, runs
+every test target and builds the app for macOS, iOS and visionOS; `--platforms none` skips the app
+builds. Device behaviour still needs a person on each device.
+
 `PackagePinAgreementTests` fails if the two pin files disagree, and `AcknowledgementsTests` fails if a
 dependency has no entry in `Tools/Licenses/components.json`. Adding a dependency means adding its
 entry there and running the generator, which copies its licence into

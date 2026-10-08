@@ -332,14 +332,22 @@ Store. The site is static, built into `_site/`; where and how it is hosted is ke
 
 Every dependency is pinned to a revision in `Package.resolved`; Xcode's copy must match it
 (`Tools/Packages/sync-xcode-pins.py`, `PackagePinAgreementTests`). Notable versions: swift-nio
-2.103.0, swift-nio-ssl 2.37.5, swift-crypto 4.5.2, BigInt 6.0.1, SwiftTerm **1.18.0** (exact),
+2.103.0, swift-nio-ssl 2.37.5, swift-crypto 4.5.2, BigInt 6.0.1, SwiftTerm **1.20.0** (exact, D48;
+its build-tool plugin needs `-skipPackagePluginValidation` for `xcodebuild`),
 swift-markdown 0.9.0 (exact), tree-sitter 0.25.10, postgres-nio 1.33.1, mysql-nio at the fork's
 recorded revision. Vendored: Citadel `ae8562f`, swift-nio-ssh 0.3.7 (`6acaa1a`), RDPKit 0.3.1.
+
+**Watching for newer releases (D48, 2026-10-07):** `Tools/Packages/check-updates.py` reports what is
+newer, with release notes, commits and anything to review (new plugins, binary targets, unsafe flags,
+dependencies, licence changes, major versions); `--test NAME` tests the app against a release in a
+temporary worktree. A LaunchAgent (`Tools/Packages/install-weekly-check.sh`) runs it Mondays at
+08:00 with `--test newer`; reports in `~/Library/Logs/GlassPowerTools/`. It never changes a pin.
+First survey: 8 of 30 pins behind (swift-log 1.16.1 and swift-nio 2.104.0 allowed as declared; the
+rest indirect, including tree-sitter 0.27 and swift-crypto 5 below).
 
 Held back, with the reason:
 
 | Dependency | Newest | Why not taken |
 |---|---|---|
-| SwiftTerm | 1.19.0 (1.20.0 pre-release) | 1.19 adds a build-tool plugin that Xcode must be told to trust; the owner's decision |
 | tree-sitter | 0.27.0 | SwiftTreeSitter (latest tag and `main`) allows only 0.25.x |
 | swift-crypto | 5.0.0 | postgres-nio's latest release and mysql-nio (upstream and the fork) allow only `< 5.0.0`; Citadel's and swift-nio-ssh's vendored manifests say the same |
