@@ -2255,6 +2255,9 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
     var gridCardWidth: Double? = nil
     let createdAt: Date
     var lastUsed: Date?
+    /// When it was last saved, here or on another device: its sync clock (2026-10-08). Nil for a
+    /// workgroup saved before workgroups synced, which counts from `createdAt`.
+    var modifiedAt: Date? = nil
 
     init(
         id: UUID = UUID(),

@@ -24,6 +24,8 @@ nonisolated enum UserDefaultsKeys {
     static let localShell = "localShell"
     static let localWorkingDirectory = "localWorkingDirectory"
     static let localTmux = "localTmux"
+    /// Workgroups deleted on this device, so the deletion reaches the others (2026-10-08).
+    static let layoutPresetTombstones = "layoutPresetTombstones"
     static let bellEnabled = "bellEnabled"
     static let visualBell = "visualBell"
     static let hostKeyVerificationMode = "hostKeyVerificationMode"

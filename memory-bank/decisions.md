@@ -1193,3 +1193,12 @@ pinned for the other devices, and a Terminal service with tmux on added to the M
 Writing `authorized_keys` is the owner's call. Also wanted with it: the Mac recognising its synced
 record as itself, so Active does not list each session twice.
 
+## D51 — Workgroups sync across devices — Approved 2026-10-08
+**Owner:** "work on getting workgroups to sync on icloud". They were saved per device. **Decision:**
+each workgroup travels through the shell's iCloud key-value sync under the terminal's existing iCloud
+switch (key `terminal-workgroups-envelope-v1`), as its own JSON (the module's main-actor coding cannot
+cross into the off-main payload). Saving stamps `modifiedAt`; the newest change per workgroup wins; a
+deletion leaves a dated tombstone (kept 90 days) so it travels; on a tie the workgroup outlives its
+deletion. When it was last opened and its per-device SSH substitutions stay on the device, so opening
+one sends nothing.
+

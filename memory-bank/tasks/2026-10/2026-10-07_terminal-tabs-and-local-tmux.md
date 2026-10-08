@@ -247,3 +247,19 @@ Three reports from the headset (`devicectl … --domain-type systemCrashLogs`):
 - 0.4.295 installed on Mac, iPhone, Vision Pro. No tab was attached to the session at the Mac's quit,
   so nothing reopened; the owner reattaches through Active.
 
+## Workgroups sync (D51) and the headset crash, continued (2026-10-08, ~01:45)
+
+- D51 built: `ICloudWorkgroupsPayload`, `SettingsManager.workgroupsPayload/applyWorkgroups`, tombstones
+  (`layoutPresetTombstones`), started with the terminal's iCloud switch. `WorkgroupsSyncTests`: merge
+  rules; two devices over a shared in-memory store (save arrives, opening sends nothing, deleting
+  travels); the two-device test fails without the push. Terminal: 457 pass.
+- Headset crash: four Release crashes (0.4.288–0.4.295) in SwiftUI stack layout, over-releases with
+  garbage pointers, each while a terminal showed this Mac's tmux session running Claude Code (tmux on
+  another host was fine). An Address Sanitizer debug build attached to the same session for 20+
+  minutes, resized, did not crash and reported nothing. A desktop in that build overflowed the stack
+  in `performRDPGraphicsDynamicChannelHandshake` (sanitizer frames are larger; Release connects
+  fine). The headset runs xrOS 27.2 beta 24N5103f. Cause unknown; the debug build is still installed.
+- 0.4.294's CPU report: 50% CPU for three minutes while attached — mostly the terminal's CoreGraphics
+  drawing of Claude Code's constant redraws.
+- Owner's idea, not started: drag terminal tabs between windows to consolidate them.
+

@@ -212,6 +212,8 @@ class SettingsManager {
     /// the Keychain one in production.
     var sshKeyCatalogStore: SSHKeyCatalogStore
     private let iCloudSettingsSyncService: ICloudSettingsSyncService
+    private let workgroupsSyncService: GlassSettingsSyncService<ICloudWorkgroupsPayload>
+    private var workgroupsSyncStarted = false
 
     init(
         loadImmediately: Bool = true,
@@ -220,6 +222,7 @@ class SettingsManager {
         sshKeyLifecycleStore: SSHKeyLifecycleStore? = nil,
         sshKeyCatalogWriter: ((Data) -> Void)? = nil,
         iCloudSettingsSyncService: ICloudSettingsSyncService? = nil,
+        workgroupsSyncService: GlassSettingsSyncService<ICloudWorkgroupsPayload>? = nil,
         layers: GlassLayerStore? = nil
     ) {
         let resolvedSettingsDefaults = settingsDefaults ?? .standard
@@ -253,6 +256,8 @@ class SettingsManager {
         }
         self.iCloudSettingsSyncService = iCloudSettingsSyncService
             ?? ICloudSettingsSyncService(writerID: writerID)
+        self.workgroupsSyncService = workgroupsSyncService
+            ?? GlassSettingsSyncService(workgroupsStore: GlassUbiquitousSettingsStore(), writerID: writerID)
         if loadImmediately {
             loadPersistentStateIfNeeded()
         }
@@ -1320,9 +1325,12 @@ class SettingsManager {
         // the key-value store would carry them to the person's other devices.
         guard iCloudSyncEnabled, !SharedDefaults.isUITestRun else {
             iCloudSettingsSyncService.stop()
+            workgroupsSyncService.stop()
+            workgroupsSyncStarted = false
             iCloudSyncStatusText = "Off"
             return
         }
+        startWorkgroupsSync()
 
         iCloudConfigurationTask = Task { @MainActor [weak self] in
             guard let self else { return }
@@ -1658,22 +1666,114 @@ class SettingsManager {
     }
 
     func upsertLayoutPreset(_ preset: LayoutPreset) {
-        let normalized = preset.migratedToCurrentSchema()
+        var normalized = preset.migratedToCurrentSchema()
         guard normalized.isValidForPersistence else {
             Logger.settings.error("Refusing to persist an invalid workgroup preset")
             return
         }
+        normalized.modifiedAt = Date()
         if let index = layoutPresets.firstIndex(where: { $0.id == normalized.id }) {
             layoutPresets[index] = normalized
         } else {
             layoutPresets.append(normalized)
         }
         saveLayoutPresets()
+        var tombstones = workgroupTombstones
+        if tombstones.removeValue(forKey: normalized.id) != nil { workgroupTombstones = tombstones }
+        pushWorkgroups()
     }
 
     func deleteLayoutPreset(_ preset: LayoutPreset) {
         layoutPresets.removeAll { $0.id == preset.id }
         saveLayoutPresets()
+        var tombstones = workgroupTombstones
+        tombstones[preset.id] = Date()
+        workgroupTombstones = tombstones
+        pushWorkgroups()
+    }
+
+    // MARK: Workgroups on every device (2026-10-08)
+
+    /// Workgroups deleted here, and when, so the deletion travels. Kept for 90 days.
+    private var workgroupTombstones: [UUID: Date] {
+        get {
+            guard let data = settingsDefaults.data(forKey: UserDefaultsKeys.layoutPresetTombstones),
+                  let decoded = try? JSONDecoder().decode([UUID: Date].self, from: data) else { return [:] }
+            return decoded
+        }
+        set {
+            let cutoff = Date().addingTimeInterval(-90 * 24 * 60 * 60)
+            let kept = newValue.filter { $0.value > cutoff }
+            if let data = try? JSONEncoder().encode(kept) {
+                settingsDefaults.set(data, forKey: UserDefaultsKeys.layoutPresetTombstones)
+            }
+        }
+    }
+
+    /// This device's workgroups as the sync carries them: without when each was last opened.
+    var workgroupsPayload: ICloudWorkgroupsPayload {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        var records = layoutPresets.compactMap { preset -> ICloudWorkgroupsPayload.Record? in
+            var travelling = preset
+            travelling.lastUsed = nil
+            guard let data = try? encoder.encode(travelling) else { return nil }
+            return .init(id: preset.id, changedAt: preset.modifiedAt ?? preset.createdAt, preset: data)
+        }
+        let present = Set(layoutPresets.map(\.id))
+        records += workgroupTombstones.filter { !present.contains($0.key) }
+            .map { .init(id: $0.key, changedAt: $0.value, preset: nil) }
+        return ICloudWorkgroupsPayload(records: records.sorted { $0.id.uuidString < $1.id.uuidString })
+    }
+
+    /// Takes each newer workgroup, or deletion, from another device. When it was last opened
+    /// here stays as it was.
+    func applyWorkgroups(_ incoming: ICloudWorkgroupsPayload) {
+        var tombstones = workgroupTombstones
+        var changed = false
+        let ours = Dictionary(workgroupsPayload.records.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        for record in incoming.records {
+            let local = ours[record.id]
+            guard local == nil || (ICloudWorkgroupsPayload.newer(record, local!) == record && record != local) else { continue }
+            if let data = record.preset,
+               var preset = (try? JSONDecoder().decode(LayoutPreset.self, from: data))?.migratedToCurrentSchema(),
+               preset.id == record.id, preset.isValidForPersistence {
+                preset.lastUsed = layoutPresets.first(where: { $0.id == record.id })?.lastUsed
+                preset.modifiedAt = record.changedAt
+                if let index = layoutPresets.firstIndex(where: { $0.id == record.id }) {
+                    layoutPresets[index] = preset
+                } else {
+                    layoutPresets.append(preset)
+                }
+                tombstones.removeValue(forKey: record.id)
+                changed = true
+            } else if record.preset == nil {
+                let before = layoutPresets.count
+                layoutPresets.removeAll { $0.id == record.id }
+                tombstones[record.id] = record.changedAt
+                changed = changed || before != layoutPresets.count || local?.preset != nil
+            }
+        }
+        guard changed else { return }
+        saveLayoutPresets()
+        workgroupTombstones = tombstones
+    }
+
+    func startWorkgroupsSync() {
+        guard !workgroupsSyncStarted else { return }
+        workgroupsSyncStarted = true
+        let service = workgroupsSyncService
+        Task { @MainActor [weak self] in
+            await service.start(onMerge: { [weak self] incoming in self?.applyWorkgroups(incoming) })
+            self?.pushWorkgroups()
+        }
+    }
+
+    private func pushWorkgroups() {
+        guard workgroupsSyncStarted else { return }
+        let payload = workgroupsPayload
+        let service = workgroupsSyncService
+        Task { try? await service.push(payload) }
     }
 
     func updateLayoutPresetLastUsed(_ presetID: UUID) {
