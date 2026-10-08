@@ -14,7 +14,6 @@ struct MacWorkspaceFocusedActions {
     let requestSSHPane: (MacWorkspaceSplitAxis) -> Void
     let closeFocusedPane: () -> Void
     let focusNextPane: () -> Void
-    let findInFocusedPane: () -> Void
     let toggleSecureKeyboardEntry: () -> Void
 }
 
@@ -121,15 +120,17 @@ struct MacWorkspaceCommands: Commands {
 
     var body: some Commands {
         CommandGroup(after: .sidebar) {
+            // ⌘G is Find Next, the shell's (`GlassShellFindCommands`); Grid moved to ⌥⌘G and
+            // Carousel to ⌥⇧⌘G (the owner, 2026-10-08).
             Button("Terminal Grid") {
                 commandCenterEntries?.first { $0.id == "workspace.grid" }?.action()
             }
-            .keyboardShortcut("g", modifiers: .command)
+            .keyboardShortcut("g", modifiers: [.command, .option])
             .disabled(commandCenterEntries?.contains { $0.id == "workspace.grid" } != true)
             Button("Terminal Carousel") {
                 commandCenterEntries?.first { $0.id == "workspace.carousel" }?.action()
             }
-            .keyboardShortcut("g", modifiers: [.command, .option])
+            .keyboardShortcut("g", modifiers: [.command, .option, .shift])
             .disabled(commandCenterEntries?.contains { $0.id == "workspace.carousel" } != true)
             Divider()
             ForEach(1...9, id: \.self) { number in
@@ -224,13 +225,7 @@ struct MacWorkspaceCommands: Commands {
                 .keyboardShortcut("0", modifiers: .command)
                 .disabled(fontActions == nil)
 
-            Divider()
-
-            Button("Find in Pane…") {
-                actions?.findInFocusedPane()
-            }
-            .keyboardShortcut("f", modifiers: .command)
-            .disabled(actions?.hasFocusedPane != true)
+            // Find is Edit ▸ Find now, the shell's, and goes to the focused pane (`\.glassFindItem`).
 
             Divider()
 

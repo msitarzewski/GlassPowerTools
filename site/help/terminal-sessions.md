@@ -19,7 +19,8 @@ This page covers terminal windows and tabs, the session's tools menu, text size,
 | Close pane | **Close Pane** | ⌥⌘W |
 | Close tab | | ⌘W |
 | Go to tab 1–9 | | ⌘1–⌘9 |
-| All tabs as a grid or carousel | **Terminal Grid**, **Terminal Carousel** | ⌘G, ⌥⌘G |
+| All tabs as a grid or carousel | **Terminal Grid**, **Terminal Carousel** | ⌥⌘G, ⌥⇧⌘G |
+| Find in the focused pane | **Edit ▸ Find ▸ Find…**, **Find Next**, **Find Previous** | ⌘F, ⌘G, ⇧⌘G |
 
 A tab is named after what is running in it: the title a program set (Claude Code's task, the file open in vim), or the folder it is in. In your home folder it takes its Workgroup's name, or, in tmux, its session's name as **Active** shows it (**Terminal 1**), or else the shell's. Below the name: where it is, and **in tmux** when it is kept in tmux.
 
@@ -45,7 +46,9 @@ Press ⌘+ to enlarge, ⌘- to shrink and ⌘0 to reset. This changes the curren
 
 ## Search
 
-Choose **Search** from the tools menu, or on Mac press ⌘F (**Find in Pane…**). Step through matches with the arrows.
+Choose **Search** from the tools menu, or press ⌘F (on Mac, **Edit ▸ Find ▸ Find…**; on iPad and Vision Pro, with a hardware keyboard). Type, then press Return: the first match is the newest, and each Return goes on to an older one. The arrows step to older and newer matches, the bar shows how many there are, and Escape closes it. **On Mac**, ⌘G (**Find Next**) and ⇧⌘G (**Find Previous**) step older and newer too, and with the bar closed they open it with the last word searched for.
+
+In a terminal kept in tmux, tmux searches its own history, so text that has scrolled away is found; closing the bar returns to the live prompt. In a program that fills the screen, such as `less` or `vim`, only what's on screen can be searched: use the program's own search.
 
 ## Paste
 

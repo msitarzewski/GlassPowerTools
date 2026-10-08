@@ -21,7 +21,7 @@ final class MacWorkspaceController {
     private(set) var localProcessStatusesByPaneID: [UUID: String] = [:]
     private(set) var recordersByPaneID: [UUID: SessionRecorder] = [:]
     private(set) var findTargetPaneID: UUID?
-    private(set) var findRequestNonce: UInt64 = 0
+    private(set) var findRequest = TerminalFindRequest.none
     private(set) var isClosed = false
     var pendingSSHAxis: MacWorkspaceSplitAxis?
 
@@ -662,10 +662,11 @@ final class MacWorkspaceController {
         return closesWorkspace
     }
 
-    func requestFindInFocusedPane() {
+    /// Edit ▸ Find, Find Next and Find Previous, for the focused pane's find bar.
+    func requestFind(_ command: TerminalFindCommand) {
         guard let focusedPaneID else { return }
         findTargetPaneID = focusedPaneID
-        findRequestNonce &+= 1
+        findRequest = TerminalFindRequest(nonce: findRequest.nonce &+ 1, command: command)
     }
 
     private func prepareOffscreenRenderer(for session: TerminalSession, settingsManager: SettingsManager) {

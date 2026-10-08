@@ -345,9 +345,9 @@ struct MacWorkspaceView: View {
             MacCommandCenterEntry(id: "workspace.overview", title: "Terminal Overview",
                                  detail: "Browse tabs in a live grid or carousel") { openOverview() },
             MacCommandCenterEntry(id: "workspace.grid", title: "Terminal Grid",
-                                 detail: "View all terminal tabs", shortcut: "⌘G") { showOverview(carousel: false) },
+                                 detail: "View all terminal tabs", shortcut: "⌥⌘G") { showOverview(carousel: false) },
             MacCommandCenterEntry(id: "workspace.carousel", title: "Terminal Carousel",
-                                 detail: "Browse overlapping terminal previews", shortcut: "⌥⌘G") { showOverview(carousel: true) },
+                                 detail: "Browse overlapping terminal previews", shortcut: "⌥⇧⌘G") { showOverview(carousel: true) },
             MacCommandCenterEntry(id: "workspace.activity", title: followsActivity ? "Disable Auto-focus on Activity" : "Enable Auto-focus on Activity",
                                  detail: "Follow new output in Grid or Carousel") { followsActivity.toggle() }
         ] + windowController.tabs.enumerated().map { index, tab in
@@ -680,6 +680,14 @@ private struct MacWorkspaceTabContent: View {
         workspaceContent
             .frame(minHeight: 460)
             .focusedSceneValue(\.macWorkspaceActions, focusedActions)
+            // Edit ▸ Find, Find Next and Find Previous belong to the shell (`GlassShellFindCommands`);
+            // here they go to the focused pane's find bar.
+            .focusedSceneValue(\.glassFindItem, GlassFindItemAction(
+                isEnabled: controller.focusedPaneID != nil,
+                find: { controller.requestFind(.show) },
+                findNext: { controller.requestFind(.next) },
+                findPrevious: { controller.requestFind(.previous) }
+            ))
             .sheet(isPresented: sshPickerPresented) { sshPicker }
             .sheet(item: $credentialPrompt) { prompt in
                 ConnectionPasswordPromptSheet(server: prompt.server, savesPassword: true) { password in
@@ -801,7 +809,7 @@ private struct MacWorkspaceTabContent: View {
                     tmuxSession: pane.intent.localTmuxSession,
                     isFocused: isFocused,
                     showsPaneChrome: showsPaneChrome,
-                    findRequestNonce: findNonce(for: pane.id),
+                    findRequest: findRequest(for: pane.id),
                     claimStartupCommand: { controller.claimStartupCommand(for: pane.id) },
                     onFocus: { controller.focus(pane.id) },
                     onDisconnect: { closeLocalPane(pane.id) },
@@ -833,7 +841,7 @@ private struct MacWorkspaceTabContent: View {
                     ownsSessionLifecycle: false,
                     isTerminalActive: isFocused,
                     showsMacPaneChrome: showsPaneChrome,
-                    externalSearchRequestNonce: findNonce(for: pane.id),
+                    externalFindRequest: findRequest(for: pane.id),
                     onNewTerminalTab: onNewTab,
                     onSessionRequestedClose: {
                         guard !controller.isClosed else { return }
@@ -981,15 +989,14 @@ private struct MacWorkspaceTabContent: View {
                 }
             },
             focusNextPane: { controller.focusNextPane() },
-            findInFocusedPane: { controller.requestFindInFocusedPane() },
             toggleSecureKeyboardEntry: {
                 secureKeyboardEntry.toggle(for: controller.workspaceID)
             }
         )
     }
 
-    private func findNonce(for paneID: UUID) -> UInt64 {
-        controller.findTargetPaneID == paneID ? controller.findRequestNonce : 0
+    private func findRequest(for paneID: UUID) -> TerminalFindRequest {
+        controller.findTargetPaneID == paneID ? controller.findRequest : .none
     }
 
     private var sshPickerPresented: Binding<Bool> {

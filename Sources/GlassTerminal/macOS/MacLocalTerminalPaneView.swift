@@ -16,7 +16,8 @@ struct MacLocalTerminalPaneView: View {
     var tmuxSession: String? = nil
     let isFocused: Bool
     let showsPaneChrome: Bool
-    let findRequestNonce: UInt64
+    /// Find, Find Next and Find Previous from the menu bar, for this pane.
+    let findRequest: TerminalFindRequest
     let claimStartupCommand: () -> TerminalStartupCommandTicket?
     let onFocus: () -> Void
     let onDisconnect: () -> Void
@@ -33,9 +34,7 @@ struct MacLocalTerminalPaneView: View {
     @ObservedObject var processState: SwiftTermLocalProcessState
     @State private var aiAssistant = AIAssistant()
     @State private var localSessionID = UUID()
-    @State private var showingSearch = false
-    @State private var searchQuery = ""
-    @State private var searchFound: Bool?
+    @State private var find = TerminalFindController()
     @State private var showingAIAssistant = false
     @State private var aiAssistantDirectory: String?
     /// Why Open Folder Here did not open a folder, while that is shown.
@@ -53,15 +52,9 @@ struct MacLocalTerminalPaneView: View {
     @State private var didReportLocalShell = false
     @State private var isLocalFullScreen = false
     @State private var showVisualBell = false
-    @FocusState private var searchFieldFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
-            if showingSearch {
-                localSearchBar
-                    .background(.regularMaterial)
-                Divider()
-            }
             SwiftTermLocalProcessHostView(
                 runtime: runtime,
                 configuration: localConfiguration,
@@ -122,6 +115,16 @@ struct MacLocalTerminalPaneView: View {
                     .background(.regularMaterial)
                 }
             }
+            .overlay(alignment: .top) {
+                if find.isPresented {
+                    TerminalFindBar(controller: find)
+                        .padding(.top, 10)
+                        .padding(.horizontal, 14)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
+            // A bar that goes with its pane would leave tmux in copy mode, with nothing to close it.
+            .onDisappear { if find.isPresented { find.close() } }
         }
         .clipShape(.rect(cornerRadius: showsPaneChrome ? 18 : 0, style: .continuous))
         .overlay {
@@ -210,11 +213,18 @@ struct MacLocalTerminalPaneView: View {
             hostModel.setFocusOwnershipAllowed(focused)
             if focused { processState.focus() }
         }
-        .onChange(of: findRequestNonce) { _, nonce in
-            guard nonce > 0 else { return }
-            showingSearch = true
-            hostModel.setFocusOwnershipAllowed(false)
-            searchFieldFocused = true
+        .onChange(of: findRequest) { _, request in
+            guard request.nonce > 0 else { return }
+            configureFind()
+            withAnimation(.easeInOut(duration: 0.2)) { find.perform(request.command) }
+        }
+        // The bar holds the keyboard while it is open; closing it gives the shell back.
+        .onChange(of: find.isPresented) { _, showing in
+            if showing {
+                hostModel.setFocusOwnershipAllowed(false)
+            } else {
+                restoreTerminalFocus()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) {
             updateLocalFullScreenState(from: $0, isFullScreen: true)
@@ -298,44 +308,6 @@ struct MacLocalTerminalPaneView: View {
                 ?? request.normalizedHost
             Text("A local terminal link wants to open this address.\n\nHost: \(authority)\n\nExact URL:\n\(request.exactURL)")
         }
-    }
-
-    private var localSearchBar: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-            TextField("Find in terminal", text: $searchQuery)
-                .textFieldStyle(.plain)
-                .focused($searchFieldFocused)
-                .onSubmit { searchFound = hostModel.findNext(searchQuery) }
-            if searchFound == false {
-                Text("No match")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-            Button("Previous", systemImage: "chevron.up") {
-                searchFound = hostModel.findPrevious(searchQuery)
-            }
-            .labelStyle(.iconOnly)
-            .disabled(searchQuery.isEmpty)
-            Button("Next", systemImage: "chevron.down") {
-                searchFound = hostModel.findNext(searchQuery)
-            }
-            .labelStyle(.iconOnly)
-            .disabled(searchQuery.isEmpty)
-            Button("Close", systemImage: "xmark") {
-                showingSearch = false
-                searchQuery = ""
-                searchFound = nil
-                hostModel.clearSearch()
-                hostModel.setFocusOwnershipAllowed(true)
-                processState.focus()
-            }
-            .labelStyle(.iconOnly)
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
     }
 
     private var localProcessStatusText: String? {
@@ -491,9 +463,15 @@ struct MacLocalTerminalPaneView: View {
     }
 
     private func presentSearch() {
-        showingSearch = true
-        hostModel.setFocusOwnershipAllowed(false)
-        searchFieldFocused = true
+        configureFind()
+        withAnimation(.easeInOut(duration: 0.2)) { find.present() }
+    }
+
+    /// Where this pane's finds search: tmux's history when the pane runs in this Mac's tmux,
+    /// otherwise the shell's own buffer.
+    private func configureFind() {
+        let session = tmuxSession
+        find.configure(model: hostModel) { MacLocalTmux.findTarget(session: session) }
     }
 
     private func presentAIAssistant() {

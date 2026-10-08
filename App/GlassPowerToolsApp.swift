@@ -339,6 +339,8 @@ struct GlassPowerToolsApp: App {
             // they silently delete each other (see `GlassShellFileCommands`).
             .commands {
                 GlassShellFileCommands()
+                // Edit ▸ Find, the same way: the shell owns ⌘F, ⌘G and ⇧⌘G, the focused window aims them.
+                GlassShellFindCommands()
                 // D38: Check for Updates…, for the build distributed outside the App Store.
                 GlassShellUpdateCommands()
             }

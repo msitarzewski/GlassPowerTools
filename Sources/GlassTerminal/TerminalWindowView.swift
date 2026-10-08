@@ -78,9 +78,9 @@ struct TerminalWindowView: View {
     /// square edge-to-edge canvas provided by the native window. This value is
     /// harmless on other platforms and keeps the shared initializer portable.
     var showsMacPaneChrome = false
-    /// Workspace command routing increments this value to present the existing
-    /// terminal search UI without duplicating search state outside this view.
-    var externalSearchRequestNonce: UInt64 = 0
+    /// Find, Find Next and Find Previous from the menu bar, for this pane; each new nonce is one
+    /// command. The bar's state stays in this view.
+    var externalFindRequest: TerminalFindRequest = .none
     /// Embedded workspaces provide their own tab launcher. Standalone windows
     /// use their platform's default terminal-launch route.
     var onNewTerminalTab: (() -> Void)? = nil
@@ -100,10 +100,7 @@ struct TerminalWindowView: View {
     #endif
     @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiateWithoutColor
     
-    @State private var searchQuery: String = ""
-    @State private var terminalSearchFound: Bool?
-    @State private var showingSearchOverlay = false
-    @FocusState private var isSearchFieldFocused: Bool
+    @State private var find = TerminalFindController()
     @State private var showingTerminalSettings = false
     #if os(iOS)
     @State private var softwareKeyboardVisible = false
@@ -152,7 +149,7 @@ struct TerminalWindowView: View {
         showsConnectionOrnament: Bool = true,
         isTerminalActive: Bool = true,
         showsMacPaneChrome: Bool = false,
-        externalSearchRequestNonce: UInt64 = 0,
+        externalFindRequest: TerminalFindRequest = .none,
         onNewTerminalTab: (() -> Void)? = nil,
         onSessionRequestedClose: (() -> Void)? = nil,
         onSessionEndedCleanly: (() -> Void)? = nil,
@@ -163,7 +160,7 @@ struct TerminalWindowView: View {
         self.showsConnectionOrnament = showsConnectionOrnament
         self.isTerminalActive = isTerminalActive
         self.showsMacPaneChrome = showsMacPaneChrome
-        self.externalSearchRequestNonce = externalSearchRequestNonce
+        self.externalFindRequest = externalFindRequest
         self.onNewTerminalTab = onNewTerminalTab
         self.onSessionRequestedClose = onSessionRequestedClose
         self.onSessionEndedCleanly = onSessionEndedCleanly
@@ -256,16 +253,17 @@ struct TerminalWindowView: View {
             .onDisappear {
                 handleTerminalDisappear()
             }
-            .onChange(of: showingSearchOverlay) { oldValue, showing in
+            .onChange(of: find.isPresented) { oldValue, showing in
                 handleSearchPresentationChange(oldValue, showing)
             }
     }
 
     private var terminalFocusTracking: some View {
         terminalLifecycle
-            .onChange(of: externalSearchRequestNonce) { _, nonce in
-                guard nonce > 0 else { return }
-                showingSearchOverlay = true
+            .onChange(of: externalFindRequest) { _, request in
+                guard request.nonce > 0 else { return }
+                configureFind()
+                withAnimation(.easeInOut(duration: 0.2)) { find.perform(request.command) }
             }
             .onChange(of: showingTerminalSettings) { _, showing in
                 updateTerminalFocusOwnership(competingControlPresented: showing)
@@ -514,15 +512,17 @@ struct TerminalWindowView: View {
         #endif
     }
 
+    /// The bar holds the keyboard while it is open; closing it gives the terminal back. The bar
+    /// itself clears the highlight, or leaves tmux's copy mode.
     private func handleSearchPresentationChange(_ oldValue: Bool, _ showing: Bool) {
-        if showing {
-            updateTerminalFocusOwnership(competingControlPresented: true)
-            isSearchFieldFocused = true
-        } else {
-            terminalHostModel.clearSearch()
-            terminalSearchFound = nil
-            updateTerminalFocusOwnership(competingControlPresented: false)
-        }
+        updateTerminalFocusOwnership(competingControlPresented: showing)
+    }
+
+    /// Where this terminal's finds search: tmux on the host while it is kept in tmux and
+    /// connected, otherwise its own buffer. Asked again at every step.
+    private func configureFind() {
+        let session = session
+        find.configure(model: terminalHostModel) { [weak session] in session?.tmuxFindTarget }
     }
 
     /// Opens this session's current directory in the file browser.
@@ -719,12 +719,20 @@ struct TerminalWindowView: View {
             }
         }
         .overlay(alignment: .top) {
-            if showingSearchOverlay {
-                terminalSearchOverlay
+            if find.isPresented {
+                TerminalFindBar(controller: find)
                     .padding(.top, 14)
+                    .padding(.horizontal, 14)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
+        .onAppear { configureFind() }
+        .onChange(of: ObjectIdentifier(session)) { _, _ in configureFind() }
+        // A bar that goes with its view would leave tmux in copy mode, with nothing to close it.
+        .onDisappear { if find.isPresented { find.close() } }
+        #if !os(macOS)
+        .background { findKeyboardShortcut }
+        #endif
         .overlay(alignment: .bottom) {
             if showingErrorCard, let errorInfo = aiAssistant.lastError {
                 AIErrorCard(
@@ -796,7 +804,7 @@ struct TerminalWindowView: View {
 
     private var terminalCanOwnFocus: Bool {
         isTerminalActive
-            && !showingSearchOverlay
+            && !find.isPresented
             && !showingTerminalSettings
             && !showingCloseConfirmation
             && !showingSnippetPicker
@@ -1430,8 +1438,9 @@ struct TerminalWindowView: View {
 
             Menu {
                 Button {
+                    configureFind()
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        showingSearchOverlay.toggle()
+                        if find.isPresented { find.close() } else { find.present() }
                     }
                 } label: {
                     Label("Search", systemImage: "magnifyingglass")
@@ -1558,67 +1567,24 @@ struct TerminalWindowView: View {
         else { Image(systemName: image) }
     }
     
-    private var terminalSearchOverlay: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-
-            TextField("Search terminal output", text: $searchQuery)
-                .textFieldStyle(.plain)
-                .submitLabel(.search)
-                .focused($isSearchFieldFocused)
-                .onSubmit {
-                    terminalSearchFound = terminalHostModel.findNext(searchQuery)
-                }
-                .onChange(of: searchQuery) { _, _ in
-                    terminalHostModel.clearSearch()
-                    terminalSearchFound = nil
-                }
-                .accessibilityLabel("Search terminal output")
-
-            if terminalSearchFound == false {
-                Text("No match")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+    #if !os(macOS)
+    /// ⌘F on an iPad's or Vision Pro's hardware keyboard, beside the tools menu's Search: the Mac's
+    /// is in its menu bar. Only the terminal in front answers it. Not drawn, not reachable by touch.
+    @ViewBuilder
+    private var findKeyboardShortcut: some View {
+        if isTerminalActive {
+            Button("Find") {
+                configureFind()
+                withAnimation(.easeInOut(duration: 0.2)) { find.present() }
             }
-
-            Button {
-                terminalSearchFound = terminalHostModel.findPrevious(searchQuery)
-            } label: {
-                Image(systemName: "chevron.up")
-            }
-            .buttonStyle(.plain)
-            .disabled(searchQuery.isEmpty)
-            .accessibilityLabel("Previous match")
-
-            Button {
-                terminalSearchFound = terminalHostModel.findNext(searchQuery)
-            } label: {
-                Image(systemName: "chevron.down")
-            }
-            .buttonStyle(.plain)
-            .disabled(searchQuery.isEmpty)
-            .accessibilityLabel("Next match")
-
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    showingSearchOverlay = false
-                }
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .frame(minWidth: 44, minHeight: 44)
-            .contentShape(Circle())
-            .accessibilityLabel("Close search")
+            .keyboardShortcut("f", modifiers: .command)
+            .frame(width: 0, height: 0)
+            .opacity(0)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .frame(minWidth: 280, maxWidth: 420)
-        .background(.ultraThinMaterial, in: .capsule)
     }
+    #endif
 
     private var snippetPicker: some View {
         NavigationStack {

@@ -176,6 +176,49 @@ struct MenuBarPlacementTests {
                 "⇧⌘E is declared in \(files.sorted()). It opens a new editor window; give anything else its own key.")
     }
 
+    /// ⌘G is Find Next, the shell's (2026-10-08). It was Terminal Grid, which moved to ⌥⌘G, and
+    /// Carousel moved from there to ⌥⇧⌘G. The editor wants ⌘G as much as the terminal, so the key
+    /// belongs to no capability: a window says what Find Next does there with `\.glassFindItem`.
+    @Test func commandGHasASingleOwner() throws {
+        #expect(try owners(of: "g", modifiers: ["command"]) == ["GlassShellFindCommands.swift"],
+                "⌘G is Find Next, the shell's Edit ▸ Find item; a window aims it by publishing \\.glassFindItem.")
+    }
+
+    @Test func shiftCommandGHasASingleOwner() throws {
+        #expect(try owners(of: "g", modifiers: ["command", "shift"]) == ["GlassShellFindCommands.swift"],
+                "⇧⌘G is Find Previous, the shell's Edit ▸ Find item.")
+    }
+
+    @Test func optionCommandGIsTerminalGridAlone() throws {
+        #expect(try owners(of: "g", modifiers: ["command", "option"]) == ["MacWorkspaceCommands.swift"],
+                "⌥⌘G is Terminal Grid.")
+        #expect(try owners(of: "g", modifiers: ["command", "option", "shift"]) == ["MacWorkspaceCommands.swift"],
+                "⌥⇧⌘G is Terminal Carousel.")
+    }
+
+    /// ⌘F moved with them, from the terminal's Find in Pane… to the shell's Find…. The other two
+    /// declarations are not menu owners on a Mac: both are compiled only for iPad and Vision Pro
+    /// (`#if !os(macOS)`), where the shell's item does not exist — the terminal's hardware-keyboard
+    /// Find and the editor's toolbar Find, in windows of their own.
+    @Test func commandFHasASingleMenuOwnerOnTheMac() throws {
+        #expect(try owners(of: "f", modifiers: ["command"])
+                == ["GlassEditorWorkspaceView.swift", "GlassShellFindCommands.swift", "TerminalWindowView.swift"],
+                "⌘F is the shell's Edit ▸ Find ▸ Find… on a Mac; a window aims it by publishing \\.glassFindItem.")
+    }
+
+    /// Every window with a find bar says so; one that stops publishing makes ⌘F, ⌘G and ⇧⌘G grey.
+    @Test func eachWorkspacePublishesWhatFindSearches() throws {
+        var publishers: Set<String> = []
+        for file in try swiftSources() {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            if text.contains(#"\.glassFindItem, GlassFindItemAction("#) {
+                publishers.insert(file.lastPathComponent)
+            }
+        }
+        #expect(publishers == ["MacWorkspaceView.swift"],
+                "The windows publishing \\.glassFindItem changed: \(publishers.sorted()).")
+    }
+
     /// Every window with something to save says so; one that stops publishing makes ⌘S a beep.
     @Test func eachWorkspacePublishesWhatSaveSaves() throws {
         var publishers: Set<String> = []
@@ -205,6 +248,43 @@ struct MenuBarPlacementTests {
     }
 
     // MARK: Reading the sources
+
+    /// The files declaring `key` with exactly these modifiers, in any order and spelling of the
+    /// list — `.command`, `[.command]` and `[.shift, .command]` are all read — sorted.
+    /// A declaration with no modifiers is ⌘, as SwiftUI defaults it.
+    private func owners(of key: String, modifiers: Set<String>) throws -> [String] {
+        var files: Set<String> = []
+        for file in try swiftSources() {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            if shortcutModifiers(of: key, in: text).contains(modifiers) {
+                files.insert(file.lastPathComponent)
+            }
+        }
+        return files.sorted()
+    }
+
+    private func shortcutModifiers(of key: String, in text: String) -> [Set<String>] {
+        let marker = #"keyboardShortcut(""# + key + #"""#
+        var found: [Set<String>] = []
+        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            let code = line.trimmingCharacters(in: .whitespaces)
+            guard !code.hasPrefix("//"), !code.hasPrefix("///"), !code.hasPrefix("*") else { continue }
+            var rest = Substring(code)
+            while let start = rest.range(of: marker) {
+                let tail = rest[start.upperBound...]
+                guard let close = tail.firstIndex(of: ")") else { break }
+                let arguments = tail[..<close]
+                if let label = arguments.range(of: "modifiers:") {
+                    let names = arguments[label.upperBound...].split { ",[]. ".contains($0) }.map(String.init)
+                    found.append(Set(names))
+                } else {
+                    found.append(["command"])
+                }
+                rest = tail[close...]
+            }
+        }
+        return found
+    }
 
     /// Line by line, skipping comments — a comment explaining why a placement is *not* replaced any
     /// more is prose, and counting it as an owner would make the test fail on its own explanation.

@@ -310,4 +310,24 @@ enum MacLocalTmux {
         return environment.map { "\($0.key)=\($0.value)" }.sorted()
     }
 }
+
+// MARK: Find (2026-10-08)
+
+extension MacLocalTmux {
+    /// One step of the find bar in tmux's own search, as argv: enter copy mode, search, and print
+    /// where the search landed, in one run. `-u` first, as in every tmux command Glass builds.
+    /// `end` leaves copy mode, so typing reaches the shell again.
+    nonisolated static func findArguments(session: String, request: TerminalTmuxFindRequest) -> [String] {
+        let target = "=" + session + ":"
+        switch request {
+        case .search(let term, let direction):
+            return ["-u", "copy-mode", "-t", target, ";",
+                    "send-keys", "-t", target, "-X", TerminalTmuxFind.searchCommand(direction),
+                    "--", TerminalTmuxFind.argument(term), ";",
+                    "display", "-p", "-t", target, TerminalTmuxFind.replyFormat]
+        case .end:
+            return ["-u", "send-keys", "-t", target, "-X", "cancel"]
+        }
+    }
+}
 #endif

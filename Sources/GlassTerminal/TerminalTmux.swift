@@ -248,3 +248,25 @@ struct TerminalTmuxAttachment: Equatable, Sendable {
     var name: String
     var takeOver: Bool = false
 }
+
+// MARK: Find (2026-10-08)
+
+extension TerminalTmux {
+    /// One step of the find bar in tmux's own search, as an exec channel's `sh` runs it: enter copy
+    /// mode, search, and print where the search landed — one invocation, so one round trip a step.
+    /// `-u` first, as in every tmux command Glass builds. `end` leaves copy mode, so typing reaches
+    /// the shell again; outside copy mode it is a harmless error.
+    static func findCommand(name: String, request: TerminalTmuxFindRequest) -> String {
+        let target = quoted("=" + name + ":")
+        let tmux: String
+        switch request {
+        case .search(let term, let direction):
+            tmux = "tmux -u copy-mode -t \(target) ';' send-keys -t \(target) -X "
+                + "\(TerminalTmuxFind.searchCommand(direction)) -- \(quoted(TerminalTmuxFind.argument(term))) "
+                + "';' display -p -t \(target) \(quoted(TerminalTmuxFind.replyFormat))"
+        case .end:
+            tmux = "tmux -u send-keys -t \(target) -X cancel"
+        }
+        return "sh -c \(quoted(searchPath + tmux))"
+    }
+}

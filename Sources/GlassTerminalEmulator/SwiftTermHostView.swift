@@ -650,26 +650,27 @@ public final class SwiftTermHostModel: ObservableObject {
     }
     #endif
 
-    @discardableResult
-    public func findNext(_ term: String) -> Bool {
+    // MARK: Find
+
+    /// One find step in this terminal's buffer: toward older output from the hit, or from the
+    /// newest line when there is none, so the first search finds the newest match. Nil when no
+    /// renderer is attached yet, which is not the same as "no match".
+    public func find(_ term: String, towardOlder: Bool) -> SwiftTermFindResult? {
         guard !term.isEmpty else {
             clearSearch()
-            return false
+            return SwiftTermFindResult(found: false, index: 0, total: 0)
         }
-        return terminalEngine?.findNext(term) ?? false
+        return terminalEngine?.find(term, towardOlder: towardOlder)
     }
 
-    @discardableResult
-    public func findPrevious(_ term: String) -> Bool {
-        guard !term.isEmpty else {
-            clearSearch()
-            return false
-        }
-        return terminalEngine?.findPrevious(term) ?? false
-    }
-
+    /// Forgets the hit and clears its highlight.
     public func clearSearch() {
         terminalEngine?.clearSearch()
+    }
+
+    /// The line the current hit is on, while it is highlighted; nil when there is none.
+    public var selectedFindLine: String? {
+        terminalEngine?.selectedFindLine
     }
 
     public func resolvePendingPaste(approvedText: String?) {
@@ -822,6 +823,115 @@ public final class SwiftTermHostModel: ObservableObject {
             pendingRendererByteCount += retained.count
         }
         droppedPendingRendererByteCount += max(0, data.count - available)
+    }
+}
+
+/// What one find step found, and where that match is among all of them.
+public struct SwiftTermFindResult: Equatable, Sendable {
+    public let found: Bool
+    /// The match's place counted from the newest, 1 being the newest; 0 when it is not known.
+    public let index: Int
+    /// Every match in the buffer, up to SwiftTerm's limit of 1,000.
+    public let total: Int
+
+    public init(found: Bool, index: Int, total: Int) {
+        self.found = found
+        self.index = index
+        self.total = total
+    }
+}
+
+/// A find hit that survives output (2026-10-08).
+///
+/// SwiftTerm keeps a hit only as the selection, and `feedPrepare` clears the selection on every
+/// chunk while mouse reporting is on, which is its default. The selection is also where the next
+/// search starts, so one spinner frame erased the hit before it was drawn and sent the next search
+/// back to the oldest line. Mouse reporting is not turned off for this: on iOS that makes a pan
+/// send arrow keys. The hit is remembered in buffer terms instead, put back after each chunk and
+/// before each find, and dropped when the scrollback trims past it or its text is gone.
+@MainActor
+private final class SwiftTermFindTracker {
+    private struct Hit {
+        var start: Position
+        var end: Position
+        /// `totalLinesTrimmed` when the hit was found: rows shift up by one per trimmed line.
+        var trimmed: Int
+        var buffer: ObjectIdentifier
+        var term: String
+    }
+
+    private var hit: Hit?
+    /// Where the hit was last selected. A selection anywhere else is someone else's, and wins.
+    private var applied: (start: Position, end: Position)?
+
+    func find(_ term: String, towardOlder: Bool, in view: TerminalView) -> SwiftTermFindResult {
+        reapply(in: view)
+        let found = towardOlder ? view.findPrevious(term) : view.findNext(term)
+        guard found, let selection = view.selection, selection.active else {
+            forget()
+            return SwiftTermFindResult(found: false, index: 0, total: 0)
+        }
+        // Asked at once: SwiftTerm forgets its last result on the next chunk of output.
+        let summary = view.searchMatchSummary(term)
+        let buffer = view.getTerminal().buffer
+        hit = Hit(start: selection.start, end: selection.end, trimmed: buffer.totalLinesTrimmed,
+                  buffer: ObjectIdentifier(buffer), term: term)
+        applied = (selection.start, selection.end)
+        let index = summary.index > 0 ? summary.total - summary.index + 1 : 0
+        return SwiftTermFindResult(found: true, index: index, total: max(summary.total, 1))
+    }
+
+    /// Puts the hit back after output cleared it.
+    func reapply(in view: TerminalView) {
+        guard let hit, let selection = view.selection else { return }
+        let terminal = view.getTerminal()
+        let buffer = terminal.buffer
+        // The other screen is showing: the hit belongs to the one that comes back.
+        guard ObjectIdentifier(buffer) == hit.buffer else { return }
+        if let applied, selection.start != applied.start || selection.end != applied.end {
+            forget()
+            return
+        }
+        let shift = buffer.totalLinesTrimmed - hit.trimmed
+        let start = Position(col: hit.start.col, row: hit.start.row - shift)
+        let end = Position(col: hit.end.col, row: hit.end.row - shift)
+        guard shift >= 0, start.row >= 0,
+              Self.text(rows: start.row...max(start.row, end.row), in: terminal)
+                .range(of: hit.term, options: .caseInsensitive) != nil else {
+            forget()
+            return
+        }
+        applied = (start, end)
+        guard !selection.active || selection.start != start || selection.end != end else { return }
+        selection.setSelection(start: start, end: end)
+    }
+
+    func clear(in view: TerminalView) {
+        forget()
+        view.clearSearch()
+    }
+
+    func selectedLine(in view: TerminalView) -> String? {
+        guard hit != nil, let applied, let selection = view.selection, selection.active,
+              selection.start == applied.start, selection.end == applied.end else { return nil }
+        return Self.text(rows: applied.start.row...applied.start.row, in: view.getTerminal())
+    }
+
+    private func forget() {
+        hit = nil
+        applied = nil
+    }
+
+    /// The text of buffer rows, counted from the oldest line still kept.
+    private static func text(rows: ClosedRange<Int>, in terminal: Terminal) -> String {
+        let top = terminal.buffer.totalLinesTrimmed
+        return rows.compactMap { row in
+            terminal.getScrollInvariantLine(row: top + row)?.translateToString(
+                trimRight: true,
+                skipNullCellsFollowingWide: true,
+                characterProvider: { terminal.getCharacter(for: $0) }
+            )
+        }.joined()
     }
 }
 
@@ -1045,9 +1155,9 @@ private protocol TerminalEngine: AnyObject {
     func resignFocus()
     func refreshAccessibilityViewport()
     func visibleText(lastNLines: Int) -> [String]
-    func findNext(_ term: String) -> Bool
-    func findPrevious(_ term: String) -> Bool
+    func find(_ term: String, towardOlder: Bool) -> SwiftTermFindResult
     func clearSearch()
+    var selectedFindLine: String? { get }
     func commitPaste(_ text: String, bracketed: Bool)
     /// Whether the program in the terminal asked for bracketed paste.
     var isBracketedPasteMode: Bool { get }
@@ -1867,6 +1977,7 @@ private final class SwiftTermEngine: TerminalEngine {
     func receive(_ data: Data) {
         let start = performanceClock.now
         terminalView.feed(byteArray: ArraySlice(data))
+        reapplyFindHit()
         performanceDiagnostics.recordFeed(
             byteCount: data.count,
             duration: start.duration(to: performanceClock.now)
@@ -1921,9 +2032,14 @@ private final class SwiftTermEngine: TerminalEngine {
         return Array(nonEmpty.suffix(max(0, lastNLines)))
     }
 
-    func findNext(_ term: String) -> Bool { terminalView.findNext(term) }
-    func findPrevious(_ term: String) -> Bool { terminalView.findPrevious(term) }
-    func clearSearch() { terminalView.clearSearch() }
+    private let findTracker = SwiftTermFindTracker()
+    func find(_ term: String, towardOlder: Bool) -> SwiftTermFindResult {
+        findTracker.find(term, towardOlder: towardOlder, in: terminalView)
+    }
+    func clearSearch() { findTracker.clear(in: terminalView) }
+    var selectedFindLine: String? { findTracker.selectedLine(in: terminalView) }
+    /// After each chunk of output, which clears the selection the hit is drawn with.
+    func reapplyFindHit() { findTracker.reapply(in: terminalView) }
     func commitPaste(_ text: String, bracketed: Bool) {
         let data = SwiftTermPastePolicy.framedData(for: text, bracketed: bracketed)
         recordInput(byteCount: data.count)
@@ -2425,9 +2541,9 @@ private protocol TerminalEngine: AnyObject {
     func resignFocus()
     func refreshAccessibilityViewport()
     func visibleText(lastNLines: Int) -> [String]
-    func findNext(_ term: String) -> Bool
-    func findPrevious(_ term: String) -> Bool
+    func find(_ term: String, towardOlder: Bool) -> SwiftTermFindResult
     func clearSearch()
+    var selectedFindLine: String? { get }
     func commitPaste(_ text: String, bracketed: Bool)
     func fitHostWindow(columns: Int, rows: Int) -> Bool
     /// Whether the program in the terminal asked for bracketed paste.
@@ -2586,6 +2702,7 @@ private final class MacSwiftTermEngine: TerminalEngine {
     func receive(_ data: Data) {
         let start = performanceClock.now
         terminalView.feed(byteArray: ArraySlice(data))
+        reapplyFindHit()
         performanceDiagnostics.recordFeed(
             byteCount: data.count,
             duration: start.duration(to: performanceClock.now)
@@ -2622,9 +2739,14 @@ private final class MacSwiftTermEngine: TerminalEngine {
         return Array(lines.suffix(max(0, lastNLines)))
     }
 
-    func findNext(_ term: String) -> Bool { terminalView.findNext(term) }
-    func findPrevious(_ term: String) -> Bool { terminalView.findPrevious(term) }
-    func clearSearch() { terminalView.clearSearch() }
+    private let findTracker = SwiftTermFindTracker()
+    func find(_ term: String, towardOlder: Bool) -> SwiftTermFindResult {
+        findTracker.find(term, towardOlder: towardOlder, in: terminalView)
+    }
+    func clearSearch() { findTracker.clear(in: terminalView) }
+    var selectedFindLine: String? { findTracker.selectedLine(in: terminalView) }
+    /// After each chunk of output, which clears the selection the hit is drawn with.
+    func reapplyFindHit() { findTracker.reapply(in: terminalView) }
 
     func commitPaste(_ text: String, bracketed: Bool) {
         let data = SwiftTermPastePolicy.framedData(for: text, bracketed: bracketed)
@@ -3344,6 +3466,7 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
         terminalView.onPasteRequest = onPasteRequest
         terminalView.onProcessOutput = { [weak self] bytes, duration in
             self?.recordProcessOutput(bytes, duration: duration)
+            self?.reapplyFindHit()
             self?.scheduleWorkingDirectoryCheck()
             self?.delegateProxy.hostModel?.noteOutputActivity()
         }
@@ -3460,6 +3583,7 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
         let clock = ContinuousClock()
         let start = clock.now
         terminalView.feed(byteArray: ArraySlice(data))
+        reapplyFindHit()
         performanceDiagnostics.recordFeed(
             byteCount: data.count,
             duration: start.duration(to: clock.now)
@@ -3647,9 +3771,14 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
         return Array(lines.suffix(max(0, lastNLines)))
     }
 
-    func findNext(_ term: String) -> Bool { terminalView.findNext(term) }
-    func findPrevious(_ term: String) -> Bool { terminalView.findPrevious(term) }
-    func clearSearch() { terminalView.clearSearch() }
+    private let findTracker = SwiftTermFindTracker()
+    func find(_ term: String, towardOlder: Bool) -> SwiftTermFindResult {
+        findTracker.find(term, towardOlder: towardOlder, in: terminalView)
+    }
+    func clearSearch() { findTracker.clear(in: terminalView) }
+    var selectedFindLine: String? { findTracker.selectedLine(in: terminalView) }
+    /// After each chunk of output, which clears the selection the hit is drawn with.
+    func reapplyFindHit() { findTracker.reapply(in: terminalView) }
 
     func commitPaste(_ text: String, bracketed: Bool) {
         let data = SwiftTermPastePolicy.framedData(for: text, bracketed: bracketed)
