@@ -100,7 +100,7 @@ public extension GlassShellModel {
     }
 
     /// The ⚡'s destination.
-    func showActiveConnections() { panelToShow = Self.activePanelID }
+    func showActiveConnections() { showPanel(Self.activePanelID) }
 
     /// The panel, seated in the Library section by its `sectionTitle`.
     func activeConnectionsPanel() -> GlassLibraryPanel {

@@ -31,10 +31,16 @@ public final class GlassTerminalRuntime {
     let settingsManager: SettingsManager
     let windowRecoveryManager: WindowRecoveryManager
 
-    /// Shared by every Workgroups surface: the library panel's two columns, the standalone window
-    /// and the iOS sheet. One instance, so a workgroup selected in one is selected in all of them
-    /// and the two library columns agree about what is shown.
+    /// Shared by the Workgroups panel's two columns, so the list and the detail agree about what
+    /// is selected.
     let workgroupsModel = TerminalWorkgroupsModel()
+
+    /// The library's id for the Workgroups panel, and what its menu items ask the library to open.
+    static let workgroupsPanelID = "workgroups"
+
+    /// Opens a panel in the library's sidebar. Supplied by the composition root, since the library
+    /// is the shell's; nil means there is no library to show it in.
+    public var showLibraryPanel: GlassShowLibraryPanel?
 
     /// Everything the library, the command palette, the workgroup and Tailscale surfaces and the
     /// shell can ask the terminal to do. One queue, consumed by `TerminalConnectFlow`, so the
@@ -197,6 +203,24 @@ public final class GlassTerminalRuntime {
         pendingLocalShellReports.removeFirst()(outcome)
     }
     public func requestShowWorkgroups() { enqueue(.showWorkgroups) }
+
+    /// Window ▸ Workgroups, Library ▸ Workgroups… and the palette's Workgroups: the Connections
+    /// window, on its Workgroups panel. An open one comes forward; with none open, one is opened
+    /// and picks the request up as it appears.
+    func showWorkgroups(openWindow: OpenWindowAction) {
+        #if os(macOS)
+        if !GlassLibraryWindows.bringForward() { openWindow(id: "main") }
+        #elseif os(visionOS)
+        // One Connections window on the headset: opening it brings that one forward.
+        openWindow(id: "main")
+        #endif
+        showWorkgroupsPanel()
+    }
+
+    /// The library half of `showWorkgroups`, which every platform shares.
+    func showWorkgroupsPanel() {
+        showLibraryPanel?(Self.workgroupsPanelID)
+    }
     #if DEBUG
     /// Screenshots only: a terminal window on `name` showing `output`, with no connection behind it.
     public func requestDemoReplay(name: String, output: Data) { enqueue(.demoReplay(name: name, output: output)) }
@@ -533,7 +557,7 @@ public final class GlassTerminalCapability: GlassCapability {
         let runtime = self.runtime
         return [
             GlassLibraryPanel(
-                id: "workgroups",
+                id: GlassTerminalRuntime.workgroupsPanelID,
                 sectionTitle: "Workgroups",
                 title: "Workgroups",
                 symbolName: "rectangle.stack",
@@ -595,9 +619,6 @@ public struct GlassTerminalBootstrap<Content: View>: View {
         platformRoot
             .modifier(TerminalConnectFlow())
             #if os(iOS)
-            .sheet(isPresented: Binding(get: { router.showsWorkgroups }, set: { router.showsWorkgroups = $0 })) {
-                TerminalWorkgroupsView(model: runtime.workgroupsModel)
-            }
             .sheet(isPresented: Binding(get: { router.showsTailscale }, set: { router.showsTailscale = $0 })) {
                 TerminalTailscaleView()
             }

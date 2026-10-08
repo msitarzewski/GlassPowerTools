@@ -344,10 +344,13 @@ struct TerminalConnectFlow: ViewModifier {
             }
             #endif
         case .showWorkgroups:
+            // The library's Workgroups panel — there is no Workgroups window (2026-10-08).
             #if os(iOS)
-            iOSRouter.showsWorkgroups = true
+            // A phone may be showing a terminal in the library's place.
+            iOSRouter.showConnections()
+            runtime.showWorkgroupsPanel()
             #else
-            openWindow(id: "terminal-workgroups")
+            runtime.showWorkgroups(openWindow: openWindow)
             #endif
         case .showTailscale:
             #if os(iOS)

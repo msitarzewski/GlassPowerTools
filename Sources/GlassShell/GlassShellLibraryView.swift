@@ -32,7 +32,7 @@ public struct GlassShellLibraryView: View {
     public var body: some View {
         GlassLayeredWindow {
             GlassConnectionLibrary(items: model.items, selection: $selection, scope: $scope, searchText: $search,
-                                   order: .source, columnAutosaveName: "com.glasspowertools.library.columns",
+                                   order: .source,
                                    onActivate: { model.connect(hostID: $0) }) { item in
                 row(item)
             } detail: { id in
@@ -164,6 +164,8 @@ public struct GlassShellLibraryView: View {
         // glas.sh's Connections window minimum; with the scene's default size this keeps the
         // detail's controls inside the window instead of below its bottom edge.
         .frame(minWidth: 900, minHeight: 560)
+        // So Window ▸ Workgroups can bring this window forward rather than open another.
+        .background { GlassLibraryWindowRegistration() }
         #endif
     }
 

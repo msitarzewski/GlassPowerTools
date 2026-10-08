@@ -122,7 +122,6 @@ struct PlatformTerminalCommands: Commands {
 final class IOSAppRouter {
     var terminalWorkgroupID: UUID?
     private(set) var mostRecentTerminalWorkgroupID: UUID?
-    var showsWorkgroups = false
     var showsTailscale = false
     var sftpContext: SFTPBrowserContext?
 

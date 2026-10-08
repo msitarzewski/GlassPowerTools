@@ -247,6 +247,39 @@ struct MenuBarPlacementTests {
                 "The windows publishing \\.glassNewItem changed: \(publishers.sorted()).")
     }
 
+    /// **There is no Workgroups window** (2026-10-08). Resizing it crashed the app four times in
+    /// four minutes, and it was a second copy of the library's Workgroups panel. A scene declaring
+    /// it, or anything opening it, brings that copy back.
+    @Test func nothingDeclaresOrOpensAWorkgroupsWindow() throws {
+        var files: [String] = []
+        for file in try swiftSources() {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            let code = text.split(separator: "\n").filter {
+                !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//")
+            }
+            if code.contains(where: { $0.contains(#"id: "terminal-workgroups""#) }) {
+                files.append(file.lastPathComponent)
+            }
+        }
+        #expect(files.isEmpty,
+                "\(files.sorted()) declares or opens a \"terminal-workgroups\" window. Workgroups is the library's panel; open it with GlassTerminalRuntime.showWorkgroups(openWindow:).")
+    }
+
+    /// The window's own Window-menu item went with it, and the owner opens Workgroups from there,
+    /// so the Window menu says Workgroups itself.
+    @Test func theWindowMenuStillOffersWorkgroups() throws {
+        var offeredBy: [String] = []
+        for file in try swiftSources() {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            if text.contains("CommandGroup(after: .singleWindowList)"),
+               text.contains(#"Button("Workgroups") { runtime.showWorkgroups(openWindow: openWindow) }"#) {
+                offeredBy.append(file.lastPathComponent)
+            }
+        }
+        #expect(offeredBy == ["GlassTerminalLibraryEntries.swift"],
+                "Window ▸ Workgroups is offered by \(offeredBy.sorted()); it belongs to TerminalLibraryCommands, once.")
+    }
+
     // MARK: Reading the sources
 
     /// The files declaring `key` with exactly these modifiers, in any order and spelling of the

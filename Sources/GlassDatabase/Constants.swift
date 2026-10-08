@@ -67,9 +67,6 @@ enum ConnectionLibraryColumnLayout {
     static let resultsMinimum: CGFloat = GlassLibraryColumnLayout.resultsMinimum
     static let resultsIdeal: CGFloat = GlassLibraryColumnLayout.resultsIdeal
     static let resultsMaximum: CGFloat = GlassLibraryColumnLayout.resultsMaximum
-    /// AppKit persists the user's divider positions under this name, so a
-    /// resize survives relaunch. Namespaced to glassdb; glas.sh keeps its own.
-    static let autosaveName = "app.glassdb.connection-library.columns"
 }
 
 enum DatabaseSidebarLayout {
@@ -147,18 +144,6 @@ extension View {
             ideal: DatabaseSidebarLayout.idealWidth,
             max: DatabaseSidebarLayout.maximumWidth
         )
-        #else
-        self
-        #endif
-    }
-
-    /// Attaches AppKit's split-view autosave so the user's own column widths
-    /// replace the defaults after the first resize. Mirrors glas.sh's
-    /// `MacConnectionLibrarySplitViewAutosave`.
-    @ViewBuilder
-    func connectionLibraryColumnAutosave() -> some View {
-        #if os(macOS)
-        glassLibraryColumnAutosave(ConnectionLibraryColumnLayout.autosaveName)
         #else
         self
         #endif

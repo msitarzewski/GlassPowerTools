@@ -1,8 +1,5 @@
 import SwiftUI
 import GlassConnectionKit
-#if os(macOS)
-import AppKit
-#endif
 
 /// Matches the accepted Connections dimensions in both existing apps.
 public enum GlassLibraryColumnLayout {
@@ -312,49 +309,3 @@ public struct GlassLibraryDetail<Content: View, Actions: View>: View {
         .navigationTitle(title)
     }
 }
-
-public extension View {
-    /// Per-app namespace preserves independent user divider positions.
-    @ViewBuilder func glassLibraryColumnAutosave(_ name: String?) -> some View {
-        #if os(macOS)
-        if let name { background(GlassLibrarySplitViewAutosave(name: name)) } else { self }
-        #else
-        self
-        #endif
-    }
-}
-
-#if os(macOS)
-private struct GlassLibrarySplitViewAutosave: NSViewRepresentable {
-    let name: String
-    func makeNSView(context: Context) -> AttachmentView {
-        let view = AttachmentView(frame: .zero)
-        view.autosaveName = name
-        view.applyAutosaveName()
-        return view
-    }
-    func updateNSView(_ nsView: AttachmentView, context: Context) {
-        nsView.autosaveName = name
-        nsView.applyAutosaveName()
-    }
-    final class AttachmentView: NSView {
-        var autosaveName = ""
-        override func viewDidMoveToSuperview() { super.viewDidMoveToSuperview(); applyAutosaveName() }
-        override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); applyAutosaveName() }
-        func applyAutosaveName() {
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                var candidate = superview
-                while let view = candidate {
-                    if let split = view as? NSSplitView {
-                        if split.autosaveName != autosaveName { split.autosaveName = autosaveName }
-                        return
-                    }
-                    candidate = view.superview
-                }
-            }
-        }
-        override func hitTest(_ point: NSPoint) -> NSView? { nil }
-    }
-}
-#endif

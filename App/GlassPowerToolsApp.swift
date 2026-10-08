@@ -243,6 +243,8 @@ struct GlassPowerToolsApp: App {
         database.showActiveConnections = showActive
         desktop.showActiveConnections = showActive
         editor.showActiveConnections = showActive
+        // Workgroups is a panel in the library, not a window: its menu items open it there.
+        terminal.showLibraryPanel = { [weak model] panelID in model?.showPanel(panelID) }
         terminal.openFolderAsProject = { @MainActor serverID, path in
             let hostID = library.host(owningEndpoint: EndpointID(rawValue: serverID))?.id
             let project = GlassEditorProject(hostID: hostID, path: path)

@@ -177,10 +177,9 @@ struct MacWorkspaceView: View {
                 // A wider ceiling than 360: the sidebar carries a title and a monospaced subtitle
                 // per tab, and a user with long session names could not widen past truncation.
                 .navigationSplitViewColumnWidth(min: 180, ideal: 240, max: 520)
-                // Remember where the user put the divider. AppKit persists this per autosave name,
-                // and the terminal window had none — every new window reverted to the ideal width.
-                // Its own namespace, so it does not share a position with the library.
-                .glassLibraryColumnAutosave("com.glasspowertools.terminal.columns")
+                // No autosave name of our own: SwiftUI autosaves the split view itself, and a
+                // second name assigned from outside restored layouts SwiftUI had not asked for
+                // (2026-10-08). One owner per split view.
                 // **AppKit's own sidebar toggle, left alone — the family standard.**
                 //
                 // glassdb's `databaseSidebarChrome()` removes it on every platform *except* macOS

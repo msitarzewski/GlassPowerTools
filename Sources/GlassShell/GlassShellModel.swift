@@ -95,6 +95,11 @@ public final class GlassShellModel: GlassServiceStore {
 
     public func showHost(_ id: HostID) { hostToShow = id }
 
+    /// Asks the library to open one of its sidebar panels — Active for the ⚡, Workgroups for its
+    /// menu items. The library opens it and clears the request, so asking twice opens it twice;
+    /// a Connections window opened to show it picks it up as it appears.
+    public func showPanel(_ id: String) { panelToShow = id }
+
     /// The library's hosts: catalog records that describe the same machine, consolidated
     /// (see `GlassShellHostGrouping`). Never written back as one record before Stage 6.
     public private(set) var hosts: [GlassShellHost] = []

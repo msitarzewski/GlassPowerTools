@@ -104,20 +104,32 @@ enum GlassTerminalCommandCenter {
 
 /// Menu entries for the two surfaces. macOS gets a Library menu; visionOS shares the same
 /// commands for hardware keyboards.
+///
+/// Workgroups opens the Connections window on its Workgroups panel, directly rather than through
+/// the request queue: the queue is drained inside a Connections window, and these items must work
+/// when none is open.
 struct TerminalLibraryCommands: Commands {
     let runtime: GlassTerminalRuntime
+    @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
         CommandMenu("Library") {
             // ⌥⌘W is Close Pane on the Mac (MacWorkspaceCommands); a shortcut has one owner.
             #if os(macOS)
-            Button("Workgroups…") { runtime.requestShowWorkgroups() }
+            Button("Workgroups…") { runtime.showWorkgroups(openWindow: openWindow) }
             #else
-            Button("Workgroups…") { runtime.requestShowWorkgroups() }
+            Button("Workgroups…") { runtime.showWorkgroups(openWindow: openWindow) }
                 .keyboardShortcut("w", modifiers: [.command, .option])
             #endif
             Button("Tailscale Devices…") { runtime.requestShowTailscale() }
                 .disabled(!runtime.tailscaleIsConfigured)
         }
+        #if os(macOS)
+        // Window ▸ Workgroups, beside Tailscale where the Workgroups window used to list itself;
+        // the owner opens Workgroups from here (2026-10-08).
+        CommandGroup(after: .singleWindowList) {
+            Button("Workgroups") { runtime.showWorkgroups(openWindow: openWindow) }
+        }
+        #endif
     }
 }

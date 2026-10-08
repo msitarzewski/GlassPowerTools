@@ -2,8 +2,9 @@
 //  TerminalWorkgroupsView.swift
 //  Glass Power Tools — GlassTerminal
 //
-//  glas.sh's Workgroups library mode, re-homed as its own surface now that the shell owns the
-//  host library. List, detail, table and plan rows are verbatim from ConnectionManagerView
+//  glas.sh's Workgroups library mode: the Workgroups panel in the library's sidebar, which is
+//  its only home (the separate Workgroups window went on 2026-10-08). List, detail, table and plan
+//  rows are verbatim from ConnectionManagerView
 //  (lines 840-998, 1136-1408); launching goes through the runtime so the connect flow stays the
 //  one place that confirms legacy algorithms, prompts for trust and asks for passwords.
 //
@@ -45,14 +46,14 @@ struct TerminalWorkgroupsView: View {
     #endif
 
     private var serverManager: ServerManager { sessionManager.serverManager }
-    /// Which column (or columns) this instance is drawing. The library renders `.results` and
-    /// `.detail` into two columns over one model; the standalone window still renders both.
-    enum Presentation { case results, detail, standalone }
+    /// Which column this instance is drawing. The library renders `.results` and `.detail` into
+    /// two of its columns over one model.
+    enum Presentation { case results, detail }
     let presentation: Presentation
     @Bindable var model: TerminalWorkgroupsModel
     @FocusState private var searchIsFocused: Bool
 
-    init(presentation: Presentation = .standalone, model: TerminalWorkgroupsModel) {
+    init(presentation: Presentation, model: TerminalWorkgroupsModel) {
         self.presentation = presentation
         self.model = model
     }
@@ -78,22 +79,15 @@ struct TerminalWorkgroupsView: View {
     var body: some View {
         content
             // The editor sheet, the failure alert and the pruning of a selection whose workgroup
-            // has gone are attached once, to whichever instance owns the results — never to both
+            // has gone are attached once, to the instance that owns the results — never to both
             // columns, or the sheet presents twice and the alert fights itself. Carried on a
             // zero-size background the way the library carries its own presentation anchor.
-            .background { if presentation != .detail { sharedPresentations } }
+            .background { if presentation == .results { sharedPresentations } }
     }
 
     @ViewBuilder
     private var content: some View {
         switch presentation {
-        case .standalone:
-            NavigationSplitView {
-                workgroupResults(connectionLibrary: connectionLibrary)
-                    .glassLibraryColumnAutosave("com.glasspowertools.workgroups.columns")
-            } detail: {
-                workgroupDetail(connectionLibrary: connectionLibrary)
-            }
         case .results:
             workgroupResults(connectionLibrary: connectionLibrary)
         case .detail:

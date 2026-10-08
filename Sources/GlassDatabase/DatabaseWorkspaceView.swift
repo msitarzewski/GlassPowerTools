@@ -717,7 +717,6 @@ struct DatabaseWorkspaceView: View {
             schemaBrowser
                 .databaseSidebarColumnWidth()
                 .databaseWorkspaceSidebarMaterial()
-                .glassLibraryColumnAutosave("com.glasspowertools.database.columns")
         } detail: {
             detailSurface
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

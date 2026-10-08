@@ -212,7 +212,6 @@ public struct GlassEditorWorkspaceView: View {
                 .navigationSplitViewColumnWidth(min: GlassLibraryColumnLayout.navigationMinimum,
                                                 ideal: GlassLibraryColumnLayout.navigationIdeal,
                                                 max: GlassLibraryColumnLayout.navigationMaximum)
-                .glassLibraryColumnAutosave("com.glasspowertools.editor.columns")
         } detail: {
             GlassLayeredPanel(cornerRadius: 0, role: .embedded) { detail }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -28,18 +28,10 @@ public struct GlassTerminalScenes: Scene {
 
     public var body: some Scene {
         #if os(macOS) || os(visionOS)
-        Window("Workgroups", id: "terminal-workgroups") {
-            GlassLayeredWindow {
-                TerminalWorkgroupsView(model: runtime.workgroupsModel)
-                    .environment(runtime)
-                    .environment(sessionManager)
-                    .environment(settingsManager)
-                .glassLayers(runtime.layers)
-            }
-            .glassLayers(runtime.layers)
-        }
-        .defaultSize(width: 900, height: 600)
-        .commands { TerminalLibraryCommands(runtime: runtime) }
+        // **No Workgroups window** (owner, 2026-10-08: "It's weird that we have a separate window
+        // for that anyway"). Workgroups is a panel in the Connections window's sidebar; its menu
+        // items open that panel (`TerminalLibraryCommands`). The window was a second copy of the
+        // panel with a split view and toolbar of its own, and resizing it crashed the app.
         Window("Tailscale", id: "terminal-tailscale") {
             GlassLayeredWindow {
                 TerminalTailscaleView()
@@ -51,6 +43,8 @@ public struct GlassTerminalScenes: Scene {
             .glassLayers(runtime.layers)
         }
         .defaultSize(width: 900, height: 600)
+        // The Library menu (and Window ▸ Workgroups) rode on the Workgroups window's scene.
+        .commands { TerminalLibraryCommands(runtime: runtime) }
         #endif
         #if os(macOS)
         WindowGroup("Terminal", id: "workspace", for: MacWorkspaceLaunchRequest.self) { $request in

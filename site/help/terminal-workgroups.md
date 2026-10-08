@@ -6,7 +6,7 @@ A Workgroup is a saved set of terminal tabs, each with a connection and an optio
 
 Workgroups are in the library's sidebar, beside Collections, under **Workgroups**. Select one to see its terminals and startup commands.
 
-**On Vision Pro and Mac**, **Library** > **Workgroups…** also opens them in a window of their own.
+**On a Mac**, **Window** > **Workgroups** (or **Library** > **Workgroups…**) brings the Connections window forward with Workgroups selected. **On Vision Pro**, **Library** > **Workgroups…** does the same.
 
 Use **Search workgroups...** to filter the list. A Workgroup's menu (right-click, or touch and hold) offers **Open**, **Edit**, **Duplicate** and **Delete**.
 

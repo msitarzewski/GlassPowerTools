@@ -10,7 +10,6 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
     @Binding private var selection: ID?
     @Binding private var scope: GlassLibraryScope
     @Binding private var searchText: String
-    private let columnAutosaveName: String?
     private let onActivate: (ID) -> Void
     private let row: (GlassLibraryItem<ID>) -> Row
     private let detail: (ID?) -> Detail
@@ -41,7 +40,7 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
 
     public init(items: [GlassLibraryItem<ID>], selection: Binding<ID?>,
                 scope: Binding<GlassLibraryScope>, searchText: Binding<String>,
-                order: GlassLibraryOrder = .source, columnAutosaveName: String? = nil,
+                order: GlassLibraryOrder = .source,
                 onActivate: @escaping (ID) -> Void,
                 @ViewBuilder row: @escaping (GlassLibraryItem<ID>) -> Row,
                 @ViewBuilder detail: @escaping (ID?) -> Detail) {
@@ -50,7 +49,6 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
         _scope = scope
         _searchText = searchText
         self.order = order
-        self.columnAutosaveName = columnAutosaveName
         self.onActivate = onActivate
         self.row = row
         self.detail = detail
@@ -60,13 +58,13 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
     /// outer toolbar to this adaptive shell does not reach compact stacks.
     public init<Actions: View>(items: [GlassLibraryItem<ID>], selection: Binding<ID?>,
                 scope: Binding<GlassLibraryScope>, searchText: Binding<String>,
-                order: GlassLibraryOrder = .source, columnAutosaveName: String? = nil,
+                order: GlassLibraryOrder = .source,
                 onActivate: @escaping (ID) -> Void,
                 @ViewBuilder row: @escaping (GlassLibraryItem<ID>) -> Row,
                 @ViewBuilder detail: @escaping (ID?) -> Detail,
                 @ViewBuilder toolbarActions: @escaping () -> Actions) {
         self.init(items: items, selection: selection, scope: scope, searchText: searchText,
-                  order: order, columnAutosaveName: columnAutosaveName,
+                  order: order,
                   onActivate: onActivate, row: row, detail: detail)
         self.toolbarActions = { AnyView(toolbarActions()) }
     }
@@ -75,14 +73,14 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
     /// root. Retained compact destinations and inactive vision tabs do not present.
     public init<Actions: View, Anchor: View>(items: [GlassLibraryItem<ID>], selection: Binding<ID?>,
                 scope: Binding<GlassLibraryScope>, searchText: Binding<String>,
-                order: GlassLibraryOrder = .source, columnAutosaveName: String? = nil,
+                order: GlassLibraryOrder = .source,
                 onActivate: @escaping (ID) -> Void,
                 @ViewBuilder row: @escaping (GlassLibraryItem<ID>) -> Row,
                 @ViewBuilder detail: @escaping (ID?) -> Detail,
                 @ViewBuilder toolbarActions: @escaping () -> Actions,
                 @ViewBuilder presentationAnchor: @escaping () -> Anchor) {
         self.init(items: items, selection: selection, scope: scope, searchText: searchText,
-                  order: order, columnAutosaveName: columnAutosaveName,
+                  order: order,
                   onActivate: onActivate, row: row, detail: detail, toolbarActions: toolbarActions)
         self.presentationAnchor = { AnyView(presentationAnchor()) }
     }
@@ -316,7 +314,9 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
             .navigationSplitViewColumnWidth(min: GlassLibraryColumnLayout.resultsMinimum,
                                              ideal: GlassLibraryColumnLayout.resultsIdeal,
                                              max: GlassLibraryColumnLayout.resultsMaximum)
-            .glassLibraryColumnAutosave(columnAutosaveName)
+            // **No autosave name of our own** (2026-10-08). SwiftUI autosaves this split view
+            // itself; renaming it from outside made AppKit restore a layout SwiftUI never asked
+            // for — a collapsed sidebar while SwiftUI's visibility still said `.all`. One owner.
             // The app's own actions lead the content region, past the divider — the placement
             // glassdb gives Add Connection (`ConnectionManagerView.swift:327-330`).
             .toolbar {
