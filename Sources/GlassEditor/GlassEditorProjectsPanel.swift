@@ -264,14 +264,12 @@ public struct GlassEditorProjectsPanel: View {
             return
         }
         // Only a folder on this device can be checked from here; a remote one is the reader's to
-        // answer, and it reports on the row it failed to fill.
-        if case .thisMachine = reach {
-            var isDirectory: ObjCBool = false
-            guard FileManager.default.fileExists(atPath: project.path, isDirectory: &isDirectory),
-                  isDirectory.boolValue else {
-                panel.detailMessage = "There is no folder at \(project.path) any more. Remove the project, or put the folder back."
-                return
-            }
+        // answer, and it reports on the row it failed to fill. Checked through the runtime, which
+        // reaches a folder picked from Files the way this device kept it (a bookmark) — a plain
+        // look at the path has no access to one and said it was gone.
+        if case .thisMachine = reach, !runtime.localFolderExists(project) {
+            panel.detailMessage = "There is no folder at \(project.path) any more. Remove the project, or put the folder back."
+            return
         }
         if let windowID = runtime.openProject(project, reach: reach) {
             runtime.present(windowID)
@@ -297,10 +295,10 @@ public struct GlassEditorProjectsPanel: View {
                 switch result {
                 case .success(let url):
                     // A folder chosen from Files on iOS arrives security-scoped, and reading it
-                    // without asking for access silently returns nothing. Every other importer in
-                    // this app does this; the editor's was the one that did not.
-                    let scoped = url.startAccessingSecurityScopedResource()
-                    defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                    // without asking for access silently returns nothing. The project asks, and
+                    // **holds** it while it is open: this used to give it back the moment this
+                    // returned, while the tree was still loading. It also leaves this device a
+                    // bookmark, so the folder reopens from the list after a relaunch.
                     if let windowID = runtime.openProject(url) {
                         runtime.present(windowID)
                     }

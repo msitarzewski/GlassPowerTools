@@ -72,10 +72,11 @@ struct GlassEditorProjectOverview: View {
     }
 
     /// Files edited here before, newest first. The app already keeps this list; filtering it by the
-    /// project's path is the whole of the work.
+    /// project's path is the whole of the work. Folders are in the list too (Open Recent offers
+    /// them) and are not files to edit.
     private var recents: [URL] {
         workspace.preferences.recents
-            .filter { $0.path(percentEncoded: false).hasPrefix(project.path + "/") }
+            .filter { !$0.hasDirectoryPath && $0.path(percentEncoded: false).hasPrefix(project.path + "/") }
             .prefix(5)
             .map { $0 }
     }

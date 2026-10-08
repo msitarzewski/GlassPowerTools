@@ -5,9 +5,9 @@
 //  The editor's window, and the File menu items that belong to it.
 //
 //  One scene on every platform: the Mac opens a window, the iPad opens a window, the headset opens
-//  a panel in space, and an iPhone gets the same scene full-screen. The workspace lives on the
-//  runtime rather than in the scene, so a second window is a second view of the same open
-//  documents rather than a second editor that does not know about the first.
+//  a panel in space, and an iPhone gets the same scene full-screen. The workspaces live on the
+//  runtime, one per window, and the runtime is what decides which window something opens in:
+//  one project per window, loose files as tabs in the window in front.
 //
 
 import SwiftUI
@@ -54,12 +54,48 @@ public final class GlassEditorRuntime {
         self.projects = GlassEditorProjectLibrary(defaults: defaults)
     }
 
-    /// The workspace for a window, made the first time that window asks for it.
+    /// The workspace for a window, made the first time anything asks for it.
+    ///
+    /// Asking from here counts as this launch wanting that window (`issuedWindowIDs`). The
+    /// window's own scene asks through `windowWorkspace(for:)`, which does not.
     public func workspace(for id: UUID) -> GlassEditorWorkspace {
+        issuedWindowIDs.insert(id)
+        return windowWorkspace(for: id)
+    }
+
+    /// The workspace a window shows, **without** counting as a request for that window — so a
+    /// window SwiftUI brings back from an earlier launch can be told from one this launch opened.
+    func windowWorkspace(for id: UUID) -> GlassEditorWorkspace {
         if let existing = workspaces[id] { return existing }
         let workspace = GlassEditorWorkspace(preferences: preferences, defaults: defaults)
+        workspace.securityScope = securityScope
         workspaces[id] = workspace
         return workspace
+    }
+
+    /// Every window id this launch has asked for: opened, prepared, presented or made new.
+    /// Not observed: it is written while scenes draw, and nothing draws from it.
+    @ObservationIgnored private var issuedWindowIDs: Set<UUID> = []
+
+    /// A new window's id, counted as asked for — what the scene opens when it is given no value.
+    func newWindowID() -> UUID {
+        let id = UUID()
+        issuedWindowIDs.insert(id)
+        return id
+    }
+
+    /// A window this launch never asked for, with nothing in it — one the system brought back from
+    /// an earlier launch. A workspace is never saved, so such a window can only come back empty,
+    /// and blank editor windows are not restored (decided 2026-10-08). Windows with something in
+    /// them are this launch's own and are never closed by this.
+    func isRestoredBlankWindow(_ id: UUID) -> Bool {
+        !issuedWindowIDs.contains(id) && isBlank(id)
+    }
+
+    /// How access to a picked file or folder is asked for, handed to every workspace. The system's,
+    /// except in a test that counts it.
+    @ObservationIgnored var securityScope = GlassEditorSecurityScope.system {
+        didSet { for workspace in workspaces.values { workspace.securityScope = securityScope } }
     }
 
     /// Windows that are actually on screen.
@@ -185,20 +221,66 @@ public final class GlassEditorRuntime {
         return workspace.projects.isEmpty ? nil : "No files open"
     }
 
-    /// Opens a file in the window in front, or **prepares a new window** for it and returns that
-    /// window's id — the hook other capabilities use (the SFTP browser's "Edit") and the one the
-    /// File menu uses, which runs its own panel and so has a URL before any window exists.
+    // MARK: Where things open
+
+    /// Opens what was chosen — files and folders together, from one Open… — and returns the
+    /// windows to show, in order. The panel, the File menu, a drop, the Projects list and the Files
+    /// browser all come through here, so there is one answer to "which window?".
     ///
-    /// Returns nil when an existing window took it, so the caller knows not to open one.
+    /// **One project per window** (owner, 2026-10-08: *"Each new project should appear in its own
+    /// editor window"*). Every project used to go into the window in front, where nothing showed
+    /// it: the title, the footer, the overview and the switcher read only the first project, so a
+    /// second one "died in a silent whisper". A folder now goes
+    /// 1. to the window that already has it open, which comes forward;
+    /// 2. else to the window in front when that window is blank (`GlassEditorWorkspace.isBlank`);
+    /// 3. else to a new window.
+    ///
+    /// **Files are tabs in the window in front**, as they always were, or a new window when there
+    /// is none. They are placed first, so a blank window taking the files does not also take a
+    /// folder chosen beside them: a window holding loose files does not take a project.
+    ///
+    /// `window` is the window asking, when one is — its own Open… or a drop on it — and it is "in
+    /// front" for this call. Off the Mac the runtime cannot tell which window has focus.
+    ///
+    /// The window is decided now and the reading happens after: a window that appeared only once
+    /// the bytes arrived would look like a click that did nothing.
+    @discardableResult
+    public func open(urls: [URL], from window: UUID? = nil) -> [UUID] {
+        var files: [URL] = []
+        var folders: [URL] = []
+        for url in urls {
+            if securityScope.isFolder(url) { folders.append(url) } else { files.append(url) }
+        }
+        var shown: [UUID] = []
+        if !files.isEmpty {
+            let id = window ?? frontmostWindowID ?? UUID()
+            let workspace = workspace(for: id)
+            beginPending(id)
+            Task { @MainActor in
+                // In the order chosen, so the tabs are too.
+                for url in files { await workspace.open(url) }
+                self.endPending(id)
+            }
+            shown.append(id)
+        }
+        for folder in folders {
+            let id = openFolder(folder, from: window)
+            if !shown.contains(id) { shown.append(id) }
+        }
+        return shown
+    }
+
+    /// One file or folder; see `open(urls:from:)`. The id is the window to show — including one
+    /// already on screen, so the caller can bring it forward.
     @discardableResult
     public func open(_ url: URL) -> UUID? {
-        // The window is decided now and the read happens after it: reading is asynchronous for the
-        // same reason a listing is, and a window that appeared only once the bytes arrived would
-        // look like a click that did nothing.
-        let id = frontmostWindowID ?? UUID()
-        let workspace = workspace(for: id)
-        Task { await workspace.open(url) }
-        return id
+        open(urls: [url]).first
+    }
+
+    /// A folder on this device, opened as a project; see `open(urls:from:)`.
+    @discardableResult
+    public func openProject(_ url: URL) -> UUID? {
+        openFolder(url, from: nil)
     }
 
     /// The window a file should land in: the one in front, or none when there is no window at all.
@@ -208,13 +290,15 @@ public final class GlassEditorRuntime {
     }
 
     /// Opens one file on another machine — **Edit** in the Files browser, with no project around
-    /// it. Returns a window to show, or nil when an existing one took it.
+    /// it — as a tab in the window in front. Returns the window to show.
     @discardableResult
     public func open(path: String, on hostID: HostID, machine: String) -> UUID? {
         guard let remoteAccess else { return nil }
         let windowID = frontmostWindowID ?? UUID()
         let workspace = workspace(for: windowID)
+        beginPending(windowID)
         Task { @MainActor in
+            defer { self.endPending(windowID) }
             do {
                 let access = try await remoteAccess(hostID)
                 await workspace.open(path: path, through: access, machine: machine)
@@ -225,26 +309,99 @@ public final class GlassEditorRuntime {
         return windowID
     }
 
-    /// The same, for a folder opened as a project.
-    @discardableResult
-    public func openProject(_ url: URL) -> UUID? {
-        let window = frontmostWindowID ?? UUID()
-        let opened = workspace(for: window).openProject(url)
-        // Opening a folder is what puts it in the library, so the two cannot disagree about what a
-        // project is: there is one way in.
-        if let opened { projects.remember(opened) }
-        return window
+    /// A folder on this device, in the window the rule picks.
+    ///
+    /// Opening a folder is what puts it in the library, so the two cannot disagree about what a
+    /// project is: there is one way in. A folder that needed granted access — one picked from
+    /// Files — also leaves this device a bookmark, so it opens again from the list after a
+    /// relaunch.
+    private func openFolder(_ url: URL, from asking: UUID?) -> UUID {
+        securityScope.withAccess(to: url) { scoped in
+            let place = ProjectPlace(path: url.standardizedFileURL.path(percentEncoded: false),
+                                     hostID: nil)
+            let target = window(holding: place) ?? windowForNewProject(from: asking)
+            if let opened = workspace(for: target).openProject(url) {
+                projects.remember(opened)
+                if scoped { projects.keepBookmark(of: url, forPath: opened.path) }
+            }
+            return target
+        }
+    }
+
+    /// A folder on a machine, for telling whether it is already open somewhere. `hostID` nil is
+    /// this device, whatever the project record calls it: the reach decides which machine it is.
+    struct ProjectPlace: Hashable {
+        let path: String
+        let hostID: HostID?
+
+        init(path: String, hostID: HostID?) {
+            self.path = GlassEditorProject.normalized(path)
+            self.hostID = hostID
+        }
+    }
+
+    /// Windows waiting on something they were given: files still being read, or a project still
+    /// connecting. Neither is in the workspace yet, and a window waiting for one is not blank.
+    @ObservationIgnored private var pendingOpens: [UUID: Int] = [:]
+    @ObservationIgnored private var pendingProjects: [UUID: ProjectPlace] = [:]
+
+    private func beginPending(_ id: UUID) { pendingOpens[id, default: 0] += 1 }
+
+    private func endPending(_ id: UUID) {
+        let remaining = (pendingOpens[id] ?? 1) - 1
+        pendingOpens[id] = remaining > 0 ? remaining : nil
+    }
+
+    /// The window with this folder open — or on its way to being open — in any workspace this
+    /// device keeps. On a phone those are the switcher's sessions, kept after their screen goes.
+    private func window(holding place: ProjectPlace) -> UUID? {
+        if let pending = pendingProjects.first(where: { $0.value == place }) { return pending.key }
+        return workspaces.first { $0.value.holdsProject(at: place.path, on: place.hostID) }?.key
+    }
+
+    /// The window in front when it is blank, emptied of its untouched Untitled; else a new one.
+    private func windowForNewProject(from asking: UUID?) -> UUID {
+        guard let front = asking ?? frontmostWindowID, isBlank(front) else { return UUID() }
+        workspaces[front]?.discardUntouchedUntitled()
+        return front
+    }
+
+    private func isBlank(_ id: UUID) -> Bool {
+        guard pendingOpens[id] == nil, pendingProjects[id] == nil else { return false }
+        return workspaces[id]?.isBlank ?? true
+    }
+
+    /// Where a project on this device is, as this device can reach it: through the bookmark kept
+    /// when its folder was picked from Files, else its path.
+    func localURL(for project: GlassEditorProject) -> URL {
+        guard let found = projects.bookmarkedURL(forPath: project.path) else {
+            return URL(filePath: project.path, directoryHint: .isDirectory)
+        }
+        if found.isStale {
+            // Remade while access is held, which is the only time it can be.
+            securityScope.withAccess(to: found.url) { scoped in
+                if scoped { projects.keepBookmark(of: found.url, forPath: project.path) }
+            }
+        }
+        return found.url
+    }
+
+    /// Whether a project's folder on this device is still there — asked with the access a folder
+    /// picked from Files needs, which a plain look at its path does not have.
+    public func localFolderExists(_ project: GlassEditorProject) -> Bool {
+        securityScope.isFolder(localURL(for: project))
     }
 
     // MARK: A window's project and the durable list
 
     /// Whether a project a window has open is actually **in** the list.
     ///
-    /// Not every route through the editor puts it there: opening a folder from the Files browser
-    /// and opening one from the library both go through `openProject`, which remembers it — but
-    /// `Open Project…` in an editor window opens the folder straight into the workspace, and the
-    /// folder is then a project you can work in and cannot find again (reported 2026-09-18).
-    /// A window that notices offers to keep it rather than doing it silently: the list is the
+    /// Every route in remembers it now — Open…, a drop, the Files browser and the library all go
+    /// through `open(urls:from:)` or `openProject` (2026-10-08). It used not to: `Open Project…` in
+    /// an editor window opened the folder straight into the workspace, and the folder was then a
+    /// project you could work in and could not find again (reported 2026-09-18). A project can
+    /// still be open and out of the list — removed from it while its window was open — and a
+    /// window that notices offers to keep it rather than doing it silently: the list is the
     /// user's, and it syncs to their other devices.
     public func isRemembered(_ project: GlassEditorProject) -> Bool {
         projects.project(at: project.path, on: project.hostID) != nil
@@ -283,22 +440,29 @@ public final class GlassEditorRuntime {
     /// The ⚡ in the editor's toolbar. Supplied by the composition root.
     public var showActiveConnections: GlassShowActiveConnections?
 
-    /// Opens a project already in the library, wherever it lives.
+    /// Opens a project already in the library, wherever it lives, by the rule in
+    /// `open(urls:from:)`: its own window, or the window that already has it.
     ///
-    /// Returns the id of a window to open, or nil when an existing window took it — or when the
-    /// project could not be opened at all, in which case the workspace carries the reason.
+    /// Returns the id of the window to show — one already on screen included, so it comes
+    /// forward — or nil when this build cannot reach the machine at all. A project that could not
+    /// be opened says why in the window.
     @discardableResult
     public func openProject(_ project: GlassEditorProject, reach: GlassEditorProjectReach) -> UUID? {
         projects.remember(project)
         if case .thisMachine = reach {
-            return openProject(URL(filePath: project.path, directoryHint: .isDirectory))
+            return openFolder(localURL(for: project), from: nil)
         }
         guard let hostID = project.hostID, let remoteAccess else { return nil }
+        let place = ProjectPlace(path: project.path, hostID: hostID)
+        // Already open, or still connecting: that window comes forward and nothing connects twice.
+        if let holder = window(holding: place) { return holder }
         // The window comes first and fills in, because connecting is not instant and an editor
         // that appears only once the SSH handshake finishes looks like a click that did nothing.
-        let windowID = frontmostWindowID ?? UUID()
+        let windowID = windowForNewProject(from: nil)
         let workspace = workspace(for: windowID)
+        pendingProjects[windowID] = place
         Task { @MainActor in
+            defer { if self.pendingProjects[windowID] == place { self.pendingProjects[windowID] = nil } }
             do {
                 let access = try await remoteAccess(hostID)
                 workspace.openProject(project, access: access, reach: reach)
@@ -321,7 +485,9 @@ public final class GlassEditorRuntime {
 
     /// Asks for a window. Nil is a request for a new, empty one.
     public func present(_ id: UUID?) {
-        requestedWindowID = id ?? UUID()
+        let id = id ?? newWindowID()
+        issuedWindowIDs.insert(id)
+        requestedWindowID = id
         presentationSerial += 1
     }
 
@@ -414,6 +580,62 @@ public struct GlassEditorWindowPresentation: Identifiable, Hashable, Sendable {
     public init(id: UUID) { self.id = id }
 }
 
+/// Shows the editor window something asked for (`GlassEditorRuntime.present`), from whichever
+/// window carries it.
+///
+/// **Not only the Connections window.** That was the one place a request was answered, so with
+/// Connections closed, Open in Editor in the Files browser opened a project into a window nothing
+/// ever showed. Every editor window and the Mac's Files window carry one too; the first to see a
+/// request shows it and clears it, so the others find nothing to do.
+struct GlassEditorWindowPresenter: ViewModifier {
+    let runtime: GlassEditorRuntime
+    @Environment(\.openWindow) private var openWindow
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: runtime.presentationSerial) { _, _ in
+                // Where there are no windows the bootstrap presents in place; this has nothing to add.
+                guard GlassWindowPresentation.canOpenWindows,
+                      let id = runtime.requestedWindowID else { return }
+                openWindow(id: GlassEditorRuntime.windowID, value: id)
+                runtime.clearPresentation()
+            }
+    }
+}
+
+public extension View {
+    /// Lets this window show the editor windows other surfaces ask for — the Files browser's Open
+    /// in Editor, the Projects list — while the Connections window is closed.
+    func glassEditorWindowPresenter(_ runtime: GlassEditorRuntime) -> some View {
+        modifier(GlassEditorWindowPresenter(runtime: runtime))
+    }
+}
+
+/// Closes an editor window the system brought back from an earlier launch with nothing in it.
+///
+/// Blank editor windows are not restored (decided 2026-10-08), and nothing in a workspace is
+/// saved, so a restored editor window is always blank. The Mac and the headset are told not to
+/// restore the scene at all; an iPad cannot be (`SceneRestorationBehavior.disabled` does not exist
+/// there), so the window closes as it arrives. **Alone, it hands over to Connections first** — the
+/// app's front door — rather than closing the only window and leaving nothing on screen.
+struct GlassEditorRestoredWindowGuard: ViewModifier {
+    let runtime: GlassEditorRuntime
+    let windowID: UUID
+    @Environment(\.dismissWindow) private var dismissWindow
+    @Environment(\.openWindow) private var openWindow
+
+    func body(content: Content) -> some View {
+        content
+            #if os(iOS)
+            .task {
+                guard runtime.isRestoredBlankWindow(windowID) else { return }
+                if UIApplication.shared.connectedScenes.count <= 1 { openWindow(id: "main") }
+                dismissWindow()
+            }
+            #endif
+    }
+}
+
 public struct GlassEditorScenes: Scene {
     private let runtime: GlassEditorRuntime
 
@@ -424,13 +646,21 @@ public struct GlassEditorScenes: Scene {
         // documents: the id is the workspace's, and a new id is a new, empty editor. Opening a file
         // when no window is up creates the workspace first and then opens a window *for* it, so the
         // document is there before the window draws.
+        //
+        // **Still a value-keyed group on the headset**, never a singleton `Window`: visionOS once
+        // handed the app two saved sessions for one, and SwiftUI stops the app on the second.
         WindowGroup("Editor", id: GlassEditorRuntime.windowID, for: UUID.self) { $id in
-            let windowID = id ?? UUID()
-            GlassEditorWorkspaceView(workspace: runtime.workspace(for: windowID), windowID: windowID)
+            // Never nil: `defaultValue` gives a window opened without one its id.
+            let windowID = id
+            // `windowWorkspace`, not `workspace`: drawing a window is not this launch asking for
+            // it, which is how a window restored from an earlier launch is recognised.
+            GlassEditorWorkspaceView(workspace: runtime.windowWorkspace(for: windowID), windowID: windowID)
                 .environment(runtime)
                 .glassLayers(runtime.layers)
+                .glassEditorWindowPresenter(runtime)
+                .modifier(GlassEditorRestoredWindowGuard(runtime: runtime, windowID: windowID))
         } defaultValue: {
-            UUID()
+            runtime.newWindowID()
         }
         #if os(visionOS)
         .windowStyle(.plain)
@@ -440,6 +670,10 @@ public struct GlassEditorScenes: Scene {
         // Not on launch: the library is the app's front door, and an editor with nothing open is
         // not a useful first thing to see.
         .defaultLaunchBehavior(.suppressed)
+        // Nor after a relaunch (decided 2026-10-08). A workspace is never saved, so every editor
+        // window brought back was a blank one; windows with work in them never came back with it.
+        // An iPad cannot say this per scene, so there `GlassEditorRestoredWindowGuard` closes them.
+        .restorationBehavior(.disabled)
         #endif
         #if os(macOS)
         .commands { GlassEditorCommands(runtime: runtime) }
@@ -483,20 +717,20 @@ struct GlassEditorCommands: Commands {
             // ⌘O, the key every Mac application opens something with. It runs its own panel, so it
             // works from any window in this app — including an editor with nothing in it, which is
             // where it was first found not to (2026-09-17).
-            Button("Open File…") { open(directories: false) }
+            //
+            // **One Open… for files and folders.** There was an Open Project… on ⌥⌘O beside it,
+            // which asked the user to know in advance what the panel would decide anyway
+            // (2026-10-08: *"we've just asked the user to remember something that can be decided
+            // at selection time"*). A folder chosen here is a project in a window of its own.
+            Button("Open…") { show(GlassEditorOpenPanel.run(runtime: runtime)) }
                 .keyboardShortcut("o", modifiers: .command)
-            Button("Open Project…") { open(directories: true) }
-                .keyboardShortcut("o", modifiers: [.command, .option])
             // **Open Recent belongs here**, not in the sidebar. The sidebar is a project's tree;
             // recents are the app's memory of what you have been in lately, which is a File-menu
-            // fact on this platform and has been since long before this app (2026-09-17).
+            // fact on this platform and has been since long before this app (2026-09-17). Folders
+            // are listed too, and open as the projects they were.
             Menu("Open Recent") {
                 ForEach(runtime.preferences.recents, id: \.self) { url in
-                    Button(url.lastPathComponent) {
-                        if let id = runtime.open(url) {
-                            openWindow(id: GlassEditorRuntime.windowID, value: id)
-                        }
-                    }
+                    Button(url.lastPathComponent) { show(runtime.open(urls: [url])) }
                 }
                 if !runtime.preferences.recents.isEmpty { Divider() }
                 Button("Clear Menu") { runtime.preferences.clearRecents() }
@@ -537,46 +771,47 @@ struct GlassEditorCommands: Commands {
 }
 
 private extension GlassEditorCommands {
-    /// Runs the panel, then opens what came back. Cancelling does nothing at all — no window, no
-    /// trace, which is the whole point of running the panel before anything is built.
-    func open(directories: Bool) {
+    /// Brings forward, or opens, each window an open named — the one in front included, which is
+    /// where files go.
+    func show(_ windows: [UUID]) {
+        for id in windows { openWindow(id: GlassEditorRuntime.windowID, value: id) }
+    }
+}
+
+/// The Mac's one Open…: files and folders in one panel, and what is chosen decides what happens to
+/// it (`GlassEditorRuntime.open(urls:from:)`). The File menu and an empty editor window's own
+/// Open… both run this, so they cannot drift apart.
+@MainActor
+enum GlassEditorOpenPanel {
+    /// Runs the panel, then opens what came back, and returns the windows to show. Cancelling
+    /// returns none — no window, no trace, which is the whole point of running the panel before
+    /// anything is built.
+    static func run(runtime: GlassEditorRuntime, from window: UUID? = nil) -> [UUID] {
         let panel = NSOpenPanel()
-        panel.canChooseFiles = !directories
-        panel.canChooseDirectories = directories
-        panel.allowsMultipleSelection = !directories
-        panel.prompt = directories ? "Open Project" : "Open"
-        panel.message = directories ? "Choose a folder to open as a project."
-                                    : "Choose a file to open."
-        guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
-        // Into the window in front — including the empty one ⇧⌘E just made — and only into a new
-        // window when there is none. `open` returns the id of a workspace it had to create.
-        var newWindow: UUID?
-        for url in panel.urls {
-            let created = directories ? runtime.openProject(url) : runtime.open(url)
-            newWindow = newWindow ?? created
-        }
-        if let newWindow { openWindow(id: GlassEditorRuntime.windowID, value: newWindow) }
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Open"
+        panel.message = "Choose files to open, or a folder to open as a project."
+        guard panel.runModal() == .OK, !panel.urls.isEmpty else { return [] }
+        return runtime.open(urls: panel.urls, from: window)
     }
 }
 
 /// What the focused editor window can do, published so the menu bar can ask without holding a view.
+/// Open… is not here: the menu runs its own panel, so it works with no editor window at all.
 @MainActor
 public struct GlassEditorActions {
-    public let open: () -> Void
-    public let openProject: () -> Void
     public let increaseFontSize: () -> Void
     public let decreaseFontSize: () -> Void
     public let resetFontSize: () -> Void
     public let find: () -> Void
     public let goToLine: () -> Void
 
-    public init(open: @escaping () -> Void, openProject: @escaping () -> Void,
-                increaseFontSize: @escaping () -> Void,
+    public init(increaseFontSize: @escaping () -> Void,
                 decreaseFontSize: @escaping () -> Void,
                 resetFontSize: @escaping () -> Void,
                 find: @escaping () -> Void, goToLine: @escaping () -> Void) {
-        self.open = open
-        self.openProject = openProject
         self.increaseFontSize = increaseFontSize
         self.decreaseFontSize = decreaseFontSize
         self.resetFontSize = resetFontSize

@@ -398,7 +398,11 @@ struct GlassPowerToolsApp: App {
 
     var body: some Scene {
         mainScene
-        GlassTerminalScenes(runtime: terminal)
+        // The Files window carries the editor's presenter: Open in Editor there has to show a
+        // window when Connections, the other place that can, is closed.
+        GlassTerminalScenes(runtime: terminal) { [editor] in
+            AnyView(Color.clear.accessibilityHidden(true).glassEditorWindowPresenter(editor))
+        }
         GlassDatabaseScenes(runtime: database)
         GlassDesktopScenes(runtime: desktop)
         GlassEditorScenes(runtime: editor)

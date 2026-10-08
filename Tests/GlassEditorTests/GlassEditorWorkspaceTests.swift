@@ -101,12 +101,17 @@ struct GlassEditorWorkspaceTests {
         #expect(workspace.documents.count == 1)
     }
 
-    @Test func aFolderIsNotAFile() async throws {
+    /// A folder handed to `open` is a project, not a "not a file" error (2026-10-08: one Open…
+    /// for files and folders, decided by what is chosen).
+    @Test func aFolderOpensAsAProject() async throws {
         let root = try makeRoot(); defer { try? FileManager.default.removeItem(at: root) }
         let workspace = makeWorkspace()
         let opened = await workspace.open(root)
-        #expect(opened == nil)
-        #expect(workspace.message?.contains("folder") == true)
+        #expect(opened == nil, "a folder is not a document")
+        #expect(workspace.message == nil, "a folder is not an error")
+        #expect(workspace.projects.map(\.path)
+                == [GlassEditorProject.normalized(root.standardizedFileURL.path(percentEncoded: false))])
+        #expect(workspace.documents.isEmpty)
     }
 
     // MARK: Closing

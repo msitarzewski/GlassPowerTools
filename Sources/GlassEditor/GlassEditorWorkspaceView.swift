@@ -39,8 +39,8 @@ public struct GlassEditorWorkspaceView: View {
     /// has no project.
     @State private var compactPath: [GlassEditorCompactRoute] = []
     #endif
+    /// Open… off the Mac: one picker for files and folders.
     @State private var isImporting = false
-    @State private var isImportingProject = false
     @State private var exportingDocument: GlassEditorDocument?
     /// The document the save panel was opened for, kept apart from `exportingDocument` because the
     /// panel's own dismissal clears that — and when the dismissal came first, the completion found
@@ -57,6 +57,7 @@ public struct GlassEditorWorkspaceView: View {
     @State private var filter = ""
     @State private var settingsProject: GlassEditorProject?
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.openWindow) private var openWindow
     // Optional: the scene injects it, and a preview or a test may not.
     @Environment(GlassEditorRuntime.self) private var runtime: GlassEditorRuntime?
     /// **This file's** text settings, from the gear in the toolbar — on every platform now. The
@@ -122,26 +123,15 @@ public struct GlassEditorWorkspaceView: View {
                                              colorScheme: colorScheme,
                                              columnVisibility: $columnVisibility))
         // Drop a file on the window to open it — the gesture a Mac user tries first, and the one
-        // that works in the headset and on an iPad too.
+        // that works in the headset and on an iPad too. A folder dropped is a project, by the same
+        // rule as Open…: its own window, unless this one is blank.
         .dropDestination(for: URL.self) { urls, _ in
-            var opened = false
-            for url in urls { Task { await workspace.open(url) } }
-            opened = !urls.isEmpty
-            return opened
+            open(urls)
+            return !urls.isEmpty
         }
-        .fileImporter(isPresented: $isImporting, allowedContentTypes: [.text, .sourceCode, .plainText, .json, .yaml, .data],
-                      allowsMultipleSelection: true) { result in
-            switch result {
-            case .success(let urls): for url in urls { Task { await workspace.open(url) } }
-            case .failure(let error): workspace.message = error.localizedDescription
-            }
-        }
-        .fileImporter(isPresented: $isImportingProject, allowedContentTypes: [.folder]) { result in
-            switch result {
-            case .success(let url): workspace.openProject(url)
-            case .failure(let error): workspace.message = error.localizedDescription
-            }
-        }
+        .modifier(GlassEditorOpenImporter(isPresented: $isImporting,
+                                          open: { open($0) },
+                                          failed: { workspace.message = $0.localizedDescription }))
         .fileExporter(isPresented: Binding(get: { exportingDocument != nil },
                                            set: { if !$0 { exportingDocument = nil } }),
                       document: exportingDocument.map { GlassEditorTextFile(text: $0.model.text) },
@@ -202,12 +192,10 @@ public struct GlassEditorWorkspaceView: View {
         }
     }
 
-    /// Built here rather than inline in `body`: the whole expression is one literal with nine
+    /// Built here rather than inline in `body`: the whole expression is one literal with several
     /// closures in it, and the type checker gives up on the chain it sits in.
     private var editorActions: GlassEditorActions {
         GlassEditorActions(
-            open: { isImporting = true },
-            openProject: { isImportingProject = true },
             increaseFontSize: { workspace.preferences.increaseFontSize() },
             decreaseFontSize: { workspace.preferences.decreaseFontSize() },
             resetFontSize: { workspace.preferences.resetFontSize() },
@@ -236,8 +224,9 @@ public struct GlassEditorWorkspaceView: View {
         // reveal a column that could only ever be blank, so the control goes too: a toggle whose
         // only outcome is an empty stripe is a promise the window cannot keep.
         //
-        // Nobody is stranded by it. Opening a project is File ▸ Open Project… (⌥⌘O) and a button
-        // on the empty document view, neither of which is in the sidebar.
+        // Nobody is stranded by it. Opening a project is Open… — File ▸ Open… (⌘O) on a Mac, the
+        // toolbar elsewhere, and a button on the empty document view — none of which is in the
+        // sidebar.
         .toolbar(removing: workspace.projects.isEmpty ? .sidebarToggle : nil)
     }
 
@@ -590,15 +579,15 @@ public struct GlassEditorWorkspaceView: View {
             .navigationSubtitle(abbreviated(project.path))
             #endif
         } else {
-            // An editor with nothing in it — what ⇧⌘E and File ▸ New Editor make. Here the three
-            // ways in are the only thing to offer, and they are the whole point of the window.
+            // An editor with nothing in it — what ⇧⌘E and File ▸ New Editor make. Here the ways
+            // in are the only thing to offer, and they are the whole point of the window. One
+            // Open… for files and folders: a folder chosen here becomes this window's project.
             ContentUnavailableView {
                 Label("No Document", systemImage: "text.page")
             } description: {
-                Text("Open a file, drop one on this window, or start something new.")
+                Text("Open a file or a folder, drop one on this window, or start something new.")
             } actions: {
-                Button("Open Project…") { isImportingProject = true }
-                Button("Open File…") { isImporting = true }
+                Button("Open…") { beginOpening() }
                 Button("New Document") { workspace.newDocument() }
             }
             #if os(visionOS)
@@ -732,9 +721,21 @@ public struct GlassEditorWorkspaceView: View {
                 .help("New Document")
                 .accessibilityIdentifier("editor-new")
         }
-        // **A folder you can work in and cannot find again.** `Open Project…` opens straight into
-        // the workspace, so the folder never reached the Projects list — offered here rather than
-        // done silently, because that list is the user's and it syncs (`GlassSuggestionButton`).
+        #if !os(macOS)
+        // **Open…, off the Mac**, with ⌘O for a hardware keyboard. The Mac has it in the File menu,
+        // which owns ⌘O there (rule 39); here there is no menu, and the only ways in were two
+        // buttons on an empty window, gone the moment anything was open.
+        ToolbarItem(placement: .navigation) {
+            Button("Open…", systemImage: "folder") { beginOpening() }
+                .keyboardShortcut("o", modifiers: .command)
+                .help("Open files, or a folder as a project")
+                .accessibilityIdentifier("editor-open")
+        }
+        #endif
+        // **A folder you can work in and cannot find again.** Every Open puts a folder in the
+        // Projects list now, but one removed from the list while its window is open is still
+        // here — offered back rather than re-added silently, because that list is the user's and
+        // it syncs (`GlassSuggestionButton`).
         if let project = workspace.projects.first, let runtime, !runtime.isRemembered(project) {
             ToolbarItem(placement: .primaryAction) {
                 GlassSuggestionButton("Save as Project",
@@ -799,6 +800,37 @@ public struct GlassEditorWorkspaceView: View {
     }
 
     // MARK: Actions
+
+    /// Open…: the Mac's own panel, the system picker everywhere else.
+    private func beginOpening() {
+        #if os(macOS)
+        if let runtime { show(GlassEditorOpenPanel.run(runtime: runtime, from: windowID)) }
+        #else
+        isImporting = true
+        #endif
+    }
+
+    /// What was chosen or dropped, through the runtime's one rule (`open(urls:from:)`): files
+    /// here, and each folder a project in a window of its own — this one, if it is blank.
+    private func open(_ urls: [URL]) {
+        guard let runtime else {
+            // A preview with no runtime: everything here, which is all it can do.
+            for url in urls { Task { await workspace.open(url) } }
+            return
+        }
+        show(runtime.open(urls: urls, from: windowID))
+    }
+
+    /// Shows the windows an open named, other than this one: each as a window where windows
+    /// exist; on a phone, the last of them in this one's place, since only one is on screen.
+    private func show(_ windows: [UUID]) {
+        let others = windows.filter { $0 != windowID }
+        if GlassWindowPresentation.canOpenWindows {
+            for id in others { openWindow(id: GlassEditorRuntime.windowID, value: id) }
+        } else if let last = others.last {
+            runtime?.present(last)
+        }
+    }
 
     private func saveSelected() {
         guard let document = workspace.selectedDocument else { return }
@@ -891,6 +923,28 @@ public struct GlassEditorWorkspaceView: View {
         case .html: "chevron.left.slash.chevron.right"
         case .plaintext: "doc.text"
         }
+    }
+}
+
+/// The one Open… picker: files and folders together, decided by what is chosen.
+///
+/// There were two — files in one, a folder in the other — and the folder one never asked for
+/// access to what it was given, so a folder from Files opened empty. Access is now the runtime's
+/// to ask for and the project's to hold. `.data` is every file and `.folder` every folder.
+private struct GlassEditorOpenImporter: ViewModifier {
+    @Binding var isPresented: Bool
+    let open: ([URL]) -> Void
+    let failed: (any Error) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .fileImporter(isPresented: $isPresented, allowedContentTypes: [.folder, .data],
+                          allowsMultipleSelection: true) { result in
+                switch result {
+                case .success(let urls): open(urls)
+                case .failure(let error): failed(error)
+                }
+            }
     }
 }
 

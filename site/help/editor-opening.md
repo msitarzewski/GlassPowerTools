@@ -9,28 +9,34 @@ On Apple Vision Pro, iPad and iPhone there is no File menu, so you reach the Edi
 - Choose **Projects** in the library, select a project, and choose **Open**. See [Work with projects](editor-projects.md).
 - In a Terminal service's Files browser, choose **Edit** on a file, or **Open in Editor** on a folder. See [Projects on a server](editor-projects.md#open-a-folder-on-a-server).
 
+Once an editor window is open, **Open…** (the folder button in its toolbar) asks for files or a folder. With a keyboard attached, press ⌘O.
+
 **On Mac:** you can also use the File menu from any window:
 
 | Command | Shortcut | What it does |
 |---|---|---|
 | **New Editor Window** | ⇧⌘E | Opens a new editor window on a new, empty document, ready to type into. |
-| **Open File…** | ⌘O | Asks for one or more files, then opens them. |
-| **Open Project…** | ⌥⌘O | Asks for a folder, then opens it as a project. |
-| **Open Recent** | — | Lists files you opened recently on this Mac. **Clear Menu** empties the list. |
+| **Open…** | ⌘O | Asks for one or more files, or a folder, then opens them. |
+| **Open Recent** | — | Lists files and folders you opened recently on this Mac. **Clear Menu** empties the list. |
 
-A file or folder you choose from the File menu opens in the editor window in front. A new window opens only when no editor window is open. If you cancel the panel, nothing opens.
+What you choose decides what happens:
 
-The Editor does not open by itself when the app starts. The library is the first thing you see.
+- **Files** open as tabs in the editor window in front. A new window opens only when no editor window is open.
+- **A folder** opens as a project, in its own window. If the project is already open, its window comes forward. If the editor window in front is empty, the project opens there instead of in a new window.
+
+If you cancel, nothing opens.
+
+The Editor does not open by itself when the app starts, and empty editor windows are not brought back after the app restarts. The library is the first thing you see.
 
 ## What an editor window holds
 
-Each editor window has its own set of documents. A second window starts empty; it does not show the first window's tabs. Your text size, line-number and wrapping settings, and the recent files list, are shared by every window.
+Each editor window has its own set of documents, and at most one project. A second window starts empty; it does not show the first window's tabs. Your text size, line-number and wrapping settings, and the recent files list, are shared by every window.
 
 - Open documents appear as tabs across the top once there are two or more.
 - The file list on the left appears only when a project is open. With no project, the window shows just the document.
 - The bar at the bottom shows the cursor position, the language and the line endings. See [Languages and syntax highlighting](editor-languages.md).
 
-An empty editor window shows **No Document** with three buttons: **Open Project…**, **Open File…** and **New Document**. You can also drop files onto any editor window to open them.
+An empty editor window shows **No Document** with two buttons: **Open…** and **New Document**. You can also drop files or a folder onto any editor window. Dropped files open in that window; a dropped folder opens as a project, in that window if it is empty, otherwise in its own.
 
 ## Start a new document
 

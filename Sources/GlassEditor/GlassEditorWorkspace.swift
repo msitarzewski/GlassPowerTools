@@ -14,6 +14,7 @@ import Foundation
 import UIKit
 #endif
 import Observation
+import GlassConnectionKit
 import GlassEditorCore
 import GlassEditorUI
 
@@ -68,6 +69,10 @@ public final class GlassEditorWorkspace {
 
     /// Shared with every other window: text size, line numbers, wrapping, recents.
     public let preferences: GlassEditorPreferences
+
+    /// How access to a picked file or folder is asked for and given back. The system's, except in
+    /// a test that counts it.
+    @ObservationIgnored var securityScope = GlassEditorSecurityScope.system
 
     /// Set when a **file** is opened with no project in this window: the sidebar is a project's
     /// tree, and a tree of nothing beside one open file is a column of empty space. Opening a
@@ -183,15 +188,25 @@ public final class GlassEditorWorkspace {
     /// ended at "No Document" (2026-09-23). Access is asked for here and **held while the document
     /// is open**, because saving writes back to the same file; `close` gives it back. A URL that is
     /// not scoped answers false and nothing is held.
+    ///
+    /// **A folder becomes a project** in this window, rather than "not a file". Which one it is
+    /// was decided by what was chosen, not by which command was used to choose it (2026-10-08:
+    /// *"we've just asked the user to remember something that can be decided at selection
+    /// time"*). Routing a folder to a window of its own is the runtime's job
+    /// (`GlassEditorRuntime.open(urls:)`); this is what a window does with one handed to it.
     @discardableResult
     public func open(_ url: URL, asPreview: Bool = false) async -> GlassEditorDocument? {
-        let scoped = url.startAccessingSecurityScopedResource()
+        if securityScope.isFolder(url) {
+            openProject(url)
+            return nil
+        }
+        let scoped = securityScope.start(url)
         let document = await open(path: url.standardizedFileURL.path(percentEncoded: false), asPreview: asPreview)
         if scoped {
             if let document, securityScopedURLs[document.id] == nil {
                 securityScopedURLs[document.id] = url
             } else {
-                url.stopAccessingSecurityScopedResource()
+                securityScope.stop(url)
             }
         }
         return document
@@ -383,7 +398,7 @@ public final class GlassEditorWorkspace {
         if documents[index].isDirty, !force { return false }
         documentAccess[id] = nil
         previewModes[id] = nil
-        securityScopedURLs.removeValue(forKey: id)?.stopAccessingSecurityScopedResource()
+        if let scoped = securityScopedURLs.removeValue(forKey: id) { securityScope.stop(scoped) }
         if previewDocumentID == id { previewDocumentID = nil }
         documents.remove(at: index)
         if selection == id {
@@ -533,6 +548,40 @@ public final class GlassEditorWorkspace {
         }
     }
 
+    // MARK: What a window holds
+
+    /// Nothing in it worth keeping: no project and no document, or only the untouched Untitled a
+    /// new window opens on (⇧⌘E). A window like that takes the next project opened, rather than a
+    /// second window appearing beside an empty one.
+    public var isBlank: Bool {
+        guard projects.isEmpty, pendingLargeOpen == nil else { return false }
+        return documents.isEmpty || isOnlyUntouchedUntitled
+    }
+
+    private var isOnlyUntouchedUntitled: Bool {
+        guard documents.count == 1, let only = documents.first else { return false }
+        return only.hasNeverBeenSaved && !only.isDirty
+    }
+
+    /// Lets go of the untouched Untitled before a project takes the window, so the window shows
+    /// the project rather than an empty page in front of it. Nothing is lost: it was never typed in.
+    func discardUntouchedUntitled() {
+        guard isOnlyUntouchedUntitled, let only = documents.first else { return }
+        close(only.id)
+    }
+
+    /// Whether this window has the folder at `path` open as a project — on this device when
+    /// `hostID` is nil, else on that machine. The same folder reached two ways is the same project,
+    /// and the reach is what says which machine it is on.
+    func holdsProject(at path: String, on hostID: HostID?) -> Bool {
+        let wanted = GlassEditorProject.normalized(path)
+        return projects.contains { project in
+            guard project.path == wanted else { return false }
+            if case .thisMachine = projectReach[project.id] { return hostID == nil }
+            return hostID != nil && project.hostID == hostID
+        }
+    }
+
     // MARK: Projects
 
     /// Opens a folder as a project on this device.
@@ -540,12 +589,19 @@ public final class GlassEditorWorkspace {
     /// The reach is settled here rather than at every draw: whether these files come off a disk or
     /// an SSH connection is a property of where the folder is and where you are, and neither moves
     /// while the project is open.
+    ///
+    /// **A folder picked from Files keeps its access for as long as the project is open**, and
+    /// gives it back when the project closes. The tree is read asynchronously, folder by folder as
+    /// they are opened, and every file in it is opened and saved through the same access — so
+    /// giving it back as soon as this returned left a project that could read nothing.
     @discardableResult
     public func openProject(_ url: URL, access: any GlassEditorFileAccess = GlassEditorLocalFileAccess()) -> GlassEditorProject? {
         let standardized = url.standardizedFileURL
+        let scoped = securityScope.start(url)
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: standardized.path, isDirectory: &isDirectory),
               isDirectory.boolValue else {
+            if scoped { securityScope.stop(url) }
             message = "\(standardized.lastPathComponent) is not a folder."
             return nil
         }
@@ -554,18 +610,27 @@ public final class GlassEditorWorkspace {
         // and opened the same folder as a second project every time.
         let wanted = GlassEditorProject.normalized(standardized.path(percentEncoded: false))
         if let existing = projects.first(where: { $0.path == wanted }) {
+            // Already held by the project that is open.
+            if scoped { securityScope.stop(url) }
             return existing
         }
         let project = GlassEditorProject.local(standardized)
         projects.append(project)
+        if scoped { securityScopedProjects[project.id] = url }
         prefersCollapsedSidebar = false
         let root = GlassEditorProjectNode(name: project.displayName, path: project.path, isDirectory: true)
         projectAccess[project.id] = access
         root.beginLoadingChildrenIfNeeded(using: access)
         projectRoots[project.id] = root
         projectReach[project.id] = .thisMachine
+        // Open Recent lists folders too (decided 2026-10-08), so a project is one menu away as a
+        // file is. Only this device's: a folder on a server is reopened through Projects.
+        preferences.noteRecent(URL(filePath: project.path, directoryHint: .isDirectory))
         return project
     }
+
+    /// Scoped access held for projects opened from a picked folder, given back on close.
+    @ObservationIgnored private var securityScopedProjects: [GlassEditorProject.ID: URL] = [:]
 
     /// Opens a project that already exists — a folder on another machine, or one from the library.
     ///
@@ -778,6 +843,7 @@ public final class GlassEditorWorkspace {
             Task { await access.close() }
         }
         projectReach[id] = nil
+        if let scoped = securityScopedProjects.removeValue(forKey: id) { securityScope.stop(scoped) }
     }
 
     /// Drops a closed project's nodes out of the expansion set and the selection, so neither grows

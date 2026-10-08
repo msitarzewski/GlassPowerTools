@@ -15,8 +15,16 @@ public struct GlassTerminalScenes: Scene {
     private var sessionManager: SessionManager { runtime.sessionManager }
     private var settingsManager: SettingsManager { runtime.settingsManager }
     private var windowRecoveryManager: WindowRecoveryManager { runtime.windowRecoveryManager }
+    /// Something another capability needs present in the Mac's Files window — the editor's window
+    /// presenter, so Open in Editor shows its window while Connections is closed. Supplied by the
+    /// composition root, the only place that knows both; the terminal never learns what it is.
+    private let filesWindowAccessory: (@MainActor () -> AnyView)?
 
-    public init(runtime: GlassTerminalRuntime) { self.runtime = runtime }
+    public init(runtime: GlassTerminalRuntime,
+                filesWindowAccessory: (@MainActor () -> AnyView)? = nil) {
+        self.runtime = runtime
+        self.filesWindowAccessory = filesWindowAccessory
+    }
 
     public var body: some Scene {
         #if os(macOS) || os(visionOS)
@@ -74,6 +82,7 @@ public struct GlassTerminalScenes: Scene {
                 }
             }
             .glassLayers(runtime.layers)
+            .background { filesWindowAccessory?() }
         }
         .defaultSize(width: 820, height: 620)
         #if DEBUG

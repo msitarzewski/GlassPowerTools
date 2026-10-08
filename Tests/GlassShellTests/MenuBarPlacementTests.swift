@@ -103,21 +103,46 @@ struct MenuBarPlacementTests {
                 "⌘W is declared in \(files.sorted()). AppKit's File ▸ Close owns that key equivalent; declaring it either takes the key off Close or is dropped outright, and either way ⌘W stops working somewhere. Register the action with glassCloseCommandTarget(priority:) instead.")
     }
 
-    /// ⌘O has one owner, for the reason ⌘T and ⌘W each taught once.
+    /// ⌘O has one owner on the Mac, for the reason ⌘T and ⌘W each taught once.
     ///
-    /// Opening *a file* is the general act and belongs to the editor, whose command runs its own
-    /// panel and so works from any window. The database's Open SQL Document… is the specific one
-    /// and sits on ⇧⌘O. Two items on one key equivalent do not give the focused window a choice:
-    /// one of them is dropped, silently, and which one is not something the source says.
+    /// Opening a file or a folder is the general act and belongs to the editor, whose File ▸ Open…
+    /// runs its own panel and so works from any window. The database's Open SQL Document… is the
+    /// specific one and sits on ⇧⌘O. Two items on one key equivalent do not give the focused window
+    /// a choice: one of them is dropped, silently, and which one is not something the source says.
+    ///
+    /// The editor window's toolbar Open… carries ⌘O too, for an iPad or headset keyboard, where
+    /// there is no menu bar — and only there: it must sit inside `#if !os(macOS)`, so the Mac never
+    /// compiles a second owner.
     @Test func commandOHasASingleOwner() throws {
+        let marker = #"keyboardShortcut("o", modifiers: .command)"#
+        var files: [String] = []
+        var onTheMac: [String] = []
+        for file in try swiftSources() {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            guard text.contains(marker) else { continue }
+            files.append(file.lastPathComponent)
+            if declarations(of: marker, in: text).contains(where: { !excludesTheMac($0) }) {
+                onTheMac.append(file.lastPathComponent)
+            }
+        }
+        #expect(files.sorted() == ["GlassEditorScenes.swift", "GlassEditorWorkspaceView.swift"],
+                "⌘O is declared in \(files.sorted()). It opens files and folders; a capability's own Open belongs on a modified key.")
+        #expect(onTheMac == ["GlassEditorScenes.swift"],
+                "⌘O reaches the Mac from \(onTheMac.sorted()). There it is File ▸ Open…, alone; a toolbar's ⌘O belongs inside #if !os(macOS).")
+    }
+
+    /// ⌥⌘O was Open Project…, and it is gone (2026-10-08): one Open… takes files and folders and
+    /// decides by what was chosen. A second open command asked the user to know in advance what the
+    /// panel would decide anyway.
+    @Test func optionCommandOIsNotDeclared() throws {
         var files: [String] = []
         for file in try swiftSources() {
             let text = try String(contentsOf: file, encoding: .utf8)
-            guard text.contains(#"keyboardShortcut("o", modifiers: .command)"#) else { continue }
+            guard text.contains(#"keyboardShortcut("o", modifiers: [.command, .option])"#)
+                    || text.contains(#"keyboardShortcut("o", modifiers: [.option, .command])"#) else { continue }
             files.append(file.lastPathComponent)
         }
-        #expect(files == ["GlassEditorScenes.swift"],
-                "⌘O is declared in \(files.sorted()). It opens a file; a capability's own Open belongs on a modified key.")
+        #expect(files.isEmpty, "⌥⌘O is declared in \(files.sorted()). Open… (⌘O) opens folders as projects.")
     }
 
     /// ⌘S has one menu owner on a Mac: the shell's File ▸ Save, aimed by `\.glassSaveItem`.
@@ -201,6 +226,34 @@ struct MenuBarPlacementTests {
             }
         }
         return found
+    }
+
+    /// The compilation conditions around each line declaring `marker`, innermost last: `#if X`
+    /// opens `X`, `#elseif Y` and `#else` replace it with what that branch means, `#endif` closes
+    /// it. Enough to say whether a declaration can reach the Mac; not a preprocessor.
+    private func declarations(of marker: String, in text: String) -> [[String]] {
+        var conditions: [String] = []
+        var found: [[String]] = []
+        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            let code = line.trimmingCharacters(in: .whitespaces)
+            if code.hasPrefix("#if ") {
+                conditions.append(String(code.dropFirst(4)))
+            } else if code.hasPrefix("#elseif "), !conditions.isEmpty {
+                conditions[conditions.count - 1] = String(code.dropFirst(8))
+            } else if code.hasPrefix("#else"), let last = conditions.last {
+                conditions[conditions.count - 1] = "not (\(last))"
+            } else if code.hasPrefix("#endif"), !conditions.isEmpty {
+                conditions.removeLast()
+            } else if !code.hasPrefix("//"), code.contains(marker) {
+                found.append(conditions)
+            }
+        }
+        return found
+    }
+
+    /// Whether any of these conditions keeps the code out of a Mac build.
+    private func excludesTheMac(_ conditions: [String]) -> Bool {
+        conditions.contains { ["!os(macOS)", "not (os(macOS))", "os(iOS)", "os(visionOS)"].contains($0) }
     }
 
     /// `Sources` and `App`, found from this file rather than from the working directory, so the

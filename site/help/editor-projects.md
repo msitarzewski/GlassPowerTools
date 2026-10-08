@@ -10,7 +10,13 @@ A project is a folder on a machine: a folder on this device, or a folder on a se
 
 The folder opens in an editor window and is added to **Projects**.
 
-**On Mac:** you can also choose File ▸ **Open Project…** (⌥⌘O), or **Open Project…** in an empty editor window. A folder opened this way is not added to **Projects** automatically. The toolbar shows **Save as Project**; choose it to keep the folder in the list.
+You can also choose **Open…** in an editor window (the folder button in the toolbar, or ⌘O with a keyboard) and pick a folder. **On Mac:** choose File ▸ **Open…** (⌘O), or **Open…** in an empty editor window. A folder opened any of these ways is added to **Projects** too.
+
+Each project opens in its own editor window. Opening a project that is already open brings its window forward. When the editor window in front is empty, the project opens there rather than in a new window.
+
+If a project is open but no longer in **Projects** (you removed it while its window was open), the toolbar shows **Save as Project**; choose it to keep the folder in the list.
+
+**On Apple Vision Pro and iPad:** a folder you pick from the Files app opens again from **Projects** after the app restarts. This device keeps its own permission to read that folder; it is not synchronized.
 
 ## Open a folder on a server
 

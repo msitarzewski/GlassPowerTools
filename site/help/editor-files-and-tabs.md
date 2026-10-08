@@ -40,7 +40,7 @@ The same context menu has **Open** (or **Open Folder**) and, on a folder, **Refr
 
 ## Open a file on its own
 
-A file does not need a project. Open one with **Open File…**, by dropping it on an editor window, or with **Edit** in a Terminal service's Files browser. The file list stays hidden while no project is open.
+A file does not need a project. Open one with **Open…**, by dropping it on an editor window, or with **Edit** in a Terminal service's Files browser. It opens as a tab in the editor window in front. The file list stays hidden while no project is open.
 
 **On iPhone:** **Edit** in the Files browser opens the Editor over the browser. The back chevron, **Files**, returns to the browser with its connection still open.
 

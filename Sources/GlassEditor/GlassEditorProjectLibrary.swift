@@ -335,6 +335,54 @@ public final class GlassEditorProjectLibrary {
         guard var record = payload.records.first(where: { $0.id == id }) else { return }
         record.deletedAt = date
         upsert(record)
+        // The way back into the folder goes with the last record that names it.
+        if !projects.contains(where: { $0.path == record.project.path }) {
+            forgetBookmark(forPath: record.project.path)
+        }
+    }
+
+    // MARK: This device's way back in
+
+    /// Bookmarks for folders picked from Files, by path — **this device's only, and never
+    /// synchronized.**
+    ///
+    /// A folder chosen from Files on an iPad or a headset can be read only with the access the
+    /// picker granted, and that access does not survive a relaunch: the project stayed in the list
+    /// and its Open said the folder was gone. A bookmark is how the access comes back (decided
+    /// 2026-10-08). It is this device's permission for a folder on this device, so it means nothing
+    /// on any other, and it is kept under its own key beside the list rather than in the payload.
+    static let bookmarksDefaultsKey = "com.glasspowertools.editor.projects.device-bookmarks"
+
+    private var bookmarks: [String: Data] {
+        defaults.dictionary(forKey: Self.bookmarksDefaultsKey) as? [String: Data] ?? [:]
+    }
+
+    /// Keeps a way back into a folder that was opened with granted access. Made while that access
+    /// is held, which is the only time it can be.
+    func keepBookmark(of url: URL, forPath path: String) {
+        guard let data = try? url.bookmarkData(options: .minimalBookmark,
+                                               includingResourceValuesForKeys: nil,
+                                               relativeTo: nil) else { return }
+        var stored = bookmarks
+        stored[GlassEditorProject.normalized(path)] = data
+        defaults.set(stored, forKey: Self.bookmarksDefaultsKey)
+    }
+
+    /// The folder at `path` as the bookmark finds it, and whether the bookmark wants remaking.
+    /// Nil when there is none, which is every folder that never needed one.
+    func bookmarkedURL(forPath path: String) -> (url: URL, isStale: Bool)? {
+        guard let data = bookmarks[GlassEditorProject.normalized(path)] else { return nil }
+        var isStale = false
+        guard let url = try? URL(resolvingBookmarkData: data, bookmarkDataIsStale: &isStale) else {
+            return nil
+        }
+        return (url, isStale)
+    }
+
+    func forgetBookmark(forPath path: String) {
+        var stored = bookmarks
+        guard stored.removeValue(forKey: GlassEditorProject.normalized(path)) != nil else { return }
+        defaults.set(stored, forKey: Self.bookmarksDefaultsKey)
     }
 
     private func upsert(_ record: GlassEditorProjectRecord) {
