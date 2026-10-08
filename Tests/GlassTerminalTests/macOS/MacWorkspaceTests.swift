@@ -347,6 +347,7 @@ struct MacWorkspaceTests {
                 settingsManager: SettingsManager,
                 startupCommand: String? = nil,
                 tmux: TerminalTmuxAttachment? = nil,
+                configure: (@MainActor (TerminalSession) -> Void)? = nil,
                 initialTerminalPresentation: TerminalSession.InitialTerminalPresentationRequest? = nil
             ) async throws -> AuthorizedSessionLaunch {
                 receivedCommands.append(startupCommand)

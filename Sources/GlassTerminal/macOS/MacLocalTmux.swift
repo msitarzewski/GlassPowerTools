@@ -236,6 +236,8 @@ enum MacLocalTmux {
     /// macOS restores no windows after a quit while "Close windows when quitting an application"
     /// is on — its default — so a tab kept in tmux would never come back to its session. The app
     /// notes those windows as it quits, and opens them again at the next launch (2026-10-07).
+    /// SSH terminals in tmux count too (W4b): their panes keep their sessions' names, so a window
+    /// of SSH tabs comes back attached to the same sessions rather than not at all.
     static let reopenKey = "macLocalTmuxWindowsToReopen"
 
     /// The windows on screen, as `MacWorkspacePreviewRegistry` knows them: the controller each one
@@ -243,7 +245,7 @@ enum MacLocalTmux {
     @MainActor static func rememberWindowsToReopen(defaults: UserDefaults = .standard,
                                                    registry: MacWorkspacePreviewRegistry = .shared) {
         let ids = registry.shownControllers
-            .filter { $0.tabs.contains(where: \.hasLocalTerminalsInTmux) }
+            .filter { $0.tabs.contains(where: \.hasTerminalsInTmux) }
             .map(\.windowID.uuidString)
         if ids.isEmpty { defaults.removeObject(forKey: reopenKey) } else { defaults.set(ids, forKey: reopenKey) }
     }

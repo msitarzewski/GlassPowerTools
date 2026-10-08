@@ -103,7 +103,8 @@ struct TerminalWorkgroupsView: View {
             .sheet(item: $model.editorContext) { context in
             WorkgroupEditorView(
                 context: context,
-                servers: serverManager.servers
+                servers: serverManager.servers,
+                existing: settingsManager.layoutPresets
             ) { preset in
                 settingsManager.upsertLayoutPreset(preset)
             }
@@ -634,10 +635,18 @@ struct TerminalWorkgroupsView: View {
     }
 
     private var currentSavedSessionIntents: [LayoutPreset.SessionIntent] {
-        sessionManager.sessions.compactMap { session in
+        Self.savedSessionIntents(of: sessionManager.sessions, servers: serverManager.servers)
+    }
+
+    /// The open terminals on saved servers as a workgroup's tabs, each with the tmux session it
+    /// is in, so the workgroup reopens on them (W4b).
+    static func savedSessionIntents(of sessions: [TerminalSession],
+                                    servers: [ServerConfiguration]) -> [LayoutPreset.SessionIntent] {
+        sessions.compactMap { session in
             guard session.purpose == .terminal,
-                  serverManager.server(for: session.server.id) != nil else { return nil }
-            return LayoutPreset.SessionIntent(serverID: session.server.id)
+                  servers.contains(where: { $0.id == session.server.id }) else { return nil }
+            return LayoutPreset.SessionIntent(serverID: session.server.id, label: session.workgroupLabel,
+                                              tmuxSession: session.usesTmux ? session.tmuxSessionName : nil)
         }
     }
 

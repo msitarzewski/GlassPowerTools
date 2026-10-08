@@ -439,6 +439,31 @@ class TerminalSession: Identifiable, Hashable {
     var tmuxNamesHeld: (@MainActor () -> Set<String>)?
     /// The session was made for this terminal and the startup command has not followed yet.
     private var tmuxSessionIsNew = false
+    /// W4b: told the name this terminal claimed for a new session, once it has one, so whoever
+    /// opened it — a workgroup, a Mac tab — keeps the name and attaches to it next time.
+    var tmuxSessionClaimed: (@MainActor (String) -> Void)?
+
+    // MARK: Workgroup slots (W4b, 2026-10-08)
+    /// What the workgroup calls this terminal, when it names it: the iPhone's switcher shows it.
+    var workgroupLabel: String?
+    /// One of the terminals an iPhone opens a workgroup with: it connects only when it is shown
+    /// (owner, 2026-10-08: "opening a workgroup on iPhone would be a challenge"). Terminals opened
+    /// any other way connect as they always have.
+    var isWorkgroupSlot = false
+    /// A slot that is not on screen: it connects when it is shown, and a connection it loses —
+    /// the app was suspended — waits to be shown again rather than reconnecting unseen.
+    var connectsWhenShown = false
+
+    /// A slot just shown should connect: it never has, or it lost its connection while hidden or
+    /// failed to open. Not one someone disconnected, one already on its way, or one waiting for a
+    /// host-key answer.
+    var connectsOnShow: Bool {
+        guard purpose == .terminal, !userInitiatedDisconnect, pendingHostKeyChallenge == nil else { return false }
+        switch state {
+        case .disconnected, .error: return true
+        case .connecting, .connected, .reconnecting: return false
+        }
+    }
 
     init(
         server: ServerConfiguration,
@@ -729,6 +754,9 @@ class TerminalSession: Identifiable, Hashable {
               purpose == .terminal,
               !userInitiatedDisconnect
         else { return }
+        // W4b: a slot hidden on an iPhone reconnects when it is shown (`connectsOnShow`), so a
+        // workgroup coming back from suspension reconnects only the terminal on screen.
+        guard !connectsWhenShown else { return }
 
         reconnectTask?.cancel()
         flushPendingTerminalOutputNow()
@@ -843,6 +871,7 @@ class TerminalSession: Identifiable, Hashable {
             guard let self else { return }
             if tmuxSessionName == nil {
                 guard await claimNewTmuxSession() else { return }
+                if let claimed = tmuxSessionName { tmuxSessionClaimed?(claimed) }
             } else if tmuxClaimsGivenName, let given = tmuxSessionName {
                 guard await claimGivenTmuxSession(given) else { return }
             }
@@ -2111,13 +2140,19 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
         var startupCommand: String?
         var localShell: String? = nil
         var localDirectory: String? = nil
+        /// W4b (2026-10-08): the tmux session this terminal lives in — on its SSH host, or on the
+        /// Mac for a local one — so opening the workgroup attaches to it again rather than starting
+        /// a new one. It travels with the workgroup (D51): the session lives on the host, not on
+        /// the device. Nil until a terminal opened from the workgroup claims one.
+        var tmuxSession: String? = nil
 
         init(
             schemaVersion: Int = SessionIntent.currentSchemaVersion,
             serverID: UUID,
             restoration: Restoration = .freshAuthorizedSession,
             label: String? = nil,
-            startupCommand: String? = nil
+            startupCommand: String? = nil,
+            tmuxSession: String? = nil
         ) {
             self.schemaVersion = schemaVersion
             self.kind = .ssh
@@ -2125,6 +2160,7 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
             self.restoration = restoration
             self.label = Self.normalizedLabel(label)
             self.startupCommand = Self.normalizedCommand(startupCommand)
+            self.tmuxSession = Self.normalizedTmuxSession(tmuxSession)
         }
 
         init(
@@ -2135,7 +2171,8 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
             label: String? = nil,
             startupCommand: String? = nil,
             localShell: String? = nil,
-            localDirectory: String? = nil
+            localDirectory: String? = nil,
+            tmuxSession: String? = nil
         ) {
             self.schemaVersion = schemaVersion
             self.kind = kind
@@ -2145,6 +2182,7 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
             self.restoration = restoration
             self.label = Self.normalizedLabel(label)
             self.startupCommand = Self.normalizedCommand(startupCommand)
+            self.tmuxSession = Self.normalizedTmuxSession(tmuxSession)
         }
 
         var isSupported: Bool {
@@ -2153,8 +2191,18 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
                 && ((kind == .local && serverID == nil) || (kind == .ssh && serverID != nil))
                 && label == Self.normalizedLabel(label)
                 && startupCommand == Self.normalizedCommand(startupCommand)
+                && tmuxSession == Self.normalizedTmuxSession(tmuxSession)
                 && [localShell, localDirectory].allSatisfy { $0 == nil || (!$0!.isEmpty && !$0!.utf8.contains(0)) }
                 && (kind == .local || (localShell == nil && localDirectory == nil))
+        }
+
+        /// The same terminal, whatever tmux session it was given: a name a pane claimed and wrote
+        /// back does not make it a different pane (a device's SSH substitution, an edit's draft).
+        func sameTerminal(as other: Self) -> Bool {
+            var mine = self, theirs = other
+            mine.tmuxSession = nil
+            theirs.tmuxSession = nil
+            return mine == theirs
         }
 
         var needsMigration: Bool { schemaVersion < Self.currentSchemaVersion }
@@ -2186,6 +2234,12 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
             return value
         }
 
+        /// A name tmux would take, else none — as an unreadable label or command is read as none:
+        /// the terminal then claims a new session, and the workgroup still opens.
+        private static func normalizedTmuxSession(_ value: String?) -> String? {
+            value.flatMap { TerminalTmux.isValidSessionName($0) ? $0 : nil }
+        }
+
         private enum CodingKeys: String, CodingKey {
             case schemaVersion
             case kind
@@ -2194,6 +2248,7 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
             case label
             case startupCommand
             case localShell, localDirectory
+            case tmuxSession
         }
 
         init(from decoder: Decoder) throws {
@@ -2209,6 +2264,9 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
             startupCommand = Self.normalizedCommand(
                 try container.decodeIfPresent(String.self, forKey: .startupCommand)
             )
+            // Optional and without a schema change, so a build from before W4b still reads the
+            // workgroup; it drops the name only if it saves the workgroup again.
+            tmuxSession = Self.normalizedTmuxSession(try container.decodeIfPresent(String.self, forKey: .tmuxSession))
         }
 
         func encode(to encoder: Encoder) throws {
@@ -2221,6 +2279,7 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
             try container.encodeIfPresent(startupCommand, forKey: .startupCommand)
             try container.encodeIfPresent(localShell, forKey: .localShell)
             try container.encodeIfPresent(localDirectory, forKey: .localDirectory)
+            try container.encodeIfPresent(tmuxSession, forKey: .tmuxSession)
         }
     }
 
@@ -2371,6 +2430,15 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
     /// Repeated IDs are intentional: each entry represents a separate session.
     var serverIDs: [UUID] {
         sessionIntents.compactMap(\.serverID)
+    }
+
+    /// W4b: the tmux sessions saved workgroups hold on one machine — an SSH server, or this Mac
+    /// when `serverID` is nil. A new terminal there never takes one, though nothing may be
+    /// running it: the workgroup would attach to that terminal's work next time it opens.
+    static func tmuxSessionsHeld(in presets: [LayoutPreset], serverID: UUID?) -> Set<String> {
+        Set(presets.flatMap(\.sessionIntents).filter { intent in
+            serverID == nil ? intent.kind == .local : (intent.kind == .ssh && intent.serverID == serverID)
+        }.compactMap(\.tmuxSession))
     }
 
     var needsMigration: Bool {

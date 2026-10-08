@@ -172,6 +172,7 @@ struct VisionTerminalWorkgroupView: View {
         .onAppear {
             sessionManager.serverManager.loadServersIfNeeded()
             synchronizeSelection()
+            connectShownSlot()
         }
         .onChange(of: liveSelectedSessionID) { _, newSelection in
             if selectedSessionID != newSelection {
@@ -181,6 +182,7 @@ struct VisionTerminalWorkgroupView: View {
         .onChange(of: selectedSessionID) { _, newSelection in
             guard let newSelection else { return }
             sessionManager.selectSession(newSelection, inWorkgroup: workgroupID)
+            connectShownSlot()
         }
         .focusedSceneValue(
             \.platformNewTerminalAction,
@@ -511,7 +513,9 @@ struct VisionTerminalWorkgroupView: View {
         sessions: [TerminalSession]
     ) -> some View {
         ZStack {
-            ForEach(sessions) { session in
+            // A slot that has never connected has nothing to keep on screen: its terminal is
+            // made when it is shown (W4b). Connected ones stay, hidden, as before.
+            ForEach(sessions.filter { $0.id == (selectedSessionID ?? workgroup.selectedSessionID) || $0.state != .disconnected }) { session in
                 let active = (selectedSessionID ?? workgroup.selectedSessionID) == session.id
                 TerminalWindowView(
                     session: session,
@@ -605,14 +609,15 @@ struct VisionTerminalWorkgroupView: View {
         }
     }
 
+    /// Each slot by the workgroup's label for it, else "Terminal N · server", with a filled dot
+    /// once it is connected (W4b): choosing one connects it.
     private func compactSessionSwitcher(sessions: [TerminalSession]) -> some View {
         Menu {
             Picker("Session", selection: $selectedSessionID) {
-                ForEach(sessions) { session in
-                    Text(
-                        "\(session.server.name) — "
-                            + "\(session.server.username)@\(session.server.host)"
-                    )
+                ForEach(Array(sessions.enumerated()), id: \.element.id) { position, session in
+                    Label(TerminalWorkgroupOpening.slotTitle(session, position: position),
+                          systemImage: session.state == .connected ? "circle.fill" : "circle")
+                        .accessibilityValue(session.state == .connected ? "Connected" : "Not connected")
                         .tag(Optional(session.id))
                 }
             }
@@ -631,11 +636,27 @@ struct VisionTerminalWorkgroupView: View {
     }
 
     private func selectedSessionName(in sessions: [TerminalSession]) -> String {
-        sessions.first(where: { $0.id == selectedSessionID })?.server.name
-            ?? sessions.first?.server.name
-            ?? "Session"
+        let position = sessions.firstIndex(where: { $0.id == selectedSessionID }) ?? 0
+        guard sessions.indices.contains(position) else { return "Session" }
+        return TerminalWorkgroupOpening.slotTitle(sessions[position], position: position)
     }
     #endif
+
+    /// iPhone: the slot on screen connects if it needs to, and the hidden ones wait to be shown
+    /// (W4b). iPad and Vision Pro keep every terminal connected for their previews.
+    private func connectShownSlot() {
+        #if os(iOS)
+        guard usesCompactPhoneNavigation else { return }
+        Task { @MainActor in
+            do {
+                try await TerminalWorkgroupOpening.connectShownSlot(in: workgroupID, sessionManager: sessionManager,
+                                                                    settingsManager: settingsManager)
+            } catch {
+                connectionFailureMessage = error.localizedDescription
+            }
+        }
+        #endif
+    }
 
     private func liveSessions(in workgroup: TerminalWorkgroup) -> [TerminalSession] {
         sessionManager.sessions(inWorkgroup: workgroup.id)

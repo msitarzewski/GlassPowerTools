@@ -13,6 +13,9 @@ import SwiftUI
 import GlassLayers
 import GlassShell
 import GlassSSHTransport
+#if os(iOS)
+import UIKit
+#endif
 
 /// Attached once by `GlassTerminalBootstrap`; runs connect requests posted to the runtime.
 struct TerminalConnectFlow: ViewModifier {
@@ -52,14 +55,22 @@ struct TerminalConnectFlow: ViewModifier {
     #endif
     #if os(visionOS) || os(iOS)
     @State private var pendingPasswordWorkgroup: LayoutPreset?
+    /// The device's stand-ins for the waiting workgroup's Mac terminals, already reviewed.
+    @State private var pendingPasswordSubstitutions: [Int: LayoutPreset.SessionIntent]?
     @State private var workgroupPasswordWasSaved = false
     @State private var isOpeningWorkgroup = false
     @State private var substitutionReviewPreset: LayoutPreset?
-    @State private var reviewedSubstitutionPreset: LayoutPreset?
+    @State private var reviewedSubstitution: ReviewedSubstitution?
     #endif
 
     /// `Identifiable` wrapper so an empty draft (plain "Add Server") can drive a `.sheet(item:)`.
     struct AddServerRequest: Identifiable { let id = UUID(); let draft: ServerConfiguration? }
+    /// A workgroup with its Mac terminals' SSH stand-ins chosen: the saved workgroup itself, so
+    /// its other terminals keep their places and tmux sessions (W4b).
+    struct ReviewedSubstitution {
+        let preset: LayoutPreset
+        let replacements: [Int: LayoutPreset.SessionIntent]
+    }
     struct EditServerRequest: Identifiable {
         let server: ServerConfiguration
         let hostContext: ServerFormHostContext?
@@ -256,20 +267,15 @@ struct TerminalConnectFlow: ViewModifier {
         }
         #if os(visionOS) || os(iOS)
         .sheet(item: $substitutionReviewPreset, onDismiss: {
-            guard let preset = reviewedSubstitutionPreset else { return }
-            reviewedSubstitutionPreset = nil
-            openVisionWorkgroup(preset, plan: LayoutRestorationPlan(
-                preset: preset, availableServers: serverManager.servers), reviewedLocalEntries: true)
+            guard let reviewed = reviewedSubstitution else { return }
+            reviewedSubstitution = nil
+            openVisionWorkgroup(reviewed.preset, substitutions: reviewed.replacements)
         }) { preset in
             WorkgroupSSHSubstitutionReview(preset: preset, servers: serverManager.servers,
                                           saved: settingsManager.sshSubstitutions(for: preset)) { replacements, remember in
                 settingsManager.saveSSHSubstitutions(remember ? replacements : [:], for: preset)
-                var launchPreset = preset
-                launchPreset.sessionIntents = preset.sessionIntents.enumerated().compactMap { index, intent in
-                    intent.kind == .local ? replacements[index]?.intent : intent
-                }
-                launchPreset.workspaceLayout = nil
-                reviewedSubstitutionPreset = launchPreset
+                reviewedSubstitution = ReviewedSubstitution(preset: preset,
+                                                            replacements: replacements.mapValues(\.intent))
                 substitutionReviewPreset = nil
             }
         }
@@ -371,14 +377,10 @@ struct TerminalConnectFlow: ViewModifier {
 
     private func openWorkgroup(_ preset: LayoutPreset) {
         settingsManager.updateLayoutPresetLastUsed(preset.id)
-        let restorationPlan = LayoutRestorationPlan(
-            preset: preset,
-            availableServers: serverManager.servers
-        )
         #if os(visionOS) || os(iOS)
-        openVisionWorkgroup(preset, plan: restorationPlan)
+        openVisionWorkgroup(preset)
         #else
-        openMacWorkgroup(preset, plan: restorationPlan)
+        openMacWorkgroup(preset)
         #endif
     }
 
@@ -396,20 +398,49 @@ struct TerminalConnectFlow: ViewModifier {
     private func resumeWorkgroupAfterPasswordPrompt() {
         guard let preset = pendingPasswordWorkgroup else { return }
         let shouldContinue = workgroupPasswordWasSaved
+        let substitutions = pendingPasswordSubstitutions
         pendingPasswordWorkgroup = nil
+        pendingPasswordSubstitutions = nil
         workgroupPasswordWasSaved = false
         guard shouldContinue else { return }
-        openVisionWorkgroup(preset, plan: LayoutRestorationPlan(
-            preset: preset, availableServers: serverManager.servers
-        ))
+        openVisionWorkgroup(preset, substitutions: substitutions)
     }
 
-    private func openVisionWorkgroup(_ preset: LayoutPreset, plan: LayoutRestorationPlan, reviewedLocalEntries: Bool = false) {
+    /// Shows a workgroup whose terminals are open here already.
+    private func showOpenWorkgroup(_ workgroupID: UUID) {
+        #if os(visionOS)
+        openWindow(id: "terminal", value: workgroupID)
+        #else
+        iOSRouter.showTerminal(workgroupID: workgroupID)
+        #endif
+    }
+
+    /// The phone: one slot per terminal, connected when shown (W4b). iPad and Vision Pro open
+    /// every terminal, since their grid and carousel previews need live sessions.
+    private var opensWorkgroupSlotsLazily: Bool {
+        #if os(iOS)
+        UIDevice.current.userInterfaceIdiom == .phone
+        #else
+        false
+        #endif
+    }
+
+    /// - Parameter substitutions: the reviewed SSH stand-ins for its Mac terminals; nil until
+    ///   they have been reviewed.
+    private func openVisionWorkgroup(_ preset: LayoutPreset, substitutions: [Int: LayoutPreset.SessionIntent]? = nil) {
         guard !isOpeningWorkgroup, passwordPromptServer == nil else { return }
-        if !reviewedLocalEntries && preset.sessionIntents.contains(where: { $0.kind == .local }) {
+        // Open here already: shown, never opened a second time (W4b). Its live terminals carry
+        // the workgroup's id.
+        if TerminalWorkgroupOpening.isOpen(preset.id, in: sessionManager) {
+            showOpenWorkgroup(preset.id)
+            return
+        }
+        if substitutions == nil && preset.sessionIntents.contains(where: { $0.kind == .local }) {
             substitutionReviewPreset = preset
             return
         }
+        let plan = LayoutRestorationPlan(preset: preset, availableServers: serverManager.servers,
+                                         substitutions: substitutions)
         // The Mac's policy, on every platform: a Workgroup opens its connections without the
         // per-connection confirmation that legacy algorithms require, so it does not open one of
         // those at all. Before this, a headset, iPad or iPhone connected it without asking.
@@ -425,6 +456,7 @@ struct TerminalConnectFlow: ViewModifier {
                 _ = try sessionManager.prepareConnection(for: server)
             } catch SessionOpenError.missingPassword(let missingServer, _) {
                 pendingPasswordWorkgroup = preset
+                pendingPasswordSubstitutions = substitutions
                 workgroupPasswordWasSaved = false
                 passwordPromptServer = missingServer
                 return
@@ -436,13 +468,35 @@ struct TerminalConnectFlow: ViewModifier {
         isOpeningWorkgroup = true
         Task { @MainActor in
             defer { isOpeningWorkgroup = false }
+            // The workgroup's own id, so opening it again finds these terminals (W4b).
             let workgroupID = sessionManager.createWorkgroup(
+                id: preset.id,
                 name: preset.name,
                 colorTag: preset.colorTag
             )
             var failures = plan.failures
-            var appendedSessionIDs: [UUID] = []
 
+            if opensWorkgroupSlotsLazily {
+                failures += TerminalWorkgroupOpening.makeSlots(for: plan, workgroupID: workgroupID,
+                                                              sessionManager: sessionManager, settingsManager: settingsManager)
+                if TerminalWorkgroupOpening.isOpen(workgroupID, in: sessionManager) {
+                    showOpenWorkgroup(workgroupID)
+                    do {
+                        try await TerminalWorkgroupOpening.connectShownSlot(in: workgroupID, sessionManager: sessionManager,
+                                                                            settingsManager: settingsManager)
+                    } catch {
+                        failures.append(error.localizedDescription)
+                    }
+                } else {
+                    sessionManager.discardWorkgroupIfEmpty(workgroupID)
+                }
+                if !failures.isEmpty {
+                    connectionFailureMessage = failures.joined(separator: "\n")
+                }
+                return
+            }
+
+            var appendedSessionIDs: [UUID] = []
             for target in plan.targets {
                 guard target.intent.kind == .ssh,
                       let server = target.server,
@@ -454,7 +508,11 @@ struct TerminalConnectFlow: ViewModifier {
                     let launch = try await sessionManager.createAuthorizedSessionByServerID(
                         serverID,
                         settingsManager: settingsManager,
-                        startupCommand: target.intent.startupCommand
+                        startupCommand: target.intent.startupCommand,
+                        configure: { session in
+                            TerminalWorkgroupOpening.prepare(session, for: target, workgroupID: workgroupID,
+                                                             settingsManager: settingsManager)
+                        }
                     )
                     let session = launch.session
                     if session.state == .connected
@@ -497,7 +555,10 @@ struct TerminalConnectFlow: ViewModifier {
         }
     }
     #else
-    private func openMacWorkgroup(_ preset: LayoutPreset, plan: LayoutRestorationPlan) {
+    private func openMacWorkgroup(_ preset: LayoutPreset) {
+        // Open already — a window opened from it, or one showing its saved sessions: brought
+        // forward, never opened a second time beside it (W4b).
+        if MacWorkspacePreviewRegistry.shared.reveal(workgroup: preset) { return }
         // Keep every pane's position even when a saved endpoint is missing;
         // its native pane offers recovery without rearranging the workspace.
         // Legacy algorithm consent still requires the direct connection flow.

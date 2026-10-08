@@ -99,6 +99,47 @@ final class MacWorkspacePreviewRegistry {
         return nil
     }
 
+    /// W4b: brings forward the window showing a workgroup, on its tab, so opening it again never
+    /// attaches a second window to its sessions: the window opened from it, else one showing a
+    /// tmux session it saved — a window saved as the workgroup, or tabs reopened after a quit.
+    @discardableResult
+    func reveal(workgroup preset: LayoutPreset) -> Bool {
+        guard let found = locate(workgroup: preset) else { return false }
+        found.controller.select(found.tab.workspaceID)
+        NSApp.activate()
+        found.window.makeKeyAndOrderFront(nil)
+        return true
+    }
+
+    /// The window and tab `reveal(workgroup:)` brings forward, if any.
+    func locate(workgroup preset: LayoutPreset) -> (window: NSWindow, controller: MacWorkspaceWindowController,
+                                                    tab: MacWorkspaceController)? {
+        let saved = Set(preset.sessionIntents.compactMap { intent in
+            intent.tmuxSession.map { TerminalWorkgroupSession(serverID: intent.kind == .local ? nil : intent.serverID, name: $0) }
+        })
+        func holdsSaved(_ tab: MacWorkspaceController) -> Bool {
+            (tab.state.root?.panes ?? []).contains { pane in
+                pane.intent.tmuxSession.map { saved.contains(TerminalWorkgroupSession(serverID: pane.intent.serverID, name: $0)) } == true
+            }
+        }
+        let shown = entries.keys.sorted { $0.uuidString < $1.uuidString }.compactMap { id -> (NSWindow, MacWorkspaceWindowController)? in
+            guard let entry = entries[id], let window = entry.window, let controller = entry.controller else { return nil }
+            return (window, controller)
+        }
+        let matchers: [(MacWorkspaceController) -> Bool] = [{ $0.workgroupID == preset.id }, holdsSaved]
+        for match in matchers {
+            for (window, controller) in shown {
+                if let tab = controller.tabs.first(where: { !$0.isClosed && match($0) }) { return (window, controller, tab) }
+            }
+        }
+        return nil
+    }
+
+    private struct TerminalWorkgroupSession: Hashable {
+        let serverID: UUID?
+        let name: String
+    }
+
     /// Brings the window holding the session forward, on its tab.
     @discardableResult
     func reveal(sessionID: UUID) -> Bool {

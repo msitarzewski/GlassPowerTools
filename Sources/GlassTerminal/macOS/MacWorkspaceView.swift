@@ -377,7 +377,10 @@ struct MacWorkspaceView: View {
             requestCloseSelectedTab()
         }
         .sheet(item: $workgroupEditorContext) { context in
-            WorkgroupEditorView(context: context, servers: sessionManager.serverManager.servers) { preset in
+            // Saving under a workgroup's name offers to replace it: how a window rebuilds the
+            // workgroup it was arranged as (W4b).
+            WorkgroupEditorView(context: context, servers: sessionManager.serverManager.servers,
+                                existing: settingsManager.layoutPresets) { preset in
                 settingsManager.addLayoutPreset(preset)
             }
         }
@@ -525,7 +528,8 @@ struct MacWorkspaceView: View {
                 defaultLocalDirectory: defaults.currentDirectory ?? NSHomeDirectory(),
                 sourcePresets: settingsManager.layoutPresets
             )
-            // A capture is a new preset; saving does not overwrite its source.
+            // A capture is a new preset; it replaces one only when saved under its name and the
+            // editor's Replace is chosen.
             workgroupEditorContext = WorkgroupEditorContext(
                 original: nil,
                 name: preset.name,
@@ -601,6 +605,7 @@ struct MacWorkspaceView: View {
         intent.sourceSessionIndex = nil
         // And the tmux session belongs to the pane that made it: the new tab gets its own.
         intent.localTmuxSession = nil
+        intent.sshTmuxSession = nil
         if let tab = windowController.addTab(
             MacWorkspaceTabRequest(startsEmpty: false, initialPaneIntent: intent)
         ) {

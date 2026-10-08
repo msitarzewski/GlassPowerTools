@@ -51,7 +51,12 @@ struct WorkgroupEditorContext: Identifiable {
             original: nil,
             name: copyName,
             colorTag: preset.colorTag,
-            sessionIntents: preset.sessionIntents,
+            // A copy opens terminals of its own, never the original's tmux sessions (W4b).
+            sessionIntents: preset.sessionIntents.map { intent in
+                var copy = intent
+                copy.tmuxSession = nil
+                return copy
+            },
             workspaceLayout: preset.workspaceLayout,
             openingView: preset.openingView,
             autoFocusOnActivity: preset.autoFocusOnActivity,
@@ -74,12 +79,21 @@ private extension ToolbarItemPlacement {
 
 struct WorkgroupTabDraft: Identifiable {
     let id: UUID
-    var kind: LayoutPreset.SessionIntent.Kind
-    var serverID: UUID?
+    /// Another kind of terminal is another machine: the tmux session stays with the old one.
+    var kind: LayoutPreset.SessionIntent.Kind {
+        didSet { if kind != oldValue { tmuxSession = nil } }
+    }
+    /// Another server, the same: a session lives on its host (W4b).
+    var serverID: UUID? {
+        didSet { if serverID != oldValue { tmuxSession = nil } }
+    }
     var label: String
     var startupCommand: String
     var localShell: String = ""
     var localDirectory: String = ""
+    /// W4b: the tmux session the tab opens on, kept through an edit — the editor rebuilds every
+    /// terminal from its draft, and a name left out here was lost on save.
+    var tmuxSession: String? = nil
 
     init(
         id: UUID = UUID(),
@@ -104,6 +118,7 @@ struct WorkgroupTabDraft: Identifiable {
         )
         localShell = intent.localShell ?? ""
         localDirectory = intent.localDirectory ?? ""
+        tmuxSession = intent.tmuxSession
     }
 
     var intent: LayoutPreset.SessionIntent {
@@ -113,7 +128,8 @@ struct WorkgroupTabDraft: Identifiable {
             label: label,
             startupCommand: startupCommand,
             localShell: kind == .local ? localShell : nil,
-            localDirectory: kind == .local ? localDirectory : nil
+            localDirectory: kind == .local ? localDirectory : nil,
+            tmuxSession: tmuxSession
         )
     }
 
@@ -147,6 +163,8 @@ struct WorkgroupEditorView: View {
 
     let context: WorkgroupEditorContext
     let servers: [ServerConfiguration]
+    /// The workgroups saved now: a new one given one of their names may replace it (W4b).
+    let existing: [LayoutPreset]
     let onSave: (LayoutPreset) -> Void
 
     @State private var name: String
@@ -158,14 +176,18 @@ struct WorkgroupEditorView: View {
     @State private var editingTab: WorkgroupTabDraft?
     @State private var pendingDeletionIDs: [UUID] = []
     @State private var showingTabDeletion = false
+    /// A saved workgroup with the name being saved, waiting for Replace or Keep Both.
+    @State private var replaceCandidate: LayoutPreset?
 
     init(
         context: WorkgroupEditorContext,
         servers: [ServerConfiguration],
+        existing: [LayoutPreset] = [],
         onSave: @escaping (LayoutPreset) -> Void
     ) {
         self.context = context
         self.servers = servers
+        self.existing = existing
         self.onSave = onSave
         _name = State(initialValue: context.name)
         _colorTag = State(initialValue: context.colorTag)
@@ -226,6 +248,18 @@ struct WorkgroupEditorView: View {
             Button("Cancel", role: .cancel) { pendingDeletionIDs = [] }
         } message: {
             Text("This removes the selected tabs from this draft. The saved Workgroup is unchanged until you save.")
+        }
+        .confirmationDialog(
+            "Replace “\(replaceCandidate?.name ?? normalizedName)”?",
+            isPresented: Binding(get: { replaceCandidate != nil }, set: { if !$0 { replaceCandidate = nil } }),
+            titleVisibility: .visible,
+            presenting: replaceCandidate
+        ) { candidate in
+            Button("Replace", role: .destructive) { save(replacing: candidate) }
+            Button("Keep Both") { save(replacing: nil) }
+            Button("Cancel", role: .cancel) { replaceCandidate = nil }
+        } message: { _ in
+            Text("A workgroup with this name already exists. Replace it with these tabs, on every device, or keep both.")
         }
     }
 
@@ -541,19 +575,45 @@ struct WorkgroupEditorView: View {
 
     private func save() {
         guard validationMessage == nil else { return }
+        // A new workgroup under a name already saved — a window saved again to rebuild its
+        // workgroup (owner, 2026-10-08) — asks whether it replaces that one.
+        if context.original == nil, let candidate = Self.workgroup(named: normalizedName, in: existing) {
+            replaceCandidate = candidate
+            return
+        }
+        save(replacing: nil)
+    }
+
+    /// The saved workgroup a new one named `name` would replace: the same name, ignoring case.
+    static func workgroup(named name: String, in presets: [LayoutPreset]) -> LayoutPreset? {
+        presets.first { $0.name.compare(name, options: [.caseInsensitive, .diacriticInsensitive]) == .orderedSame }
+    }
+
+    /// Saves the draft. Replacing keeps the replaced workgroup's identity, so every device
+    /// updates that workgroup rather than gaining a second one.
+    private func save(replacing replaced: LayoutPreset?) {
+        guard validationMessage == nil else { return }
+        replaceCandidate = nil
+        let kept = replaced ?? context.original
         let intents = tabs.map(\.intent)
         var preset = LayoutPreset(
-            id: context.original?.id ?? UUID(),
+            id: kept?.id ?? UUID(),
             name: normalizedName,
             colorTag: colorTag,
             sessionIntents: intents,
-            createdAt: context.original?.createdAt ?? Date(),
-            lastUsed: context.original?.lastUsed
+            createdAt: kept?.createdAt ?? Date(),
+            lastUsed: kept?.lastUsed
         )
         preset.workspaceLayout = context.workspaceLayout
+        #if os(macOS)
         preset.openingView = openingView
         preset.autoFocusOnActivity = autoFocusOnActivity
-        preset.gridCardWidth = context.gridCardWidth
+        #else
+        // Not offered here: a workgroup replaced from this device keeps how the Mac opens it.
+        preset.openingView = replaced?.openingView ?? openingView
+        preset.autoFocusOnActivity = replaced?.autoFocusOnActivity ?? autoFocusOnActivity
+        #endif
+        preset.gridCardWidth = context.gridCardWidth ?? replaced?.gridCardWidth
         onSave(preset)
         dismiss()
     }
@@ -669,6 +729,21 @@ struct WorkgroupTabEditorView: View {
                 }
             }
             textField("Label", text: $draft.label)
+            // W4b: the session this tab reopens on. Forgetting it leaves the session running, in
+            // Active; the tab starts a new one the next time the workgroup opens.
+            if let tmuxSession = draft.tmuxSession {
+                LabeledContent("tmux session") {
+                    HStack {
+                        Text(tmuxSession)
+                            .font(.body.monospaced())
+                            .textSelection(.enabled)
+                        Spacer()
+                        Button("Start a New One") { draft.tmuxSession = nil }
+                            .help("Open a new tmux session next time. This one keeps running, and Active lists it.")
+                    }
+                    .serverFormControlPresentation()
+                }
+            }
         }
         Section {
             textField("Startup command", text: $draft.startupCommand, monospaced: true)

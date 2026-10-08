@@ -40,6 +40,8 @@ class SessionManager {
     let serverManager: ServerManager
     private var sessionOrigins: [UUID: SessionOrigin] = [:]
     private var transientPasswords: [UUID: SecureBytes] = [:]
+    /// Workgroup slots signing in now (`connectWhenShown`).
+    @ObservationIgnored private var slotsConnecting: Set<UUID> = []
 
     init(
         serverManager: ServerManager? = nil,
@@ -194,6 +196,7 @@ class SessionManager {
         providedPassword: String?,
         startupCommand: String?,
         tmux: TerminalTmuxAttachment? = nil,
+        configure: (@MainActor (TerminalSession) -> Void)? = nil,
         initialTerminalPresentation: TerminalSession.InitialTerminalPresentationRequest?
     ) async throws -> AuthorizedSessionLaunch {
         if startupCommand != nil,
@@ -227,6 +230,7 @@ class SessionManager {
             purpose: purpose,
             startupCommand: startupCommand,
             tmux: tmux,
+            configure: configure,
             initialTerminalPresentation: initialTerminalPresentation
         )
         if case .error = session.state,
@@ -237,11 +241,14 @@ class SessionManager {
         return AuthorizedSessionLaunch(session: session)
     }
 
+    /// - Parameter configure: W4b — runs on the new session before it connects: a workgroup
+    ///   pane's saved tmux name, and where a name it claims is kept.
     func createAuthorizedSessionByServerID(
         _ serverID: UUID,
         settingsManager: SettingsManager,
         startupCommand: String? = nil,
         tmux: TerminalTmuxAttachment? = nil,
+        configure: (@MainActor (TerminalSession) -> Void)? = nil,
         initialTerminalPresentation: TerminalSession.InitialTerminalPresentationRequest? = nil
     ) async throws -> AuthorizedSessionLaunch {
         guard let server = serverManager.server(for: serverID) else {
@@ -254,8 +261,69 @@ class SessionManager {
             providedPassword: nil,
             startupCommand: startupCommand,
             tmux: tmux,
+            configure: configure,
             initialTerminalPresentation: initialTerminalPresentation
         )
+    }
+
+    // MARK: Workgroup slots on iPhone (W4b, 2026-10-08)
+
+    /// A terminal for a workgroup slot, made and registered but not connected: an iPhone opens
+    /// a workgroup with one slot per pane and connects only the one shown (`connectWhenShown`).
+    /// Its credentials are read when it connects, as a reconnect reads them.
+    func createSessionWithoutConnecting(
+        serverID: UUID,
+        settingsManager: SettingsManager,
+        startupCommand: String? = nil,
+        configure: (@MainActor (TerminalSession) -> Void)? = nil
+    ) throws -> TerminalSession {
+        guard let server = serverManager.server(for: serverID) else {
+            throw SessionOpenError.savedServerNotFound
+        }
+        if startupCommand != nil, TerminalStartupCommandTicket(command: startupCommand) == nil {
+            throw SessionOpenError.invalidStartupCommand
+        }
+        _ = try resolveJumpHostChain(for: server)
+        let session = TerminalSession(
+            server: server,
+            initialTerminalGeometry: settingsManager.initialTerminalGeometry(for: server)
+        )
+        if let startupCommand { _ = session.installStartupCommand(startupCommand) }
+        installTmuxObservers(on: session, settingsManager: settingsManager)
+        configure?(session)
+        registerSession(session, origin: .savedProfile(server.id), transientPassword: nil)
+        installReconnectPreparation(on: session, settingsManager: settingsManager)
+        return session
+    }
+
+    /// Connects a slot that is being shown: one never connected, or one whose connection was lost
+    /// while it was hidden. A connection already open to the same server is shared, as a new
+    /// terminal shares it; otherwise it signs in with the saved credentials.
+    func connectWhenShown(_ session: TerminalSession, settingsManager: SettingsManager) async throws {
+        // Once at a time: the opener and the view both ask, and the state says "connecting"
+        // only once the sign-in starts.
+        guard session.connectsOnShow, slotsConnecting.insert(session.id).inserted else { return }
+        defer { slotsConnecting.remove(session.id) }
+        let context = try reconnectContext(for: session)
+        let jumpHostChain = try resolveJumpHostChain(for: context.server)
+        session.server = context.server
+        session.jumpHostChain = jumpHostChain
+        session.updateConfiguredInitialTerminalGeometry(settingsManager.initialTerminalGeometry(for: context.server))
+        var shared = false
+        if let connection = session.getSSHConnection(),
+           let source = reusableConnection(for: context.server, jumpHostChain: jumpHostChain) {
+            shared = await connection.shareTransport(from: source)
+        }
+        if !shared {
+            session.connectionPreparation = try prepareConnection(for: context.server).authentication
+        }
+        guard sessions.contains(where: { $0.id == session.id }) else { return }
+        await session.connect()
+        if session.state == .connected {
+            recordSuccessfulConnection(for: session)
+        } else {
+            settlePasswordTrialIfFailed(session)
+        }
     }
 
     func duplicateAuthorizedSession(
@@ -389,6 +457,7 @@ class SessionManager {
         purpose: TerminalSession.Purpose,
         startupCommand: String?,
         tmux: TerminalTmuxAttachment?,
+        configure: (@MainActor (TerminalSession) -> Void)?,
         initialTerminalPresentation: TerminalSession.InitialTerminalPresentationRequest?
     ) async -> TerminalSession {
         let session = TerminalSession(
@@ -407,11 +476,9 @@ class SessionManager {
             session.tmuxTakesOver = tmux.takeOver
         }
         if purpose == .terminal, case .savedProfile = origin {
-            session.tmuxAvailabilityObserved = { [weak self, weak session] available in
-                guard let self, let session else { return }
-                self.noteTmuxAvailability(available, on: session)
-            }
+            installTmuxObservers(on: session, settingsManager: settingsManager)
         }
+        configure?(session)
         session.jumpHostChain = jumpHostChain
         session.connectionPreparation = prepared?.authentication
         if let sharedConnection {
@@ -833,6 +900,19 @@ class SessionManager {
             guard let self, let session,
                   self.sessions.contains(where: { $0.id == session.id }) else { return }
             self.recordSuccessfulConnection(for: session)
+        }
+    }
+
+    /// A terminal on a saved server reports whether the host has tmux (D44), and a new session
+    /// there skips the names saved workgroups hold for that server (W4b), read when it claims.
+    private func installTmuxObservers(on session: TerminalSession, settingsManager: SettingsManager) {
+        session.tmuxAvailabilityObserved = { [weak self, weak session] available in
+            guard let self, let session else { return }
+            self.noteTmuxAvailability(available, on: session)
+        }
+        let serverID = session.server.id
+        session.tmuxNamesHeld = { [weak settingsManager] in
+            settingsManager?.tmuxSessionsHeld(forServer: serverID) ?? []
         }
     }
 

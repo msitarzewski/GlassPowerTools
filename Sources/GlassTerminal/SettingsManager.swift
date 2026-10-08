@@ -1620,7 +1620,8 @@ class SettingsManager {
         return saved.filter { index, replacement in
             preset.sessionIntents.indices.contains(index)
                 && preset.sessionIntents[index].kind == .local
-                && preset.sessionIntents[index] == replacement.source
+                // A tmux name the Mac wrote back does not undo this device's choice (W4b).
+                && preset.sessionIntents[index].sameTerminal(as: replacement.source)
         }
     }
 
@@ -1774,6 +1775,40 @@ class SettingsManager {
         let payload = workgroupsPayload
         let service = workgroupsSyncService
         Task { try? await service.push(payload) }
+    }
+
+    // MARK: Workgroups keep their tmux sessions (W4b, 2026-10-08)
+
+    /// The tmux sessions saved workgroups hold on an SSH server: a new terminal there skips them.
+    func tmuxSessionsHeld(forServer serverID: UUID) -> Set<String> {
+        LayoutPreset.tmuxSessionsHeld(in: layoutPresets, serverID: serverID)
+    }
+
+    /// The workgroups saved in `defaults`, read without a settings manager: the Mac's window
+    /// controllers read their other settings from the same store.
+    static func savedLayoutPresets(in defaults: UserDefaults) -> [LayoutPreset] {
+        guard let data = defaults.data(forKey: UserDefaultsKeys.layoutPresets),
+              let presets = try? JSONDecoder().decode([LayoutPreset].self, from: data) else { return [] }
+        return presets
+    }
+
+    /// A terminal opened from a workgroup without a saved tmux session claimed `name`: the
+    /// workgroup keeps it, so it attaches to that session the next time it opens, on any device.
+    /// Once: a saved name is never replaced, and nothing is written when the pane at `index` is
+    /// no longer the one that opened — the workgroup was edited meanwhile. This is the one change
+    /// opening a workgroup sends (amends D51's "opening sends nothing").
+    @discardableResult
+    func recordWorkgroupTmuxSession(_ name: String, workgroupID: UUID, index: Int,
+                                    opened: LayoutPreset.SessionIntent) -> Bool {
+        guard TerminalTmux.isValidSessionName(name),
+              let position = layoutPresets.firstIndex(where: { $0.id == workgroupID }),
+              layoutPresets[position].sessionIntents.indices.contains(index) else { return false }
+        var preset = layoutPresets[position]
+        let saved = preset.sessionIntents[index]
+        guard saved.tmuxSession == nil, saved.kind == opened.kind, saved.serverID == opened.serverID else { return false }
+        preset.sessionIntents[index].tmuxSession = name
+        upsertLayoutPreset(preset)
+        return true
     }
 
     func updateLayoutPresetLastUsed(_ presetID: UUID) {

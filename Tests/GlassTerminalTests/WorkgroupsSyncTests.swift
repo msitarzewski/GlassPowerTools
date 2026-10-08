@@ -92,6 +92,39 @@ struct WorkgroupsSyncTests {
         #expect(!mac.layoutPresets.contains { $0.id == preset.id }, "deleting travels")
     }
 
+    /// W4b: the sessions live on the hosts, so the names travel with the workgroup, and a name
+    /// one device claims when it first opens a terminal reaches the others.
+    @Test("a workgroup's tmux sessions travel with it, and a name written back on one device reaches the other")
+    func tmuxSessionsTravel() async throws {
+        let shared = SharedStore()
+        let (mac, macDefaults, macSuite) = try device(shared)
+        let (phone, phoneDefaults, phoneSuite) = try device(shared)
+        defer {
+            macDefaults.removePersistentDomain(forName: macSuite)
+            phoneDefaults.removePersistentDomain(forName: phoneSuite)
+        }
+        mac.startWorkgroupsSync()
+        phone.startWorkgroupsSync()
+        try await Task.sleep(for: .milliseconds(50))
+
+        let serverID = UUID()
+        let preset = LayoutPreset(name: "Builds", sessionIntents: [
+            .init(serverID: serverID, tmuxSession: "glass-4"),
+            .init(serverID: serverID),
+            .init(kind: .local, tmuxSession: "glass-9")
+        ])
+        mac.upsertLayoutPreset(preset)
+        await eventually { phone.layoutPresets.contains { $0.id == preset.id } }
+        let arrived = try #require(phone.layoutPresets.first { $0.id == preset.id })
+        #expect(arrived.sessionIntents.map(\.tmuxSession) == ["glass-4", nil, "glass-9"])
+
+        try await Task.sleep(for: .milliseconds(5))
+        #expect(phone.recordWorkgroupTmuxSession("glass-5", workgroupID: preset.id, index: 1,
+                                                 opened: .init(serverID: serverID)))
+        await eventually { mac.layoutPresets.first { $0.id == preset.id }?.sessionIntents[1].tmuxSession == "glass-5" }
+        #expect(mac.layoutPresets.first { $0.id == preset.id }?.sessionIntents.map(\.tmuxSession) == ["glass-4", "glass-5", "glass-9"])
+    }
+
     /// D51's clock was never written: after a relaunch every workgroup counted from when it was
     /// made, so an edit not yet sent could lose to an older copy from another device.
     @Test("when a workgroup was last saved survives a relaunch, and stays its sync clock")

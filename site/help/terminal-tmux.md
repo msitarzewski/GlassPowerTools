@@ -24,7 +24,8 @@ The switch can only be turned on once a connection has found tmux on the machine
 - In **Active**, a terminal in tmux says **in tmux** under its name, and swiping it offers **Detach** rather than **Close**. Its tools menu says **Detach** rather than **Disconnect**. Afterwards **Active** lists it under the machine as **Detached**.
 - **Open Folder Here** and the **AI Assistant** ask tmux which folder the shell is in, so they follow your `cd` inside tmux too.
 - Detaching from tmux yourself (its prefix key, then **d**) closes the terminal and leaves the session running.
-- A Workgroup's startup command runs inside the new session the first time it is created.
+- A Workgroup remembers each terminal's session and opens on it again. Its startup command runs only when the session is new, never into one still running. See [Save and open terminal Workgroups](terminal-workgroups.md).
+- A new terminal never takes a session a saved Workgroup keeps on that machine.
 
 If the machine doesn't have tmux, the terminal says so and opens an ordinary shell instead.
 
@@ -62,7 +63,7 @@ A Mac's own terminals can be kept in tmux too, so quitting or updating Glass Pow
 
 Each local terminal you open afterwards runs in its own tmux session on the Mac.
 
-- **Quit** the app and the sessions keep running. When it opens again, each tab picks up where it was.
+- **Quit** the app and the sessions keep running. When it opens again, each tab picks up where it was. Windows of SSH terminals in tmux come back too, each terminal on its own session.
 - **Close** a tab, a pane or a window and its session keeps running, as for a terminal in tmux on any other machine. Its tools menu says **Detach** rather than **Disconnect**.
 - **Active** lists the Mac's sessions under **This Mac**: open one again, take it over from another terminal, or end it (swipe left and choose **End**, or right-click and choose **End Session…**). Typing `exit` in the session ends it too.
 - The tab's name follows the program's title and the folder you `cd` into, as it does without tmux.

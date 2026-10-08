@@ -19,8 +19,8 @@ With **Sync terminal settings** on (Settings ▸ **Terminal**, under **iCloud Sy
 
 ## Create a Workgroup
 
-- **On Vision Pro, iPad and iPhone:** choose the plus button (**New workgroup**) above the list. To capture the SSH terminals you have open now, choose the button beside it (**Save current SSH sessions as workgroup**).
-- **On Mac:** arrange tabs and split panes in a terminal window, then choose **Save Workspace as Workgroup…** in its toolbar. This saves the window's tabs and split layout. With no Workgroup selected, **New Workgroup** in the detail also starts an empty one.
+- **On Vision Pro, iPad and iPhone:** choose the plus button (**New workgroup**) above the list. To capture the SSH terminals you have open now, choose the button beside it (**Save current SSH sessions as workgroup**). Each terminal in tmux is saved with its session.
+- **On Mac:** arrange tabs and split panes in a terminal window, then choose **Save Workspace as Workgroup…** in its toolbar. This saves the window's tabs, its split layout, and the tmux session each terminal is in. With no Workgroup selected, **New Workgroup** in the detail also starts an empty one.
 
 In **New Workgroup**:
 
@@ -33,7 +33,9 @@ In **New Workgroup**:
    - **Startup command**: an optional command to run once after the tab connects, for example `cd /srv/shop && git status`.
    - For a local tab: **Shell** and **Working directory**, or leave them empty to use the app's defaults.
 4. To reorder tabs on Mac, use **Move Up** and **Move Down** in a tab's menu. Elsewhere, choose **Edit** above the tabs and drag them.
-5. Choose **Save**.
+5. Choose **Save**. If another Workgroup already has that name, choose **Replace** to update it, on all your devices, or **Keep Both**.
+
+To rebuild a Workgroup from a window, arrange the window, choose **Save Workspace as Workgroup…**, give it the Workgroup's name, and choose **Replace**.
 
 A Workgroup holds up to 32 terminals.
 
@@ -44,13 +46,28 @@ A Workgroup holds up to 32 terminals.
 
 Select it and choose **Open Workgroup**, or choose **Open** in its menu. **On Mac**, the command palette also lists each Workgroup as **Open** followed by its name.
 
-All terminals start together. Each runs its startup command once, after it connects and its host key is checked, without waiting for the others.
+Each terminal runs its startup command once, after it connects and its host key is checked, without waiting for the others. With tmux, it runs only when the terminal's session is new (see below).
+
+If the Workgroup is already open on this device, its window or terminals come forward instead of opening a second time.
 
 - **On Vision Pro:** the terminals open as tabs in one terminal window. If a connection needs a password, you are asked for it before anything opens.
 - **On Mac:** the Workgroup opens in a terminal window with its tabs and split layout, in the view you chose with **Open in**. A pane that cannot connect shows **Connection Failed** with **Enter Password…** (when a password is missing), **Retry** and **Close Pane**. The Workgroup's detail shows its running tabs under **Running terminals**.
-- **On iPad and iPhone:** the terminals open in place of the library, after asking for any missing password. The list's **Live Terminals** section shows open Workgroups; **Resume Terminal** returns to one.
+- **On iPad:** the terminals open together in place of the library, after asking for any missing password. The list's **Live Terminals** section shows open Workgroups; **Resume Terminal** returns to one.
+- **On iPhone:** after asking for any missing password, the Workgroup opens on its first terminal, and only that one connects. Choose another from the menu at the top to connect it: each is named by its tab's label, or **Terminal 2 · alpha** and so on, and a filled dot means it is connected. Terminals you have opened stay connected. After the app has been in the background, only the terminal on screen reconnects; the others reconnect when you choose them.
 
 If some terminals cannot open, the others still do, and a message lists what failed and why.
+
+## Workgroups and tmux
+
+When a terminal's machine keeps sessions running with tmux, the Workgroup remembers that terminal's session (see [Keep terminals running with tmux](terminal-tmux.md)).
+
+- **Opening it again** attaches each terminal to its own session, so everything you left running is there. Nothing is typed into a session that is still running.
+- **A session that has ended** is started again under the same name, and only then does the tab's startup command run.
+- **A terminal without a session yet** gets a new one the first time the Workgroup opens, and the Workgroup keeps it from then on, on all your devices.
+- **On another device**, the Workgroup joins the same sessions, as a second screen on the same work.
+- New terminals you open on a machine never take a session a Workgroup keeps there.
+
+In **Edit Tab**, **tmux session** shows the session a tab opens on. **Start a New One** gives the tab a new session next time; the old one keeps running, and **Active** lists it.
 
 ## Open a Mac Workgroup on Vision Pro or iPad
 

@@ -34,6 +34,9 @@ final class MacWorkspaceController {
     /// A layout made here rather than read from the record: saved when a window shows the tab or
     /// changes, never by init, so a controller made and thrown away writes nothing (W7b).
     @ObservationIgnored private var hasUnsavedState = false
+    /// Panes its workgroup has just opened, which write a tmux name they claim back to it, once
+    /// (W4b). Not panes restored later: their workgroup may have changed since.
+    @ObservationIgnored private var panesOpenedFromWorkgroup: Set<UUID> = []
     var pendingSSHAxis: MacWorkspaceSplitAxis?
 
     private let defaults: UserDefaults
@@ -124,6 +127,9 @@ final class MacWorkspaceController {
             self.state = validated
             acceptedInitialLayout = true
             startupTicketIDsByPaneID = request.paneStartupTicketIDs ?? [:]
+            if request.workgroupID != nil {
+                panesOpenedFromWorkgroup = Set(validated.root?.panes.filter { $0.intent.sourceSessionIndex != nil }.map(\.id) ?? [])
+            }
         } else {
             for id in request.paneStartupTicketIDs?.values ?? Dictionary<UUID, UUID>().values {
                 startupCommandBroker.discard(id)
@@ -145,6 +151,10 @@ final class MacWorkspaceController {
                    pane.intent.serverID == ticket.session.server.id {
                     sessionsByPaneID[paneID] = ticket.session
                     observeOutput(of: ticket.session.terminalHostModel)
+                    // Connect, or Active's Open: the pane keeps the session's tmux name, now or
+                    // once it claims one, so a relaunch reattaches (W4b). Saved with the window.
+                    if let name = ticket.session.tmuxSessionName { setSSHTmuxSession(name, for: paneID) }
+                    keepClaimedSSHTmuxSession(of: ticket.session, paneID: paneID, settingsManager: nil)
                 } else {
                     ticket.discard()
                     errorsByPaneID[paneID] = "The prepared terminal session did not match its launch request."
@@ -456,6 +466,10 @@ final class MacWorkspaceController {
     /// Start every local pane independently of SwiftUI's lazy tab presentation.
     func startLocalPanes(sessionManager: SessionManager, settingsManager: SettingsManager, onEmpty: @escaping () -> Void) {
         for pane in state.root?.panes ?? [] where pane.intent.kind == .local {
+            // The session a new pane of the workgroup was given goes back to the workgroup (W4b).
+            if let name = pane.intent.localTmuxSession {
+                writeBackTmuxSession(name, paneID: pane.id, settingsManager: settingsManager)
+            }
             guard let runtime = localRuntime(for: pane.id), !runtime.hasEngine,
                   let recorder = recorder(for: pane.id) else { continue }
             runtime.start(
@@ -575,6 +589,7 @@ final class MacWorkspaceController {
         let tmux = server.executablePath()
         var running: Set<String>?
         var unreadable = false
+        var held: Set<String>?
         var updated = root
         for pane in panes {
             let session = tmux.flatMap { tmux in
@@ -589,11 +604,26 @@ final class MacWorkspaceController {
                         // Unread, a saved session is kept: it may well be running.
                         return unreadable || running?.contains(name) == true
                     },
-                    allocate: { MacLocalTmux.allocateName(tmux: tmux, launch: localTmuxLaunch(for: pane)) }
+                    allocate: {
+                        // Never a name a saved workgroup holds for this Mac (W4b).
+                        if held == nil {
+                            held = LayoutPreset.tmuxSessionsHeld(in: SettingsManager.savedLayoutPresets(in: defaults), serverID: nil)
+                        }
+                        return MacLocalTmux.allocateName(tmux: tmux, launch: localTmuxLaunch(for: pane), avoiding: held ?? [])
+                    }
                 )
             }
             // Restored, or opened from Active: no other pane is given it, running yet or not.
             if let session { MacLocalTmux.reserve(session) }
+            // A workgroup's saved session, with a startup command to run: claimed first. Made
+            // again, the command runs in it; still running, nothing is typed into what runs
+            // there (W4b). A new name was made for this pane, so its command always runs.
+            if let session, let tmux, session == pane.intent.localTmuxSession,
+               retainedStartupTicketsByPaneID[pane.id] != nil {
+                let claim = server.claim([session], localTmuxLaunch(for: pane), tmux)
+                    .map { TerminalTmux.parseClaim($0, candidates: [session]) }
+                if claim != .created(session) { retainedStartupTicketsByPaneID.removeValue(forKey: pane.id) }
+            }
             guard session != pane.intent.localTmuxSession else { continue }
             updated = updated.updatingPane(id: pane.id) { $0.intent.localTmuxSession = session }
         }
@@ -729,16 +759,27 @@ final class MacWorkspaceController {
 
         let startupTicket = retainedStartupTicketsByPaneID.removeValue(forKey: pane.id) ?? claimStartupCommand(for: pane.id)
         let startupCommand = startupTicket?.command
+        // The pane as it is now: a retry after a session ended carries the name it claimed.
+        let tmuxSession = state.root?.pane(id: pane.id)?.intent.sshTmuxSession ?? pane.intent.sshTmuxSession
         do {
             let launch = try await sessionManager.createAuthorizedSessionByServerID(
                 serverID,
                 settingsManager: settingsManager,
                 startupCommand: startupCommand,
+                configure: { [weak self] session in
+                    // W4b: its saved session, claimed — joined when it runs, made again when it
+                    // has ended — or, without one, the session it claims kept for next time.
+                    if let tmuxSession {
+                        session.tmuxSessionName = tmuxSession
+                        session.tmuxClaimsGivenName = true
+                    }
+                    self?.keepClaimedSSHTmuxSession(of: session, paneID: pane.id, settingsManager: settingsManager)
+                },
                 initialTerminalPresentation: { [weak self] pendingSession in
                     guard let self,
                           !isClosed,
                           generation == lifecycleGeneration,
-                          state.root?.pane(id: pane.id)?.intent == pane.intent else { return }
+                          isSamePane(pane) else { return }
                     sessionsByPaneID[pane.id] = pendingSession
                     observeOutput(of: pendingSession.terminalHostModel)
                     prepareOffscreenRenderer(for: pendingSession, settingsManager: settingsManager)
@@ -746,7 +787,7 @@ final class MacWorkspaceController {
             )
             guard !isClosed,
                   generation == lifecycleGeneration,
-                  state.root?.pane(id: pane.id)?.intent == pane.intent else {
+                  isSamePane(pane) else {
                 sessionManager.closeSession(launch.session)
                 return
             }
@@ -768,7 +809,7 @@ final class MacWorkspaceController {
         } catch {
             guard !isClosed,
                   generation == lifecycleGeneration,
-                  state.root?.pane(id: pane.id)?.intent == pane.intent else { return }
+                  isSamePane(pane) else { return }
             errorsByPaneID[pane.id] = error.localizedDescription
             let pendingSession = sessionsByPaneID.removeValue(forKey: pane.id)
             if pendingSession == nil || pendingSession?.hasPendingStartupCommand == true {
@@ -779,6 +820,46 @@ final class MacWorkspaceController {
                 pendingCredentialErrorsByPaneID[pane.id] = credentialError
             }
         }
+    }
+
+    /// The pane is still here, to start as it was asked: a tmux name written back to it while it
+    /// connects leaves it the same pane.
+    private func isSamePane(_ pane: MacWorkspacePane) -> Bool {
+        state.root?.pane(id: pane.id)?.intent.startsSamePane(as: pane.intent) == true
+    }
+
+    // MARK: SSH panes keep their tmux sessions (W4b, 2026-10-08)
+
+    /// The pane keeps the tmux session its terminal is in. Returns whether that changed it.
+    @discardableResult
+    private func setSSHTmuxSession(_ name: String, for paneID: UUID) -> Bool {
+        guard TerminalTmux.isValidSessionName(name), let root = state.root,
+              let pane = root.pane(id: paneID), pane.intent.kind == .ssh,
+              pane.intent.sshTmuxSession != name else { return false }
+        state.root = root.updatingPane(id: paneID) { $0.intent.sshTmuxSession = name }
+        return true
+    }
+
+    /// Keeps the name the pane's terminal claims for a new session: saved with the tab, so a
+    /// relaunch reattaches to it, and — for a pane its workgroup just opened — written back to
+    /// the workgroup, once. A tab its window has not saved yet saves it when the window opens.
+    private func keepClaimedSSHTmuxSession(of session: TerminalSession, paneID: UUID, settingsManager: SettingsManager?) {
+        session.tmuxSessionClaimed = { [weak self, weak settingsManager] name in
+            guard let self, !isClosed, sessionsByPaneID[paneID] == nil || sessionsByPaneID[paneID] === session else { return }
+            if setSSHTmuxSession(name, for: paneID), !hasUnsavedState { persist() }
+            if let settingsManager { writeBackTmuxSession(name, paneID: paneID, settingsManager: settingsManager) }
+        }
+    }
+
+    /// A pane its workgroup just opened, without a saved tmux session, was given `name`: the
+    /// workgroup keeps it, so it opens on the same session next time, here or on another device.
+    private func writeBackTmuxSession(_ name: String, paneID: UUID, settingsManager: SettingsManager) {
+        guard panesOpenedFromWorkgroup.contains(paneID), let workgroupID,
+              let pane = state.root?.pane(id: paneID), let index = pane.intent.sourceSessionIndex else { return }
+        panesOpenedFromWorkgroup.remove(paneID)
+        let opened = LayoutPreset.SessionIntent(kind: pane.intent.kind == .local ? .local : .ssh,
+                                                serverID: pane.intent.serverID)
+        settingsManager.recordWorkgroupTmuxSession(name, workgroupID: workgroupID, index: index, opened: opened)
     }
 
     func closeAllSessions(sessionManager: SessionManager) {
@@ -1218,6 +1299,11 @@ final class MacWorkspaceWindowController {
                        !servers.contains(where: { $0.id == intent.serverID }) {
                         throw MacWorkspaceStateError.invalidPaneIntent
                     }
+                    // The tmux session each terminal is in now, so the workgroup reopens on it
+                    // (W4b): the live terminal's for SSH, which may have claimed one since.
+                    let tmuxSession = intent.kind == .local
+                        ? intent.localTmuxSession
+                        : (tab.session(for: pane.id)?.tmuxSessionName ?? intent.sshTmuxSession)
                     intents.append(.init(kind: intent.kind == .local ? .local : .ssh,
                                          serverID: intent.serverID,
                                          label: intent.label,
@@ -1226,7 +1312,8 @@ final class MacWorkspaceWindowController {
                                             ? (tab.localRuntimesByPaneID[pane.id]?.launchedShell ?? intent.localShell ?? defaultLocalShell) : nil,
                                          localDirectory: intent.kind == .local
                                             ? (tab.localDirectory(for: pane.id) ?? intent.localDirectory ?? defaultLocalDirectory)
-                                            : nil))
+                                            : nil,
+                                         tmuxSession: tmuxSession))
                     return .session(index)
                 case .split(let split):
                     return .split(axis: split.axis == .horizontal ? .horizontal : .vertical,

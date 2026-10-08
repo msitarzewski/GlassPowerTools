@@ -56,6 +56,10 @@ struct MacWorkspacePaneIntent: Codable, Hashable, Sendable {
     /// opened from Active — so the pane reattaches after the app quits. Absent for a plain shell,
     /// and always for an SSH pane.
     var localTmuxSession: String? = nil
+    /// W4b (2026-10-08): the tmux session an SSH pane runs in on its host — the one its
+    /// workgroup saved, or the one it claimed or attached to — so a relaunch reattaches to it
+    /// rather than starting another. Always absent for a local pane, whose is `localTmuxSession`.
+    var sshTmuxSession: String? = nil
 
     static let local = MacWorkspacePaneIntent(kind: .local, serverID: nil)
     static func local(shell: String?, directory: String?) -> Self {
@@ -98,7 +102,23 @@ struct MacWorkspacePaneIntent: Codable, Hashable, Sendable {
             throw MacWorkspaceStateError.invalidPaneIntent
         }
         self.localTmuxSession = tmuxSession
+        // Read leniently: a name that would not do is dropped, and the pane claims a new session.
+        // Refusing it would turn the whole tab into "Couldn't restore" (W7b).
+        self.sshTmuxSession = try container.decodeIfPresent(String.self, forKey: .sshTmuxSession)
+            .flatMap { kind == .ssh && TerminalTmux.isValidSessionName($0) ? $0 : nil }
     }
+
+    /// The same pane to start, whatever tmux session an SSH pane has since claimed: a name
+    /// written back while it connects does not make it another pane.
+    func startsSamePane(as other: Self) -> Bool {
+        var mine = self, theirs = other
+        mine.sshTmuxSession = nil
+        theirs.sshTmuxSession = nil
+        return mine == theirs
+    }
+
+    /// The tmux session the pane runs in, on whichever machine it is.
+    var tmuxSession: String? { kind == .local ? localTmuxSession : sshTmuxSession }
 }
 
 struct MacWorkspacePane: Identifiable, Codable, Hashable, Sendable {
@@ -776,6 +796,11 @@ enum MacWorkgroupLauncher {
                         : .ssh(serverID: item.serverID!)
                     intent.label = item.label
                     intent.sourceSessionIndex = index
+                    // The session the workgroup saved: claimed as the pane opens (W4b).
+                    switch item.kind {
+                    case .local: intent.localTmuxSession = item.tmuxSession
+                    case .ssh: intent.sshTmuxSession = item.tmuxSession
+                    }
                     let pane = MacWorkspacePane(intent: intent)
                     paneIDs[index] = pane.id
                     tickets[pane.id] = broker.issue(command: item.startupCommand)
