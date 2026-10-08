@@ -229,3 +229,21 @@ Three reports from the headset (`devicectl … --domain-type systemCrashLogs`):
   (`tmux list-clients`), with no step from the owner — **D47's reattach after a quit, verified live**.
   The reopen record was taken and cleared. Vision Pro relaunched with no new crash report.
 
+## Committed, and SSH scrolling everywhere (2026-10-08, ~01:10)
+
+- Committed in pieces: 24ca9af rows, b64f664 SwiftTerm 1.20, bc734b6 update check, ed851ec tabs
+  (built and tested on its own in a worktree: 440 terminal tests), 1074d5a local tmux + environment +
+  Mac scrolling, a924c9d headset Connections window, f2f304e favourites, ca2e62b + 7db0ba3 notes
+  (ca2e62b's task note named a private machine; 7db0ba3 removes it — the history keeps it until the
+  pre-publication scrub), c60f280 iOS/visionOS scrolling + safe tmux naming.
+- **A Vision Pro opened the Mac's terminal over SSH** (the owner added a Terminal service for the
+  Mac's synced record) and landed in the Mac's running `glass-1` — this session — instead of a new
+  one: the only way a new terminal gets `glass-1` while it is taken is a failed or empty listing.
+  Cause of the failure not yet known (the headset's log needs `sudo log collect`). Now: the list is
+  asked again once, and unlisted names are `glass-N` with N ≥ 100 (test fails on the old fallback).
+- iOS/visionOS: `UIKitAlternateScreenScrollWatcher`, a pan (touch, trackpad scroll, pinch-drag) on
+  the alternate screen with no mouse mode → `onAlternateScreenScroll` → `TerminalSession.scrollTmux`.
+  Not seen on a device yet.
+- 0.4.295 installed on Mac, iPhone, Vision Pro. No tab was attached to the session at the Mac's quit,
+  so nothing reopened; the owner reattaches through Active.
+
