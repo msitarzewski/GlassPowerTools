@@ -221,7 +221,7 @@ Three reports from the headset (`devicectl … --domain-type systemCrashLogs`):
 - **Favourites (D49):** built; `GlassFavoritesSyncTests` (merge rules, two devices over a shared
   in-memory store, This Mac kept local); the two-device test fails without the push (checked).
 - **This Mac from the Vision Pro (D50, proposed):** the library has no Terminal service for the Mac's
-  synced record — only "Terminal on oscar" and "Terminal on scratch" — so the headset had nothing to
+  synced record — only two other machines' Terminal services — so the headset had nothing to
   check. Remote Login is on (port 22 answers locally).
 - All test targets pass (`swift test`, exit 0). 0.4.294 built for macOS, iOS, visionOS; not installed.
 - **Installed 0.4.294 on all three (2026-10-08 00:50).** Mac: quit by 0.4.293, which recorded the tmux
