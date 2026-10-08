@@ -68,6 +68,37 @@ struct MacCloseWorkspaceTabAction {
     }
 }
 
+/// Move Tab to New Window, for the tabs selected in the focused window's sidebar (W8).
+@MainActor
+struct MacMoveWorkspaceTabsAction {
+    /// How many tabs are selected: the item says "Tabs" for several.
+    let count: Int
+    let isEnabled: Bool
+    private let action: () -> Void
+
+    init(count: Int, isEnabled: Bool, _ action: @escaping () -> Void) {
+        self.count = count
+        self.isEnabled = isEnabled
+        self.action = action
+    }
+
+    var title: String { Self.title(count: count) }
+
+    /// The one wording, for the menu bar, the toolbar's Tab Actions and the sidebar's menu.
+    static func title(count: Int) -> String {
+        count > 1 ? "Move \(count) Tabs to New Window" : "Move Tab to New Window"
+    }
+
+    func callAsFunction() {
+        guard isEnabled else { return }
+        action()
+    }
+}
+
+private struct MacMoveWorkspaceTabsActionKey: FocusedValueKey {
+    typealias Value = MacMoveWorkspaceTabsAction
+}
+
 private struct MacWorkspaceFocusedActionsKey: FocusedValueKey {
     typealias Value = MacWorkspaceFocusedActions
 }
@@ -95,6 +126,11 @@ extension FocusedValues {
         get { self[MacNewWorkspaceTabActionKey.self] }
         set { self[MacNewWorkspaceTabActionKey.self] = newValue }
     }
+
+    var macMoveWorkspaceTabsAction: MacMoveWorkspaceTabsAction? {
+        get { self[MacMoveWorkspaceTabsActionKey.self] }
+        set { self[MacMoveWorkspaceTabsActionKey.self] = newValue }
+    }
 }
 
 struct MacWorkspaceCommands: Commands {
@@ -104,6 +140,7 @@ struct MacWorkspaceCommands: Commands {
     @FocusedValue(\.macWorkspaceActions) private var actions
     @FocusedValue(\.macNewWorkspaceTabAction) private var newWorkspaceTabAction
     @FocusedValue(\.macCloseWorkspaceTabAction) private var closeWorkspaceTabAction
+    @FocusedValue(\.macMoveWorkspaceTabsAction) private var moveTabsAction
     @Environment(\.openWindow) private var openWindow
 
     private func presentCommandPalette() {
@@ -259,6 +296,16 @@ struct MacWorkspaceCommands: Commands {
             }
             .keyboardShortcut("w", modifiers: [.command, .option])
             .disabled(actions?.hasFocusedPane != true)
+
+            Divider()
+
+            // The tabs selected in the sidebar, ⌘-click for several (W8). No key equivalent, so
+            // no second owner for one (rule 39). In this menu because a `CommandMenu` draws; a
+            // placement in the Window menu is unproven for this scene (rule 60).
+            Button(moveTabsAction?.title ?? MacMoveWorkspaceTabsAction.title(count: 1)) {
+                moveTabsAction?()
+            }
+            .disabled(moveTabsAction?.isEnabled != true)
 
             Divider()
 

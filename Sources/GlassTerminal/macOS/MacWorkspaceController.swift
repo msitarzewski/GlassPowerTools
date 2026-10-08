@@ -1081,7 +1081,8 @@ final class MacWorkspaceTransferBroker {
     static let defaultExpiration: Duration = .seconds(30)
 
     private struct Entry {
-        let controller: MacWorkspaceController
+        /// The tabs moving together, in the order the new window lists them (W8).
+        let controllers: [MacWorkspaceController]
         let expirationTask: Task<Void, Never>
         let commit: @MainActor (UUID) -> Bool
         let invalidate: @MainActor (UUID) -> Void
@@ -1103,7 +1104,7 @@ final class MacWorkspaceTransferBroker {
     var pendingCount: Int { entries.count }
 
     func issue(
-        controller: MacWorkspaceController,
+        controllers: [MacWorkspaceController],
         commit: @escaping @MainActor (UUID) -> Bool,
         invalidate: @escaping @MainActor (UUID) -> Void
     ) -> UUID {
@@ -1118,7 +1119,7 @@ final class MacWorkspaceTransferBroker {
             self.invalidate(id)
         }
         entries[id] = Entry(
-            controller: controller,
+            controllers: controllers,
             expirationTask: expirationTask,
             commit: commit,
             invalidate: invalidate
@@ -1127,15 +1128,16 @@ final class MacWorkspaceTransferBroker {
         return id
     }
 
-    func claim(_ id: UUID) -> MacWorkspaceController? {
+    /// The tabs a ticket moves, all of them or none: one closed meanwhile fails the whole move.
+    func claim(_ id: UUID) -> [MacWorkspaceController]? {
         guard let entry = entries.removeValue(forKey: id) else { return nil }
         order.removeAll { $0 == id }
         entry.expirationTask.cancel()
-        guard !entry.controller.isClosed, entry.commit(id) else {
+        guard !entry.controllers.isEmpty, !entry.controllers.contains(where: \.isClosed), entry.commit(id) else {
             entry.invalidate(id)
             return nil
         }
-        return entry.controller
+        return entry.controllers
     }
 
     func discard(_ id: UUID) {
@@ -1157,7 +1159,14 @@ final class MacWorkspaceWindowController {
 
     let windowID: UUID
     private(set) var tabs: [MacWorkspaceController]
+    /// The tab shown. Always one of `selectedTabIDs`.
     private(set) var selectedTabID: UUID
+    /// The tabs selected in the sidebar: a click selects one, ⌘-click adds or removes one,
+    /// ⇧-click a range (W8, owner, 2026-10-08). Not saved: a window reopens with its shown tab.
+    private(set) var selectedTabIDs: Set<UUID> = []
+    /// The selected tabs in the order they were picked. The tab shown is the last of them, as in
+    /// Finder and Mail, so the detail never goes blank while the selection changes.
+    @ObservationIgnored private var selectionOrder: [UUID] = []
 
     private let defaults: UserDefaults
     private let startupCommandBroker: MacStartupCommandBroker
@@ -1201,12 +1210,14 @@ final class MacWorkspaceWindowController {
         var savesNow = false
         var unsaved = false
         var failure: String?
-        let transferred = request.transferredTabTicketID.flatMap { transferBroker.claim($0) }
-        if let transferred {
-            // The move already happened: the source window has let the tab go, so this one
-            // saves it now rather than leaving the tab in neither record until it opens.
-            resolvedTabs = [transferred]
-            resolvedSelectedTabID = transferred.workspaceID
+        let transferred = request.transferredTabTicketID.flatMap { transferBroker.claim($0) } ?? []
+        if let first = transferred.first {
+            // The move already happened: the source window has let the tabs go, so this one
+            // saves them now rather than leaving them in neither record until it opens.
+            resolvedTabs = transferred
+            resolvedSelectedTabID = request.initialSelectedTabID.flatMap { requested in
+                transferred.first(where: { $0.workspaceID == requested })?.workspaceID
+            } ?? first.workspaceID
             savesNow = true
         } else {
             // A moved tab's ticket dies with the process. After a crash macOS hands the window
@@ -1239,6 +1250,7 @@ final class MacWorkspaceWindowController {
         selectedTabID = resolvedSelectedTabID
         restorationFailure = failure
         hasUnsavedState = unsaved
+        collapseSelection()
         if savesNow { persist() }
         // Made once per window: its view asks the registry first (`windowController(for:)`).
         MacWorkspacePreviewRegistry.shared.noteBuilt(self)
@@ -1371,15 +1383,70 @@ final class MacWorkspaceWindowController {
     var canAddTab: Bool {
         restorationFailure == nil && tabs.count < MacWorkspaceWindowRestorationState.maximumTabCount
     }
+    /// Move Tab to New Window, for the tabs selected in the sidebar.
     var canTransferSelectedTab: Bool {
-        tabs.count > 1
-            && pendingTransferTicketsByWorkspaceID[selectedTabID] == nil
+        canTransferTabs(selectedTabIDs)
     }
 
+    /// Whether these tabs can go to a new window together: each still here, none already on its
+    /// way. A window's only tab stays, since a window holding just it changes nothing; two or more
+    /// may be every tab, and this window then closes (W8).
+    func canTransferTabs(_ ids: Set<UUID>) -> Bool {
+        let moving = tabs.filter { ids.contains($0.workspaceID) }
+        return !closesAfterLastTabLeft && !moving.isEmpty && moving.count == ids.count
+            && (moving.count > 1 || tabs.count > 1)
+            && moving.allSatisfy { pendingTransferTicketsByWorkspaceID[$0.workspaceID] == nil }
+    }
+
+    /// Shows a tab, and makes it the only one selected: ⌘1–⌘9, the overview, Active.
     func select(_ workspaceID: UUID) {
         guard tabs.contains(where: { $0.workspaceID == workspaceID }) else { return }
         selectedTabID = workspaceID
+        collapseSelection()
         persist()
+    }
+
+    /// The sidebar's selection, as the list reports it: a click selects one tab, ⌘-click adds or
+    /// removes one, ⇧-click a range. The tab shown is the one picked last that is still selected,
+    /// and an empty selection keeps the tab shown: the detail never goes blank (W8).
+    func updateSelection(_ ids: Set<UUID>) {
+        let order = tabs.map(\.workspaceID)
+        let selected = ids.intersection(order)
+        guard !selected.isEmpty else { return collapseSelection() }
+        // A range arrives as several tabs at once. The one clicked is the end farthest from the
+        // tab shown, so it counts as picked last.
+        let anchor = order.firstIndex(of: selectedTabID) ?? 0
+        let added = order.indices
+            .filter { selected.contains(order[$0]) && !selectedTabIDs.contains(order[$0]) }
+            .sorted { (abs($0 - anchor), $0) < (abs($1 - anchor), $1) }
+            .map { order[$0] }
+        selectionOrder = selectionOrder.filter(selected.contains) + added
+        if selectedTabIDs != selected { selectedTabIDs = selected }
+        if let shown = selectionOrder.last, shown != selectedTabID {
+            selectedTabID = shown
+            persist()
+        }
+    }
+
+    /// One tab selected: the one shown.
+    private func collapseSelection() {
+        if selectedTabIDs != [selectedTabID] { selectedTabIDs = [selectedTabID] }
+        selectionOrder = [selectedTabID]
+    }
+
+    /// Takes a tab out of the list; never the last, which callers handle. When it was the tab
+    /// shown, the tab picked before it in the selection is shown, or else the tab beside it.
+    private func takeOut(at index: Int) -> MacWorkspaceController {
+        let controller = tabs.remove(at: index)
+        let id = controller.workspaceID
+        selectionOrder.removeAll { $0 == id }
+        selectedTabIDs.remove(id)
+        guard !tabs.isEmpty else { return controller }
+        if selectedTabID == id {
+            selectedTabID = selectionOrder.last ?? tabs[min(index, tabs.count - 1)].workspaceID
+        }
+        if !selectedTabIDs.contains(selectedTabID) { collapseSelection() }
+        return controller
     }
 
     /// A new tab, by default with a shell on this Mac, in tmux when that is on, rather than the
@@ -1398,6 +1465,7 @@ final class MacWorkspaceWindowController {
         )
         tabs.append(controller)
         selectedTabID = controller.workspaceID
+        collapseSelection()
         persist()
         return controller
     }
@@ -1423,7 +1491,7 @@ final class MacWorkspaceWindowController {
             return true
         }
         cancelPendingTransfer(for: workspaceID)
-        let controller = tabs.remove(at: index)
+        let controller = takeOut(at: index)
         if closeSessions {
             controller.closeAllSessions(sessionManager: sessionManager)
             controller.discardSavedState()
@@ -1432,11 +1500,36 @@ final class MacWorkspaceWindowController {
             forgetSavedWindow()
             return true
         }
-        if selectedTabID == workspaceID {
-            selectedTabID = tabs[min(index, tabs.count - 1)].workspaceID
-        }
         persist()
         return false
+    }
+
+    /// Closes several tabs, each as closing it alone would: a terminal in tmux detaches and keeps
+    /// running (W8). True when that was every tab, and the window closes.
+    @discardableResult
+    func removeTabs(_ ids: Set<UUID>, sessionManager: SessionManager) -> Bool {
+        for id in tabs.map(\.workspaceID) where ids.contains(id) {
+            if removeTab(id, sessionManager: sessionManager) { return true }
+        }
+        return false
+    }
+
+    /// What closing these tabs should ask, or nil when none would stop anything. Each tab is
+    /// judged by the rules for closing it alone (D44), so a terminal kept in tmux never counts.
+    func closeWarning(forTabs ids: Set<UUID>) -> String? {
+        Self.closeWarning(combining: tabs.filter { ids.contains($0.workspaceID) }.map(\.closeWarning))
+    }
+
+    /// One tab's own warning; for several, the one that would stop something, or how many would.
+    static func closeWarning(combining warnings: [String?]) -> String? {
+        let asking = warnings.compactMap { $0 }
+        guard let first = asking.first else { return nil }
+        if warnings.count == 1 { return first }
+        if asking.count == 1 {
+            let single = "This tab "
+            return first.hasPrefix(single) ? "One of these tabs " + first.dropFirst(single.count) : first
+        }
+        return "\(asking.count) of these tabs have SSH sessions, running commands, a recording or a connection still starting. Closing them will stop those."
     }
 
     // MARK: Dragging tabs between windows (2026-10-08)
@@ -1454,23 +1547,46 @@ final class MacWorkspaceWindowController {
     /// attached, and with tmux the two windows mirrored one session (2026-10-08).
     @discardableResult
     func acceptDroppedTab(_ drag: MacWorkspaceTabDrag, at index: Int) -> Bool {
-        guard !closesAfterLastTabLeft else { return false }
-        if drag.windowID == windowID {
-            return moveTab(drag.workspaceID, to: index)
+        acceptDroppedTabs([drag], at: index)
+    }
+
+    /// Tabs dragged together from one window's sidebar — the selected rows — dropped at `index`:
+    /// reordered as a block within this window, or moved here running, in their sidebar order,
+    /// from another (W8). All of them or none: false when this window can't take them all.
+    @discardableResult
+    func acceptDroppedTabs(_ drags: [MacWorkspaceTabDrag], at index: Int) -> Bool {
+        guard !closesAfterLastTabLeft, let sourceID = drags.first?.windowID,
+              drags.allSatisfy({ $0.windowID == sourceID }) else { return false }
+        let ids = drags.map(\.workspaceID)
+        if sourceID == windowID {
+            return moveTabs(ids, to: index)
         }
-        guard canAddTab, let source = MacWorkspacePreviewRegistry.shared.shownController(windowID: drag.windowID),
-              let controller = source.detachTabForMove(drag.workspaceID) else { return false }
-        adoptTab(controller, at: index)
+        guard restorationFailure == nil,
+              tabs.count + Set(ids).count <= MacWorkspaceWindowRestorationState.maximumTabCount,
+              let source = MacWorkspacePreviewRegistry.shared.shownController(windowID: sourceID) else { return false }
+        let moving = source.detachTabsForMove(ids)
+        guard !moving.isEmpty else { return false }
+        adoptTabs(moving, at: index)
         return true
     }
 
     /// Reorders: `index` is where the tab lands in the list as it was before the move.
     @discardableResult
     func moveTab(_ workspaceID: UUID, to index: Int) -> Bool {
-        guard let from = tabs.firstIndex(where: { $0.workspaceID == workspaceID }) else { return false }
-        let tab = tabs.remove(at: from)
-        let target = min(max(index, 0), tabs.count + 1)
-        tabs.insert(tab, at: min(target > from ? target - 1 : target, tabs.count))
+        moveTabs([workspaceID], to: index)
+    }
+
+    /// Reorders several tabs as a block, in their sidebar order; `index` is counted in the list as
+    /// it was before the move.
+    @discardableResult
+    func moveTabs(_ ids: [UUID], to index: Int) -> Bool {
+        let moving = Set(ids)
+        let block = tabs.filter { moving.contains($0.workspaceID) }
+        guard !block.isEmpty else { return false }
+        let target = min(max(index, 0), tabs.count)
+        let movedFromAbove = tabs.prefix(target).filter { moving.contains($0.workspaceID) }.count
+        tabs.removeAll { moving.contains($0.workspaceID) }
+        tabs.insert(contentsOf: block, at: min(target - movedFromAbove, tabs.count))
         persist()
         return true
     }
@@ -1478,61 +1594,93 @@ final class MacWorkspaceWindowController {
     /// Lets a tab go to another window, its terminals untouched. The last tab leaves a
     /// placeholder and closes the window.
     func detachTabForMove(_ workspaceID: UUID) -> MacWorkspaceController? {
-        guard !closesAfterLastTabLeft,
-              let index = tabs.firstIndex(where: { $0.workspaceID == workspaceID }) else { return nil }
-        cancelPendingTransfer(for: workspaceID)
-        let controller = tabs.remove(at: index)
-        if tabs.isEmpty {
-            let placeholder = MacWorkspaceController(
-                request: MacWorkspaceTabRequest(workspaceID: UUID(), startsEmpty: true),
-                startupCommandBroker: startupCommandBroker,
-                liveSessionBroker: liveSessionBroker,
-                defaults: defaults
-            )
-            tabs = [placeholder]
-            selectedTabID = placeholder.workspaceID
-            closesAfterLastTabLeft = true
-            forgetSavedWindow()
-            return controller
+        detachTabsForMove([workspaceID]).first
+    }
+
+    /// Lets tabs go to another window, in sidebar order, their terminals untouched, and saves the
+    /// tabs left. When none is left, a placeholder stands in and the window closes.
+    func detachTabsForMove(_ ids: [UUID]) -> [MacWorkspaceController] {
+        guard !closesAfterLastTabLeft else { return [] }
+        let leaving = Set(ids)
+        var moved: [MacWorkspaceController] = []
+        for id in tabs.map(\.workspaceID) where leaving.contains(id) {
+            cancelPendingTransfer(for: id)
+            guard let index = tabs.firstIndex(where: { $0.workspaceID == id }) else { continue }
+            if tabs.count == 1 {
+                moved.append(tabs[0])
+                standInForLastTab()
+                return moved
+            }
+            moved.append(takeOut(at: index))
         }
-        if selectedTabID == workspaceID {
-            selectedTabID = tabs[min(index, tabs.count - 1)].workspaceID
-        }
-        persist()
-        return controller
+        if !moved.isEmpty { persist() }
+        return moved
+    }
+
+    /// The last tab has gone to another window: a placeholder stands in until the view closes the
+    /// window, so nothing reads an empty list, and the window's record goes.
+    private func standInForLastTab() {
+        let placeholder = MacWorkspaceController(
+            request: MacWorkspaceTabRequest(workspaceID: UUID(), startsEmpty: true),
+            startupCommandBroker: startupCommandBroker,
+            liveSessionBroker: liveSessionBroker,
+            defaults: defaults
+        )
+        tabs = [placeholder]
+        selectedTabID = placeholder.workspaceID
+        collapseSelection()
+        closesAfterLastTabLeft = true
+        forgetSavedWindow()
     }
 
     /// Takes in a tab another window let go of, at `index`, and shows it.
     func adoptTab(_ controller: MacWorkspaceController, at index: Int) {
-        tabs.insert(controller, at: min(max(index, 0), tabs.count))
-        selectedTabID = controller.workspaceID
+        adoptTabs([controller], at: index)
+    }
+
+    /// Takes in tabs another window let go of, at `index` in their order, selects them all and
+    /// shows the first.
+    func adoptTabs(_ controllers: [MacWorkspaceController], at index: Int) {
+        guard let first = controllers.first else { return }
+        tabs.insert(contentsOf: controllers, at: min(max(index, 0), tabs.count))
+        selectedTabID = first.workspaceID
+        selectedTabIDs = Set(controllers.map(\.workspaceID))
+        selectionOrder = controllers.reversed().map(\.workspaceID)
         persist()
     }
 
+    /// Move Tab to New Window, for the tabs selected in the sidebar.
     func transferSelectedTab() -> MacWorkspaceLaunchRequest? {
-        guard canTransferSelectedTab else { return nil }
-        let controller = selectedTab
+        transferTabs(selectedTabIDs)
+    }
+
+    /// Move Tabs to New Window: a request for a window holding these tabs, in sidebar order and
+    /// still running, showing the one picked last. Nothing leaves this window until that window
+    /// claims them; then this one saves the tabs left, or closes when none is (W8, W7b).
+    func transferTabs(_ ids: Set<UUID>) -> MacWorkspaceLaunchRequest? {
+        guard canTransferTabs(ids) else { return nil }
+        let moving = tabs.filter { ids.contains($0.workspaceID) }
+        let movingIDs = moving.map(\.workspaceID)
+        // Emptying the window was asked for only if every tab was chosen. One that would empty
+        // because the others closed meanwhile keeps its tab, and the new window fails closed.
+        let takesEveryTab = moving.count == tabs.count
         let ticketID = transferBroker.issue(
-            controller: controller,
+            controllers: moving,
             commit: { [weak self] ticketID in
-                self?.commitTransfer(
-                    controller.workspaceID,
-                    ticketID: ticketID
-                ) ?? false
+                self?.commitTransfer(movingIDs, ticketID: ticketID, mayEmptyWindow: takesEveryTab) ?? false
             },
             invalidate: { [weak self] ticketID in
-                self?.invalidateTransfer(
-                    controller.workspaceID,
-                    ticketID: ticketID
-                )
+                self?.invalidateTransfer(movingIDs, ticketID: ticketID)
             }
         )
-        pendingTransferTicketsByWorkspaceID[controller.workspaceID] = ticketID
-        return MacWorkspaceLaunchRequest(
+        for id in movingIDs { pendingTransferTicketsByWorkspaceID[id] = ticketID }
+        var request = MacWorkspaceLaunchRequest(
             windowID: UUID(),
-            tabs: [controller.restorationDescriptor.request],
+            tabs: moving.map(\.restorationDescriptor.request),
             transferredTabTicketID: ticketID
         )
+        request.initialSelectedTabID = selectionOrder.last(where: movingIDs.contains) ?? movingIDs[0]
+        return request
     }
 
     func closeAllSessions(sessionManager: SessionManager) {
@@ -1546,29 +1694,24 @@ final class MacWorkspaceWindowController {
         }
     }
 
-    private func commitTransfer(_ workspaceID: UUID, ticketID: UUID) -> Bool {
-        guard pendingTransferTicketsByWorkspaceID[workspaceID] == ticketID else {
+    /// The new window claimed its tabs: they leave this one, which saves the tabs left.
+    private func commitTransfer(_ ids: [UUID], ticketID: UUID, mayEmptyWindow: Bool) -> Bool {
+        guard ids.allSatisfy({ pendingTransferTicketsByWorkspaceID[$0] == ticketID }) else {
             return false
         }
-        guard let index = tabs.firstIndex(where: { $0.workspaceID == workspaceID }),
-              tabs.count > 1 else {
-            pendingTransferTicketsByWorkspaceID.removeValue(forKey: workspaceID)
+        for id in ids { pendingTransferTicketsByWorkspaceID.removeValue(forKey: id) }
+        guard !closesAfterLastTabLeft,
+              ids.allSatisfy({ id in tabs.contains { $0.workspaceID == id } }),
+              mayEmptyWindow || tabs.count > ids.count else {
             return false
         }
-        pendingTransferTicketsByWorkspaceID.removeValue(forKey: workspaceID)
-        tabs.remove(at: index)
-        if selectedTabID == workspaceID {
-            selectedTabID = tabs[min(index, tabs.count - 1)].workspaceID
-        }
-        persist()
-        return true
+        return detachTabsForMove(ids).count == ids.count
     }
 
-    private func invalidateTransfer(_ workspaceID: UUID, ticketID: UUID) {
-        guard pendingTransferTicketsByWorkspaceID[workspaceID] == ticketID else {
-            return
+    private func invalidateTransfer(_ ids: [UUID], ticketID: UUID) {
+        for id in ids where pendingTransferTicketsByWorkspaceID[id] == ticketID {
+            pendingTransferTicketsByWorkspaceID.removeValue(forKey: id)
         }
-        pendingTransferTicketsByWorkspaceID.removeValue(forKey: workspaceID)
     }
 
     private func cancelPendingTransfer(for workspaceID: UUID) {

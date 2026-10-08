@@ -74,31 +74,49 @@ struct MacWorkspaceView: View {
                 tabRow(controller)
             }
             .onInsert(of: [MacWorkspaceTabDrag.type]) { index, providers in
-                MacWorkspaceTabDrag.load(from: providers) { drag in
-                    windowController.acceptDroppedTab(drag, at: index)
+                MacWorkspaceTabDrag.load(from: providers) { drags in
+                    windowController.acceptDroppedTabs(drags, at: index)
                 }
             }
         }
         // The list's own menu and primary action: double-click (or Return) renames in place, as
-        // Finder's sidebar does, without a tap gesture holding every single click back.
+        // Finder's sidebar does, without a tap gesture holding every single click back. The menu
+        // gets the selection when the row right-clicked is in it, else that row alone.
         .contextMenu(forSelectionType: UUID.self) { ids in
-            if let controller = ids.first.flatMap(tab(_:)) {
-                Button("Rename Tab…", systemImage: "pencil") { beginRename(controller) }
-                    .labelStyle(.titleAndIcon)
-                if controller.tabLabel != nil {
-                    Button("Use Automatic Name", systemImage: "arrow.uturn.backward") {
-                        windowController.renameTab(controller.workspaceID, to: nil)
-                    }
-                    .labelStyle(.titleAndIcon)
-                }
-            }
+            tabMenu(for: ids)
         } primaryAction: { ids in
-            if let controller = ids.first.flatMap(tab(_:)) { beginRename(controller) }
+            if ids.count == 1, let controller = ids.first.flatMap(tab(_:)) { beginRename(controller) }
         }
     }
 
     private func tab(_ id: UUID) -> MacWorkspaceController? {
         windowController.tabs.first { $0.workspaceID == id }
+    }
+
+    /// One tab: rename, as before. Several, ⌘- or ⇧-clicked (W8, owner, 2026-10-08): move them
+    /// to a new window together, or close them. Rename is for one tab only.
+    @ViewBuilder
+    private func tabMenu(for ids: Set<UUID>) -> some View {
+        let chosen = windowController.tabs.filter { ids.contains($0.workspaceID) }
+        if chosen.count == 1, let controller = chosen.first {
+            Button("Rename Tab…", systemImage: "pencil") { beginRename(controller) }
+                .labelStyle(.titleAndIcon)
+            if controller.tabLabel != nil {
+                Button("Use Automatic Name", systemImage: "arrow.uturn.backward") {
+                    windowController.renameTab(controller.workspaceID, to: nil)
+                }
+                .labelStyle(.titleAndIcon)
+            }
+        } else if chosen.count > 1 {
+            let chosenIDs = Set(chosen.map(\.workspaceID))
+            Button(MacMoveWorkspaceTabsAction.title(count: chosen.count), systemImage: "macwindow.badge.plus") {
+                moveTabsToNewWindow(chosenIDs)
+            }
+            .labelStyle(.titleAndIcon)
+            .disabled(!windowController.canTransferTabs(chosenIDs))
+            Button("Close \(chosen.count) Tabs", systemImage: "xmark") { requestCloseTabs(chosenIDs) }
+                .labelStyle(.titleAndIcon)
+        }
     }
 
     @ViewBuilder
@@ -203,8 +221,8 @@ struct MacWorkspaceView: View {
             // A tab dragged from another window can land anywhere on this one, sidebar open or
             // not; it joins at the end. Panes take only Finder's files, so they pass it on.
             .onDrop(of: [MacWorkspaceTabDrag.type], isTargeted: $tabDropTargeted) { providers in
-                MacWorkspaceTabDrag.load(from: providers) { drag in
-                    windowController.acceptDroppedTab(drag, at: windowController.tabs.count)
+                MacWorkspaceTabDrag.load(from: providers) { drags in
+                    windowController.acceptDroppedTabs(drags, at: windowController.tabs.count)
                 }
                 return true
             }
@@ -368,6 +386,7 @@ struct MacWorkspaceView: View {
             \.macCloseWorkspaceTabAction,
             MacCloseWorkspaceTabAction { requestCloseSelectedTab() }
         )
+        .focusedSceneValue(\.macMoveWorkspaceTabsAction, moveTabsAction)
         // ⌘W, while a terminal workspace is focused, closes the tab rather than the window with
         // every tab in it — the behaviour the menu item used to carry, now registered with the
         // shell's close router rather than declared as a second ⌘W that took the key off Close.
@@ -477,7 +496,8 @@ struct MacWorkspaceView: View {
             if windowController.canTransferSelectedTab {
                 ToolbarItem(id: MacTerminalToolbarItemID.tabActions) {
                     Menu("Tab Actions", systemImage: "ellipsis.circle") {
-                        Button("Move Tab to New Window", systemImage: "macwindow.badge.plus") {
+                        Button(MacMoveWorkspaceTabsAction.title(count: windowController.selectedTabIDs.count),
+                               systemImage: "macwindow.badge.plus") {
                             moveSelectedTabToNewWindow()
                         }
                     }
@@ -542,10 +562,21 @@ struct MacWorkspaceView: View {
         }
     }
 
-    private var sidebarSelection: Binding<UUID?> {
+    /// Several tabs at once (W8): ⌘-click and ⇧-click are the list's own. The window controller
+    /// picks the tab shown from what the list reports, so a plain click still shows its tab.
+    private var sidebarSelection: Binding<Set<UUID>> {
         Binding(
-            get: { windowController.selectedTabID },
-            set: { if let id = $0 { windowController.select(id) } }
+            get: { windowController.selectedTabIDs },
+            set: { windowController.updateSelection($0) }
+        )
+    }
+
+    /// The menu bar's Move Tab to New Window, for the selected tabs.
+    private var moveTabsAction: MacMoveWorkspaceTabsAction {
+        MacMoveWorkspaceTabsAction(
+            count: windowController.selectedTabIDs.count,
+            isEnabled: windowController.canTransferSelectedTab,
+            moveSelectedTabToNewWindow
         )
     }
 
@@ -614,42 +645,57 @@ struct MacWorkspaceView: View {
     }
 
     private func closeTab(_ workspaceID: UUID) {
-        let closesWindow = windowController.removeTab(
-            workspaceID,
-            sessionManager: sessionManager
-        )
-        secureKeyboardEntry.disable(for: workspaceID)
+        closeTabs([workspaceID])
+    }
+
+    private func closeTabs(_ ids: Set<UUID>) {
+        let closesWindow = windowController.removeTabs(ids, sessionManager: sessionManager)
+        for id in ids { secureKeyboardEntry.disable(for: id) }
         if closesWindow {
             pendingWindowClose = true
             terminalWindow?.close()
         }
     }
 
+    /// ⌘W: the tab shown, even with several selected.
     private func requestCloseSelectedTab() {
+        requestCloseTabs([windowController.selectedTabID])
+    }
+
+    /// Closes tabs as closing one does (W8): asks first when any would stop something (D44), and
+    /// a terminal kept in tmux detaches and keeps running.
+    private func requestCloseTabs(_ ids: Set<UUID>) {
         guard !isConfirmingTabClose else { return }
-        let tab = windowController.selectedTab
-        guard let warning = tab.closeWarning else {
-            closeTab(tab.workspaceID)
+        let count = windowController.tabs.filter { ids.contains($0.workspaceID) }.count
+        guard count > 0 else { return }
+        guard let warning = windowController.closeWarning(forTabs: ids) else {
+            closeTabs(ids)
             return
         }
         guard let window = terminalWindow, window.attachedSheet == nil else { return }
         isConfirmingTabClose = true
         let alert = NSAlert()
-        alert.messageText = "Close Terminal Tab?"
+        alert.messageText = count == 1 ? "Close Terminal Tab?" : "Close \(count) Terminal Tabs?"
         alert.informativeText = warning + " The saved Workgroup will not be changed."
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "Close Tab")
+        alert.addButton(withTitle: count == 1 ? "Close Tab" : "Close \(count) Tabs")
         alert.addButton(withTitle: "Cancel")
         alert.beginSheetModal(for: window) { response in
             isConfirmingTabClose = false
             if response == .alertFirstButtonReturn {
-                closeTab(tab.workspaceID)
+                closeTabs(ids)
             }
         }
     }
 
     private func moveSelectedTabToNewWindow() {
-        guard let request = windowController.transferSelectedTab() else { return }
+        moveTabsToNewWindow(windowController.selectedTabIDs)
+    }
+
+    /// One new window holding these tabs, in sidebar order, still running. When they were every
+    /// tab, this window closes once they have gone (`closesAfterLastTabLeft`).
+    private func moveTabsToNewWindow(_ ids: Set<UUID>) {
+        guard let request = windowController.transferTabs(ids) else { return }
         openWindow(id: "workspace", value: request)
     }
 }

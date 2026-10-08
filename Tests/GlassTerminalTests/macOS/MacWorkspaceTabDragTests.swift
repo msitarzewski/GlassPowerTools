@@ -96,6 +96,61 @@ struct MacWorkspaceTabDragTests {
         }
     }
 
+    // MARK: Several selected tabs dragged together (W8)
+
+    @Test("a drop's tabs arrive together, in the order dragged, whatever order they load in")
+    func loadingSeveral() async throws {
+        let drags = (0..<3).map { _ in MacWorkspaceTabDrag(windowID: UUID(), workspaceID: UUID()) }
+        let providers = drags.map { $0.itemProvider() } + [NSItemProvider(object: "not a tab" as NSString)]
+        let loaded = await withCheckedContinuation { continuation in
+            MacWorkspaceTabDrag.load(from: providers) { continuation.resume(returning: $0) }
+        }
+        #expect(loaded == drags)
+    }
+
+    @Test("several tabs dropped on another window move there together, in sidebar order, all or none")
+    func movingSeveral() throws {
+        try withDefaults { defaults in
+            let source = window(defaults, tabs: 4), destination = window(defaults, tabs: 1)
+            let shown = show(source)
+            defer { MacWorkspacePreviewRegistry.shared.remove(source.windowID) }
+            let t = source.tabs
+            // Payloads in another order than the sidebar's.
+            let drags = [t[3], t[1]].map { MacWorkspaceTabDrag(windowID: source.windowID, workspaceID: $0.workspaceID) }
+
+            let full = window(defaults, tabs: MacWorkspaceWindowRestorationState.maximumTabCount - 1)
+            #expect(!full.acceptDroppedTabs(drags, at: 0), "room for one of them is not room for both")
+            #expect(source.tabs.map(\.workspaceID) == t.map(\.workspaceID), "so neither left")
+
+            #expect(destination.acceptDroppedTabs(drags, at: 1))
+            #expect(destination.tabs.count == 3 && destination.tabs[1] === t[1] && destination.tabs[2] === t[3])
+            #expect(destination.selectedTabIDs == [t[1].workspaceID, t[3].workspaceID] && destination.selectedTabID == t[1].workspaceID,
+                    "they arrive selected, the first shown")
+            #expect(source.tabs.map(\.workspaceID) == [t[0], t[2]].map(\.workspaceID))
+            let reopened = MacWorkspaceWindowController(request: MacWorkspaceLaunchRequest(windowID: source.windowID, tabs: []), defaults: defaults)
+            #expect(reopened.tabs.map(\.workspaceID) == [t[0], t[2]].map(\.workspaceID), "the source saved what it kept")
+            withExtendedLifetime(shown) {}
+        }
+    }
+
+    @Test("several tabs dragged within a window move as a block, keeping their order")
+    func reorderingSeveral() throws {
+        try withDefaults { defaults in
+            let w = window(defaults, tabs: 5)
+            let ids = w.tabs.map(\.workspaceID)
+            let (a, b, c, d, e) = (ids[0], ids[1], ids[2], ids[3], ids[4])
+            @MainActor func drop(_ moving: [UUID], at index: Int) -> Bool {
+                w.acceptDroppedTabs(moving.map { MacWorkspaceTabDrag(windowID: w.windowID, workspaceID: $0) }, at: index)
+            }
+            #expect(drop([d, b], at: 0))
+            #expect(w.tabs.map(\.workspaceID) == [b, d, a, c, e])
+            #expect(drop([b, d], at: 5))
+            #expect(w.tabs.map(\.workspaceID) == [a, c, e, b, d])
+            #expect(drop([a, b], at: 3))
+            #expect(w.tabs.map(\.workspaceID) == [c, e, a, b, d], "landing between e and b as they were")
+        }
+    }
+
     /// The copy the owner saw (2026-10-08): a second controller for the dragging window, made
     /// from its saved tabs, holds the same tab ids and session names but no terminals. Taking
     /// its tab left the real one attached, and with tmux the destination started a second client
