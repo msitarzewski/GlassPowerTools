@@ -306,10 +306,20 @@ struct GlassPowerToolsApp: App {
     /// at the sidebar's ideal height and clipped the detail.
     private var mainScene: some Scene {
         #if os(visionOS)
-        // **One Connections window on the headset** (owner, 2026-09-29). A window group made a new
-        // one for every bolt and every "show Connections"; a `Window` scene is opened once and
-        // brought forward after that, whoever asks.
-        return Window("Connections", id: "main") { mainContent }
+        // **One Connections window on the headset** (owner, 2026-09-29). A plain window group made
+        // a new one for every bolt and every "show Connections". A window group keyed by one fixed
+        // value keeps it to one — opening a value already shown brings that window forward — and
+        // every `openWindow(id: "main")` opens the default value.
+        //
+        // Not a `Window` scene (2026-10-07): after a crash visionOS handed the app two saved
+        // sessions for it, and SwiftUI stops the app on the second — "Your app was given a scene
+        // with id 'main' but the matching Window in your app body is already connected" — on
+        // every launch, a reinstall included, until the saved sessions were gone.
+        return WindowGroup("Connections", id: "main", for: GlassConnectionsWindow.self) { _ in
+            mainContent
+        } defaultValue: {
+            GlassConnectionsWindow()
+        }
         #else
         let group = WindowGroup("Connections", id: "main") { mainContent }
         #if os(macOS)
@@ -401,3 +411,10 @@ struct GlassPowerToolsApp: App {
         #endif
     }
 }
+
+#if os(visionOS)
+/// The one value the headset's Connections window shows, so opening it again brings it forward.
+struct GlassConnectionsWindow: Codable, Hashable {
+    var id = "connections"
+}
+#endif
