@@ -24,6 +24,10 @@ All four capabilities and the shell are built and in daily use on the owner's Ma
 | RDP in-session bandwidth measurements answered with the bytes received (2026-10-05) | built | unit, server (Windows 11 VM: 0 bytes before, real counts after) |
 | Trackpad scroll events drive the remote desktop on iPad and Vision Pro (2026-10-06) | built | device (owner, Vision Pro with a Mac's trackpad) |
 | Terminals kept in tmux sessions; Active lists sessions running on hosts (D44 stage 1, 2026-10-01) | built | unit, server (scratch: create, leave, reattach, end; missing-tmux path); not yet on a device |
+| Local terminals kept in tmux on the Mac: reattach after a relaunch, end on close, survive a quit (D47, 2026-10-07) | built, uncommitted | unit (fake tmux server; kill policy mutation-checked); tmux queries live on tmux 3.7c (private socket); the app driving it not yet run |
+| SwiftTerm 1.20: answers XTVERSION, so TUIs use synchronized output (D48, 2026-10-07) | built, uncommitted | unit (`TerminalCapabilityProbeTests`), every test target passes, Release builds for macOS, iOS and visionOS; not yet seen on any device |
+| Local terminals get the Mac's environment and `TERM_PROGRAM=GlassPowerTools` (2026-10-07) | built, uncommitted | unit |
+| Dependency update check, on demand and weekly (D48, 2026-10-07) | built, uncommitted | survey run live (8 of 30 pins behind); `--test` run against SwiftTerm 1.18 — see task note |
 
 Package suite: about **1,790 tests**. The last full run with the screen unlocked passed (1,777, early
 2026-09-27); the night's later runs were under a locked screen, where file-protected stores cannot be

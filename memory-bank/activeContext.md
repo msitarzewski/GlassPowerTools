@@ -50,6 +50,20 @@ Built and committed 2026-10-01 → 07 (task notes in `tasks/2026-10/`):
 - Trackpad scroll events reach the remote desktop (a Mac's trackpad driving Vision Pro; confirmed).
 - Database scroll views use a hard top scroll edge on the Mac — **not yet seen by the owner**.
 
+**In progress, uncommitted (2026-10-08: 0.4.294 installed on Mac, iPhone and Vision Pro; the owner
+works in a local tmux tab, so Mac installs no longer end the session, and the tab reattaches by
+itself after the install — verified):** Workgroups on the
+shared row with one row height everywhere; tab names from the shell's title or directory and rename
+in the sidebar or title; the activity wave; Finder drop as escaped paths; **D47 local terminals kept
+in tmux** (Settings → Terminal; tmux 3.7c now installed); **D48 SwiftTerm 1.20** (answers XTVERSION,
+so Claude Code uses synchronized output), the Mac's environment in local terminals, and the
+dependency update check (`Tools/Packages/check-updates.py`, weekly LaunchAgent); closing a local tmux
+tab detaches and Active lists This Mac's sessions; scrolling in tmux (local and SSH, Mac) scrolls
+tmux's history; the headset's Connections window can no longer lock the app out (value-keyed window
+group); favourites sync (D49). Proposed: D50, reaching This Mac's terminals from other devices. Task note:
+`tasks/2026-10/2026-10-07_terminal-tabs-and-local-tmux.md`. The owner runs this session inside the
+app, so an install ends it — resume with `claude --continue`. Commit in pieces on the owner's word.
+
 **Open, owner's call:**
 - **D46 (Proposed): palm-up pinch-drag = scroll, pinch-and-hold = right-click on Vision Pro.**
   Measured: palm direction is the pinch pose's `up` (right hand) / `−up` (left), z toward the viewer;
@@ -123,7 +137,6 @@ streaming.
 ## Open questions for the owner
 
 - Delete the legacy `SFTPRemoteEditorView` sheet? (Recommended.)
-- Take SwiftTerm 1.19, which adds a build-tool plugin Xcode must be told to trust?
 - Behaviour and design findings from the help audit, not changed: the widget reads data the app no
   longer writes (fix or drop for 1.0?); local editor projects sync to devices that cannot open them;
   the Editor off the Mac has no Find, no way to close a lone document, no blank editor; the database settings page may be unreachable (the desktop's is fixed); the database "Rows per page" field does nothing; the terminal

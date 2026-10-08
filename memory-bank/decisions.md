@@ -1146,3 +1146,50 @@ the jump machine's own service. Evidence: `tasks/2026-10/2026-10-05_db-through-a
 pinch-and-move drags. Measured palm direction separates cleanly (task note). The pose needs a SwiftUI
 spatial gesture that takes all input and has no mouse buttons, so the owner's idea — behave by device —
 becomes a hands mode and a trackpad mode switched on what is in use. Not approved or built.
+
+## D47 — Local terminals kept in tmux — Approved 2026-10-07
+**Owner:** running an agent inside the app's local terminal, an install ended it. Offered a watcher
+installer, local tmux, or Terminal.app; the owner: "local tmux is the way, right?" and "Let's build
+this … Keep local terminals running with tmux. We use it for SSH already." **Decision:** a Mac setting
+(off by default, offered only when tmux is found) runs each local pane in its own `glass-N` session on
+the Mac's tmux server, saved with the pane so a relaunched tab reattaches. Closing a pane, tab or
+window ends its session; quitting the app keeps them all. Unlike D44's SSH terminals, local sessions
+are not listed in Active — closing ends them, so none are left behind. **Amended the same day:** the
+owner closed a tab and could not resume it, so closing now detaches as D44's terminals do, and Active
+lists the Mac's sessions under This Mac (open, take over, end). The SSH tmux commands also look
+in Homebrew's folders, so another device can reach these sessions over SSH. Evidence:
+`tasks/2026-10/2026-10-07_terminal-tabs-and-local-tmux.md`.
+
+## D48 — SwiftTerm 1.20, and a weekly check of newer dependency releases — Approved 2026-10-07
+**Owner:** Claude Code drew roughly in our terminal. The cause: it asks XTVERSION before it asks
+about synchronized output, and SwiftTerm 1.18 did not answer (`tasks/2026-10/2026-10-07_terminal-tabs-and-local-tmux.md`).
+1.19 and 1.20 answer it, but 1.19 had been held back for its build-tool plugin. Asked "Why are we
+pinning like this? Can we test … when there's a new version?", the owner chose: take **SwiftTerm
+1.20** with its plugin (it runs `git` on SwiftTerm's checkout to stamp a version; no network), and
+build an **update check, on demand and weekly**, that reports newer releases and tests the app
+against them without moving a pin. Pins stay; raising one stays a person's decision. Also approved:
+local terminals get the Mac's environment (as Terminal.app passes it) with `TERM_PROGRAM=GlassPowerTools`.
+"This will need testing on the other platforms" — device checks on iPhone and Vision Pro are part of it.
+visionOS note, 2026-10-07: the "one Connections window on the headset" choice (2026-09-29) is now kept
+by a value-keyed `WindowGroup` rather than a `Window` scene, which made every launch fatal once
+visionOS held two saved sessions for it (task note of the same date).
+
+## D49 — Favourites sync across devices — Approved 2026-10-08
+**Owner:** "Favorites aren't synced" … "scroll and favorites too please". They were per-device by
+design (glas.sh's preferences). **Decision:** each host's favourite travels through the shell's iCloud
+key-value sync (`GlassFavoritesPayload`, key `shell-favorites-envelope-v1`), as the editor's project
+list does: the newest change per host wins, an unfavourite travels too, favourites set before sync
+count as the oldest change so each device's are kept together, and the device's own host (one fixed
+id on every device) is never synced. Connection history and last-used service stay per device (D41).
+
+## D50 — Reaching This Mac's terminals from other devices — Proposed 2026-10-08
+**Owner:** "Is there any chance that this local terminal will be available via [the Mac]/ssh from
+vision pro?" and, seeing Active: "This Mac isn't available on Vision Pro." This Mac is a device-only
+host (`GlassLocalHost`); other devices know the same machine only as its synced record, which has no
+Terminal service. **Proposed, not built:** a Mac setting that offers this Mac's terminals to the
+owner's other devices — it would need Remote Login (the owner turns it on), an SSH key the app holds
+and syncs, that key's public half added to the owner's `~/.ssh/authorized_keys`, the Mac's host key
+pinned for the other devices, and a Terminal service with tmux on added to the Mac's synced record.
+Writing `authorized_keys` is the owner's call. Also wanted with it: the Mac recognising its synced
+record as itself, so Active does not list each session twice.
+
