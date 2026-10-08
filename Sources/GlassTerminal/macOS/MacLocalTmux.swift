@@ -14,6 +14,7 @@
 
 #if os(macOS)
 import Foundation
+import os
 
 enum MacLocalTmux {
     /// The tmux the workspace talks to. Tests put a stand-in here.
@@ -107,6 +108,25 @@ enum MacLocalTmux {
         shownHere[name] = count > 0 ? count : nil
     }
 
+    /// A pane is about to attach to `name`: noted, or refused and logged when a tab here already
+    /// shows it. A second client would mirror the first window, which is how a dragged tab looked
+    /// like a copy of its session (2026-10-08). A view asks on every redraw, so a refusal is
+    /// logged once until the session is next claimed.
+    @MainActor static func claimShown(_ name: String) -> Bool {
+        guard shownHere[name, default: 0] == 0 else {
+            if refusalsLogged.insert(name).inserted {
+                logger.error("Refused a second client for tmux session \(name, privacy: .public): a tab here already shows it")
+            }
+            return false
+        }
+        refusalsLogged.remove(name)
+        noteShown(name)
+        return true
+    }
+
+    @MainActor private static var refusalsLogged: Set<String> = []
+    nonisolated private static let logger = Logger(subsystem: "sh.glas", category: "tmux")
+
     /// What the session's active pane shows: the directory its shell is in, and the title a
     /// program set. tmux keeps both from the terminal outside it, so a tab in tmux asks.
     nonisolated static func context(session: String, tmux: String,
@@ -172,25 +192,26 @@ enum MacLocalTmux {
     /// notes those windows as it quits, and opens them again at the next launch (2026-10-07).
     static let reopenKey = "macLocalTmuxWindowsToReopen"
 
-    @MainActor static func rememberWindowsToReopen(defaults: UserDefaults = .standard) {
-        // `allObjects` is an autoreleased array: drained here, it keeps no window alive.
-        let ids = autoreleasepool {
-            MacWorkspaceWindowController.live.allObjects
-                .filter { $0.tabs.contains(where: \.hasLocalTerminalsInTmux) }
-                .map(\.windowID.uuidString)
-        }
+    /// The windows on screen, as `MacWorkspacePreviewRegistry` knows them: the controller each one
+    /// shows, never a copy that no window shows.
+    @MainActor static func rememberWindowsToReopen(defaults: UserDefaults = .standard,
+                                                   registry: MacWorkspacePreviewRegistry = .shared) {
+        let ids = registry.shownControllers
+            .filter { $0.tabs.contains(where: \.hasLocalTerminalsInTmux) }
+            .map(\.windowID.uuidString)
         if ids.isEmpty { defaults.removeObject(forKey: reopenKey) } else { defaults.set(ids, forKey: reopenKey) }
     }
 
     /// The windows to open again, once. None when macOS restores windows itself
     /// (`NSQuitAlwaysKeepsWindows`), none already open, and none whose tabs are no longer saved.
+    /// "Already open" includes a window whose controller is made but whose window is not yet
+    /// found, so a window macOS is restoring is never opened a second time with the same id.
     @MainActor static func takeWindowsToReopen(defaults: UserDefaults = .standard,
                                                open openWindowIDs: Set<UUID>? = nil) -> [UUID] {
         guard let ids = defaults.stringArray(forKey: reopenKey) else { return [] }
         defaults.removeObject(forKey: reopenKey)
         guard !defaults.bool(forKey: "NSQuitAlwaysKeepsWindows") else { return [] }
-        let open = openWindowIDs
-            ?? autoreleasepool { Set(MacWorkspaceWindowController.live.allObjects.map(\.windowID)) }
+        let open = openWindowIDs ?? MacWorkspacePreviewRegistry.shared.openWindowIDs
         return ids.compactMap(UUID.init(uuidString:)).filter {
             !open.contains($0) && MacWorkspaceWindowController.hasSavedState(windowID: $0, defaults: defaults)
         }

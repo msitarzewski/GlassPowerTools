@@ -1,4 +1,5 @@
 #if os(macOS)
+import AppKit
 import Foundation
 import Testing
 import GlassTerminalEmulator
@@ -309,14 +310,19 @@ struct MacLocalTmuxTests {
                 fake.running = [try #require(tab.localTmuxSession(for: pane))]
                 _ = try #require(tab.localRuntime(for: pane))
             }
+            // What is on screen: the registry knows the windows and the controllers they show.
+            let registry = MacWorkspacePreviewRegistry()
+            let shown = NSWindow()
+            shown.isReleasedWhenClosed = false
+            registry.register(try #require(window), window: shown)
 
-            MacLocalTmux.rememberWindowsToReopen(defaults: defaults)
+            MacLocalTmux.rememberWindowsToReopen(defaults: defaults, registry: registry)
             #expect(defaults.stringArray(forKey: MacLocalTmux.reopenKey) == [id.uuidString])
             #expect(MacLocalTmux.takeWindowsToReopen(defaults: defaults, open: [id]).isEmpty,
                     "a window still open is not opened twice")
 
             // The next launch: nothing open yet.
-            MacLocalTmux.rememberWindowsToReopen(defaults: defaults)
+            MacLocalTmux.rememberWindowsToReopen(defaults: defaults, registry: registry)
             window = nil
             #expect(MacLocalTmux.takeWindowsToReopen(defaults: defaults, open: []) == [id])
             #expect(MacLocalTmux.takeWindowsToReopen(defaults: defaults, open: []).isEmpty, "once")

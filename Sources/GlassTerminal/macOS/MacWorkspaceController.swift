@@ -409,11 +409,14 @@ final class MacWorkspaceController {
         if let runtime = localRuntimesByPaneID[paneID] {
             return runtime
         }
+        // Never a second tmux client for a session a tab here already shows: it would mirror
+        // that tab's window. The pane says so instead (`MacWorkspaceTabContent`).
+        let tmuxSession = localTmuxSession(for: paneID)
+        if let tmuxSession, !MacLocalTmux.claimShown(tmuxSession) { return nil }
         let runtime = SwiftTermLocalProcessRuntime()
         localRuntimesByPaneID[paneID] = runtime
         observeOutput(of: runtime.model)
-        if let tmuxSession = localTmuxSession(for: paneID) {
-            MacLocalTmux.noteShown(tmuxSession)
+        if tmuxSession != nil {
             runtime.model.onAlternateScreenScroll = { [weak self] deltaY, precise in
                 self?.scrollLocalTmux(paneID, deltaY: deltaY, precise: precise) ?? false
             }
@@ -969,9 +972,6 @@ final class MacWorkspaceWindowController {
     private(set) var tabs: [MacWorkspaceController]
     private(set) var selectedTabID: UUID
 
-    /// Every terminal window open in this process, for what the app does as it quits (D47).
-    static let live = NSHashTable<MacWorkspaceWindowController>.weakObjects()
-
     private let defaults: UserDefaults
     private let startupCommandBroker: MacStartupCommandBroker
     private let liveSessionBroker: MacLiveSessionBroker
@@ -1050,7 +1050,8 @@ final class MacWorkspaceWindowController {
         tabs = resolvedTabs
         selectedTabID = resolvedSelectedTabID
         persist()
-        Self.live.add(self)
+        // Made once per window: its view asks the registry first (`windowController(for:)`).
+        MacWorkspacePreviewRegistry.shared.noteBuilt(self)
     }
 
     /// Whether this window's tabs are saved, so a launch request with its id restores them.
@@ -1171,8 +1172,11 @@ final class MacWorkspaceWindowController {
         persist()
     }
 
+    /// A new tab, by default with a shell on this Mac, in tmux when that is on, rather than the
+    /// empty chooser "+" and ⌘T used to show (2026-10-08). The caller starts its panes
+    /// (`startLocalPanes`), so they do not wait for the tab's view.
     @discardableResult
-    func addTab(_ request: MacWorkspaceTabRequest = MacWorkspaceTabRequest(startsEmpty: true))
+    func addTab(_ request: MacWorkspaceTabRequest = MacWorkspaceTabRequest(initialPaneIntent: .local))
         -> MacWorkspaceController?
     {
         guard canAddTab else { return nil }
@@ -1228,19 +1232,19 @@ final class MacWorkspaceWindowController {
     /// closing this window cannot touch the terminals that moved.
     private(set) var closesAfterLastTabLeft = false
 
-    static func live(windowID: UUID) -> MacWorkspaceWindowController? {
-        autoreleasepool { live.allObjects.first { $0.windowID == windowID } }
-    }
-
     /// A tab dropped on this window's tab list at `index`: reordered when it is from this window,
     /// moved here, running, when it is from another. False when it cannot be taken.
+    ///
+    /// The source is the controller the dragging window shows (`MacWorkspacePreviewRegistry`),
+    /// never another made for the same id: taking a copy's tab left the real one in place, still
+    /// attached, and with tmux the two windows mirrored one session (2026-10-08).
     @discardableResult
     func acceptDroppedTab(_ drag: MacWorkspaceTabDrag, at index: Int) -> Bool {
         guard !closesAfterLastTabLeft else { return false }
         if drag.windowID == windowID {
             return moveTab(drag.workspaceID, to: index)
         }
-        guard canAddTab, let source = Self.live(windowID: drag.windowID),
+        guard canAddTab, let source = MacWorkspacePreviewRegistry.shared.shownController(windowID: drag.windowID),
               let controller = source.detachTabForMove(drag.workspaceID) else { return false }
         adoptTab(controller, at: index)
         return true

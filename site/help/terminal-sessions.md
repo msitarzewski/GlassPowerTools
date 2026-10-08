@@ -10,7 +10,7 @@ This page covers terminal windows and tabs, the session's tools menu, text size,
 
 | Action | Where | Shortcut |
 |---|---|---|
-| New tab | **New Terminal Tab** | ⌘T |
+| New tab with a shell on this Mac, in tmux when that's on | **New Terminal Tab** (the plus button) | ⌘T |
 | New tab on the same machine | **New Tab with Same Connection** | ⇧⌘T |
 | New window | **New Terminal Window** | ⌘N in a terminal window |
 | Split with a local shell | **Split Right**, **Split Down** | ⌘D, ⇧⌘D |

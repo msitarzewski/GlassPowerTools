@@ -48,7 +48,10 @@ struct MacWorkspaceView: View {
     @Environment(\.openWindow) private var openWindow
 
     init(request: MacWorkspaceLaunchRequest) {
-        let controller = MacWorkspaceWindowController(request: request)
+        // SwiftUI runs this again for a window it already shows, and `@State` keeps only the first
+        // controller; a second one made here lived on beside it as a twin (2026-10-08). The
+        // registry hands back the window's own, and makes one only for a window that has none.
+        let controller = MacWorkspacePreviewRegistry.shared.windowController(for: request)
         let scope = controller.tabs.first?.workgroupID?.uuidString.lowercased() ?? "terminal"
         let key = UserDefaultsKeys.macWorkspaceSidebarVisibility + "." + scope
         sidebarPreferenceKey = key
@@ -248,11 +251,7 @@ struct MacWorkspaceView: View {
                 }
             }
             let tabs = windowController.tabs
-            for tab in tabs {
-                tab.startLocalPanes(sessionManager: sessionManager, settingsManager: settingsManager) {
-                    closeTab(tab.workspaceID)
-                }
-            }
+            for tab in tabs { startLocalPanes(of: tab) }
             // Each SSH connection progresses independently, even in unvisited tabs.
             let connections = tabs.flatMap { tab in
                 (tab.state.root?.panes ?? []).filter { $0.intent.kind == .ssh }.map { pane in
@@ -552,8 +551,17 @@ struct MacWorkspaceView: View {
         windowController.renameTab(id, to: renameText)
     }
 
+    /// "+" and ⌘T: a tab with a shell on this Mac, started at once (2026-10-08).
     private func addTab() {
-        windowController.addTab()
+        if let tab = windowController.addTab() { startLocalPanes(of: tab) }
+    }
+
+    /// Starts a tab's local shells now, not when its view first draws: a pane started only by
+    /// its view waited on SwiftUI, and could be left with no shell at all.
+    private func startLocalPanes(of tab: MacWorkspaceController) {
+        tab.startLocalPanes(sessionManager: sessionManager, settingsManager: settingsManager) {
+            closeTab(tab.workspaceID)
+        }
     }
 
     /// What ⇧⌘T repeats: the intent the focused tab's focused pane is running.
@@ -587,9 +595,11 @@ struct MacWorkspaceView: View {
         intent.sourceSessionIndex = nil
         // And the tmux session belongs to the pane that made it: the new tab gets its own.
         intent.localTmuxSession = nil
-        windowController.addTab(
+        if let tab = windowController.addTab(
             MacWorkspaceTabRequest(startsEmpty: false, initialPaneIntent: intent)
-        )
+        ) {
+            startLocalPanes(of: tab)
+        }
     }
 
     private func closeTab(_ workspaceID: UUID) {
@@ -744,28 +754,14 @@ private struct MacWorkspaceTabContent: View {
                 }
             }
         } else {
-            ContentUnavailableView {
-                Label("New Terminal", systemImage: "apple.terminal")
-            } description: {
-                Text("Choose how to start this terminal tab.")
-            } actions: {
-                Button("Local Terminal", systemImage: "apple.terminal") {
-                    controller.addPane(intent: .local, axis: .horizontal)
-                }
-                Button("SSH Connection", systemImage: "network") {
-                    controller.requestSSHPane(axis: .horizontal)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background {
-                TerminalCanvasBackground(
-                    color: settingsManager.currentTheme.background,
-                    tint: TerminalGlassTint.color(for: settingsManager.glassTint),
-                    opacity: settingsManager.windowOpacity,
-                    blur: settingsManager.blurBackground,
-                    appearance: settingsManager.currentTheme.resolvedAppearance
-                )
-            }
+            MacWorkspaceEmptyTab(
+                theme: settingsManager.currentTheme,
+                tint: TerminalGlassTint.color(for: settingsManager.glassTint),
+                opacity: settingsManager.windowOpacity,
+                blur: settingsManager.blurBackground,
+                startLocal: { controller.addPane(intent: .local, axis: .horizontal) },
+                startSSH: { controller.requestSSHPane(axis: .horizontal) }
+            )
         }
     }
 
@@ -814,6 +810,17 @@ private struct MacWorkspaceTabContent: View {
                     hostModel: runtime.model,
                     processState: runtime.processState
                 )
+            } else if !controller.isClosed, pane.intent.localTmuxSession != nil {
+                // Refused: another tab here already shows this tmux session (`claimShown`).
+                ContentUnavailableView {
+                    Label("Already Open", systemImage: "rectangle.on.rectangle")
+                } description: {
+                    Text("This terminal's tmux session is open in another tab. Close this pane and use that tab.")
+                } actions: {
+                    Button("Close Pane") { closeLocalPane(pane.id) }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(.regularMaterial, in: .rect(cornerRadius: showsPaneChrome ? 18 : 0))
             }
         case .ssh:
             if !persistentStateReady {
@@ -1038,6 +1045,41 @@ private struct MacWorkspaceTabContent: View {
             get: { secureKeyboardEntry.lastError != nil },
             set: { if !$0 { secureKeyboardEntry.clearError() } }
         )
+    }
+}
+
+/// The chooser an otherwise-empty tab shows. It sits on the terminal theme's canvas, so it takes
+/// the theme's light or dark: in the system's, a dark theme under Light appearance drew its text
+/// and buttons black on black, and the tab looked blank (2026-10-08).
+struct MacWorkspaceEmptyTab: View {
+    let theme: TerminalTheme
+    var tint: Color? = nil
+    var opacity: Double = 1
+    var blur: Double = 0
+    let startLocal: () -> Void
+    let startSSH: () -> Void
+    @Environment(\.colorScheme) private var systemColorScheme
+
+    var body: some View {
+        ContentUnavailableView {
+            Label("New Terminal", systemImage: "apple.terminal")
+        } description: {
+            Text("Choose how to start this terminal tab.")
+        } actions: {
+            Button("Local Terminal", systemImage: "apple.terminal", action: startLocal)
+            Button("SSH Connection", systemImage: "network", action: startSSH)
+        }
+        .environment(\.colorScheme, theme.resolvedAppearance.colorScheme ?? systemColorScheme)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
+            TerminalCanvasBackground(
+                color: theme.background,
+                tint: tint,
+                opacity: opacity,
+                blur: blur,
+                appearance: theme.resolvedAppearance
+            )
+        }
     }
 }
 

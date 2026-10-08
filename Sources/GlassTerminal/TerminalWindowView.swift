@@ -1274,11 +1274,7 @@ struct TerminalWindowView: View {
     /// The terminal theme's own light or dark, so controls drawn on its colour read; nil for an
     /// automatic theme, which follows the system.
     private var themeColorScheme: ColorScheme? {
-        switch settingsManager.currentTheme.resolvedAppearance {
-        case .light: .light
-        case .dark: .dark
-        case .automatic: nil
-        }
+        settingsManager.currentTheme.resolvedAppearance.colorScheme
     }
 
     /// An iPhone on its side: compact height.
@@ -2301,6 +2297,18 @@ struct GlassWindowBackground: ViewModifier {
         }
     }
     #endif
+}
+
+extension TerminalThemeAppearance {
+    /// The theme's own light or dark, so controls drawn on its colour read; nil for an automatic
+    /// theme, which follows the system.
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .light: .light
+        case .dark: .dark
+        case .automatic: nil
+        }
+    }
 }
 
 #if os(macOS)

@@ -18,14 +18,65 @@ final class MacWorkspacePreviewRegistry {
             self.window = window
         }
     }
+    private final class Built {
+        weak var controller: MacWorkspaceWindowController?
+        init(_ controller: MacWorkspaceWindowController) { self.controller = controller }
+    }
     private var entries: [UUID: Entry] = [:]
+    /// Every window controller made, by window id, held weakly. A window's view asks here before
+    /// making one, because SwiftUI runs its init again (2026-10-08): a scene update handing it an
+    /// equal request made a second controller, a twin of the window that restored its tabs, and a
+    /// tab dragged out of the window was sometimes taken from the twin. Ignored by observation,
+    /// since views read it while they are being made.
+    @ObservationIgnored private var built: [UUID: [Built]] = [:]
 
     func register(_ controller: MacWorkspaceWindowController, window: NSWindow) {
         guard entries[controller.windowID]?.window !== window else { return }
         entries[controller.windowID] = Entry(controller, window: window)
     }
 
-    func remove(_ id: UUID) { entries.removeValue(forKey: id) }
+    /// The window has closed: neither it nor its controller is found again, so a window opened
+    /// later with the same id starts from its saved tabs.
+    func remove(_ id: UUID) {
+        entries.removeValue(forKey: id)
+        built.removeValue(forKey: id)
+    }
+
+    /// A window controller was made. Only `MacWorkspaceWindowController.init` calls this.
+    func noteBuilt(_ controller: MacWorkspaceWindowController) {
+        built[controller.windowID, default: []].append(Built(controller))
+    }
+
+    /// Every controller alive for a window id. One, unless something made a second.
+    func controllers(windowID: UUID) -> [MacWorkspaceWindowController] {
+        let alive = built[windowID]?.filter { $0.controller != nil } ?? []
+        built[windowID] = alive.isEmpty ? nil : alive
+        return alive.compactMap(\.controller)
+    }
+
+    /// The controller for the window a request opens: the one already made for its id, or a new
+    /// one. A window's view gets its controller only here.
+    func windowController(for request: MacWorkspaceLaunchRequest) -> MacWorkspaceWindowController {
+        controllers(windowID: request.windowID).first ?? MacWorkspaceWindowController(request: request)
+    }
+
+    /// The controller a window on screen shows — never a copy that no window shows.
+    func shownController(windowID: UUID) -> MacWorkspaceWindowController? {
+        guard let entry = entries[windowID], entry.window != nil else { return nil }
+        return entry.controller
+    }
+
+    /// The controllers of the terminal windows on screen.
+    var shownControllers: [MacWorkspaceWindowController] {
+        entries.keys.sorted { $0.uuidString < $1.uuidString }.compactMap(shownController(windowID:))
+    }
+
+    /// The ids of terminal windows open or opening: shown, or with a controller made for them
+    /// whose window has not been found yet.
+    var openWindowIDs: Set<UUID> {
+        Set(shownControllers.map(\.windowID))
+            .union(built.filter { $0.value.contains { $0.controller != nil } }.keys)
+    }
 
     func tabs(for workgroupID: UUID) -> [MacWorkspaceController] {
         entries.keys.sorted { $0.uuidString < $1.uuidString }

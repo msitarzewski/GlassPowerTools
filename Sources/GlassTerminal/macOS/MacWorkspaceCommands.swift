@@ -172,9 +172,11 @@ struct MacWorkspaceCommands: Commands {
                 if let newWorkspaceTabAction {
                     newWorkspaceTabAction()
                 } else {
+                    // No terminal window focused: a window with a shell on this Mac, as "+" gives
+                    // a tab with one (2026-10-08). SSH is ⌥⌘T, ⇧⌘T or Connections.
                     openWindow(
                         id: "workspace",
-                        value: MacWorkspaceLaunchRequest(startsEmpty: true)
+                        value: MacWorkspaceLaunchRequest(initialPaneIntent: .local)
                     )
                 }
             }

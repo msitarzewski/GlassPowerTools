@@ -3294,6 +3294,9 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
     private var onRendererDiagnostics: (SwiftTermRendererDiagnostics) -> Void
     private var onOSC52Decision: (SwiftTermOSC52Decision) -> Void
     private var didReportTermination = false
+    /// Set by the first `start`, whether or not the process launched. A host view starts only an
+    /// engine that never has, so an exited shell waits for Restart instead of coming back alone.
+    private(set) var hasStarted = false
     private(set) var launchedShell: String?
     private(set) var rendererDiagnostics = SwiftTermRendererDiagnostics.awaitingWindow
     private(set) var performanceDiagnostics = SwiftTermPerformanceDiagnostics()
@@ -3422,6 +3425,7 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
 
     func start(_ configuration: SwiftTermLocalProcessConfiguration) {
         guard let processState else { return }
+        hasStarted = true
         if let failure = configuration.validationFailure {
             processState.failedToLaunch(failure)
             return
@@ -4039,7 +4043,10 @@ public struct SwiftTermLocalProcessHostView: NSViewRepresentable {
             model.attach(engine)
             processState.attach(engine)
             engine.configure(theme: theme, runtimeSettings: runtimeSettings)
-            if resolved.isNew {
+            // Any engine that has never started, not only one this call made: a view torn down
+            // before this block ran left its engine unstarted, and every later view found it
+            // already made, so the pane showed a terminal with no shell (2026-10-08).
+            if !engine.hasStarted {
                 engine.start(configuration)
             }
             coordinator.isReady = true
