@@ -11,6 +11,9 @@ public struct GlassShellPreferences: Codable, Equatable, Sendable {
 
     public struct HostRecord: Codable, Equatable, Sendable {
         public var isFavorite = false
+        /// When the favourite last changed, here or on another device — its sync clock
+        /// (2026-10-08). Nil for one set before favourites synced.
+        public var favoriteChangedAt: Date?
         public var lastConnected: Date?
         public var lastUsedEndpointID: EndpointID?
         public init() {}

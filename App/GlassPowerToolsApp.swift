@@ -286,6 +286,12 @@ struct GlassPowerToolsApp: App {
                     with: GlassSettingsSyncService(projectStore: GlassUbiquitousSettingsStore())
                 )
             }
+            // Favourites too (2026-10-08), the same way and for the same reasons.
+            Task { @MainActor in
+                await model.startSynchronizingFavorites(
+                    with: GlassSettingsSyncService(favoritesStore: GlassUbiquitousSettingsStore())
+                )
+            }
         }
         _layers = State(initialValue: layers)
         _model = State(initialValue: model)

@@ -1315,8 +1315,65 @@ public final class GlassShellModel: GlassServiceStore {
     }
 
     public func toggleFavorite(_ id: HostID) {
-        preferences[host: canonicalID(for: id)].isFavorite.toggle()
+        let canonical = canonicalID(for: id)
+        preferences[host: canonical].isFavorite.toggle()
+        preferences[host: canonical].favoriteChangedAt = Date()
         do { try persistPreferences() } catch { errorMessage = GlassShellError.message(for: error) }
+        pushFavorites()
+    }
+
+    // MARK: Favourites on every device (2026-10-08)
+
+    private var favoritesSync: GlassSettingsSyncService<GlassFavoritesPayload>?
+
+    /// Attaches favourites to iCloud. Without it they stay on this device, as they did before.
+    public func startSynchronizingFavorites(with service: GlassSettingsSyncService<GlassFavoritesPayload>) async {
+        favoritesSync = service
+        await service.start(onMerge: { [weak self] incoming in self?.applyFavorites(incoming) })
+        pushFavorites()
+    }
+
+    /// This device's favourites as the sync carries them. Not the device's own host: every device
+    /// has one, under one fixed id, and a favourite "This Mac" is not a favourite "This iPhone".
+    public var favoritesPayload: GlassFavoritesPayload {
+        var payload = GlassFavoritesPayload()
+        for (id, record) in preferences.hosts where id != GlassLocalHost.id
+            && (record.isFavorite || record.favoriteChangedAt != nil) {
+            payload.marks[id.rawValue.uuidString] = .init(
+                isFavorite: record.isFavorite,
+                changedAt: record.favoriteChangedAt ?? GlassFavoritesPayload.legacyChange)
+        }
+        return payload
+    }
+
+    /// Takes each newer favourite from another device, under the id this library knows the host
+    /// by — another device may still list it under a duplicate's id.
+    public func applyFavorites(_ incoming: GlassFavoritesPayload) {
+        var changed = false
+        for (key, mark) in incoming.marks {
+            guard let uuid = UUID(uuidString: key) else { continue }
+            let id = canonicalID(for: HostID(rawValue: uuid))
+            guard id != GlassLocalHost.id else { continue }
+            let current = preferences[host: id]
+            let currentMark: GlassFavoritesPayload.Mark?
+            if let changedAt = current.favoriteChangedAt {
+                currentMark = .init(isFavorite: current.isFavorite, changedAt: changedAt)
+            } else {
+                currentMark = current.isFavorite ? .init(isFavorite: true, changedAt: GlassFavoritesPayload.legacyChange) : nil
+            }
+            guard GlassFavoritesPayload.replaces(mark, currentMark) else { continue }
+            preferences[host: id].isFavorite = mark.isFavorite
+            preferences[host: id].favoriteChangedAt = mark.changedAt
+            changed = true
+        }
+        guard changed else { return }
+        do { try persistPreferences() } catch { errorMessage = GlassShellError.message(for: error) }
+    }
+
+    private func pushFavorites() {
+        guard let favoritesSync else { return }
+        let payload = favoritesPayload
+        Task { try? await favoritesSync.push(payload) }
     }
 
     /// Merges a consolidated host's member records into its canonical record **in the catalog**:
