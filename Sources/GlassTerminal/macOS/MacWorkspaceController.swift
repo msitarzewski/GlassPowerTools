@@ -5,6 +5,11 @@ import Observation
 import GlassTerminalEmulator
 import os
 
+extension Logger {
+    /// Saving and restoring terminal windows and tabs (W7b).
+    nonisolated static let workspaceRestoration = Logger(subsystem: "sh.glas", category: "workspace")
+}
+
 @MainActor
 @Observable
 final class MacWorkspaceController {
@@ -23,6 +28,12 @@ final class MacWorkspaceController {
     private(set) var findTargetPaneID: UUID?
     private(set) var findRequest = TerminalFindRequest.none
     private(set) var isClosed = false
+    /// Why this tab's saved layout could not be read, or nil. The record is then left exactly as
+    /// it was, never written over, until the tab is closed, which discards it on purpose (W7b).
+    private(set) var restorationFailure: String?
+    /// A layout made here rather than read from the record: saved when a window shows the tab or
+    /// changes, never by init, so a controller made and thrown away writes nothing (W7b).
+    @ObservationIgnored private var hasUnsavedState = false
     var pendingSSHAxis: MacWorkspaceSplitAxis?
 
     private let defaults: UserDefaults
@@ -62,12 +73,14 @@ final class MacWorkspaceController {
         self.workgroupName = nil
         self.workgroupColor = nil
         self.tabLabel = nil
-        self.state = Self.load(
+        let loaded = Self.load(
             workspaceID: workspaceID,
             startsEmptyIfUnrestored: startsEmptyIfUnrestored,
             initialPaneIntent: nil,
             defaults: defaults
-        ).state
+        )
+        self.state = loaded.state
+        self.restorationFailure = loaded.failure
     }
 
     convenience init(
@@ -104,6 +117,7 @@ final class MacWorkspaceController {
             defaults: defaults
         )
         self.state = loaded.state
+        self.restorationFailure = loaded.failure
         var acceptedInitialLayout = false
         if !loaded.hadRestorationData, let initial = request.initialState,
            let validated = try? initial.validated(for: request.workspaceID) {
@@ -153,14 +167,12 @@ final class MacWorkspaceController {
         }
         startupTicketIDsByPaneID.removeAll()
         let assignedTmuxSessions = assignLocalTmuxSessions()
-        // Unselected tabs may never receive a focus or layout event. Save their
-        // fresh trees now so window descriptors can restore every tab later.
+        // Unselected tabs may never receive a focus or layout event, so their fresh trees are
+        // saved with their window (`saveIfUnsaved`), not here: a controller SwiftUI makes and
+        // throws away wrote records — a new empty tab, a tmux name no window used (W7b).
         // Existing malformed restoration data is deliberately left untouched.
-        if !loaded.hadRestorationData && (request.initialState == nil || acceptedInitialLayout) {
-            persist()
-        } else if loaded.hadRestorationData && assignedTmuxSessions {
-            persist()
-        }
+        hasUnsavedState = (!loaded.hadRestorationData && (request.initialState == nil || acceptedInitialLayout))
+            || (loaded.hadRestorationData && assignedTmuxSessions)
     }
 
     var workspaceID: UUID { state.id }
@@ -247,8 +259,10 @@ final class MacWorkspaceController {
         case (.none, .none): "Terminal"
         }
     }
+    /// Not in a tab whose saved layout couldn't be read: a new pane would be saved over it.
     var canAddPane: Bool {
-        (state.root?.paneIDs.count ?? 0) < MacWorkspaceRestorationState.maximumPaneCount
+        restorationFailure == nil
+            && (state.root?.paneIDs.count ?? 0) < MacWorkspaceRestorationState.maximumPaneCount
     }
 
     func windowIdentity(
@@ -257,6 +271,10 @@ final class MacWorkspaceController {
         home: String? = NSHomeDirectory()
     ) -> MacWorkspaceWindowIdentity {
         guard let focusedPane else {
+            if restorationFailure != nil {
+                return MacWorkspaceWindowIdentity(title: tabLabel ?? "Tab Not Restored",
+                                                  subtitle: "Its saved layout couldn't be read")
+            }
             return MacWorkspaceWindowIdentity(
                 title: windowTitle == "Terminal" ? "New Terminal" : windowTitle,
                 subtitle: nil
@@ -628,7 +646,9 @@ final class MacWorkspaceController {
         discardStartupCommand(for: paneID)
         state.root = root.removingPane(id: paneID)
         state.focusedPaneID = state.root?.paneIDs.first
-        persist()
+        // Closing the last pane is the one change that may save an empty layout over one with
+        // panes; the tab closing next discards the record altogether (`discardSavedState`).
+        persist(emptyingSavedLayout: true)
     }
 
     func updateSplitFraction(_ splitID: UUID, fraction: Double) {
@@ -794,6 +814,8 @@ final class MacWorkspaceController {
     private func letGoOfLocalTmuxSession(_ name: String, wasShown: Bool) {
         MacLocalTmux.release(name)
         if wasShown { MacLocalTmux.noteHidden(name) }
+        // Let go of in this run, by a close or a quit: never offered back as left running (W7b).
+        MacLocalTmuxLaunchOffer.shared.noteClosed(name)
     }
 
     func claimStartupCommand(for paneID: UUID) -> TerminalStartupCommandTicket? {
@@ -817,7 +839,31 @@ final class MacWorkspaceController {
         startupCommandBroker.discard(ticketID)
     }
 
-    private func persist() {
+    /// Saves a layout made rather than read (a new tab, or a tmux name given as it opened) once a
+    /// window shows the tab. Nothing otherwise.
+    func saveIfUnsaved() {
+        if hasUnsavedState { persist() }
+    }
+
+    /// The tab is closing for good, so its saved layout goes too, read or not. One left behind
+    /// was a layout a window could later come back to as an empty tab (W7b).
+    func discardSavedState() {
+        hasUnsavedState = false
+        defaults.removeObject(forKey: Self.defaultsKey(for: state.id))
+    }
+
+    /// Stands in for a window whose saved tabs couldn't be read: says so, and saves nothing.
+    func markNotRestored(_ reason: String) {
+        restorationFailure = reason
+        hasUnsavedState = false
+    }
+
+    /// Saves the layout, except over a saved one that couldn't be read, which stays as it was. An
+    /// empty layout replaces one with panes only when the last pane was closed: a copy of the tab
+    /// made before its layout was first saved would otherwise empty it (W7b).
+    private func persist(emptyingSavedLayout: Bool = false) {
+        guard restorationFailure == nil else { return }
+        let key = Self.defaultsKey(for: state.id)
         do {
             _ = try state.validated(for: state.id)
             let encoder = JSONEncoder()
@@ -826,7 +872,15 @@ final class MacWorkspaceController {
             guard data.count <= Self.maximumEncodedBytes else {
                 throw MacWorkspaceStateError.encodedStateTooLarge
             }
-            defaults.set(data, forKey: Self.defaultsKey(for: state.id))
+            hasUnsavedState = false
+            if state.root == nil, !emptyingSavedLayout, let saved = defaults.data(forKey: key),
+               Self.mayHavePanes(saved) {
+                Logger.workspaceRestoration.error(
+                    "Kept the saved layout of terminal tab \(self.state.id.uuidString, privacy: .public): an empty one would have replaced it although no one closed it"
+                )
+                return
+            }
+            defaults.set(data, forKey: key)
         } catch {
             Logger.settings.error(
                 "Refusing to persist invalid workspace state: \(error.localizedDescription, privacy: .public)"
@@ -835,9 +889,37 @@ final class MacWorkspaceController {
         }
     }
 
+    /// A saved layout that couldn't be read counts as having panes: it may well have had them.
+    private static func mayHavePanes(_ data: Data) -> Bool {
+        guard let saved = try? JSONDecoder().decode(MacWorkspaceRestorationState.self, from: data) else { return true }
+        return saved.root != nil
+    }
+
     private struct LoadResult {
         let state: MacWorkspaceRestorationState
         let hadRestorationData: Bool
+        /// What the tab says when its record exists but couldn't be read.
+        var failure: String? = nil
+    }
+
+    /// What went wrong reading a saved layout, in words for the log: the kind of failure and
+    /// where, never the values themselves.
+    static func plainDescription(of error: Error) -> String {
+        func place(_ context: DecodingError.Context) -> String {
+            context.codingPath.isEmpty ? "the top level" : context.codingPath.map(\.stringValue).joined(separator: ".")
+        }
+        switch error {
+        case let error as MacWorkspaceStateError:
+            return error.errorDescription ?? "it failed validation"
+        case DecodingError.dataCorrupted(let context):
+            return "it is damaged at \(place(context))"
+        case DecodingError.keyNotFound(let key, let context):
+            return "\(key.stringValue) is missing at \(place(context))"
+        case DecodingError.typeMismatch(_, let context), DecodingError.valueNotFound(_, let context):
+            return "a value has the wrong type at \(place(context))"
+        default:
+            return "it couldn't be decoded"
+        }
     }
 
     private static func load(
@@ -860,9 +942,13 @@ final class MacWorkspaceController {
             return LoadResult(state: state, hadRestorationData: false)
         }
         guard data.count <= maximumEncodedBytes else {
+            Logger.workspaceRestoration.error(
+                "Couldn't restore terminal tab \(workspaceID.uuidString, privacy: .public): its saved layout is \(data.count, privacy: .public) bytes, over the limit. It is kept unchanged."
+            )
             return LoadResult(
                 state: .empty(id: workspaceID),
-                hadRestorationData: true
+                hadRestorationData: true,
+                failure: "Its saved layout is larger than this version can read."
             )
         }
         do {
@@ -873,9 +959,13 @@ final class MacWorkspaceController {
         } catch {
             // Keep malformed or future-version data untouched for diagnosis,
             // but never execute a launch request that failed validation.
+            Logger.workspaceRestoration.error(
+                "Couldn't restore terminal tab \(workspaceID.uuidString, privacy: .public): \(plainDescription(of: error), privacy: .public). Its saved layout (\(data.count, privacy: .public) bytes) is kept unchanged."
+            )
             return LoadResult(
                 state: .empty(id: workspaceID),
-                hadRestorationData: true
+                hadRestorationData: true,
+                failure: "Its saved layout couldn't be read."
             )
         }
     }
@@ -990,7 +1080,16 @@ final class MacWorkspaceWindowController {
     private let liveSessionBroker: MacLiveSessionBroker
     private let transferBroker: MacWorkspaceTransferBroker
     private var pendingTransferTicketsByWorkspaceID: [UUID: UUID] = [:]
+    /// Why this window's saved tabs could not be read, or nil. The record is then kept as it was,
+    /// never written over, until its one tab is closed (W7b).
+    private(set) var restorationFailure: String?
+    /// The tabs shown differ from the saved record: a new window, or one rebuilt from its
+    /// request. Saved when the window opens (`windowDidOpen`), never by init (W7b).
+    @ObservationIgnored private var hasUnsavedState = false
 
+    /// Makes the window's tabs and writes nothing: SwiftUI makes controllers it throws away, and a
+    /// window macOS restores after a crash must come back as it was saved, not be rewritten by
+    /// whatever its request held (W7b). The window saves when it opens or changes.
     init(
         request: MacWorkspaceLaunchRequest,
         startupCommandBroker: MacStartupCommandBroker = .shared,
@@ -1004,72 +1103,79 @@ final class MacWorkspaceWindowController {
         self.liveSessionBroker = liveSessionBroker
         self.transferBroker = transferBroker
 
-        let resolvedTabs: [MacWorkspaceController]
-        let resolvedSelectedTabID: UUID
-        if let ticketID = request.transferredTabTicketID {
-            if let transferred = transferBroker.claim(ticketID) {
-                resolvedTabs = [transferred]
-                resolvedSelectedTabID = transferred.workspaceID
-            } else {
-                let fallback = MacWorkspaceController(
-                    request: MacWorkspaceTabRequest(
-                        workspaceID: UUID(),
-                        startsEmpty: true
-                    ),
-                    startupCommandBroker: startupCommandBroker,
-                    liveSessionBroker: liveSessionBroker,
-                    defaults: defaults
-                )
-                resolvedTabs = [fallback]
-                resolvedSelectedTabID = fallback.workspaceID
-            }
-        } else if let restored = Self.load(windowID: request.windowID, defaults: defaults) {
-            resolvedTabs = restored.tabs.map {
-                MacWorkspaceController(
-                    request: $0.request,
-                    startupCommandBroker: startupCommandBroker,
-                    liveSessionBroker: liveSessionBroker,
-                    defaults: defaults
-                )
-            }
-            resolvedSelectedTabID = restored.selectedTabID
-        } else if defaults.object(
-            forKey: Self.defaultsKey(for: request.windowID)
-        ) != nil {
-            let fallback = MacWorkspaceController(
-                request: MacWorkspaceTabRequest(
-                    workspaceID: UUID(),
-                    startsEmpty: true
-                ),
+        func makeTab(_ request: MacWorkspaceTabRequest) -> MacWorkspaceController {
+            MacWorkspaceController(
+                request: request,
                 startupCommandBroker: startupCommandBroker,
                 liveSessionBroker: liveSessionBroker,
                 defaults: defaults
             )
-            resolvedTabs = [fallback]
-            resolvedSelectedTabID = fallback.workspaceID
+        }
+
+        let resolvedTabs: [MacWorkspaceController]
+        let resolvedSelectedTabID: UUID
+        var savesNow = false
+        var unsaved = false
+        var failure: String?
+        let transferred = request.transferredTabTicketID.flatMap { transferBroker.claim($0) }
+        if let transferred {
+            // The move already happened: the source window has let the tab go, so this one
+            // saves it now rather than leaving the tab in neither record until it opens.
+            resolvedTabs = [transferred]
+            resolvedSelectedTabID = transferred.workspaceID
+            savesNow = true
         } else {
-            resolvedTabs = request.tabs.map {
-                MacWorkspaceController(
-                    request: $0,
-                    startupCommandBroker: startupCommandBroker,
-                    liveSessionBroker: liveSessionBroker,
-                    defaults: defaults
-                )
+            // A moved tab's ticket dies with the process. After a crash macOS hands the window
+            // the same request, and its saved record still holds the tab that moved in; a ticket
+            // that failed in this process finds no record and fails closed with an empty tab.
+            switch Self.load(windowID: request.windowID, defaults: defaults) {
+            case .restored(let restored):
+                resolvedTabs = restored.tabs.map { makeTab($0.request) }
+                resolvedSelectedTabID = restored.selectedTabID
+            case .unreadable(let reason):
+                let fallback = makeTab(MacWorkspaceTabRequest(workspaceID: UUID(), startsEmpty: true))
+                fallback.markNotRestored(reason)
+                failure = reason
+                resolvedTabs = [fallback]
+                resolvedSelectedTabID = fallback.workspaceID
+            case .absent where request.transferredTabTicketID != nil:
+                let fallback = makeTab(MacWorkspaceTabRequest(workspaceID: UUID(), startsEmpty: true))
+                resolvedTabs = [fallback]
+                resolvedSelectedTabID = fallback.workspaceID
+                unsaved = true
+            case .absent:
+                resolvedTabs = request.tabs.map(makeTab)
+                resolvedSelectedTabID = request.initialSelectedTabID.flatMap { requested in
+                    resolvedTabs.first(where: { $0.workspaceID == requested })?.workspaceID
+                } ?? resolvedTabs[0].workspaceID
+                unsaved = true
             }
-            resolvedSelectedTabID = request.initialSelectedTabID.flatMap { requested in
-                resolvedTabs.first(where: { $0.workspaceID == requested })?.workspaceID
-            } ?? resolvedTabs[0].workspaceID
         }
         tabs = resolvedTabs
         selectedTabID = resolvedSelectedTabID
-        persist()
+        restorationFailure = failure
+        hasUnsavedState = unsaved
+        if savesNow { persist() }
         // Made once per window: its view asks the registry first (`windowController(for:)`).
         MacWorkspacePreviewRegistry.shared.noteBuilt(self)
     }
 
+    /// The window is on screen: saves what it opened with that is not saved yet — a new window,
+    /// a new tab's layout, a tmux name given as a tab opened. A window restored unchanged writes
+    /// nothing, and one whose record couldn't be read leaves it alone.
+    func windowDidOpen() {
+        guard restorationFailure == nil else { return }
+        if hasUnsavedState {
+            persist()
+        } else {
+            for tab in tabs { tab.saveIfUnsaved() }
+        }
+    }
+
     /// Whether this window's tabs are saved, so a launch request with its id restores them.
     static func hasSavedState(windowID: UUID, defaults: UserDefaults = .standard) -> Bool {
-        load(windowID: windowID, defaults: defaults) != nil
+        if case .restored = load(windowID: windowID, defaults: defaults) { return true }
+        return false
     }
 
     var selectedTab: MacWorkspaceController {
@@ -1171,8 +1277,9 @@ final class MacWorkspaceWindowController {
             return "Running terminal sessions will be disconnected."
         }
     }
+    /// Not in a window whose saved tabs couldn't be read: the new tab would be saved over them.
     var canAddTab: Bool {
-        tabs.count < MacWorkspaceWindowRestorationState.maximumTabCount
+        restorationFailure == nil && tabs.count < MacWorkspaceWindowRestorationState.maximumTabCount
     }
     var canTransferSelectedTab: Bool {
         tabs.count > 1
@@ -1214,21 +1321,25 @@ final class MacWorkspaceWindowController {
         guard let index = tabs.firstIndex(where: { $0.workspaceID == workspaceID }) else {
             return false
         }
+        // Closing a tab discards its saved layout, read or not: a record left behind was a layout
+        // a window could come back to empty (W7b). A tab kept running elsewhere is not closed.
         if tabs.count == 1 {
             cancelPendingTransfer(for: workspaceID)
             if closeSessions {
                 tabs[0].closeAllSessions(sessionManager: sessionManager)
+                tabs[0].discardSavedState()
             }
-            defaults.removeObject(forKey: Self.defaultsKey(for: windowID))
+            forgetSavedWindow()
             return true
         }
         cancelPendingTransfer(for: workspaceID)
         let controller = tabs.remove(at: index)
         if closeSessions {
             controller.closeAllSessions(sessionManager: sessionManager)
+            controller.discardSavedState()
         }
         guard !tabs.isEmpty else {
-            defaults.removeObject(forKey: Self.defaultsKey(for: windowID))
+            forgetSavedWindow()
             return true
         }
         if selectedTabID == workspaceID {
@@ -1291,7 +1402,7 @@ final class MacWorkspaceWindowController {
             tabs = [placeholder]
             selectedTabID = placeholder.workspaceID
             closesAfterLastTabLeft = true
-            defaults.removeObject(forKey: Self.defaultsKey(for: windowID))
+            forgetSavedWindow()
             return controller
         }
         if selectedTabID == workspaceID {
@@ -1377,37 +1488,75 @@ final class MacWorkspaceWindowController {
         transferBroker.discard(ticketID)
     }
 
+    /// Saves the window's tabs, and the layouts of new ones. Never over a record that couldn't be
+    /// read, and never for a window whose last tab has left. When the list of tabs changes, the
+    /// record it replaces is kept as the one previous generation (W7b).
     private func persist() {
+        guard restorationFailure == nil, !closesAfterLastTabLeft else { return }
+        for tab in tabs { tab.saveIfUnsaved() }
         let state = MacWorkspaceWindowRestorationState(
             tabs: tabs.map(\.restorationDescriptor),
             selectedTabID: selectedTabID
         )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
         guard state.validated() != nil,
-              let data = try? JSONEncoder().encode(state),
+              let data = try? encoder.encode(state),
               data.count <= Self.maximumEncodedBytes else {
             assertionFailure("Refusing to persist invalid macOS window tabs")
             return
         }
-        defaults.set(data, forKey: Self.defaultsKey(for: windowID))
+        hasUnsavedState = false
+        let key = Self.defaultsKey(for: windowID)
+        let saved = defaults.data(forKey: key)
+        guard saved != data else { return }
+        // One generation back, bounded to one record per window: enough to undo a bad write.
+        // Only when the tabs themselves change, so selecting a tab never pushes it out.
+        if let saved, let previous = Self.decode(saved), previous.tabs.map(\.id) != state.tabs.map(\.id) {
+            defaults.set(saved, forKey: Self.previousGenerationKey(for: windowID))
+        }
+        defaults.set(data, forKey: key)
     }
 
-    private static func load(
-        windowID: UUID,
-        defaults: UserDefaults
-    ) -> MacWorkspaceWindowRestorationState? {
-        guard let data = defaults.data(forKey: defaultsKey(for: windowID)),
-              data.count <= maximumEncodedBytes,
-              let state = try? JSONDecoder().decode(
-                MacWorkspaceWindowRestorationState.self,
-                from: data
-              ) else {
-            return nil
+    /// The window is going for good: its record and the generation kept behind it.
+    private func forgetSavedWindow() {
+        defaults.removeObject(forKey: Self.defaultsKey(for: windowID))
+        defaults.removeObject(forKey: Self.previousGenerationKey(for: windowID))
+    }
+
+    enum SavedWindow {
+        case restored(MacWorkspaceWindowRestorationState)
+        /// A record exists but neither it nor the generation before it can be read.
+        case unreadable(String)
+        case absent
+    }
+
+    /// The saved window, or the generation before it when the record itself can't be read.
+    static func load(windowID: UUID, defaults: UserDefaults) -> SavedWindow {
+        guard let data = defaults.data(forKey: defaultsKey(for: windowID)) else {
+            return defaults.object(forKey: defaultsKey(for: windowID)) == nil
+                ? .absent : .unreadable("This window's saved tabs couldn't be read.")
         }
-        return state.validated()
+        if let state = decode(data) { return .restored(state) }
+        let previous = defaults.data(forKey: previousGenerationKey(for: windowID)).flatMap(decode)
+        Logger.workspaceRestoration.error(
+            "Couldn't read terminal window \(windowID.uuidString, privacy: .public)'s saved tabs (\(data.count, privacy: .public) bytes). \(previous == nil ? "No earlier generation can be read either; the record is kept unchanged." : "Restoring the generation before it.", privacy: .public)"
+        )
+        if let previous { return .restored(previous) }
+        return .unreadable("This window's saved tabs couldn't be read.")
+    }
+
+    private static func decode(_ data: Data) -> MacWorkspaceWindowRestorationState? {
+        guard data.count <= maximumEncodedBytes else { return nil }
+        return (try? JSONDecoder().decode(MacWorkspaceWindowRestorationState.self, from: data))?.validated()
     }
 
     private static func defaultsKey(for windowID: UUID) -> String {
         "\(UserDefaultsKeys.macWorkspaceRestoration).window.\(windowID.uuidString.lowercased())"
+    }
+
+    static func previousGenerationKey(for windowID: UUID) -> String {
+        defaultsKey(for: windowID) + ".previous"
     }
 }
 #endif

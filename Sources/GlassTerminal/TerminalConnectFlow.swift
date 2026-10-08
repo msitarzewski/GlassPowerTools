@@ -46,6 +46,10 @@ struct TerminalConnectFlow: ViewModifier {
     @State private var editingServer: EditServerRequest?
     @State private var viewingServer: ServerConfiguration?
     @State private var serverPendingDeletion: ServerConfiguration?
+    #if os(macOS)
+    /// W7b: local tmux sessions still running that no tab shows, offered once at launch.
+    @State private var runningSessionsToOffer: [String] = []
+    #endif
     #if os(visionOS) || os(iOS)
     @State private var pendingPasswordWorkgroup: LayoutPreset?
     @State private var workgroupPasswordWasSaved = false
@@ -71,6 +75,27 @@ struct TerminalConnectFlow: ViewModifier {
             for windowID in MacLocalTmux.takeWindowsToReopen() {
                 openWindow(id: "workspace", value: MacWorkspaceLaunchRequest(windowID: windowID, tabs: []))
             }
+            // W7b: then, once those windows and any macOS restored have opened on their sessions,
+            // the sessions still running that no tab shows. After a crash that was all of them,
+            // and nothing said so. If this view goes away first, it asks when it next appears.
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            runningSessionsToOffer = MacLocalTmuxLaunchOffer.shared
+                .take(shown: MacLocalTmuxLaunchOffer.shownSessions()) ?? []
+        }
+        .alert(
+            MacLocalTmuxLaunchOffer.message(count: runningSessionsToOffer.count),
+            isPresented: Binding(
+                get: { !runningSessionsToOffer.isEmpty },
+                set: { if !$0 { runningSessionsToOffer = [] } }
+            )
+        ) {
+            Button("Reopen") { reopenRunningSessions() }
+            Button("Not Now", role: .cancel) { runningSessionsToOffer = [] }
+        } message: {
+            Text(runningSessionsToOffer.count == 1
+                 ? "It opens in a new window. Not Now leaves it in Active."
+                 : "They open in one window, a tab for each. Not Now leaves them in Active.")
         }
         #endif
         .alert(
@@ -707,6 +732,18 @@ struct TerminalConnectFlow: ViewModifier {
         sessionManager.closeSession(session)
         clearPendingTrustPrompt()
     }
+
+    #if os(macOS)
+    /// Reopen: one window, a tab per session, leaving out any a tab took up since the offer.
+    private func reopenRunningSessions() {
+        let shown = MacLocalTmuxLaunchOffer.shownSessions()
+        let sessions = runningSessionsToOffer.filter { !shown.contains($0) }
+        runningSessionsToOffer = []
+        for request in MacLocalTmuxLaunchOffer.launchRequests(for: sessions) {
+            openWindow(id: "workspace", value: request)
+        }
+    }
+    #endif
 
     private var connectionFailureAlertBinding: Binding<Bool> {
         Binding(

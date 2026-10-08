@@ -88,6 +88,8 @@ struct MacWorkspaceNewTabTests {
 
             let request = MacWorkspaceTabRequest(initialPaneIntent: .local)
             let shown = MacWorkspaceController(request: request, defaults: defaults)
+            // Saved as its window opens; init writes nothing (W7b).
+            shown.saveIfUnsaved()
             // The same tab restored a second time, with the same pane and session.
             let copy = MacWorkspaceController(request: request, defaults: defaults)
             defer { copy.closeAllSessions(sessionManager: sessionManager) }
@@ -261,6 +263,8 @@ struct MacWorkspaceNewTabTests {
             let window = MacWorkspaceWindowController(
                 request: MacWorkspaceLaunchRequest(startsEmpty: true), defaults: defaults)
             defer { MacWorkspacePreviewRegistry.shared.remove(window.windowID) }
+            // Saved when the window opened before the quit; init itself writes nothing (W7b).
+            window.windowDidOpen()
             defaults.set([window.windowID.uuidString], forKey: MacLocalTmux.reopenKey)
             #expect(MacLocalTmux.takeWindowsToReopen(defaults: defaults).isEmpty,
                     "macOS is already restoring it")

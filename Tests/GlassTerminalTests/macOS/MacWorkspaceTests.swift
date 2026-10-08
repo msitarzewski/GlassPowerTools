@@ -429,6 +429,8 @@ struct MacWorkspaceTests {
         let broker = MacStartupCommandBroker()
         let request = try MacWorkgroupLauncher.launch(preset: preset, broker: broker, openWindow: { _ in })[0]
         let live = MacWorkspaceWindowController(request: request, startupCommandBroker: broker, defaults: fixture.defaults)
+        // The window opens, which saves every tab's layout; its init writes nothing (W7b).
+        live.windowDidOpen()
         // No pane focus, startup ticket claim, or layout mutation before restoring.
         let descriptorsOnly = MacWorkspaceLaunchRequest(windowID: request.windowID,
             tabs: live.tabs.map { $0.restorationDescriptor.request })

@@ -8,14 +8,18 @@ import SwiftUI
 import GlassLayers
 
 struct MacWorkspaceSceneRoot: View {
-    private let request: MacWorkspaceLaunchRequest
+    private let request: MacWorkspaceLaunchRequest?
+    /// A window SwiftUI opens with no value — one whose saved value it couldn't read back — keeps
+    /// one request for its life. Made in `init`, each run of it was a new window id, so a new
+    /// controller that no window showed, and each wrote a window record and an empty tab (W7b).
+    @State private var requestWithoutValue = MacWorkspaceLaunchRequest(startsEmpty: true)
 
     init(request: MacWorkspaceLaunchRequest?) {
-        self.request = request ?? MacWorkspaceLaunchRequest(startsEmpty: true)
+        self.request = request
     }
 
     var body: some View {
-        MacWorkspaceView(request: request)
+        MacWorkspaceView(request: request ?? requestWithoutValue)
     }
 }
 
@@ -236,6 +240,9 @@ struct MacWorkspaceView: View {
             .toolbar(showingOverview && !overviewControlsVisible ? .hidden : .visible, for: .windowToolbar)
         }
         .task {
+            // On screen now: save what the window opened with, if it is new. Its controller's
+            // init writes nothing, since SwiftUI makes ones it never shows (W7b).
+            windowController.windowDidOpen()
             SharedDefaults.migrateIfNeeded()
             sessionManager.preloadPersistentStateIfNeeded()
             settingsManager.loadPersistentStateIfNeeded()
@@ -761,6 +768,8 @@ private struct MacWorkspaceTabContent: View {
                     }
                 }
             }
+        } else if let failure = controller.restorationFailure {
+            MacWorkspaceUnrestoredTab(reason: failure, close: onCloseEmptyTab)
         } else {
             MacWorkspaceEmptyTab(
                 theme: settingsManager.currentTheme,
@@ -1087,6 +1096,26 @@ struct MacWorkspaceEmptyTab: View {
                 appearance: theme.resolvedAppearance
             )
         }
+    }
+}
+
+/// A tab whose saved layout couldn't be read (W7b). The record is kept exactly as it was, so
+/// nothing here can add a pane over it; closing the tab is how it is discarded.
+struct MacWorkspaceUnrestoredTab: View {
+    let reason: String
+    let close: () -> Void
+
+    var body: some View {
+        ContentUnavailableView {
+            Label("Couldn't Restore This Tab", systemImage: "exclamationmark.triangle")
+        } description: {
+            Text("\(reason) It has been kept as it was. Close the tab to discard it.")
+        } actions: {
+            Button("Close Tab", action: close)
+                .accessibilityIdentifier("mac-workspace-close-unrestored-tab")
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.regularMaterial)
     }
 }
 

@@ -79,9 +79,12 @@ struct MacLocalTmuxTests {
         try await body(fake, defaults)
     }
 
+    /// A tab its window shows, so saved as the window opens; init itself writes nothing (W7b).
     private func localTab(_ defaults: UserDefaults, id: UUID = UUID()) -> MacWorkspaceController {
-        MacWorkspaceController(request: MacWorkspaceTabRequest(workspaceID: id, startsEmpty: false, initialPaneIntent: .local),
-                               defaults: defaults)
+        let tab = MacWorkspaceController(request: MacWorkspaceTabRequest(workspaceID: id, startsEmpty: false, initialPaneIntent: .local),
+                                         defaults: defaults)
+        tab.saveIfUnsaved()
+        return tab
     }
 
     @Test("finding tmux: the app's PATH first, then the package managers' folders")
@@ -447,6 +450,8 @@ struct MacLocalTmuxTests {
             defaults.set(true, forKey: UserDefaultsKeys.localTmux)
             var window: MacWorkspaceWindowController? = MacWorkspaceWindowController(
                 request: MacWorkspaceLaunchRequest(initialPaneIntent: .local), defaults: defaults)
+            // On screen, so saved; init itself writes nothing (W7b).
+            window?.windowDidOpen()
             let id = try #require(window?.windowID)
             try autoreleasepool {
                 let tab = try #require(window?.tabs.first)
