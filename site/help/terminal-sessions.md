@@ -21,6 +21,8 @@ This page covers terminal windows and tabs, the session's tools menu, text size,
 | Go to tab 1–9 | | ⌘1–⌘9 |
 | All tabs as a grid or carousel | **Terminal Grid**, **Terminal Carousel** | ⌘G, ⌥⌘G |
 
+A tab is named after what is running in it: the title a program set (Claude Code's task, the file open in vim), or the folder it is in. In your home folder it takes its Workgroup's name, or, in tmux, its session's name as **Active** shows it (**Terminal 1**), or else the shell's. Below the name: where it is, and **in tmux** when it is kept in tmux.
+
 **Move Tab to New Window** is under **Tab Actions** in the toolbar. To bring windows together, drag a tab from the sidebar onto another terminal window, anywhere on it, sidebar open or not: it moves there with its terminals still running, and a window whose last tab leaves closes. Dropped on the other window's sidebar, it lands where you drop it; dragging a tab within the sidebar reorders it. Double-click a tab, or right-click it, to rename it. Closing a tab that has an SSH session, a recording, a connection in progress or running commands asks first. A terminal kept in tmux doesn't count: closing it leaves it running, and **Active** lists it (see [Keep terminals running with tmux](terminal-tmux.md)). A Mac's local terminals kept in tmux work the same way, listed under This Mac. Closing a tab never changes a saved Workgroup.
 
 **On iPad and iPhone:** the plus button (**New Terminal Tab**) adds a terminal to the current set. iPad shows the terminals as tabs; iPhone lists them in a menu at the top.

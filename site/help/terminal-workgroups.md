@@ -11,7 +11,11 @@ Workgroups are in the library's sidebar, beside Collections, under **Workgroups*
 Use **Search workgroups...** to filter the list. A Workgroup's menu (right-click, or touch and hold) offers **Open**, **Edit**, **Duplicate** and **Delete**.
 
 > [!NOTE]
-> **Delete…** in that menu asks you to confirm. Deleting a Workgroup removes it from this device; the connections in it are not affected.
+> **Delete…** in that menu asks you to confirm. Deleting a Workgroup removes it from all your devices; the connections in it are not affected.
+
+## Workgroups on all your devices
+
+With **Sync terminal settings** on (Settings ▸ **Terminal**, under **iCloud Sync**), a Workgroup you create, edit or delete on one device does the same on your others. If it changes on two devices, the most recent change wins. When you last opened a Workgroup, and the replacements a device remembers for its Mac terminals, stay on that device.
 
 ## Create a Workgroup
 

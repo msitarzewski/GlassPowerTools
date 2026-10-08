@@ -11,12 +11,11 @@ Do one of these:
 
 A yellow star appears beside the host's name, and the host is listed under **Favorites**. Favorites are ordered with the most recently connected first. To undo, choose **Remove Favorite** in the same places.
 
-> [!NOTE]
-> Favorites are kept on each device. Marking a host as a favorite on your Mac does not mark it on your Vision Pro.
+Favorites travel to your other devices: marking a host on your Mac marks it on your Vision Pro, and removing it removes it everywhere. The host for the device itself, such as **This Mac**, is the exception, because every device has its own.
 
 ## Find hosts you used recently
 
-**Recent** lists up to ten hosts, most recently connected first. A host appears there only after a session on it actually connects. Like favorites, **Recent** is kept on each device.
+**Recent** lists up to ten hosts, most recently connected first. A host appears there only after a session on it actually connects. Unlike favorites, **Recent** is kept on each device.
 
 ## Put hosts in collections
 

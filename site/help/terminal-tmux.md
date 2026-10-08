@@ -28,6 +28,14 @@ The switch can only be turned on once a connection has found tmux on the machine
 
 If the machine doesn't have tmux, the terminal says so and opens an ordinary shell instead.
 
+## Scroll back
+
+tmux keeps its own history, so scrolling over a terminal in tmux scrolls tmux's history: two fingers on a trackpad, a mouse wheel, a finger on iPad and iPhone, or pinch and drag on Vision Pro. Scroll back to the bottom, or press **q**, to return to typing. While you are scrolled back, keys go to tmux's history view rather than to the program.
+
+## One session in several places
+
+A session can be open in more than one place at once: on your Mac and your Vision Pro, say. Both show the same screen, and typing in either goes to the same program. The window fits the device you used last. **Active**'s **Open** joins whoever is already there; **Take Over** disconnects them first.
+
 ## Pick up a session from Active
 
 **Active** lists, under each machine, the tmux sessions running there that this device isn't showing:

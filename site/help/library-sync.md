@@ -12,7 +12,9 @@ When you are signed in to iCloud, the hosts you add on one device appear on your
 | SSH keys generated in the Secure Enclave | This device only |
 | Services that sign in with a Secure Enclave key | This device only |
 | The host for this device (**This Mac**, **This iPad**, **This iPhone** or **This Apple Vision Pro**) and its services | This device only |
-| Favorites, **Recent**, and which service **Connect opens** | This device only |
+| Favorites | Your other devices. The device's own host (**This Mac** and the others) is the exception: a favorite there stays on the device. |
+| Terminal Workgroups | Your other devices, while **Sync terminal settings** is on (see [Workgroups](terminal-workgroups.md)) |
+| **Recent**, and which service **Connect opens** | This device only |
 | Window appearance (**Settings** ▸ **Appearance**) | This device only |
 
 > [!NOTE]
@@ -43,6 +45,7 @@ Settings shows the same status:
 ## When two devices disagree
 
 - If you edit the same host on two devices, the most recent edit wins for the whole host.
+- A favorite follows the most recent change on any device: removing one on your iPhone removes it on your Mac too. When favorites first sync, each device's favorites are kept together.
 - If you delete a host on one device, it is deleted on the others, together with its services' saved settings and passwords. A deletion is final: an edit made on another device, even a later one, does not bring the host back.
 - If two devices each set up the same machine, with the same name and the same address, the two are combined into one host the next time the library syncs. Where both have a service of the same kind and name, one is kept.
 
