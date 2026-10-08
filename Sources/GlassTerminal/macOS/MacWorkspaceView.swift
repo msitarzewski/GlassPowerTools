@@ -32,6 +32,8 @@ struct MacWorkspaceView: View {
     @State private var renameText = ""
     @FocusState private var renameFieldFocused: Bool
     @State private var pendingWindowClose = false
+    /// A tab from another window is being dragged over this one.
+    @State private var tabDropTargeted = false
     @State private var showingOverview = false
     @State private var overviewCarousel = false
     @State private var followsActivity = false
@@ -70,6 +72,26 @@ struct MacWorkspaceView: View {
                 }
             }
         }
+        // The list's own menu and primary action: double-click (or Return) renames in place, as
+        // Finder's sidebar does, without a tap gesture holding every single click back.
+        .contextMenu(forSelectionType: UUID.self) { ids in
+            if let controller = ids.first.flatMap(tab(_:)) {
+                Button("Rename Tab…", systemImage: "pencil") { beginRename(controller) }
+                    .labelStyle(.titleAndIcon)
+                if controller.tabLabel != nil {
+                    Button("Use Automatic Name", systemImage: "arrow.uturn.backward") {
+                        windowController.renameTab(controller.workspaceID, to: nil)
+                    }
+                    .labelStyle(.titleAndIcon)
+                }
+            }
+        } primaryAction: { ids in
+            if let controller = ids.first.flatMap(tab(_:)) { beginRename(controller) }
+        }
+    }
+
+    private func tab(_ id: UUID) -> MacWorkspaceController? {
+        windowController.tabs.first { $0.workspaceID == id }
     }
 
     @ViewBuilder
@@ -122,26 +144,15 @@ struct MacWorkspaceView: View {
             }
             .animation(.easeInOut(duration: 0.3), value: controller.isProducingOutput)
         .tag(controller.workspaceID)
-        // Double-click to rename in place, as Finder's sidebar and Safari's tab groups do.
-        .simultaneousGesture(TapGesture(count: 2).onEnded { beginRename(controller) })
-        .contextMenu {
-            Button("Rename Tab…", systemImage: "pencil") { beginRename(controller) }
-                .labelStyle(.titleAndIcon)
-            if controller.tabLabel != nil {
-                Button("Use Automatic Name", systemImage: "arrow.uturn.backward") {
-                    windowController.renameTab(controller.workspaceID, to: nil)
-                }
-                .labelStyle(.titleAndIcon)
-            }
-        }
         .accessibilityLabel(tabIdentity.title)
         .accessibilityValue(tabIdentity.subtitle ?? "")
         .accessibilityIdentifier(
             "mac-workspace-tab-\(controller.workspaceID.uuidString.lowercased())"
         )
-        // Drag a tab to another terminal window's sidebar to move it there, running, or
-        // within this one to reorder (2026-10-08).
-        .onDrag {
+        // Drag a tab to another terminal window to move it there, running, or within this
+        // sidebar to reorder (2026-10-08). The list's own drag, not a gesture on the row: a
+        // gesture made every click wait, and selecting a tab took several.
+        .itemProvider {
             MacWorkspaceTabDrag(windowID: windowController.windowID,
                                 workspaceID: controller.workspaceID).itemProvider()
         }
@@ -183,6 +194,22 @@ struct MacWorkspaceView: View {
                 onCloseEmptyTab: { closeTab(selected.workspaceID) }
             )
             .id(selected.workspaceID)
+            // A tab dragged from another window can land anywhere on this one, sidebar open or
+            // not; it joins at the end. Panes take only Finder's files, so they pass it on.
+            .onDrop(of: [MacWorkspaceTabDrag.type], isTargeted: $tabDropTargeted) { providers in
+                MacWorkspaceTabDrag.load(from: providers) { drag in
+                    windowController.acceptDroppedTab(drag, at: windowController.tabs.count)
+                }
+                return true
+            }
+            .overlay {
+                if tabDropTargeted {
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(Color.accentColor, lineWidth: 3)
+                        .padding(4)
+                        .allowsHitTesting(false)
+                }
+            }
             // Editable: clicking the window title renames the tab, as the sidebar does.
             .navigationTitle(Binding(
                 get: { showingOverview && !overviewControlsVisible ? "" : identity.title },
