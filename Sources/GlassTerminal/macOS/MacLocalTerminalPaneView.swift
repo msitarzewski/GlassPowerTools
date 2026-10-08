@@ -38,6 +38,8 @@ struct MacLocalTerminalPaneView: View {
     @State private var searchFound: Bool?
     @State private var showingAIAssistant = false
     @State private var aiAssistantDirectory: String?
+    /// Why Open Folder Here did not open a folder, while that is shown.
+    @State private var folderProblem: MacLocalShellFolder.Problem?
     @State private var showingSnippets = false
     @State private var showingRecordings = false
     @State private var showingRecordingConsent = false
@@ -171,7 +173,9 @@ struct MacLocalTerminalPaneView: View {
                         openFolderHere()
                     }
                     .labelStyle(.iconOnly)
+                    .disabled(!canOpenFolder)
                     .help("Open the shell’s working directory in Finder")
+                    .accessibilityIdentifier("terminal-open-folder-here")
 
                     Button(
                         isLocalFullScreen ? "Exit Focus Mode" : "Focus Mode",
@@ -223,7 +227,8 @@ struct MacLocalTerminalPaneView: View {
                 aiAssistant: aiAssistant,
                 host: "localhost",
                 username: NSUserName(),
-                currentDirectory: aiAssistantDirectory ?? processState.currentDirectory,
+                // Not `processState.currentDirectory`: in tmux that is the client's folder.
+                currentDirectory: aiAssistantDirectory,
                 onRunCommand: { _ = processState.sendCommand($0) }
             )
         }
@@ -262,6 +267,11 @@ struct MacLocalTerminalPaneView: View {
             Button("OK", role: .cancel) { recordingError = nil }
         } message: {
             Text(recordingError ?? "The local terminal recording could not be changed.")
+        }
+        .alert(folderProblem?.title ?? "", isPresented: folderProblemPresented, presenting: folderProblem) { _ in
+            Button("OK", role: .cancel) { folderProblem = nil }
+        } message: { problem in
+            Text(problem.message)
         }
         .sheet(item: pendingPasteBinding) { request in
             MacTerminalPasteReviewSheet(
@@ -369,6 +379,7 @@ struct MacLocalTerminalPaneView: View {
             Button("Open Folder Here", systemImage: "folder") {
                 openFolderHere()
             }
+            .disabled(!canOpenFolder)
             Button(
                 isLocalFullScreen ? "Exit Focus Mode" : "Focus Mode",
                 systemImage: isLocalFullScreen ? "moon.fill" : "moon"
@@ -487,17 +498,24 @@ struct MacLocalTerminalPaneView: View {
 
     private func presentAIAssistant() {
         hostModel.setFocusOwnershipAllowed(false)
-        aiAssistantDirectory = shellDirectory
+        aiAssistantDirectory = nil
         showingAIAssistant = true
+        // Arrives a moment later; unknown stays unknown rather than becoming the client's folder.
+        Task { aiAssistantDirectory = await resolveShellFolder().path }
     }
 
     /// Where the shell is. In tmux the process here is the tmux client, which stays where it
-    /// started, so tmux is asked.
-    private var shellDirectory: String? {
-        let tmuxDirectory = tmuxSession.flatMap { session in
-            MacLocalTmux.executablePath().flatMap { MacLocalTmux.context(session: session, tmux: $0)?.directory }
-        }
-        return tmuxDirectory ?? runtime.currentWorkingDirectory
+    /// started, so only tmux is asked (`MacLocalShellFolder`).
+    private func resolveShellFolder() async -> MacLocalShellFolder {
+        await MacLocalShellFolder.resolve(
+            tmuxSession: tmuxSession,
+            shellIsRunning: processState.isRunning,
+            processDirectory: { runtime.currentWorkingDirectory }
+        )
+    }
+
+    private var canOpenFolder: Bool {
+        MacLocalShellFolder.isAvailable(tmuxSession: tmuxSession, shellIsRunning: processState.isRunning)
     }
 
     private func presentSnippets() {
@@ -547,16 +565,19 @@ struct MacLocalTerminalPaneView: View {
         if isFocused { processState.focus() }
     }
 
+    /// The shell's folder in Finder, or a message saying why not — never Home in its place.
     private func openFolderHere() {
-        let path = shellDirectory ?? FileManager.default.homeDirectoryForCurrentUser.path
-        var isDirectory = ObjCBool(false)
-        guard path.hasPrefix("/"),
-              FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
-              isDirectory.boolValue else { return }
-        // `open`, not `activateFileViewerSelecting`: selecting shows the folder highlighted
-        // inside its *parent*, which is the wrong place — the point of the control is to
-        // arrive where the shell already is. Opening the URL shows that directory's contents.
-        NSWorkspace.shared.open(URL(fileURLWithPath: path, isDirectory: true))
+        Task {
+            let folder = await resolveShellFolder()
+            folderProblem = MacLocalShellFolder.open(folder) { NSWorkspace.shared.open($0) }
+        }
+    }
+
+    private var folderProblemPresented: Binding<Bool> {
+        Binding(
+            get: { folderProblem != nil },
+            set: { if !$0 { folderProblem = nil } }
+        )
     }
 
     private func startRecording(capturesInput: Bool) {
