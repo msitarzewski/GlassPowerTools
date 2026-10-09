@@ -16,6 +16,9 @@ struct MacWindowRestorationTests {
         #expect(delegate.applicationSupportsSecureRestorableState(NSApplication.shared))
         #expect(!delegate.application(NSApplication.shared, shouldSaveSecureApplicationState: coder))
         #expect(!delegate.application(NSApplication.shared, shouldRestoreSecureApplicationState: coder))
+        // SwiftUI's own delegate answers AppKit first, so the preference AppKit reads at launch is
+        // what actually stops a leftover state from being replayed.
+        #expect(UserDefaults.standard.bool(forKey: MacTerminalAppDelegate.ignoresSavedWindowStateKey))
     }
 }
 #endif

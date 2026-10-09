@@ -15,7 +15,17 @@ import AppKit
 
 @MainActor
 public final class MacTerminalAppDelegate: NSObject, NSApplicationDelegate {
-    public override init() { super.init() }
+    public override init() {
+        super.init()
+        // D54: AppKit replays saved window state before any delegate is asked, under SwiftUI's own
+        // delegate; this preference makes it skip that state at launch. The app's records reopen
+        // its windows (2026-10-09: a leftover state kept restoring empty terminal windows).
+        UserDefaults.standard.register(defaults: [Self.ignoresSavedWindowStateKey: true])
+    }
+
+    /// AppKit's preference to skip saved window state at launch.
+    static let ignoresSavedWindowStateKey = "ApplePersistenceIgnoreState"
+
     var sessionManager: SessionManager?
     var settingsManager: SettingsManager?
     private var terminationInProgress = false
