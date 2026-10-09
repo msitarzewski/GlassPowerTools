@@ -17,11 +17,12 @@ struct GlassActiveConnectionsTests {
         let symbolName = "circle"
         var sessions: [GlassOpenSession] = []
         var running: [GlassRunningSession] = []
+        private(set) var asked = 0
         init(kind: HostServiceKind, displayName: String) { self.kind = kind; self.displayName = displayName }
         func open(service: HostServiceLink, host: HostProfile,
                   report: @escaping @MainActor (GlassCapabilityOutcome) -> Void) { report(.dismissed) }
         func openSessions() -> [GlassOpenSession] { sessions }
-        func runningSessions() async -> [GlassRunningSession] { running }
+        func runningSessions() async -> [GlassRunningSession] { asked += 1; return running }
     }
 
     private func running(_ id: String, on endpoint: EndpointID) -> GlassRunningSession {
@@ -107,6 +108,32 @@ struct GlassActiveConnectionsTests {
         await model.refreshRunningSessions()
         #expect(model.activeSessionCount() == 14, "fourteen sessions running: the badge says so")
         #expect(model.activeConnectionsPanel().count == 14, "and the sidebar row carries it")
+    }
+
+    @Test("The library asks as it appears, so the count is right before Active is opened, and not again for a while")
+    func libraryAsksWhenDue() async throws {
+        let (model, root, store) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let terminalOnAlpha = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on alpha")
+        try await store.upsert(try HostProfile(displayName: "alpha", address: "192.0.2.1", services: [terminalOnAlpha]))
+        let terminal = StubCapability(kind: .ssh, displayName: "Terminal")
+        terminal.running = (1...15).map { running("tmux:glass-\($0)", on: terminalOnAlpha.endpointID) }
+        model.registry.register(terminal)
+        await model.load()
+
+        // The owner, 2026-10-09: "the active count is always 0 to start. once you go in it updates to 15".
+        await model.refreshRunningSessionsIfDue()
+        #expect(terminal.asked == 1)
+        #expect(model.activeConnectionsPanel().count == 15, "counted at launch, without opening Active")
+
+        // Back to the front a minute later: the answer stands. Each ask may open SSH connections.
+        await model.refreshRunningSessionsIfDue(now: .now + .seconds(60))
+        #expect(terminal.asked == 1)
+        // After five minutes the library asks again.
+        terminal.running.removeLast()
+        await model.refreshRunningSessionsIfDue(now: .now + GlassShellModel.runningSessionsMaxAge + .seconds(1))
+        #expect(terminal.asked == 2)
+        #expect(model.activeConnectionsPanel().count == 14)
     }
 
     @Test("W6: a session open here comes forward when chosen and stays listed; a skipped machine says why")

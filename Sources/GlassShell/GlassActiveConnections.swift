@@ -105,6 +105,20 @@ public extension GlassShellModel {
         let report = await registry.runningReport()
         runningSessions = report.sessions
         uncheckedMachines = report.unchecked
+        runningSessionsCheckedAt = .now
+    }
+
+    /// How long the machines' answer stands before the library asks again by itself. Each ask
+    /// can open a short SSH connection per host, and a Mac comes back to the front all day.
+    static let runningSessionsMaxAge: Duration = .seconds(300)
+
+    /// Asks the machines what runs on them as the library appears and as the app comes back,
+    /// unless they answered within `runningSessionsMaxAge`. Until 2026-10-09 only Active asked,
+    /// so the sidebar's count said 0 at every launch: *"the active count is always 0 to start.
+    /// once you go in it updates to 15"* (owner, on the iPhone).
+    func refreshRunningSessionsIfDue(now: ContinuousClock.Instant = .now) async {
+        if let checked = runningSessionsCheckedAt, now - checked < Self.runningSessionsMaxAge { return }
+        await refreshRunningSessions()
     }
 
     /// The services connected right now, for the library's green dots. Read in a view body, for
@@ -115,7 +129,8 @@ public extension GlassShellModel {
 
     /// How many sessions Active lists, for the sidebar row: those open here and those running on
     /// the machines, as last asked (W6) — the badge read 0 while fourteen sessions ran
-    /// (2026-10-08). Nothing is asked to count them. Zero when there are none: *"Active needs a 0
+    /// (2026-10-08). Counting asks nothing; the library asks as it appears
+    /// (`refreshRunningSessionsIfDue`). Zero when there are none: *"Active needs a 0
     /// like the others when nothing is connected"* (2026-09-22) — Favorites and Workgroups say
     /// 0, and a row that says nothing looks like a row that has not counted.
     func activeSessionCount() -> Int {

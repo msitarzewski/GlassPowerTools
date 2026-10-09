@@ -158,8 +158,18 @@ public struct GlassShellLibraryView: View {
         }
         // ⌘N in the library means a new machine.
         .focusedSceneValue(\.glassNewItem, GlassNewItemAction(title: "New Host") { setupMode = .addHost })
-        .task { if !model.isLoaded { await model.load() } }
-        .onChange(of: scenePhase) { _, phase in if phase == .active { Task { await model.load() } } }
+        // Then what runs on the machines, so Active's count is right before Active is opened.
+        .task {
+            if !model.isLoaded { await model.load() }
+            await model.refreshRunningSessionsIfDue()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task {
+                await model.load()
+                await model.refreshRunningSessionsIfDue()
+            }
+        }
         #if os(macOS)
         // glas.sh's Connections window minimum; with the scene's default size this keeps the
         // detail's controls inside the window instead of below its bottom edge.
