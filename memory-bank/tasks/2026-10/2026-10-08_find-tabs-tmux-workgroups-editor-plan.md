@@ -623,3 +623,49 @@ since 0.4.313.
   off the Mac, SSH uploads, Insert Path).
 - Note: crash reports for the app stopped being saved on this Mac after ~25 in a day (simulator crashes count); use the
   log (`launchd` "exited due to SIGTRAP") when no report appears.
+
+## W11 and W14 landed (2026-10-09, afternoon)
+
+Both merged onto main by patch (`git apply -3 --index`, clean), built, and committed only after every test run passed
+(terminal 647 tests in 50 suites, shell 231 in 46).
+
+- **50e56dc, W14 — files into terminals off the Mac.** On Vision Pro, iPad and iPhone a terminal takes drops from Files,
+  Photos and other apps (SwiftUI `.onDrop`, so nothing UIKit is built in an update: rule 64). Each item goes up through
+  the Files browser's own verified, no-clobber upload to `~/.cache/glass-power-tools/dropped/<yyyy-MM-dd>/` on the host
+  (folders 0700; a taken name becomes `name-2.ext`, so typed paths need no escaping for parentheses). The host's
+  absolute paths are typed, escaped, never run; a file that did not arrive types nothing. HEIC/HEIF goes as full-size,
+  upright JPEG (orientation applied to the pixels); if conversion fails, the original goes and the terminal says so.
+  Status and plain-word failures show in the terminal's bottom-right corner; a disconnected terminal refuses the drop.
+  Day folders older than a week are cleared once per connection (real directories only, `lstat`, links never
+  followed). A Mac SSH pane uploads and types the host's path; a local pane is unchanged. The Files browser of a
+  terminal gains Insert Path (context menu; Insert for a selection). `SFTPIncomingDrop` now accepts any content or data
+  type that arrives as one file (a zip from Files was refused), which also widens the browser's own drops.
+  New: `TerminalRemoteDrop.swift`, `TerminalRemoteDropTests` (9 tests, each shown failing under a mutation that removes
+  its fix). Not yet seen on a device: the drop on visionOS, Photos' item providers, Insert Path bringing the terminal
+  forward. Limits: `$XDG_CACHE_HOME` not honoured; the host needs OpenSSH's `hardlink@openssh.com`, as the browser does;
+  Mac Insert Path does not bring the window forward.
+- **dc7aa67, W11 — repo and branch in names; names on every device.** A terminal in a git repository is named by it:
+  the repository stands in for the folder and the second line reads `app · main · Sources`, in Mac tab rows, the window
+  title, Active and Show All Terminals (typing a branch or repository finds the tile). On the Mac the repository is read
+  from the files (`.git` folder or `gitdir:` file, worktrees named by their main repository), never by running git,
+  never at or above home, never on a non-local volume (mount table read with `MNT_NOWAIT`). Over SSH the host is asked
+  once per folder change with one `sh -c` (no git, no developer tools: no answer, no install prompt). Each tab keeps
+  `@glass-repo`/`@glass-branch` on its tmux session; the listing is now **15 fields**. On iPhone, iPad and Vision Pro a
+  terminal in tmux reads `@glass-name`, the pane title, folder and repository in one command after attaching and when
+  output settles (at most every 5 s, never while idle); every headset label (tab ornament, tab bar, grid, carousel,
+  connection ornament) and the iPhone switcher use one rule (`TerminalWorkgroupOpening.label(_:on:)`). Rename Tab… and
+  Use Automatic Name are there too and set `@glass-name`. Finding: tmux 3.7c's `display-message` answers a missing
+  session with empty fields and exit 0, so the read checks `has-session` first. New: `TerminalRepository.swift`,
+  `TerminalRepositoryTests` (18), `TerminalSessionNamesTests` (8), 2 in `MacLocalTmuxTests`, each shown failing without
+  its fix. Limits: a Mac tab adopts `@glass-name` once, when it attaches (a later rename elsewhere shows after it
+  reopens); Mac SSH-in-tmux tabs don't show the pane's program title yet; other devices can show a stale branch for a
+  session no tab shows; reftable repositories show no branch on the local reader. Rename menus on iOS/visionOS are
+  compile-only until seen on the devices.
+- **Test notes.** `TerminalOutputObservationTests` "output coming to rest is announced once per burst" fails only under
+  heavy parallel load (load average 30–40, its 10 ms sleeps stretch to 20–37 s); it also failed so at 0c89503, passes
+  alone and passed in both merge runs here (load 7–11). `TerminalTmuxTests.claimingLive` leaves its private `-S` tmux
+  server alive until its `sleep 600` ends (never the default server, rule 63).
+- **Installed 0.4.319** (W11 + W12 + W14) on the Mac and iPhone, 12:19. The Mac's first W12 launch: `Reopen: 4 listed,
+  0 already open, 0 not saved, 4 reopening`, then each terminal window's ask "already taken at this launch"; 15 of 15
+  tmux sessions attached; no crash report or launchd exit line. Vision Pro refused the install while asleep (CoreDevice
+  error 4016); it stays on 0.4.318 until the retry.

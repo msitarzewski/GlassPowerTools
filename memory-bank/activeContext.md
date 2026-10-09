@@ -27,9 +27,16 @@ anything touching real servers (SSH and database tests use the disposable test V
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
-## 2026-10-08 — where things stand
+## 2026-10-09 — where things stand
 
-**Installed:** Mac 0.4.308 (2026-10-08 15:34), iPhone 0.4.305, Vision Pro 0.4.305. Next device install: all three on one build (workgroup tmux names). Everything committed; nothing pushed.
+**Installed:** Mac and iPhone **0.4.319** (2026-10-09 12:19: W11 names, W12 window places, W14 drops); Vision Pro
+0.4.318 — its 0.4.319 install was refused while the headset slept (CoreDevice 4016), to retry when it is awake.
+The Mac reopened its 4 listed windows once (`Reopen: 4 listed … 4 reopening`; later asks "already taken"), 15 of 15
+tmux sessions attached, no crash. Places were not yet recorded by the 0.4.317 that quit, so positions come back from
+the next quit on. Everything committed; nothing pushed. Current task note:
+`tasks/2026-10/2026-10-08_find-tabs-tmux-workgroups-editor-plan.md` (W1–W14; backlog at its end).
+
+Earlier, 2026-10-08: Mac 0.4.308, iPhone and Vision Pro 0.4.305.
 **The owner works in Claude Code inside a local tmux tab in the app** (`glass-1`): a Mac install no
 longer ends the session, and the app reopens tmux windows after a quit. **Standing permission: install
 Mac builds as soon as they are built** (detached installer); iPhone and Vision Pro on the owner's word.
