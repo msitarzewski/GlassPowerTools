@@ -536,3 +536,31 @@ multiple times per frame". W1's `\.glassFindItem` publishes a focused value, so 
 **State loss.** After the crashes, every saved tab record was `{"id","schemaVersion"}` with no root. Each window opened as "New Terminal". The 14 sessions kept running; workgroups (`layoutPresets`) were intact. **W7b:** trace which path wrote empty records over full ones; never overwrite an undecodable or full record by side effect; keep one previous good generation; offer running sessions back at launch.
 
 **Proposed (not approved):** workgroups as tmux sessions through control mode (`tmux -CC`), as iTerm2 does: tmux windows as native tabs, panes as splits, and the layout kept on the host. Also a sessions browser per host (W6). The owner asked whether tmux windows can back workgroup tabs; answered with the two routes and the one-host-per-session limit.
+
+## Second round (2026-10-08 afternoon)
+
+| Piece | Commit | Evidence |
+|---|---|---|
+| W4b workgroups remember their tmux sessions; Replace or Keep Both; iPhone lazy slots; SSH tabs reattach after a quit | e6476b6 | 17 tests, 22 reverted fixes caught; iOS and visionOS compile |
+| W8 select several tabs; Move N Tabs to New Window; Close N Tabs | 247f613 | 9 tests; not yet tried by hand: single-click reliability, multi-tab drag, ⌘W closing only the shown tab |
+| W6 Active names sessions as tabs do (one rule, `TerminalSessionNaming`); `@glass-name` on the session carries a tab's given name to every device; this Mac recognised by its tmux server identity (pid, start time, socket), its sessions "Open here"; badge counts running sessions; skipped machines say why | 828300b | 22 reverted fixes caught; live listing on a private server; iOS and visionOS compile |
+| W9 Show All Terminals: every window's tabs as live previews, filter, arrows, drag a tile to another window, "Not in a window"; ⇧⌘\, a two-finger pinch in, Window menu, toolbar buttons in Connections and terminal windows | 64418bd | 14 tests; offscreen screenshots checked; menu bar, pinch feel and the blur need the owner's eye |
+
+Owner's asks behind them: "command click multiple tabs … 'move to new window' with a right click"; "the available
+terminal list has default names, not what's showing in the actual tabs"; "Mission Control / Exposé for Terminal
+windows *and their tabs*". Three-finger swipes are macOS's own on this Mac (`TrackpadThreeFingerVertSwipeGesture=2`),
+so the overview opens with a pinch, as Safari's tab overview does.
+
+Installed: Mac **0.4.308** (2026-10-08 15:34; windows and all 14 sessions came back on their own); iPhone and Vision
+Pro **0.4.305**. Older builds strip a workgroup's tmux names when they re-save it, so the next device install should
+put all three on the same build. Suites at 64418bd: terminal 585, shell 224, editor 132, connection UI 30.
+
+**Vision Pro crash (W10, in progress).** Two Release crashes at 14:55 on connecting to a server's tmux session:
+an over-release inside SwiftUI stack layout (`StackLayout` → `ViewLayoutEngine3D`), main thread, none of our frames,
+other threads idle. It is the same signature as 0.4.288–0.4.295. W10's stress harness reproduced it in the visionOS
+simulator (15:33; the simulator's crash reports land in the Mac's DiagnosticReports with parent `launchd_sim`).
+W10 was interrupted by a connection error and resumed.
+
+**Two tests seen hanging once under heavy parallel load** (W8's report; both passed in every later run):
+`TerminalHostTrustBrokerTests` "Cancelling everything resumes every waiting caller" (one `Task.yield()` may be too
+little), and W1's live tmux find test. Watch for them.
