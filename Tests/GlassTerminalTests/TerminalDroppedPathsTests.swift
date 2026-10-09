@@ -105,6 +105,22 @@ struct TerminalDroppedPathsTests {
         #expect(TerminalDroppedPaths.text(for: urls) == TerminalDroppedPaths.escaped(url.path) + " ")
     }
 
+    @Test("a promised file arrives on AppKit's queue without stopping the app")
+    func promiseReaderOffTheMainThread() async throws {
+        let parent = FileManager.default.temporaryDirectory.appendingPathComponent("drop-promise-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: parent) }
+        let staging = try SFTPDropStaging(keepingFilesIn: parent)
+        let file = staging.directory.appendingPathComponent("Screenshot.png")
+        let (stream, continuation) = AsyncThrowingStream<URL, Error>.makeStream()
+        let reader = SFTPIncomingDrop.promiseReader(staging: staging, continuation: continuation)
+        // As NSFilePromiseReceiver does: on its operation queue, not the main thread.
+        let queue = OperationQueue()
+        queue.addOperation { reader(file, nil) }
+        var received: [URL] = []
+        for try await url in stream { received.append(url); break }
+        #expect(received == [file])
+    }
+
     @Test("a file that already exists types its own path, not a copy")
     @MainActor func existingFile() async throws {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent("drop-existing-\(UUID()).txt")

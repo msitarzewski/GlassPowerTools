@@ -130,6 +130,23 @@ final class SFTPIncomingDrop {
 
     /// Files that already exist come back as they are; promised files and bare content are
     /// written into `staging` — by default, a temporary one that goes when it is released.
+    #if os(macOS)
+    /// What a file promise calls with each file. AppKit calls it on the receive queue, never the
+    /// main thread: written inline in this main-actor class it was main-actor code, and Swift
+    /// stopped the app the moment AppKit called it (2026-10-09, a screenshot's thumbnail dropped
+    /// on a terminal). It touches only what is safe from any thread, and keeps the staging alive
+    /// for late callbacks even if the drop's task was cancelled.
+    nonisolated static func promiseReader(staging: SFTPDropStaging,
+                                          continuation: AsyncThrowingStream<URL, Error>.Continuation)
+        -> @Sendable (URL, (any Error)?) -> Void {
+        { url, error in
+            withExtendedLifetime(staging) {
+                if let error { continuation.finish(throwing: error) } else { continuation.yield(url) }
+            }
+        }
+    }
+    #endif
+
     func materialize(into given: SFTPDropStaging? = nil) async throws -> (urls: [URL], staging: SFTPDropStaging) {
         let staging = try given ?? SFTPDropStaging()
         var urls: [URL] = []
@@ -146,13 +163,8 @@ final class SFTPIncomingDrop {
                 queue.maxConcurrentOperationCount = 1
                 let stream = AsyncThrowingStream<URL, Error> { continuation in
                     receiver.receivePromisedFiles(atDestination: staging.directory, options: [:],
-                                                  operationQueue: queue) { url, error in
-                        // Retain staging for late callbacks even if the upload task cancels.
-                        withExtendedLifetime(staging) {
-                            if let error { continuation.finish(throwing: error) }
-                            else { continuation.yield(url) }
-                        }
-                    }
+                                                  operationQueue: queue,
+                                                  reader: Self.promiseReader(staging: staging, continuation: continuation))
                 }
                 var received = 0
                 for try await url in stream {
