@@ -752,7 +752,8 @@ struct MacWorkspaceTests {
         )
         let ticketID = try #require(broker.issue(command: "echo expiring"))
 
-        try await Task.sleep(for: .milliseconds(30))
+        // Wait for the tidying, not a fixed time: under a busy machine 30 ms was not always enough.
+        for _ in 0..<200 where broker.pendingCount > 0 { try await Task.sleep(for: .milliseconds(10)) }
 
         #expect(broker.claim(ticketID) == nil)
         #expect(broker.pendingCount == 0)
@@ -808,7 +809,8 @@ struct MacWorkspaceTests {
             discarded = true
         }
 
-        try await Task.sleep(for: .milliseconds(30))
+        // Wait for the cleanup, not a fixed time: under a busy machine 30 ms was not always enough.
+        for _ in 0..<200 where !discarded { try await Task.sleep(for: .milliseconds(10)) }
 
         #expect(discarded)
         #expect(broker.pendingCount == 0)
