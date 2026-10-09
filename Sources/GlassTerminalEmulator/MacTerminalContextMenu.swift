@@ -1,0 +1,133 @@
+//
+//  MacTerminalContextMenu.swift
+//  Glass Power Tools — GlassTerminalEmulator
+//
+//  The terminal's contextual menu on the Mac. SwiftTerm's view has none, so a right-click in a
+//  terminal did nothing (owner, 2026-10-09: "we don't have any contextual menus in terminal.
+//  Copy/Paste/Paste Text/Services like [Terminal's]"). Terminal.app's shape: a right-click
+//  outside the selection selects the word under the pointer first, so Look Up and Copy have
+//  something to act on; then Look Up, Copy, Paste and Select All. The system adds Services
+//  (Search With Google among them) because the view hands its selection to them
+//  (`NSServicesMenuRequestor`), which also makes the app menu's Services work on a terminal.
+//
+//  Paste goes through the view's own `paste(_:)`, which the app reviews before anything reaches
+//  the shell, exactly as ⌘V does.
+//
+
+#if !canImport(UIKit) && canImport(AppKit)
+import AppKit
+import SwiftTerm
+
+@MainActor
+enum MacTerminalContextMenu {
+    /// The menu for a right-click or Control-click at `event`.
+    static func menu(for view: TerminalView, event: NSEvent) -> NSMenu {
+        selectWordIfOutsideSelection(in: view, at: event.locationInWindow)
+        let selected = selectedText(of: view)
+        let menu = NSMenu(title: "Terminal")
+        // Each item's state is set here; SwiftTerm's own validation knows only its selectors.
+        menu.autoenablesItems = false
+        if let selected, let phrase = lookUpPhrase(selected) {
+            let point = view.convert(event.locationInWindow, from: nil)
+            menu.addItem(item("Look Up “\(phrase)”", symbol: "info.circle") {
+                view.showDefinition(for: NSAttributedString(string: selected), at: point)
+            })
+            menu.addItem(.separator())
+        }
+        menu.addItem(item("Copy", enabled: selected != nil) { view.copy(view) })
+        menu.addItem(item("Paste", enabled: pasteboardHasText()) { view.paste(view) })
+        menu.addItem(item("Select All") { view.selectAll(nil) })
+        return menu
+    }
+
+    // MARK: The word under the pointer
+
+    /// The cell under `windowPoint`, as a position in the buffer, scrollback included.
+    static func position(in view: TerminalView, at windowPoint: NSPoint) -> Position? {
+        let terminal = view.getTerminal()
+        guard terminal.cols > 0 else { return nil }
+        // SwiftTerm's text-input answer is the screen cell, row × columns + column.
+        let index = view.characterIndex(for: windowPoint)
+        guard index >= 0 else { return nil }
+        return Position(col: index % terminal.cols, row: index / terminal.cols + terminal.buffer.yDisp)
+    }
+
+    /// Selects the word under the pointer unless the click is inside the selection, as a Mac
+    /// text view does; a click on blank space leaves nothing selected.
+    static func selectWordIfOutsideSelection(in view: TerminalView, at windowPoint: NSPoint) {
+        guard let position = position(in: view, at: windowPoint) else { return }
+        let selection = view.selection!
+        if selection.active, contains(start: selection.start, end: selection.end, position) { return }
+        selection.selectWordOrExpression(at: position, in: view.getTerminal().buffer)
+        if selectedText(of: view) == nil { selection.selectNone() }
+    }
+
+    /// Whether `position` lies in the selection from `start` to `end`, in either order.
+    nonisolated static func contains(start: Position, end: Position, _ position: Position) -> Bool {
+        let (first, last) = Position.compare(start, end) == .after ? (end, start) : (start, end)
+        return Position.compare(position, first) != .before && Position.compare(position, last) != .after
+    }
+
+    // MARK: The selection
+
+    /// The selected text, or nil when nothing but blank space is selected.
+    static func selectedText(of view: TerminalView) -> String? {
+        guard view.selection.active else { return nil }
+        let text = view.selection.getSelectedText()
+        return text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : text
+    }
+
+    /// What Look Up shows in its title: the selection's first line, trimmed and shortened.
+    /// Nil when there is nothing to look up.
+    nonisolated static func lookUpPhrase(_ text: String, limit: Int = 30) -> String? {
+        let line = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return nil }
+        return trimmed.count > limit ? String(trimmed.prefix(limit)) + "…" : trimmed
+    }
+
+    // MARK: Services
+
+    /// Whether the view hands its selection to a service: text out, nothing back, since a
+    /// terminal's screen is the program's to write, not the service's.
+    static func servesSelection(of view: TerminalView, sendType: NSPasteboard.PasteboardType?,
+                                returnType: NSPasteboard.PasteboardType?) -> Bool {
+        sendType == .string && returnType == nil && selectedText(of: view) != nil
+    }
+
+    /// Writes the selection for a service.
+    static func writeSelection(of view: TerminalView, to pasteboard: NSPasteboard,
+                               types: [NSPasteboard.PasteboardType]) -> Bool {
+        guard types.contains(.string), let text = selectedText(of: view) else { return false }
+        pasteboard.clearContents()
+        return pasteboard.setString(text, forType: .string)
+    }
+
+    // MARK: Items
+
+    /// Whether Paste has text to paste. Asks only which types are there: reading the text itself
+    /// would show the system's paste-permission prompt before anyone chose Paste.
+    private static func pasteboardHasText() -> Bool {
+        NSPasteboard.general.types?.contains(.string) ?? false
+    }
+
+    private static func item(_ title: String, symbol: String? = nil, enabled: Bool = true,
+                             _ run: @escaping @MainActor () -> Void) -> NSMenuItem {
+        let action = MenuAction(run)
+        let item = NSMenuItem(title: title, action: #selector(MenuAction.perform(_:)), keyEquivalent: "")
+        item.target = action
+        // A menu item holds its target weakly; this keeps the action alive as long as the item.
+        item.representedObject = action
+        item.isEnabled = enabled
+        if let symbol { item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil) }
+        return item
+    }
+
+    // AppKit calls a menu item's action on the main thread.
+    @MainActor private final class MenuAction: NSObject {
+        let run: @MainActor () -> Void
+        init(_ run: @escaping @MainActor () -> Void) { self.run = run }
+        @objc func perform(_ sender: Any?) { run() }
+    }
+}
+#endif

@@ -2689,6 +2689,24 @@ private final class ReviewingMacTerminalView: TerminalView {
         guard let text = NSPasteboard.general.string(forType: .string), !text.isEmpty else { return }
         onPasteRequest?(text, getTerminal().bracketedPasteMode)
     }
+
+    // The contextual menu, and the selection handed to Services (`MacTerminalContextMenu`).
+    override func menu(for event: NSEvent) -> NSMenu? {
+        MacTerminalContextMenu.menu(for: self, event: event)
+    }
+
+    override func validRequestor(forSendType sendType: NSPasteboard.PasteboardType?,
+                                 returnType: NSPasteboard.PasteboardType?) -> Any? {
+        MacTerminalContextMenu.servesSelection(of: self, sendType: sendType, returnType: returnType)
+            ? self : super.validRequestor(forSendType: sendType, returnType: returnType)
+    }
+}
+
+// AppKit asks for the selection on the main thread, from the Services menu.
+extension ReviewingMacTerminalView: @preconcurrency NSServicesMenuRequestor {
+    func writeSelection(to pboard: NSPasteboard, types: [NSPasteboard.PasteboardType]) -> Bool {
+        MacTerminalContextMenu.writeSelection(of: self, to: pboard, types: types)
+    }
 }
 
 @MainActor
@@ -3294,11 +3312,29 @@ private final class ReviewingMacLocalProcessTerminalView: LocalProcessTerminalVi
         onPasteRequest?(text, getTerminal().bracketedPasteMode)
     }
 
+    // The contextual menu, and the selection handed to Services (`MacTerminalContextMenu`).
+    override func menu(for event: NSEvent) -> NSMenu? {
+        MacTerminalContextMenu.menu(for: self, event: event)
+    }
+
+    override func validRequestor(forSendType sendType: NSPasteboard.PasteboardType?,
+                                 returnType: NSPasteboard.PasteboardType?) -> Any? {
+        MacTerminalContextMenu.servesSelection(of: self, sendType: sendType, returnType: returnType)
+            ? self : super.validRequestor(forSendType: sendType, returnType: returnType)
+    }
+
     override func dataReceived(slice: ArraySlice<UInt8>) {
         let clock = ContinuousClock()
         let start = clock.now
         super.dataReceived(slice: slice)
         onProcessOutput?(slice, start.duration(to: clock.now))
+    }
+}
+
+// AppKit asks for the selection on the main thread, from the Services menu.
+extension ReviewingMacLocalProcessTerminalView: @preconcurrency NSServicesMenuRequestor {
+    func writeSelection(to pboard: NSPasteboard, types: [NSPasteboard.PasteboardType]) -> Bool {
+        MacTerminalContextMenu.writeSelection(of: self, to: pboard, types: types)
     }
 }
 

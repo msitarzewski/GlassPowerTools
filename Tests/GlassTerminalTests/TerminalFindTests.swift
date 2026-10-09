@@ -23,11 +23,12 @@ struct TerminalFindTests {
 
     #if os(macOS)
     /// A remote terminal's renderer in an offscreen window, fed the way a connection feeds it.
+    /// The contextual menu's tests use it too (`MacTerminalContextMenuTests`).
     @MainActor
-    private final class HostedTerminal {
+    final class HostedTerminal {
         let model = SwiftTermHostModel()
         private let window = NSWindow()
-        private var hosting: NSHostingView<SwiftTermHostView>?
+        private(set) var hosting: NSHostingView<SwiftTermHostView>?
         private var nonce: UInt64 = 0
 
         init(scrollback: Int = 500, height: CGFloat = 600) async {

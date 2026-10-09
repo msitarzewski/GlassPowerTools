@@ -81,6 +81,10 @@ In a terminal kept in tmux, tmux searches its own history, so text that has scro
 
 Pasting a single short line sends it straight away. Text with more than one line, or longer than 4,096 bytes, opens **Review Terminal Paste** first. Edit it if needed, then choose **Paste**. Clipboards larger than 262,144 bytes are refused.
 
+## Right-click in a terminal (Mac)
+
+Right-click, or Control-click, in a terminal for **Look Up**, **Copy**, **Paste** and **Select All**. The selected text also works with **Services**. Right-clicking a word outside the selection selects that word first; right-clicking inside the selection keeps it. **Paste** goes through the same review as ⌘V.
+
 ## Drop files on a terminal
 
 Drag files onto a terminal to type their paths at the cursor, ready for the program that reads them, such as Claude Code. The paths are escaped for the shell and separated by spaces, with a space after the last. Nothing is run: press Return yourself.
