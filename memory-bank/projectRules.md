@@ -497,3 +497,9 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     test's pipe, the read waited a minute on the main actor, and the whole suite slowed from 11 s to
     87 s with timing failures (2026-10-08, `fa3a746`). The app's own tmux runs spawn the same way
     (`MacLocalTmux.run`).
+64. **A UIKit view is never built inside a SwiftUI update on visionOS.** SwiftTerm's view builds a keyboard
+    accessory (`UIInputView`), which makes the scene's text-effects window; on visionOS that adds an ornament and
+    moves focus, and the focus change updated the same view graph from inside SwiftUI's 3D stack layout, freeing
+    memory the outer layout still used. Every headset "SwiftUI layout over-release" crash since 0.4.288 was this
+    (2026-10-09, `32fa481`, found with a simulator stress harness and malloc stack logging). A representable returns
+    a plain host view from `makeUIView` and builds anything that touches the keyboard on the next main-queue turn.

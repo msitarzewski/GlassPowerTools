@@ -1221,3 +1221,11 @@ the host, so a crash or another device brings it back as it was. Limit: a sessio
 host, so a workgroup spanning hosts is one session per host. **Before deciding:** a spike against
 the scratch VM. **Near term instead:** W4b (each tab remembers its own session) and a sessions
 browser per host in Active (W6).
+
+## D54 — Terminal windows are reopened by the app, not by macOS — Implemented 2026-10-09
+**Owner:** "we need to remember window positions. Apple has an API for this, right?" macOS window restoration was
+turned on for the app (`56f9ce5`): it reopened the terminal windows without their value, as empty "New Terminal"
+windows, and the app's own reopen list stood aside; the owner: "that restart was f*d". **Decision:** reverted
+(`5722124`); the terminal window scene declines restoration, and the app's own records, which know each window's
+tabs, reopen them. Positions are to be kept in those records too (W12), and the list read by whichever window
+appears first and kept current while running, so a crash reopens the same windows.

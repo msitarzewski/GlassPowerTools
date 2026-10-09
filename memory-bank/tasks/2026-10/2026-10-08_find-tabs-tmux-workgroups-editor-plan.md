@@ -564,3 +564,24 @@ W10 was interrupted by a connection error and resumed.
 **Two tests seen hanging once under heavy parallel load** (W8's report; both passed in every later run):
 `TerminalHostTrustBrokerTests` "Cancelling everything resumes every waiting caller" (one `Task.yield()` may be too
 little), and W1's live tmux find test. Watch for them.
+
+## 2026-10-09 morning
+
+| Piece | Commit | Evidence |
+|---|---|---|
+| A screenshot's floating thumbnail (a file promise) drops on a terminal and types its path; promised files and bare image data go to `~/Library/Caches/com.glasspowertools/Dropped`, cleared after a week | 5a64360 | 3 tests proven to fail without the fix; the owner's by-hand check pending |
+| Two ticket-expiry tests wait for the event, not 30 ms | 4e752f8 | full suite twice |
+| macOS window restoration tried (`56f9ce5`, `bcb355a`) and reverted for terminal windows (D54) | 5722124 | a source check that the scene declines restoration |
+| **W10 Vision Pro crash fixed** (rule 64): the terminal's UIKit view is built after SwiftUI's layout | 32fa481 | simulator stress harness: old build 17/30 runs crashed, fixed 0/24; two 10-minute soaks; **on the headset, connected to the same kind of session: no crash so far (owner, 2026-10-09)** |
+
+Installed: **0.4.313** on Mac, iPhone and Vision Pro (2026-10-09 ~10:35). The owner regrouped 14 tabs into four windows
+with W8's multi-select; two restarts during the restoration detour reopened them empty or not at all; recovered by
+putting the four windows back on the reopen list between quit and launch. Positions are not yet kept.
+
+**Owner's asks this morning, in progress:** W11 repo and branch in tab names ("it would be super helpful to have the repo
+in there, and branch"); W12 window positions, a reopen list read by whichever window appears first and kept current
+while running; W13 multi-select in Active, opening several sessions together in one new window ("like the tab view").
+**Answered:** tmux's own overview is `prefix s` / `prefix w` (choose-tree with live previews). **Open question:** sidebar
+resizing on visionOS (Mac sidebars are resizable within their ranges; visionOS has no drag handle as far as known).
+**Process slip:** a commit went in after a test run with a failure, because the command's result filter always
+succeeded; commits are now gated on the run's "passed" lines.
