@@ -585,3 +585,27 @@ while running; W13 multi-select in Active, opening several sessions together in 
 resizing on visionOS (Mac sidebars are resizable within their ranges; visionOS has no drag handle as far as known).
 **Process slip:** a commit went in after a test run with a failure, because the command's result filter always
 succeeded; commits are now gated on the run's "passed" lines.
+
+## Backlog and work in flight (2026-10-09, late morning)
+
+**Mac windows, the rest of the restart story.** 69fd170 and 659a820: AppKit neither saves nor replays the app's window
+state (the delegate answers no, and `ApplePersistenceIgnoreState` is registered, because under SwiftUI's own delegate the
+answers alone did not stop a leftover state from being replayed). 0c89503 logs the reopen list. The log showed the
+list is read every time the Connections window's content appears, not once per launch, so a leftover list reopened
+windows whose sessions were already shown; their panes were refused as second clients, hence "many … empty" windows.
+Leftover list deleted by hand; W12 makes the read once per launch, app-wide, and keeps the list current. Installed:
+Mac 0.4.316 (14/14 sessions attached), iPhone and Vision Pro 0.4.313.
+
+| W | What | State |
+|---|---|---|
+| W11 | repo and branch in tab names, Active, Show All Terminals | running |
+| W12 | window positions in the app's records; the reopen list read once per launch by whichever window appears first, kept current while running (a crash reopens the same windows) | running |
+| W13 | Active: select several sessions, open them together in one new window (owner on the headset: "Multiselect from the Active would be stellar") | running |
+| W14 | files into terminals on Vision Pro, iPad and iPhone: drag from Photos and Files, upload over SFTP to `~/.cache/glass-power-tools/dropped/` on the host, type the remote path; HEIC to JPEG; the same for Mac SSH terminals; Insert Path in the Files browser | running |
+| — | sidebar resizing on visionOS (Mac sidebars resize within their ranges) | to check against the SDK |
+| — | the screenshot drop on the Mac (5a64360): owner's by-hand check | pending |
+| — | "Failed to synchronize portable settings" (`GlassSettingsSyncError` 3) logged at every launch | to look at |
+| D53 | tmux control mode spike | proposed |
+
+The owner, from the Vision Pro: "I'm in vision pro, just like I'd envisioned when all of this started." No headset crash
+since 0.4.313.
