@@ -286,14 +286,26 @@ enum MacLocalTmux {
     /// With macOS's restoration on, this is what it did not bring back: it used to give up every
     /// window to macOS, and when macOS restored nothing — the copy that quit had not had
     /// restoration on — no window came back at all (2026-10-09).
+    /// Which launch asked for the reopen list, for the log: windows have failed to come back
+    /// without saying why (2026-10-09).
+    @MainActor static func logReopenAsked() {
+        logger.notice("Reopen: asked by the Connections window")
+    }
+
     @MainActor static func takeWindowsToReopen(defaults: UserDefaults = .standard,
                                                open openWindowIDs: Set<UUID>? = nil) -> [UUID] {
-        guard let ids = defaults.stringArray(forKey: reopenKey) else { return [] }
+        guard let ids = defaults.stringArray(forKey: reopenKey) else {
+            logger.notice("Reopen: no windows listed")
+            return []
+        }
         defaults.removeObject(forKey: reopenKey)
         let open = openWindowIDs ?? MacWorkspacePreviewRegistry.shared.openWindowIDs
-        return ids.compactMap(UUID.init(uuidString:)).filter {
-            !open.contains($0) && MacWorkspaceWindowController.hasSavedState(windowID: $0, defaults: defaults)
-        }
+        let listed = ids.compactMap(UUID.init(uuidString:))
+        let alreadyOpen = listed.filter(open.contains)
+        let unsaved = listed.filter { !open.contains($0) && !MacWorkspaceWindowController.hasSavedState(windowID: $0, defaults: defaults) }
+        let reopening = listed.filter { !open.contains($0) && !unsaved.contains($0) }
+        logger.notice("Reopen: \(listed.count) listed, \(alreadyOpen.count) already open, \(unsaved.count) not saved, \(reopening.count) reopening")
+        return reopening
     }
 
     /// Runs tmux and returns what it printed, or nil when it failed. `posix_spawn` and `waitpid`

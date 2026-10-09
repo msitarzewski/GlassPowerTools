@@ -87,6 +87,7 @@ struct TerminalConnectFlow: ViewModifier {
         // sessions. Taken once. macOS never restores these windows itself (their scene declines
         // it): it brought them back without their tabs (2026-10-09).
         .task {
+            MacLocalTmux.logReopenAsked()
             for windowID in MacLocalTmux.takeWindowsToReopen() {
                 openWindow(id: "workspace", value: MacWorkspaceLaunchRequest(windowID: windowID, tabs: []))
             }
