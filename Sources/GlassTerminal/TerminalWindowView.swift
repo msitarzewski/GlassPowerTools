@@ -124,8 +124,6 @@ struct TerminalWindowView: View {
     @State private var recordingPendingDeletion: SessionRecording?
     @State private var recordingDeletionError: String?
     @State private var showingRecordingConsent = false
-    @State private var terminalColumns = 120
-    @State private var terminalRows = 40
     #if os(macOS)
     @State private var macTerminalWindow: NSWindow?
     @State private var isMacFullScreen = false
@@ -166,9 +164,6 @@ struct TerminalWindowView: View {
         self.onSessionEndedCleanly = onSessionEndedCleanly
         self.onTerminalContextChange = onTerminalContextChange
         _terminalHostModel = ObservedObject(wrappedValue: session.terminalHostModel)
-        let initialGeometry = session.currentTerminalGeometry
-        _terminalColumns = State(initialValue: initialGeometry.columns)
-        _terminalRows = State(initialValue: initialGeometry.rows)
     }
     
     var body: some View {
@@ -184,10 +179,10 @@ struct TerminalWindowView: View {
                     onTerminalContextChange(title, terminalHostModel?.currentDirectory)
                 }
             }
-            #if !os(iOS)
-            // The Mac menu consumes these closure-valued focused commands.
+            #if os(macOS)
+            // The Mac menu consumes these closure-valued focused commands; nothing else does.
             // Publishing them through the iOS TabView causes a layout update
-            // loop on iOS 27. iPhone/iPad use fontSizeMenu and its shortcuts.
+            // loop on iOS 27. iPhone, iPad and Vision Pro use fontSizeMenu and its shortcuts.
             .focusedValue(\.terminalFontActions, isTerminalActive ? fontActions : nil)
             #endif
             .sheet(isPresented: $showingRecordings) {
@@ -645,8 +640,8 @@ struct TerminalWindowView: View {
                     session.sendTerminalData(data)
                 },
                 onResize: { cols, rows in
-                    let geometry = TerminalGeometry(measuredRows: rows, columns: cols)
                     #if os(macOS)
+                    let geometry = TerminalGeometry(measuredRows: rows, columns: cols)
                     let configuredGeometry = session.currentTerminalGeometry
                     if !session.hasMeasuredTerminalGeometry,
                        geometry != configuredGeometry,
@@ -663,8 +658,8 @@ struct TerminalWindowView: View {
                         }
                     }
                     #endif
-                    terminalColumns = geometry.columns
-                    terminalRows = geometry.rows
+                    // SwiftTerm reports a new grid from inside UIKit's layout pass. The session keeps
+                    // it; no view state is written there (W10).
                     session.updateTerminalGeometry(rows: rows, columns: cols)
                 },
                 onBell: {
@@ -697,13 +692,12 @@ struct TerminalWindowView: View {
                 terminalHostModel.stopFocusMaintenance()
             }
         }
-        .onChange(of: session.terminalInputNonce) { _, _ in
-            // Debounced error detection for AI explainer
+        // Error detection for the AI explainer, once output has come to rest. Not per chunk of
+        // output: this whole view was rebuilt for each one (W10).
+        .onChange(of: session.outputSettledNonce) { _, _ in
             if aiAssistant.isAvailable {
                 errorCheckTask?.cancel()
                 errorCheckTask = Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(800))
-                    guard !Task.isCancelled else { return }
                     let lines = terminalHostModel.getVisibleText(lastNLines: 10)
                     if detectErrorInTerminalOutput(lines) {
                         await aiAssistant.explainError(
@@ -905,8 +899,8 @@ struct TerminalWindowView: View {
             sessionID: session.id,
             serverName: session.server.name,
             host: session.server.host,
-            width: terminalColumns,
-            height: terminalRows,
+            width: session.currentTerminalGeometry.columns,
+            height: session.currentTerminalGeometry.rows,
             capturesInput: capturesInput
         )
 

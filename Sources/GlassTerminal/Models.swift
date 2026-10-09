@@ -368,7 +368,16 @@ class TerminalSession: Identifiable, Hashable {
         }
     }
     var output: [TerminalLine] = []
-    var terminalInputNonce: UInt64 = 0
+    /// One per chunk of output, up to 125 a second. Not observed: every view reading it was
+    /// rebuilt per chunk — on Vision Pro the whole terminal window, ornaments and focused values
+    /// with it (W10, 2026-10-08). Views that care about output use `outputSettledNonce`.
+    @ObservationIgnored var terminalInputNonce: UInt64 = 0
+    /// Changes once output has been quiet for `outputSettleDelay`: when a busy screen has come to
+    /// rest, at most once per burst of output.
+    private(set) var outputSettledNonce: UInt64 = 0
+    @ObservationIgnored var outputSettleDelay: Duration = .milliseconds(800)
+    @ObservationIgnored private var lastOutputInstant: ContinuousClock.Instant?
+    @ObservationIgnored private var outputSettleTask: Task<Void, Never>?
     var closeWindowNonce: UInt64 = 0
     var currentDirectory: String = "~"
     var pendingHostKeyChallenge: HostKeyTrustChallenge?
@@ -529,6 +538,7 @@ class TerminalSession: Identifiable, Hashable {
         terminalResizeTask?.cancel()
         reconnectTask?.cancel()
         tmuxTask?.cancel()
+        outputSettleTask?.cancel()
         initialTerminalGeometryContinuation.finish()
     }
 
@@ -1141,6 +1151,26 @@ class TerminalSession: Identifiable, Hashable {
         // view presence so adaptive tab/sidebar reconstruction cannot delay or
         // duplicate remote output.
         terminalHostModel.ingest(data: data, nonce: terminalInputNonce)
+        noteOutputForSettle()
+    }
+
+    /// One waiting task per burst rather than one per chunk: it sleeps until the latest output is
+    /// `outputSettleDelay` old, then announces the quiet once.
+    private func noteOutputForSettle() {
+        lastOutputInstant = .now
+        guard outputSettleTask == nil else { return }
+        outputSettleTask = Task { @MainActor [weak self] in
+            while let due = self?.outputSettleDue, ContinuousClock.now < due {
+                do { try await Task.sleep(until: due, clock: .continuous) } catch { return }
+            }
+            guard let self else { return }
+            outputSettleTask = nil
+            outputSettledNonce &+= 1
+        }
+    }
+
+    private var outputSettleDue: ContinuousClock.Instant? {
+        lastOutputInstant.map { $0 + outputSettleDelay }
     }
 
     private func scheduleTerminalFlush() {

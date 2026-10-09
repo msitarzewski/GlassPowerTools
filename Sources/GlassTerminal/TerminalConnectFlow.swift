@@ -23,6 +23,9 @@ struct TerminalConnectFlow: ViewModifier {
     @Environment(SettingsManager.self) private var settingsManager
     @Environment(GlassTerminalRuntime.self) private var runtime
     @Environment(\.openWindow) private var openWindow
+    #if DEBUG || GLASS_STRESS_HARNESS
+    @Environment(\.dismissWindow) private var dismissWindow
+    #endif
     #if os(iOS)
     @Environment(IOSAppRouter.self) private var iOSRouter
     #endif
@@ -284,6 +287,15 @@ struct TerminalConnectFlow: ViewModifier {
         .onChange(of: runtime.requestSerial) { _, _ in
             for request in runtime.takeRequests() { handle(request) }
         }
+        #if DEBUG || GLASS_STRESS_HARNESS
+        // W10: `--stress-terminal` (TerminalStressHarness.swift); never in a shipped build.
+        .task {
+            guard let configuration = TerminalStressHarness.Configuration.fromLaunchArguments else { return }
+            TerminalStressHarness.start(configuration, sessionManager: sessionManager,
+                                        settingsManager: settingsManager, openWindow: openWindow,
+                                        dismissWindow: dismissWindow)
+        }
+        #endif
         #if os(macOS)
         // glas.sh's command palette posts a saved-server id and reopens the library window.
         .onChange(of: sessionManager.paletteConnectionRequest, initial: true) { _, request in

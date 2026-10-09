@@ -81,7 +81,7 @@ nonisolated enum SharedDefaults {
     /// constant of it is rejected under strict concurrency. Resolving it per access costs an
     /// argument scan and is only reached in a Debug test run.
     private static var testSuite: UserDefaults? {
-        #if DEBUG
+        #if DEBUG || GLASS_STRESS_HARNESS
         let arguments = ProcessInfo.processInfo.arguments
         guard let index = arguments.firstIndex(of: "--ui-testing"),
               arguments.indices.contains(index + 1),

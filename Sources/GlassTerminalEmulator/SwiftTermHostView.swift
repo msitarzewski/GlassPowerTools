@@ -556,10 +556,11 @@ public final class SwiftTermHostModel: ObservableObject {
             focus()
         } else {
             stopFocusMaintenance()
-            #if os(iOS)
+            #if canImport(UIKit)
             // updateUIView can revoke ownership during a TabView transaction.
             // Resigning synchronously asks the hosting view for its next
-            // responder, re-entering that same SwiftUI graph update.
+            // responder, re-entering that same SwiftUI graph update. Vision Pro
+            // too: its workgroup tabs revoke it the same way (W10).
             DispatchQueue.main.async { [weak self] in
                 guard let self, !self.allowsFocusOwnership else { return }
                 self.terminalEngine?.resignFocus()
@@ -2270,6 +2271,28 @@ private final class SwiftTermEngine: TerminalEngine {
     }
 }
 
+/// The view SwiftUI holds for a terminal; the engine's view goes inside it, filling it. The
+/// engine's view can arrive a turn later (see `makeUIView`) and moves between hosts as SwiftUI
+/// rebuilds them, so it is never itself the view SwiftUI made.
+@MainActor
+private final class TerminalRendererHostView: UIView {
+    init() {
+        super.init(frame: .zero)
+        isOpaque = false
+        backgroundColor = .clear
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { nil }
+
+    func install(_ view: UIView) {
+        guard view.superview !== self else { return }
+        view.frame = bounds
+        view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        addSubview(view)
+    }
+}
+
 public struct SwiftTermHostView: UIViewRepresentable {
     @ObservedObject var model: SwiftTermHostModel
     let theme: SwiftTermTheme
@@ -2329,26 +2352,41 @@ public struct SwiftTermHostView: UIViewRepresentable {
             onTitleChanged: onTitleChanged,
             onBell: onBell
         )
-        let retainedEngine = model.retainedRenderer()
-        let engine = retainedEngine ?? makeEngine(delegate: context.coordinator)
-        engine.updateDelegate(context.coordinator)
-        engine.configure(theme: theme, runtimeSettings: runtimeSettings)
         context.coordinator.lastTheme = theme
         context.coordinator.lastRuntimeSettings = runtimeSettings
-
-        if retainedEngine == nil {
-            // Dismiss an active edit menu on any tap. The eye+hand input model can
-            // otherwise leave it visible after the selection interaction ends.
-            let dismissMenuTap = UITapGestureRecognizer(
-                target: context.coordinator,
-                action: #selector(Coordinator.dismissEditMenu(_:))
-            )
-            dismissMenuTap.cancelsTouchesInView = false
-            engine.hostView.addGestureRecognizer(dismissMenuTap)
+        let host = TerminalRendererHostView()
+        if let engine = model.retainedRenderer() {
+            Self.install(engine, in: host, model: model, coordinator: context.coordinator)
+            return host
         }
+        // **SwiftTerm's views are built after this update, never inside it** (W10, 2026-10-08).
+        // Vision Pro's SwiftUI makes this view from inside its 3D stack layout. SwiftTerm's view
+        // builds a keyboard accessory (a `UIInputView`); the first in a window makes UIKit create
+        // the scene's text-effects window, whose focus update re-enters SwiftUI's view graph while
+        // that stack layout still runs — leaving it with freed children, the headset's crashes in
+        // `StackLayout` and `HVStack.updateCache`. Output arriving meanwhile is queued by the model.
+        let model = model
+        DispatchQueue.main.async { [weak host, weak coordinator = context.coordinator] in
+            guard let host, let coordinator else { return }
+            let engine = model.retainedRenderer() ?? Self.makeEngine(model: model, delegate: coordinator)
+            Self.install(engine, in: host, model: model, coordinator: coordinator)
+        }
+        return host
+    }
 
-        model.attach(engine, delegateOwner: context.coordinator)
-        return engine.hostView
+    /// Puts the engine's view in `host`, configured with the latest theme the view was given.
+    private static func install(
+        _ engine: any TerminalEngine,
+        in host: TerminalRendererHostView,
+        model: SwiftTermHostModel,
+        coordinator: Coordinator
+    ) {
+        engine.updateDelegate(coordinator)
+        if let theme = coordinator.lastTheme, let runtimeSettings = coordinator.lastRuntimeSettings {
+            engine.configure(theme: theme, runtimeSettings: runtimeSettings)
+        }
+        host.install(engine.hostView)
+        model.attach(engine, delegateOwner: coordinator)
     }
 
     public func updateUIView(_ uiView: UIView, context: Context) {
@@ -2371,8 +2409,13 @@ public struct SwiftTermHostView: UIViewRepresentable {
         if !uiView.layer.masksToBounds {
             uiView.layer.masksToBounds = true
         }
-        guard let engine = model.retainedRenderer(),
-              engine.hostView === uiView else { return }
+        guard let engine = model.retainedRenderer() else {
+            // Not built yet: the build after this update configures it with these.
+            context.coordinator.lastTheme = theme
+            context.coordinator.lastRuntimeSettings = runtimeSettings
+            return
+        }
+        guard engine.hostView.superview === uiView else { return }
         engine.updateDelegate(context.coordinator)
         var needsConfiguration = false
         if context.coordinator.lastTheme != theme {
@@ -2393,8 +2436,8 @@ public struct SwiftTermHostView: UIViewRepresentable {
         coordinator.prepareForDismantle()
     }
 
-    private func makeEngine(delegate: Coordinator) -> any TerminalEngine {
-        SwiftTermEngine(
+    private static func makeEngine(model: SwiftTermHostModel, delegate: Coordinator) -> any TerminalEngine {
+        let engine = SwiftTermEngine(
             delegate: delegate,
             onPasteRequest: { [weak model] text, bracketed in
                 model?.requestPaste(text, bracketed: bracketed)
@@ -2415,6 +2458,15 @@ public struct SwiftTermHostView: UIViewRepresentable {
             },
             alternateScreenScroll: { [weak model] in model?.onAlternateScreenScroll }
         )
+        // Dismiss an active edit menu on any tap. The eye+hand input model can
+        // otherwise leave it visible after the selection interaction ends.
+        let dismissMenuTap = UITapGestureRecognizer(
+            target: delegate,
+            action: #selector(Coordinator.dismissEditMenu(_:))
+        )
+        dismissMenuTap.cancelsTouchesInView = false
+        engine.hostView.addGestureRecognizer(dismissMenuTap)
+        return engine
     }
 
     @MainActor

@@ -38,7 +38,7 @@ struct GlassPowerToolsApp: App {
     init() {
         let layers = GlassLayerStore()
         var isolatedDirectory: URL?
-        #if DEBUG
+        #if DEBUG || GLASS_STRESS_HARNESS
         // `--ui-testing <uuid>` isolates storage and the catalog under a per-run directory so UI
         // tests never touch the real App Group container. Same convention as glassDT.
         let arguments = ProcessInfo.processInfo.arguments
@@ -385,7 +385,7 @@ struct GlassPowerToolsApp: App {
         #endif
     }
 
-    #if DEBUG
+    #if DEBUG || GLASS_STRESS_HARNESS
     /// The UI test runner cannot reach this sandbox from iOS or visionOS, so each isolated run
     /// removes earlier runs' directories older than ten minutes (a run in progress is never
     /// touched). macOS runs also clean up from the test side.
