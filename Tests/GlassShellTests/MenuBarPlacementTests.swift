@@ -389,6 +389,20 @@ struct MenuBarPlacementTests {
 
     /// `Sources` and `App`, found from this file rather than from the working directory, so the
     /// test does not depend on where it was launched.
+    /// Terminal windows come back from the app's own records, which know their tabs. macOS's
+    /// restoration reopened them as empty "New Terminal" windows and stood in for the windows the
+    /// app would have opened (2026-10-09), so their scene declines it.
+    @Test("terminal windows are reopened by the app, never restored by macOS")
+    func terminalWindowsAreNotRestoredByMacOS() throws {
+        let file = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/GlassTerminal/GlassTerminalScenes.swift")
+        let source = try String(contentsOf: file, encoding: .utf8)
+        let start = try #require(source.range(of: #"WindowGroup("Terminal", id: "workspace""#))
+        let end = try #require(source.range(of: ".commands { MacWorkspaceCommands", range: start.upperBound..<source.endIndex))
+        #expect(source[start.lowerBound..<end.lowerBound].contains(".restorationBehavior(.disabled)"))
+    }
+
     private func swiftSources() throws -> [URL] {
         let root = URL(fileURLWithPath: #filePath)      // …/Tests/GlassShellTests/this file
             .deletingLastPathComponent()                 // …/Tests/GlassShellTests

@@ -56,6 +56,10 @@ public struct GlassTerminalScenes: Scene {
         }
         .defaultSize(width: 1180, height: 760)
         .defaultLaunchBehavior(.suppressed)
+        // The app reopens these windows from its own records, which know their tabs. macOS's
+        // restoration brought them back as empty "New Terminal" windows instead, and stood in for
+        // the windows the app would have opened (2026-10-09).
+        .restorationBehavior(.disabled)
         .commands { MacWorkspaceCommands(sessionManager: sessionManager) }
         // **Glass, like every other window.** The browser was the one window painting an opaque
         // surface of its own: `.glassLayers` gave it the *state* and nothing painted it, because

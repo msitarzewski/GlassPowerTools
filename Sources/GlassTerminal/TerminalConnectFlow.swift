@@ -81,13 +81,9 @@ struct TerminalConnectFlow: ViewModifier {
         content
         #if os(macOS)
         // D47: the windows that held local terminals in tmux when the app quit, back on their
-        // sessions. Taken once. With macOS's own window restoration on, it goes first — it puts
-        // windows back where they were — and this opens whatever it did not bring back.
+        // sessions. Taken once. macOS never restores these windows itself (their scene declines
+        // it): it brought them back without their tabs (2026-10-09).
         .task {
-            if UserDefaults.standard.bool(forKey: GlassWindowRestoration.key) {
-                try? await Task.sleep(for: .milliseconds(1500))
-                guard !Task.isCancelled else { return }
-            }
             for windowID in MacLocalTmux.takeWindowsToReopen() {
                 openWindow(id: "workspace", value: MacWorkspaceLaunchRequest(windowID: windowID, tabs: []))
             }
