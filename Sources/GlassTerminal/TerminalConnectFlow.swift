@@ -60,6 +60,8 @@ struct TerminalConnectFlow: ViewModifier {
     @State private var pendingPasswordWorkgroup: LayoutPreset?
     /// The device's stand-ins for the waiting workgroup's Mac terminals, already reviewed.
     @State private var pendingPasswordSubstitutions: [Int: LayoutPreset.SessionIntent]?
+    /// What Active could not open with the waiting workgroup's terminals (W13), said once it opens.
+    @State private var pendingPasswordNotOpened: [String] = []
     @State private var workgroupPasswordWasSaved = false
     @State private var isOpeningWorkgroup = false
     @State private var substitutionReviewPreset: LayoutPreset?
@@ -363,6 +365,8 @@ struct TerminalConnectFlow: ViewModifier {
                 openWindow(id: "workspace", value: MacWorkspaceLaunchRequest())
             }
             #endif
+        case .openTmuxSessions(let targets):
+            openTmuxSessionsTogether(targets)
         case .showWorkgroups:
             // The library's Workgroups panel — there is no Workgroups window (2026-10-08).
             #if os(iOS)
@@ -413,11 +417,13 @@ struct TerminalConnectFlow: ViewModifier {
         guard let preset = pendingPasswordWorkgroup else { return }
         let shouldContinue = workgroupPasswordWasSaved
         let substitutions = pendingPasswordSubstitutions
+        let notOpened = pendingPasswordNotOpened
         pendingPasswordWorkgroup = nil
         pendingPasswordSubstitutions = nil
+        pendingPasswordNotOpened = []
         workgroupPasswordWasSaved = false
         guard shouldContinue else { return }
-        openVisionWorkgroup(preset, substitutions: substitutions)
+        openVisionWorkgroup(preset, substitutions: substitutions, notOpened: notOpened)
     }
 
     /// Shows a workgroup whose terminals are open here already.
@@ -441,7 +447,10 @@ struct TerminalConnectFlow: ViewModifier {
 
     /// - Parameter substitutions: the reviewed SSH stand-ins for its Mac terminals; nil until
     ///   they have been reviewed.
-    private func openVisionWorkgroup(_ preset: LayoutPreset, substitutions: [Int: LayoutPreset.SessionIntent]? = nil) {
+    /// - Parameter notOpened: what was left out before it opened — Active's sessions that could
+    ///   not open together (W13) — said with its own failures, in one alert.
+    private func openVisionWorkgroup(_ preset: LayoutPreset, substitutions: [Int: LayoutPreset.SessionIntent]? = nil,
+                                     notOpened: [String] = []) {
         guard !isOpeningWorkgroup, passwordPromptServer == nil else { return }
         // Open here already: shown, never opened a second time (W4b). Its live terminals carry
         // the workgroup's id.
@@ -471,6 +480,7 @@ struct TerminalConnectFlow: ViewModifier {
             } catch SessionOpenError.missingPassword(let missingServer, _) {
                 pendingPasswordWorkgroup = preset
                 pendingPasswordSubstitutions = substitutions
+                pendingPasswordNotOpened = notOpened
                 workgroupPasswordWasSaved = false
                 passwordPromptServer = missingServer
                 return
@@ -488,7 +498,7 @@ struct TerminalConnectFlow: ViewModifier {
                 name: preset.name,
                 colorTag: preset.colorTag
             )
-            var failures = plan.failures
+            var failures = notOpened + plan.failures
 
             if opensWorkgroupSlotsLazily {
                 failures += TerminalWorkgroupOpening.makeSlots(for: plan, workgroupID: workgroupID,
@@ -589,6 +599,30 @@ struct TerminalConnectFlow: ViewModifier {
         }
     }
     #endif
+
+    // MARK: - Several running sessions at once (W13)
+
+    /// Active's "Open N in New Window": one new window holding the sessions, a terminal each on
+    /// its own tmux session, in Active's order (`TerminalOpenTogether`). On iPhone, iPad and
+    /// Vision Pro it is a workgroup opened as any other is, so a phone connects only the terminal
+    /// it shows; what could not open is said with whatever else failed, once it has opened.
+    private func openTmuxSessionsTogether(_ targets: [TerminalTmuxTarget]) {
+        let plan = TerminalOpenTogether.plan(targets, servers: serverManager.servers)
+        #if os(macOS)
+        for request in TerminalOpenTogether.macLaunchRequests(for: plan.opening) {
+            openWindow(id: "workspace", value: request)
+        }
+        if !plan.notOpened.isEmpty {
+            connectionFailureMessage = plan.notOpened.joined(separator: "\n")
+        }
+        #else
+        guard let preset = TerminalOpenTogether.workgroup(for: plan.opening, servers: serverManager.servers) else {
+            if !plan.notOpened.isEmpty { connectionFailureMessage = plan.notOpened.joined(separator: "\n") }
+            return
+        }
+        openVisionWorkgroup(preset, notOpened: plan.notOpened)
+        #endif
+    }
 
 
 

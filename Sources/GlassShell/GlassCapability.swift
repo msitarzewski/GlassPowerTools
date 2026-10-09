@@ -385,6 +385,11 @@ public protocol GlassCapability: AnyObject {
     /// `runningSessions()` and none unasked. A requirement for the same reason.
     func runningReport() async -> GlassRunningReport
 
+    /// Opens running sessions this capability listed, together, in one new window, in the order
+    /// given: Active's "Open N in New Window" (W13). Each carries the attachment the capability
+    /// put on its row. Default: nothing. A requirement for the same reason as `openSessions()`.
+    func openRunningSessions(_ attachments: [GlassRunningAttachment])
+
     /// Surfaces the capability contributes to the library's sidebar, beside Collections.
     ///
     /// For things that span the whole fleet rather than belonging to one machine — Workgroups,

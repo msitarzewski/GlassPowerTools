@@ -197,7 +197,8 @@ extension GlassTerminalCapability {
             end: {
                 guard let tmux = server.executablePath() else { return }
                 await Task.detached { server.kill(name, tmux) }.value
-            })
+            },
+            attachment: Self.attachment(serverID: nil, name: name))
     }
     #endif
 
@@ -237,7 +238,8 @@ extension GlassTerminalCapability {
             end: { [weak self] in
                 guard let self else { return }
                 try await self.withTmuxSession(on: server) { _ = try await $0.runTmuxCommand(TerminalTmux.killCommand(name: tmux.name)) }
-            })
+            },
+            attachment: Self.attachment(serverID: server.id, name: tmux.name))
     }
 
     /// The host's tmux sessions, or why they were not listed: it could not be asked without a

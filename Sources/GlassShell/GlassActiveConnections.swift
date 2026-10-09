@@ -14,10 +14,18 @@
 //  second one: on a Mac the window comes forward, on a phone the root swaps. That is what makes
 //  the library the switcher instead of a list beside one.
 //
+//  W13 (owner, 2026-10-09, on the Vision Pro): "Multiselect from the 'Active' would be stellar …
+//  I'd like to select multiple and open in a new window like the tab view." Sessions running on
+//  the machines can be chosen together — ⌘-click and ⇧-click on a Mac, Select on the others — and
+//  opened as one new window, a tab each, or ended together.
+//
 
 import SwiftUI
 import GlassConnectionKit
 import GlassConnectionUI
+#if os(macOS)
+import AppKit
+#endif
 
 /// "Take me to the live connections." Supplied to each capability's runtime by the composition
 /// root, because the library is the shell's and a capability must not hold the shell.
@@ -131,67 +139,209 @@ public extension GlassShellModel {
     }
 }
 
+// MARK: - Several at once (W13)
+
+/// What Open does with the running sessions chosen: which open together, and which are left out
+/// and why. Pure, so the choice is tested without a screen.
+struct GlassOpenTogetherPlan {
+    /// Opened together, in list order: one new window, a tab each.
+    private(set) var opening: [GlassRunningSession] = []
+    /// Shown in a window here already (W6): left out, where they are. A second client would
+    /// mirror that window, and choosing one alone brings it forward.
+    private(set) var alreadyOpen: [GlassRunningSession] = []
+    /// From a capability that opens its sessions one at a time: left out, and said so.
+    private(set) var oneAtATime: [GlassRunningSession] = []
+
+    init(_ chosen: [GlassRunningSession]) {
+        for session in chosen {
+            if session.isOpenHere {
+                alreadyOpen.append(session)
+            } else if session.attachment != nil {
+                opening.append(session)
+            } else {
+                oneAtATime.append(session)
+            }
+        }
+    }
+
+    /// What to say after opening, when some could not open together.
+    var note: GlassActiveNotice? {
+        guard !oneAtATime.isEmpty else { return nil }
+        let names = oneAtATime.map(\.title).joined(separator: ", ")
+        return GlassActiveNotice(title: "Only Terminal Sessions Open Together",
+                                 message: "\(names) didn't open. Open \(oneAtATime.count == 1 ? "it" : "each") on its own.")
+    }
+}
+
+/// Something Active says after acting on the chosen sessions.
+struct GlassActiveNotice: Equatable {
+    let title: String
+    let message: String
+}
+
+extension GlassShellModel {
+    /// Opens running sessions together: one new window holding them, a tab each, in the order
+    /// given (W13). Each capability is asked once, with all of its own — never each row's `open`,
+    /// which makes a window apiece. Those opened leave the list at once, as one opened alone does;
+    /// those open here already, and those that open only alone, are left as they are.
+    @discardableResult
+    func openTogether(_ sessions: [GlassRunningSession]) -> GlassOpenTogetherPlan {
+        let plan = GlassOpenTogetherPlan(sessions)
+        guard !plan.opening.isEmpty else { return plan }
+        let opened = Set(plan.opening.map(\.id))
+        runningSessions.removeAll { opened.contains($0.id) }
+        registry.openRunningSessions(plan.opening.compactMap(\.attachment))
+        Task {
+            try? await Task.sleep(for: .seconds(3))
+            await refreshRunningSessions()
+        }
+        return plan
+    }
+
+    /// Ends each session on its machine, one after another — a probe connection apiece where no
+    /// terminal is open there, and several at once could trip a server's limit on new ones — then
+    /// asks the machines again. Returns what could not be ended, in plain words.
+    func end(_ sessions: [GlassRunningSession]) async -> [String] {
+        var failures: [String] = []
+        for session in sessions {
+            do {
+                try await session.end()
+            } catch {
+                failures.append("\(session.title): \(error.localizedDescription)")
+            }
+        }
+        await refreshRunningSessions()
+        return failures
+    }
+}
+
+/// The running sessions chosen in Active (W13): ⌘-click and ⇧-click on a Mac, as in W8's tab
+/// sidebar; Select, then taps, on iPhone, iPad and Vision Pro, as in Mail and Files. Held by the
+/// list; the model opens and ends.
+@MainActor @Observable
+final class GlassActiveSelection {
+    /// The chosen rows, by `GlassRunningSession.id`.
+    private(set) var ids: Set<String> = []
+    /// Selection mode, where there is one: Select was chosen and a tap chooses. Leaving it
+    /// chooses nothing. The Mac has none.
+    var isSelecting = false {
+        didSet { if !isSelecting { ids = [] } }
+    }
+    /// End asks once, for all of them.
+    var isConfirmingEnd = false
+    /// What could not be ended or opened together, said afterwards.
+    var notice: GlassActiveNotice?
+
+    /// The chosen sessions still listed, in the order Active lists them.
+    func chosen(in machines: [GlassActiveMachine]) -> [GlassRunningSession] {
+        machines.flatMap(\.running).filter { ids.contains($0.id) }
+    }
+
+    /// The list's selection changed. A plain click — one row, nothing held, not in selection mode
+    /// — opens that row at once, as a tap always has, and leaves nothing chosen: the row to open
+    /// is returned. Otherwise the rows are chosen.
+    func listSelected(_ newIDs: Set<String>, plainClick: Bool,
+                      in machines: [GlassActiveMachine]) -> GlassRunningSession? {
+        let listed = machines.flatMap(\.running)
+        let selected = newIDs.filter { id in listed.contains { $0.id == id } }
+        guard plainClick, !isSelecting, selected.count == 1, let row = listed.first(where: { selected.contains($0.id) }) else {
+            ids = selected
+            return nil
+        }
+        ids = []
+        return row
+    }
+
+    /// Open N in New Window: the chosen sessions open together and the choice ends.
+    @discardableResult
+    func openChosen(in model: GlassShellModel) -> GlassOpenTogetherPlan {
+        let plan = model.openTogether(chosen(in: model.activeMachines()))
+        finish()
+        notice = plan.note
+        return plan
+    }
+
+    /// End N: asks once, for all of them; `endChosen` ends each once it is answered.
+    func askToEnd() {
+        isConfirmingEnd = !ids.isEmpty
+    }
+
+    /// Ends each chosen session. The choice ends first: they are on their way out.
+    func endChosen(in model: GlassShellModel) async {
+        let sessions = chosen(in: model.activeMachines())
+        finish()
+        let failures = await model.end(sessions)
+        guard !failures.isEmpty else { return }
+        notice = GlassActiveNotice(title: failures.count == 1 ? "Couldn't End a Session" : "Couldn't End \(failures.count) Sessions",
+                                   message: failures.joined(separator: "\n"))
+    }
+
+    /// Nothing chosen, and out of selection mode.
+    func finish() {
+        ids = []
+        isSelecting = false
+        isConfirmingEnd = false
+    }
+
+    // MARK: Words
+
+    /// Where several open: a new window on a Mac and Vision Pro. On iPhone and iPad a terminal
+    /// takes the library's place rather than opening a window, so they open together there.
+    static func openTitle(count: Int) -> String {
+        #if os(iOS)
+        count > 1 ? "Open \(count) Together" : "Open"
+        #else
+        count > 1 ? "Open \(count) in New Window" : "Open in New Window"
+        #endif
+    }
+
+    static let openHelp = "Opens the chosen sessions in one new window, a tab each. Sessions open here already stay where they are."
+
+    static func endTitle(count: Int) -> String {
+        count > 1 ? "End \(count) Sessions…" : "End Session…"
+    }
+
+    /// End's question, plainly: one session by name, as its own row asks; several by number.
+    static func endQuestion(for chosen: [GlassRunningSession]) -> (title: String, message: String, button: String) {
+        guard chosen.count > 1 else {
+            return ("End \(chosen.first?.title ?? "the Session")?", "Everything running in it stops, on every device.", "End Session")
+        }
+        return ("End \(chosen.count) sessions?", "What runs in them stops, on every device.", "End \(chosen.count) Sessions")
+    }
+}
+
 /// The results column: each machine a disclosure over its live sessions.
 struct GlassActiveConnectionsList: View {
     let model: GlassShellModel
     @State private var collapsed: Set<String> = []
+    /// The running sessions chosen to open together or end (W13).
+    @State private var selection = GlassActiveSelection()
 
     var body: some View {
         let machines = model.activeMachines()
-        List {
+        let chosen = selection.chosen(in: machines)
+        List(selection: listSelection(machines)) {
             if machines.isEmpty {
                 ContentUnavailableView("Nothing Is Open",
                                        systemImage: "bolt.slash",
                                        description: Text("Connect to a machine and it appears here while the session is live."))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
+                    .selectionDisabled()
             }
             ForEach(machines) { machine in
-                // A disclosure per machine, open by default: the point of coming here is to see
-                // what is live, not to open folders first. Collapsing is remembered for the sheet.
-                DisclosureGroup(isExpanded: Binding(
-                    get: { !collapsed.contains(machine.id) },
-                    set: { expanded in if expanded { collapsed.remove(machine.id) } else { collapsed.insert(machine.id) } }
-                )) {
-                    ForEach(machine.sessions) { session in
-                        GlassActiveSessionRow(session: session) {
-                            // A detached session is still running on its machine: list it there.
-                            // The client takes a moment to leave, so ask once it has.
-                            guard session.closeTitle != "Close" else { return }
-                            try? await Task.sleep(for: .seconds(1))
-                            await model.refreshRunningSessions()
-                        }
-                    }
-                    ForEach(machine.running) { session in
-                        GlassRunningSessionRow(session: session,
-                                               open: { model.open(session, takingOver: $0) },
-                                               didEnd: { await model.refreshRunningSessions() })
-                    }
-                    if let reason = machine.notChecked {
-                        Label(reason, systemImage: "info.circle")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .glassSpatialListRow()
-                            .accessibilityIdentifier("active-not-checked-\(machine.id)")
-                    }
-                } label: {
-                    HStack {
-                        Label(machine.name, systemImage: "server.rack")
-                            .font(.headline)
-                        Spacer()
-                        Text(machine.sessions.count + machine.running.count, format: .number)
-                            .foregroundStyle(.secondary)
-                    }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityIdentifier("active-machine-\(machine.id)")
-                }
+                machineGroup(machine, chosen: chosen)
             }
         }
         .glassSpatialList()
+        #if !os(macOS)
+        .environment(\.editMode, editMode)
+        #endif
         .navigationTitle("Active")
         .accessibilityIdentifier("active-connections")
         .task { await model.refreshRunningSessions() }
         .refreshable { await model.refreshRunningSessions() }
+        .toolbar { selectionToolbar(machines: machines, chosen: chosen) }
         .toolbar {
             ToolbarItem {
                 if model.isCheckingRunningSessions {
@@ -205,7 +355,225 @@ struct GlassActiveConnectionsList: View {
                 }
             }
         }
+        .modifier(GlassActiveSelectionPrompts(model: model, selection: selection, chosen: chosen))
     }
+
+    /// One machine: a disclosure over its live sessions.
+    @ViewBuilder
+    private func machineGroup(_ machine: GlassActiveMachine, chosen: [GlassRunningSession]) -> some View {
+        // A disclosure per machine, open by default: the point of coming here is to see
+        // what is live, not to open folders first. Collapsing is remembered for the sheet.
+        DisclosureGroup(isExpanded: Binding(
+            get: { !collapsed.contains(machine.id) },
+            set: { expanded in if expanded { collapsed.remove(machine.id) } else { collapsed.insert(machine.id) } }
+        )) {
+            ForEach(machine.sessions) { session in
+                GlassActiveSessionRow(session: session) {
+                    // A detached session is still running on its machine: list it there.
+                    // The client takes a moment to leave, so ask once it has.
+                    guard session.closeTitle != "Close" else { return }
+                    try? await Task.sleep(for: .seconds(1))
+                    await model.refreshRunningSessions()
+                }
+                // Open here already: nothing to open together (W13). Choosing one switches to it.
+                .selectionDisabled()
+                .disabled(selection.isSelecting)
+            }
+            ForEach(machine.running) { session in
+                GlassRunningSessionRow(session: session,
+                                       opensOnTap: opensOnTap,
+                                       batch: batchActions(for: session, chosen: chosen),
+                                       open: { model.open(session, takingOver: $0) },
+                                       didEnd: { await model.refreshRunningSessions() })
+                    .tag(GlassActiveRowTag(sessionID: session.id))
+            }
+            if let reason = machine.notChecked {
+                Label(reason, systemImage: "info.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .glassSpatialListRow()
+                    .selectionDisabled()
+                    .accessibilityIdentifier("active-not-checked-\(machine.id)")
+            }
+        } label: {
+            HStack {
+                Label(machine.name, systemImage: "server.rack")
+                    .font(.headline)
+                Spacer()
+                Text(machine.sessions.count + machine.running.count, format: .number)
+                    .foregroundStyle(.secondary)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("active-machine-\(machine.id)")
+        }
+    }
+
+    // MARK: Choosing several (W13)
+
+    /// A running row opens when tapped, as it always has — except on a Mac, where the list's own
+    /// selection reports the click (so ⌘-click and ⇧-click choose), and in selection mode, where
+    /// a tap chooses.
+    private var opensOnTap: Bool {
+        #if os(macOS)
+        false
+        #else
+        !selection.isSelecting
+        #endif
+    }
+
+    /// The list's own selection, as W8's tab sidebar uses it. On a Mac a plain click with nothing
+    /// held opens the row at once and leaves nothing chosen; ⌘-click and ⇧-click choose. On the
+    /// others it chooses only in selection mode: a tap otherwise reaches the row's button.
+    private func listSelection(_ machines: [GlassActiveMachine]) -> Binding<Set<GlassActiveRowTag>> {
+        Binding(
+            get: { Set(selection.ids.map(GlassActiveRowTag.init)) },
+            set: { tags in
+                let ids = Set(tags.map(\.sessionID))
+                #if os(macOS)
+                if let row = selection.listSelected(ids, plainClick: Self.clickOpensRow(), in: machines) {
+                    // After the click: it may bring a window forward.
+                    Task { model.open(row) }
+                }
+                #else
+                guard selection.isSelecting else { return }
+                _ = selection.listSelected(ids, plainClick: false, in: machines)
+                #endif
+            })
+    }
+
+    #if os(macOS)
+    /// The selection changed under a click with neither ⌘ nor ⇧ held: open the row. A key moving
+    /// the selection, or a change with no event behind it, only chooses.
+    private static func clickOpensRow() -> Bool {
+        switch NSApp.currentEvent?.type {
+        case .leftMouseDown?, .leftMouseUp?:
+            return NSEvent.modifierFlags.intersection([.command, .shift]).isEmpty
+        default:
+            return false
+        }
+    }
+    #else
+    /// Selection mode is the system's edit mode, so the list draws its own checkmarks.
+    private var editMode: Binding<EditMode> {
+        Binding(get: { selection.isSelecting ? .active : .inactive },
+                set: { selection.isSelecting = $0.isEditing })
+    }
+    #endif
+
+    /// The chosen rows' actions on the menu of a row that is one of several chosen; nil otherwise,
+    /// and the row offers its own.
+    private func batchActions(for session: GlassRunningSession,
+                              chosen: [GlassRunningSession]) -> GlassActiveBatchActions? {
+        guard chosen.count > 1, chosen.contains(where: { $0.id == session.id }) else { return nil }
+        let plan = GlassOpenTogetherPlan(chosen)
+        return GlassActiveBatchActions(
+            openTitle: GlassActiveSelection.openTitle(count: plan.opening.count),
+            canOpen: !plan.opening.isEmpty,
+            endTitle: GlassActiveSelection.endTitle(count: chosen.count),
+            open: { selection.openChosen(in: model) },
+            end: { selection.askToEnd() })
+    }
+
+    @ToolbarContentBuilder
+    private func selectionToolbar(machines: [GlassActiveMachine], chosen: [GlassRunningSession]) -> some ToolbarContent {
+        let plan = GlassOpenTogetherPlan(chosen)
+        #if os(macOS)
+        if !chosen.isEmpty {
+            ToolbarItem {
+                Button(GlassActiveSelection.openTitle(count: plan.opening.count), systemImage: "macwindow.badge.plus") {
+                    selection.openChosen(in: model)
+                }
+                .disabled(plan.opening.isEmpty)
+                .help(GlassActiveSelection.openHelp)
+            }
+        }
+        #else
+        ToolbarItem {
+            Button(selection.isSelecting ? "Done" : "Select") {
+                withAnimation { selection.isSelecting.toggle() }
+            }
+            .disabled(!selection.isSelecting && machines.allSatisfy(\.running.isEmpty))
+            .accessibilityIdentifier("active-select")
+        }
+        if selection.isSelecting {
+            ToolbarItemGroup(placement: .glassActiveSelectionActions) {
+                Button(GlassActiveSelection.openTitle(count: plan.opening.count), systemImage: "macwindow.badge.plus") {
+                    selection.openChosen(in: model)
+                }
+                .labelStyle(.titleOnly)
+                .disabled(plan.opening.isEmpty)
+                .accessibilityIdentifier("active-open-together")
+                #if os(iOS)
+                // Mail's bar: one action at each end. An ornament sizes to what it holds.
+                Spacer()
+                #endif
+                Button(GlassActiveSelection.endTitle(count: chosen.count), systemImage: "stop.circle", role: .destructive) {
+                    selection.askToEnd()
+                }
+                .labelStyle(.titleOnly)
+                .disabled(chosen.isEmpty)
+                .accessibilityIdentifier("active-end-together")
+            }
+        }
+        #endif
+    }
+}
+
+#if !os(macOS)
+private extension ToolbarItemPlacement {
+    /// Selection mode's actions: the system's bottom bar, an ornament on Vision Pro (D40).
+    static var glassActiveSelectionActions: Self {
+        #if os(visionOS)
+        .bottomOrnament
+        #else
+        .bottomBar
+        #endif
+    }
+}
+#endif
+
+/// A running row in the list's selection. Its own type, so nothing else in the list — a
+/// machine's disclosure is tagged with its `String` id — can be chosen.
+struct GlassActiveRowTag: Hashable {
+    let sessionID: String
+}
+
+/// The question End asks for the chosen sessions, once for all of them, and what could not be
+/// ended or opened together, afterwards.
+private struct GlassActiveSelectionPrompts: ViewModifier {
+    let model: GlassShellModel
+    let selection: GlassActiveSelection
+    let chosen: [GlassRunningSession]
+
+    func body(content: Content) -> some View {
+        let question = GlassActiveSelection.endQuestion(for: chosen)
+        content
+            .confirmationDialog(question.title, isPresented: Bindable(selection).isConfirmingEnd,
+                                titleVisibility: .visible) {
+                Button(question.button, role: .destructive) {
+                    Task { await selection.endChosen(in: model) }
+                }
+            } message: {
+                Text(question.message)
+            }
+            .alert(selection.notice?.title ?? "", isPresented: Binding(
+                get: { selection.notice != nil },
+                set: { if !$0 { selection.notice = nil } }
+            )) {
+            } message: {
+                Text(selection.notice?.message ?? "")
+            }
+    }
+}
+
+/// The chosen rows' actions, offered on the menu of a row that is one of them (W13): right-click
+/// one of several chosen, as in Finder, and the menu acts on all of them.
+struct GlassActiveBatchActions {
+    let openTitle: String
+    let canOpen: Bool
+    let endTitle: String
+    let open: @MainActor () -> Void
+    let end: @MainActor () -> Void
 }
 
 /// A session running on the machine (D44). Choosing it opens it here, or goes to it when a
@@ -213,6 +581,10 @@ struct GlassActiveConnectionsList: View {
 /// on the machine.
 struct GlassRunningSessionRow: View {
     let session: GlassRunningSession
+    /// False where the list's selection takes the tap (W13): on a Mac, and in selection mode.
+    var opensOnTap = true
+    /// The chosen rows' actions, when this row is one of several chosen (W13).
+    var batch: GlassActiveBatchActions? = nil
     /// Opens it here; `true` takes it over.
     let open: @MainActor (Bool) -> Void
     let didEnd: @MainActor () async -> Void
@@ -222,41 +594,60 @@ struct GlassRunningSessionRow: View {
     /// Open here already: the row goes to it, as an open session's row does.
     private var openSymbol: String { session.isOpenHere ? "arrow.right.circle" : "arrow.down.right.circle" }
 
-    var body: some View {
-        Button {
-            open(false)
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: session.symbolName)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 22)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(session.title)
-                    Text(session.subtitle ?? (session.isAttachedElsewhere ? "Open elsewhere" : "Running on the machine"))
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: openSymbol)
-                    .foregroundStyle(.tertiary)
+    private var content: some View {
+        HStack(spacing: 10) {
+            Image(systemName: session.symbolName)
+                .foregroundStyle(.secondary)
+                .frame(width: 22)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(session.title)
+                Text(session.subtitle ?? (session.isAttachedElsewhere ? "Open elsewhere" : "Running on the machine"))
+                    .font(.caption).foregroundStyle(.secondary)
             }
-            .contentShape(.rect)
+            Spacer(minLength: 0)
+            Image(systemName: openSymbol)
+                .foregroundStyle(.tertiary)
         }
-        .buttonStyle(.plain)
+        .contentShape(.rect)
+    }
+
+    var body: some View {
+        Group {
+            if opensOnTap {
+                Button {
+                    open(false)
+                } label: {
+                    content
+                }
+                .buttonStyle(.plain)
+            } else {
+                // The list's selection takes the tap; VoiceOver's activate still opens it.
+                content
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { open(false) }
+            }
+        }
         .glassSpatialListRow()
         .swipeActions(edge: .trailing) {
             Button("End", systemImage: "stop.circle", role: .destructive) { confirmingEnd = true }
         }
         .contextMenu {
-            if session.isOpenHere {
-                Button("Switch To", systemImage: openSymbol) { open(false) }
+            if let batch {
+                Button(batch.openTitle, systemImage: "macwindow.badge.plus") { batch.open() }
+                    .disabled(!batch.canOpen)
+                Button(batch.endTitle, systemImage: "stop.circle", role: .destructive) { batch.end() }
             } else {
-                Button("Open Here", systemImage: openSymbol) { open(false) }
+                if session.isOpenHere {
+                    Button("Switch To", systemImage: openSymbol) { open(false) }
+                } else {
+                    Button("Open Here", systemImage: openSymbol) { open(false) }
+                }
+                // Taking over a session open here would detach this app's own window from it.
+                if session.isAttachedElsewhere && !session.isOpenHere {
+                    Button("Take Over", systemImage: "arrow.down.right.and.arrow.up.left") { open(true) }
+                }
+                Button("End Session…", systemImage: "stop.circle", role: .destructive) { confirmingEnd = true }
             }
-            // Taking over a session open here would detach this app's own window from it.
-            if session.isAttachedElsewhere && !session.isOpenHere {
-                Button("Take Over", systemImage: "arrow.down.right.and.arrow.up.left") { open(true) }
-            }
-            Button("End Session…", systemImage: "stop.circle", role: .destructive) { confirmingEnd = true }
         }
         .confirmationDialog("End \(session.title)?", isPresented: $confirmingEnd, titleVisibility: .visible) {
             Button("End Session", role: .destructive) {
@@ -328,12 +719,13 @@ struct GlassActiveSessionRow: View {
 /// The detail column on a wide layout. Rows switch rather than select, so there is nothing to
 /// detail; this says what the column is for instead of sitting blank.
 struct GlassActiveConnectionsDetail: View {
-    /// How a row is closed where this is read: a Mac mouse cannot swipe.
+    /// How a row is closed where this is read: a Mac mouse cannot swipe. And how several running
+    /// sessions are chosen there (W13).
     static var closeHint: String {
         #if os(macOS)
-        "Choose a session to switch to it. Right-click one to close it."
+        "Choose a session to switch to it. Right-click one to close it. ⌘-click running sessions to open several in one window."
         #else
-        "Choose a session to switch to it. Swipe one to close it."
+        "Choose a session to switch to it. Swipe one to close it. Choose Select to open several running sessions together."
         #endif
     }
 

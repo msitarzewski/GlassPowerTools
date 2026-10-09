@@ -60,6 +60,9 @@ public final class GlassTerminalRuntime {
         case deleteServer(ServerConfiguration)
         /// `tmux` names a session on this Mac to attach to — Active's Open (D47).
         case localTerminal(tmux: String? = nil)
+        /// Running tmux sessions, on this Mac and on saved servers, opened together in one new
+        /// window in this order — Active's "Open N in New Window" (W13).
+        case openTmuxSessions([TerminalTmuxTarget])
         case showWorkgroups
         // (`localTerminal` carries no report: the outcome is claimed by the pane that actually
         // starts a shell — see `expectLocalShell`.)

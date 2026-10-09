@@ -37,6 +37,8 @@ Sessions are grouped under the host they belong to, with a count for each host. 
 
 Choose a session in **Active** to switch to it. The open session comes back to the screen; a second session is not opened. You can also right-click the session, or touch and hold it, and choose **Switch To**.
 
+Sessions running on your machines can be chosen several at a time and opened together; see [Open several together](terminal-tmux.md#open-several-together).
+
 ## Get to Active from anywhere
 
 Every session has **Active Connections** (⚡) at the right end of its top toolbar, and the library has one too.

@@ -106,14 +106,35 @@ public struct GlassRunningSession: Identifiable {
     public let takeOver: @MainActor () -> Void
     /// End it on the host. Whatever is running in it stops.
     public let end: @MainActor () async throws -> Void
+    /// What to attach to when it opens with others in one new window (W13). Nil for a session its
+    /// capability opens only one at a time.
+    public let attachment: GlassRunningAttachment?
 
     public init(id: String, title: String, subtitle: String? = nil, symbolName: String,
                 endpointID: EndpointID, isAttachedElsewhere: Bool, isOpenHere: Bool = false,
                 open: @escaping @MainActor () -> Void, takeOver: @escaping @MainActor () -> Void,
-                end: @escaping @MainActor () async throws -> Void) {
+                end: @escaping @MainActor () async throws -> Void,
+                attachment: GlassRunningAttachment? = nil) {
         self.id = id; self.title = title; self.subtitle = subtitle; self.symbolName = symbolName
         self.endpointID = endpointID; self.isAttachedElsewhere = isAttachedElsewhere; self.isOpenHere = isOpenHere
         self.open = open; self.takeOver = takeOver; self.end = end
+        self.attachment = attachment
+    }
+}
+
+/// A running session as something to attach to, so Active can open several in one new window
+/// (W13, owner, 2026-10-09: "select multiple and open in a new window like the tab view"). Each
+/// row's own `open` opens a window of its own, so it can't be called N times for this.
+public struct GlassRunningAttachment: Hashable, Sendable {
+    /// The capability that opens it (`GlassCapability.openRunningSessions`).
+    public let kind: HostServiceKind
+    /// The service it runs through.
+    public let endpointID: EndpointID
+    /// Its name there: a tmux session's, for a terminal.
+    public let name: String
+
+    public init(kind: HostServiceKind, endpointID: EndpointID, name: String) {
+        self.kind = kind; self.endpointID = endpointID; self.name = name
     }
 }
 
@@ -159,6 +180,10 @@ public extension GlassCapability {
     /// The same, with the machines that could not be asked and why (W6). Default: the running
     /// sessions, and no machine left unasked.
     func runningReport() async -> GlassRunningReport { GlassRunningReport(sessions: await runningSessions()) }
+
+    /// Opens running sessions together, in one new window, in the order given (W13). Default:
+    /// nothing, for a capability whose rows carry no attachment.
+    func openRunningSessions(_ attachments: [GlassRunningAttachment]) {}
 }
 
 public extension GlassCapabilityRegistry {
@@ -183,6 +208,16 @@ public extension GlassCapabilityRegistry {
             all.unchecked += report.unchecked
         }
         return all
+    }
+
+    /// Opens running sessions together (W13): each capability's own in one new window of its
+    /// own, in the order given. Today only the terminal's rows carry an attachment.
+    func openRunningSessions(_ attachments: [GlassRunningAttachment]) {
+        var kinds: [HostServiceKind] = []
+        for attachment in attachments where !kinds.contains(attachment.kind) { kinds.append(attachment.kind) }
+        for kind in kinds {
+            capability(for: kind)?.openRunningSessions(attachments.filter { $0.kind == kind })
+        }
     }
 
     /// The rows to offer from inside `currentSessionID`: everything open except the session

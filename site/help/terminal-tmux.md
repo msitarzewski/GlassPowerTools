@@ -51,6 +51,16 @@ Choose a session to open it here. To use it here and disconnect everyone else, r
 
 **Active** checks your machines when it appears. To check again, choose **Check Machines** in its toolbar, or pull down the list on iPhone and iPad. Only machines with the setting on are checked, and only those that can sign in without asking. A machine that wasn't checked says why under its name, for example **Not checked: signing in would need your password.** Save the password, or connect to the machine once (to trust its host key), and check again.
 
+## Open several together
+
+To open several running sessions at once, choose them in **Active** and open them together, a terminal for each, the way **Move 3 Tabs to New Window** gathers tabs. They can be on different machines.
+
+- **On Mac:** ⌘-click the sessions, or ⇧-click to choose a range. Then choose **Open 3 in New Window** in the toolbar (with however many you chose), or right-click one of them and choose it there. They open in one new window, a tab for each. A click with neither key held still opens one session at once.
+- **On Vision Pro:** choose **Select** at the top of **Active**, tap each session you want, then choose **Open 3 in New Window** at the bottom. They open as one workgroup window with a terminal for each. **Done** leaves without opening anything.
+- **On iPad and iPhone:** the same, with **Open 3 Together**. They open as one workgroup, in place of the library as a terminal does. On iPhone only the terminal on screen connects, and each of the others connects when you switch to it.
+
+They open in the order **Active** lists them, each on its own session, joining whoever is already there. A session that says **Open here** stays where it is and isn't counted. A machine that allows legacy SSH algorithms is left out, because it asks before each connection: open its sessions one at a time. Nothing is saved as a workgroup.
+
 ## Names travel with the session
 
 When you rename a tab that runs in tmux, its session keeps the name. **Active** on each of your devices lists the session by that name, and a tab that opens the session later takes the name too. **Use Automatic Name** removes it from the session as well.
@@ -58,6 +68,8 @@ When you rename a tab that runs in tmux, its session keeps the name. **Active** 
 ## End a session
 
 In **Active**, swipe left on a running session and choose **End**, or right-click it and choose **End Session…**. Everything running in it stops, on every device.
+
+To end several, choose them as you would to open them together (above), then right-click one and choose **End 3 Sessions…** on a Mac, or choose **End 3 Sessions…** at the bottom on iPhone, iPad and Vision Pro. It asks once for all of them. A session that couldn't be ended is named afterwards, with why.
 
 ## Local terminals on a Mac
 
