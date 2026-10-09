@@ -501,7 +501,11 @@ struct MacLocalTmuxTests {
                     "a window with nothing saved is skipped")
             defaults.set([id.uuidString], forKey: MacLocalTmux.reopenKey)
             defaults.set(true, forKey: "NSQuitAlwaysKeepsWindows")
-            #expect(MacLocalTmux.takeWindowsToReopen(defaults: defaults, open: []).isEmpty, "macOS restores windows itself")
+            #expect(MacLocalTmux.takeWindowsToReopen(defaults: defaults, open: [id]).isEmpty,
+                    "macOS restored it: not opened a second time")
+            defaults.set([id.uuidString], forKey: MacLocalTmux.reopenKey)
+            #expect(MacLocalTmux.takeWindowsToReopen(defaults: defaults, open: []) == [id],
+                    "restoration on, but macOS brought nothing back: it opens all the same (2026-10-09)")
         }
     }
 

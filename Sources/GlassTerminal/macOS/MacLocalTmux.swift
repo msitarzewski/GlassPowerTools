@@ -280,15 +280,16 @@ enum MacLocalTmux {
         if ids.isEmpty { defaults.removeObject(forKey: reopenKey) } else { defaults.set(ids, forKey: reopenKey) }
     }
 
-    /// The windows to open again, once. None when macOS restores windows itself
-    /// (`NSQuitAlwaysKeepsWindows`), none already open, and none whose tabs are no longer saved.
-    /// "Already open" includes a window whose controller is made but whose window is not yet
-    /// found, so a window macOS is restoring is never opened a second time with the same id.
+    /// The windows to open again, once: none already open, and none whose tabs are no longer
+    /// saved. "Already open" includes a window whose controller is made but whose window is not
+    /// yet found, so a window macOS is restoring is never opened a second time with the same id.
+    /// With macOS's restoration on, this is what it did not bring back: it used to give up every
+    /// window to macOS, and when macOS restored nothing — the copy that quit had not had
+    /// restoration on — no window came back at all (2026-10-09).
     @MainActor static func takeWindowsToReopen(defaults: UserDefaults = .standard,
                                                open openWindowIDs: Set<UUID>? = nil) -> [UUID] {
         guard let ids = defaults.stringArray(forKey: reopenKey) else { return [] }
         defaults.removeObject(forKey: reopenKey)
-        guard !defaults.bool(forKey: "NSQuitAlwaysKeepsWindows") else { return [] }
         let open = openWindowIDs ?? MacWorkspacePreviewRegistry.shared.openWindowIDs
         return ids.compactMap(UUID.init(uuidString:)).filter {
             !open.contains($0) && MacWorkspaceWindowController.hasSavedState(windowID: $0, defaults: defaults)
