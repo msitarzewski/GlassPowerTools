@@ -609,3 +609,17 @@ Mac 0.4.316 (14/14 sessions attached), iPhone and Vision Pro 0.4.313.
 
 The owner, from the Vision Pro: "I'm in vision pro, just like I'd envisioned when all of this started." No headset crash
 since 0.4.313.
+
+## Status when the owner closed the laptop (2026-10-09, ~11:30)
+
+- Landed since the backlog note: d68056e (a screenshot thumbnail drop trapped: the file-promise block was main-actor code
+  called on AppKit's queue; now nonisolated and Sendable, test proven to SIGTRAP without it), 29f016d W13 (multi-select in
+  Active, open together), and the W12 commit (window places in records; reopen list taken once per launch by any window,
+  kept current while running; `isRestorable = true` in `MacTerminalWindowPolicy` had undone the scene's opt-out — the real
+  cause of the empty restored windows). Suites: terminal 610, shell 231.
+- Installed: Vision Pro and iPhone **0.4.318** (W13); Mac **0.4.317** (the W12 build not yet installed: the owner was
+  about to close the laptop). Next Mac install should be the first with W12; check the `Reopen:` log lines after it.
+- Running: W11 (repo and branch; also names across devices via `@glass-name` on iOS/visionOS), W14 (drops into terminals
+  off the Mac, SSH uploads, Insert Path).
+- Note: crash reports for the app stopped being saved on this Mac after ~25 in a day (simulator crashes count); use the
+  log (`launchd` "exited due to SIGTRAP") when no report appears.
