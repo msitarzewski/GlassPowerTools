@@ -134,6 +134,9 @@ struct VisionTerminalWorkgroupView: View {
     @State private var openingServerID: UUID?
     @State private var connectionFailureMessage: String?
     @State private var didCloseWorkgroup = false
+    /// The terminal being renamed, and the name typed (W11): as a Mac tab's Rename Tab….
+    @State private var renamingSession: TerminalSession?
+    @State private var renameText = ""
     #if os(visionOS)
     @State var spatialPresentation = VisionTerminalPresentationState()
     @FocusState private var overviewFocused: Bool
@@ -169,6 +172,13 @@ struct VisionTerminalWorkgroupView: View {
         } message: {
             Text(connectionFailureMessage ?? "The saved host could not be opened.")
         }
+        .alert("Rename Tab", isPresented: renamingBinding) {
+            TextField("Tab Name", text: $renameText)
+            Button("Rename") { renamingSession?.rename(to: renameText) }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Leave it blank to use the automatic name. In tmux, every device shows the name.")
+        }
         .onAppear {
             sessionManager.serverManager.loadServersIfNeeded()
             synchronizeSelection()
@@ -194,6 +204,36 @@ struct VisionTerminalWorkgroupView: View {
 
     private var liveSelectedSessionID: UUID? {
         sessionManager.workgroup(for: workgroupID)?.selectedSessionID
+    }
+
+    // MARK: Names (W11, 2026-10-09)
+    //
+    // Every label here — the tab ornament, the tab bar, the grid and carousel cards, the iPhone's
+    // switcher — is `TerminalWorkgroupOpening.label`, so a name kept on a session shows on all of
+    // them: the headset's ornament, grid and carousel each read the server's name for itself.
+
+    /// Under the name: in a repository its name and branch, then the machine.
+    private func machineLine(of session: TerminalSession) -> String {
+        let machine = "\(session.server.username)@\(session.server.host)"
+        return session.repositoryLine.map { "\($0) · \(machine)" } ?? machine
+    }
+
+    private var renamingBinding: Binding<Bool> {
+        Binding(get: { renamingSession != nil }, set: { if !$0 { renamingSession = nil } })
+    }
+
+    private func beginRename(_ session: TerminalSession) {
+        renameText = session.givenName ?? ""
+        renamingSession = session
+    }
+
+    /// The Mac's tab menu, for one terminal: Rename Tab…, and Use Automatic Name once named.
+    @ViewBuilder
+    private func renameActions(for session: TerminalSession) -> some View {
+        Button("Rename Tab…", systemImage: "pencil") { beginRename(session) }
+        if session.givenName != nil {
+            Button("Use Automatic Name", systemImage: "arrow.uturn.backward") { session.rename(to: nil) }
+        }
     }
 
     private var connectionFailureBinding: Binding<Bool> {
@@ -341,10 +381,11 @@ struct VisionTerminalWorkgroupView: View {
             TabView(selection: $selectedSessionID) {
                 ForEach(sessions) { session in
                     Tab(value: Optional(session.id)) { Color.clear } label: {
-                        Label(session.server.name, systemImage: "terminal")
+                        Label(TerminalWorkgroupOpening.label(session, on: .tabOrnament), systemImage: "terminal")
                             .foregroundStyle(VisionTerminalStatus.color(for: session.state))
                             .accessibilityValue(session.state.displayName)
                     }
+                    .contextMenu { renameActions(for: session) }
                 }
             }
             .toolbarVisibility(presentation == .tabs && sessions.count > 1 ? .visible : .hidden, for: .tabBar)
@@ -415,7 +456,7 @@ struct VisionTerminalWorkgroupView: View {
                     ScrollView {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 24)], spacing: 24) {
                             ForEach(sessions) { session in
-                                overviewCard(session)
+                                overviewCard(session, on: .grid)
                             }
                         }
                         .padding(28)
@@ -427,7 +468,7 @@ struct VisionTerminalWorkgroupView: View {
                     ZStack {
                         ForEach(Array(sessions.enumerated()).filter { abs($0.offset - selectedIndex) <= 1 }, id: \.element.id) { index, session in
                             let distance = index - selectedIndex
-                            overviewCard(session)
+                            overviewCard(session, on: .carousel)
                                 .frame(width: width)
                                 .scaleEffect(distance == 0 ? 1 : 0.82)
                                 .rotation3DEffect(.degrees(Double(distance) * -18), axis: (x: 0, y: 1, z: 0))
@@ -455,7 +496,7 @@ struct VisionTerminalWorkgroupView: View {
         .accessibilityIdentifier("vision-terminal-overview")
     }
 
-    private func overviewCard(_ session: TerminalSession) -> some View {
+    private func overviewCard(_ session: TerminalSession, on surface: TerminalWorkgroupOpening.LabelSurface) -> some View {
         Button {
             selectedSessionID = session.id
             presentation = .tabs
@@ -463,7 +504,7 @@ struct VisionTerminalWorkgroupView: View {
             VStack(alignment: .leading, spacing: 10) {
                 VisionTerminalPreview(session: session)
                     .aspectRatio(1.6, contentMode: .fit)
-                Text(session.server.name)
+                Text(TerminalWorkgroupOpening.label(session, on: surface))
                     .font(.headline)
                     .foregroundStyle(VisionTerminalStatus.color(for: session.state))
                     .opacity(selectedSessionID == session.id ? 1 : 0.65)
@@ -482,7 +523,8 @@ struct VisionTerminalWorkgroupView: View {
         // The system highlight fills it with an oversized gaze capsule.
         .hoverEffectDisabled()
         .focusEffectDisabled()
-        .accessibilityLabel("Open \(session.server.name) terminal")
+        .contextMenu { renameActions(for: session) }
+        .accessibilityLabel("Open \(TerminalWorkgroupOpening.label(session, on: surface)) terminal")
         .accessibilityValue(session.state.displayName)
     }
 
@@ -555,16 +597,19 @@ struct VisionTerminalWorkgroupView: View {
         } label: {
             Label {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(session.server.name)
-                    Text("\(session.server.username)@\(session.server.host)")
+                    Text(TerminalWorkgroupOpening.label(session, on: .tabBar))
+                        .lineLimit(1)
+                    Text(machineLine(of: session))
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
             } icon: {
                 Image(systemName: "circle.fill")
                     .foregroundStyle(workgroup.colorTag.color)
             }
         }
+        .contextMenu { renameActions(for: session) }
     }
 
     #if os(iOS)
@@ -620,6 +665,11 @@ struct VisionTerminalWorkgroupView: View {
                         .accessibilityValue(session.state == .connected ? "Connected" : "Not connected")
                         .tag(Optional(session.id))
                 }
+            }
+            // The terminal on screen, as a Mac tab's menu names it (W11).
+            if let shown = sessions.first(where: { $0.id == selectedSessionID }) ?? sessions.first {
+                Divider()
+                renameActions(for: shown)
             }
         } label: {
             HStack(spacing: 5) {

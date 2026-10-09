@@ -522,10 +522,11 @@ struct TerminalTmuxTests {
     func richListing() throws {
         let server = TerminalTmux.Server(pid: 4242, startTime: 1_789_990_000, socketPath: "/private/tmp/tmux-501/default")
         func line(_ fields: [String]) -> String { fields.joined(separator: "\t") }
+        // The repository and branch fields (W11) are empty here; `TerminalRepositoryTests` reads them.
         let titled = line(["glass-3", "1", "2", "1790000000", "4242", "1789990000", server.socketPath, "claude",
-                           "alpha.example.com", "alpha", "shop", "/Users/ann/src/shop", "✳ Claude\tCode: fix: the build"])
+                           "alpha.example.com", "alpha", "shop", "/Users/ann/src/shop", "", "", "✳ Claude\tCode: fix: the build"])
         let atHome = line(["glass-4", "0", "1", "1790000200", "4242", "1789990000", server.socketPath, "zsh",
-                           "alpha.example.com", "alpha", "", "/Users/ann", "alpha.example.com"])
+                           "alpha.example.com", "alpha", "", "/Users/ann", "", "", "alpha.example.com"])
         let older = "work\t0\t1\t1790000100"
         let output = [titled, older, atHome, "__glass_home__\t/Users/ann"].joined(separator: "\n") + "\n"
         guard case .sessions(let sessions) = TerminalTmux.parse(output) else {
@@ -533,7 +534,7 @@ struct TerminalTmuxTests {
             return
         }
         try #require(sessions.map(\.name) == ["glass-3", "work", "glass-4"])
-        #expect(sessions[0].title == "✳ Claude\tCode: fix: the build", "everything after the twelfth tab is the title")
+        #expect(sessions[0].title == "✳ Claude\tCode: fix: the build", "everything after the fourteenth tab is the title")
         #expect(sessions[0].directory == "/Users/ann/src/shop" && sessions[0].command == "claude")
         #expect(sessions[0].givenName == "shop" && sessions[0].displayName == "shop")
         #expect(sessions[0].server == server && sessions[0].home == "/Users/ann")

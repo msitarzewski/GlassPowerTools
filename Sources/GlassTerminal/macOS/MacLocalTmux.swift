@@ -38,6 +38,11 @@ enum MacLocalTmux {
         var setGivenName: @Sendable (_ session: String, _ name: String?, _ tmux: String) -> Void = { _, _, _ in }
         /// What a session's active pane shows (`MacLocalTmux.context`); nil when it could not be read.
         var context: @Sendable (_ session: String, _ tmux: String) -> MacWorkspacePaneContext? = { _, _ in nil }
+        /// Keeps on a session the repository and branch its tab found, or takes them away (W11).
+        var setRepository: @Sendable (_ session: String, _ repository: TerminalRepository?, _ tmux: String) -> Void = { _, _, _ in }
+        /// The repository a session's folder is in, read from the files (W11). Stand-ins that
+        /// leave it out read none, so a listing's folders on the test machine change nothing.
+        var readRepository: @Sendable (_ folder: String, _ home: String?) -> TerminalRepository? = { _, _ in nil }
 
         nonisolated static let live = Server(
             executablePath: { MacLocalTmux.executablePath() },
@@ -61,7 +66,15 @@ enum MacLocalTmux {
                     MacLocalTmux.logger.notice("tmux would not keep the name given to session \(session, privacy: .public)")
                 }
             },
-            context: { MacLocalTmux.context(session: $0, tmux: $1) }
+            context: { MacLocalTmux.context(session: $0, tmux: $1) },
+            setRepository: { session, repository, tmux in
+                guard let arguments = TerminalTmux.repositoryArguments(session: session, repository: repository) else { return }
+                // Argv, never a shell: a folder's name can be anything.
+                if MacLocalTmux.run(tmux, arguments) == nil {
+                    MacLocalTmux.logger.notice("tmux would not keep the repository of session \(session, privacy: .public)")
+                }
+            },
+            readRepository: { TerminalRepository.read(folder: $0, home: $1) }
         )
     }
 
@@ -199,19 +212,15 @@ enum MacLocalTmux {
             environment: environment).flatMap(parseContext)
     }
 
-    /// The title last, so that it may hold anything.
-    nonisolated static let contextFormat = "#{pane_current_path}\t#{host}\t#{host_short}\t#{\(TerminalTmux.givenNameOption)}\t#{pane_title}"
+    /// The title last, so that it may hold anything. The same a terminal on any device asks a
+    /// host with (`TerminalTmux.paneStateCommand`, W11).
+    nonisolated static let contextFormat = TerminalTmux.contextFormat
 
     /// tmux titles a pane with the host name until a program sets one; that is not a title.
     nonisolated static func parseContext(_ output: String) -> MacWorkspacePaneContext? {
-        let fields = output.trimmingCharacters(in: .newlines)
-            .split(separator: "\t", maxSplits: 4, omittingEmptySubsequences: false).map(String.init)
-        guard fields.count == 5 else { return nil }
-        return MacWorkspacePaneContext(
-            title: TerminalSessionNaming.programTitle(fields[4], hostNames: [fields[1], fields[2]]),
-            directory: fields[0].hasPrefix("/") ? fields[0] : nil,
-            givenName: TerminalSessionNaming.displayText(fields[3])
-        )
+        TerminalTmux.parseContext(output).map {
+            MacWorkspacePaneContext(title: $0.title, directory: $0.directory, givenName: $0.givenName)
+        }
     }
 
     /// Gives a session the name its tab was given, or takes it away (W6). Off the main thread,
@@ -223,6 +232,28 @@ enum MacLocalTmux {
     }
 
     nonisolated static let nameQueue = DispatchQueue(label: "GlassPowerTools.local-tmux-name", qos: .utility)
+
+    /// Keeps on a session the repository and branch its tab found (W11), so Active on another
+    /// device says them. On the name's queue, so changes arrive in the order they were made.
+    @MainActor static func shareRepository(_ repository: TerminalRepository?, session: String) {
+        let server = server
+        guard let tmux = server.executablePath() else { return }
+        nameQueue.async { server.setRepository(session, repository, tmux) }
+    }
+
+    /// The sessions with the repository each one's folder is in, read from the files: on this Mac
+    /// the folder is the truth, where a session's options say only what a tab last saw (W11).
+    /// A session whose folder is not known keeps what its options say. Off the main actor.
+    nonisolated static func readingRepositories(_ sessions: [TerminalTmux.Session], home: String?,
+                                                read: @Sendable (_ folder: String, _ home: String?) -> TerminalRepository?)
+        -> [TerminalTmux.Session] {
+        sessions.map { listed in
+            guard let directory = listed.directory else { return listed }
+            var session = listed
+            session.repository = read(directory, home)
+            return session
+        }
+    }
 
     /// A pane is done with its name: the session ended, or it runs on without a tab.
     @MainActor static func release(_ name: String) {

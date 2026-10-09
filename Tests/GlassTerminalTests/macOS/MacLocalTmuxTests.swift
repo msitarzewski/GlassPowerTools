@@ -26,6 +26,16 @@ struct MacLocalTmuxTests {
         private var _listing: String?
         private var _givenNames: [(session: String, name: String?)] = []
         private var _contexts: [String: MacWorkspacePaneContext] = [:]
+        private var _repositories: [(session: String, repository: TerminalRepository?)] = []
+        private var _readsRepositories = false
+        /// What each session was told about its repository (W11).
+        var repositories: [(session: String, repository: TerminalRepository?)] { lock.withLock { _repositories } }
+        /// Reads a listed folder's repository from the disk, as this Mac does; off, a listing's
+        /// folders on the test machine change nothing.
+        var readsRepositories: Bool {
+            get { lock.withLock { _readsRepositories } }
+            set { lock.withLock { _readsRepositories = newValue } }
+        }
         /// What the list answers in place of the running names, in the full format (W6).
         var listing: String? {
             get { lock.withLock { _listing } }
@@ -81,7 +91,11 @@ struct MacLocalTmuxTests {
                     }
                 },
                 setGivenName: { session, name, _ in self.lock.withLock { self._givenNames.append((session, name)) } },
-                context: { session, _ in self.contexts[session] }
+                context: { session, _ in self.contexts[session] },
+                setRepository: { session, repository, _ in self.lock.withLock { self._repositories.append((session, repository)) } },
+                readRepository: { folder, home in
+                    self.readsRepositories ? TerminalRepository.read(folder: folder, home: home) : nil
+                }
             )
         }
     }
@@ -596,9 +610,10 @@ struct MacLocalTmuxTests {
     /// One session's line in the listing's full format (`TerminalTmux.listFormat`), with no
     /// activity time, so a row's second line reads the same whenever the test runs.
     private static func line(_ name: String, attached: Int = 0, server: TerminalTmux.Server, directory: String,
-                                         title: String = "alpha.example.com", given: String = "", command: String = "zsh") -> String {
+                                         title: String = "alpha.example.com", given: String = "", command: String = "zsh",
+                                         repository: String = "", branch: String = "") -> String {
         [name, String(attached), "1", "", String(server.pid), String(server.startTime), server.socketPath, command,
-         "alpha.example.com", "alpha", given, directory, title].joined(separator: "\t")
+         "alpha.example.com", "alpha", given, directory, repository, branch, title].joined(separator: "\t")
     }
 
     /// Waits up to two seconds for `condition`.
@@ -800,6 +815,91 @@ struct MacLocalTmuxTests {
             let unnamed = try #require(TerminalTmux.givenNameCommand(session: "glass-5", name: nil))
             #expect(await eventually { commands.all.contains(named) && commands.all.contains(unnamed) })
             tab.closeAllSessions(sessionManager: manager)
+        }
+    }
+
+    // MARK: W11 — the repository and branch a session is in (2026-10-09)
+
+    /// A repository as far as the reader looks — a `.git` folder and its HEAD — in a folder of
+    /// the test's own, outside any home and any repository. Returns that folder, to remove.
+    private static func scratchRepository(branch: String = "main") throws -> (root: String, app: String) {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("gpt-repo-\(UUID().uuidString.prefix(8))").path
+        let app = root + "/app"
+        try FileManager.default.createDirectory(atPath: app + "/.git", withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: app + "/Sources", withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: root + "/notes", withIntermediateDirectories: true)
+        try Data("ref: refs/heads/\(branch)\n".utf8).write(to: URL(fileURLWithPath: app + "/.git/HEAD"))
+        return (root, app)
+    }
+
+    @Test("W11: a local tab in tmux keeps the repository and branch it is in on its session — a change only — and leaving it takes them away")
+    func repositoryKeptOnTheSession() async throws {
+        let (root, app) = try Self.scratchRepository()
+        defer { try? FileManager.default.removeItem(atPath: root) }
+        try await withFake { fake, defaults in
+            defaults.set(true, forKey: UserDefaultsKeys.localTmux)
+            let tab = localTab(defaults)
+            let pane = try #require(tab.focusedPaneID)
+            let session = try #require(tab.localTmuxSession(for: pane))
+            _ = try #require(tab.localRuntime(for: pane))
+            tab.paneContextInterval = .zero
+            tab.localRepositoryInterval = .zero
+            tab.repositoryCache = TerminalRepositoryCache()
+            fake.contexts = [session: MacWorkspacePaneContext(title: nil, directory: app + "/Sources")]
+            tab.refreshLocalTmuxContext()
+            #expect(await eventually {
+                tab.windowIdentity(servers: [], localUsername: "ann", home: "/Users/ann")
+                    == MacWorkspaceWindowIdentity(title: "app", subtitle: "app · main · Sources · in tmux")
+            })
+            let kept = TerminalRepository(name: "app", branch: "main")
+            #expect(await eventually { fake.repositories.map(\.repository) == [kept] })
+            #expect(fake.repositories.map(\.session) == [session])
+
+            tab.refreshRepositories()
+            #expect(await eventually { tab.repositoryByPaneID[pane] == TerminalRepository(name: "app", branch: "main", root: app) })
+            fake.contexts = [session: MacWorkspacePaneContext(title: nil, directory: root + "/notes")]
+            tab.refreshLocalTmuxContext()
+            #expect(await eventually { fake.repositories.map(\.repository) == [kept, nil] },
+                    "told once while unchanged, then told it is in none")
+            tab.closeAllSessions(sessionManager: SessionManager(loadImmediately: false))
+        }
+    }
+
+    @Test("W11: Active says each of this Mac's sessions' repository and branch, read from its folder; a host's, from what its tab kept there")
+    func activeSaysTheRepository() async throws {
+        let (root, app) = try Self.scratchRepository()
+        defer { try? FileManager.default.removeItem(atPath: root) }
+        try await withFake { fake, _ in
+            fake.readsRepositories = true
+            let thisMac = TerminalTmux.Server(pid: 4242, startTime: 1_790_000_000, socketPath: "/private/tmp/tmux-501/default")
+            fake.listing = [
+                // What a tab kept on it before a checkout: this Mac reads the folder instead.
+                Self.line("glass-1", server: thisMac, directory: app + "/Sources", repository: "app", branch: "old"),
+                Self.line("glass-2", server: thisMac, directory: root + "/notes"),
+            ].joined(separator: "\n") + "\n"
+
+            let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+            let capability = GlassTerminalCapability(runtime: runtime)
+            var bravo = ServerConfiguration(name: "bravo", host: "bravo.example.com", username: "ann")
+            bravo.tmux = true
+            runtime.sessionManager.serverManager.servers = [bravo]
+            var bravoCopy = bravo
+            bravoCopy.tmux = false
+            let toBravo = TerminalSession(server: bravoCopy, terminalWriteSink: { _ in })
+            let other = TerminalTmux.Server(pid: 4242, startTime: 1_780_000_000, socketPath: "/private/tmp/tmux-501/default")
+            let bravoListing = Self.line("glass-1", attached: 1, server: other, directory: "/home/ann/src/shop",
+                                         repository: "shop", branch: "fix/login") + "\n__glass_home__\t/home/ann\n"
+            toBravo.tmuxCommandRunner = { _ in bravoListing }
+            runtime.sessionManager.registerSession(toBravo)
+            toBravo.state = .connected
+
+            let rows = await capability.runningReport().sessions
+            let local = rows.filter { $0.endpointID == GlassTerminalCapability.localShellEndpointID }
+            #expect(local.map(\.title) == ["app", "notes"])
+            #expect(local.map(\.subtitle) == ["app · main · Sources · Detached", root + "/notes · Detached"])
+            let onBravo = rows.filter { $0.endpointID == EndpointID(rawValue: bravo.id) }
+            #expect(onBravo.map(\.title) == ["shop"] && onBravo.map(\.subtitle) == ["shop · fix/login · Open elsewhere"])
+            runtime.sessionManager.closeSession(toBravo)
         }
     }
 }

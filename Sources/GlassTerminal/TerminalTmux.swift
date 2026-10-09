@@ -45,12 +45,16 @@ enum TerminalTmux {
         var command: String? = nil
         /// The home folder of the account that listed it, so a folder is named as a tab names it.
         var home: String? = nil
+        /// The repository and branch its active pane is in (W11): kept on the session by the tab
+        /// that last showed it (`@glass-repo`, `@glass-branch`), or on this Mac read from the folder.
+        var repository: TerminalRepository? = nil
         var id: String { name }
         var isGlass: Bool { TerminalTmux.glassNumber(name) != nil }
 
         /// What Active and a tab showing it call it (`TerminalSessionNaming`).
         var displayName: String {
-            TerminalSessionNaming.name(given: givenName, title: title, directory: directory, home: home, session: name)
+            TerminalSessionNaming.name(given: givenName, title: title, directory: directory, home: home, session: name,
+                                       repository: repository)
         }
     }
 
@@ -83,15 +87,21 @@ enum TerminalTmux {
     /// by every device's Active and by a tab attaching to it.
     nonisolated static let givenNameOption = "@glass-name"
 
+    /// The user options the repository and branch a tab found are kept in (W11), so every
+    /// device's Active says them for the session.
+    nonisolated static let repositoryOption = "@glass-repo"
+    nonisolated static let branchOption = "@glass-branch"
+
     /// What `list-sessions` prints for each session, read by `parse`: name, attached clients,
     /// windows, last activity; then (W6) the server's pid, start time and socket, the active pane's
     /// program, the host's names (tmux's default pane title), the session's given name, the
-    /// pane's folder, and last its title. Pane variables in a session's line are its active pane's.
-    /// The title is last so that it may hold anything: `parse` splits a bounded number of times.
+    /// pane's folder; (W11) its repository and branch; and last its title. Pane variables in a
+    /// session's line are its active pane's. The title is last so that it may hold anything:
+    /// `parse` splits a bounded number of times.
     nonisolated static let listFormat = "#{session_name}\t#{session_attached}\t#{session_windows}\t#{session_activity}"
         + "\t#{pid}\t#{start_time}\t#{socket_path}\t#{pane_current_command}\t#{host}\t#{host_short}"
-        + "\t#{\(givenNameOption)}\t#{pane_current_path}\t#{pane_title}"
-    private nonisolated static let listFieldCount = 13
+        + "\t#{\(givenNameOption)}\t#{pane_current_path}\t#{\(repositoryOption)}\t#{\(branchOption)}\t#{pane_title}"
+    private nonisolated static let listFieldCount = 15
 
     /// A session name Glass will pass to tmux: tmux rejects `:` and `.` in names, a leading `-`
     /// would read as an option, and control characters have no business in a tab's record.
@@ -103,7 +113,7 @@ enum TerminalTmux {
     /// An exec channel's `sh -c` has the system PATH only, and a Mac's tmux is usually Homebrew's
     /// (D47: a Vision Pro reaching a Mac's local tmux sessions over SSH). Appended, so a tmux
     /// already on the PATH still wins.
-    private nonisolated static let searchPath = #"PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; "#
+    nonisolated static let searchPath = #"PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; "#
 
     /// Lists the host's sessions, or says tmux is missing. Exits 0 either way: "no server running"
     /// is an empty list, not a failure.
@@ -163,7 +173,10 @@ enum TerminalTmux {
         session.command = fields[7].isEmpty ? nil : fields[7]
         session.givenName = TerminalSessionNaming.displayText(fields[10])
         session.directory = fields[11].hasPrefix("/") ? fields[11] : nil
-        session.title = TerminalSessionNaming.programTitle(fields[12], hostNames: [fields[8], fields[9]])
+        session.repository = TerminalSessionNaming.displayText(fields[12]).map {
+            TerminalRepository(name: $0, branch: TerminalSessionNaming.displayText(fields[13]))
+        }
+        session.title = TerminalSessionNaming.programTitle(fields[14], hostNames: [fields[8], fields[9]])
         session.home = home
         return session
     }
@@ -190,6 +203,90 @@ enum TerminalTmux {
         givenNameArguments(session: session, name: name).map { arguments in
             "sh -c \(quoted(searchPath + "tmux " + arguments.map(quoted).joined(separator: " ")))"
         }
+    }
+
+    // MARK: A session's repository and branch (W11, 2026-10-09)
+
+    /// tmux's argv for keeping on a session the repository and branch its tab found, or with nil
+    /// taking them away: every device's Active then says them. One tmux run, two commands. Nil
+    /// for a session name tmux could misread. A trailing `;` is escaped, as in a given name.
+    nonisolated static func repositoryArguments(session: String, repository: TerminalRepository?) -> [String]? {
+        guard isValidSessionName(session) else { return nil }
+        let target = "=" + session + ":"
+        func setting(_ option: String, _ value: String?) -> [String] {
+            guard var value = value.flatMap({ TerminalSessionNaming.displayText($0) }) else {
+                return ["set-option", "-u", "-t", target, option]
+            }
+            if value.hasSuffix(";") { value.insert("\\", at: value.index(before: value.endIndex)) }
+            return ["set-option", "-t", target, option, value]
+        }
+        return ["-u"] + setting(repositoryOption, repository?.name) + [";"] + setting(branchOption, repository?.branch)
+    }
+
+    /// The same, for a host: through `sh -c`, every word quoted, as every exec-channel command is.
+    nonisolated static func repositoryCommand(session: String, repository: TerminalRepository?) -> String? {
+        repositoryArguments(session: session, repository: repository).map { arguments in
+            "sh -c \(quoted(searchPath + "tmux " + arguments.map(quoted).joined(separator: " ")))"
+        }
+    }
+
+    // MARK: What a session says about itself (W11, 2026-10-09)
+
+    /// What `display-message` prints for a session's active pane: its folder, the host's names
+    /// (tmux's default pane title), the name a tab gave the session (W6), and last its title, so
+    /// that the title may hold anything. This Mac's tabs ask with it (`MacLocalTmux.context`), and
+    /// so do terminals on every other device (`paneStateCommand`).
+    nonisolated static let contextFormat = "#{pane_current_path}\t#{host}\t#{host_short}\t#{\(givenNameOption)}\t#{pane_title}"
+
+    /// What a session's active pane shows, and what the session is called.
+    nonisolated struct PaneState: Equatable, Sendable {
+        /// The name a tab gave the session, held to what a tab can show.
+        var givenName: String?
+        /// The title a program set; never tmux's default, the host name.
+        var title: String?
+        var directory: String?
+        /// The home folder of the account asked, so a folder is named as a tab names it.
+        var home: String?
+        var repository: TerminalRepository?
+    }
+
+    /// Reads one `contextFormat` line.
+    nonisolated static func parseContext(_ output: String) -> PaneState? {
+        let fields = output.trimmingCharacters(in: .newlines)
+            .split(separator: "\t", maxSplits: 4, omittingEmptySubsequences: false).map(String.init)
+        guard fields.count == 5 else { return nil }
+        return PaneState(givenName: TerminalSessionNaming.displayText(fields[3]),
+                         title: TerminalSessionNaming.programTitle(fields[4], hostNames: [fields[1], fields[2]]),
+                         directory: fields[0].hasPrefix("/") ? fields[0] : nil)
+    }
+
+    /// Starts the line a pane-state read prints: the home folder, then the `contextFormat` fields.
+    nonisolated static let paneMarker = "__glass_pane__"
+
+    /// One read of what a host's session says about itself (W11), for a terminal on a device
+    /// without the Mac's tabs: the name a tab gave it, its active pane's title and folder, the
+    /// home folder, then the repository and branch that folder is in. One command, so one round
+    /// trip; the session's name is the script's `$1`, never part of its text. A session that is
+    /// not running answers nothing: `display-message` would print its format with every field
+    /// empty, and exit 0 (tmux 3.7c).
+    nonisolated static func paneStateCommand(session: String) -> String? {
+        guard isValidSessionName(session) else { return nil }
+        let script = "s=$1; tmux -u has-session -t \"=$s\" 2>/dev/null || exit 0; "
+            + "c=$(tmux -u display-message -p -t \"=$s:\" \(quoted(contextFormat)) 2>/dev/null) || exit 0; "
+            + "printf '\(paneMarker)\\t%s\\t%s\\n' \"$HOME\" \"$c\"; "
+            + "set -- \"$(tmux -u display-message -p -t \"=$s:\" '#{pane_current_path}' 2>/dev/null)\"; "
+            + TerminalRepository.remoteScript
+        return "sh -c \(quoted(searchPath + script)) _ \(quoted(session))"
+    }
+
+    /// Reads a pane-state answer; nil when tmux said nothing about the session.
+    nonisolated static func parsePaneState(_ output: String) -> PaneState? {
+        guard let line = output.split(separator: "\n").last(where: { $0.hasPrefix(paneMarker + "\t") }) else { return nil }
+        let fields = line.dropFirst(paneMarker.count + 1).split(separator: "\t", maxSplits: 1, omittingEmptySubsequences: false)
+        guard fields.count == 2, var state = parseContext(String(fields[1])) else { return nil }
+        state.home = fields[0].hasPrefix("/") ? String(fields[0]) : nil
+        state.repository = TerminalRepository.parseRemote(output).repository
+        return state
     }
 
     /// Asks a host for the name a session was given: the line it prints, empty when none.

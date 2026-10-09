@@ -8,9 +8,11 @@
 //  and the tabs asked tmux what the session shows. Now Active asks the same, and both name it by
 //  this rule.
 //
-//  In order: a name someone gave it, the title its program set, a folder other than home, and
-//  last the session's own name ("Terminal N" for Glass's `glass-N`). The Mac's tabs put a few of
-//  their own between these — a workgroup's name, the shell — but never reorder them.
+//  In order: a name someone gave it, the title its program set, the repository it is in (W11), a
+//  folder other than home, and last the session's own name ("Terminal N" for Glass's `glass-N`).
+//  The Mac's tabs put a few of their own between these — a workgroup's name, the shell — but
+//  never reorder them. The line under the name says where it is: `repo · branch` in a
+//  repository (W11), else the folder.
 //
 
 import Foundation
@@ -20,21 +22,51 @@ enum TerminalSessionNaming {
     nonisolated static let maximumLength = 80
 
     /// What a tmux session is called in Active: as a tab showing it would be.
-    nonisolated static func name(given: String?, title: String?, directory: String?, home: String?, session: String) -> String {
+    nonisolated static func name(given: String?, title: String?, directory: String?, home: String?, session: String,
+                                 repository: TerminalRepository? = nil) -> String {
         given.flatMap { displayText($0) }
-            ?? automaticName(title: title, directory: directory, home: home)
+            ?? automaticName(title: title, directory: directory, home: home, repository: repository)
             ?? tmuxDisplayName(session)
     }
 
     /// The name a terminal gives itself, or nil when it has said nothing that names it: the title
-    /// its program set, else the folder it is in. The home folder and `/` do not: a tab called "~"
-    /// read as a tab with no name (2026-10-08), so the caller goes on to its next choice.
-    nonisolated static func automaticName(title: String?, directory: String?, home: String?) -> String? {
+    /// its program set, else the repository it is in, else the folder it is in. The home folder
+    /// and `/` do not: a tab called "~" read as a tab with no name (2026-10-08), so the caller
+    /// goes on to its next choice.
+    nonisolated static func automaticName(title: String?, directory: String?, home: String?,
+                                          repository: TerminalRepository? = nil) -> String? {
         if let title = title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
             return title
         }
+        // A folder inside a repository is named by the repository: "Sources" said nothing (W11).
+        if let repository { return repository.name }
         guard let directory, directory.hasPrefix("/"), directory != "/", directory != home else { return nil }
         return (directory as NSString).lastPathComponent
+    }
+
+    /// Where a terminal is, for the line under its name. In a repository its name and branch,
+    /// then the folder inside it unless that is the top: `app · main · Sources/App` (W11). The
+    /// owner's tabs showed a folder path, which did not say which repository, or which branch.
+    /// Elsewhere the folder, as a person writes it. Nil when nothing is known.
+    nonisolated static func location(directory: String?, home: String?, repository: TerminalRepository?) -> String? {
+        guard let repository else { return directory.map { abbreviated($0, home: home) } }
+        var parts = [repository.name]
+        if let branch = repository.branch { parts.append(shortenedBranch(branch)) }
+        if let directory, let root = repository.root, directory.hasPrefix(root + "/") {
+            parts.append(String(directory.dropFirst(root.count + 1)))
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// The longest branch the line shows whole.
+    nonisolated static let maximumBranchLength = 30
+
+    /// A branch as one line shows it: a long one loses its middle, keeping the start and the end
+    /// that tell branches apart (`feature/billing…ong-name-retry`).
+    nonisolated static func shortenedBranch(_ branch: String, maximumLength: Int = maximumBranchLength) -> String {
+        guard maximumLength > 1, branch.count > maximumLength else { return branch }
+        let kept = maximumLength - 1
+        return branch.prefix((kept + 1) / 2) + "…" + branch.suffix(kept / 2)
     }
 
     /// The title a program set, or nil: tmux titles a pane with the host name until a program

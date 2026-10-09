@@ -34,6 +34,9 @@ struct MacTerminalExposeTile: Identifiable, Equatable {
     let title: String
     /// Where the tab's focused pane stands, as a person writes it.
     var folder: String?
+    /// In a repository, its name, branch and the folder inside it, as the tab's second line says
+    /// them (W11): what the caption shows in place of the folder. Typing either finds the tab.
+    var repository: String? = nil
     /// What a tmux session is doing: detached, how many windows, when it was last used.
     var detail: String?
     /// Output arrived in the last moment: the tile carries the sidebar's activity wave.
@@ -41,8 +44,11 @@ struct MacTerminalExposeTile: Identifiable, Equatable {
     /// The tmux session's own name, so "glass-3" finds "Terminal 3".
     var sessionName: String?
 
+    /// The line under the name: the repository's, else the folder.
+    var location: String? { repository ?? folder }
+
     func matches(_ query: String) -> Bool {
-        [title, folder, sessionName].compactMap { $0 }.contains { $0.localizedStandardContains(query) }
+        [title, repository, folder, sessionName].compactMap { $0 }.contains { $0.localizedStandardContains(query) }
     }
 }
 
@@ -79,6 +85,7 @@ enum MacTerminalExposeModel {
         MacTerminalExposeTile(id: .tab(tab.workspaceID),
                               title: tab.windowIdentity(servers: servers, home: home).title,
                               folder: folder(of: tab, home: home),
+                              repository: repositoryLocation(of: tab, home: home),
                               isBusy: tab.isProducingOutput)
     }
 
@@ -93,6 +100,15 @@ enum MacTerminalExposeModel {
         case .ssh:
             return reported
         }
+    }
+
+    /// In a repository, where the focused pane is as the tab's second line says it:
+    /// `app · main · Sources` (W11). Nil outside one.
+    static func repositoryLocation(of tab: MacWorkspaceController, home: String?) -> String? {
+        guard let pane = tab.focusedPane, let repository = tab.repositoryByPaneID[pane.id] else { return nil }
+        let directory = pane.intent.kind == .local
+            ? tab.paneContextByPaneID[pane.id]?.directory ?? tab.localDirectory(for: pane.id) : nil
+        return TerminalSessionNaming.location(directory: directory, home: home, repository: repository)
     }
 
     /// This Mac's running tmux sessions that no tab shows: Active's This Mac list, less any a
@@ -616,8 +632,14 @@ final class MacTerminalExpose {
             return
         }
         let output = await Task.detached(priority: .userInitiated) { server.listSessions(tmux) }.value
+        // Each with the repository its folder is in, read here, as Active lists them (W11).
+        let listed = MacLocalTmux.sessions(from: output)
+        let home = NSHomeDirectory()
+        let sessions = await Task.detached(priority: .userInitiated) {
+            MacLocalTmux.readingRepositories(listed, home: home, read: server.readRepository)
+        }.value
         unshownSessions = MacTerminalExposeModel.notInAWindow(
-            MacLocalTmux.sessions(from: output), shown: MacLocalTmuxLaunchOffer.shownSessions(registry: registry))
+            sessions, shown: MacLocalTmuxLaunchOffer.shownSessions(registry: registry))
     }
 
     /// The tab the window underneath was showing, so Return goes straight back to it.

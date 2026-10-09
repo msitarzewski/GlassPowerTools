@@ -24,11 +24,13 @@ This page covers terminal windows and tabs, Show All Terminals, the session's to
 | Every terminal window and its tabs at once | **Window ▸ Show All Terminals** | ⇧⌘\ |
 | Find in the focused pane | **Edit ▸ Find ▸ Find…**, **Find Next**, **Find Previous** | ⌘F, ⌘G, ⇧⌘G |
 
-A tab is named after what is running in it: the title a program set (Claude Code's task, the file open in vim), or the folder it is in. In your home folder it takes its Workgroup's name, or, in tmux, its session's name as **Active** shows it (**Terminal 1**), or else the shell's. Below the name: where it is, and **in tmux** when it is kept in tmux.
+A tab is named after what is running in it: the title a program set (Claude Code's task, the file open in vim), else the Git repository it is in, else the folder it is in. In your home folder it takes its Workgroup's name, or, in tmux, its session's name as **Active** shows it (**Terminal 1**), or else the shell's. Below the name: where it is, and **in tmux** when it is kept in tmux. In a Git repository, where it is reads as the repository and branch, then the folder inside the repository, for example **app · main · Sources**. A long branch name is shortened in the middle. After you switch branches in it, the tab shows the new branch within a few seconds, or within about 15 seconds over SSH. On a machine you reach over SSH, that machine's `git` is asked; without `git` there, the tab shows the folder as before. Over SSH the repository and branch come before the machine's address.
 
 To work with several tabs at once, ⌘-click them in the sidebar, or ⇧-click to select a range; the window shows the tab you clicked last. Right-click the selection for **Move 3 Tabs to New Window** (with however many you chose), which opens one window holding them in their order, still running, or **Close 3 Tabs**, which asks first under the same rules as closing one. **Move Tab to New Window**, in the **Terminal** menu and under **Tab Actions** in the toolbar, moves the selected tabs too; when they are every tab in the window, that window closes. To bring windows together, drag a tab from the sidebar onto another terminal window, anywhere on it, sidebar open or not: it moves there with its terminals still running, and a window whose last tab leaves closes. Dropped on the other window's sidebar, it lands where you drop it; dragging a tab within the sidebar reorders it. Double-click a tab, or right-click it, to rename it. Closing a tab that has an SSH session, a recording, a connection in progress or running commands asks first. A terminal kept in tmux doesn't count: closing it leaves it running, and **Active** lists it (see [Keep terminals running with tmux](terminal-tmux.md)). A Mac's local terminals kept in tmux work the same way, listed under This Mac. Closing a tab never changes a saved Workgroup.
 
 **On iPad and iPhone:** the plus button (**New Terminal Tab**) adds a terminal to the current set. iPad shows the terminals as tabs; iPhone lists them in a menu at the top.
+
+**On Vision Pro, iPad and iPhone**, a terminal is named the way the Mac names its tabs: the name you gave it, else the title its program set, else its Git repository, else its folder, else its server. For a terminal kept in tmux, these come from its tmux session, so a name you give a tab on your Mac shows on your other devices too, without reconnecting. In a repository, the repository and branch come before the machine's address. To rename a terminal, touch and hold its tab (on Vision Pro, its tab or its card in **Grid** and **Carousel**), or open the menu at the top on iPhone, and choose **Rename Tab…**. Leave the name blank, or choose **Use Automatic Name**, to go back to the automatic name. A terminal kept in tmux keeps the name on its session, so every device shows it.
 
 ## Show All Terminals
 
@@ -44,8 +46,8 @@ In it:
 
 - Click a terminal, or select it and press Return, to bring its window forward on that tab.
 - Use the arrow keys to move between terminals, across windows.
-- Type to show only the terminals whose name or folder contains what you type. Delete removes the last letter.
-- Hover over a terminal to see its name and folder.
+- Type to show only the terminals whose name, folder, repository or branch contains what you type. Delete removes the last letter.
+- Hover over a terminal to see its name and where it is: its repository and branch, or its folder.
 - Drag a terminal onto another window's group to move that tab there. Its terminals keep running, and a window whose last tab leaves closes.
 - Press Escape, or click outside the groups, to close it.
 

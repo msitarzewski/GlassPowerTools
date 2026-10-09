@@ -553,10 +553,19 @@ struct TerminalWindowView: View {
     
     // MARK: - Connection Label (top ornament)
 
+    /// The terminal by the rule the Mac's tabs and Active share, as its tab says it (W11).
+    private var terminalName: String { TerminalWorkgroupOpening.label(session, on: .connectionOrnament) }
+
+    /// The machine, after the repository and branch when it is in one (W11).
+    private var connectionLine: String {
+        let machine = "\(session.server.username)@\(session.server.host):\(session.server.port)"
+        return session.repositoryLine.map { "\($0) · \(machine)" } ?? machine
+    }
+
     private var connectionLabel: some View {
         HStack(spacing: 8) {
             #if os(visionOS)
-            Text(session.server.name)
+            Text(terminalName)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(VisionTerminalStatus.color(for: session.state))
                 .accessibilityValue(session.state.displayName)
@@ -580,14 +589,15 @@ struct TerminalWindowView: View {
                 recordingIndicator
 
                 #if !os(visionOS)
-                Text(session.server.name)
+                Text(terminalName)
                     .font(.caption)
                     .fontWeight(.semibold)
                 #endif
 
-                Text("\(session.server.username)@\(session.server.host):\(session.server.port)")
+                Text(connectionLine)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
 
             }
         }
@@ -599,7 +609,7 @@ struct TerminalWindowView: View {
         #endif
         .accessibilityLabel(session.state == .reconnecting
             ? "Reconnecting, attempt \(session.reconnectAttemptCount) of 5"
-            : "\(session.server.name), \(session.server.username) at \(session.server.host) port \(session.server.port)")
+            : "\(terminalName), \(session.repositoryLine.map { "\($0), " } ?? "")\(session.server.username) at \(session.server.host) port \(session.server.port)")
     }
 
     // MARK: - Terminal Content

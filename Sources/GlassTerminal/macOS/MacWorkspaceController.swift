@@ -62,6 +62,23 @@ final class MacWorkspaceController {
     @ObservationIgnored var paneContextInterval: Duration = .milliseconds(500)
     @ObservationIgnored private var pendingPaneContextByPaneID: [UUID: MacWorkspacePaneContext] = [:]
     @ObservationIgnored private var paneContextFlush: Task<Void, Never>?
+    /// The repository each pane's folder is in, with its branch (W11): the line under the tab's
+    /// name, and its name when no program titled it.
+    private(set) var repositoryByPaneID: [UUID: TerminalRepository] = [:]
+    /// The least time between two lookups of a pane whose folder has not changed: a checkout
+    /// changes the branch. A host is asked over the network, so less often. Tests set zero.
+    @ObservationIgnored var localRepositoryInterval: Duration = .seconds(5)
+    @ObservationIgnored var remoteRepositoryInterval: Duration = .seconds(15)
+    @ObservationIgnored var repositoryCache = TerminalRepositoryCache.shared
+    /// Where a local walk stops; tests give their own.
+    @ObservationIgnored var repositoryHome: String? = NSHomeDirectory()
+    @ObservationIgnored private var repositoryLookups: [UUID: Task<Void, Never>] = [:]
+    @ObservationIgnored private var repositoryLookedUpAt: [UUID: ContinuousClock.Instant] = [:]
+    /// Panes whose folder changed during their lookup: looked up again when it ends.
+    @ObservationIgnored private var repositoryFolderChanged: Set<UUID> = []
+    /// What each pane's tmux session was last told, so it is told only of a change.
+    @ObservationIgnored private var sharedRepositoryByPaneID: [UUID: TerminalRepository?] = [:]
+    @ObservationIgnored private var repositoryWrite: Task<Void, Never>?
     @ObservationIgnored private var pendingScrollByPaneID: [UUID: Double] = [:]
     @ObservationIgnored private var scrollFlush: Task<Void, Never>?
     /// A terminal in this tab printed something in the last moment: the sidebar's activity wave.
@@ -302,17 +319,19 @@ final class MacWorkspaceController {
             // The subtitle is where it stands: on this Mac, "user@localhost" said nothing two
             // local tabs did not share.
             let context = paneContextByPaneID[focusedPane.id]
+            let repository = repositoryByPaneID[focusedPane.id]
             // Named, else configured, else what the terminal says, else the workgroup, else the
             // tmux session as Active names it, else the shell.
             let shell = localRuntimesByPaneID[focusedPane.id]?.launchedShell.map { ($0 as NSString).lastPathComponent }
             let title = tabLabel ?? focusedPane.intent.label
-                ?? MacWorkspaceTabNaming.automaticTitle(context, home: home) ?? workgroupName
+                ?? MacWorkspaceTabNaming.automaticTitle(context, repository: repository, home: home) ?? workgroupName
                 ?? focusedPane.intent.localTmuxSession.map(MacWorkspaceTabNaming.tmuxDisplayName)
                 ?? (shell == "tmux" ? nil : shell) ?? "Local"
-            // The folder, unless the title already says exactly that: "~" over "~" said it twice
-            // and nothing else (2026-10-08). Then the machine, as before.
-            let directory = context?.directory.map { MacWorkspaceTabNaming.abbreviated($0, home: home) }
-            var subtitle = directory.flatMap { $0 == title ? nil : $0 } ?? "\(localUsername)@localhost"
+            // Where it is — `repo · branch` in a repository (W11), else the folder — unless the
+            // title already says exactly that: "~" over "~" said it twice and nothing else
+            // (2026-10-08). Then the machine, as before.
+            let location = TerminalSessionNaming.location(directory: context?.directory, home: home, repository: repository)
+            var subtitle = location.flatMap { $0 == title ? nil : $0 } ?? "\(localUsername)@localhost"
             if focusedPane.intent.localTmuxSession != nil { subtitle += " · in tmux" }
             if let status = localProcessStatusesByPaneID[focusedPane.id] { subtitle += " — \(status)" }
             return MacWorkspaceWindowIdentity(title: title, subtitle: subtitle)
@@ -325,13 +344,17 @@ final class MacWorkspaceController {
                     subtitle: nil
                 )
             }
-            // A remote home is unknown here, so a remote directory is named by its last part.
+            // A remote home is unknown here, so a remote directory is named by its last part. In
+            // a repository the line says it, then the machine (W11).
+            let repository = repositoryByPaneID[focusedPane.id]
+            let connection = "\(server.username)@\(server.host):\(server.port)"
             return MacWorkspaceWindowIdentity(
                 title: tabLabel ?? focusedPane.intent.label
-                    ?? MacWorkspaceTabNaming.automaticTitle(paneContextByPaneID[focusedPane.id], home: nil)
+                    ?? MacWorkspaceTabNaming.automaticTitle(paneContextByPaneID[focusedPane.id], repository: repository, home: nil)
                     ?? server.name,
                 subtitle: Self.connectionSubtitle(
-                    "\(server.username)@\(server.host):\(server.port)",
+                    TerminalSessionNaming.location(directory: nil, home: nil, repository: repository)
+                        .map { "\($0) · \(connection)" } ?? connection,
                     state: session(for: focusedPane.id)?.state
                 )
             )
@@ -347,6 +370,11 @@ final class MacWorkspaceController {
     func noteOutput() {
         guard !isClosed else { return }
         if !isProducingOutput { isProducingOutput = true }
+        // A program printing without pause (an agent's spinner) still has its branch checked
+        // now and then: it may be the one checking out (W11).
+        if repositorySweptAt.map({ ContinuousClock.now - $0 >= localRepositoryInterval }) ?? true {
+            refreshRepositories()
+        }
         quietTask?.cancel()
         quietTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: Self.activityLinger)
@@ -354,6 +382,7 @@ final class MacWorkspaceController {
             isProducingOutput = false
             refreshLocalTmuxContext()
             askForGivenNamesOverSSH()
+            refreshRepositories()
         }
     }
 
@@ -474,7 +503,105 @@ final class MacWorkspaceController {
         guard !isClosed, state.root?.pane(id: paneID) != nil else { return }
         // Only tmux answers for a session; an SSH pane in tmux asks its host instead.
         if localTmuxSession(for: paneID) != nil { adoptGivenName(context.givenName, for: paneID) }
+        let folderChanged = paneContextByPaneID[paneID]?.directory != context.directory
         if paneContextByPaneID[paneID] != context { paneContextByPaneID[paneID] = context }
+        if folderChanged { lookUpRepository(for: paneID, folderChanged: true) }
+    }
+
+    // MARK: Repository and branch (W11, 2026-10-09)
+
+    /// Looks up again the repository of every pane whose last lookup is old enough.
+    func refreshRepositories() {
+        repositorySweptAt = .now
+        for paneID in state.root?.paneIDs ?? [] { lookUpRepository(for: paneID, folderChanged: false) }
+    }
+
+    @ObservationIgnored private var repositorySweptAt: ContinuousClock.Instant?
+
+    /// Which repository a pane's folder is in, and its branch: at once when the folder changed,
+    /// otherwise at most once an interval. A local folder's files are read here; a host is asked,
+    /// for the folder tmux says its shell is in, or the one the shell reported (OSC 7).
+    private func lookUpRepository(for paneID: UUID, folderChanged: Bool) {
+        guard !isClosed, let pane = state.root?.pane(id: paneID) else { return }
+        guard repositoryLookups[paneID] == nil else {
+            if folderChanged { repositoryFolderChanged.insert(paneID) }
+            return
+        }
+        let interval = pane.intent.kind == .local ? localRepositoryInterval : remoteRepositoryInterval
+        if !folderChanged, let last = repositoryLookedUpAt[paneID], ContinuousClock.now - last < interval { return }
+        let cache = repositoryCache
+        let reported = paneContextByPaneID[paneID]?.directory
+        let lookup: @MainActor () async -> TerminalRepositoryAnswer
+        switch pane.intent.kind {
+        case .local:
+            guard let folder = TerminalRepository.path(fromReported: reported) else { return }
+            let home = repositoryHome
+            lookup = {
+                await cache.answer(for: .init(host: nil, folder: folder), maximumAge: interval) {
+                    await TerminalRepository.readOffMain(folder: folder, home: home)
+                }
+            }
+        case .ssh:
+            guard let terminal = sessionsByPaneID[paneID], terminal.state == .connected else { return }
+            lookup = {
+                // tmux keeps the shell's reports to itself, so in tmux it is asked where the shell is.
+                guard let folder = TerminalRepository.path(fromReported: await terminal.workingDirectory(reported: reported))
+                else { return terminal.survivesClose ? .unknown : .none }
+                return await cache.answer(for: .init(host: terminal.server.id, folder: folder), maximumAge: interval) {
+                    guard let answer = try? await terminal.runTmuxCommand(TerminalRepository.remoteCommand(folder: folder))
+                    else { return .unknown }
+                    return TerminalRepository.parseRemote(answer)
+                }
+            }
+        }
+        repositoryLookedUpAt[paneID] = .now
+        repositoryLookups[paneID] = Task { [weak self] in
+            let answer = await lookup()
+            guard let self else { return }
+            repositoryLookups[paneID] = nil
+            guard !isClosed, state.root?.pane(id: paneID) != nil else { return }
+            setRepository(answer, for: paneID)
+            if repositoryFolderChanged.remove(paneID) != nil { lookUpRepository(for: paneID, folderChanged: true) }
+        }
+    }
+
+    private func setRepository(_ answer: TerminalRepositoryAnswer, for paneID: UUID) {
+        guard answer != .unknown else { return }
+        let repository = answer.repository
+        if repositoryByPaneID[paneID] != repository { repositoryByPaneID[paneID] = repository }
+        shareRepository(repository, for: paneID)
+    }
+
+    /// Keeps the repository and branch on the pane's tmux session, for Active on every device:
+    /// only a change, and only the name and branch, which are all a listing carries.
+    private func shareRepository(_ found: TerminalRepository?, for paneID: UUID) {
+        let repository = found.map { TerminalRepository(name: $0.name, branch: $0.branch) }
+        if let shared = sharedRepositoryByPaneID[paneID], shared == repository { return }
+        guard let pane = state.root?.pane(id: paneID) else { return }
+        if let session = pane.intent.localTmuxSession {
+            sharedRepositoryByPaneID[paneID] = repository
+            MacLocalTmux.shareRepository(repository, session: session)
+        } else if let terminal = sessionsByPaneID[paneID], terminal.survivesClose, terminal.state == .connected,
+                  let session = terminal.tmuxSessionName,
+                  let command = TerminalTmux.repositoryCommand(session: session, repository: repository) {
+            sharedRepositoryByPaneID[paneID] = repository
+            // One after another, so the host keeps the latest.
+            let previous = repositoryWrite
+            repositoryWrite = Task {
+                await previous?.value
+                do { _ = try await terminal.runTmuxCommand(command) } catch {
+                    Logger.ssh.notice("A tab's repository didn't reach its tmux session: \(error.localizedDescription, privacy: .public)")
+                }
+            }
+        }
+    }
+
+    private func forgetRepository(of paneID: UUID) {
+        repositoryLookups.removeValue(forKey: paneID)?.cancel()
+        repositoryByPaneID.removeValue(forKey: paneID)
+        repositoryLookedUpAt.removeValue(forKey: paneID)
+        repositoryFolderChanged.remove(paneID)
+        sharedRepositoryByPaneID.removeValue(forKey: paneID)
     }
 
     func updateLocalProcessStatus(_ status: String?, for paneID: UUID) {
@@ -742,6 +869,7 @@ final class MacWorkspaceController {
         localRuntimesByPaneID.removeValue(forKey: paneID)?.terminate()
         localProcessStatusesByPaneID.removeValue(forKey: paneID)
         paneContextByPaneID.removeValue(forKey: paneID)
+        forgetRepository(of: paneID)
         recordersByPaneID.removeValue(forKey: paneID)?.finalize()
         discardStartupCommand(for: paneID)
         state.root = root.removingPane(id: paneID)
@@ -937,6 +1065,8 @@ final class MacWorkspaceController {
         }
         isClosed = true
         lifecycleGeneration &+= 1
+        for lookup in repositoryLookups.values { lookup.cancel() }
+        repositoryLookups.removeAll()
         let sessions = Array(sessionsByPaneID.values)
         sessionsByPaneID.removeAll()
         let localRuntimes = Array(localRuntimesByPaneID.values)

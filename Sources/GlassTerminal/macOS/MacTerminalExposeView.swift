@@ -175,10 +175,10 @@ struct MacTerminalExposeView: View {
             if inside { hovered = tile.id } else if hovered == tile.id { hovered = nil }
         }
         .onTapGesture { expose.choose(tile.id) }
-        .help([tile.title, tile.folder ?? tile.detail].compactMap { $0 }.joined(separator: " — "))
+        .help([tile.title, tile.location ?? tile.detail].compactMap { $0 }.joined(separator: " — "))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(tile.title)
-        .accessibilityValue([tile.folder ?? tile.detail, selected ? "Selected" : nil].compactMap { $0 }.joined(separator: ", "))
+        .accessibilityValue([tile.location ?? tile.detail, selected ? "Selected" : nil].compactMap { $0 }.joined(separator: ", "))
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { expose.choose(tile.id) }
         .accessibilityIdentifier(identifier(tile.id))
@@ -256,7 +256,10 @@ private struct MacTerminalExposeTabTile: View {
             .animation(.easeInOut(duration: 0.3), value: tile.isBusy)
             .overlay(alignment: .bottom) {
                 if selected || hovering {
-                    MacTerminalExposeCaption(title: tile.title, detail: tile.folder)
+                    // `repo · branch · folder` loses its end, where the least is said; a folder
+                    // path its start, keeping the folder itself (W11).
+                    MacTerminalExposeCaption(title: tile.title, detail: tile.location,
+                                             detailTruncation: tile.repository == nil ? .head : .tail)
                         .padding(8)
                         .transition(.opacity)
                 }
@@ -309,6 +312,7 @@ private struct MacTerminalExposeSessionTile: View {
 private struct MacTerminalExposeCaption: View {
     let title: String
     let detail: String?
+    var detailTruncation: Text.TruncationMode = .head
 
     var body: some View {
         VStack(spacing: 1) {
@@ -320,7 +324,7 @@ private struct MacTerminalExposeCaption: View {
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    .truncationMode(.head)
+                    .truncationMode(detailTruncation)
             }
         }
         .padding(.horizontal, 10)

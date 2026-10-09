@@ -463,6 +463,108 @@ class TerminalSession: Identifiable, Hashable {
     /// the app was suspended — waits to be shown again rather than reconnecting unseen.
     var connectsWhenShown = false
 
+    // MARK: What it is called (W11, 2026-10-09)
+    //
+    // The owner: "Terminal names aren't persisted between devices." A Mac tab keeps the name it
+    // is given on its tmux session (`@glass-name`, W6), and names itself by its program's title,
+    // repository and folder; an iPhone, iPad or Vision Pro showed the server's name. A terminal
+    // there reads what its session says about itself — once attached, and when output settles —
+    // and is named by the same rule.
+
+    /// What its tmux session says about itself, last read: the name a tab gave it, its active
+    /// pane's title and folder, and the repository and branch there.
+    private(set) var tmuxPane: TerminalTmux.PaneState?
+    /// The name someone gave this terminal, here or on another device through its session.
+    private(set) var givenName: String?
+    /// Reads `tmuxPane` on devices without the Mac's tabs, which ask tmux for themselves.
+    #if os(macOS)
+    @ObservationIgnored var readsTmuxPane = false
+    #else
+    @ObservationIgnored var readsTmuxPane = true
+    #endif
+    /// The least time between two reads. Output settling inside it asks for one more at its end;
+    /// a quiet terminal is never asked.
+    @ObservationIgnored var tmuxPaneReadInterval: Duration = .seconds(5)
+    @ObservationIgnored private var tmuxPaneRead: Task<Void, Never>?
+    @ObservationIgnored private var tmuxPaneReadAt: ContinuousClock.Instant?
+    @ObservationIgnored private var tmuxPaneReadWanted = false
+    /// Counts namings here, so an answer asked for before one is not taken after it.
+    @ObservationIgnored private var givenNameGeneration: UInt64 = 0
+    /// The last name sent to the session; a read waits for it, and the next name follows it.
+    @ObservationIgnored private var givenNameWrite: Task<Void, Never>?
+
+    /// What this terminal is called away from the Mac's tabs, by the rule they and Active share
+    /// (`TerminalSessionNaming`): a given name, the workgroup's label for it, its program's title,
+    /// its repository, its folder. Nil when nothing names it, and the caller says the server.
+    var terminalName: String? {
+        givenName ?? workgroupLabel
+            ?? TerminalSessionNaming.automaticName(title: tmuxPane?.title, directory: tmuxPane?.directory,
+                                                   home: tmuxPane?.home, repository: tmuxPane?.repository)
+    }
+
+    /// In a repository, its name and branch, said before the machine as a Mac's SSH tab says them.
+    var repositoryLine: String? {
+        TerminalSessionNaming.location(directory: nil, home: nil, repository: tmuxPane?.repository)
+    }
+
+    /// Names this terminal, as a Mac tab's Rename does (W6): its tmux session keeps the name as
+    /// `@glass-name`, so every device shows it. Nil or blank goes back to the automatic name.
+    /// Outside tmux the name is this device's alone.
+    func rename(to name: String?) {
+        let value = name.flatMap { TerminalSessionNaming.displayText($0) }
+        givenNameGeneration &+= 1
+        givenName = value
+        guard survivesClose, state == .connected, let session = tmuxSessionName,
+              let command = TerminalTmux.givenNameCommand(session: session, name: value) else { return }
+        // One after another, so a rename and its undo reach the host in that order.
+        let previous = givenNameWrite
+        givenNameWrite = Task { [weak self] in
+            await previous?.value
+            do { _ = try await self?.runTmuxCommand(command) } catch {
+                Logger.ssh.notice("A terminal's name didn't reach its tmux session: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
+
+    /// Asks its tmux session what it says about itself, in one command: at once, or at the end of
+    /// the interval when it was asked within it. Called once attached and when output settles.
+    func readTmuxPaneIfDue() {
+        guard readsTmuxPane, purpose == .terminal, survivesClose, state == .connected,
+              let name = tmuxSessionName, let command = TerminalTmux.paneStateCommand(session: name) else { return }
+        guard tmuxPaneRead == nil else {
+            tmuxPaneReadWanted = true
+            return
+        }
+        tmuxPaneRead = Task { [weak self] in
+            if let due = self?.tmuxPaneReadDue, ContinuousClock.now < due {
+                try? await Task.sleep(until: due, clock: .continuous)
+            }
+            await self?.readTmuxPane(command)
+        }
+    }
+
+    private var tmuxPaneReadDue: ContinuousClock.Instant? {
+        tmuxPaneReadAt.map { $0 + tmuxPaneReadInterval }
+    }
+
+    private func readTmuxPane(_ command: String) async {
+        defer {
+            tmuxPaneRead = nil
+            if tmuxPaneReadWanted { readTmuxPaneIfDue() }
+        }
+        guard state == .connected else { return }
+        // This read answers for every settle so far; one after it starts asks again.
+        tmuxPaneReadWanted = false
+        // A name on its way to the host is read back, not the one it replaces.
+        await givenNameWrite?.value
+        let generation = givenNameGeneration
+        tmuxPaneReadAt = .now
+        guard let answer = try? await runTmuxCommand(command),
+              let pane = TerminalTmux.parsePaneState(answer) else { return }
+        if tmuxPane != pane { tmuxPane = pane }
+        if generation == givenNameGeneration, givenName != pane.givenName { givenName = pane.givenName }
+    }
+
     /// A slot just shown should connect: it never has, or it lost its connection while hidden or
     /// failed to open. Not one someone disconnected, one already on its way, or one waiting for a
     /// host-key answer.
@@ -896,6 +998,8 @@ class TerminalSession: Identifiable, Hashable {
             } else {
                 startupCommandTicket = nil
             }
+            // What the session is called and shows (W11): a name given on another device, at once.
+            readTmuxPaneIfDue()
         }
     }
 
@@ -1166,6 +1270,8 @@ class TerminalSession: Identifiable, Hashable {
             guard let self else { return }
             outputSettleTask = nil
             outputSettledNonce &+= 1
+            // A program may have retitled it, or changed folder or branch (W11).
+            readTmuxPaneIfDue()
         }
     }
 

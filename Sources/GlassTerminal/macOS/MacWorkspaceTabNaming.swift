@@ -25,10 +25,13 @@ struct MacWorkspacePaneContext: Equatable {
 
 enum MacWorkspaceTabNaming {
     /// The automatic name, or nil when the terminal has said nothing that names it. The caller
-    /// goes on to the workgroup, the tmux session or the shell.
-    static func automaticTitle(_ context: MacWorkspacePaneContext?, home: String?) -> String? {
-        guard let context else { return nil }
-        return TerminalSessionNaming.automaticName(title: context.title, directory: context.directory, home: home)
+    /// goes on to the workgroup, the tmux session or the shell. The repository the pane's folder
+    /// is in stands in for the folder (W11).
+    static func automaticTitle(_ context: MacWorkspacePaneContext?, repository: TerminalRepository? = nil,
+                               home: String?) -> String? {
+        guard context != nil || repository != nil else { return nil }
+        return TerminalSessionNaming.automaticName(title: context?.title, directory: context?.directory, home: home,
+                                                   repository: repository)
     }
 
     /// A tmux session as Active names it when nothing else does: `glass-N` is "Terminal N".

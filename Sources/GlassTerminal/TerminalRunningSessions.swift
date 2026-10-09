@@ -16,6 +16,9 @@
 //  with tmux on; its fourteen running tabs were listed under that host as "Terminal 1"…"Terminal
 //  14", "Open elsewhere", and This Mac listed nothing because a tab here showed each one.
 //
+//  W11 (2026-10-09): a session's line says the repository and branch it is in — for this Mac's
+//  own sessions read from the folder, for a host's from what the tab showing it kept there.
+//
 
 import Foundation
 import os
@@ -146,12 +149,16 @@ extension GlassTerminalCapability {
 
     #if os(macOS)
     /// D47: this Mac's own tmux sessions, or nil when it has no tmux or its answer did not read.
+    /// Each with the repository its folder is in, read here (W11).
     private func localTmuxListing() async -> [TerminalTmux.Session]? {
         let server = MacLocalTmux.server
         guard let tmux = server.executablePath() else { return nil }
         let output = await Task.detached(priority: .userInitiated) { server.listSessions(tmux) }.value
         guard let output, case .sessions(let sessions) = TerminalTmux.parse(output) else { return nil }
-        return sessions
+        let home = NSHomeDirectory()
+        return await Task.detached(priority: .userInitiated) {
+            MacLocalTmux.readingRepositories(sessions, home: home, read: server.readRepository)
+        }.value
     }
 
     /// Goes to the tab showing a local session. Tests put a stand-in here.
@@ -202,13 +209,15 @@ extension GlassTerminalCapability {
     }
     #endif
 
-    /// A running session's second line: its folder unless its name already says it, then whether
-    /// it is open here, elsewhere or nowhere, its windows, and when it was last used.
+    /// A running session's second line: where it is — `repo · branch` in a repository (W11), else
+    /// its folder — unless its name already says it, then whether it is open here, elsewhere or
+    /// nowhere, its windows, and when it was last used.
     static func runningDetails(_ tmux: TerminalTmux.Session, shownHere: Int = 0) -> String {
         var details: [String] = []
-        if let directory = tmux.directory {
-            let folder = TerminalSessionNaming.abbreviated(directory, home: tmux.home)
-            if folder != tmux.displayName { details.append(folder) }
+        if let location = TerminalSessionNaming.location(directory: tmux.directory, home: tmux.home,
+                                                         repository: tmux.repository),
+           location != tmux.displayName {
+            details.append(location)
         }
         if shownHere > 0 {
             details.append(tmux.attachedClients > shownHere ? "Open here and elsewhere" : "Open here")

@@ -39,7 +39,7 @@ A session can be open in more than one place at once: on your Mac and your Visio
 
 ## Pick up a session from Active
 
-**Active** lists, under each machine, the tmux sessions running there. A session is called what its tab would be called: the name you gave the tab, else the title its program set, else the folder it's in, else **Terminal 1**, **Terminal 2** and so on. Under the name is its folder, unless the name already says it, and then where it's open:
+**Active** lists, under each machine, the tmux sessions running there. A session is called what its tab would be called: the name you gave the tab, else the title its program set, else the Git repository it's in, else the folder it's in, else **Terminal 1**, **Terminal 2** and so on. Under the name is where it is (the repository and branch, or else the folder) unless the name already says it, and then where it's open:
 
 - **Detached**: nobody is attached. It may be one you closed, one from a dropped connection, or one you started on another device.
 - **Open elsewhere**: another device, or a terminal outside Glass Power Tools, is attached.
@@ -63,7 +63,9 @@ They open in the order **Active** lists them, each on its own session, joining w
 
 ## Names travel with the session
 
-When you rename a tab that runs in tmux, its session keeps the name. **Active** on each of your devices lists the session by that name, and a tab that opens the session later takes the name too. **Use Automatic Name** removes it from the session as well.
+When you rename a tab that runs in tmux, on any of your devices, its session keeps the name. **Active** on each of your devices lists the session by that name, and a tab that opens the session later takes the name too. On Vision Pro, iPad and iPhone, a terminal that already has the session open shows the new name the next time something happens in it; a tab on a Mac takes it the next time it opens the session. **Use Automatic Name** removes it from the session as well.
+
+A session also keeps the repository and branch its tab last showed, so **Active** on your other devices lists them too. If the branch changes while no tab shows the session, other devices show the old branch until a tab shows it again. On the Mac itself, **Active** reads the repository and branch of each of the Mac's own sessions from its folder each time it checks.
 
 ## End a session
 
@@ -83,6 +85,6 @@ Each local terminal you open afterwards runs in its own tmux session on the Mac.
 - **Quit** the app and the sessions keep running. When it opens again, each tab picks up where it was. Windows of SSH terminals in tmux come back too, each terminal on its own session.
 - **Close** a tab, a pane or a window and its session keeps running, as for a terminal in tmux on any other machine. Its tools menu says **Detach** rather than **Disconnect**.
 - **Active** lists the Mac's sessions under **This Mac**. Those a tab shows say **Open here**, and choosing one brings its tab forward. Open the others again, take one over from another terminal, or end one (swipe left and choose **End**, or right-click and choose **End Session…**). Typing `exit` in the session ends it too.
-- The tab's name follows the program's title and the folder you `cd` into, as it does without tmux.
+- The tab's name follows the program's title, the repository and the folder you `cd` into, as it does without tmux.
 
 To reach these sessions from another device, turn on **Remote Login** on the Mac (System Settings, **General**, **Sharing**) and add the Mac to the library with a Terminal service that keeps sessions running with tmux. **Active** on your other devices then lists the Mac's sessions like any machine's. On the Mac itself, **Active** recognizes that machine as this Mac and lists its sessions once, under **This Mac**.

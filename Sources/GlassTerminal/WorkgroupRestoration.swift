@@ -144,9 +144,36 @@ enum TerminalWorkgroupOpening {
         try await sessionManager.connectWhenShown(shown, settingsManager: settingsManager)
     }
 
-    /// The switcher's name for a slot: the pane's label, else "Terminal N · server".
+    /// The switcher's name for a slot: what the terminal is called (`terminalName`, W11) — a given
+    /// name, the pane's label, its program's title, repository or folder — else "Terminal N · server".
     static func slotTitle(_ session: TerminalSession, position: Int) -> String {
-        session.workgroupLabel ?? "Terminal \(position + 1) · \(session.server.name)"
+        label(session, on: .switcher, position: position)
+    }
+
+    /// Where a terminal is labelled on iPhone, iPad and Vision Pro (W11). The owner, on the
+    /// headset: "the tab names in the tab ornaments didn't keep the names, so neither did the
+    /// grid or carousel views" — each surface read the server's name for itself.
+    enum LabelSurface: CaseIterable {
+        /// Vision Pro's tab ornament.
+        case tabOrnament
+        /// iPad's tab bar and sidebar.
+        case tabBar
+        /// Vision Pro's overview, as a grid.
+        case grid
+        /// Vision Pro's overview, as a carousel.
+        case carousel
+        /// The iPhone's session switcher.
+        case switcher
+        /// The connection ornament above a terminal.
+        case connectionOrnament
+    }
+
+    /// What a terminal is called on `surface`: one answer for all of them, by the rule the Mac's
+    /// tabs and Active share (`terminalName`). With nothing to name it, the server — or in the
+    /// iPhone's switcher, which lists a workgroup's slots, "Terminal N · server".
+    static func label(_ session: TerminalSession, on surface: LabelSurface, position: Int = 0) -> String {
+        if let name = session.terminalName { return name }
+        return surface == .switcher ? "Terminal \(position + 1) · \(session.server.name)" : session.server.name
     }
 }
 
