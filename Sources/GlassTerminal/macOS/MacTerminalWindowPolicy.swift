@@ -41,6 +41,19 @@ struct MacTerminalWindowReader: NSViewRepresentable {
         Coordinator()
     }
 
+    /// Terminal windows that have closed. SwiftUI updates a closing window's views once more
+    /// after `willClose`, and that update ran `configure` again: the closed window went back into
+    /// the app's list of windows, with a coordinator as its delegate whose SwiftUI delegate was
+    /// gone. Show All Terminals offered it as "New Terminal" with an empty tab, and choosing it
+    /// brought the torn-down, transparent window forward, where AppKit's messages to it ended in
+    /// an unrecognized selector and then a crash (owner, 2026-10-09, after `exit` in a tmux
+    /// session over SSH). A `WindowGroup` makes a new window each time, so closed is for good.
+    static let closedWindows = NSHashTable<NSWindow>.weakObjects()
+
+    static func hasClosed(_ window: NSWindow) -> Bool {
+        closedWindows.contains(window)
+    }
+
     func makeNSView(context: Context) -> NSView {
         let view = NonHitTestingWindowReaderView(frame: .zero)
         let coordinator = context.coordinator
@@ -59,7 +72,7 @@ struct MacTerminalWindowReader: NSViewRepresentable {
     }
 
     private func configure(_ window: NSWindow?, coordinator: Coordinator) {
-        guard let window else { return }
+        guard let window, !Self.hasClosed(window) else { return }
         let state = GlassLayerResolution.resolve(layers.state, reduceTransparency: reduceTransparency)
         MacTerminalWindowPolicy.apply(window, tabbingIdentifier: tabbingIdentifier, overviewPresented: overviewPresented, layers: state)
         coordinator.observeWindowClose(window, action: onClose)
@@ -129,6 +142,7 @@ struct MacTerminalWindowReader: NSViewRepresentable {
             _ window: NSWindow,
             action: @escaping () -> Void
         ) {
+            guard !MacTerminalWindowReader.hasClosed(window) else { return }
             closeAction = action
             guard observedWindow !== window else { return }
             if observedWindow != nil {
@@ -181,6 +195,7 @@ struct MacTerminalWindowReader: NSViewRepresentable {
             _ window: NSWindow,
             shouldConfirm: @escaping (_ quitting: Bool) -> String?
         ) {
+            guard !MacTerminalWindowReader.hasClosed(window) else { return }
             self.shouldConfirmClose = shouldConfirm
             guard observedWindow === window, window.delegate !== self else { return }
             originalWindowDelegate = window.delegate
@@ -244,7 +259,15 @@ struct MacTerminalWindowReader: NSViewRepresentable {
         }
 
         @objc private func observedWindowWillClose(_ notification: Notification) {
+            if let window = notification.object as? NSWindow {
+                MacTerminalWindowReader.closedWindows.add(window)
+            }
             finishSessions()
+        }
+
+        // The notification center is never left holding a coordinator that has gone.
+        deinit {
+            NotificationCenter.default.removeObserver(self)
         }
     }
 }

@@ -12,12 +12,17 @@ final class MacWorkspacePreviewRegistry {
     static let shared = MacWorkspacePreviewRegistry()
     private final class Entry {
         weak var controller: MacWorkspaceWindowController?
-        weak var window: NSWindow?
+        /// Nil once it has closed: a closed window is never shown or brought forward again.
+        var window: NSWindow? {
+            guard let window = registered, !MacTerminalWindowReader.hasClosed(window) else { return nil }
+            return window
+        }
+        private weak var registered: NSWindow?
         /// When the window was first found, for an order that does not change while it is open.
         let order: Int
         init(_ controller: MacWorkspaceWindowController, window: NSWindow, order: Int) {
             self.controller = controller
-            self.window = window
+            self.registered = window
             self.order = order
         }
     }
@@ -38,7 +43,8 @@ final class MacWorkspacePreviewRegistry {
     @ObservationIgnored var windowsChanged: (() -> Void)?
 
     func register(_ controller: MacWorkspaceWindowController, window: NSWindow) {
-        guard entries[controller.windowID]?.window !== window else { return }
+        guard !MacTerminalWindowReader.hasClosed(window),
+              entries[controller.windowID]?.window !== window else { return }
         entries[controller.windowID] = Entry(controller, window: window, order: nextOrder)
         nextOrder += 1
         windowsChanged?()
