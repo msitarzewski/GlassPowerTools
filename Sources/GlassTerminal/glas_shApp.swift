@@ -30,6 +30,16 @@ public final class MacTerminalAppDelegate: NSObject, NSApplicationDelegate {
         GlassRemoteChangeReceiver.register()
     }
 
+    // MARK: Window restoration (D54)
+    //
+    // The app reopens its windows from its own records, which know each terminal window's tabs.
+    // AppKit's saved window state is neither written nor replayed: an hour with it turned on left
+    // a saved state that AppKit then restored at every launch, as empty terminal windows beside
+    // the app's own (2026-10-09).
+    public func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
+    public func application(_ app: NSApplication, shouldSaveSecureApplicationState coder: NSCoder) -> Bool { false }
+    public func application(_ app: NSApplication, shouldRestoreSecureApplicationState coder: NSCoder) -> Bool { false }
+
     public func application(_ application: NSApplication,
                             didReceiveRemoteNotification userInfo: [String: Any]) {
         GlassRemoteChangeReceiver.handleRemoteNotification(userInfo)
