@@ -29,6 +29,8 @@ struct MacWorkspaceView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility
     @State private var secureKeyboardEntry = MacSecureKeyboardEntry.shared
     @State private var terminalWindow: NSWindow?
+    /// Puts a reopened window back where it was, and keeps its place in its record (W12).
+    @State private var placementTracker = MacWorkspaceWindowPlacementTracker()
     @State private var workgroupEditorContext: WorkgroupEditorContext?
     @State private var workspaceSaveError: String?
     @State private var isConfirmingTabClose = false
@@ -331,6 +333,9 @@ struct MacWorkspaceView: View {
                 onWindow: { window in
                     terminalWindow = window
                     MacWorkspacePreviewRegistry.shared.register(windowController, window: window)
+                    // Once per window: back where it was if reopened from its record. Here, on the
+                    // main queue after SwiftUI's update, never from inside one.
+                    placementTracker.track(window, controller: windowController)
                     window.title = showingOverview && !overviewControlsVisible ? "" : identity.title
                     window.subtitle = showingOverview && !overviewControlsVisible ? "" : identity.subtitle ?? ""
                     if pendingWindowClose {
@@ -338,6 +343,7 @@ struct MacWorkspaceView: View {
                     }
                 },
                 onClose: {
+                    placementTracker.stop()
                     MacWorkspacePreviewRegistry.shared.remove(windowController.windowID)
                     windowController.closeAllSessions(sessionManager: sessionManager)
                     for tab in windowController.tabs {

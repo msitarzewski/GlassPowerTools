@@ -49,6 +49,9 @@ public struct GlassTerminalScenes: Scene {
         #if os(macOS)
         WindowGroup("Terminal", id: "workspace", for: MacWorkspaceLaunchRequest.self) { $request in
             MacWorkspaceSceneRoot(request: request)
+                // The reopen list and the launch offer, if this is the first window of the launch:
+                // Connections need not have appeared (W12).
+                .modifier(MacLaunchReopen(asker: "a terminal window"))
                 .environment(runtime)
                 .environment(sessionManager)
                 .environment(settingsManager)

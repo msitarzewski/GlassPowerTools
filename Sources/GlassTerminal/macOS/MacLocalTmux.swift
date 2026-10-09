@@ -13,6 +13,7 @@
 //
 
 #if os(macOS)
+import AppKit
 import Foundation
 import os
 
@@ -261,37 +262,94 @@ enum MacLocalTmux {
         ["-u", "-T", "sync,RGB", "new-session", "-A", "-s", session, "-c", directory]
     }
 
-    // MARK: Reopening after a quit
+    // MARK: Reopening after a quit or a crash
 
-    /// macOS restores no windows after a quit while "Close windows when quitting an application"
-    /// is on — its default — so a tab kept in tmux would never come back to its session. The app
-    /// notes those windows as it quits, and opens them again at the next launch (2026-10-07).
+    /// macOS restores none of these windows (D54), so a tab kept in tmux would never come back to
+    /// its session without this list: the windows to open again at the next launch (2026-10-07).
     /// SSH terminals in tmux count too (W4b): their panes keep their sessions' names, so a window
-    /// of SSH tabs comes back attached to the same sessions rather than not at all.
+    /// of SSH tabs comes back attached to the same sessions rather than not at all. Only the app
+    /// writes it, and it keeps it current while it runs (`MacWindowsToReopen`, W12): a list
+    /// written from outside raced with the app's own (2026-10-09).
     static let reopenKey = "macLocalTmuxWindowsToReopen"
 
-    /// The windows on screen, as `MacWorkspacePreviewRegistry` knows them: the controller each one
-    /// shows, never a copy that no window shows.
-    @MainActor static func rememberWindowsToReopen(defaults: UserDefaults = .standard,
-                                                   registry: MacWorkspacePreviewRegistry = .shared) {
-        let ids = registry.shownControllers
-            .filter { $0.tabs.contains(where: \.hasTerminalsInTmux) }
-            .map(\.windowID.uuidString)
-        if ids.isEmpty { defaults.removeObject(forKey: reopenKey) } else { defaults.set(ids, forKey: reopenKey) }
+    /// The windows on screen, as `MacWorkspacePreviewRegistry` knows them — the controller each
+    /// one shows, never a copy that no window shows — that hold terminals in tmux; then `opening`,
+    /// windows of the last run asked to open and not on screen yet. Written only when it changes;
+    /// true when it did.
+    @MainActor @discardableResult
+    static func rememberWindowsToReopen(defaults: UserDefaults = .standard,
+                                        registry: MacWorkspacePreviewRegistry = .shared,
+                                        opening: [UUID] = []) -> Bool {
+        let shown = registry.shownControllers.filter(reopensOnTmux).map(\.windowID)
+        let ids = (shown + opening.filter { !shown.contains($0) }).map(\.uuidString)
+        if ids.isEmpty {
+            guard defaults.object(forKey: reopenKey) != nil else { return false }
+            defaults.removeObject(forKey: reopenKey)
+        } else {
+            guard defaults.stringArray(forKey: reopenKey) != ids else { return false }
+            defaults.set(ids, forKey: reopenKey)
+        }
+        return true
     }
 
-    /// The windows to open again, once: none already open, and none whose tabs are no longer
-    /// saved. "Already open" includes a window whose controller is made but whose window is not
-    /// yet found, so a window macOS is restoring is never opened a second time with the same id.
-    /// With macOS's restoration on, this is what it did not bring back: it used to give up every
-    /// window to macOS, and when macOS restored nothing — the copy that quit had not had
-    /// restoration on — no window came back at all (2026-10-09).
-    /// Which launch asked for the reopen list, for the log: windows have failed to come back
-    /// without saying why (2026-10-09).
-    @MainActor static func logReopenAsked() {
-        logger.notice("Reopen: asked by the Connections window")
+    /// A window to open again: a tab of it shows a terminal in tmux, or names a tmux session to
+    /// attach to. Names count because the list is kept while the app runs (W12): a window is
+    /// found before its panes start, and an SSH terminal claims its session after it connects.
+    @MainActor static func reopensOnTmux(_ window: MacWorkspaceWindowController) -> Bool {
+        window.tabs.contains { tab in
+            tab.hasTerminalsInTmux || (tab.state.root?.panes ?? []).contains { tmuxSession(of: $0) != nil }
+        }
     }
 
+    /// A tmux session as a pane names it: this Mac's (`serverID` nil), or one on a host.
+    struct TmuxSessionKey: Hashable {
+        let serverID: UUID?
+        let name: String
+    }
+
+    static func tmuxSession(of pane: MacWorkspacePane) -> TmuxSessionKey? {
+        if let name = pane.intent.localTmuxSession { return TmuxSessionKey(serverID: nil, name: name) }
+        if let name = pane.intent.sshTmuxSession { return TmuxSessionKey(serverID: pane.intent.serverID, name: name) }
+        return nil
+    }
+
+    /// The tmux sessions panes here show or are about to: every pane of every terminal window on
+    /// screen or opening, and every session a local pane is attached to.
+    @MainActor static func sessionsShown(registry: MacWorkspacePreviewRegistry) -> Set<TmuxSessionKey> {
+        let windows = registry.shownControllers + registry.openWindowIDs.flatMap { registry.controllers(windowID: $0) }
+        let named = windows.flatMap(\.tabs).flatMap { $0.state.root?.panes ?? [] }.compactMap(tmuxSession(of:))
+        return Set(named).union(shownHere.keys.map { TmuxSessionKey(serverID: nil, name: $0) })
+    }
+
+    /// Of `windows`, in order, those that bring something of their own: never a window whose
+    /// every tab holds only tmux sessions that panes here already show, or that a window before
+    /// it in the list brings. Opened, such a window was a window of panes refused as already open
+    /// (`claimShown`) — many empty windows, from a list left behind (2026-10-09).
+    @MainActor static func withoutDuplicates(_ windows: [UUID], shown: Set<TmuxSessionKey>,
+                                             defaults: UserDefaults) -> [UUID] {
+        var claimed = shown
+        return windows.filter { windowID in
+            guard case .restored(let saved) = MacWorkspaceWindowController.load(windowID: windowID, defaults: defaults) else {
+                return true
+            }
+            // Per tab, the sessions it holds; nil when it shows anything else — a plain shell, an
+            // empty tab, or a layout that can't be read, which says so.
+            let tabs = saved.tabs.map { tab -> Set<TmuxSessionKey>? in
+                guard let panes = MacWorkspaceController.savedPanes(workspaceID: tab.id, defaults: defaults),
+                      !panes.isEmpty else { return nil }
+                let sessions = panes.compactMap(tmuxSession(of:))
+                return sessions.count == panes.count ? Set(sessions) : nil
+            }
+            let duplicate = tabs.allSatisfy { $0.map { $0.isSubset(of: claimed) } ?? false }
+            if !duplicate { for case let sessions? in tabs { claimed.formUnion(sessions) } }
+            return !duplicate
+        }
+    }
+
+    /// The windows to open again, taken from the list: none already open, and none whose tabs are
+    /// no longer saved. "Already open" includes a window whose controller is made but whose
+    /// window is not yet found, so a window is never opened a second time with the same id.
+    /// `MacWindowsToReopen.takeOnce` is the one caller in the app, once per launch.
     @MainActor static func takeWindowsToReopen(defaults: UserDefaults = .standard,
                                                open openWindowIDs: Set<UUID>? = nil) -> [UUID] {
         guard let ids = defaults.stringArray(forKey: reopenKey) else {
@@ -353,6 +411,90 @@ enum MacLocalTmux {
             environment["LANG"] = "en_US.UTF-8"
         }
         return environment.map { "\($0.key)=\($0.value)" }.sorted()
+    }
+}
+
+// MARK: The list, for the whole run (W12)
+
+/// The windows to open at the next launch (D47), owned for the whole run. The first window of a
+/// launch — Connections or a terminal window, whichever appears first — takes the last run's
+/// list, once per process: the Connections window's own task ran each time its content appeared
+/// and applied whatever list it found (2026-10-09). From then on the list is kept current as
+/// windows open and close and their tabs are saved, so a crash or a forced quit brings back the
+/// same windows. Quitting writes it once more, and the windows closing for the quit leave it alone.
+final class MacWindowsToReopen: NSObject {
+    static let shared = MacWindowsToReopen()
+    private nonisolated static let logger = Logger(subsystem: "sh.glas", category: "local-tmux")
+
+    private let defaults: UserDefaults
+    private let registry: MacWorkspacePreviewRegistry
+    /// This run has taken the last run's list: from then on, this run's windows are the list.
+    private(set) var hasTaken = false
+    /// Windows of the last run asked to open and not on screen yet, kept in the list until they
+    /// are, so a crash before they appear loses none.
+    private var opening: [UUID] = []
+    /// Set as the app quits. Windows closing after it are closing for the quit, not by hand.
+    private(set) var isQuitting = false
+
+    init(defaults: UserDefaults = .standard, registry: MacWorkspacePreviewRegistry = .shared) {
+        self.defaults = defaults
+        self.registry = registry
+        super.init()
+        registry.windowsChanged = { [weak self] in self?.update() }
+        NotificationCenter.default.addObserver(self, selector: #selector(recordSaved(_:)),
+                                               name: .macWorkspaceRecordSaved, object: defaults)
+    }
+
+    /// The windows the last run left, for whichever window of this launch asks first; nil for
+    /// every other. None already open, none whose tabs are no longer saved, and none whose every
+    /// tab holds only sessions already shown.
+    func takeOnce(askedBy asker: String) -> [UUID]? {
+        guard !hasTaken else {
+            Self.logger.notice("Reopen: asked by \(asker, privacy: .public), already taken at this launch")
+            return nil
+        }
+        hasTaken = true
+        Self.logger.notice("Reopen: asked by \(asker, privacy: .public)")
+        let candidates = MacLocalTmux.takeWindowsToReopen(defaults: defaults, open: registry.openWindowIDs)
+        let reopening = MacLocalTmux.withoutDuplicates(candidates, shown: MacLocalTmux.sessionsShown(registry: registry),
+                                                       defaults: defaults)
+        if reopening.count < candidates.count {
+            Self.logger.notice("Reopen: \(candidates.count - reopening.count) left closed, every tab's sessions already shown")
+        }
+        opening = reopening
+        write()
+        return reopening
+    }
+
+    /// A window opened or closed, or a tab or window record was saved: the list as it is now.
+    /// Nothing before the last run's list is taken — it is still that run's — and nothing while
+    /// quitting.
+    func update() {
+        guard hasTaken, !isQuitting else { return }
+        write()
+    }
+
+    /// Quitting, before the windows let go of their terminals: where each window is, and which to
+    /// open again. Closing them for the quit then changes neither. When no window appeared in this
+    /// run, nothing took the last run's list, and it stands.
+    func prepareForQuit(displayOf: @MainActor (NSWindow) -> MacWorkspaceDisplay? = MacWorkspaceDisplay.of) {
+        MacWorkspaceWindowPlacement.saveAll(registry: registry, displayOf: displayOf)
+        if hasTaken { write() }
+        isQuitting = true
+        let listed = defaults.stringArray(forKey: MacLocalTmux.reopenKey)?.count ?? 0
+        Self.logger.notice("Reopen: quitting with \(listed) windows listed")
+    }
+
+    @objc private func recordSaved(_ notification: Notification) {
+        update()
+    }
+
+    private func write() {
+        opening.removeAll { registry.shownController(windowID: $0) != nil }
+        if MacLocalTmux.rememberWindowsToReopen(defaults: defaults, registry: registry, opening: opening) {
+            let listed = defaults.stringArray(forKey: MacLocalTmux.reopenKey)?.count ?? 0
+            Self.logger.notice("Reopen: \(listed) windows listed now")
+        }
     }
 }
 

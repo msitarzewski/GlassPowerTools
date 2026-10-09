@@ -79,9 +79,11 @@ public final class MacTerminalAppDelegate: NSObject, NSApplicationDelegate {
             guard alert.runModal() == .alertFirstButtonReturn else { return .terminateCancel }
         }
         terminationInProgress = true
-        // Before the windows let go of their terminals: which hold local terminals in tmux, to
-        // open again at the next launch (D47).
-        MacLocalTmux.rememberWindowsToReopen()
+        // Before the windows let go of their terminals: where each window is, and which hold
+        // terminals in tmux, to open again at the next launch (D47, W12). The list is kept current
+        // while the app runs, for a crash. A window closed by hand drops out of it; the windows
+        // closing for this quit do not.
+        MacWindowsToReopen.shared.prepareForQuit()
         // Keep the windows and their saved layouts intact for restoration while
         // finalizing recordings and stopping their local and remote processes.
         for window in windows { window.finishSessions() }

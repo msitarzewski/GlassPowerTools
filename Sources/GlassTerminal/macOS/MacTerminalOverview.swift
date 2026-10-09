@@ -33,18 +33,23 @@ final class MacWorkspacePreviewRegistry {
     /// tab dragged out of the window was sometimes taken from the twin. Ignored by observation,
     /// since views read it while they are being made.
     @ObservationIgnored private var built: [UUID: [Built]] = [:]
+    /// A window was found on screen or closed. The reopen list follows it, so it is current
+    /// without a quit (`MacWindowsToReopen`, W12).
+    @ObservationIgnored var windowsChanged: (() -> Void)?
 
     func register(_ controller: MacWorkspaceWindowController, window: NSWindow) {
         guard entries[controller.windowID]?.window !== window else { return }
         entries[controller.windowID] = Entry(controller, window: window, order: nextOrder)
         nextOrder += 1
+        windowsChanged?()
     }
 
     /// The window has closed: neither it nor its controller is found again, so a window opened
     /// later with the same id starts from its saved tabs.
     func remove(_ id: UUID) {
-        entries.removeValue(forKey: id)
+        let wasShown = entries.removeValue(forKey: id) != nil
         built.removeValue(forKey: id)
+        if wasShown { windowsChanged?() }
     }
 
     /// A window controller was made. Only `MacWorkspaceWindowController.init` calls this.

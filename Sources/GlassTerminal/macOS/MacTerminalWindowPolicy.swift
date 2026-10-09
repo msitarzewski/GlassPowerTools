@@ -271,7 +271,11 @@ enum MacTerminalWindowPolicy {
         // window. Disallow a second AppKit tab layer and its horizontal strip.
         window.tabbingMode = .disallowed
         window.tabbingIdentifier = ""
-        window.isRestorable = true
+        // `isRestorable` is SwiftUI's (rule 62): the scene declines restoration and SwiftUI sets it
+        // false. Set true here, it undid that: in a scratch app, after a crash, AppKit brought such
+        // windows back without their value, as empty windows, and SwiftUI then opened no
+        // Connections window, whose task was the only reader of the reopen list (W12,
+        // 2026-10-09). D54 now keeps AppKit from restoring anything; SwiftUI stays the one owner.
         window.autorecalculatesKeyViewLoop = true
     }
 

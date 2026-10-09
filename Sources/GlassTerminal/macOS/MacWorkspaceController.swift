@@ -10,6 +10,12 @@ extension Logger {
     nonisolated static let workspaceRestoration = Logger(subsystem: "sh.glas", category: "workspace")
 }
 
+extension Notification.Name {
+    /// A terminal tab's or window's record was written, in the defaults the notification carries
+    /// as its object. The reopen list follows it (`MacWindowsToReopen`, W12).
+    static let macWorkspaceRecordSaved = Notification.Name("GlassTerminal.macWorkspaceRecordSaved")
+}
+
 @MainActor
 @Observable
 final class MacWorkspaceController {
@@ -1026,6 +1032,8 @@ final class MacWorkspaceController {
                 return
             }
             defaults.set(data, forKey: key)
+            // A pane may have just been given a tmux session: the reopen list follows (W12).
+            NotificationCenter.default.post(name: .macWorkspaceRecordSaved, object: defaults)
         } catch {
             Logger.settings.error(
                 "Refusing to persist invalid workspace state: \(error.localizedDescription, privacy: .public)"
@@ -1117,6 +1125,16 @@ final class MacWorkspaceController {
 
     private static func defaultsKey(for workspaceID: UUID) -> String {
         "\(UserDefaultsKeys.macWorkspaceRestoration).\(workspaceID.uuidString.lowercased())"
+    }
+
+    /// The panes a tab's record holds, read without making the tab: nil when it has no record
+    /// that can be read. The reopen list asks, so it never opens a window of tabs another window
+    /// already shows (W12).
+    static func savedPanes(workspaceID: UUID, defaults: UserDefaults) -> [MacWorkspacePane]? {
+        guard let data = defaults.data(forKey: defaultsKey(for: workspaceID)), data.count <= maximumEncodedBytes,
+              let state = try? JSONDecoder().decode(MacWorkspaceRestorationState.self, from: data)
+                .validated(for: workspaceID) else { return nil }
+        return state.root?.panes ?? []
     }
 }
 
@@ -1240,6 +1258,11 @@ final class MacWorkspaceWindowController {
     /// The tabs shown differ from the saved record: a new window, or one rebuilt from its
     /// request. Saved when the window opens (`windowDidOpen`), never by init (W7b).
     @ObservationIgnored private var hasUnsavedState = false
+    /// Where the window is, saved with its tabs (W12): read from its record, then kept current
+    /// by its window (`MacWorkspaceWindowPlacementTracker`).
+    @ObservationIgnored private(set) var placement: MacWorkspaceWindowPlacement?
+    /// The place read from the record, for the window's first appearance only.
+    @ObservationIgnored private var placementToRestore: MacWorkspaceWindowPlacement?
 
     /// Makes the window's tabs and writes nothing: SwiftUI makes controllers it throws away, and a
     /// window macOS restores after a crash must come back as it was saved, not be rewritten by
@@ -1288,6 +1311,8 @@ final class MacWorkspaceWindowController {
             case .restored(let restored):
                 resolvedTabs = restored.tabs.map { makeTab($0.request) }
                 resolvedSelectedTabID = restored.selectedTabID
+                placement = restored.placement
+                placementToRestore = restored.placement
             case .unreadable(let reason):
                 let fallback = makeTab(MacWorkspaceTabRequest(workspaceID: UUID(), startsEmpty: true))
                 fallback.markNotRestored(reason)
@@ -1327,6 +1352,21 @@ final class MacWorkspaceWindowController {
         } else {
             for tab in tabs { tab.saveIfUnsaved() }
         }
+    }
+
+    /// Where the window was when it was saved, the first time it is asked and only then: a window
+    /// reopened from its record goes back there once, as it first appears (W12).
+    func takePlacementToRestore() -> MacWorkspaceWindowPlacement? {
+        defer { placementToRestore = nil }
+        return placementToRestore
+    }
+
+    /// The window moved, resized, or went in or out of full screen: saved with its tabs, unless
+    /// it is where it was saved. Never over a record that couldn't be read (`persist`).
+    func savePlacement(_ placement: MacWorkspaceWindowPlacement) {
+        guard let placement = placement.validated(), placement != self.placement else { return }
+        self.placement = placement
+        persist()
     }
 
     /// Whether this window's tabs are saved, so a launch request with its id restores them.
@@ -1790,7 +1830,8 @@ final class MacWorkspaceWindowController {
         for tab in tabs { tab.saveIfUnsaved() }
         let state = MacWorkspaceWindowRestorationState(
             tabs: tabs.map(\.restorationDescriptor),
-            selectedTabID: selectedTabID
+            selectedTabID: selectedTabID,
+            placement: placement
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
@@ -1810,6 +1851,7 @@ final class MacWorkspaceWindowController {
             defaults.set(saved, forKey: Self.previousGenerationKey(for: windowID))
         }
         defaults.set(data, forKey: key)
+        NotificationCenter.default.post(name: .macWorkspaceRecordSaved, object: defaults)
     }
 
     /// The window is going for good: its record and the generation kept behind it.

@@ -11,6 +11,59 @@
 
 #if os(macOS)
 import Foundation
+import SwiftUI
+
+/// What the first window of a launch does, whichever it is — Connections or a terminal window
+/// (W12): opens the windows the last run left (D47), then offers the tmux sessions no tab shows
+/// (W7b). Each once per process. It was the Connections window's alone, and it ran every time
+/// that window's content appeared (2026-10-09).
+struct MacLaunchReopen: ViewModifier {
+    /// Which window asked, for the log.
+    let asker: String
+    @Environment(\.openWindow) private var openWindow
+    /// W7b: local tmux sessions still running that no tab shows, offered once at launch.
+    @State private var runningSessionsToOffer: [String] = []
+
+    func body(content: Content) -> some View {
+        content
+            .task {
+                for windowID in MacWindowsToReopen.shared.takeOnce(askedBy: asker) ?? [] {
+                    openWindow(id: "workspace", value: MacWorkspaceLaunchRequest(windowID: windowID, tabs: []))
+                }
+                // W7b: then, once those windows have opened on their sessions, the sessions still
+                // running that no tab shows. After a crash that was all of them, and nothing said
+                // so. If this view goes away first, the next window to appear asks.
+                try? await Task.sleep(for: .seconds(2))
+                guard !Task.isCancelled else { return }
+                runningSessionsToOffer = MacLocalTmuxLaunchOffer.shared
+                    .take(shown: MacLocalTmuxLaunchOffer.shownSessions()) ?? []
+            }
+            .alert(
+                MacLocalTmuxLaunchOffer.message(count: runningSessionsToOffer.count),
+                isPresented: Binding(
+                    get: { !runningSessionsToOffer.isEmpty },
+                    set: { if !$0 { runningSessionsToOffer = [] } }
+                )
+            ) {
+                Button("Reopen") { reopenRunningSessions() }
+                Button("Not Now", role: .cancel) { runningSessionsToOffer = [] }
+            } message: {
+                Text(runningSessionsToOffer.count == 1
+                     ? "It opens in a new window. Not Now leaves it in Active."
+                     : "They open in one window, a tab for each. Not Now leaves them in Active.")
+            }
+    }
+
+    /// Reopen: one window, a tab per session, leaving out any a tab took up since the offer.
+    private func reopenRunningSessions() {
+        let shown = MacLocalTmuxLaunchOffer.shownSessions()
+        let sessions = runningSessionsToOffer.filter { !shown.contains($0) }
+        runningSessionsToOffer = []
+        for request in MacLocalTmuxLaunchOffer.launchRequests(for: sessions) {
+            openWindow(id: "workspace", value: request)
+        }
+    }
+}
 
 @MainActor
 final class MacLocalTmuxLaunchOffer {
@@ -38,8 +91,8 @@ final class MacLocalTmuxLaunchOffer {
             .sorted { (TerminalTmux.glassNumber($0) ?? .max, $0) < (TerminalTmux.glassNumber($1) ?? .max, $1) }
     }
 
-    /// What to offer at this launch: the sessions above, the first time it is asked and only
-    /// then; nil when there are none.
+    /// What to offer at this launch: the sessions above, the first time it is asked in this
+    /// process and only then; nil when there are none.
     func take(shown: Set<String>, defaults: UserDefaults = .standard) -> [String]? {
         guard !hasOffered else { return nil }
         hasOffered = true

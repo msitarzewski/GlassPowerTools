@@ -571,11 +571,28 @@ struct MacWorkspaceWindowRestorationState: Codable, Equatable, Sendable {
     let schemaVersion: Int
     let tabs: [MacWorkspaceTabDescriptor]
     let selectedTabID: UUID
+    /// Where the window was (W12). Absent from records saved before it, and from windows that
+    /// have not been placed yet; an earlier version reading a record ignores it.
+    let placement: MacWorkspaceWindowPlacement?
 
-    init(tabs: [MacWorkspaceTabDescriptor], selectedTabID: UUID) {
+    init(tabs: [MacWorkspaceTabDescriptor], selectedTabID: UUID, placement: MacWorkspaceWindowPlacement? = nil) {
         schemaVersion = Self.currentSchemaVersion
         self.tabs = tabs
         self.selectedTabID = selectedTabID
+        self.placement = placement
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion, tabs, selectedTabID, placement
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
+        tabs = try container.decode([MacWorkspaceTabDescriptor].self, forKey: .tabs)
+        selectedTabID = try container.decode(UUID.self, forKey: .selectedTabID)
+        // A place that can't be read costs the window its place, never its tabs (W12).
+        placement = (try? container.decodeIfPresent(MacWorkspaceWindowPlacement.self, forKey: .placement))?.validated()
     }
 
     func validated() -> MacWorkspaceWindowRestorationState? {
