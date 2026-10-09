@@ -1,6 +1,6 @@
 # Browse and transfer files over SFTP
 
-The file browser shows a machine's files over SFTP, using the host's Terminal service: its address, sign-in and host key. This page covers opening the browser, moving around, uploading and downloading, creating, renaming and deleting items, and editing files.
+The file browser shows a machine's files over SFTP, using the host's Terminal service: its address, sign-in and host key. This page covers opening the browser, moving around, uploading and downloading, creating, renaming and deleting items, inserting paths into a terminal, and editing files.
 
 ## Open the file browser
 
@@ -56,6 +56,16 @@ Right-click an item, or touch and hold it, for its menu.
 To act on several items at once, select them; **Select All** (⌘A) in the ellipsis (…) menu selects everything. **On Vision Pro, iPhone and iPad**, choose **Select…** in that menu first, or swipe right on a file. While items are selected, a bar at the bottom offers **Download**, **Delete** and **Deselect All**.
 
 **Get Info** shows a file's size, modification date, read-only permissions and SFTP address.
+
+## Insert a path into the terminal
+
+When you open the browser from a terminal with **Open Folder Here**, you can type paths into that terminal. Choose **Insert Path** in an item's menu, or select several items and choose **Insert** in the bar at the bottom. Their paths on the host are typed at the terminal's cursor, escaped for the shell and separated by spaces. Nothing is run.
+
+- **On iPhone and iPad**, the browser then closes and you're back in the terminal. If a transfer is still running, the browser stays open so the transfer can finish.
+- **On Vision Pro**, the terminal's window comes forward and the browser stays open.
+- **On Mac**, the browser stays in front; click the terminal to carry on.
+
+A browser opened from the library has no terminal, so **Insert Path** isn't offered there.
 
 ## Edit a file
 

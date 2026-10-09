@@ -128,6 +128,17 @@ final class SFTPIncomingDrop {
     }
     #endif
 
+    /// A representation that arrives as one regular file: any content or data — a zip from Files
+    /// is data, not "content" — but not a link, and not a package or folder (a Live Photo's
+    /// bundle, say), which `retainFile` would refuse after the copy (W14, 2026-10-09).
+    nonisolated static func isReadableAsOneFile(_ type: UTType?) -> Bool {
+        guard let type else { return false }
+        return (type.conforms(to: .content) || type.conforms(to: .data))
+            && !type.conforms(to: .url)
+            && !type.conforms(to: .package)
+            && !type.conforms(to: .directory)
+    }
+
     /// Files that already exist come back as they are; promised files and bare content are
     /// written into `staging` — by default, a temporary one that goes when it is released.
     #if os(macOS)
@@ -196,8 +207,7 @@ final class SFTPIncomingDrop {
                     continue
                 }
                 guard let identifier = provider.registeredTypeIdentifiers.first(where: {
-                    guard let type = UTType($0) else { return false }
-                    return type.conforms(to: .content) && !type.conforms(to: .url)
+                    Self.isReadableAsOneFile(UTType($0))
                 }) else { throw CocoaError(.fileReadUnsupportedScheme) }
                 let name = provider.suggestedName
                 let stream = AsyncThrowingStream<URL, Error> { continuation in

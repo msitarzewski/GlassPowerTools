@@ -680,6 +680,14 @@ struct TerminalWindowView: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: terminalCanvasCornerRadius, style: .continuous))
         .contentShape(.rect)
+        #if !os(macOS)
+        // Files and photos dropped from another app go up to the host, and their paths there are
+        // typed (W14). SwiftUI's own drop target, so nothing UIKit is built here (rule 64). A Mac
+        // pane takes its drop in the workspace, which knows a local shell from an SSH one.
+        .onDrop(of: TerminalRemoteDrops.acceptedTypes, isTargeted: nil) { providers in
+            TerminalRemoteDrops.shared.receive(providers, on: session)
+        }
+        #endif
         .onTapGesture {
             if terminalCanOwnFocus {
                 terminalHostModel.focus()
@@ -742,6 +750,12 @@ struct TerminalWindowView: View {
                 .padding(.bottom, session.survivesClose ? 34 : 14)
                 .padding(.horizontal, 14)
             }
+        }
+        // A drop's upload and what went wrong with it, in the corner, clear of tmux's status line.
+        .overlay(alignment: .bottomTrailing) {
+            TerminalRemoteDropStatusView(sessionID: session.id)
+                .padding(.bottom, session.survivesClose ? 34 : 14)
+                .padding(.horizontal, 14)
         }
         .overlay(alignment: .topTrailing) {
             VStack(spacing: 6) {

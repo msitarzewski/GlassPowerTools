@@ -866,8 +866,21 @@ private struct MacWorkspaceTabContent: View {
     /// Reads a drop the way the Files browser does — a file promise first, as AppKit offers it —
     /// and types the paths. A file that already exists types its own path; a promised file or bare
     /// image data is written to the drop inbox first (`TerminalDroppedPaths.inbox`).
+    ///
+    /// An SSH pane's shell is on the host, where this Mac's paths mean nothing: its files are
+    /// uploaded to the host's drop folder and the host's paths are typed instead (W14).
     private func receiveDrop(_ providers: [NSItemProvider], on paneID: UUID) -> Bool {
         guard let drop = SFTPIncomingDrop(providers: providers) else { return false }
+        let route = TerminalDropRoute.resolve(
+            localModel: controller.localRuntimesByPaneID[paneID]?.model,
+            session: controller.session(for: paneID)
+        )
+        if case .upload(let session) = route {
+            return TerminalRemoteDrops.shared.receive(drop, on: session) { text in
+                controller.focus(paneID)
+                session.terminalHostModel.insertDroppedText(text)
+            }
+        }
         Task { @MainActor in
             do {
                 let staging = try SFTPDropStaging(keepingFilesIn: TerminalDroppedPaths.inbox())

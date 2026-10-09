@@ -471,6 +471,10 @@ struct SFTPBrowserView: View {
     @Environment(\.glassOpenFolderAsProject) private var openFolderAsProject
     @Environment(\.glassOpenFileInEditor) private var openFileInEditor
     @Environment(\.glassEditorFileScreen) private var editorFileScreen
+    #if os(visionOS)
+    /// Insert Path brings the terminal's window forward (W14).
+    @Environment(\.openWindow) private var openWindow
+    #endif
 
     @State private var sftpClient: SFTPClient?
     @State private var sessionLifetime: SFTPBrowserSessionLifetime?
@@ -1401,6 +1405,19 @@ struct SFTPBrowserView: View {
             .controlSize(.small)
             .disabled(!selectionContainsFile)
 
+            if insertTerminal != nil {
+                Button {
+                    insertPaths(of: contextEntries(for: []))
+                } label: {
+                    // "Insert", short: the bar has an iPhone's width.
+                    Label("Insert", systemImage: "text.cursor")
+                        .font(.caption)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .accessibilityLabel(selectedFilenames.count == 1 ? "Insert Path" : "Insert Paths")
+            }
+
             Button(role: .destructive) {
                 showingBatchDeleteConfirmation = true
             } label: {
@@ -1838,6 +1855,12 @@ struct SFTPBrowserView: View {
                 }
             }
 
+            if insertTerminal != nil {
+                Button(targetEntries.count == 1 ? "Insert Path" : "Insert Paths") {
+                    insertPaths(of: targetEntries)
+                }
+            }
+
             if includesClipboardCopy {
                 Button("Copy") {
                     copyRemoteReferences(targetEntries)
@@ -1878,6 +1901,40 @@ struct SFTPBrowserView: View {
                 prepareDeletion(of: targetEntries)
             }
         }
+    }
+
+    // MARK: Insert Path (W14)
+
+    /// The terminal this browser belongs to, when it was opened from one ("Open Folder Here"). A
+    /// browser opened from the library has its own SFTP session and no terminal to type into.
+    private var insertTerminal: TerminalSession? {
+        TerminalRemoteDrops.terminal(forBrowserSession: sessionID) { sessionManager.session(for: $0) }
+    }
+
+    /// Types the items' paths at the terminal's cursor, as a drop does (2026-10-09: "the SFTP
+    /// interface for the terminal should allow 'insert' into the current cursor position"), then
+    /// goes back to that terminal.
+    private func insertPaths(of targetEntries: [SFTPBrowserEntry]) {
+        guard let terminal = insertTerminal,
+              TerminalRemoteDrops.insertPaths(targetEntries.map(\.id), into: terminal) else { return }
+        #if os(iOS) || os(visionOS)
+        if let workgroup = sessionManager.workgroups.first(where: { $0.sessionIDs.contains(terminal.id) }) {
+            sessionManager.selectSession(terminal.id, inWorkgroup: workgroup.id)
+            #if os(visionOS)
+            openWindow(id: "terminal", value: workgroup.id)
+            #endif
+        }
+        #endif
+        #if os(iOS)
+        // The browser is a sheet over the terminal: closing it is going back. Not while a transfer
+        // runs, which closing would cancel.
+        guard transferTask == nil, operationInProgress == nil else { return }
+        Task {
+            if await shutdownTransferAndConnection() {
+                dismiss()
+            }
+        }
+        #endif
     }
 
     private func beginDownload(_ targetEntries: [SFTPBrowserEntry]) {
@@ -6028,5 +6085,47 @@ struct SFTPBrowserView: View {
 
     private func formattedFullDate(_ date: Date) -> String {
         date.formatted(date: .complete, time: .shortened)
+    }
+}
+
+// MARK: - Files dropped on a terminal (W14)
+
+extension SFTPBrowserView {
+    /// The browser's own verified, no-clobber upload, for a file dropped on a terminal: one
+    /// uploader, so a drop on a terminal gets the same checksum and atomic commit as one here.
+    /// Failures come back in the drop's plain words (`TerminalRemoteDropFailure`); the server's own
+    /// text goes to the log.
+    nonisolated static func uploadDroppedFile(
+        client: SFTPClient,
+        file: URL,
+        serverID: UUID,
+        directory: String,
+        name: String,
+        maximumBytes: UInt64
+    ) async throws {
+        let accessed = file.startAccessingSecurityScopedResource()
+        defer { if accessed { file.stopAccessingSecurityScopedResource() } }
+        do {
+            let cleanupWarning = try await performUpload(
+                client: client,
+                sourceURL: file,
+                serverID: serverID,
+                remoteDirectory: directory,
+                sourceName: file.lastPathComponent,
+                finalName: name,
+                targetPath: remotePath(directory: directory, basename: name),
+                maximumUploadBytes: maximumBytes
+            )
+            if cleanupWarning { TerminalRemoteDropLog.partialCopyRemains() }
+        } catch SFTPTransferError.atomicCommitUnavailable {
+            throw TerminalRemoteDropFailure.noSafeUpload
+        } catch let failure as SFTPUploadWorkerFailure where failure.kind == .cancelled {
+            throw CancellationError()
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            TerminalRemoteDropLog.uploadFailed(error)
+            throw TerminalRemoteDropFailure.didNotFinish
+        }
     }
 }

@@ -38,15 +38,23 @@ enum TerminalDroppedPaths {
 
     /// The text a drop of `urls` types. File URLs only; anything else is left out.
     static func text(for urls: [URL]) -> String? {
-        let paths = urls.filter(\.isFileURL).map { escaped($0.path) }
-        return paths.isEmpty ? nil : paths.joined(separator: " ") + " "
+        text(forPaths: urls.filter(\.isFileURL).map(\.path))
+    }
+
+    /// The text that types absolute `paths` — on this Mac, or on the host an SSH terminal is
+    /// connected to (a file dropped there and uploaded, or Insert Path in its Files browser).
+    /// Anything that isn't absolute is left out: a shell resolves a relative path against a folder
+    /// the app doesn't know.
+    nonisolated static func text(forPaths paths: [String]) -> String? {
+        let escapedPaths = paths.filter { $0.hasPrefix("/") }.map(escaped)
+        return escapedPaths.isEmpty ? nil : escapedPaths.joined(separator: " ") + " "
     }
 
     /// A path as a shell reads it back unchanged. Letters, digits and `_./-+,:@%^=` stand as they
     /// are; anything else is backslash-escaped, as Terminal.app writes a dropped path. A control
     /// character — a newline in a file name — cannot be backslash-escaped, so that path is written
     /// in `$'…'` form instead, which bash, zsh and fish all read.
-    static func escaped(_ path: String) -> String {
+    nonisolated static func escaped(_ path: String) -> String {
         if path.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) {
             var body = ""
             for scalar in path.unicodeScalars {

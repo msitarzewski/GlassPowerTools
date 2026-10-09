@@ -1,6 +1,6 @@
 # Work in a terminal
 
-This page covers terminal windows and tabs, Show All Terminals, the session's tools menu, text size, search, pasting, snippets, recording, and the Mac's local shell.
+This page covers terminal windows and tabs, Show All Terminals, the session's tools menu, text size, search, pasting, dropping files, snippets, recording, and the Mac's local shell.
 
 ## Windows and tabs
 
@@ -78,6 +78,19 @@ In a terminal kept in tmux, tmux searches its own history, so text that has scro
 ## Paste
 
 Pasting a single short line sends it straight away. Text with more than one line, or longer than 4,096 bytes, opens **Review Terminal Paste** first. Edit it if needed, then choose **Paste**. Clipboards larger than 262,144 bytes are refused.
+
+## Drop files on a terminal
+
+Drag files onto a terminal to type their paths at the cursor, ready for the program that reads them, such as Claude Code. The paths are escaped for the shell and separated by spaces, with a space after the last. Nothing is run: press Return yourself.
+
+- **On Mac, in a local terminal:** each file types its own path. A screenshot dragged from its thumbnail, or an image dragged from a browser, is saved in the app's caches first and types that path.
+- **In an SSH terminal, on every platform:** the shell is on the host, so the files are uploaded there first, into `~/.cache/glass-power-tools/dropped/` in a folder for the day, and their paths on the host are typed. This works with files from Files or the Finder, photos from Photos, and files from other apps. A photo in HEIC is uploaded as a JPEG, which more tools can read; other files go as they are. If a name is taken, the file gets a number, for example `photo-2.jpg`. Nothing is ever uploaded into the shell's current folder.
+
+While files upload, the terminal's corner shows their progress; its × cancels, and a cancelled drop types nothing. A file that doesn't arrive types nothing either, and the corner says why and what to do. A terminal that isn't connected refuses the drop.
+
+The day folders are cleared once they're more than a week old, the first time you drop something on each connection. Only that drop folder is touched. To keep a dropped file, move it somewhere else on the host.
+
+Folders can't be dropped; drop the files inside them.
 
 ## The on-screen keyboard bar
 
