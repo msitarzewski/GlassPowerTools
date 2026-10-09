@@ -669,3 +669,30 @@ Both merged onto main by patch (`git apply -3 --index`, clean), built, and commi
   0 already open, 0 not saved, 4 reopening`, then each terminal window's ask "already taken at this launch"; 15 of 15
   tmux sessions attached; no crash report or launchd exit line. Vision Pro refused the install while asleep (CoreDevice
   error 4016); it stays on 0.4.318 until the retry.
+
+## After 0.4.319 (2026-10-09, afternoon)
+
+The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Photos reached Claude Code over SSH).
+
+- **6065016 — the crash after `exit`.** `exit` ended a window's last terminal (tmux over SSH); the window closed, then
+  SwiftUI's next update of its views ran the window reader's `configure` again: the closed window went back into
+  `MacWorkspacePreviewRegistry` and the reader's coordinator became its delegate again, with SwiftUI's delegate gone.
+  Show All Terminals offered it ("New Terminal", "Empty tab"); choosing it brought the torn-down, transparent window
+  forward ("an invisible window"), `windowDidBecomeKey:` sent to the forwarding coordinator raised "unrecognized
+  selector" (twice, caught by AppKit, from `MacTerminalExpose.choose` and `.close`), and the next window update trapped
+  (PAC failure) in `Coordinator.observedWindowDidUpdate`. Report `Glass Power Tools-2026-10-09-124250.ips`, 0.4.319.
+  Fix: `MacTerminalWindowReader.closedWindows` (weak) is filled at `willClose`; a closed window is never configured,
+  observed, delegated or registered again, and the registry's entries never return a closed window. Coordinator
+  `deinit` removes its observers. `MacTerminalWindowCloseTests` (2 tests) fail without it (5 expectations).
+- **deb5d2f — Active's count at launch.** Only Active asked the machines, so the sidebar said 0 at launch ("once you
+  go in it updates to 15"). The library asks as it appears and when the app returns to the front, unless answered in
+  the last 5 minutes (`refreshRunningSessionsIfDue`). Test fails without the throttle.
+- **b390920 — right-click menu in Mac terminals** (owner: "we don't have any contextual menus in terminal"):
+  `MacTerminalContextMenu` — word under the pointer selected unless inside the selection, Look Up, Copy, Paste (the
+  view's own reviewed paste), Select All; `validRequestor`/`writeSelection` hand the selection to Services (send only).
+  `MacTerminalContextMenuTests` (5) through the real remote view, each failing without its override. Not verified:
+  whether macOS adds a Services submenu to this context menu by itself (a probe popping the menu in a test hung);
+  the owner's "Paste Text" is not built yet (Terminal's "Paste Escaped Text" is the likely meaning, to confirm).
+- Suites: terminal 654 tests in 52 suites, shell 232 in 46, all passed. Building 0.4.320.
+- **Installed 0.4.320 on the Mac** (13:10): `Reopen: quitting with 4 windows listed`, then 4 reopened once; 15 of 15
+  sessions attached; no crash report or exception. The iPhone refused it while locked (CoreDevice 4016).

@@ -29,8 +29,9 @@ anything touching real servers (SSH and database tests use the disposable test V
 
 ## 2026-10-09 — where things stand
 
-**Installed:** Mac and iPhone **0.4.319** (2026-10-09 12:19: W11 names, W12 window places, W14 drops); Vision Pro
-0.4.318 — its 0.4.319 install was refused while the headset slept (CoreDevice 4016), to retry when it is awake.
+**Installed:** Mac **0.4.320** (2026-10-09 13:10: closed-window crash fix, Active count at launch, terminal
+right-click menu; 4 windows reopened, 15/15 sessions, no crash). iPhone **0.4.319** (its 0.4.320 install refused
+while locked, CoreDevice 4016); Vision Pro 0.4.318 (asleep at 0.4.319). Builds in `$SP/dd-*`, to retry.
 The Mac reopened its 4 listed windows once (`Reopen: 4 listed … 4 reopening`; later asks "already taken"), 15 of 15
 tmux sessions attached, no crash. Places were not yet recorded by the 0.4.317 that quit, so positions come back from
 the next quit on. Everything committed; nothing pushed. Current task note:
