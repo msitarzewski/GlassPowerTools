@@ -28,15 +28,27 @@ import AppKit
 /// still exporting after cancellation. Never deletes a source application's file.
 final class SFTPDropStaging: @unchecked Sendable {
     let directory: URL
+    /// A terminal's drop keeps what it received: the paths are typed into the shell, and a program
+    /// reads them after the drop is over. An upload's staging is gone once the upload is.
+    private let keepsFiles: Bool
 
-    init() throws {
-        directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("glas-sh-drop-" + UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
+    convenience init() throws {
+        try self.init(in: FileManager.default.temporaryDirectory, prefix: "glas-sh-drop-", keepsFiles: false)
+    }
+
+    /// A directory of its own inside `parent`, whose files outlive the drop.
+    convenience init(keepingFilesIn parent: URL) throws {
+        try self.init(in: parent, prefix: "", keepsFiles: true)
+    }
+
+    private init(in parent: URL, prefix: String, keepsFiles: Bool) throws {
+        directory = parent.appendingPathComponent(prefix + UUID().uuidString, isDirectory: true)
+        self.keepsFiles = keepsFiles
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: keepsFiles,
                                                attributes: [.posixPermissions: 0o700])
     }
 
-    deinit { try? FileManager.default.removeItem(at: directory) }
+    deinit { if !keepsFiles { try? FileManager.default.removeItem(at: directory) } }
 
     nonisolated func owns(_ url: URL) -> Bool {
         url.isFileURL && url.resolvingSymlinksInPath().path.hasPrefix(
@@ -116,8 +128,10 @@ final class SFTPIncomingDrop {
     }
     #endif
 
-    func materialize() async throws -> (urls: [URL], staging: SFTPDropStaging) {
-        let staging = try SFTPDropStaging()
+    /// Files that already exist come back as they are; promised files and bare content are
+    /// written into `staging` — by default, a temporary one that goes when it is released.
+    func materialize(into given: SFTPDropStaging? = nil) async throws -> (urls: [URL], staging: SFTPDropStaging) {
+        let staging = try given ?? SFTPDropStaging()
         var urls: [URL] = []
         for source in sources {
             try Task.checkCancellation()

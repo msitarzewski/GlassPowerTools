@@ -11,6 +11,31 @@
 import Foundation
 
 enum TerminalDroppedPaths {
+    /// The app's own folder in the user's caches, for files a drop had to write.
+    static let inboxName = "Dropped"
+
+    /// Where a dropped file that exists nowhere yet is written. A screenshot dragged from its
+    /// floating thumbnail is a file promise, written only when the drop says where (2026-10-09:
+    /// "I really do need to be able to drag screen shots taken with shift-command-4 … into a
+    /// terminal window"); so is an image dragged as bare data. The path is typed into the shell and
+    /// read later — by an agent, often — so the file stays. Each drop has a folder of its own, and
+    /// folders older than a week are cleared the next time something is dropped.
+    static func inbox(caches: URL? = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first,
+                      now: Date = Date(), fileManager: FileManager = .default) throws -> URL {
+        guard let caches else { throw CocoaError(.fileNoSuchFile) }
+        let inbox = caches.appendingPathComponent("com.glasspowertools", isDirectory: true)
+            .appendingPathComponent(inboxName, isDirectory: true)
+        try fileManager.createDirectory(at: inbox, withIntermediateDirectories: true)
+        let cutoff = now.addingTimeInterval(-7 * 24 * 60 * 60)
+        let folders = (try? fileManager.contentsOfDirectory(at: inbox, includingPropertiesForKeys: [.creationDateKey])) ?? []
+        for folder in folders {
+            if let created = try? folder.resourceValues(forKeys: [.creationDateKey]).creationDate, created < cutoff {
+                try? fileManager.removeItem(at: folder)
+            }
+        }
+        return inbox
+    }
+
     /// The text a drop of `urls` types. File URLs only; anything else is left out.
     static func text(for urls: [URL]) -> String? {
         let paths = urls.filter(\.isFileURL).map { escaped($0.path) }

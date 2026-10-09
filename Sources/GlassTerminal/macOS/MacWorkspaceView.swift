@@ -3,6 +3,7 @@ import AppKit
 import GlassConnectionUI
 import GlassShell
 import Observation
+import os
 import GlassTerminalEmulator
 import SwiftUI
 import GlassLayers
@@ -827,9 +828,10 @@ private struct MacWorkspaceTabContent: View {
                         if let frame = layout.paneFrames[pane.id] {
                             paneView(pane, showsPaneChrome: showsPaneChrome)
                                 .id(pane.id)
-                                // Files dropped from Finder type their paths, as Terminal.app does.
-                                .dropDestination(for: URL.self) { urls, _ in
-                                    dropFiles(urls, on: pane.id)
+                                // Files dropped from Finder type their paths, as Terminal.app does;
+                                // so does a screenshot's floating thumbnail, a file promise.
+                                .onDrop(of: SFTPIncomingDrop.acceptedTypes, isTargeted: nil) { providers in
+                                    receiveDrop(providers, on: pane.id)
                                 }
                                 .frame(width: frame.width, height: frame.height)
                                 .position(x: frame.midX, y: frame.midY)
@@ -854,6 +856,25 @@ private struct MacWorkspaceTabContent: View {
             )
         }
     }
+
+    /// Reads a drop the way the Files browser does — a file promise first, as AppKit offers it —
+    /// and types the paths. A file that already exists types its own path; a promised file or bare
+    /// image data is written to the drop inbox first (`TerminalDroppedPaths.inbox`).
+    private func receiveDrop(_ providers: [NSItemProvider], on paneID: UUID) -> Bool {
+        guard let drop = SFTPIncomingDrop(providers: providers) else { return false }
+        Task { @MainActor in
+            do {
+                let staging = try SFTPDropStaging(keepingFilesIn: TerminalDroppedPaths.inbox())
+                let received = try await drop.materialize(into: staging)
+                _ = dropFiles(received.urls, on: paneID)
+            } catch {
+                Self.dropLogger.error("A drop on a terminal could not be read: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+        return true
+    }
+
+    private static let dropLogger = Logger(subsystem: "sh.glas", category: "terminal-drop")
 
     /// Types the dropped files' paths into the pane's terminal, and makes it the focused pane.
     private func dropFiles(_ urls: [URL], on paneID: UUID) -> Bool {
