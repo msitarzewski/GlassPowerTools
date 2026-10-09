@@ -191,6 +191,9 @@ public struct GlassShellSettingsView: View {
     }
 
     @AppStorage(GlassAvailabilityMonitor.settingKey) private var showsAvailability = false
+    #if os(macOS)
+    @AppStorage(GlassWindowRestoration.key) private var reopensWindows = true
+    #endif
 
     private var general: some View {
         Group {
@@ -202,6 +205,16 @@ public struct GlassShellSettingsView: View {
         } footer: {
             Text("A dot beside each service: green when it answers, orange when it answers slowly, red when it does not. This device opens a connection to each service's port about once a minute while the library is on screen, and closes it at once. It never signs in.")
         }
+        #if os(macOS)
+        Section {
+            Toggle("Reopen windows where you left them", isOn: $reopensWindows)
+                .accessibilityIdentifier("settings-reopen-windows")
+        } header: {
+            Text("Windows")
+        } footer: {
+            Text("When the app opens again, its terminal windows and the Connections window come back on the same displays, at the same size and place. Off, this app follows the Mac's own setting, \u{201C}Close windows when quitting an application\u{201D}.")
+        }
+        #endif
         Section("Host Library") {
             LabeledContent("Storage", value: model.hasSharedContainer ? "App group container" : "This app's container")
             Text(model.hostLibraryStatus).font(.footnote).foregroundStyle(.secondary)

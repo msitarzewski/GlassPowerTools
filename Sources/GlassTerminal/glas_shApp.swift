@@ -26,6 +26,12 @@ public final class MacTerminalAppDelegate: NSObject, NSApplicationDelegate {
     // receiver is called from here rather than taking a second one. The three methods below are
     // the whole of it; the reconciling happens in `GlassShellModel`.
 
+    public func applicationWillFinishLaunching(_ notification: Notification) {
+        // Windows come back where they were, whatever the system-wide "Close windows when
+        // quitting" says, unless General settings turned it off here (2026-10-09).
+        GlassWindowRestoration.adoptDefault()
+    }
+
     public func applicationDidFinishLaunching(_ notification: Notification) {
         GlassRemoteChangeReceiver.register()
     }
