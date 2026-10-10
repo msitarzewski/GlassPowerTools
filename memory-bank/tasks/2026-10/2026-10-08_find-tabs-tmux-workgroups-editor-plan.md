@@ -799,3 +799,11 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   the terminal canvas (opacity, tint, frost/material, blur). Sections are now This Window / All Terminals / Port
   Forwarding, opening on This Window; captions say what each changes. Open question for the owner: should a window's
   outer glass (Appearance's frost/opacity) be per window too on Vision Pro? 0.4.330 to iPhone and Vision Pro.
+- **Owner, 2026-10-10, on the Vision Pro:** "I do not want borders.... I like it just the way it is" (a voice-control ask
+  I misread as "add beveled glass"; the edit was reverted, nothing committed). "the mismatched radii bothers me" →
+  **9b9fc26**: the terminal canvas corner is concentric with the window paint (24−10 = 14 with ornaments, 46−10 = 36
+  without; `GlassWindowShape.concentricCornerRadius`, tests fail with the old fixed 18). 0.4.331 to iPhone and Vision Pro.
+- **"the original idea was that anything in the system settings could be overridden per window"** — asked the scope, he
+  chose **every kind of window now**. **W22 started** (agent): the shared per-window overlay contract, Appearance (glass
+  layers) per window, and every terminal setting per window (W20's look migrated). Then W23–W25 adopt it for the editor,
+  database and desktop windows.
