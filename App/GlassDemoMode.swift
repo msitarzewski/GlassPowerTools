@@ -21,6 +21,7 @@ import GlassLayers
 import GlassDatabase
 import GlassDesktop
 import GlassShell
+import GlassConnectionKit
 
 @MainActor
 enum GlassDemoMode {
@@ -83,6 +84,17 @@ enum GlassDemoMode {
             // and either title drags into the other window.
             terminal.requestDemoReplay(name: "alpha", output: Data(terminalTranscript.utf8))
             terminal.requestDemoReplay(name: "bravo", output: Data("ann@bravo:~$ ".utf8))
+        case "library-history":
+            // The library's overview with a month of invented connections behind it: the chart and
+            // Most used, for checking how its tiles and sections line up.
+            while !shell.isLoaded { try? await Task.sleep(for: .milliseconds(100)) }
+            var connections: [(host: String, daysAgo: Int, kind: HostServiceKind)] = []
+            for day in 0..<30 where day % 3 != 1 {
+                connections.append(("alpha", day, day % 2 == 0 ? .ssh : .database))
+                if day % 4 == 0 { connections.append(("bravo", day, .rdp)) }
+                if day % 5 == 0 { connections.append(("build", day, .ssh)) }
+            }
+            shell.demoRecordConnections(connections)
         case "connections-host":
             // The Connections window at its first size with a machine's details showing (W29).
             while !shell.isLoaded { try? await Task.sleep(for: .milliseconds(100)) }

@@ -965,3 +965,15 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   Opacity paint, no 34/12-pt inset); the overview uses `.scenePadding()` on visionOS (24 elsewhere). Connections is
   visionOS's own window: neither Opacity nor Glass changes it (help updated). Shell 254, layers 48, connection UI 43
   pass; simulator capture checked.
+- **0.4.340 installed on Vision Pro (relaunched) and iPhone (~17:35).**
+- **Owner (~17:30):** "I like the minimum space that terminal provides as a margin ... let's keep all tiles and shapes
+  aligned (vision pro)"; "use the Glass Power Tools icon ... for the floater"; "install mac". Mac **0.4.341** installed
+  17:36 (running, windows reopened, no new crash report). Orb: app icon (flattened solidimagestack → `GlassPowerToolsOrb`
+  imageset), count badge on the rim. Library overview on visionOS: "Your Library" is the column's `navigationTitle`
+  (level with "All Connections"); content leading 24 (the title's inset), trailing/bottom 34 (terminal margin); tiles in
+  `GlassEqualWidthRow` (equal width and height; 4 in a row only when the widest fits, else 2×2); tile labels with the
+  symbol overlaid so labels share a line. Demo `library-history` seeds a month of invented connections.
+- **Owner:** "Why are these different sizes? Let's make them all the smaller apple defaults" (terminal's bottom
+  ornament vs the library's toolbar ornament) → **W31** (move GlassNativeWindowFrame controls into Apple's
+  `.bottomOrnament` toolbar, or match its metrics). **Owner:** no resize for the left (sidebar) columns — never decided;
+  visionOS shows no drag handle; to be tested.

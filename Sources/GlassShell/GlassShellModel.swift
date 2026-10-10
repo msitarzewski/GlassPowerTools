@@ -1679,3 +1679,20 @@ public final class GlassShellModel: GlassServiceStore {
 extension Logger {
     static let catalogSync = Logger(subsystem: "com.glasspowertools", category: "catalog-sync")
 }
+
+#if DEBUG
+extension GlassShellModel {
+    /// Screenshots only (`--demo-open library-history`): connections as if made over the last
+    /// weeks, so the overview's chart and Most used have something to show. Each is a host's name,
+    /// how many days ago, and the kind of service.
+    public func demoRecordConnections(_ connections: [(host: String, daysAgo: Int, kind: HostServiceKind)]) {
+        let now = Date()
+        for connection in connections {
+            guard let host = hosts.first(where: { $0.displayName == connection.host }) else { continue }
+            let date = now.addingTimeInterval(-Double(connection.daysAgo) * 24 * 60 * 60)
+            preferences.recordConnection(.init(date: date, hostID: host.id, kind: connection.kind))
+        }
+        try? persistPreferences()
+    }
+}
+#endif

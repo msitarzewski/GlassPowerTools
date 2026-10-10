@@ -87,13 +87,10 @@ struct GlassLibraryOverview: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
+                #if !os(visionOS)
                 Text("Your Library").font(.largeTitle.bold())
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 12)], spacing: 12) {
-                    metric("Machines", statistics.machines, "server.rack")
-                    metric("Services", statistics.services, "square.stack.3d.up")
-                    metric("Favorites", statistics.favorites, "star")
-                    metric("Collections", statistics.collections, "folder")
-                }
+                #endif
+                metrics
                 if !statistics.servicesByKind.isEmpty {
                     HStack(spacing: 20) {
                         ForEach(HostServiceKind.allCases, id: \.self) { kind in
@@ -112,23 +109,66 @@ struct GlassLibraryOverview: View {
                 if !statistics.mostUsed.isEmpty { mostUsedSection }
             }
             #if os(visionOS)
-            // Apple's own margins for the window it is in.
-            .scenePadding()
+            // Level with the column's title on the left (visionOS sets it 24 points in), and at
+            // least the terminal's margin from the window's own edges, right and bottom (owner,
+            // 2026-10-10: "I like the minimum space that terminal provides as a margin").
+            .padding(.leading, Self.titleInset)
+            .padding(.trailing, GlassWindowShape.spatialNestedCanvasInset)
+            .padding(.bottom, GlassWindowShape.spatialNestedCanvasInset)
             #else
             .padding(24)
             #endif
             .frame(maxWidth: 760, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
+        #if os(visionOS)
+        // The column's own title, so visionOS sets it level with the sidebar's "All Connections"
+        // (owner: "let's keep all tiles and shapes aligned"). It was text inside the scroll view,
+        // which sat higher than the sidebar's title.
+        .navigationTitle("Your Library")
+        #endif
         .accessibilityIdentifier("library-overview")
     }
 
+    #if os(visionOS)
+    /// Where visionOS sets a column's navigation title from the column's leading edge, measured in
+    /// the visionOS 27 simulator; the overview's left edge follows it.
+    static let titleInset: CGFloat = 24
+    #endif
+
+    /// The four figures, in one even row, or two even rows of two where the column is narrow:
+    /// every tile the same width, so their edges line up with the chart and the list below. An
+    /// adaptive grid left three on one row and one under it, short of the right-hand edge.
+    private var metrics: some View {
+        ViewThatFits(in: .horizontal) {
+            GlassEqualWidthRow(spacing: 12) {
+                machines; services; favorites; collections
+            }
+            VStack(spacing: 12) {
+                GlassEqualWidthRow(spacing: 12) { machines; services }
+                GlassEqualWidthRow(spacing: 12) { favorites; collections }
+            }
+        }
+    }
+
+    private var machines: some View { metric("Machines", statistics.machines, "server.rack") }
+    private var services: some View { metric("Services", statistics.services, "square.stack.3d.up") }
+    private var favorites: some View { metric("Favorites", statistics.favorites, "star") }
+    private var collections: some View { metric("Collections", statistics.collections, "folder") }
+
     private func metric(_ title: String, _ value: Int, _ symbol: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label(title, systemImage: symbol).font(.subheadline).foregroundStyle(.secondary)
+            // The words set the line's height and the symbol sits over its start: the four symbols
+            // differ in height, and side by side they set each tile's label a little lower or higher.
+            Text(title)
+                .padding(.leading, 24)
+                .overlay(alignment: .leading) { Image(systemName: symbol) }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
             Text(value, format: .number).font(.title.bold()).monospacedDigit()
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        // The row's width and height, so every tile in it is the same shape.
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(14)
         .background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 12))
         .accessibilityElement(children: .combine)
@@ -171,5 +211,36 @@ struct GlassLibraryOverview: View {
                 .accessibilityHint("Shows this machine")
             }
         }
+    }
+}
+
+/// Views side by side at one shared width and one shared height, filling the width they are
+/// given. Asked for its ideal size it needs its widest view's width for each, so a `ViewThatFits`
+/// chooses it only where every view fits whole: equal shares of the width otherwise squeezed the
+/// longest label ("Collections") onto two lines and left its tile taller than the rest.
+struct GlassEqualWidthRow: Layout {
+    var spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard !subviews.isEmpty else { return .zero }
+        let gaps = spacing * CGFloat(subviews.count - 1)
+        let widest = subviews.map { $0.sizeThatFits(.unspecified).width }.max() ?? 0
+        let width = proposal.width ?? widest * CGFloat(subviews.count) + gaps
+        return CGSize(width: width, height: rowHeight(width: width, gaps: gaps, subviews: subviews))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard !subviews.isEmpty else { return }
+        let gaps = spacing * CGFloat(subviews.count - 1)
+        let column = max(0, (bounds.width - gaps) / CGFloat(subviews.count))
+        for (index, subview) in subviews.enumerated() {
+            subview.place(at: CGPoint(x: bounds.minX + CGFloat(index) * (column + spacing), y: bounds.minY),
+                          proposal: ProposedViewSize(width: column, height: bounds.height))
+        }
+    }
+
+    private func rowHeight(width: CGFloat, gaps: CGFloat, subviews: Subviews) -> CGFloat {
+        let column = max(0, (width - gaps) / CGFloat(subviews.count))
+        return subviews.map { $0.sizeThatFits(ProposedViewSize(width: column, height: nil)).height }.max() ?? 0
     }
 }
