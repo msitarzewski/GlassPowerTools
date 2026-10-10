@@ -1299,3 +1299,19 @@ Connections, the editor, Files and the database keep system navigation (D40), wi
 column in the nested corner and no extra glass. **Proposed, owner to choose:** the database without a split view on
 visionOS (`DatabaseSpatialLayout.ownGlass`, off), fully clear at Glass 0, at the cost of the system sidebar's collapse,
 adaptive column widths and split-view rotor landmarks.
+
+## D61 — A remote display per window on one connection, and Quality the person can set — Implemented 2026-10-10 (unverified on a Mac)
+**Owner** (Vision Pro on a mobile link, sharing a two-display Mac): "no scaling or bandwidth streaming control / quality
+setting ... I'd like two screens, independently controllable like a real desktop setup." **Decision (W30):** one
+`DesktopSessionModel` per connection, one `DesktopViewport` per window (display, presentation, its own settings, pointer
+mode, on-screen); display windows are `WindowGroup(id: "desktop-display", for: DesktopDisplayWindowValue)` joining the live
+session; input maps through each window's display region; VNC update requests cover only on-screen displays (bounding
+rectangle; nothing on screen → a 1-px keep-alive every 2 s; CopyRect withheld while region-limited). Quality per
+connection: Best (32 bpp lossless), Balanced (JPEG 8, today's), Data Saver (RGB565, JPEG 5, ≤15 updates/s), Lowest (8-bit
+or 16-bit for Tight servers, JPEG 2, ≤8/s); Automatic measures every socket byte and steps at 16/4/0.75 Mbit/s with
+hysteresis; colour changes wait for no outstanding request. Apple's server (RFB 003.889): ZRLE first, Apple's display
+layout (encoding 1105, read defensively; a failure disables asking that host for the run), colour ≥16-bit. Desktop
+Settings ▸ Connection shows the live figures. **Evidence:** TigerVNC fixture with two screens and a rate-limited proxy
+(whole Best 87 Mbit/s → display 2 only Best 49 → whole Data Saver 5.6 → Lowest 1.3; Automatic settled Data Saver at 2
+Mbit/s and Lowest at 0.6). **Unverified on a real Mac:** Apple's layout encoding, 16-bit colour, region requests — the
+owner's checklist is in the task note.

@@ -30,6 +30,10 @@ All four capabilities and the shell are built and in daily use on the owner's Ma
 | Dependency update check, on demand and weekly (D48) | built | survey live (8 of 30 pins behind); `--test swiftterm@1.18.0` fails as it should; the weekly LaunchAgent installed, first run not yet seen |
 | Mac tabs: names from what runs in them, rename, activity wave, Finder drop, drag between windows and reorder (2026-10-07/08) | built | unit (naming, throttle, drop escaping with a zsh/bash round trip, drag rules), device (Mac: rename, drag between windows confirmed by the owner) |
 | Scrolling in tmux: local and SSH on the Mac, a pan on iPhone, iPad and Vision Pro (2026-10-08) | built | unit, live (commands through `sh` against tmux 3.7c); Mac local confirmed by the owner; iOS/visionOS not yet seen |
+| Vision Pro windows draw Apple's glass themselves at their Glass; terminal and remote desktop completely clear at 0 (D59, D60, 2026-10-10) | built | unit, visionOS simulator captures; the terminal's earlier form on device (0.4.336); split-view windows keep system glass (observed limit) |
+| This Window sheets: ↺ reset beside changed settings, Opacity/Glass/Material, one sheet layout (W27, 2026-10-10) | built | unit, visionOS simulator; Mac/iPad not yet looked at |
+| Connections idle orb with the Active count; one Connections window on visionOS (W29, 2026-10-10) | built | unit, 8 visionOS simulator UI tests; not yet on a device |
+| VNC: a window per remote display, region-limited updates, Quality levels and the Connection readout (D61, 2026-10-10) | built | unit, server (TigerVNC fixture with two screens and a rate-limited proxy); not yet against a Mac |
 | Library rows one height in every list; Workgroups on the shared row | built | unit (`GlassLibraryRowConsistencyTests`), device (Mac) |
 | Favourites (D49) and workgroups (D51) sync across devices | built | unit (two devices over a shared in-memory store; each fails without its push); not yet seen across real devices |
 | Vision Pro: Connections window as a value-keyed window group (no launch lockout) | built | device (launched cleanly after the lockout) |

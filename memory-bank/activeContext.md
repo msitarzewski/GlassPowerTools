@@ -27,6 +27,22 @@ anything touching real servers (SSH and database tests use the disposable test V
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
+## 2026-10-10 (evening) — where things stand
+
+**Committed today, after the 0.4.336 install:** 6eafdfd (D59, Vision Pro terminal fully clear: plain window drawing
+Apple's glass at its Glass), c981da3 (W26, combine one-terminal windows: Move Tab To in the tools menu, draggable title),
+aa9f9fe (W27, This Window: ↺ beside changed settings, Opacity/Glass/Material, one sheet), 3c3661d (W28/D60, shared
+window glass; remote desktop fully clear; split-view windows paint only their content), f213d4a (W29, Connections idle
+orb with the Active count), 928baaa (one Connections window on visionOS), ed8f09e (tunnel-hop test coin toss fixed),
+2b4f75f (W30/D61, a window per remote display, region-limited fetching, Quality and the Connection page).
+**Installed:** iPhone and Vision Pro 0.4.336; Mac 0.4.329. The owner is away from the devices (remote); install the
+current HEAD on both when reachable, the Mac at his word.
+**Validation limits:** the Mac's screen was locked for the last three commits: every touched suite passes except the Mac
+title-bar layout test (`workspaceUsesNativeTitle`), which fails the same way on pre-merge code while locked — rerun
+unlocked. W30 is unverified against a real Mac; his checklist is in the task note (2026-10-08 plan note, W30 entry).
+**Owner's open choices:** database split view vs own glass (`DatabaseSpatialLayout.ownGlass`); desktop canvas corners
+rounded vs square; desktop default Glass 25% vs 100%; the no-split treatment for Connections/editor/Files.
+
 ## 2026-10-09 — where things stand
 
 **Installed:** Mac **0.4.326** (2026-10-09 23:43: everything through W15; 4 windows reopened, 16/16 sessions, no

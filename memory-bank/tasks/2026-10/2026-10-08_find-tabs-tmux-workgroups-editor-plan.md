@@ -931,3 +931,29 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   238; visionOS sim build passes. Help: Vision Pro glass wording applied (library, desktop-vision-pro, editor,
   database). Owner's choices pending: database split vs own glass; desktop rounded vs square corners; desktop default
   Glass 25% vs 100%; same treatment for Connections/editor/Files. Editor text view still paints opaque at Opacity 0.
+- **W29 applied to main, staged, NOT committed (~16:00): the Mac's screen is locked**, so GlassShell/GlassTerminal/
+  GlassDesktop protected-file tests fail with EPERM (desktop's 4 failures are exactly that). Passing now: layers 48,
+  connection UI 43, database 317, editor 150; visionOS sim build passes. Commit after the shell, terminal and desktop
+  suites pass unlocked. Orb: `>_` in Apple's glass, "⚡ N" from `activeSessionCount()`, hover grows 8% + "Connections";
+  idle via `pushWindow` (hidden, not closed), holds for sheets/menus/editing/drag/connecting (10-min cap)/only window;
+  Settings ▸ General "Shrink Connections when idle" (Never/1/2/5/10, default 2); Connections 960×700 (was 1280×720).
+  Found: `openWindow(id: "main")` with no value opens a SECOND Connections window on visionOS → W29 follow-up (w29b):
+  `GlassConnectionsWindow` moved to a shared module + `openConnections()` helper for every caller, with a UI test.
+- **W30 applied to main on top of W29, staged, NOT committed (screen locked) — D61.** Conflicts (7 files, one block each)
+  resolved: DesktopSessionView keeps W27's `GlassSettingsSheet` (W30's old toolbar dropped; Original is Show Original);
+  W27's two new lines in DesktopWindowSettingsView repointed from `session.windowSettings` to `viewport.windowSettings`;
+  plain-window inventory gains `DesktopDisplayWindowValue.windowID` with W28's glass/canvas snippets. Passing: VNCKit 54,
+  VNC transport 8, layers 48, connection UI 43, database 317, editor 150; desktop 195 with 4 lock-only failures (the
+  wallpaper one fails identically on pre-W30 code in W28's worktree). visionOS sim build passes; captures sent.
+  **To commit when unlocked:** run shell/terminal/desktop suites; then `git reset -q`, `git apply --cached
+  $SP/w29-onmain.patch` → commit W29 (+ w29b if landed), then `git add -A ':!README.md'` → commit W30.
+  **Owner's checklist on his Mac over mobile** (W30): Connection ▸ Encoding reads ZRLE (Raw = report); a Displays
+  control and a second window, correct crops, clicks land, pointer in the right window (else Console
+  `event=apple-display-layout`); Data Saver → Color 16-bit with correct colours; closing display 2 → Fetching "Only the
+  displays on screen" and Receiving drops; which level Automatic settles on; Mac menus (rule 34) after the new window group.
+- **Committed (~17:00, screen still locked):** f213d4a W29 orb; 928baaa one Connections window (w29b: `GlassConnectionsWindow`
+  in GlassConnectionUI, `openConnections()`; 8 orb UI tests pass; the orb's own second-window handling removed);
+  ed8f09e tunnel-hop tests given explicit creation dates (were a coin toss: equal dates read back, tie broken by random
+  ids; 30/30 alone, 4/4 full after); 2b4f75f W30. Split from one index with `$SP/w29-onmain.patch` and `w29b.patch`
+  applied `--cached`. All touched suites pass except `workspaceUsesNativeTitle` (fails identically on pre-merge code
+  while locked; no Mac terminal file changed) — rerun when unlocked.
