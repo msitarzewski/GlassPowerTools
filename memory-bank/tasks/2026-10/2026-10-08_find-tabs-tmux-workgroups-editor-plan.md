@@ -792,3 +792,10 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   shows only `kvs/synchronize` after launch — no "Failed to synchronize" for the first time since 2026-09-27 (W18). The
   SSH pool logs one line per decision. To confirm on the Vision Pro: opening the usual sets connects every terminal
   (W21), at most 6 ttys per headset `sshd-session` on the Mac.
+- **a0310df — This Window first.** Owner, on the Vision Pro (0.4.329): "we still don't have terminal level or window
+  level controls. They all change transparency in color and on." The Settings sheet opened on "Terminal" (the global
+  settings: tint) with the window's look second as "Overrides"; and the window's outer glass on visionOS comes from the
+  app-wide Appearance layers (`GlassLayeredWindow`, `runtime.layers`), which W20's look does not reach — the look sets
+  the terminal canvas (opacity, tint, frost/material, blur). Sections are now This Window / All Terminals / Port
+  Forwarding, opening on This Window; captions say what each changes. Open question for the owner: should a window's
+  outer glass (Appearance's frost/opacity) be per window too on Vision Pro? 0.4.330 to iPhone and Vision Pro.
