@@ -34,7 +34,7 @@ These apply to every open document and to documents opened later, in every edito
 
 Each setting follows **All Editors** (or **Appearance**) until you change it here. Once you do, a small ↺ appears beside its name; choose it to follow again. Its tooltip says what it returns to: hold the pointer over it, or on Vision Pro look at it. **Reset This Window**, at the end, returns every one. Every document in the window changes at once. A project's or a file's own text settings still apply over the window's.
 
-**On Apple Vision Pro:** the gear is in the row of controls below the window, and **Appearance** has **Opacity** only. A Vision Pro window's glass is the system's own, so an editor window has no **Glass** or **Material** of its own there.
+**On Apple Vision Pro:** the gear is in the row of controls below the window, and **Appearance** has **Opacity** only. **Opacity** paints the column the text sits in. The window's glass is visionOS's own, so an editor window has no **Glass** or **Material** of its own there.
 
 The window keeps its settings with its project, on this device. Close the window and open the project again — after quitting the app too — and they're back. They don't sync to your other devices: the Editor's defaults and **Appearance** they stand in for are kept on each device too, and a project's own settings are what travel with it. A window with no project keeps its settings until you close it.
 

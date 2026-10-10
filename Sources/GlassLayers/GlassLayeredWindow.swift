@@ -97,7 +97,8 @@ public enum GlassLayeredPanelRole: Sendable {
 /// A panel or detail surface drawing from the same state.
 ///
 /// visionOS leads: a panel is a floating surface with the family's rounded frost, so there it
-/// always paints its own theme and frost inside `cornerRadius`. On the Mac, iPad and iPhone a
+/// always paints its own theme inside `cornerRadius` — and an `.embedded` one is the window's
+/// canvas, in the corner nested in Apple's (W28). On the Mac, iPad and iPhone a
 /// `.presented` panel paints the same way, while an `.embedded` panel is the content itself:
 /// painting a second rounded card inside an already layered window doubled the theme paint,
 /// clipped the detail's bottom action bar into a lighter band and let the window corner show
@@ -110,11 +111,16 @@ public struct GlassLayeredPanel<Content: View>: View {
 
     private let cornerRadius: CGFloat
     private let role: GlassLayeredPanelRole
+    private let besideSidebar: Bool
     private let content: Content
 
-    public init(cornerRadius: CGFloat = 24, role: GlassLayeredPanelRole = .presented, @ViewBuilder content: () -> Content) {
+    /// - Parameter besideSidebar: an `.embedded` panel on the headset, where it is the window's
+    ///   canvas: whether a sidebar stands at its leading edge, or the window's edge does.
+    public init(cornerRadius: CGFloat = 24, role: GlassLayeredPanelRole = .presented, besideSidebar: Bool = true,
+                @ViewBuilder content: () -> Content) {
         self.cornerRadius = cornerRadius
         self.role = role
+        self.besideSidebar = besideSidebar
         self.content = content()
     }
 
@@ -130,14 +136,36 @@ public struct GlassLayeredPanel<Content: View>: View {
         if paintsOwnSurface {
             let state = GlassLayerResolution.resolve(layers.state, window: windowOverrides,
                                                      reduceTransparency: reduceTransparency)
-            content
-                .background {
-                    GlassLayerBackground(state: state, cornerRadius: cornerRadius)
-                }
-                .clipShape(.rect(cornerRadius: cornerRadius))
+            #if os(visionOS)
+            if role == .embedded {
+                // **A detail column on the headset is the window's canvas** (W28, the owner: "rebuild
+                // all window appearances to match the new terminal"): Opacity paints it as a
+                // terminal's canvas is painted, in the corner nested in Apple's, 34 points in from the
+                // window edges the column reaches and a little apart from the sidebar. The column's
+                // window paints nothing of its own (`GlassLayeredWindow(paintsTheme: false)`), so
+                // the paint is the content's, not a tint over the whole window's glass.
+                content
+                    // The whole column, whatever it shows: an empty state is not the canvas's size.
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .glassSpatialCanvas(opacity: state.effectiveOpacity)
+                    .padding(GlassWindowShape.spatialColumnCanvasInsets(besideSidebar: besideSidebar))
+            } else {
+                presentedSurface(state)
+            }
+            #else
+            presentedSurface(state)
+            #endif
         } else {
             content
         }
+    }
+
+    private func presentedSurface(_ state: GlassLayerState) -> some View {
+        content
+            .background {
+                GlassLayerBackground(state: state, cornerRadius: cornerRadius)
+            }
+            .clipShape(.rect(cornerRadius: cornerRadius))
     }
 }
 

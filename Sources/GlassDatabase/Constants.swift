@@ -675,7 +675,10 @@ struct DatabaseCommands: Commands {
 @MainActor let databaseSidebarToolbarPlacement: ToolbarItemPlacement = .topBarLeading
 #else
 @MainActor let databaseToolbarPlacement: ToolbarItemPlacement = .bottomOrnament
-@MainActor let databaseExecutionToolbarPlacement: ToolbarItemPlacement = .primaryAction
+/// Run and the assistant: the detail's navigation bar, or with no split view (`DatabaseSpatialLayout`)
+/// and so no navigation bar, the bottom toolbar beside everything else.
+@MainActor let databaseExecutionToolbarPlacement: ToolbarItemPlacement =
+    DatabaseSpatialLayout.drawsItsOwnGlass ? .bottomOrnament : .primaryAction
 @MainActor let databaseTransferToolbarPlacement: ToolbarItemPlacement = .bottomOrnament
 @MainActor let databaseContextToolbarPlacement: ToolbarItemPlacement = .bottomOrnament
 @MainActor let databaseSidebarToolbarPlacement: ToolbarItemPlacement = .topBarLeading

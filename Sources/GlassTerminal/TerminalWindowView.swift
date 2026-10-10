@@ -315,7 +315,7 @@ struct TerminalWindowView: View {
         #if os(visionOS)
         // Stage 2 layering proof: the window chrome comes from the one layering state. The canvas
         // keeps its own theme painting; the window's glass behind it is the workgroup's, drawn
-        // once for the whole window (`VisionTerminalWindowGlass`).
+        // once for the whole window (`GlassSpatialWindowGlass`).
         GlassLayeredWindow(
             showTitle: visionShowsTitle,
             showControls: isTerminalActive,
@@ -997,7 +997,7 @@ struct TerminalWindowView: View {
     /// inside the window's edge on every side, whether or not the ornaments show, so it never
     /// moves as the window gains or loses focus; its corner is concentric with the window's; and
     /// the rows sit `visionRowsInset` inside it on every side, square, concentric with that.
-    static let visionCanvasEdgeInset: CGFloat = 34
+    static let visionCanvasEdgeInset: CGFloat = GlassWindowShape.spatialNestedCanvasInset
 
     /// How far the rows sit inside the canvas, on every side. The rows are square: the terminal
     /// view itself has no corner on Vision Pro (owner, 2026-10-10: "remove that radius all
@@ -1008,19 +1008,14 @@ struct TerminalWindowView: View {
     /// along each edge so the gap round it reads even (46 − 34 / 1.528 ≈ 24). The circular rule
     /// gave 12, which the owner found "too small and still uneven".
     static var visionCanvasCornerRadius: CGFloat {
-        GlassWindowShape.continuousConcentricCornerRadius(outer: GlassWindowShape.spatialWindowCornerRadius,
-                                                          inset: visionCanvasEdgeInset)
+        GlassWindowShape.spatialNestedCanvasCornerRadius
     }
 
     /// The padding inside `GlassNativeWindowFrame` that puts the canvas `visionCanvasEdgeInset`
     /// from the window's edge: the frame insets for the ornaments it shows, this makes up the rest.
+    /// Shared with every plain window's canvas (`GlassWindowShape.spatialNestedCanvasPadding`).
     static func visionCanvasPadding(showsTitle: Bool, showsControls: Bool) -> EdgeInsets {
-        let side = showsTitle || showsControls ? GlassWindowShape.spatialCanvasInset : 0
-        return EdgeInsets(
-            top: visionCanvasEdgeInset - (showsTitle ? GlassWindowShape.spatialTitleInset : 0),
-            leading: visionCanvasEdgeInset - side,
-            bottom: visionCanvasEdgeInset - (showsControls ? GlassWindowShape.spatialControlsInset : 0),
-            trailing: visionCanvasEdgeInset - side)
+        GlassWindowShape.spatialNestedCanvasPadding(showsTitle: showsTitle, showsControls: showsControls)
     }
 
     /// Whether a Vision Pro terminal shows its connection title ornament.

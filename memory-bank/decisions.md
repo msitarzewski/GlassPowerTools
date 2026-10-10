@@ -1278,10 +1278,24 @@ Frost/Material there change nothing.
 `.plain` from the terminal scene to get Apple's window back as the corner the canvas nests in, and the system keeps that
 window's glass behind a focused window whatever the app draws. Proposed returning to `.plain` and drawing the glass
 ourselves; he said "Yeah". **Decision:** the terminal scene is `.plain` again; `VisionTerminalWorkgroupView` draws
-`VisionTerminalWindowGlass` once behind the whole window: `glassBackgroundEffect` in Apple's 46-pt continuous corner,
+`VisionTerminalWindowGlass` (since D60 the shared `GlassSpatialWindowGlass`) once behind the whole window: `glassBackgroundEffect` in Apple's 46-pt continuous corner,
 faded by `TerminalLook.windowGlass` = the resolved Blur (This Window's, else Appearance's Frost; Reduce Transparency
 keeps it at full). 0 draws no glass, so the window is completely clear; the default Frost 100% looks as Apple's window
 did. Opacity still paints only the canvas, and the nested corners (`cfd5094`, `0788d12`) are unchanged. The window-only
 canvas frost (`TerminalLook.windowBlur`, a material fill over the whole window) is gone. Checked in the visionOS
 simulator: `.opacity` fades the glass smoothly (Blur 0, 50%, 100%). Open: Interactive Glass and Material no longer
 change a headset terminal (Settings UX round).
+
+## D60 — Every Vision Pro window follows the terminal's glass where visionOS allows — Implemented 2026-10-10
+**Owner:** "rebuild all window appearances to match the new terminal. So screen sharing, database, etc." **Decision
+(W28):** the terminal's model is shared in GlassLayers: `GlassSpatialWindowGlass` (Apple's glass in the 46-pt
+continuous corner, faded to a strength, nothing at 0), `GlassWindowGlass.strength` (Appearance's Glass with the
+window's own over it; Reduce Transparency → 1) and `.glassSpatialCanvas(opacity:)` (Opacity paints the content area 34 pt
+in, in the ≈23.75 continuous concentric corner; `GlassWindowShape.spatialNestedCanvas*`). The remote desktop matches the
+terminal fully: plain, its own glass at the desktop's Glass, the remote screen as the nested canvas. **Observed limit:**
+on visionOS 27 a NavigationSplitView/NavigationStack always draws its own system glass (UIKit columns'
+`preferredContainerBackgroundStyle = .automatic`); no public API removes it and rule 62 forbids introspection. So
+Connections, the editor, Files and the database keep system navigation (D40), with Opacity painting only their content
+column in the nested corner and no extra glass. **Proposed, owner to choose:** the database without a split view on
+visionOS (`DatabaseSpatialLayout.ownGlass`, off), fully clear at Glass 0, at the cost of the system sidebar's collapse,
+adaptive column widths and split-view rotor landmarks.

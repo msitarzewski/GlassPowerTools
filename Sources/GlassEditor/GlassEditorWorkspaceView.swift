@@ -94,7 +94,9 @@ public struct GlassEditorWorkspaceView: View {
     }
 
     public var body: some View {
-        GlassLayeredWindow {
+        // On the headset the window paints no theme of its own: Opacity paints the text's column,
+        // the window's canvas (`GlassLayeredPanel`, W28), not a tint over the split view's glass.
+        GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsWholeWindow) {
             #if os(iOS)
             // **A phone is not a narrow Mac.** `NavigationSplitView` collapses on a compact width
             // into a single stack showing its *sidebar* first — so an editor opened on a file
@@ -219,7 +221,8 @@ public struct GlassEditorWorkspaceView: View {
                                                 ideal: GlassLibraryColumnLayout.navigationIdeal,
                                                 max: GlassLibraryColumnLayout.navigationMaximum)
         } detail: {
-            GlassLayeredPanel(cornerRadius: 0, role: .embedded) { detail }
+            GlassLayeredPanel(cornerRadius: 0, role: .embedded,
+                              besideSidebar: columnVisibility != .detailOnly) { detail }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 #if os(visionOS)
                 // **On the headset a split view's own toolbar is not drawn; a column's is** — the

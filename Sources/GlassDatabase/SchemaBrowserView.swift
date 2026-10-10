@@ -56,6 +56,8 @@ struct SchemaBrowserView: View {
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
+    /// No navigation bar to hold the title, controls and filter (W28, `DatabaseSpatialLayout`).
+    @Environment(\.databaseSchemaInlineChrome) private var inlineChrome
 
     @State private var databases: [String] = []
     @State private var expandedDatabases: Set<String> = []
@@ -90,10 +92,18 @@ struct SchemaBrowserView: View {
         )
     }
 
+    /// "Schemas" for PostgreSQL, whose schemas are what the tree lists; "Databases" elsewhere.
+    private var title: String {
+        session?.connection?.dialect == .postgresql ? "Schemas" : "Databases"
+    }
+
     var body: some View {
         Group {
             if session != nil {
                 VStack(spacing: 0) {
+                    if inlineChrome {
+                        inlineHeader
+                    }
                     if isLoading && databases.isEmpty {
                         ProgressView("Loading schema...")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -115,7 +125,7 @@ struct SchemaBrowserView: View {
                 )
             }
         }
-        .navigationTitle(session?.connection?.dialect == .postgresql ? "Schemas" : "Databases")
+        .navigationTitle(title)
         .schemaSearchable(text: $filterText)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -343,6 +353,53 @@ struct SchemaBrowserView: View {
         }
     }
     #endif
+
+    /// **The list's own title, controls and filter**, where there is no navigation bar to hold
+    /// them: a Vision Pro database window without the split view (W28, `DatabaseSpatialLayout`).
+    /// The same title, Refresh, Mutation Log and filter the bar shows, in the bar's order.
+    private var inlineHeader: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Text(title)
+                    .font(.title.weight(.bold))
+                    .lineLimit(1)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 0)
+                Button {
+                    Task { await refreshExpandedSchema() }
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                .help("Reload databases and tables")
+                Menu {
+                    Button {
+                        showingMutationAudit = true
+                    } label: {
+                        Label("Mutation Log", systemImage: "list.bullet.rectangle.portrait")
+                    }
+                    .help("Review every row and schema change this app has made")
+                } label: {
+                    Label("More", systemImage: "ellipsis")
+                }
+            }
+            .labelStyle(.iconOnly)
+            .buttonBorderShape(.circle)
+
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+                TextField("Filter", text: $filterText)
+                    .autocorrectionDisabled()
+                    .databaseNoAutocapitalization()
+                    .accessibilityIdentifier("db-schema-filter")
+            }
+            .textFieldStyle(.roundedBorder)
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
+    }
 
     private var schemaTree: some View {
         ScrollViewReader { reader in

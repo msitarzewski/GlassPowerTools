@@ -30,14 +30,17 @@ public struct GlassShellLibraryView: View {
     public init(model: GlassShellModel) { self.model = model }
 
     public var body: some View {
-        GlassLayeredWindow {
+        // On the headset the window paints no theme of its own: Opacity paints the detail, the
+        // window's canvas (`GlassLayeredPanel`, W28), rather than darkening the whole window.
+        GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsWholeWindow) {
             GlassConnectionLibrary(items: model.items, selection: $selection, scope: $scope, searchText: $search,
                                    order: .source,
                                    onActivate: { model.connect(hostID: $0) }) { item in
                 row(item)
             } detail: { id in
-                // Embedded in the layered window's own column: paints only on visionOS (rounded
-                // panel); on macOS and iOS the column is flat and the window paints once.
+                // Embedded in the layered window's own column: paints only on visionOS, where it is
+                // the window's canvas (W28); on macOS and iOS the column is flat and the window
+                // paints once.
                 GlassLayeredPanel(role: .embedded) {
                     if let id, let host = model.host(id) {
                         detail(host)

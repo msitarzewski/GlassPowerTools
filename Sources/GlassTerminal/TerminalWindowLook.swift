@@ -37,12 +37,13 @@ struct TerminalLook: Equatable {
 
     /// **How much of Apple's glass a Vision Pro terminal window shows behind its canvas**, 0…1:
     /// its Blur, the window's own or Appearance's Frost. The window is plain and draws the glass
-    /// itself (`VisionTerminalWindowGlass`), because the system's window keeps its glass while it
+    /// itself (`GlassSpatialWindowGlass`), because the system's window keeps its glass while it
     /// has focus. The owner, on the headset (2026-10-10): "We've lost complete transparency ...
     /// 100% transparent glass (the whole point of the app)". At 0 the window is completely clear;
-    /// Opacity still paints the canvas. Reduce Transparency always shows the glass.
+    /// Opacity still paints the canvas. Reduce Transparency always shows the glass. Every plain
+    /// window resolves its glass the same way (`GlassWindowGlass`, W28).
     func windowGlass(reduceTransparency: Bool) -> Double {
-        reduceTransparency ? 1 : blur
+        GlassWindowGlass.strength(frost: blur, reduceTransparency: reduceTransparency)
     }
 
     var material: Material {

@@ -86,7 +86,7 @@ A database window can keep settings of its own, so one window can have larger te
 
 **This Window** has:
 
-- **Appearance**: **Opacity** and **Glass**, which otherwise follow **Appearance** in Settings. They change the canvas behind the window's tabs, editor and results; the schema sidebar keeps the system's material.
+- **Appearance**: **Opacity** and **Glass**, which otherwise follow **Appearance** in Settings. They change the canvas behind the window's tabs, editor and results; the schema sidebar keeps the system's material. **On Vision Pro**, **Opacity** paints the workspace, set in from the window's edge, and **Glass** only lightens it: the window's glass is visionOS's own.
 - **Query**: **Result row limit**.
 - **Editor**: **SQL editor text**, **Results grid text**, **Show line numbers** and **Format JSON automatically while editing**.
 

@@ -10,6 +10,7 @@
 //
 
 import Foundation
+import SwiftUI
 import Testing
 @testable import GlassConnectionUI
 
@@ -42,22 +43,30 @@ struct GlassWindowShapeTests {
     // MARK: - Every plain window, and what shapes it
 
     /// Each scene declared `.windowStyle(.plain)`, by the `id:` it is declared with, and what keeps
-    /// its content inside the window's rounded shape. `frame` names a source file and the shared
-    /// framing it must use; `nil` says why the window needs none.
+    /// its content inside the window's rounded shape and gives it its glass. `frame` names a source
+    /// file and the shared framing it must use, every one of `uses`; `nil` says why the window
+    /// needs none.
     ///
     /// Anything plain and not listed here is a window nobody has decided the shape of — which is
-    /// how Files and the editor shipped with square corners.
-    static let plainWindows: [String: (frame: (file: String, uses: String)?, why: String)] = [
-        "\"terminal\"": (("VisionTerminalWorkgroupView.swift", "VisionTerminalWindowGlass(strength:"),
+    /// how Files and the editor shipped with square corners. W28 (2026-10-10): a plain window
+    /// either draws Apple's glass itself (`glassSpatialWindowGlass`, as strong as its Glass, none at
+    /// 0) or holds a navigation container whose own system glass is the window's, and then paints
+    /// its content as a canvas in the corner nested in Apple's and draws no glass under it.
+    static let plainWindows: [String: (frame: (file: String, uses: [String])?, why: String)] = [
+        "\"terminal\"": (("VisionTerminalWorkgroupView.swift", [".glassSpatialWindowGlass(strength:"]),
                          "it draws Apple's glass itself, in Apple's corner, as strong as its Blur, so it can be clear"),
-        "\"sftp\"": (("GlassTerminalScenes.swift", "GlassLayeredWindow {"),
-                     "the browser's own glass lies over the paint; the paint has the window's shape"),
-        "GlassEditorRuntime.windowID": (("GlassEditorWorkspaceView.swift", "GlassLayeredWindow {"),
-                                        "the split view's glass lies over the paint, as in Files"),
-        "\"desktop-session\"": (("DesktopSessionView.swift", "GlassNativeWindowFrame {"),
-                                "the session is a card clipped to the canvas corner"),
-        "\"database-workspace\"": (nil,
-                                   "its paint is inside the split view's columns, which keep the window's corners"),
+        "\"sftp\"": (("GlassTerminalScenes.swift", ["GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsWholeWindow) {"]),
+                     "the browser's NavigationStack draws the window's glass; Opacity paints the list, its canvas"),
+        "GlassEditorRuntime.windowID": (("GlassEditorWorkspaceView.swift",
+                                         ["GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsWholeWindow) {",
+                                          "GlassLayeredPanel(cornerRadius: 0, role: .embedded,"]),
+                                        "the split view draws the window's glass; Opacity paints the text's column, its canvas"),
+        "\"desktop-session\"": (("DesktopSessionView.swift",
+                                 [".glassSpatialWindowGlass(strength:", "GlassWindowShape.spatialNestedCanvasCornerRadius"]),
+                                "it draws Apple's glass itself; the remote screen is its canvas, nested in Apple's corner"),
+        "\"database-workspace\"": (("DatabaseWorkspaceView.swift",
+                                    ["DatabaseSpatialCanvas(", ".glassSpatialWindowGlass(strength:"]),
+                                   "the split view draws the window's glass and the workspace is its canvas; without the split view (DatabaseSpatialLayout) it draws Apple's glass itself"),
         "\"minimized\"": (nil, "an icon in a circle; there is no window surface to shape"),
     ]
 
@@ -80,7 +89,9 @@ struct GlassWindowShapeTests {
             let file = try #require(sources.first { $0.lastPathComponent == frame.file },
                                     "\(id): \(frame.file) is not in the sources")
             let text = try String(contentsOf: file, encoding: .utf8)
-            #expect(text.contains(frame.uses), "\(id) is plain and no longer framed by \(frame.uses) in \(frame.file)")
+            for uses in frame.uses {
+                #expect(text.contains(uses), "\(id) is plain and no longer framed by \(uses) in \(frame.file)")
+            }
         }
     }
 
@@ -147,6 +158,40 @@ struct GlassConcentricCornerTests {
         #expect(GlassWindowShape.concentricCornerRadius(outer: 24, inset: 10) == 14)
         #expect(GlassWindowShape.concentricCornerRadius(outer: 46, inset: 10) == 36)
         #expect(GlassWindowShape.concentricCornerRadius(outer: 8, inset: 10) == 0, "never below square")
+    }
+}
+
+/// W28: every plain window's canvas is the terminal's (owner, on the headset, 2026-10-10: "Yep, I
+/// like this much better"), and lives in one place.
+@Suite("A canvas nested in the window")
+struct GlassNestedCanvasTests {
+    @Test func theCanvasSitsTheTerminalsEvenDistanceInsideTheWindowInAConcentricCorner() {
+        #expect(GlassWindowShape.spatialNestedCanvasInset == 34)
+        let r = GlassWindowShape.spatialNestedCanvasCornerRadius
+        #expect(r == GlassWindowShape.continuousConcentricCornerRadius(outer: 46, inset: 34))
+        #expect(abs(r - 23.75) < 0.01, "46 − 34 / 1.528")
+    }
+
+    @Test func theFramePlusThePaddingIsTheSameInsetOnEverySideWhateverTheOrnaments() {
+        for (title, controls) in [(true, true), (true, false), (false, true), (false, false)] {
+            let padding = GlassWindowShape.spatialNestedCanvasPadding(showsTitle: title, showsControls: controls)
+            let side = title || controls ? GlassWindowShape.spatialCanvasInset : 0
+            let edge = GlassWindowShape.spatialNestedCanvasInset
+            #expect(padding.top + (title ? GlassWindowShape.spatialTitleInset : 0) == edge)
+            #expect(padding.bottom + (controls ? GlassWindowShape.spatialControlsInset : 0) == edge)
+            #expect(padding.leading + side == edge && padding.trailing + side == edge)
+            #expect(padding.top >= 0 && padding.bottom >= 0 && padding.leading >= 0, "a frame inset never exceeds the canvas's")
+        }
+    }
+
+    @Test func aColumnCanvasMeetsTheWindowsCornerWhereItReachesTheWindowsEdge() {
+        let alone = GlassWindowShape.spatialColumnCanvasInsets(besideSidebar: false)
+        #expect(alone.leading == 34 && alone.trailing == 34 && alone.bottom == 34)
+        #expect(alone.top == 0, "the column's navigation bar is above it, not the window's edge")
+        let beside = GlassWindowShape.spatialColumnCanvasInsets(besideSidebar: true)
+        #expect(beside.leading == GlassWindowShape.spatialCanvasGap && beside.leading < 34,
+                "beside a sidebar the leading edge is not the window's")
+        #expect(beside.trailing == 34 && beside.bottom == 34)
     }
 }
 

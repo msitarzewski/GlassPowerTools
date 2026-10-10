@@ -46,11 +46,13 @@ enum GlassDemoMode {
         // `--demo-glass <opacity>,<frost>`: Appearance's two sliders, for checking a window's glass
         // at a given setting (a Vision Pro terminal at Blur 0 is completely clear).
         let arguments = ProcessInfo.processInfo.arguments
+        var demoGlass: (opacity: Double, frost: Double)?
         if let index = arguments.firstIndex(of: "--demo-glass"), arguments.indices.contains(index + 1) {
             let values = arguments[index + 1].split(separator: ",").compactMap { Double($0) }
             if values.count == 2 {
                 layers.state.opacity = values[0]
                 layers.state.frost = values[1]
+                demoGlass = (values[0], values[1])
             }
         }
         #if os(iOS)
@@ -97,10 +99,18 @@ enum GlassDemoMode {
             renderer.scale = 1
             guard let picture = renderer.cgImage else { return }
             // `desktop-window`: a window with settings of its own (W25); `desktop-settings`: and
-            // Desktop Settings ▸ This Window open over it.
+            // Desktop Settings ▸ This Window open over it. `desktop` with `--demo-glass`: the
+            // window's glass is the frost given (a desktop's glass is its own Background Frost,
+            // not Appearance's), and an opacity above 0 fades the remote screen — a desktop has no
+            // theme to paint, so 0 leaves the screen as it is (W28).
+            var windowSettings = surface == "desktop" ? GlassWindowOverrides() : GlassDesktopRuntime.demoWindowSettings
+            if surface == "desktop", let demoGlass {
+                windowSettings = GlassDesktopRuntime.demoWindowSettings(
+                    frost: demoGlass.frost, opacity: demoGlass.opacity > 0 ? demoGlass.opacity : nil)
+            }
             await desktop.requestDemoDesktop(
                 name: "bravo", host: "192.0.2.20", picture: picture,
-                windowSettings: surface == "desktop" ? GlassWindowOverrides() : GlassDesktopRuntime.demoWindowSettings,
+                windowSettings: windowSettings,
                 opensSettings: surface == "desktop-settings")
         default:
             break

@@ -577,6 +577,16 @@ struct SFTPBrowserView: View {
     var body: some View {
         NavigationStack {
             content
+                #if os(visionOS)
+                // **The files are the window's canvas** (W28, the owner: "rebuild all window
+                // appearances to match the new terminal"): Opacity paints them as a terminal's
+                // canvas is painted, in the corner nested in Apple's, 34 points in from the window's
+                // edges, rather than tinting the stack's glass across the whole window. The whole
+                // column, whatever it shows: a message or a progress view is not the canvas's size.
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .glassSpatialCanvas()
+                .padding(GlassWindowShape.spatialColumnCanvasInsets(besideSidebar: false))
+                #endif
                 // **The folder's name, with the path beneath it.** The title used to be
                 // `currentPath` — the whole path as a title, which reads as a string of text
                 // rather than a place (reported 2026-09-18). The editor's file list shows the

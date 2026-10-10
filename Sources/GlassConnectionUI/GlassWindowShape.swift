@@ -21,6 +21,7 @@
 //
 
 import CoreGraphics
+import SwiftUI
 
 public enum GlassWindowShape {
     /// The corner of a visionOS window's glass, in points, drawn with continuous curvature.
@@ -75,5 +76,44 @@ public enum GlassWindowShape {
     /// still uneven").
     public static func continuousConcentricCornerRadius(outer: CGFloat, inset: CGFloat) -> CGFloat {
         max(0, outer - inset / continuousCornerExtent)
+    }
+
+    // MARK: - A canvas nested in the window (the terminal's, then every plain window's)
+
+    /// How far a window's canvas — the area its Opacity paints, or a remote desktop's screen — sits
+    /// inside the window's edge, on every side, whether or not the title and control ornaments
+    /// show, so it never moves as the window gains or loses focus. The terminal's geometry, which
+    /// the owner approved on the headset (2026-10-10: "Yep, I like this much better").
+    public static let spatialNestedCanvasInset: CGFloat = 34
+
+    /// The canvas's corner: continuous like Apple's window corner, and begun where Apple's begins
+    /// along each edge, so the gap round it reads even (46 − 34 / 1.528 ≈ 23.75).
+    public static var spatialNestedCanvasCornerRadius: CGFloat {
+        continuousConcentricCornerRadius(outer: spatialWindowCornerRadius, inset: spatialNestedCanvasInset)
+    }
+
+    /// A canvas in a navigation container's column, which runs to the window's edges: 34 points
+    /// in from each window edge it reaches, so its corner meets Apple's as the terminal's does, and
+    /// none under the column's navigation bar. Beside a sidebar the leading edge is not the
+    /// window's, and the canvas only stands a little apart from it.
+    public static func spatialColumnCanvasInsets(besideSidebar: Bool) -> EdgeInsets {
+        EdgeInsets(top: 0,
+                   leading: besideSidebar ? spatialCanvasGap : spatialNestedCanvasInset,
+                   bottom: spatialNestedCanvasInset,
+                   trailing: spatialNestedCanvasInset)
+    }
+
+    /// The room between a canvas and what stands beside it in the window, such as a sidebar: the
+    /// distance a terminal's rows keep inside its canvas.
+    public static let spatialCanvasGap: CGFloat = 12
+
+    /// The padding inside `GlassNativeWindowFrame` that puts a canvas `spatialNestedCanvasInset`
+    /// from the window's edge: the frame insets for the ornaments it shows, this makes up the rest.
+    public static func spatialNestedCanvasPadding(showsTitle: Bool, showsControls: Bool) -> EdgeInsets {
+        let side = showsTitle || showsControls ? spatialCanvasInset : 0
+        return EdgeInsets(top: spatialNestedCanvasInset - (showsTitle ? spatialTitleInset : 0),
+                          leading: spatialNestedCanvasInset - side,
+                          bottom: spatialNestedCanvasInset - (showsControls ? spatialControlsInset : 0),
+                          trailing: spatialNestedCanvasInset - side)
     }
 }

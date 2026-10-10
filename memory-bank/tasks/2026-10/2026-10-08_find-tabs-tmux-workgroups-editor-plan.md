@@ -923,3 +923,11 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   `GlassSettingsSheet`: Done `.confirmationAction`; visionOS 820×860 (was 760×560), Mac 760×560, iOS `.large`. Desktop's
   "Original" → This Window ▸ Background Removal ▸ Show Original. Shared footers. Suites on main: layers 43, connection UI
   40, terminal 724, editor 150, database 317, desktop 185. Mac/iPad layouts built but not looked at.
+- **W28 merged (window appearance, D60).** Shared `GlassSpatialWindowGlass` / `GlassWindowGlass` / nested canvas in
+  GlassLayers; terminal uses it (look unchanged); remote desktop matches the terminal (own glass at its Glass, screen as
+  the 34-pt canvas, ≈23.75 corner); editor/Files/Connections/database: Opacity on the content column only, system glass
+  stays. Database without a split view behind `DatabaseSpatialLayout.ownGlass` (off; `--demo-database-own-glass`).
+  Suites on main after W27+W28: layers 48, connection UI 43, terminal 724, editor 150, database 317, desktop 185, shell
+  238; visionOS sim build passes. Help: Vision Pro glass wording applied (library, desktop-vision-pro, editor,
+  database). Owner's choices pending: database split vs own glass; desktop rounded vs square corners; desktop default
+  Glass 25% vs 100%; same treatment for Connections/editor/Files. Editor text view still paints opaque at Opacity 0.

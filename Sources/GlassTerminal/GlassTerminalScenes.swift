@@ -118,7 +118,7 @@ public struct GlassTerminalScenes: Scene {
                 .trackWindowPresence(key: "terminal-workgroup-missing", recovery: windowRecoveryManager)
             }
         }
-        // Plain, with Apple's glass drawn by the window itself (`VisionTerminalWindowGlass`), in
+        // Plain, with Apple's glass drawn by the window itself (`GlassSpatialWindowGlass`), in
         // Apple's corner, as strong as the window's Blur. The system's own window (cfd5094) gave
         // the canvas a corner to nest in, but its glass is always there while the window has
         // focus, so the clearest a terminal could be was Apple's glass. The owner, on the headset
@@ -157,8 +157,14 @@ public struct GlassTerminalScenes: Scene {
         // tints the glass. In the system's window the paint lies over the window's glass instead,
         // and the same setting read nearly black in the simulator. The plain window's missing
         // shape is `GlassLayeredWindow`'s to supply (`GlassWindowShape`).
+        //
+        // **Opacity paints the files, not the window** (W28): the window paints no theme, and the
+        // browser's list is its canvas, in the corner nested in Apple's. The stack's own glass is
+        // still the window's: a `NavigationStack` draws system glass behind its content in a plain
+        // window, and nothing public turns it off (`GlassSpatialWindowGlass`), so Glass can't
+        // clear this window the way it clears a terminal.
         WindowGroup(id: "sftp", for: SFTPBrowserContext.self) { $context in
-            GlassLayeredWindow {
+            GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsWholeWindow) {
                 if let context, sessionManager.session(for: context.sessionID) != nil {
                     SFTPBrowserView(sessionID: context.sessionID, initialPath: context.initialPath)
                         .environment(sessionManager)

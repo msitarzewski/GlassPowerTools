@@ -53,6 +53,15 @@ extension GlassDesktopRuntime {
         enqueue(.show(connectionID: connection.id))
     }
 
+    /// Screenshots only (`--demo-glass`, W28): a desktop window at a given glass — its Background
+    /// Frost — and, when given, a remote screen faded to `opacity`.
+    public static func demoWindowSettings(frost: Double, opacity: Double?) -> GlassWindowOverrides {
+        var window = GlassWindowOverrides()
+        window[DesktopWindowSettings.frost] = frost
+        if let opacity { window[DesktopWindowSettings.opacity] = opacity }
+        return window
+    }
+
     /// Screenshots only: a desktop window with settings of its own (W25).
     public static var demoWindowSettings: GlassWindowOverrides {
         var window = GlassWindowOverrides()

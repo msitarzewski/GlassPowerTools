@@ -28,9 +28,9 @@ The window is at least 800 × 440 points. With **Match Window Size** on, resizin
 In **Desktop Settings** > **This Window**, the **Appearance** section changes how this window sits in your space:
 
 - **Opacity** fades the whole desktop, from transparent to opaque.
-- **Glass** is the glass behind it, from none to full.
+- **Glass** is the window's own glass, from none to Apple's.
 
-Set both to 0% for a clear canvas; the controls stay visible. Only this window changes, and it keeps these on this device for the next time this desktop opens. To change every desktop window, use **All Desktops**, beside **This Window**, or **Settings** > **Desktops**, which are the same page; there **Clear** and **Frosted** set **Glass** in one step. A window follows **All Desktops** until you set its own; see [Give a desktop window its own settings](desktop-sessions.md#give-a-desktop-window-its-own-settings). **On Mac** the same settings apply: the desktop window fades over a frosted or clear backdrop showing what is behind it.
+The desktop sits inset in the window, with corners that follow the window's. Set both to 0% and only the title and controls remain. Only this window changes, and it keeps these on this device for the next time this desktop opens. To change every desktop window, use **All Desktops**, beside **This Window**, or **Settings** > **Desktops**, which are the same page; there **Clear** and **Frosted** set **Glass** in one step. A window follows **All Desktops** until you set its own; see [Give a desktop window its own settings](desktop-sessions.md#give-a-desktop-window-its-own-settings). **On Mac** the same settings apply: the desktop window fades over a frosted or clear backdrop showing what is behind it.
 
 > [!NOTE]
 > When Reduce Transparency is on in Accessibility settings, the glass controls are unavailable and the desktop is shown opaque with **Original** presentation.

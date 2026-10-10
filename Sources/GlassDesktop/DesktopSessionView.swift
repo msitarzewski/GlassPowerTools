@@ -117,15 +117,19 @@ public struct DesktopSessionView: View {
 
     @ViewBuilder private var window: some View {
         #if os(visionOS)
+        // **The terminal's window, with the remote screen as its canvas** (W28; owner, 2026-10-10:
+        // "rebuild all window appearances to match the new terminal. So screen sharing, database,
+        // etc."). The window is plain and draws Apple's glass itself, once, as strong as its
+        // Background Frost — none at all at 0 — so with Opacity at 0 too it is completely clear
+        // but for its title and controls. The screen sits an even 34 points inside the window's
+        // edge in the corner concentric with Apple's, as a terminal's canvas does. It was a frosted
+        // card 22 points in with the screen 10 points inside that: a material plate laid over the
+        // room, and a corner of its own.
         GlassNativeWindowFrame {
             sessionContent
                 .modifier(DesktopClipboardBridge(session: session))
-                .padding(10)
-                .background {
-                    GlassCanvasBackdrop(blurAmount: profile.frost)
-                        .allowsHitTesting(false)
-                }
-                .clipShape(.rect(cornerRadius: 24))
+                .clipShape(.rect(cornerRadius: GlassWindowShape.spatialNestedCanvasCornerRadius, style: .continuous))
+                .padding(GlassWindowShape.spatialNestedCanvasPadding(showsTitle: true, showsControls: true))
         } title: {
             Label(session.connection.name, systemImage: "desktopcomputer")
                 .font(.headline).lineLimit(1).padding(.horizontal, 20).padding(.vertical, 10)
@@ -133,6 +137,8 @@ public struct DesktopSessionView: View {
             nativeControls
         }
         .frame(minWidth: 800, minHeight: 440)
+        .glassSpatialWindowGlass(strength: GlassWindowGlass.strength(frost: profile.frost,
+                                                                     reduceTransparency: reduceTransparency))
         #else
         sessionContent
             .modifier(DesktopClipboardBridge(session: session))
@@ -181,8 +187,8 @@ public struct DesktopSessionView: View {
                 .onChange(of: displayScale) { _, _ in session.resize(width: geometry.size.width, height: geometry.size.height, displayScale: displayScale) }
             }
             .background {
-                // visionOS uses the shared frost behind the image, including
-                // letterboxing. An opaque backing would defeat desktop opacity.
+                // visionOS: nothing. The window's own glass is behind the image, including
+                // letterboxing (W28). An opaque backing would defeat desktop opacity.
                 #if os(macOS)
                 // The Mac's window is clear (`DesktopMetalSurface`), so it gets the same glass as the
                 // headset whenever the desktop is see-through: faded, or with a colour removed. An
