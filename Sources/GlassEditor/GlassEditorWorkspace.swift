@@ -15,6 +15,7 @@ import UIKit
 #endif
 import Observation
 import GlassConnectionKit
+import GlassLayers
 import GlassEditorCore
 import GlassEditorUI
 
@@ -67,7 +68,8 @@ public final class GlassEditorWorkspace {
     public var findIsCaseSensitive = false
     public var findUsesRegularExpression = false
 
-    /// Shared with every other window: text size, line numbers, wrapping, recents.
+    /// Shared with every other window: text size, line numbers, wrapping, recents. This window's
+    /// own text settings, where it keeps any, are in `windowSettings`.
     public let preferences: GlassEditorPreferences
 
     /// How access to a picked file or folder is asked for and given back. The system's, except in
@@ -91,15 +93,86 @@ public final class GlassEditorWorkspace {
     }
 
     private func apply(to document: GlassEditorDocument) {
-        // **File over project over global.** One funnel, so no surface can apply the levels in a
-        // different order than another (`GlassEditorTextOverrides`).
-        let global = preferences.configuration(basedOn: document.model.configuration)
+        // **File over project over window over global.** One funnel, so no surface can apply the
+        // levels in a different order than another (`GlassEditorTextOverrides`). The window takes
+        // the app's place for everything in it (`GlassEditorWindowSettings`).
+        let window = preferences.configuration(basedOn: document.model.configuration).overlaid(by: windowSettings)
         document.model.configuration = GlassEditorTextOverrides.resolve(
-            global: global,
+            global: window,
             project: projectOverrides(for: document),
             file: document.textOverrides)
         document.model.theme = preferences.theme
     }
+
+    // MARK: This window's own settings
+
+    /// What this window sets for itself over Settings ▸ Editor and Appearance (W23): its glass,
+    /// which `GlassLayeredWindow` draws from the environment the window's root passes down, and its
+    /// text, which its projects' and files' own settings still sit over. Empty is the window
+    /// following every setting.
+    public private(set) var windowSettings = GlassWindowOverrides()
+
+    /// Keeps the window's settings with the project it shows, on this device: the runtime's
+    /// (`GlassEditorProjectLibrary.setWindowSettings`). Nil in a workspace with no runtime.
+    @ObservationIgnored var keepWindowSettings: ((GlassEditorProject.ID, GlassWindowOverrides) -> Void)?
+
+    /// This window's settings, now: every document in it follows at once, and the window's project
+    /// keeps them for the next time it opens here.
+    public func setWindowSettings(_ settings: GlassWindowOverrides) {
+        windowSettings = settings
+        applyAppearance()
+        if let project = projects.first { keepWindowSettings?(project.id, settings) }
+    }
+
+    /// A project arriving in this window brings what its window set last time on this device. A
+    /// window that set something itself first — a blank window taking the project — keeps that,
+    /// and takes the rest.
+    func takeWindowSettings(_ saved: GlassWindowOverrides) {
+        setWindowSettings(saved.merging(windowSettings))
+    }
+
+    /// The text this window starts every document from: Settings ▸ Editor with the window's own
+    /// over it. What a project's "Default" follows in this window.
+    public var windowTextConfiguration: GlassEditorConfiguration {
+        preferences.configuration(basedOn: GlassEditorConfiguration()).overlaid(by: windowSettings)
+    }
+
+    /// Whether this window sets any of the text settings for itself.
+    public var setsWindowText: Bool {
+        !windowSettings.restricted(to: GlassEditorWindowSettings.textKeys).isEmpty
+    }
+
+    /// ⌘+ and ⌘−: the size this window's text follows — its own when it keeps one, else every
+    /// window's, Settings ▸ Editor, as it always was. Changing every window's size in a window
+    /// that keeps its own changed nothing in front of you.
+    public func adjustFontSize(by points: Double) {
+        if let own = windowSettings[GlassEditorWindowSettings.fontSize] {
+            var settings = windowSettings
+            settings[GlassEditorWindowSettings.fontSize] = own + points
+            setWindowSettings(settings)
+        } else if points > 0 {
+            preferences.increaseFontSize()
+        } else if points < 0 {
+            preferences.decreaseFontSize()
+        }
+    }
+
+    /// ⌘0, Actual Size, at the same level as ⌘+.
+    public func resetFontSize() {
+        if windowSettings.sets(GlassEditorWindowSettings.fontSize) {
+            var settings = windowSettings
+            settings[GlassEditorWindowSettings.fontSize] = GlassEditorConfiguration().fontSize
+            setWindowSettings(settings)
+        } else {
+            preferences.resetFontSize()
+        }
+    }
+
+    #if DEBUG
+    /// Screenshots only (App/GlassDemoMode.swift): Editor Settings opens over this window as it
+    /// first appears, once.
+    @ObservationIgnored public var demoOpensSettings = false
+    #endif
 
     /// The overrides of the project this document belongs to, if it belongs to one.
     func projectOverrides(for document: GlassEditorDocument) -> GlassEditorTextOverrides? {
@@ -111,7 +184,7 @@ public final class GlassEditorWorkspace {
     /// "Default", and where that default comes from.
     public func inheritedConfiguration(for document: GlassEditorDocument) -> GlassEditorConfiguration {
         GlassEditorTextOverrides.resolve(
-            global: preferences.configuration(basedOn: document.model.configuration),
+            global: preferences.configuration(basedOn: document.model.configuration).overlaid(by: windowSettings),
             project: projectOverrides(for: document),
             file: nil)
     }
@@ -594,8 +667,14 @@ public final class GlassEditorWorkspace {
     /// gives it back when the project closes. The tree is read asynchronously, folder by folder as
     /// they are opened, and every file in it is opened and saved through the same access — so
     /// giving it back as soon as this returned left a project that could read nothing.
+    ///
+    /// `known` is the project the list already has for this folder, so the window opens **that**
+    /// project — its id, name, machine and text settings — rather than a new record for the same
+    /// folder. A new one, remembered, replaced the list's name and text settings with the folder's
+    /// own and none, and every setting kept by the project's id — its window's (W23) — was lost.
     @discardableResult
-    public func openProject(_ url: URL, access: any GlassEditorFileAccess = GlassEditorLocalFileAccess()) -> GlassEditorProject? {
+    public func openProject(_ url: URL, as known: GlassEditorProject? = nil,
+                            access: any GlassEditorFileAccess = GlassEditorLocalFileAccess()) -> GlassEditorProject? {
         let standardized = url.standardizedFileURL
         let scoped = securityScope.start(url)
         var isDirectory: ObjCBool = false
@@ -614,7 +693,12 @@ public final class GlassEditorWorkspace {
             if scoped { securityScope.stop(url) }
             return existing
         }
-        let project = GlassEditorProject.local(standardized)
+        var project = GlassEditorProject.local(standardized)
+        if let known {
+            project = GlassEditorProject(id: known.id, hostID: known.hostID, path: wanted,
+                                         displayName: known.displayName, openedAt: known.openedAt,
+                                         textOverrides: known.textOverrides)
+        }
         projects.append(project)
         if scoped { securityScopedProjects[project.id] = url }
         prefersCollapsedSidebar = false

@@ -73,4 +73,4 @@ A number past the end of the file goes to the last line.
 
 ## Text size on Mac
 
-The Text menu also has **Increase Text Size** (⌘+), **Decrease Text Size** (⌘−) and **Actual Size** (⌘0). These change the Editor's default size for every window. See [Editor settings](editor-settings.md).
+The Text menu also has **Increase Text Size** (⌘+), **Decrease Text Size** (⌘−) and **Actual Size** (⌘0). These change the Editor's default size for every window; in a window that keeps its own **Text Size**, they change that window's size. See [Editor settings](editor-settings.md).

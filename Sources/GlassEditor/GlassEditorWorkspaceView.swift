@@ -60,10 +60,11 @@ public struct GlassEditorWorkspaceView: View {
     @Environment(\.openWindow) private var openWindow
     // Optional: the scene injects it, and a preview or a test may not.
     @Environment(GlassEditorRuntime.self) private var runtime: GlassEditorRuntime?
-    /// **This file's** text settings, from the gear in the toolbar — on every platform now. The
-    /// Mac's gear used to be a `SettingsLink` to the app's Settings window, which is a keystroke
-    /// away at ⌘, and did not need a toolbar button; what a window's toolbar is good for is the
-    /// thing in that window (2026-09-18).
+    /// **This window's** settings, then this file's and every editor's, from the gear in the
+    /// toolbar — on every platform (`GlassEditorSettingsSheet`, W23). The Mac's gear used to be a
+    /// `SettingsLink` to the app's Settings window, which is a keystroke away at ⌘, and did not
+    /// need a toolbar button; what a window's toolbar is good for is the thing in that window
+    /// (2026-09-18).
     @State private var isShowingSettings = false
     #if os(iOS)
     /// Whether the software keyboard is up, so the control in the status bar can say which way it
@@ -121,7 +122,8 @@ public struct GlassEditorWorkspaceView: View {
                                              runtime: runtime,
                                              windowID: windowID,
                                              colorScheme: colorScheme,
-                                             columnVisibility: $columnVisibility))
+                                             columnVisibility: $columnVisibility,
+                                             isShowingSettings: $isShowingSettings))
         // Drop a file on the window to open it — the gesture a Mac user tries first, and the one
         // that works in the headset and on an iPad too. A folder dropped is a project, by the same
         // rule as Open…: its own window, unless this one is blank.
@@ -177,6 +179,9 @@ public struct GlassEditorWorkspaceView: View {
             closeCancellations: closeCancellations,
             closeDocument: { if let document = workspace.selectedDocument { requestClose(document) } }))
         #endif
+        // **The window's own settings, for everything in it** (W23): outermost, so the window's
+        // glass (`GlassLayeredWindow`), its panels and its sheets all draw with them.
+        .glassWindowOverrides(workspace.windowSettings)
     }
 
     #if os(macOS)
@@ -195,10 +200,11 @@ public struct GlassEditorWorkspaceView: View {
     /// Built here rather than inline in `body`: the whole expression is one literal with several
     /// closures in it, and the type checker gives up on the chain it sits in.
     private var editorActions: GlassEditorActions {
+        // The size this window follows: its own when it keeps one (W23), else every window's.
         GlassEditorActions(
-            increaseFontSize: { workspace.preferences.increaseFontSize() },
-            decreaseFontSize: { workspace.preferences.decreaseFontSize() },
-            resetFontSize: { workspace.preferences.resetFontSize() },
+            increaseFontSize: { workspace.adjustFontSize(by: 1) },
+            decreaseFontSize: { workspace.adjustFontSize(by: -1) },
+            resetFontSize: { workspace.resetFontSize() },
             find: { workspace.findIsPresented = true },
             goToLine: { goToLineText = ""; isGoingToLine = true })
     }
@@ -768,10 +774,10 @@ public struct GlassEditorWorkspaceView: View {
                 .accessibilityIdentifier("editor-save-as-project")
             }
         }
-        // The gear is **this file's** text settings: size, line numbers, wrapping, each of which
-        // can disagree with its project and with the app. The project's own are at the foot of the
-        // file list, and the app's defaults are in Settings ▸ Editor at ⌘, — three scopes, and the
-        // one in this window's toolbar belongs to what this window is showing.
+        // The gear is **this window's** settings first (W23) — its glass and its text — then this
+        // file's and every editor's, in one sheet. The project's own are at the foot of the file
+        // list, and the app's defaults are also in Settings ▸ Editor at ⌘,; the gear in this
+        // window's toolbar belongs to what this window is showing.
         // **Preview**, for text that has a picture: beside the text, then alone, then back.
         if let document = workspace.selectedDocument, workspace.previewKind(for: document) != nil {
             let mode = workspace.previewModes[document.id] ?? .text
@@ -785,8 +791,8 @@ public struct GlassEditorWorkspaceView: View {
             }
         }
         ToolbarItem(placement: .editorTrailing) {
-            Button("Text Settings", systemImage: "gearshape") { isShowingSettings = true }
-                .help("Text settings for this file")
+            Button("Settings", systemImage: "gearshape") { isShowingSettings = true }
+                .help("Settings for this window and this file")
                 .accessibilityIdentifier("editor-settings")
         }
         ToolbarItem(placement: .editorTrailing) {
@@ -1072,7 +1078,7 @@ private struct GlassEditorDialogs: ViewModifier {
             Text("\(document.displayName) has changes that have not been saved.")
             }
             .sheet(isPresented: $isShowingSettings) {
-            GlassEditorFileSettingsSheet(workspace: workspace, isPresented: $isShowingSettings)
+            GlassEditorSettingsSheet(workspace: workspace, isPresented: $isShowingSettings)
             }
             .sheet(item: $settingsProject) { project in
             GlassEditorProjectSettingsView(workspace: workspace, project: project)
@@ -1107,6 +1113,7 @@ private struct GlassEditorWindowLifecycle: ViewModifier {
     let windowID: UUID
     let colorScheme: ColorScheme
     @Binding var columnVisibility: NavigationSplitViewVisibility
+    @Binding var isShowingSettings: Bool
     // Which window is in front. `controlActiveState` is macOS-only — a window in a headset or on a
     // phone is not "key" in that sense — so elsewhere the last window to appear is the front one,
     // which is true on those platforms anyway.
@@ -1162,6 +1169,17 @@ private struct GlassEditorWindowLifecycle: ViewModifier {
             // not, and neither does one showing a single file.
             .onAppear {
                 columnVisibility = workspace.projects.isEmpty ? .detailOnly : .all
+                #if DEBUG
+                // Screenshots (App/GlassDemoMode.swift): This Window, over the window it changes —
+                // once the window is on screen: a sheet asked for as it first appears is not shown.
+                if workspace.demoOpensSettings {
+                    workspace.demoOpensSettings = false
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .seconds(2))
+                        isShowingSettings = true
+                    }
+                }
+                #endif
             }
             // The column follows the projects: it arrives with the first one and leaves with the
             // last. Closing the only project used to leave the tree open and empty, which is the

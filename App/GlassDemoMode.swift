@@ -54,6 +54,10 @@ enum GlassDemoMode {
         switch surface {
         case "editor", "preview":
             await openEditor(editor, preview: surface == "preview")
+        case "editor-window", "editor-settings":
+            // A window with settings of its own (W23), and This Window open over it.
+            await openEditor(editor, preview: false, windowSettings: GlassEditorRuntime.demoWindowSettings,
+                             opensSettings: surface == "editor-settings")
         case "terminal":
             terminal.requestDemoReplay(name: "alpha", output: Data(terminalTranscript.utf8))
         case "terminal-window", "terminal-settings":
@@ -109,8 +113,12 @@ enum GlassDemoMode {
     }()
 
     /// The invented shop's repository, written into Documents and opened: several files in tabs,
-    /// the Swift one in front; for `preview`, the README with its rendered preview beside it.
-    private static func openEditor(_ editor: GlassEditorRuntime, preview: Bool) async {
+    /// the Swift one in front; for `preview`, the README with its rendered preview beside it. With
+    /// `windowSettings`, the window keeps them as its own (W23); with `opensSettings`, Editor
+    /// Settings ▸ This Window opens over it.
+    private static func openEditor(_ editor: GlassEditorRuntime, preview: Bool,
+                                   windowSettings: GlassWindowOverrides = GlassWindowOverrides(),
+                                   opensSettings: Bool = false) async {
         let root = URL.documentsDirectory.appending(path: "shop", directoryHint: .isDirectory)
         do {
             for (path, text) in projectFiles {
@@ -122,6 +130,8 @@ enum GlassDemoMode {
         } catch { return }
         guard let window = editor.openProject(root) else { return }
         let workspace = editor.workspace(for: window)
+        if !windowSettings.isEmpty { workspace.setWindowSettings(windowSettings) }
+        workspace.demoOpensSettings = opensSettings
         let order = preview
             ? ["compose.yaml", "Sources/Checkout/ShippingAddress.swift", "README.md"]
             : ["compose.yaml", "README.md", "Sources/Checkout/ShippingAddress.swift"]

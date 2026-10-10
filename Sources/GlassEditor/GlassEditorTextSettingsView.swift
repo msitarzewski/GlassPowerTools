@@ -4,10 +4,12 @@
 //
 //  One control set for the text, used at whichever level is being edited.
 //
-//  The gear at the foot of the file list is the **project's**; the gear in the toolbar is **this
-//  file's**; Settings ▸ Editor (⌘,) holds the app's defaults. Three scopes, one view, so a size
-//  chosen for a file and a size chosen for a project cannot end up with two different controls
-//  that behave differently.
+//  The gear at the foot of the file list is the **project's**; the gear in the toolbar opens the
+//  window's Editor Settings, whose **This File** is the file's; Settings ▸ Editor (⌘,) holds the
+//  app's defaults. Three scopes, one view, so a size chosen for a file and a size chosen for a
+//  project cannot end up with two different controls that behave differently. The window's own
+//  level (W23) is This Window, built from the rows every kind of window shares
+//  (`GlassEditorWindowSettingsView`).
 //
 //  Every row can say "Default", and the default names the value it would take *and where it comes
 //  from*. A toggle cannot express three states, which is why line numbers and wrapping are
@@ -114,68 +116,47 @@ enum GlassEditorOverrideChoice: Hashable {
     case inherited, on, off
 }
 
-/// The toolbar gear's sheet: the front document's text settings, or the project's when no document
-/// is open, so the control always leads somewhere.
-struct GlassEditorFileSettingsSheet: View {
+/// **This File** in the toolbar gear's sheet (`GlassEditorSettingsSheet`): the front document's
+/// text settings, or the project's when no document is open, so the section always leads somewhere.
+struct GlassEditorFileSettingsPage: View {
     let workspace: GlassEditorWorkspace
-    @Binding var isPresented: Bool
     @Environment(GlassEditorRuntime.self) private var runtime: GlassEditorRuntime?
 
     var body: some View {
-        NavigationStack {
-            Form {
-                if let document = workspace.selectedDocument {
-                    // **Read here, in the body.** A computed `Binding`'s getter is a closure that
-                    // does not run while the body is being evaluated, so binding straight to the
-                    // document would register no dependency and the controls would not follow the
-                    // value they set (the trap this project met on 2026-09-17).
-                    let current = document.textOverrides
-                    GlassEditorTextSettingsView(
-                        overrides: Binding(get: { current },
-                                           set: { workspace.setTextOverrides($0, for: document) }),
-                        inherited: workspace.inheritedConfiguration(for: document),
-                        inheritedFrom: inheritedName(for: document))
-                } else if let project = workspace.projects.first {
-                    let current = project.textOverrides ?? GlassEditorTextOverrides()
-                    GlassEditorTextSettingsView(
-                        overrides: Binding(get: { current },
-                                           set: { setProject($0, for: project) }),
-                        inherited: workspace.preferences.configuration(basedOn: GlassEditorConfiguration()),
-                        inheritedFrom: "the editor's defaults")
-                } else {
-                    Section {
-                        Text("Open a file to set how it is shown. The editor's defaults are in Settings ▸ Editor.")
-                            .foregroundStyle(.secondary)
-                    }
+        Form {
+            if let document = workspace.selectedDocument {
+                // **Read here, in the body.** A computed `Binding`'s getter is a closure that
+                // does not run while the body is being evaluated, so binding straight to the
+                // document would register no dependency and the controls would not follow the
+                // value they set (the trap this project met on 2026-09-17).
+                let current = document.textOverrides
+                Section {
+                    LabeledContent("File", value: document.displayName)
                 }
-            }
-            .formStyle(.grouped)
-            .navigationTitle(title)
-            #if !os(macOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { isPresented = false }
+                GlassEditorTextSettingsView(
+                    overrides: Binding(get: { current },
+                                       set: { workspace.setTextOverrides($0, for: document) }),
+                    inherited: workspace.inheritedConfiguration(for: document),
+                    inheritedFrom: GlassEditorInheritedName.forFile(document, in: workspace))
+            } else if let project = workspace.projects.first {
+                let current = project.textOverrides ?? GlassEditorTextOverrides()
+                Section {
+                    LabeledContent("Project", value: project.displayName)
+                }
+                GlassEditorTextSettingsView(
+                    overrides: Binding(get: { current },
+                                       set: { setProject($0, for: project) }),
+                    inherited: workspace.windowTextConfiguration,
+                    inheritedFrom: GlassEditorInheritedName.forProject(in: workspace))
+            } else {
+                Section {
+                    Text("Open a file to set how it is shown. This window's own settings are in This Window, and every window's in All Editors.")
+                        .foregroundStyle(.secondary)
                 }
             }
         }
-        .frame(minWidth: 420, minHeight: 300)
-        .accessibilityIdentifier("editor-file-settings-sheet")
-    }
-
-    private var title: String {
-        workspace.selectedDocument?.displayName ?? workspace.projects.first?.displayName ?? "Text"
-    }
-
-    /// What the file follows when it says nothing: its project, if it has one, and the app's
-    /// defaults otherwise. Named rather than implied, because "Default" is useless without it.
-    private func inheritedName(for document: GlassEditorDocument) -> String {
-        guard let path = document.path, let project = workspace.project(owning: path),
-              project.textOverrides != nil else {
-            return "the editor's defaults"
-        }
-        return "\(project.displayName)'s settings"
+        .formStyle(.grouped)
+        .accessibilityIdentifier("editor-file-settings")
     }
 
     private func setProject(_ overrides: GlassEditorTextOverrides, for project: GlassEditorProject) {
@@ -184,5 +165,29 @@ struct GlassEditorFileSettingsSheet: View {
         } else {
             workspace.setTextOverrides(overrides, forProject: project.id)
         }
+    }
+}
+
+/// What "Default" follows, named, because "Default" is useless without it: a project's settings,
+/// this window's (W23), or the editor's defaults — the level under the one being edited that
+/// actually says something.
+@MainActor
+enum GlassEditorInheritedName {
+    static let editorDefaults = "the editor's defaults"
+    static let thisWindow = "this window's settings"
+
+    /// A file follows its project when the project says something, and otherwise what a project
+    /// would follow.
+    static func forFile(_ document: GlassEditorDocument, in workspace: GlassEditorWorkspace) -> String {
+        if let path = document.path, let project = workspace.project(owning: path), project.textOverrides != nil {
+            return "\(project.displayName)'s settings"
+        }
+        return forProject(in: workspace)
+    }
+
+    /// A project follows its window when the window sets any of the text for itself, and
+    /// otherwise the editor's defaults.
+    static func forProject(in workspace: GlassEditorWorkspace) -> String {
+        workspace.setsWindowText ? thisWindow : editorDefaults
     }
 }

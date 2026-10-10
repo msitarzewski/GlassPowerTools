@@ -69,6 +69,10 @@ public final class GlassEditorRuntime {
         if let existing = workspaces[id] { return existing }
         let workspace = GlassEditorWorkspace(preferences: preferences, defaults: defaults)
         workspace.securityScope = securityScope
+        // A window's own settings are kept with its project, on this device (W23).
+        workspace.keepWindowSettings = { [weak self] project, settings in
+            self?.projects.setWindowSettings(settings, for: project)
+        }
         workspaces[id] = workspace
         return workspace
     }
@@ -328,14 +332,20 @@ public final class GlassEditorRuntime {
     /// project is: there is one way in. A folder that needed granted access — one picked from
     /// Files — also leaves this device a bookmark, so it opens again from the list after a
     /// relaunch.
-    private func openFolder(_ url: URL, from asking: UUID?) -> UUID {
+    ///
+    /// The folder opens as the project the list already has for it — `known`, or the one it lists
+    /// at that path — so the window, the list and whatever is kept by the project's id agree on
+    /// which project it is; and the window takes what it set last time it showed that project here.
+    private func openFolder(_ url: URL, from asking: UUID?, known: GlassEditorProject? = nil) -> UUID {
         securityScope.withAccess(to: url) { scoped in
-            let place = ProjectPlace(path: url.standardizedFileURL.path(percentEncoded: false),
-                                     hostID: nil)
+            let path = url.standardizedFileURL.path(percentEncoded: false)
+            let place = ProjectPlace(path: path, hostID: nil)
             let target = window(holding: place) ?? windowForNewProject(from: asking)
-            if let opened = workspace(for: target).openProject(url) {
-                projects.remember(opened)
+            let workspace = workspace(for: target)
+            if let opened = workspace.openProject(url, as: known ?? projects.project(at: path, on: nil)) {
+                let kept = projects.remember(opened)
                 if scoped { projects.keepBookmark(of: url, forPath: opened.path) }
+                workspace.takeWindowSettings(projects.windowSettings(for: kept.id))
             }
             return target
         }
@@ -461,9 +471,9 @@ public final class GlassEditorRuntime {
     /// be opened says why in the window.
     @discardableResult
     public func openProject(_ project: GlassEditorProject, reach: GlassEditorProjectReach) -> UUID? {
-        projects.remember(project)
+        let project = projects.remember(project)
         if case .thisMachine = reach {
-            return openFolder(localURL(for: project), from: nil)
+            return openFolder(localURL(for: project), from: nil, known: project)
         }
         guard let hostID = project.hostID, let remoteAccess else { return nil }
         let place = ProjectPlace(path: project.path, hostID: hostID)
@@ -478,7 +488,8 @@ public final class GlassEditorRuntime {
             defer { if self.pendingProjects[windowID] == place { self.pendingProjects[windowID] = nil } }
             do {
                 let access = try await remoteAccess(hostID)
-                workspace.openProject(project, access: access, reach: reach)
+                let opened = workspace.openProject(project, access: access, reach: reach)
+                workspace.takeWindowSettings(self.projects.windowSettings(for: opened.id))
             } catch {
                 workspace.message = error.localizedDescription
             }
@@ -707,6 +718,18 @@ public struct GlassEditorScenes: Scene {
 
 public extension GlassEditorRuntime {
     static let windowID = "editor"
+
+    #if DEBUG
+    /// Screenshots only (App/GlassDemoMode.swift): an editor window's own settings (W23) — lighter
+    /// glass, larger text, long lines wrapped — over the demo's Appearance and Settings ▸ Editor.
+    static var demoWindowSettings: GlassWindowOverrides {
+        var window = GlassWindowOverrides()
+        window[GlassLayerSettings.opacity] = 0.45
+        window[GlassEditorWindowSettings.fontSize] = 17
+        window[GlassEditorWindowSettings.wrapsLines] = true
+        return window
+    }
+    #endif
 }
 
 #if os(macOS)

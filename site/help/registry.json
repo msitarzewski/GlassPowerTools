@@ -46,7 +46,7 @@
       {"slug": "editor-saving", "title": "Save Your Work", "summary": "Save with ⌘S or the toolbar, choose where a new document goes, handle files that changed, and close unsaved documents."},
       {"slug": "editor-languages", "title": "Languages, Find and the Status Bar", "summary": "The 15 highlighted languages and their extensions, changing a file's language, the status bar, Go to Line, and Find and Replace."},
       {"slug": "editor-preview-and-viewers", "title": "Preview and Viewers", "summary": "Preview Markdown with Mermaid diagrams, HTML, SVG and CSV, and view images, PDFs, video and audio."},
-      {"slug": "editor-settings", "title": "Editor Settings", "summary": "Text size, line numbers and wrapping at three levels: the Editor's defaults, a project, and a single file."}
+      {"slug": "editor-settings", "title": "Editor Settings", "summary": "Text size, line numbers and wrapping at four levels: the Editor's defaults, a window, a project, and a single file; and a window's own glass."}
     ]}
   ]
 }

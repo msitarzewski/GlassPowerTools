@@ -35,7 +35,7 @@ struct GlassEditorSettingsView: View {
                 Text("Applies to every open document, and to documents opened later.")
             }
 
-            Section("Size") {
+            Section {
                 // The same range the terminal's font control uses, and the same two keys reach it
                 // from an editor window: ⌘+ and ⌘−.
                 LabeledContent("Text Size") {
@@ -55,6 +55,14 @@ struct GlassEditorSettingsView: View {
                             .font(.callout)
                     }
                     .buttonStyle(.bordered)
+                }
+            } header: {
+                Text("Size")
+            } footer: {
+                // W23: these are every window's, and a window can keep its own — where there are
+                // windows: a phone has none, and no This Window either.
+                if GlassWindowPresentation.canOpenWindows {
+                    Text("These change every editor window. To change one window — its glass, text size, line numbers or wrapping — choose Settings (the gear) in its toolbar, then This Window.")
                 }
             }
         }

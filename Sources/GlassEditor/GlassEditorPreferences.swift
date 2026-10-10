@@ -9,6 +9,10 @@
 //  is recent everywhere. Documents, projects, the selection and the find state are the opposite —
 //  they are what a *window* is — and they live on `GlassEditorWorkspace`, one per window.
 //
+//  A window can keep its own text size, line numbers and wrapping over these (W23,
+//  `GlassEditorWindowSettings`), deliberately, from its This Window; one that keeps none follows
+//  these, and changes with them.
+//
 //  The split exists because a second editor window used to be a second view of the same documents.
 //
 

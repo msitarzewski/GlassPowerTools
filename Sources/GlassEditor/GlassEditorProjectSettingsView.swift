@@ -54,16 +54,16 @@ struct GlassEditorProjectSettingsView: View {
                     }
                 }
 
-                // The project's own text settings, over the app's defaults and under the open
-                // file's. The same controls the toolbar's gear shows, at a different level.
-                // Read here, in the body: a computed `Binding`'s getter is a closure that does not
-                // run during body evaluation, so it would register no dependency on the list it
-                // reads and the controls would not follow the value they set.
+                // The project's own text settings, over this window's (W23) and the app's defaults
+                // and under the open file's. The same controls the toolbar's gear shows, at a
+                // different level. Read here, in the body: a computed `Binding`'s getter is a
+                // closure that does not run during body evaluation, so it would register no
+                // dependency on the list it reads and the controls would not follow the value they set.
                 let overrides = current.textOverrides ?? GlassEditorTextOverrides()
                 GlassEditorTextSettingsView(
                     overrides: Binding(get: { overrides }, set: { set($0) }),
-                    inherited: workspace.preferences.configuration(basedOn: GlassEditorConfiguration()),
-                    inheritedFrom: "the editor's defaults")
+                    inherited: workspace.windowTextConfiguration,
+                    inheritedFrom: GlassEditorInheritedName.forProject(in: workspace))
 
                 Section {
                     Button("Refresh Files", systemImage: "arrow.clockwise") {

@@ -21,6 +21,7 @@ import ImageIO
 import UniformTypeIdentifiers
 import GlassConnectionKit
 import GlassShell
+import GlassLayers
 
 /// One project, with the metadata a merge needs. Deletion is a tombstone rather than a removal —
 /// an offline device that still has the project would otherwise resurrect it simply by being the
@@ -339,6 +340,8 @@ public final class GlassEditorProjectLibrary {
         if !projects.contains(where: { $0.path == record.project.path }) {
             forgetBookmark(forPath: record.project.path)
         }
+        // And what its window kept on this device goes with the project.
+        forgetWindow(of: id)
     }
 
     // MARK: This device's way back in
@@ -383,6 +386,48 @@ public final class GlassEditorProjectLibrary {
         var stored = bookmarks
         guard stored.removeValue(forKey: GlassEditorProject.normalized(path)) != nil else { return }
         defaults.set(stored, forKey: Self.bookmarksDefaultsKey)
+    }
+
+    // MARK: This device's windows
+
+    /// Each project's editor window as this device keeps it — the window's own settings (W23) — by
+    /// project. **This device's only, and never synchronized**, kept beside the list rather than in
+    /// its payload, as the bookmarks are: what a window overrides, Settings ▸ Editor and
+    /// Appearance, is each device's own (`GlassEditorWindowSettings`).
+    static let windowsDefaultsKey = "com.glasspowertools.editor.projects.device-windows"
+
+    @ObservationIgnored private lazy var windows = GlassEditorWindowRecords.decoded(
+        from: defaults.data(forKey: Self.windowsDefaultsKey))
+
+    /// What the window showing this project set for itself the last time, on this device.
+    public func windowSettings(for id: GlassEditorProject.ID) -> GlassWindowOverrides {
+        windows.settings(for: id)
+    }
+
+    /// Keeps what the window showing this project sets, for the next time it opens on this device.
+    /// Only for a project in the list: one removed from it, still open in a window, keeps its
+    /// settings for as long as the window is open, as a window with no project does.
+    public func setWindowSettings(_ settings: GlassWindowOverrides, for id: GlassEditorProject.ID) {
+        guard payload.records.contains(where: { $0.id == id && !$0.isDeleted }) || settings.isEmpty else { return }
+        var updated = windows
+        updated.set(settings, for: id)
+        guard updated != windows else { return }
+        windows = updated
+        persistWindows()
+    }
+
+    private func forgetWindow(of id: GlassEditorProject.ID) {
+        guard windows.byProject[id] != nil else { return }
+        windows.forget(id)
+        persistWindows()
+    }
+
+    private func persistWindows() {
+        guard !windows.byProject.isEmpty, let data = windows.encoded() else {
+            defaults.removeObject(forKey: Self.windowsDefaultsKey)
+            return
+        }
+        defaults.set(data, forKey: Self.windowsDefaultsKey)
     }
 
     private func upsert(_ record: GlassEditorProjectRecord) {

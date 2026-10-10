@@ -12,7 +12,7 @@ On Apple Vision Pro, iPad and iPhone there is no File menu, so you reach the Edi
 
 Once an editor window is open, **Open…** (the folder button in its toolbar) asks for files or a folder. With a keyboard attached, press ⌘O.
 
-**On Apple Vision Pro:** the editor window's toolbar is the row of controls below the window: **New Document**, **Open…**, **Show Preview** when the file has one, **Text Settings**, **Save**, **Find** and **Close Document**. The lightning bolt for **Active** is at the top of the window.
+**On Apple Vision Pro:** the editor window's toolbar is the row of controls below the window: **New Document**, **Open…**, **Show Preview** when the file has one, **Settings**, **Save**, **Find** and **Close Document**. The lightning bolt for **Active** is at the top of the window.
 
 **On Mac:** you can also use the File menu from any window:
 
