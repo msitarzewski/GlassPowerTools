@@ -826,3 +826,9 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   fills the window in the window's corner. Diagnosed with temporary coloured outlines in the visionOS simulator (never
   committed); clean capture sent before install. Earlier "I do not want borders" was about my added glass border; this
   is Apple's default window, which he asked for. 0.4.334 on Vision Pro and iPhone.
+- **0788d12 — continuous corner, square rows.** Owner (0.4.334, annotated): black area "too small and still uneven";
+  remove the terminal's own radius at tmux's bar. Apple's window corner is continuous (blends over ~1.528 × radius);
+  the circular rule (46 − 34 = 12) left the diagonal gap wider (simulator: 64 px vs 46 px at the side). Now
+  `GlassWindowShape.continuousConcentricCornerRadius`: 46 − 34 / 1.528 ≈ 24; SwiftTerm view's layer corner 0 on visionOS
+  (`SwiftTermHostView.terminalViewCornerRadius`; iPad keeps 18). Side-by-side simulator crop sent; owner on 0.4.335:
+  "Yep, I like this much better... good work!" Settled.
