@@ -64,7 +64,7 @@ struct TerminalWindowSettingsTests {
 
         // As W20 drew it: every field the look set, none it left unset.
         let drawn = TerminalLook(window: settings, frost: "regular", opacity: 0.9, blur: 0.1, interactiveGlass: true, tint: "None")
-        #expect(drawn.frost == "thick" && drawn.opacity == 0.3 && drawn.blur == 0.6 && drawn.windowBlur == 0.6)
+        #expect(drawn.frost == "thick" && drawn.opacity == 0.3 && drawn.blur == 0.6)
         #expect(!drawn.interactiveGlass && drawn.tint == "#FF2D55")
     }
 

@@ -43,6 +43,16 @@ enum GlassDemoMode {
         // The theme colour behind content, so a window reads against the simulator's bright room.
         // A setting anyone can choose (Settings ▸ Appearance); the default paints none.
         layers.state.opacity = 0.9
+        // `--demo-glass <opacity>,<frost>`: Appearance's two sliders, for checking a window's glass
+        // at a given setting (a Vision Pro terminal at Blur 0 is completely clear).
+        let arguments = ProcessInfo.processInfo.arguments
+        if let index = arguments.firstIndex(of: "--demo-glass"), arguments.indices.contains(index + 1) {
+            let values = arguments[index + 1].split(separator: ",").compactMap { Double($0) }
+            if values.count == 2 {
+                layers.state.opacity = values[0]
+                layers.state.frost = values[1]
+            }
+        }
         #if os(iOS)
         // `--demo-landscape`: the iPhone turned on its side, for checking the landscape layout
         // without driving the Simulator app's rotate menu.

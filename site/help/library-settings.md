@@ -20,7 +20,7 @@ Choose **Appearance**. The **Glass** section has:
 
 The sliders settle on 0%, 50% and 100% when you drag near them. Text and controls stay fully visible at every setting. For a completely clear window, set **Opacity** and **Frost** to 0%.
 
-**On Vision Pro:** windows use the system's own glass. **Opacity** paints the theme color over it; **Frost** and **Material** do not add a second layer to the library's windows.
+**On Vision Pro:** windows use the system's own glass. **Opacity** paints the theme color over it; **Frost** and **Material** do not add a second layer to the library's windows. A terminal window's glass is its **Frost**: at 0% the window is completely clear.
 
 These settings also apply to terminal windows. They are kept on each device.
 

@@ -118,10 +118,13 @@ public struct GlassTerminalScenes: Scene {
                 .trackWindowPresence(key: "terminal-workgroup-missing", recovery: windowRecoveryManager)
             }
         }
-        // Apple's own window: its glass, in its own corner, with the canvas and its rows nested
-        // inside at even insets (`TerminalWindowView.visionCanvasEdgeInset`). The owner, on the
-        // headset (2026-10-10): "Let's get apple's default window back in this mix. It will help
-        // me a lot." A plain window drew nothing, so the canvas had no visible corner to nest in.
+        // Plain, with Apple's glass drawn by the window itself (`VisionTerminalWindowGlass`), in
+        // Apple's corner, as strong as the window's Blur. The system's own window (cfd5094) gave
+        // the canvas a corner to nest in, but its glass is always there while the window has
+        // focus, so the clearest a terminal could be was Apple's glass. The owner, on the headset
+        // (2026-10-10): "We've lost complete transparency ... 100% transparent glass (the whole
+        // point of the app)". At Blur 0 the window is completely clear again.
+        .windowStyle(.plain)
         .defaultSize(width: 1200, height: 800)
         .restorationBehavior(.disabled)
         .commands { PlatformTerminalCommands() }

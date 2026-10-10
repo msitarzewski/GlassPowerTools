@@ -1271,3 +1271,17 @@ cursor, bell, scrollback, tint, interactive glass and Appearance; W20's look (D5
 W20's format for earlier builds. Initial size and connection/security/device settings stay global. Editor, database and
 desktop windows adopt it in W23–W25. Caveat: visionOS layers paint no frost since `7478a39`, so per-window
 Frost/Material there change nothing.
+
+## D59 — A Vision Pro terminal window draws Apple's glass itself, as strong as its Blur — Implemented 2026-10-10
+**Owner:** "We've lost complete transparency... 100% transparent glass (the whole point of the app)"; his diagnosis:
+"we're assigning transparency to the terminal (the black part), not the Apple provided window". `cfd5094` had dropped
+`.plain` from the terminal scene to get Apple's window back as the corner the canvas nests in, and the system keeps that
+window's glass behind a focused window whatever the app draws. Proposed returning to `.plain` and drawing the glass
+ourselves; he said "Yeah". **Decision:** the terminal scene is `.plain` again; `VisionTerminalWorkgroupView` draws
+`VisionTerminalWindowGlass` once behind the whole window: `glassBackgroundEffect` in Apple's 46-pt continuous corner,
+faded by `TerminalLook.windowGlass` = the resolved Blur (This Window's, else Appearance's Frost; Reduce Transparency
+keeps it at full). 0 draws no glass, so the window is completely clear; the default Frost 100% looks as Apple's window
+did. Opacity still paints only the canvas, and the nested corners (`cfd5094`, `0788d12`) are unchanged. The window-only
+canvas frost (`TerminalLook.windowBlur`, a material fill over the whole window) is gone. Checked in the visionOS
+simulator: `.opacity` fades the glass smoothly (Blur 0, 50%, 100%). Open: Interactive Glass and Material no longer
+change a headset terminal (Settings UX round).

@@ -48,6 +48,8 @@ struct GlassWindowShapeTests {
     /// Anything plain and not listed here is a window nobody has decided the shape of — which is
     /// how Files and the editor shipped with square corners.
     static let plainWindows: [String: (frame: (file: String, uses: String)?, why: String)] = [
+        "\"terminal\"": (("VisionTerminalWorkgroupView.swift", "VisionTerminalWindowGlass(strength:"),
+                         "it draws Apple's glass itself, in Apple's corner, as strong as its Blur, so it can be clear"),
         "\"sftp\"": (("GlassTerminalScenes.swift", "GlassLayeredWindow {"),
                      "the browser's own glass lies over the paint; the paint has the window's shape"),
         "GlassEditorRuntime.windowID": (("GlassEditorWorkspaceView.swift", "GlassLayeredWindow {"),

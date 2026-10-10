@@ -869,3 +869,12 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
 - **Compacting (13:15).** Owner: "Yeah" to the transparency proposal; "i also want to address the settings... we have some
   UX issue in there now." Next session: transparency first (simulator capture before install), then ask what the Settings
   UX issues are, then the Mac install at his word.
+- **Transparency restored (D59, 2026-10-10 ~13:40).** Terminal scene `.plain` again; `VisionTerminalWorkgroupView` draws
+  `VisionTerminalWindowGlass` (glassBackgroundEffect, 46-pt continuous) once behind the window at `TerminalLook.windowGlass`
+  = resolved Blur (Reduce Transparency → 1). `TerminalLook.windowBlur` and the window-frost path removed; the corner
+  params added in cfd5094 to `GlassCanvasBackdrop`/`GlassWindowBackground` reverted. Demo arg `--demo-glass <opacity>,<frost>`.
+  Simulator captures at Blur 0 / 50% / 100% (opacity 0) and 0.7/1, 0.7/0: fade is smooth; 0 is completely clear; nested
+  corners unchanged. Suites: terminal 722 (serial; one tmux naming test flaked in the parallel run, passed serially and
+  in the first run), connection UI 40, layers 42, desktop 185. Install waits for the owner's look at the captures.
+- **Owner (13:40):** "we still don't have a way to combine two independent terminal windows there's no tab to drag
+  between." Confirmed: one terminal → tab bar hidden, no grid, and Move to… lives only on tabs and grid cards. Next.

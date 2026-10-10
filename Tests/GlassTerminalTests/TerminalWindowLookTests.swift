@@ -53,17 +53,39 @@ struct TerminalWindowLookTests {
         }
         let plain = resolved(GlassWindowOverrides())
         #expect(plain.frost == "regular" && plain.opacity == 0.25 && plain.blur == 0.75)
-        #expect(plain.interactiveGlass && plain.tint == "None" && plain.tintColor == nil && plain.windowBlur == nil)
+        #expect(plain.interactiveGlass && plain.tint == "None" && plain.tintColor == nil)
 
         let tinted = resolved(red)
         #expect(tinted.tint == "#FF2D55" && tinted.tintColor != nil)
         #expect(tinted.opacity == 0.4, "set by the window")
-        #expect(tinted.blur == 0.75 && tinted.windowBlur == nil, "left to the settings")
+        #expect(tinted.blur == 0.75, "left to the settings")
         #expect(tinted.frost == "regular" && tinted.interactiveGlass)
 
         let frosted = resolved(TerminalSessionOverride(glassFrost: "thick", blurBackground: 0, interactiveGlass: false).windowSettings)
-        #expect(frosted.frost == "thick" && frosted.blur == 0 && frosted.windowBlur == 0 && !frosted.interactiveGlass)
+        #expect(frosted.frost == "thick" && frosted.blur == 0 && !frosted.interactiveGlass)
         #expect(frosted.opacity == 0.25)
+    }
+
+    /// The owner, on the Vision Pro (2026-10-10): "We've lost complete transparency ... 100%
+    /// transparent glass (the whole point of the app)". The window's glass is its Blur.
+    @Test("a Vision Pro terminal window's glass is its Blur: none at all at 0, the window's own over Appearance's")
+    func windowGlassIsTheBlur() {
+        func look(_ window: GlassWindowOverrides, appearanceFrost: Double) -> TerminalLook {
+            TerminalLook(window: window, frost: "regular", opacity: 0, blur: appearanceFrost,
+                         interactiveGlass: true, tint: "None")
+        }
+        #expect(look(GlassWindowOverrides(), appearanceFrost: 1).windowGlass(reduceTransparency: false) == 1,
+                "Appearance's starting Frost: Apple's glass, as the system's window drew it")
+        #expect(look(GlassWindowOverrides(), appearanceFrost: 0).windowGlass(reduceTransparency: false) == 0,
+                "Frost 0 in Appearance: every terminal window that sets none of its own is clear")
+        #expect(look(GlassWindowOverrides(), appearanceFrost: 0.4).windowGlass(reduceTransparency: false) == 0.4)
+
+        var clear = GlassWindowOverrides()
+        clear[GlassLayerSettings.frost] = 0
+        #expect(look(clear, appearanceFrost: 1).windowGlass(reduceTransparency: false) == 0,
+                "This Window's Blur 0: completely clear, whatever Appearance says")
+        #expect(look(clear, appearanceFrost: 1).windowGlass(reduceTransparency: true) == 1,
+                "Reduce Transparency keeps the glass")
     }
 
     @Test("a tint shows on a terminal at the starting opacity of 0%, not only on a painted canvas")

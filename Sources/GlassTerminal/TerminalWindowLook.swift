@@ -30,14 +30,20 @@ struct TerminalLook: Equatable {
     let interactiveGlass: Bool
     /// "None", a name ("Blue") or a hex colour (`#FF9500`), as `TerminalGlassTint` reads it.
     let tint: String
-    /// The blur the window itself sets, or nil. On Vision Pro a terminal's canvas adds frost only
-    /// when its window asks: the window has no glass of its own there (`.plain`), and none is added
-    /// around it at the settings' level (the owner: "I like it just the way it is").
-    let windowBlur: Double?
 
     var opacity: Double { glass.opacity }
     var blur: Double { glass.blur }
     var tintColor: Color? { TerminalGlassTint.color(for: tint) }
+
+    /// **How much of Apple's glass a Vision Pro terminal window shows behind its canvas**, 0…1:
+    /// its Blur, the window's own or Appearance's Frost. The window is plain and draws the glass
+    /// itself (`VisionTerminalWindowGlass`), because the system's window keeps its glass while it
+    /// has focus. The owner, on the headset (2026-10-10): "We've lost complete transparency ...
+    /// 100% transparent glass (the whole point of the app)". At 0 the window is completely clear;
+    /// Opacity still paints the canvas. Reduce Transparency always shows the glass.
+    func windowGlass(reduceTransparency: Bool) -> Double {
+        reduceTransparency ? 1 : blur
+    }
 
     var material: Material {
         switch frost {
@@ -56,7 +62,6 @@ struct TerminalLook: Equatable {
         self.glass = TerminalGlassAppearance.resolved(globalOpacity: opacity, globalBlur: blur, window: window)
         self.interactiveGlass = window.value(of: TerminalWindowSettings.interactiveGlass, over: interactiveGlass)
         self.tint = window.value(of: TerminalWindowSettings.tint, over: tint)
-        self.windowBlur = window[GlassLayerSettings.frost]
     }
 
     /// A terminal in a window with these settings. Read in a view's body, it follows both: the

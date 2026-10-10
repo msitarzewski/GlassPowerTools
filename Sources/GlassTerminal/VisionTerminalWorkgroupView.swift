@@ -9,6 +9,7 @@ import SwiftUI
 import GlassShell
 import GlassLayers
 #if os(visionOS)
+import GlassConnectionUI
 import GlassTerminalEmulator
 import UIKit
 
@@ -54,6 +55,24 @@ struct VisionTerminalPresentationPicker: View {
         .pickerStyle(.segmented)
         .frame(width: 290)
         .accessibilityIdentifier("vision-terminal-presentation")
+    }
+}
+
+/// **Apple's window glass, drawn by a plain terminal window**: in Apple's own corner, faded to the
+/// window's Blur (`TerminalLook.windowGlass`), and not drawn at all at 0, so the window is completely
+/// clear. The system's window keeps its glass whenever it has focus, which left a terminal no
+/// clearer than that glass (owner, 2026-10-10: "100% transparent glass (the whole point of the app)").
+struct VisionTerminalWindowGlass: View {
+    let strength: Double
+
+    var body: some View {
+        if strength > 0 {
+            Color.clear
+                .glassBackgroundEffect(in: RoundedRectangle(cornerRadius: GlassWindowShape.spatialWindowCornerRadius,
+                                                            style: .continuous))
+                .opacity(strength)
+                .allowsHitTesting(false)
+        }
     }
 }
 
@@ -132,6 +151,7 @@ struct VisionTerminalWorkgroupView: View {
     /// Set once this view has left a workgroup that emptied, so it leaves once.
     @State private var didLeaveEmptiedWorkgroup = false
     #if os(visionOS)
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State var spatialPresentation = VisionTerminalPresentationState()
     @FocusState private var overviewFocused: Bool
     /// The grid card a dragged tab is over (W15).
@@ -207,7 +227,23 @@ struct VisionTerminalWorkgroupView: View {
         // now. The workgroup's id is where This Window writes them.
         .glassWindowOverrides(sessionManager.workgroup(for: workgroupID)?.windowSettings ?? GlassWindowOverrides())
         .environment(\.terminalWorkgroupID, workgroupID)
+        #if os(visionOS)
+        // The window's glass, once, behind every terminal, card and message in it: the window is
+        // plain, and this is as much of Apple's glass as its Blur asks for (2026-10-10).
+        .background {
+            VisionTerminalWindowGlass(strength: windowLook.windowGlass(reduceTransparency: reduceTransparency))
+                .ignoresSafeArea()
+        }
+        #endif
     }
+
+    #if os(visionOS)
+    /// The canvas look of this window: its own settings over the terminal settings.
+    private var windowLook: TerminalLook {
+        TerminalLook.resolved(sessionManager.workgroup(for: workgroupID)?.windowSettings ?? GlassWindowOverrides(),
+                              settings: settingsManager)
+    }
+    #endif
 
     private var liveSelectedSessionID: UUID? {
         sessionManager.workgroup(for: workgroupID)?.selectedSessionID

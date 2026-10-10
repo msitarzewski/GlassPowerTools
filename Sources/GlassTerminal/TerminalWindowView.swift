@@ -311,9 +311,9 @@ struct TerminalWindowView: View {
     @ViewBuilder
     private var terminalSurface: some View {
         #if os(visionOS)
-        // Stage 2 layering proof: the window chrome and its backdrop come from the one layering
-        // state. The canvas keeps its own theme painting; a window whose look sets a blur adds its
-        // own backdrop on top (W20), otherwise the shared window backdrop is the only frost.
+        // Stage 2 layering proof: the window chrome comes from the one layering state. The canvas
+        // keeps its own theme painting; the window's glass behind it is the workgroup's, drawn
+        // once for the whole window (`VisionTerminalWindowGlass`).
         GlassLayeredWindow(
             showTitle: visionShowsTitle,
             showControls: isTerminalActive,
@@ -326,16 +326,9 @@ struct TerminalWindowView: View {
         } controls: {
             bottomStatusBar
         }
-        // Three shapes nest from Apple's corner in (owner, 2026-10-10): the window's frost, when it
-        // has one, is the whole window in the window's own corner; the canvas sits an even
-        // `visionCanvasEdgeInset` inside it; the rows an even `visionRowsInset` inside that.
-        .modifier(GlassWindowBackground(
-            interactive: effectiveInteractiveGlass,
-            material: resolvedMaterial,
-            blurAmount: windowLookBlur,
-            appearance: windowTheme.resolvedAppearance,
-            cornerRadius: GlassWindowShape.spatialWindowCornerRadius
-        ))
+        // Three shapes nest from Apple's corner in (owner, 2026-10-10): the window's glass, in the
+        // window's own corner; the canvas an even `visionCanvasEdgeInset` inside it; the rows an
+        // even `visionRowsInset` inside that.
         #elseif os(macOS)
         terminalContent
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1106,12 +1099,6 @@ struct TerminalWindowView: View {
     private var effectiveWindowOpacity: Double { look.opacity }
 
     private var effectiveBlurBackground: Double { look.blur }
-
-    /// Blur painted by the canvas itself, on visionOS: only when the window sets one. A `.plain`
-    /// window has no glass of its own, and none is added around a terminal at the settings' level.
-    private var windowLookBlur: Double { look.windowBlur ?? 0 }
-
-    private var effectiveInteractiveGlass: Bool { look.interactiveGlass }
 
     private var resolvedMaterial: Material { look.material }
 
@@ -2303,7 +2290,6 @@ struct GlassWindowBackground: ViewModifier {
     let material: Material
     let blurAmount: Double
     let appearance: TerminalThemeAppearance
-    var cornerRadius: CGFloat = 24
 
     func body(content: Content) -> some View {
         content.background {
@@ -2323,8 +2309,7 @@ struct GlassWindowBackground: ViewModifier {
             material: material,
             blurAmount: blurAmount,
             interactive: interactive,
-            colorScheme: canvasColorScheme,
-            cornerRadius: cornerRadius
+            colorScheme: canvasColorScheme
         )
     }
 
