@@ -1,0 +1,13 @@
+{
+  "images" : [
+    {
+      "filename" : "glass-power-tools-orb.png",
+      "idiom" : "vision",
+      "scale" : "2x"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

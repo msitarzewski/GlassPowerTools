@@ -8,7 +8,7 @@
 //  (`GlassWindowRecoveryManager`, which parks it here). Either way a pinch brings the window back.
 //
 //  It was glas.sh's spinner: a terminal symbol rotating without end in a material circle, which
-//  moved in the corner of the eye all day. Now it is still — the app's own prompt in Apple's
+//  moved in the corner of the eye all day. Now it is still — the app's own icon in Apple's
 //  glass — and only answers being looked at, the way every control on the headset does: the system
 //  grows and lights it and shows "Connections" beneath it. The app is never told it was looked at
 //  (visionOS keeps where a person looks private), so looking shows and a pinch restores.
@@ -42,7 +42,7 @@ public struct GlassConnectionsOrbScene: Scene {
     }
 }
 
-/// The orb: the app's prompt in a glass circle, with the library's Active count when there is one.
+/// The orb: the app's icon in a glass circle, with the library's Active count when there is one.
 public struct GlassConnectionsOrb: View {
     /// The orb's scene. "minimized" since glas.sh; the recovery manager parks Connections by it.
     public static let windowID = "minimized"
@@ -68,7 +68,8 @@ public struct GlassConnectionsOrb: View {
     public var body: some View {
         let count = activeCount
         Button(action: restore) {
-            VStack(spacing: 10) {
+            // Room under the icon for its count's badge before the name.
+            VStack(spacing: 10 + GlassConnectionsOrbFace.badgeDrop) {
                 GlassConnectionsOrbFace(count: count)
                     .frame(width: Self.diameter, height: Self.diameter)
                     .glassBackgroundEffect(in: .circle)
@@ -149,30 +150,41 @@ private struct GlassOrbRevealEffect: CustomHoverEffect {
     }
 }
 
-/// The prompt, and under it the Active count when there is one.
+/// The app's icon, and at its foot the Active count when there is one.
 private struct GlassConnectionsOrbFace: View {
     let count: Int
 
     var body: some View {
-        VStack(spacing: 8) {
-            GlassPromptGlyph()
-                .frame(width: 44, height: 28)
-            if count > 0 {
-                // The Active row's own symbol and number: what the window would say.
-                Label {
-                    Text(count, format: .number)
-                } icon: {
-                    Image(systemName: "bolt.fill")
+        // The app's own icon, its three layers flattened (`GlassPowerToolsOrb` in the app's
+        // assets), round as visionOS draws app icons. The owner (2026-10-10): "use the Glass Power
+        // Tools icon instead of the generic terminal one for the floater."
+        Image("GlassPowerToolsOrb")
+            .resizable()
+            .scaledToFill()
+            .clipShape(.circle)
+            .overlay(alignment: .bottom) {
+                if count > 0 {
+                    // The Active row's own symbol and number: what the window would say.
+                    Label {
+                        Text(count, format: .number)
+                    } icon: {
+                        Image(systemName: "bolt.fill")
+                    }
+                    .labelStyle(GlassOrbCountLabelStyle())
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .glassBackgroundEffect(in: .capsule)
+                    // A badge on the icon's rim, as the system badges an app.
+                    .offset(y: Self.badgeDrop)
+                    .transition(.opacity)
                 }
-                .labelStyle(GlassOrbCountLabelStyle())
-                .font(.subheadline.weight(.semibold).monospacedDigit())
-                .foregroundStyle(.secondary)
-                .transition(.opacity)
             }
-        }
-        .foregroundStyle(.primary)
-        .accessibilityHidden(true)
+            .accessibilityHidden(true)
     }
+
+    /// How far the count's badge hangs below the icon.
+    static let badgeDrop: CGFloat = 12
 }
 
 /// Pressed, the orb gives a little; looked at, its own hover effects answer.
@@ -193,26 +205,4 @@ private struct GlassOrbCountLabelStyle: LabelStyle {
     }
 }
 
-/// The app icon's prompt, `>_`, drawn rather than shipped as a picture: a rounded chevron and a
-/// bar, in the proportions of the icon's own layer (`App/GlassPowerTools.icon`).
-struct GlassPromptGlyph: View {
-    var body: some View {
-        GeometryReader { proxy in
-            let w = proxy.size.width, h = proxy.size.height
-            let stroke = h * 0.24
-            ZStack(alignment: .topLeading) {
-                Path { path in
-                    path.move(to: CGPoint(x: w * 0.10, y: h * 0.13))
-                    path.addLine(to: CGPoint(x: w * 0.37, y: h * 0.50))
-                    path.addLine(to: CGPoint(x: w * 0.10, y: h * 0.87))
-                }
-                .stroke(style: StrokeStyle(lineWidth: stroke, lineCap: .round, lineJoin: .round))
-                RoundedRectangle(cornerRadius: stroke / 2, style: .continuous)
-                    .frame(width: w * 0.50, height: stroke)
-                    .offset(x: w * 0.49, y: h * 0.87 - stroke / 2)
-            }
-        }
-        .accessibilityHidden(true)
-    }
-}
 #endif
