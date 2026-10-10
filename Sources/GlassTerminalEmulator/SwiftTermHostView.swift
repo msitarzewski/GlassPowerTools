@@ -936,6 +936,43 @@ private final class SwiftTermFindTracker {
     }
 }
 
+/// Keeps what someone selected while output arrives. SwiftTerm lets go of the selection at
+/// every chunk of output while mouse reporting is allowed (`feedPrepare`), so with anything
+/// printing — Claude Code's spinner, tmux's status line — a selection lasted until the next frame
+/// (owner, 2026-10-09: "I can't select text in terminals... it seems to be deselected with a
+/// refresh of screen"). Taken before a chunk and put back after it, where its text still is; a
+/// selection whose text the output changed is gone, as SwiftTerm meant.
+@MainActor
+enum SwiftTermSelectionKeeper {
+    struct Kept {
+        let start: Position
+        let end: Position
+        /// `totalLinesTrimmed` when taken: rows shift up by one per trimmed line.
+        let trimmed: Int
+        let buffer: ObjectIdentifier
+        let text: String
+    }
+
+    static func take(from view: TerminalView) -> Kept? {
+        guard let selection = view.selection, selection.active else { return nil }
+        let buffer = view.getTerminal().buffer
+        return Kept(start: selection.start, end: selection.end, trimmed: buffer.totalLinesTrimmed,
+                    buffer: ObjectIdentifier(buffer), text: selection.getSelectedText())
+    }
+
+    static func restore(_ kept: Kept?, in view: TerminalView) {
+        guard let kept, let selection = view.selection, !selection.active else { return }
+        let buffer = view.getTerminal().buffer
+        // The other screen is showing, or the selected lines were trimmed away.
+        let shift = buffer.totalLinesTrimmed - kept.trimmed
+        guard ObjectIdentifier(buffer) == kept.buffer, shift >= 0,
+              min(kept.start.row, kept.end.row) - shift >= 0 else { return }
+        selection.setSelection(start: Position(col: kept.start.col, row: kept.start.row - shift),
+                               end: Position(col: kept.end.col, row: kept.end.row - shift))
+        if selection.getSelectedText() != kept.text { selection.selectNone() }
+    }
+}
+
 public struct SwiftTermExternalLinkRequest: Identifiable, Equatable {
     public let id: UUID
     public let url: URL
@@ -1977,8 +2014,11 @@ private final class SwiftTermEngine: TerminalEngine {
 
     func receive(_ data: Data) {
         let start = performanceClock.now
+        let kept = SwiftTermSelectionKeeper.take(from: terminalView)
         terminalView.feed(byteArray: ArraySlice(data))
+        // Find's hit first: it knows where its own selection went. Any other selection after.
         reapplyFindHit()
+        SwiftTermSelectionKeeper.restore(kept, in: terminalView)
         performanceDiagnostics.recordFeed(
             byteCount: data.count,
             duration: start.duration(to: performanceClock.now)
@@ -2771,8 +2811,11 @@ private final class MacSwiftTermEngine: TerminalEngine {
 
     func receive(_ data: Data) {
         let start = performanceClock.now
+        let kept = SwiftTermSelectionKeeper.take(from: terminalView)
         terminalView.feed(byteArray: ArraySlice(data))
+        // Find's hit first: it knows where its own selection went. Any other selection after.
         reapplyFindHit()
+        SwiftTermSelectionKeeper.restore(kept, in: terminalView)
         performanceDiagnostics.recordFeed(
             byteCount: data.count,
             duration: start.duration(to: performanceClock.now)
@@ -3326,8 +3369,11 @@ private final class ReviewingMacLocalProcessTerminalView: LocalProcessTerminalVi
     override func dataReceived(slice: ArraySlice<UInt8>) {
         let clock = ContinuousClock()
         let start = clock.now
+        let kept = SwiftTermSelectionKeeper.take(from: self)
         super.dataReceived(slice: slice)
+        // After Find's hit, which `onProcessOutput` puts back.
         onProcessOutput?(slice, start.duration(to: clock.now))
+        SwiftTermSelectionKeeper.restore(kept, in: self)
     }
 }
 
@@ -3670,8 +3716,11 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
     func receive(_ data: Data) {
         let clock = ContinuousClock()
         let start = clock.now
+        let kept = SwiftTermSelectionKeeper.take(from: terminalView)
         terminalView.feed(byteArray: ArraySlice(data))
+        // Find's hit first: it knows where its own selection went. Any other selection after.
         reapplyFindHit()
+        SwiftTermSelectionKeeper.restore(kept, in: terminalView)
         performanceDiagnostics.recordFeed(
             byteCount: data.count,
             duration: start.duration(to: clock.now)
