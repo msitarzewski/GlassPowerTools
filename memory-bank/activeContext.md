@@ -40,13 +40,10 @@ Vision Pro windows by dragging grid cards or Move Tab To ▸. ef88118: a termina
 W17 merged (`f70da14`): the editor on Vision Pro — its toolbar (was on the split view, which visionOS does not
 draw), Markdown preview reachable, Projects + ▸ New Document / Open…, rule 64 deferrals for the editor view and SQL focus.
 W16 merged (`02711b3`): visionOS `.plain` windows paint in the window shape (46 pt; 24 pt inset card,
-`GlassWindowShape`); Files names its folder in the system window title with an ancestors menu. W20 (agent
-`w20-window-look`): a terminal window/tab group owns its look (tint, opacity, blur) on every platform — owner chose
-"window owns it" (2026-10-10); also the local tab gear's Settings opens Terminal Settings, not app Settings.
+`GlassWindowShape`); Files names its folder in the system window title with an ancestors menu. W20 merged (`d274577`, D57): a terminal window owns its look; local tab gear opens Terminal Settings.
 **Owner (2026-10-10 ~00:35): "install all three when W21 lands"** — Mac, iPhone and Vision Pro, one build with W18 + W21.
 W18 merged (`6293e69`, D56): settings sync was blocked since 09-27 by a duplicate built-in theme when combining with
-an older writer's copy; fixed. The first launch with it applies iCloud's frozen terminal preferences once more. W19 (agent `w19-mac-names`): open Mac tabs follow names given on other devices; Mac SSH tabs
-in tmux show the program title.
+an older writer's copy; fixed. The first launch with it applies iCloud's frozen terminal preferences once more. W19 merged (`1e80498`): Mac tabs follow names given elsewhere; Mac SSH tabs in tmux show the program title.
 W16 (agent `w16-vision-framing`): dark square corners on visionOS `.plain` windows (Files first) and the Files
 window's header to match the Mac's modern one. W17 (agent `w17-vision-editor`): the editor fully working on visionOS.
 W15 (agent `w15-vision-windows`, worktree): Vision Pro/iPad tab groups back on relaunch; moving tabs between windows

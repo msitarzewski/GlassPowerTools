@@ -775,3 +775,11 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   both sides first. Logging names the case and detail; Settings caption in plain words. Suites: terminal 676, shell 238.
   Not installed yet (waiting to ship with W21). A stray README.md edit (a trailing space on "What it does", 00:14,
   likely the owner trying the editor) is left uncommitted and untouched.
+- **1e80498 — W19 merged.** Open Mac tabs follow `@glass-name` given or removed elsewhere (local: one batched
+  `list-sessions` for every local tab, ≤ every 2 s, when output settles; SSH: the tab's own pane read). When a tab
+  meets its session, the session's name wins; a nameless session gets the tab's (pre-W6 names now reach other devices).
+  Mac SSH tabs in tmux name themselves from the pane (`readsTmuxPane` on for them). Suites: terminal 685, shell 238.
+- **d274577 — W20 merged (D57):** window-owned look; local tab gear ▸ Settings opens Terminal Settings; sidebar icons
+  and waves take the window's tint; iPad "Window Appearance". Tint now a fixed 12%. Suites: terminal 705, shell 238.
+  To check: sidebar selection highlight with `.tint` (unverified), 12% legibility, Vision Pro Overrides on a tab.
+- Waiting for W21 (SSH limits); then one build on all three (owner: "install all three when W21 lands").

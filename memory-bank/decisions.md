@@ -1248,3 +1248,14 @@ before combining, both sides rename the built-in theme to the current identifier
 one; selection follows. No migration, nothing deleted; an older build reading the new copy rejects it and stops syncing
 rather than overwriting. Built in W18 (`6293e69`). After-effect: the first launch with the fix applies iCloud's
 frozen copy of terminal preferences once more; changes made since 09-27 may need making again, then they sync.
+
+## D57 — A terminal window owns its look — Implemented 2026-10-10
+**Owner:** "a way to give a color/tint to the tab group… It should inherit the settings of the first one in the order
+yes?" Asked how; chose **"window owns it"**. **Decision:** one look (`TerminalSessionOverride` fields: tint, opacity,
+blur, frost, interactive glass) per terminal window/tab group, resolved field by field over the global settings
+(`TerminalLook.resolved`). Stored on the Mac window record, on `TerminalWorkgroup` and W15's reopen records, and in
+`LayoutPreset` (synced, decoded leniently, schema unchanged so earlier builds still read it). Set from any tab's
+Settings ▸ Overrides; new and moved-in tabs take it; Move Tab to New Window and Duplicate carry it; ⌘N starts plain.
+Per-session overrides removed (keyed by ids no later session has). Tint drawn at a fixed 12% (it was 12% × opacity,
+invisible at the default 0%). Built in W20 (`d274577`). Limit: a build before W20 that re-saves a synced workgroup
+drops its look.
