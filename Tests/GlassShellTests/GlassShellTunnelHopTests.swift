@@ -58,12 +58,16 @@ struct GlassShellTunnelHopTests {
         defer { try? FileManager.default.removeItem(at: root) }
 
         let store = HostCatalogStore(fileURL: model.catalogFileURL)
-        // Oldest first: this one supplies `host.address`, and carries no SSH service.
+        // Oldest first: this one supplies `host.address`, and carries no SSH service. The dates are
+        // set apart: two made a moment apart can read back equal from the catalog, and a tie is
+        // broken by id, so which machine the host *is* would be a coin toss.
         try await store.upsert(try HostProfile(displayName: "db", address: "10.0.0.1",
-                                               services: [databaseLink()]))
+                                               services: [databaseLink()],
+                                               createdAt: Date(timeIntervalSince1970: 1_700_000_000)))
         // Same display name, different machine, and this is the one with SSH.
         try await store.upsert(try HostProfile(displayName: "db", address: "10.0.0.99",
-                                               services: [sshLink()]))
+                                               services: [sshLink()],
+                                               createdAt: Date(timeIntervalSince1970: 1_700_000_060)))
         await model.load()
 
         let host = try #require(model.catalogHosts.first { $0.displayName == "db" })
@@ -125,10 +129,13 @@ struct GlassShellTunnelHopTests {
         defer { try? FileManager.default.removeItem(at: root) }
 
         let store = HostCatalogStore(fileURL: model.catalogFileURL)
+        // Dates set apart, as above, so 10.0.0.1 is the host's own machine on every run.
         try await store.upsert(try HostProfile(displayName: "split", address: "10.0.0.1",
-                                               services: [databaseLink()]))
+                                               services: [databaseLink()],
+                                               createdAt: Date(timeIntervalSince1970: 1_700_000_000)))
         try await store.upsert(try HostProfile(displayName: "split", address: "10.0.0.99",
-                                               services: [sshLink()]))
+                                               services: [sshLink()],
+                                               createdAt: Date(timeIntervalSince1970: 1_700_000_060)))
         await model.load()
 
         let host = try #require(model.catalogHosts.first { $0.displayName == "split" })
