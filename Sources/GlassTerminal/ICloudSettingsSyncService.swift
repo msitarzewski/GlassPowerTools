@@ -70,6 +70,12 @@ nonisolated struct ICloudTerminalTheme: Codable, Equatable, Identifiable, Sendab
     var fontSize: Double
     var preferredAppearance: TerminalThemeAppearance? = nil
 
+    func reidentified(id: UUID) -> Self {
+        Self(id: id, name: name, background: background, foreground: foreground, cursor: cursor,
+             selection: selection, ansiColors: ansiColors, fontName: fontName, fontSize: fontSize,
+             preferredAppearance: preferredAppearance)
+    }
+
     func validate() throws {
         guard !name.isEmpty, name.count <= Self.maximumNameLength else {
             throw ICloudSettingsSyncError.invalidPayload("Theme names must contain 1...128 characters.")
@@ -214,7 +220,7 @@ nonisolated struct ICloudSettingsSyncPayload: Codable, Equatable, Sendable {
                 throw ICloudSettingsSyncError.invalidPayload("The built-in terminal theme cannot be deleted.")
             }
             // A device on an older build still sends the built-in theme under its former identifier;
-            // the merge re-identifies it.
+            // `canonicalizingBuiltInTheme()` re-identifies it before a push, the library on merge.
             if record.origin == .builtIn,
                record.id != TerminalTheme.defaultID, record.id != TerminalTheme.legacyDefaultID {
                 throw ICloudSettingsSyncError.invalidPayload("The built-in terminal theme identifier is invalid.")
@@ -244,7 +250,9 @@ nonisolated struct ICloudSettingsSyncPayload: Codable, Equatable, Sendable {
     /// device retain remote tombstones instead of overwriting them merely by
     /// publishing the next envelope revision.
     func mergingThemeRecords(with other: Self) -> Self {
-        var merged = Dictionary(uniqueKeysWithValues: themeRecords.map { ($0.id, $0) })
+        let mine = canonicalizingBuiltInTheme()
+        let other = other.canonicalizingBuiltInTheme()
+        var merged = Dictionary(uniqueKeysWithValues: mine.themeRecords.map { ($0.id, $0) })
         for record in other.themeRecords {
             guard let existing = merged[record.id] else {
                 merged[record.id] = record
@@ -255,11 +263,11 @@ nonisolated struct ICloudSettingsSyncPayload: Codable, Equatable, Sendable {
             }
         }
 
-        let useOtherSelection = other.selectionModifiedAt > selectionModifiedAt
-            || (other.selectionModifiedAt == selectionModifiedAt
-                && other.selectedThemeID.uuidString > selectedThemeID.uuidString)
+        let useOtherSelection = other.selectionModifiedAt > mine.selectionModifiedAt
+            || (other.selectionModifiedAt == mine.selectionModifiedAt
+                && other.selectedThemeID.uuidString > mine.selectedThemeID.uuidString)
         let mergedRecords = Array(merged.values)
-        var resolvedSelection = useOtherSelection ? other.selectedThemeID : selectedThemeID
+        var resolvedSelection = useOtherSelection ? other.selectedThemeID : mine.selectedThemeID
         let activeIDs = Set(mergedRecords.filter { !$0.isDeleted }.map(\.id))
         if !activeIDs.contains(resolvedSelection),
            let fallback = mergedRecords
@@ -271,7 +279,36 @@ nonisolated struct ICloudSettingsSyncPayload: Codable, Equatable, Sendable {
         return Self(
             themeRecords: mergedRecords,
             selectedThemeID: resolvedSelection,
-            selectionModifiedAt: max(selectionModifiedAt, other.selectionModifiedAt),
+            selectionModifiedAt: max(mine.selectionModifiedAt, other.selectionModifiedAt),
+            preferences: preferences
+        )
+    }
+
+    /// The built-in theme as one record under the current identifier. glas.sh and this app's
+    /// builds before 2026-09-27 send it under `legacyDefaultID`, and they share this store
+    /// (`GPT_KVSTORE_SUFFIX`), so a union by identifier with this device's record held the
+    /// built-in theme twice: `validate()` refused the result, and while such an envelope was
+    /// stored no push could land (W18, 2026-10-10). As `TerminalThemeLibrary.canonicalize()`
+    /// does, the newest built-in record wins, so neither device's later edit is lost.
+    func canonicalizingBuiltInTheme() -> Self {
+        let builtIns = themeRecords.filter { $0.origin == .builtIn }
+        guard builtIns.contains(where: { $0.id != TerminalTheme.defaultID })
+                || selectedThemeID == TerminalTheme.legacyDefaultID else { return self }
+        var records = themeRecords.filter { $0.origin != .builtIn }
+        if let newest = builtIns.max(by: { Self.recordIsNewer($1, than: $0) }) {
+            records.append(ICloudTerminalThemeRecord(
+                theme: newest.theme.reidentified(id: TerminalTheme.defaultID),
+                origin: .builtIn,
+                modifiedAt: newest.modifiedAt,
+                deletedAt: newest.deletedAt
+            ))
+        }
+        return Self(
+            schemaVersion: schemaVersion,
+            themeRecords: records,
+            selectedThemeID: selectedThemeID == TerminalTheme.legacyDefaultID
+                ? TerminalTheme.defaultID : selectedThemeID,
+            selectionModifiedAt: selectionModifiedAt,
             preferences: preferences
         )
     }

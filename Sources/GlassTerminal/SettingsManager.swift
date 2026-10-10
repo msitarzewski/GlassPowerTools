@@ -1403,7 +1403,8 @@ class SettingsManager {
                 return
             } catch {
                 self.iCloudSyncDirty = true
-                Logger.settings.error("Failed to synchronize portable settings: \(error)")
+                // The service has logged it, case and detail, under this store's key: the
+                // `\(error)` this line logged bridged to "GlassSettingsSyncError Code=3" (W18).
                 if self.shouldRetryICloudSync(after: error), self.iCloudRetryAttempt < 5 {
                     self.iCloudRetryAttempt += 1
                     let seconds = min(30, 1 << self.iCloudRetryAttempt)

@@ -10,6 +10,13 @@
 //
 
 import Foundation
+import GlassLayers
+import os
+
+/// Every refused read or write, from every capability's sync, in one place: the callers that push
+/// with `try?` (favourites, workgroups, editor projects) were otherwise silent, and a refused read
+/// of the stored value was silent everywhere (W18). Category "settings", as the terminal's own.
+private let settingsSyncLog = Logger(subsystem: "com.glasspowertools", category: "settings")
 
 /// What a capability synchronizes. `converged(with:)` reconciles this device's value with the
 /// last accepted one before a push, so a slower writer never drops the other's records.
@@ -213,7 +220,10 @@ public enum GlassSettingsSyncError: LocalizedError, Equatable, Sendable {
     case encodingFailed(String)
     case decodingFailed(String)
 
+    /// What the person reads (Settings ▸ Themes ▸ iCloud Sync): what happens to their settings and
+    /// what to do, in plain words. The case and its detail go to the log (`logDescription`).
     public var errorDescription: String? {
+        let product = GlassProduct.displayName
         switch self {
         case .disabled:
             return "iCloud settings synchronization is disabled."
@@ -222,22 +232,34 @@ public enum GlassSettingsSyncError: LocalizedError, Equatable, Sendable {
         case .accountUnavailable:
             return "An iCloud account is required to synchronize settings."
         case .quotaExceeded:
-            return "The iCloud key-value storage quota was exceeded."
-        case .encodedValueTooLarge(let actual, let maximum):
-            return "The synchronized settings value is \(actual) bytes; the maximum is \(maximum) bytes."
-        case .unsupportedEnvelopeSchema(let version):
-            return "The iCloud settings envelope schema \(version) is not supported."
-        case .unsupportedPayloadSchema(let version):
-            return "The iCloud settings payload schema \(version) is not supported."
-        case .invalidPayload(let reason):
-            return "The iCloud settings payload is invalid: \(reason)"
-        case .revisionOverflow:
-            return "The iCloud settings revision counter cannot be incremented."
-        case .encodingFailed(let reason):
-            return "The iCloud settings payload could not be encoded: \(reason)"
-        case .decodingFailed(let reason):
-            return "The iCloud settings payload could not be decoded: \(reason)"
+            return "iCloud has no room left for these settings, so they stay on this device. "
+                + "Removing themes or workgroups you no longer use makes room."
+        case .encodedValueTooLarge:
+            return "These settings are too large for iCloud, so they stay on this device. "
+                + "Removing themes or workgroups you no longer use makes room."
+        case .unsupportedEnvelopeSchema, .unsupportedPayloadSchema:
+            return "Another device synced these settings from a different version of \(product), "
+                + "so this device keeps its own. Update \(product) on each device to sync them again."
+        case .decodingFailed:
+            return "The settings in iCloud couldn't be read, so this device keeps its own. "
+                + "Update \(product) on each device to sync them again."
+        case .invalidPayload, .revisionOverflow, .encodingFailed:
+            return "These settings couldn't be synced, so they stay on this device. "
+                + "Update \(product) on each device to sync them again."
         }
+    }
+
+    /// For the log: the case and its detail, as `invalidPayload("…")` or
+    /// `encodedValueTooLarge(actual: …, maximum: …)`. Every detail is the app's own wording, a
+    /// count or a schema number — never a synchronized value — so it is safe to log publicly.
+    public var logDescription: String { String(describing: self) }
+
+    /// `logDescription` for this type. Any other error is named by its domain and code only,
+    /// since its text could carry what it was handed.
+    public static func logDescription(of error: any Error) -> String {
+        if let error = error as? GlassSettingsSyncError { return error.logDescription }
+        let bridged = error as NSError
+        return "\(bridged.domain) \(bridged.code)"
     }
 }
 
@@ -406,7 +428,7 @@ public final class GlassSettingsSyncService<Payload: GlassSettingsSyncPayload> {
         } catch let error as CancellationError {
             throw error
         } catch {
-            record(error)
+            record(error, while: "sending")
             throw error
         }
     }
@@ -426,7 +448,7 @@ public final class GlassSettingsSyncService<Payload: GlassSettingsSyncPayload> {
             updateStatus(.synced)
             return result
         } catch {
-            record(error)
+            record(error, while: "reading")
             throw error
         }
     }
@@ -438,7 +460,7 @@ public final class GlassSettingsSyncService<Payload: GlassSettingsSyncPayload> {
         do {
             try candidate.validate()
         } catch {
-            record(error)
+            record(error, while: "reading")
             return .ignored(candidate)
         }
 
@@ -546,19 +568,32 @@ public final class GlassSettingsSyncService<Payload: GlassSettingsSyncPayload> {
         }
     }
 
-    private func record(_ error: Error) {
+    /// `action` is which way it failed: "sending" this device's settings or "reading" iCloud's.
+    private func record(_ error: Error, while action: String) {
+        let newStatus: GlassSettingsSyncStatus
         switch error {
         case GlassSettingsSyncError.disabled:
-            updateStatus(.disabled, error: error)
+            newStatus = .disabled
         case GlassSettingsSyncError.accountUnavailable:
-            updateStatus(.account, error: error)
+            newStatus = .account
         case GlassSettingsSyncError.quotaExceeded:
-            updateStatus(.quota, error: error)
+            newStatus = .quota
         case GlassSettingsSyncError.unavailable:
-            updateStatus(.unavailable, error: error)
+            newStatus = .unavailable
         default:
-            updateStatus(.error, error: error)
+            newStatus = .error
         }
+        let message = "Failed to synchronize settings (\(storeKey)) while \(action): "
+            + GlassSettingsSyncError.logDescription(of: error)
+        switch newStatus {
+        case .disabled:
+            break
+        case .account, .unavailable:
+            settingsSyncLog.notice("\(message, privacy: .public)")
+        default:
+            settingsSyncLog.error("\(message, privacy: .public)")
+        }
+        updateStatus(newStatus, error: error)
     }
 
     private func updateStatus(
