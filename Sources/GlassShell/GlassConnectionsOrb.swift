@@ -68,15 +68,23 @@ public struct GlassConnectionsOrb: View {
     public var body: some View {
         let count = activeCount
         Button(action: restore) {
-            // Room under the icon for its count's badge before the name.
-            VStack(spacing: 10 + GlassConnectionsOrbFace.badgeDrop) {
-                GlassConnectionsOrbFace(count: count)
+            // Room under the icon for the count's badge before the name.
+            VStack(spacing: 10 + GlassConnectionsOrbBadge.drop) {
+                GlassConnectionsOrbFace()
                     .frame(width: Self.diameter, height: Self.diameter)
                     .glassBackgroundEffect(in: .circle)
                     .contentShape(.hoverEffect, .circle)
                     // Looked at, it lights as every control does, and grows a little.
                     .hoverEffect(.highlight)
                     .hoverEffect(GlassOrbGrowEffect().hoverEffectPhaseOverride(Self.lookedAtOverride))
+                    // Over the icon, after its hover effects, so the highlight's circle never clips it.
+                    .overlay(alignment: .bottom) {
+                        if count > 0 {
+                            GlassConnectionsOrbBadge(count: count)
+                                .alignmentGuide(.bottom) { $0[.bottom] - GlassConnectionsOrbBadge.drop }
+                                .transition(.opacity)
+                        }
+                    }
                 Text("Connections")
                     .font(.callout.weight(.medium))
                     .padding(.horizontal, 14)
@@ -150,41 +158,43 @@ private struct GlassOrbRevealEffect: CustomHoverEffect {
     }
 }
 
-/// The app's icon, and at its foot the Active count when there is one.
+/// The app's icon: its three visionOS layers flattened (`GlassPowerToolsOrb` in the app's assets),
+/// round as visionOS draws app icons. The owner (2026-10-10): "use the Glass Power Tools icon
+/// instead of the generic terminal one for the floater."
 private struct GlassConnectionsOrbFace: View {
-    let count: Int
-
     var body: some View {
-        // The app's own icon, its three layers flattened (`GlassPowerToolsOrb` in the app's
-        // assets), round as visionOS draws app icons. The owner (2026-10-10): "use the Glass Power
-        // Tools icon instead of the generic terminal one for the floater."
         Image("GlassPowerToolsOrb")
             .resizable()
             .scaledToFill()
             .clipShape(.circle)
-            .overlay(alignment: .bottom) {
-                if count > 0 {
-                    // The Active row's own symbol and number: what the window would say.
-                    Label {
-                        Text(count, format: .number)
-                    } icon: {
-                        Image(systemName: "bolt.fill")
-                    }
-                    .labelStyle(GlassOrbCountLabelStyle())
-                    .font(.subheadline.weight(.semibold).monospacedDigit())
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .glassBackgroundEffect(in: .capsule)
-                    // A badge on the icon's rim, as the system badges an app.
-                    .offset(y: Self.badgeDrop)
-                    .transition(.opacity)
-                }
-            }
             .accessibilityHidden(true)
     }
+}
 
-    /// How far the count's badge hangs below the icon.
-    static let badgeDrop: CGFloat = 12
+/// The library's Active count on the orb's rim, as the system badges an app: its own glass, drawn
+/// over the icon rather than inside it. Inside, the look highlight (clipped to the circle) cut it
+/// in half (owner, on the headset: "the count is kind of off").
+private struct GlassConnectionsOrbBadge: View {
+    let count: Int
+
+    var body: some View {
+        // The Active row's own symbol and number: what the window would say.
+        Label {
+            Text(count, format: .number)
+        } icon: {
+            Image(systemName: "bolt.fill")
+        }
+        .labelStyle(GlassOrbCountLabelStyle())
+        .font(.subheadline.weight(.semibold).monospacedDigit())
+        .fixedSize()
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .glassBackgroundEffect(in: .capsule)
+        .accessibilityHidden(true)
+    }
+
+    /// How far the badge hangs below the icon's rim: half its height, so it straddles the rim.
+    static let drop: CGFloat = 14
 }
 
 /// Pressed, the orb gives a little; looked at, its own hover effects answer.
