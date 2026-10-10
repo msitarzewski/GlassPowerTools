@@ -878,3 +878,10 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   in the first run), connection UI 40, layers 42, desktop 185. Install waits for the owner's look at the captures.
 - **Owner (13:40):** "we still don't have a way to combine two independent terminal windows there's no tab to drag
   between." Confirmed: one terminal → tab bar hidden, no grid, and Move to… lives only on tabs and grid cards. Next.
+- **W26 merged (combine Vision Pro windows).** Tools menu ▸ **Move Tab To** (one row; **New Window** inside it — two rows
+  pushed Settings below the menu's 640-pt fold at 1200×800) on visionOS and iPad (iPad's tab menu only shows in the
+  sidebar, per the SDK); the title ornament is `.draggable(TerminalTabTransfer)`, dropped back on its own window it is
+  ignored (`TerminalTabMoves.arriving`). Moves handed down as `\.terminalTabMoving`. Demo surface `terminal-move`.
+  Simulator: menu move combined two one-terminal windows, the emptied one closed; title drag lifts, but a cross-window
+  drop can't be driven by XCUITest — check on the headset. Suites: terminal 724 (serial), connection UI 40; visionOS +
+  iOS simulator builds pass. To check: W15's help line "touch and hold its tab" on Vision Pro may not work either.

@@ -135,6 +135,49 @@ struct TerminalTabMovesTests {
         #expect(TerminalTabMoves.destinations(from: source, among: [named], in: manager).map(\.id) == [named])
     }
 
+    // MARK: One terminal to a window (W26)
+    //
+    // The owner, on the Vision Pro: "we still don't have a way to combine two independent terminal
+    // windows there's no tab to drag between". The terminal's tools menu and its title move it.
+
+    @Test("two windows of one terminal each combine: the terminal moves in, and the window it left goes")
+    func loneTerminalsCombine() {
+        let manager = SessionManager(loadImmediately: false)
+        let a = terminal("alpha", in: manager), b = terminal("bravo", in: manager)
+        let left = workgroup("alpha", [a], in: manager)
+        let right = workgroup("bravo", [b], in: manager)
+
+        // The tools menu: the other open window, never its own, and no new window for a terminal
+        // that is in one of its own already.
+        #expect(TerminalTabMoves.destinations(from: left, among: [left, right], in: manager).map(\.id) == [right])
+        #expect(!TerminalTabMoves.canMoveToNewWindow(from: left, in: manager))
+
+        #expect(TerminalTabMoves.move(a.id, to: right, at: nil, in: manager) == .moved(sourceClosed: true))
+        #expect(manager.workgroup(for: left) == nil, "its window closes")
+        #expect(manager.workgroup(for: right)?.sessionIDs == [b.id, a.id])
+        #expect(manager.selectedSession(inWorkgroup: right) === a, "the very same session, on screen where it went")
+        #expect(manager.sessions.count == 2, "moved, never copied")
+        #expect(TerminalTabMoves.canMoveToNewWindow(from: right, in: manager), "with two, either can leave")
+    }
+
+    @Test("a title let go over its own window stays where it is; one from another window arrives")
+    func droppedOnItsOwnWindow() {
+        let manager = SessionManager(loadImmediately: false)
+        let a1 = terminal("alpha", in: manager), a2 = terminal("alpha", in: manager), b = terminal("bravo", in: manager)
+        let left = workgroup("Left", [a1, a2], in: manager)
+        let right = workgroup("Right", [b], in: manager)
+        let own = TerminalTabTransfer(workgroupID: left, sessionID: a1.id)
+        let other = TerminalTabTransfer(workgroupID: right, sessionID: b.id)
+
+        #expect(TerminalTabMoves.arriving([own], at: left, in: manager).isEmpty,
+                "not taken, so not sent to the end of its own tabs")
+        #expect(TerminalTabMoves.arriving([own, other], at: left, in: manager) == [other])
+        // Where the terminal is now decides, not where the drag says it began.
+        let movedSince = TerminalTabTransfer(workgroupID: right, sessionID: a2.id)
+        #expect(TerminalTabMoves.arriving([movedSince], at: left, in: manager).isEmpty)
+        #expect(TerminalTabMoves.arriving([movedSince], at: right, in: manager) == [movedSince])
+    }
+
     // MARK: The drag
 
     @Test("a dragged tab arrives as the tab it was, and only this app's windows read it")

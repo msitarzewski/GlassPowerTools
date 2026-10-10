@@ -106,6 +106,8 @@ struct TerminalWindowView: View {
     @Environment(\.terminalTabDrop) private var terminalTabDrop
     /// W20, W22: the workgroup this terminal is drawn in, whose settings This Window edits.
     @Environment(\.terminalWorkgroupID) private var workgroupID
+    /// W26: that workgroup's moves, for the tools menu and, on Vision Pro, the title.
+    @Environment(\.terminalTabMoving) private var tabMoving
     #else
     /// W20, W22: the Mac terminal window this pane is in, whose settings This Window edits.
     @Environment(MacWorkspaceWindowController.self) private var macWindow: MacWorkspaceWindowController?
@@ -322,7 +324,7 @@ struct TerminalWindowView: View {
             terminalContent
                 .padding(Self.visionCanvasPadding(showsTitle: visionShowsTitle, showsControls: isTerminalActive))
         } title: {
-            connectionLabel
+            movableConnectionLabel
         } controls: {
             bottomStatusBar
         }
@@ -670,6 +672,29 @@ struct TerminalWindowView: View {
             ? "Reconnecting, attempt \(session.reconnectAttemptCount) of 5"
             : "\(terminalName), \(session.repositoryLine.map { "\($0), " } ?? "")\(session.server.username) at \(session.server.host) port \(session.server.port)")
     }
+
+    #if os(visionOS)
+    /// **The title drags** (W26): onto another terminal window, this terminal moves there, still
+    /// running — the owner's "combine two independent terminal windows" from a window with no tab
+    /// to drag. It is the tab here: the same `TerminalTabTransfer` a grid card carries, taken by the
+    /// same drops. Let go over its own window, nothing changes (`TerminalTabMoves.arriving`). The
+    /// tools menu's **Move Tab To** is the same move without a drag. The ornament looks as before:
+    /// the content shape only lets the whole capsule be picked up, and the lifted copy wears the
+    /// capsule's glass.
+    @ViewBuilder
+    private var movableConnectionLabel: some View {
+        if let workgroupID, tabMoving != nil {
+            connectionLabel
+                .contentShape(.capsule)
+                .draggable(TerminalTabTransfer(workgroupID: workgroupID, sessionID: session.id)) {
+                    connectionLabel.glassBackgroundEffect(in: .capsule)
+                }
+                .accessibilityHint("Drag onto another terminal window to move this terminal there.")
+        } else {
+            connectionLabel
+        }
+    }
+    #endif
 
     // MARK: - Terminal Content
 
@@ -1639,6 +1664,18 @@ struct TerminalWindowView: View {
                 } label: {
                     Label("Duplicate Session", systemImage: "doc.on.doc")
                 }
+
+                #if os(visionOS) || os(iOS)
+                // W26: a window with one terminal has no tab, and so no tab menu to move it from.
+                // The tab's own moves, for this terminal, as one row (**New Window** is inside it):
+                // a second row would push Settings below this menu's fold.
+                if let tabMoving, let workgroupID {
+                    TerminalTabMoveActions(workgroupID: workgroupID, canMoveToNewWindow: tabMoving.canMoveToNewWindow,
+                                           asOneRow: true,
+                                           moveToNewWindow: { tabMoving.moveToNewWindow(session) },
+                                           move: { tabMoving.move(session, $0) })
+                }
+                #endif
 
                 Button {
                     reconnectSession()

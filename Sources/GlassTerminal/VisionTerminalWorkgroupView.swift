@@ -294,15 +294,28 @@ struct VisionTerminalWorkgroupView: View {
     // A tab's menu moves it — its terminal still running, the same session — to a new window or
     // into another open one, whose name the menu shows as Active does. On Vision Pro a grid card
     // also drags onto another terminal window. A window whose last tab leaves closes.
+    //
+    // W26 (2026-10-10): "we still don't have a way to combine two independent terminal windows
+    // there's no tab to drag between". A window with one terminal shows no tab bar, so the same
+    // moves are in the terminal's tools menu, and on Vision Pro its title drags as a card does.
 
     /// A new window for a tab that leaves others behind; on iPhone there is only the one window.
     private var canMoveToNewWindow: Bool {
-        guard sessionManager.sessions(inWorkgroup: workgroupID).count > 1 else { return false }
+        guard TerminalTabMoves.canMoveToNewWindow(from: workgroupID, in: sessionManager) else { return false }
         #if os(visionOS)
         return true
         #else
         return supportsMultipleWindows && runtime != nil
         #endif
+    }
+
+    /// The same moves, for a terminal's tools menu and its title (W26): a window with one terminal
+    /// has no tab bar to hold them. Handed down rather than rebuilt in the terminal, since opening,
+    /// bringing forward and closing windows is this view's.
+    private var tabMoving: TerminalTabMoving {
+        TerminalTabMoving(canMoveToNewWindow: canMoveToNewWindow,
+                          moveToNewWindow: { moveToNewWindow($0) },
+                          move: { move($0, to: $1) })
     }
 
     private func moveToNewWindow(_ session: TerminalSession) {
@@ -537,8 +550,13 @@ struct VisionTerminalWorkgroupView: View {
                     onSessionRequestedClose: { closeSessionTab(session) }
                 )
                 .environment(\.visionTerminalPresentation, sessions.count > 1 ? presentationBinding : nil)
-                // A grid card from another window, dropped on the terminal: it joins this window.
-                .environment(\.terminalTabDrop, { tabs in _ = acceptDroppedTabs(tabs, at: nil) })
+                // A grid card or a terminal's title from another window, dropped on the terminal: it
+                // joins this window. This window's own title let go over it changes nothing (W26).
+                .environment(\.terminalTabDrop, { tabs in
+                    _ = acceptDroppedTabs(TerminalTabMoves.arriving(tabs, at: workgroupID, in: sessionManager), at: nil)
+                })
+                // W26: its tools menu and its title move it, with one terminal in the window or many.
+                .environment(\.terminalTabMoving, tabMoving)
                 .opacity(active ? 1 : 0)
                 .allowsHitTesting(active)
                 .accessibilityHidden(!active)
@@ -760,6 +778,8 @@ struct VisionTerminalWorkgroupView: View {
                     closeSessionTab(session)
                 }
             )
+            // iPad (W26): a tab's own menu is drawn only in the sidebar, so Tools moves it too.
+            .environment(\.terminalTabMoving, tabMoving)
             .accessibilityIdentifier("terminal-workgroup-session-\(session.id.uuidString)")
         } label: {
             Label {
@@ -966,12 +986,19 @@ struct VisionTerminalWorkgroupView: View {
     }
 }
 
-/// A tab's **Move Tab to New Window** and **Move Tab To** (W15). A view of its own, so the other
-/// windows' names it shows are read here: read by the terminal window itself, a name changing in
-/// any window would redraw every terminal window.
-private struct TerminalTabMoveActions: View {
+/// A tab's **Move Tab to New Window** and **Move Tab To** (W15), in its menu and, for the terminal
+/// on screen, in the terminal's tools menu (W26). A view of its own, so the other windows' names it
+/// shows are read here: read by the terminal window itself, a name changing in any window would
+/// redraw every terminal window.
+struct TerminalTabMoveActions: View {
     let workgroupID: UUID
     let canMoveToNewWindow: Bool
+    /// The tools menu's form (W26): one **Move Tab To** row holding **New Window** as well, with no
+    /// divider of its own. That menu shows 640 points in a terminal window of the default size and
+    /// already filled about 595 of them in a Release build (651 in Debug, with HTML Preview); two
+    /// rows and a divider put its last item, Settings, out of sight below the fold (measured in the
+    /// visionOS simulator, 2026-10-10).
+    var asOneRow = false
     let moveToNewWindow: () -> Void
     let move: (UUID) -> Void
     @Environment(SessionManager.self) private var sessionManager
@@ -989,6 +1016,27 @@ private struct TerminalTabMoveActions: View {
 
     var body: some View {
         let destinations = self.destinations
+        if asOneRow {
+            if canMoveToNewWindow || !destinations.isEmpty {
+                Menu("Move Tab To", systemImage: "rectangle.portrait.and.arrow.right") {
+                    if canMoveToNewWindow {
+                        Button("New Window", systemImage: "macwindow.badge.plus", action: moveToNewWindow)
+                    }
+                    if canMoveToNewWindow && !destinations.isEmpty {
+                        Divider()
+                    }
+                    ForEach(destinations) { destination in
+                        Button(destination.title) { move(destination.id) }
+                    }
+                }
+            }
+        } else {
+            separateRows(destinations)
+        }
+    }
+
+    @ViewBuilder
+    private func separateRows(_ destinations: [TerminalTabMoves.Destination]) -> some View {
         if canMoveToNewWindow || !destinations.isEmpty {
             Divider()
         }

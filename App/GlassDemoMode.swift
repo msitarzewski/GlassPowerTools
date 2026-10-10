@@ -75,6 +75,11 @@ enum GlassDemoMode {
             terminal.requestDemoReplay(name: "alpha", output: Data(terminalTranscript.utf8),
                                        windowSettings: GlassTerminalRuntime.demoWindowSettings,
                                        opensSettings: surface == "terminal-settings")
+        case "terminal-move":
+            // Two windows of one terminal each (W26): the tools menu's Move Tab To lists the other,
+            // and either title drags into the other window.
+            terminal.requestDemoReplay(name: "alpha", output: Data(terminalTranscript.utf8))
+            terminal.requestDemoReplay(name: "bravo", output: Data("ann@bravo:~$ ".utf8))
         case "files":
             // The window and its header; with nothing connected, the list says so.
             terminal.requestDemoFiles(name: "alpha", path: "/home/ann/shop")

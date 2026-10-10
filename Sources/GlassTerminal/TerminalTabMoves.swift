@@ -31,6 +31,31 @@ extension EnvironmentValues {
     }
 }
 
+/// W26 (owner, 2026-10-10, on the Vision Pro): "we still don't have a way to combine two
+/// independent terminal windows there's no tab to drag between". A window holding one terminal
+/// shows no tab bar, so the terminal itself moves: its tools menu and its title. The workgroup's
+/// view owns the moves — it opens or brings forward the window a terminal goes to and closes the
+/// one it empties — and hands them down here, as it hands down `terminalTabDrop`. Nil where
+/// nothing moves terminals between windows (the Mac's own windows, an iPhone's single screen).
+nonisolated struct TerminalTabMoving: Sendable {
+    /// Whether **Move Tab to New Window** is offered: the window has other terminals to leave.
+    var canMoveToNewWindow: Bool
+    var moveToNewWindow: @MainActor (TerminalSession) -> Void
+    /// Moves the terminal into the open workgroup with this id.
+    var move: @MainActor (TerminalSession, UUID) -> Void
+}
+
+private struct TerminalTabMovingKey: EnvironmentKey {
+    static let defaultValue: TerminalTabMoving? = nil
+}
+
+extension EnvironmentValues {
+    var terminalTabMoving: TerminalTabMoving? {
+        get { self[TerminalTabMovingKey.self] }
+        set { self[TerminalTabMovingKey.self] = newValue }
+    }
+}
+
 /// A terminal tab being dragged: which terminal, from which workgroup. Only this app's windows
 /// read it (`ownProcess`), so nothing else accepts it, and it is never uploaded as a file.
 nonisolated struct TerminalTabTransfer: Codable, Hashable, Sendable, Transferable {
@@ -112,6 +137,20 @@ enum TerminalTabMoves {
         let emptied = manager.workgroup(for: source.id)?.sessionIDs.isEmpty == true
         if emptied { manager.discardWorkgroupIfEmpty(source.id) }
         return .moved(sourceClosed: emptied)
+    }
+
+    /// The dragged tabs that come from another window. Dropped on a terminal, one already in
+    /// `workgroupID` was let go over its own window — a terminal's title dragged and dropped back
+    /// on it (W26) — and stays where it is, rather than going to the end of the tabs.
+    static func arriving(_ tabs: [TerminalTabTransfer], at workgroupID: UUID,
+                         in manager: SessionManager) -> [TerminalTabTransfer] {
+        tabs.filter { workgroup(holding: $0.sessionID, in: manager)?.id != workgroupID }
+    }
+
+    /// Whether **Move Tab to New Window** has anything to do: a terminal alone in its window is
+    /// in a window of its own already.
+    static func canMoveToNewWindow(from workgroupID: UUID, in manager: SessionManager) -> Bool {
+        manager.sessions(inWorkgroup: workgroupID).count > 1
     }
 
     /// **Move to New Window**: a new workgroup holding only this terminal, named for its machine
