@@ -735,3 +735,14 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   under its mutation (M1–M16 in the agent's report). Suites after merge: terminal 674, shell 234. Untried on a device:
   the drag, menus on the tab ornament, reopen at launch, iPad's new-window handoff. Behaviour change: a Vision Pro
   window whose workgroup disappears now closes. Log: subsystem `sh.glas`, category `reopen`.
+- **Mac 0.4.326** installed at the owner's word (23:43): 4 windows reopened once, 16/16 sessions attached, no crash.
+- **f70da14 — W17 merged: the editor on Vision Pro.** The editor's toolbar was attached to the `NavigationSplitView`,
+  which visionOS does not draw (a column's toolbar it does; the database recorded the same,
+  `DatabaseWorkspaceView.swift:722-724`), so Preview, Save, Open…, New, Find, Close, Text Settings and ⚡ were
+  unreachable. Highlighting was never excluded (16 grammars and queries ship). Now the detail column's toolbar, as a
+  bottom ornament on visionOS. Also: Projects + ▸ New Document / Open… (iPad and Vision Pro had no way in without a
+  project; Mac's ⇧⌘E shares `prepareNewEditorWindow`), status-line location, preview background transparent, editor
+  text view and SQL focus deferred a turn (rule 64). Suites after merge: terminal 674, shell 234, editor core 117 /
+  editor 134 / editor UI 310 (1 known issue), database 307. Open for the owner: ⌘S for the editor's Save off the Mac
+  (the database owns ⌘S there, rule 39); 13 pt default text size at headset distance. The agent kept re-sending its
+  report with background work running and was stopped. Simulator "W17 Editor Vision Pro" left shut down.
