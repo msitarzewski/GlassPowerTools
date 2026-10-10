@@ -788,3 +788,7 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   connection, 2 handshakes and 2 commands per connection at once, retries, plain-words MaxStartups/MaxSessions errors.
   Found, not changed: on a shared connection's loss only one terminal gets `.lost` (the others see their shell end);
   database/desktop tunnels still connect outside the pool.
+- **0.4.329 on all three** (09:36): Mac reopened 4 windows, 16/16 sessions attached, no crash; the settings category
+  shows only `kvs/synchronize` after launch — no "Failed to synchronize" for the first time since 2026-09-27 (W18). The
+  SSH pool logs one line per decision. To confirm on the Vision Pro: opening the usual sets connects every terminal
+  (W21), at most 6 ttys per headset `sshd-session` on the Mac.

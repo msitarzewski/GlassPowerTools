@@ -30,7 +30,7 @@ anything touching real servers (SSH and database tests use the disposable test V
 ## 2026-10-09 — where things stand
 
 **Installed:** Mac **0.4.326** (2026-10-09 23:43: everything through W15; 4 windows reopened, 16/16 sessions, no
-crash). Before that 0.4.320 (13:10: closed-window crash fix, Active count at launch, terminal right-click menu). All three on **0.4.328** (2026-10-10 00:08; Mac: 4 windows reopened, 16/16 sessions, no crash) (a28dc68: Active
+crash). Before that 0.4.320 (13:10: closed-window crash fix, Active count at launch, terminal right-click menu). Earlier: all three on 0.4.328 (00:08) (a28dc68: Active
 names a Connect workgroup's row by its terminal; 54a66d5: Active asks nothing until the library has loaded; d5b7d2f:
 Open Folder Here opens the shell's folder in Files, not home; 1c7c65c: Open in Editor on the folder button's pinch and
 hold and in the tools menu). The Mac has none of these since 0.4.320 (its 0.4.322 is
@@ -41,7 +41,9 @@ W17 merged (`f70da14`): the editor on Vision Pro — its toolbar (was on the spl
 draw), Markdown preview reachable, Projects + ▸ New Document / Open…, rule 64 deferrals for the editor view and SQL focus.
 W16 merged (`02711b3`): visionOS `.plain` windows paint in the window shape (46 pt; 24 pt inset card,
 `GlassWindowShape`); Files names its folder in the system window title with an ancestors menu. W20 merged (`d274577`, D57): a terminal window owns its look; local tab gear opens Terminal Settings.
-**W21 committed** (SSH limits; suites passed once the screen was unlocked). Building 0.4.329 for all three.
+**All three on 0.4.329** (2026-10-10 09:36: W18 settings sync, W19 Mac names, W20 window look, W21 SSH limits). Mac:
+4 windows reopened, 16/16 sessions, no crash; no settings-sync failure logged after relaunch (first time since 09-27);
+pool log lines (`sh.glas`/`ssh`) present.
 **Owner (2026-10-10 ~00:35): "install all three when W21 lands"** — Mac, iPhone and Vision Pro, one build with W18 + W21.
 W18 merged (`6293e69`, D56): settings sync was blocked since 09-27 by a duplicate built-in theme when combining with
 an older writer's copy; fixed. The first launch with it applies iCloud's frozen terminal preferences once more. W19 merged (`1e80498`): Mac tabs follow names given elsewhere; Mac SSH tabs in tmux show the program title.
