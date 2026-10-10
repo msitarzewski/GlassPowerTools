@@ -284,16 +284,15 @@ struct TerminalWindowLookTests {
     }
 }
 
-/// A Vision Pro terminal's canvas is concentric with the window paint around it (owner, on the
-/// headset, 2026-10-10: "the mismatched radii bothers me" — 18-point corners 10 points inside a
-/// 24-point card).
+/// A Vision Pro terminal's canvas corner fits the square rows inside it (owner, on the headset,
+/// 2026-10-10: "the mismatched radii bothers me", then of 14/36-point corners round a square tmux
+/// status line, "it should be smaller to fit in the corner").
 @Suite("A Vision Pro terminal's corners")
 @MainActor
 struct VisionTerminalCornerTests {
-    @Test func theCanvasIsConcentricWithTheWindowPaint() {
-        #expect(TerminalWindowView.visionCanvasCornerRadius(ornamentsShown: true) == 24 - TerminalWindowView.visionCanvasInset,
-                "inside the card the frame insets for the ornaments")
-        #expect(TerminalWindowView.visionCanvasCornerRadius(ornamentsShown: false) == 46 - TerminalWindowView.visionCanvasInset,
-                "inside the whole window when no ornaments show")
+    @Test func theCanvasCornerFitsTheRowsInsideIt() {
+        #expect(TerminalWindowView.visionCanvasCornerRadius == TerminalWindowView.visionRowsInset,
+                "concentric with the square rows, their inset in")
+        #expect(TerminalWindowView.visionCanvasCornerRadius == 10)
     }
 }

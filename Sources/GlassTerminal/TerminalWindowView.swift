@@ -944,6 +944,8 @@ struct TerminalWindowView: View {
     private var terminalCanvasPadding: CGFloat {
         #if os(macOS)
         4
+        #elseif os(visionOS)
+        Self.visionRowsInset
         #else
         10
         #endif
@@ -952,12 +954,16 @@ struct TerminalWindowView: View {
     /// On Vision Pro, how far the terminal canvas sits inside the window's paint.
     static let visionCanvasInset: CGFloat = 10
 
-    /// A Vision Pro terminal's canvas corner: the window paint's corner (`GlassLayeredWindow`, which
-    /// insets for the ornaments while they show) less the inset between them.
-    static func visionCanvasCornerRadius(ornamentsShown: Bool) -> CGFloat {
-        GlassWindowShape.concentricCornerRadius(
-            outer: GlassWindowShape.paintCornerRadius(spatial: true, insetForOrnaments: ornamentsShown),
-            inset: visionCanvasInset)
+    /// On Vision Pro, how far the terminal's rows sit inside its canvas, top and bottom.
+    static let visionRowsInset: CGFloat = 10
+
+    /// A Vision Pro terminal's canvas corner, concentric with the square rows inside it: their
+    /// inset, so a full-width row such as tmux's status line sits snugly in the corner. The owner,
+    /// on the headset (2026-10-10): the corner "should be smaller to fit in the corner" — made
+    /// concentric with the window instead (9b9fc26), it was 14 or 36 points around a square
+    /// status line 10 points in, and the window's own edge is not drawn to be concentric with.
+    static var visionCanvasCornerRadius: CGFloat {
+        GlassWindowShape.concentricCornerRadius(outer: visionRowsInset, inset: 0)
     }
 
     private var terminalCanvasCornerRadius: CGFloat {
@@ -968,9 +974,8 @@ struct TerminalWindowView: View {
         #elseif os(iOS)
         UIDevice.current.userInterfaceIdiom == .phone ? 0 : 18
         #else
-        // Concentric with the window's paint around it, `visionCanvasInset` inside it: the card
-        // while the ornaments show, the whole window when they don't.
-        Self.visionCanvasCornerRadius(ornamentsShown: isTerminalActive)
+        // Concentric with the rows inside it, which are square and `visionRowsInset` in.
+        Self.visionCanvasCornerRadius
         #endif
     }
 
