@@ -44,9 +44,6 @@ private struct GlassConnectionsIdleShrinkModifier: ViewModifier {
     @Environment(\.pushWindow) private var pushWindow
     @Environment(\.dismissWindow) private var dismissWindow
     @State private var probe = GlassConnectionsWindowProbe()
-    /// This window, among Connections windows: `openWindow(id: "main")` without a value opens a
-    /// second one on visionOS 27 rather than bringing the first forward.
-    @State private var instance = UUID()
 
     private var setting: GlassConnectionsIdleShrink { GlassConnectionsIdleShrink(storedSeconds: storedSeconds) }
 
@@ -65,17 +62,11 @@ private struct GlassConnectionsIdleShrinkModifier: ViewModifier {
             .onChange(of: scenePhase, initial: true) { _, phase in
                 guard phase == .active else { return }
                 probe.clock.interaction()
-                if let waiting = recovery.connectionsPushedAside, waiting != instance {
-                    // Asked for from elsewhere — ⚡, "Open Connections" — while the window waits
-                    // behind its orb: visionOS opened a second one. Putting the orb away brings
-                    // the first back where it was, as it was; this one is not needed.
-                    Logger.idle.info("A second Connections window opened behind the orb: bringing the first back")
-                    dismissWindow(id: GlassConnectionsOrb.windowID)
-                    dismissWindow()
-                    return
-                }
                 // Back on screen — from the orb, from ⚡, from "Open Connections" anywhere — is a
-                // fresh start, and an orb has nothing left to stand in for.
+                // fresh start, and an orb has nothing left to stand in for. Asked for from
+                // elsewhere while it waits behind the orb, the window itself comes back:
+                // `openConnections()` names its value, so visionOS brings it forward rather than
+                // opening a second one (W29b).
                 recovery.connectionsWindowIsBack()
                 if recovery.visibleWindowKeys.contains(GlassConnectionsOrb.windowID) {
                     dismissWindow(id: GlassConnectionsOrb.windowID)
@@ -104,7 +95,7 @@ private struct GlassConnectionsIdleShrinkModifier: ViewModifier {
                     continue
                 }
                 Logger.idle.info("Connections idle for \(String(describing: interval), privacy: .public): shrinking into the orb")
-                recovery.connectionsWillShrink(instance)
+                recovery.connectionsWillShrink()
                 pushWindow(id: GlassConnectionsOrb.windowID)
                 return
             }

@@ -11,6 +11,7 @@ import SwiftUI
 import GlassShell
 import GlassLayers
 import GlassConnectionKit
+import GlassConnectionUI
 import GlassTerminal
 import GlassDatabase
 import GlassDesktop
@@ -316,8 +317,10 @@ struct GlassPowerToolsApp: App {
         #if os(visionOS)
         // **One Connections window on the headset** (owner, 2026-09-29). A plain window group made
         // a new one for every bolt and every "show Connections". A window group keyed by one fixed
-        // value keeps it to one — opening a value already shown brings that window forward — and
-        // every `openWindow(id: "main")` opens the default value.
+        // value keeps it to one — opening a value already shown brings that window forward — so
+        // everything asks for it with `openWindow.openConnections()`, which names that value.
+        // `openWindow(id: "main")` names none, and SwiftUI answers that from `defaultValue` as a
+        // new window: a second Connections window on visionOS 27 (W29b).
         //
         // Not a `Window` scene (2026-10-07): after a crash visionOS handed the app two saved
         // sessions for it, and SwiftUI stops the app on the second — "Your app was given a scene
@@ -442,11 +445,6 @@ struct GlassPowerToolsApp: App {
 }
 
 #if os(visionOS)
-/// The one value the headset's Connections window shows, so opening it again brings it forward.
-struct GlassConnectionsWindow: Codable, Hashable {
-    var id = "connections"
-}
-
 /// The headset Connections window's first size, in points (W29). A quarter narrower than the
 /// system's 1280: the 360-point list column beside a 600-point detail, which holds a host's
 /// grouped form at a comfortable width (the overview's four tiles wrap to two rows). Tall enough

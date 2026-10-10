@@ -664,7 +664,7 @@ struct GlassEditorRestoredWindowGuard: ViewModifier {
             #if os(iOS)
             .task {
                 guard runtime.isRestoredBlankWindow(windowID) else { return }
-                if UIApplication.shared.connectedScenes.count <= 1 { openWindow(id: "main") }
+                if UIApplication.shared.connectedScenes.count <= 1 { openWindow.openConnections() }
                 dismissWindow()
             }
             #endif

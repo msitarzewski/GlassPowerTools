@@ -828,7 +828,7 @@ public struct GlassActiveConnectionsToolbarContent: ToolbarContent {
             ToolbarItem(placement: GlassActiveConnectionsToolbarModifier.placement) {
                 GlassActiveConnectionsButton {
                     if GlassWindowPresentation.canOpenWindows {
-                        openWindow(id: "main")
+                        openWindow.openConnections()
                     } else {
                         dismissCurrent?()
                     }
@@ -881,7 +881,7 @@ public struct GlassActiveConnectionsButton: View {
             // scene there, so this reuses it) and opens Active in it. The desktop's control-bar
             // bolt only asked for Active, which did nothing while Connections was closed
             // (2026-09-29).
-            openWindow(id: "main")
+            openWindow.openConnections()
             #endif
             action()
         } label: {

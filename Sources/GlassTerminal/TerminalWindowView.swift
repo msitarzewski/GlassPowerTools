@@ -1348,7 +1348,7 @@ struct TerminalWindowView: View {
         #if os(iOS)
         iOSRouter.showConnections()
         #else
-        openWindow(id: "main")
+        openWindow.openConnections()
         #endif
     }
 

@@ -220,7 +220,7 @@ public final class GlassTerminalRuntime {
         if !GlassLibraryWindows.bringForward() { openWindow(id: "main") }
         #elseif os(visionOS)
         // One Connections window on the headset: opening it brings that one forward.
-        openWindow(id: "main")
+        openWindow.openConnections()
         #endif
         showWorkgroupsPanel()
     }

@@ -559,7 +559,7 @@ struct DatabaseCommands: Commands {
             MacCommandCenterEntry(id: "connection.connect.\(config.id)", title: "connect: \(config.name)",
                                   detail: "Open a database connection window") {
                 sessionManager.paletteConnectionRequest = config.id
-                openWindow(id: "main")
+                openWindow.openConnections()
             }
         }
         let catalog = MacDatabasePaletteCatalog(sessionManager: sessionManager) { id, selection in
@@ -597,7 +597,7 @@ struct DatabaseCommands: Commands {
             // (`DatabaseWorkspaceView.swift`). Unbound here, it stays reachable from any window.
             Button("New SQL Document") { workspaceActions?.newQueryTab() }
                 .disabled(workspaceActions == nil)
-            Button("New Connections Window") { openWindow(id: "main") }
+            Button("New Connections Window") { openWindow.openConnections() }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
 
             Divider()

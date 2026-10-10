@@ -54,7 +54,7 @@ struct DesktopSessionHost: View {
     /// The ⚡ in this window: bring the library forward on its Active list.
     private var showActive: (@MainActor () -> Void)? {
         guard let show = runtime.showActiveConnections else { return nil }
-        return { openWindow(id: "main"); show() }
+        return { openWindow.openConnections(); show() }
     }
 
     var body: some View {

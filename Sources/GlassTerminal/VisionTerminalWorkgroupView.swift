@@ -952,7 +952,7 @@ struct VisionTerminalWorkgroupView: View {
 
     private func showConnections() {
         #if os(visionOS)
-        openWindow(id: "main")
+        openWindow.openConnections()
         dismiss()
         #else
         iOSRouter.showConnections()

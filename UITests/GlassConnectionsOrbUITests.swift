@@ -132,7 +132,7 @@ final class GlassConnectionsOrbUITests: XCTestCase {
 
         terminalsConnections.tap()
         assertOrbGoes()
-        // The second window visionOS opens for the request closes itself.
+        // The same window, not a second one beside it.
         assertOneConnectionsWindow()
         XCTAssertTrue(bravoIsShowing(), "Connections came back without bravo selected")
         attachTree("restored-from-terminal")
@@ -155,10 +155,49 @@ final class GlassConnectionsOrbUITests: XCTestCase {
         assertOrbGoes()
         XCTAssertTrue(element("active-connections").waitForExistence(timeout: 10), "Connections came back without Active")
         attachTree("restored-by-bolt")
-        // One window on Active: the second one visionOS opened for the ⚡ has closed itself.
+        // One window, on Active: the same one, not a second.
         let active = app.descendants(matching: .any).matching(identifier: "active-connections")
         let one = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == 1"), object: active)
         XCTAssertEqual(XCTWaiter().wait(for: [one], timeout: 10), .completed, "\(active.count) Connections windows on Active")
+    }
+
+    // MARK: One Connections window (W29b)
+
+    /// With no orb up, a terminal's Connections control brings the one window forward, however
+    /// often it is pressed. `openWindow(id: "main")` opened a second window every time.
+    func testATerminalsConnectionsControlNeverOpensASecondWindow() {
+        launch(idleSeconds: 600)
+        waitForTerminals()
+        for press in 1...2 {
+            let control = app.buttons.matching(NSPredicate(format: "identifier == %@ AND label == %@",
+                                                           "server.rack", "Connections"))
+                .allElementsBoundByIndex.first { $0.isHittable }
+            guard let control else { return XCTFail("press \(press): the terminal's Connections control is out of reach") }
+            control.tap()
+            Thread.sleep(forTimeInterval: 3)
+            assertOneConnectionsWindow()
+        }
+        attachTree("one-window-from-terminal")
+    }
+
+    /// The same for a desktop's ⚡: one window, on Active.
+    func testTheBoltNeverOpensASecondWindow() {
+        launch(idleSeconds: 600, surface: "orb-later-desktop")
+        // The desktop's ⚡, in the control bar beside its Input button — not the library's own.
+        let desktopBar = app.windows.containing(NSPredicate(format: "elementType == %d AND label == %@",
+                                                            XCUIElement.ElementType.button.rawValue, "Input"))
+        let bolt = desktopBar.buttons.matching(identifier: "active-connections-bolt").firstMatch
+        XCTAssertTrue(bolt.waitForExistence(timeout: 40), "the demo desktop did not open")
+        for press in 1...2 {
+            XCTAssertTrue(bolt.isHittable, "press \(press): the desktop's ⚡ is out of reach")
+            bolt.tap()
+            XCTAssertTrue(element("active-connections").waitForExistence(timeout: 10), "press \(press): no Active")
+            Thread.sleep(forTimeInterval: 3)
+            let active = app.descendants(matching: .any).matching(identifier: "active-connections")
+            XCTAssertEqual(active.count, 1, "press \(press): \(active.count) Connections windows on Active")
+            XCTAssertEqual(bravoRows.count, 0, "press \(press): a Connections window not on Active")
+        }
+        attachTree("one-window-from-bolt")
     }
 
     /// A sheet over Connections holds it at full size.

@@ -654,7 +654,7 @@ struct DatabaseWorkspaceView: View {
             return
         }
         #endif
-        openWindow(id: "main")
+        openWindow.openConnections()
     }
 
     /// **Ends this session on purpose, on a phone.** Everywhere else the workspace is a window

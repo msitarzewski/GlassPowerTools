@@ -110,7 +110,7 @@ public struct GlassConnectionsOrb: View {
         if recovery.isConnectionsPushedAside {
             dismissWindow()
         } else {
-            openWindow(id: "main")
+            openWindow.openConnections()
             dismissWindow(id: Self.windowID)
         }
     }

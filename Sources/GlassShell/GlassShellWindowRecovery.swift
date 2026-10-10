@@ -18,19 +18,17 @@ public final class GlassWindowRecoveryManager {
     public init() {}
 
     public private(set) var visibleWindowKeys: Set<String> = []
-    /// The Connections window hidden behind its orb for idle (W29), by an id of its own. The
-    /// window still exists, so the orb brings it back by dismissing itself rather than opening
-    /// another, and a second Connections window opened meanwhile knows it is the second.
-    public private(set) var connectionsPushedAside: UUID?
-    public var isConnectionsPushedAside: Bool { connectionsPushedAside != nil }
+    /// True while Connections is hidden behind its orb for idle (W29): the window still exists,
+    /// so the orb brings it back by dismissing itself rather than opening another.
+    public private(set) var isConnectionsPushedAside = false
     private var recoveryTask: Task<Void, Never>?
     private var openWindowAction: OpenWindowAction?
 
-    /// The Connections window `instance` is about to be pushed aside for its orb.
-    public func connectionsWillShrink(_ instance: UUID) { connectionsPushedAside = instance }
+    /// Connections is about to be pushed aside for its orb.
+    public func connectionsWillShrink() { isConnectionsPushedAside = true }
 
-    /// The Connections window that was pushed aside is on screen again.
-    public func connectionsWindowIsBack() { connectionsPushedAside = nil }
+    /// Connections is on screen again, however it came back.
+    public func connectionsWindowIsBack() { isConnectionsPushedAside = false }
 
     public func setOpenWindowAction(_ action: OpenWindowAction) {
         openWindowAction = action
@@ -64,7 +62,7 @@ public final class GlassWindowRecoveryManager {
             case "minimized":
                 break
             default:
-                openWindowAction?(id: "main")
+                openWindowAction?.openConnections()
             }
         }
     }
