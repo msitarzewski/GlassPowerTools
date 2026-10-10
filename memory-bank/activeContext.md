@@ -43,6 +43,7 @@ W16 merged (`02711b3`): visionOS `.plain` windows paint in the window shape (46 
 `GlassWindowShape`); Files names its folder in the system window title with an ancestors menu. W20 (agent
 `w20-window-look`): a terminal window/tab group owns its look (tint, opacity, blur) on every platform — owner chose
 "window owns it" (2026-10-10); also the local tab gear's Settings opens Terminal Settings, not app Settings.
+**Owner (2026-10-10 ~00:35): "install all three when W21 lands"** — Mac, iPhone and Vision Pro, one build with W18 + W21.
 W18 merged (`6293e69`, D56): settings sync was blocked since 09-27 by a duplicate built-in theme when combining with
 an older writer's copy; fixed. The first launch with it applies iCloud's frozen terminal preferences once more. W19 (agent `w19-mac-names`): open Mac tabs follow names given on other devices; Mac SSH tabs
 in tmux show the program title.
