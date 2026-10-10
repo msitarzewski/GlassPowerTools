@@ -15,7 +15,7 @@ The terminal adds three pages to Settings: **Connections**, **Terminal** and **S
 ## Terminal
 
 - **Theme**: the current theme and its font. **Edit Theme** opens the theme editor.
-- **Canvas**: a tint for the terminal background. **On Vision Pro**, **Interactive glass** too. Opacity and frost are shared with every window and set in Settings under **Appearance**. A window can keep its own of these and more; see [Give a terminal window its own settings](#give-a-terminal-window-its-own-settings).
+- **Canvas**: a tint for the terminal background. **Opacity**, **Glass** and **Material** are shared with every window and set in Settings under **Appearance**. A window can keep its own of these and more; see [Give a terminal window its own settings](#give-a-terminal-window-its-own-settings).
 - **Font Family** (**SF Mono**, **Monaco**, **Menlo** or **Courier New**) and **Font Size** (10 to 24 points).
 - **Initial Terminal Size**: **Columns** and **Rows** for a new terminal before its window is measured.
 - **Cursor Style** (**Block**, **Underline** or **Bar**) and **Blinking cursor**.
@@ -37,14 +37,14 @@ Anything about how a terminal window looks and behaves can be set for that windo
 
 **This Window** has:
 
-- **Glass**: **Opacity**, **Blur** and a **Glass Tint**. **On iPad and Vision Pro**, also **Frost**; **on Vision Pro**, **Interactive glass**.
+- **Appearance**: **Opacity**, **Glass** and a **Glass Tint**. **On iPad**, also **Material**.
 - **Theme**: any theme from your theme library, its **Font Family** and its **Font Size**.
 - **Cursor**: **Cursor Style** and **Blinking cursor**.
 - **Bell and Scrollback**: **Bell enabled**, **Visual bell**, **Keep scrollback during session** and **Max scrollback lines**.
 
-Under each one, **Same as All Terminals** (or **Same as Appearance**, or **Same as Settings**) says the window follows that setting for every window. Change it, and it reads **This window only**, with **Reset** beside it to follow again. **Reset This Window**, at the end, returns every one. Every tab in the window changes at once.
+Each setting follows **All Terminals** (or **Appearance**, or **Settings**) until you change it here. Once you do, a small ↺ appears beside its name; choose it to follow again. Its tooltip says what it returns to: hold the pointer over it, or on Vision Pro look at it. **Reset This Window**, at the end, returns every one. Every tab in the window changes at once.
 
-**Opacity**, **Blur** and **Frost** are the window's own **Appearance**: change them here and only this window changes; change them in Settings under **Appearance** and every window that hasn't set its own changes. A tint colours the terminal whatever its opacity; for a completely clear terminal, set **Opacity** and **Blur** to zero and choose no tint. **On Vision Pro**, **Blur** is the window's glass: at 100% it's the system's glass, and at 0% there is none, so only the text floats in the room. **Opacity** paints the area behind the text.
+**Opacity**, **Glass** and **Material** are the window's own **Appearance**: change them here and only this window changes; change them in Settings under **Appearance** and every window that hasn't set its own changes. A tint colours the terminal whatever its opacity; for a completely clear terminal, set **Opacity** and **Glass** to 0% and choose no tint. **On Vision Pro**, **Glass** is the window's glass: at 100% it's the system's glass, and at 0% there is none, so only the text floats in the room. **Opacity** paints the area behind the text.
 
 A theme comes from your theme library, which syncs with **Sync terminal settings**. If a window's theme isn't on this device yet, the window uses the theme from **All Terminals** until it arrives.
 

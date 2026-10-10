@@ -2,11 +2,15 @@
 //  TerminalWindowSettingsView.swift
 //  Glass Power Tools — GlassTerminal
 //
-//  **This Window** (W20, W22): every setting a terminal window can keep for itself, built from
-//  GlassLayers' shared rows. Each row's control shows what the window uses now; under it, "Same as
-//  All Terminals" (or Appearance, or Settings) until it is changed here, then "This window only"
-//  with its own Reset. Reset This Window, at the end, returns them all. A change applies at once to
-//  every tab in the window, and stays with the window.
+//  **This Window** (W20, W22, W27): every setting a terminal window can keep for itself, built
+//  from GlassLayers' shared rows. Each row's control shows what the window uses now; once it is
+//  changed here, a ↺ beside its name returns it to All Terminals (or Appearance, or Settings).
+//  Reset This Window, at the end, returns them all. A change applies at once to every tab in the
+//  window, and stays with the window.
+//
+//  Not offered on Vision Pro, though stored and synced for other devices: Material, since the
+//  window's glass there is Apple's own, and Interactive Glass, which changes nothing since the
+//  window draws that glass itself (D59).
 //
 
 import SwiftUI
@@ -48,52 +52,48 @@ struct TerminalOverridesSettingsView: View {
                 }
                 GlassWindowSettingRow(GlassLayerSettings.frost, overrides: $settings,
                                       global: global.blurBackground, inheritsFrom: Source.appearance) { value in
-                    GlassSettingSlider(title: "Blur", value: value, detents: [0, 0.5, 1],
-                                       leadingAccessibilityLabel: "None", trailingAccessibilityLabel: "Maximum",
+                    GlassSettingSlider(title: GlassLayerSettings.frost.title, value: value, detents: [0, 0.5, 1],
+                                       leadingAccessibilityLabel: "No glass", trailingAccessibilityLabel: "Full glass",
                                        accessibilityIdentifier: "terminal-window-blur")
                 }
-                #if !os(macOS)
-                // The canvas's material off the Mac; a Mac terminal blurs with the window behind it.
+                #if os(iOS)
+                // The canvas's material on iPad. A Mac terminal blurs with the window behind it, and
+                // a Vision Pro window's glass is Apple's own, so neither has a material to choose.
                 GlassWindowSettingRow(GlassLayerSettings.material, overrides: $settings,
                                       global: GlassLayerMaterial(rawValue: global.glassFrost) ?? GlassLayerState.default.material,
                                       inheritsFrom: Source.appearance) { value in
-                    Picker("Frost", selection: value) {
-                        ForEach(GlassLayerMaterial.allCases) { material in
-                            Text(material.title).tag(material)
+                    GlassSettingLabeled(GlassLayerSettings.material.title) {
+                        Picker(GlassLayerSettings.material.title, selection: value) {
+                            ForEach(GlassLayerMaterial.allCases) { material in
+                                Text(material.title).tag(material)
+                            }
                         }
+                        .accessibilityIdentifier("terminal-window-frost")
                     }
-                    .accessibilityIdentifier("terminal-window-frost")
                 }
                 #endif
                 GlassWindowSettingRow(TerminalWindowSettings.tint, overrides: $settings,
                                       global: global.glassTint, inheritsFrom: Source.allTerminals) { value in
                     GlassTintPicker(value: value)
                 }
-                #if os(visionOS)
-                GlassWindowSettingRow(TerminalWindowSettings.interactiveGlass, overrides: $settings,
-                                      global: global.interactiveGlass, inheritsFrom: Source.allTerminals) { value in
-                    Toggle("Interactive glass", isOn: value)
-                }
-                #endif
             } header: {
-                Text("Glass")
+                Text("Appearance")
             } footer: {
-                #if os(visionOS)
-                Text("Only this window changes: every tab in it, and it keeps these after a relaunch. Opacity and blur remain independent; set both to zero, with no tint, for a completely transparent terminal.")
-                #else
-                Text("Only this window changes: every tab in it, and it keeps these after a relaunch. Tint, opacity and blur affect the terminal canvas; the window's chrome stays system glass.")
-                #endif
+                Text(GlassWindowGlassFooter.text(opacity: "paints the terminal's background color",
+                                                 clearAlso: "with no tint"))
             }
 
             Section("Theme") {
                 GlassWindowSettingRow(TerminalWindowSettings.theme, overrides: $settings,
                                       global: global.currentTheme.id.uuidString, inheritsFrom: Source.allTerminals) { value in
-                    Picker("Theme", selection: themeSelection(value, global: global)) {
-                        ForEach(global.themeLibrary.activeRecords) { record in
-                            Text(record.theme.name).tag(record.id.uuidString)
+                    GlassSettingLabeled("Theme") {
+                        Picker("Theme", selection: themeSelection(value, global: global)) {
+                            ForEach(global.themeLibrary.activeRecords) { record in
+                                Text(record.theme.name).tag(record.id.uuidString)
+                            }
                         }
+                        .accessibilityIdentifier("terminal-window-theme")
                     }
-                    .accessibilityIdentifier("terminal-window-theme")
                 }
                 if TerminalWindowProfile.isMissingTheme(settings, library: global.themeLibrary) {
                     Text("This window's theme isn't on this device yet, so it uses All Terminals' theme until it arrives.")
@@ -102,61 +102,82 @@ struct TerminalOverridesSettingsView: View {
                 }
                 GlassWindowSettingRow(TerminalWindowSettings.fontFamily, overrides: $settings,
                                       global: themeFont.fontName, inheritsFrom: Source.allTerminals) { value in
-                    Picker("Font Family", selection: value) {
-                        ForEach(fontFamilies(including: value.wrappedValue), id: \.self) { family in
-                            Text(family).tag(family)
+                    GlassSettingLabeled("Font Family") {
+                        Picker("Font Family", selection: value) {
+                            ForEach(fontFamilies(including: value.wrappedValue), id: \.self) { family in
+                                Text(family).tag(family)
+                            }
                         }
+                        .accessibilityIdentifier("terminal-window-font-family")
                     }
-                    .accessibilityIdentifier("terminal-window-font-family")
                 }
                 GlassWindowSettingRow(TerminalWindowSettings.fontSize, overrides: $settings,
                                       global: Double(themeFont.fontSize), inheritsFrom: Source.allTerminals) { value in
-                    Slider(value: value, in: 10...24, step: 1) {
-                        Text("Font Size")
-                    } minimumValueLabel: {
-                        Text("10")
-                    } maximumValueLabel: {
-                        Text("24")
+                    GlassSettingLabeled("Font Size") {
+                        Slider(value: value, in: 10...24, step: 1) {
+                            Text("Font Size")
+                        } minimumValueLabel: {
+                            Text("10")
+                        } maximumValueLabel: {
+                            Text("24")
+                        }
+                        .frame(maxWidth: 280)
+                        .accessibilityValue("\(Int(value.wrappedValue)) points")
+                        .accessibilityIdentifier("terminal-window-font-size")
                     }
-                    .accessibilityValue("\(Int(value.wrappedValue)) points")
-                    .accessibilityIdentifier("terminal-window-font-size")
                 }
             }
 
             Section("Cursor") {
                 GlassWindowSettingRow(TerminalWindowSettings.cursorStyle, overrides: $settings,
                                       global: global.cursorStyle, inheritsFrom: Source.allTerminals) { value in
-                    Picker("Cursor Style", selection: value) {
-                        ForEach(TerminalWindowSettings.cursorStyles, id: \.self) { style in
-                            Text(style).tag(style)
+                    GlassSettingLabeled("Cursor Style") {
+                        Picker("Cursor Style", selection: value) {
+                            ForEach(TerminalWindowSettings.cursorStyles, id: \.self) { style in
+                                Text(style).tag(style)
+                            }
                         }
+                        .accessibilityIdentifier("terminal-window-cursor-style")
                     }
-                    .accessibilityIdentifier("terminal-window-cursor-style")
                 }
                 GlassWindowSettingRow(TerminalWindowSettings.blinkingCursor, overrides: $settings,
                                       global: global.blinkingCursor, inheritsFrom: Source.allTerminals) { value in
-                    Toggle("Blinking cursor", isOn: value)
+                    GlassSettingLabeled("Blinking cursor") { Toggle("Blinking cursor", isOn: value) }
                 }
             }
 
             Section {
                 GlassWindowSettingRow(TerminalWindowSettings.bell, overrides: $settings,
                                       global: global.bellEnabled, inheritsFrom: Source.settings) { value in
-                    Toggle("Bell enabled", isOn: value)
+                    GlassSettingLabeled("Bell enabled") { Toggle("Bell enabled", isOn: value) }
                 }
                 GlassWindowSettingRow(TerminalWindowSettings.visualBell, overrides: $settings,
                                       global: global.visualBell, inheritsFrom: Source.settings) { value in
-                    Toggle("Visual bell", isOn: value)
-                        .disabled(!effective.bellEnabled)
+                    GlassSettingLabeled("Visual bell") {
+                        Toggle("Visual bell", isOn: value)
+                            .disabled(!effective.bellEnabled)
+                    }
                 }
                 GlassWindowSettingRow(TerminalWindowSettings.keepsScrollback, overrides: $settings,
                                       global: global.saveScrollback, inheritsFrom: Source.settings) { value in
-                    Toggle("Keep scrollback during session", isOn: value)
+                    GlassSettingLabeled("Keep scrollback during session") {
+                        Toggle("Keep scrollback during session", isOn: value)
+                    }
                 }
                 GlassWindowSettingRow(TerminalWindowSettings.scrollbackLines, overrides: $settings,
                                       global: global.maxScrollbackLines, inheritsFrom: Source.settings) { value in
-                    Stepper("Max scrollback lines: \(value.wrappedValue)", value: value, in: 1000...100_000, step: 1000)
+                    GlassSettingLabeled("Max scrollback lines") {
+                        HStack(spacing: 8) {
+                            Text(value.wrappedValue, format: .number.grouping(.automatic))
+                                .monospacedDigit()
+                                .foregroundStyle(.secondary)
+                                .accessibilityHidden(true)
+                            Stepper("Max scrollback lines", value: value, in: 1000...100_000, step: 1000)
+                                .fixedSize()
+                                .accessibilityValue(Text(value.wrappedValue, format: .number))
+                        }
                         .disabled(effective.scrollbackLines == 0)
+                    }
                 }
             } header: {
                 Text("Bell and Scrollback")
@@ -167,7 +188,9 @@ struct TerminalOverridesSettingsView: View {
             Section {
                 GlassWindowResetButton(overrides: $settings)
             } footer: {
-                Text("Every setting here follows All Terminals, Appearance or Settings until you change it for this window. To change every window, use All Terminals, or Appearance in Settings.")
+                GlassWindowSettingsFooter(
+                    follows: "All Terminals, Appearance or Settings",
+                    keeps: "Every tab in this window changes, and the window keeps its settings after a relaunch.")
             }
         }
         .formStyle(.grouped)

@@ -453,17 +453,14 @@ struct TerminalSettingsView: View {
             }
             
             Section("Canvas") {
-                #if os(visionOS)
-                Toggle("Interactive glass", isOn: $settings.interactiveGlass)
-                    .onChange(of: settings.interactiveGlass) { _, _ in
-                        settings.saveSettings()
-                    }
-                #endif
+                // Interactive Glass is no longer offered: it was a Vision Pro toggle, and it changes
+                // nothing there since the window draws Apple's glass itself (D59). The stored value
+                // stays, so earlier builds and other devices still read it.
                 GlassTintPicker(value: $settings.glassTint)
                     .onChange(of: settings.glassTint) { _, _ in
                         settings.saveSettings()
                     }
-                Text("These change every terminal window. To change one window — its glass, tint, theme, font, cursor, bell or scrollback — open Settings from its tools menu and choose This Window. Opacity, frost and material are shared with every Glass window: change them in Appearance. Tint applies only to the terminal canvas.")
+                Text("These change every terminal window. To change one window — its glass, tint, theme, font, cursor, bell or scrollback — open Settings from its tools menu and choose This Window. \(Self.sharedGlassSettings) are shared with every Glass window: change them in Appearance. Tint applies only to the terminal canvas.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -534,6 +531,16 @@ struct TerminalSettingsView: View {
             ThemeEditorView()
                 .environment(settingsManager)
         }
+    }
+
+    /// Appearance's settings this device offers, as the Canvas footer names them: no Material on
+    /// Vision Pro, where every window's glass is Apple's own.
+    private static var sharedGlassSettings: String {
+        #if os(visionOS)
+        "Opacity and Glass"
+        #else
+        "Opacity, Glass and Material"
+        #endif
     }
 
     private var previewColumns: [GridItem] {

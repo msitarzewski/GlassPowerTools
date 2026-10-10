@@ -62,7 +62,7 @@ nonisolated enum DesktopWindowSettings {
     /// Fades the whole desktop (Settings ▸ Desktops ▸ Opacity). Not Appearance's opacity, which
     /// paints a theme colour behind content: this fades the content itself.
     static let opacity = GlassWindowSetting<Double>.unit("desktop.opacity", title: "Opacity")
-    /// The material behind the desktop (Settings ▸ Desktops ▸ Background Frost): a window's frost,
+    /// The glass behind the desktop (Settings ▸ Desktops ▸ Glass): a window's frost,
     /// so under the key every window's frost shares.
     static let frost = GlassLayerSettings.frost
 
@@ -89,7 +89,7 @@ nonisolated enum DesktopWindowSettings {
          detail.key, pointer.key]
     }
 
-    /// Where Opacity and Background Frost apply: a see-through window, on the Mac and the headset.
+    /// Where Opacity and Glass apply: a see-through window, on the Mac and the headset.
     /// Settings ▸ Desktops offers them only there too.
     static var offersGlass: Bool {
         #if os(visionOS) || os(macOS)
@@ -116,8 +116,9 @@ nonisolated enum DesktopWindowSettings {
 }
 
 extension GlassWindowOverrides {
-    /// The toolbar's **Original** for one desktop window: the complete image, fully opaque, in
-    /// this window only.
+    /// **Show Original** for one desktop window: the complete image, fully opaque, in this window
+    /// only. glassDT put it in Desktop Settings' toolbar, opposite Done; it is on This Window now,
+    /// under Presentation, so every window's Settings sheet has Done alone in its bar (W27).
     mutating func showDesktopOriginal() {
         self[DesktopWindowSettings.backgroundRemoval] = .original
         if DesktopWindowSettings.offersGlass { self[DesktopWindowSettings.opacity] = 1 }
@@ -203,7 +204,7 @@ struct DesktopWindowProfile: Equatable {
     let pointer: DesktopPointerMode?
 
     /// - Parameters:
-    ///   - glass: whether Opacity and Background Frost apply here (`offersGlass`); where they
+    ///   - glass: whether Opacity and Glass apply here (`offersGlass`); where they
     ///     don't, the desktop is opaque, as it always was.
     ///   - touch: whether touch has a pointer choice here (`offersTouchPointer`).
     init(window: GlassWindowOverrides, defaults: DesktopDefaults,
@@ -229,6 +230,9 @@ struct DesktopWindowProfile: Equatable {
             ? window.value(of: DesktopWindowSettings.pointer, over: defaults.pointer(compactScreen: compactScreen))
             : nil
     }
+
+    /// Whether the window already shows what **Show Original** asks for: the complete image, opaque.
+    var showsOriginal: Bool { backgroundRemoval == .original && opacity == 1 }
 }
 
 extension DesktopSessionModel {

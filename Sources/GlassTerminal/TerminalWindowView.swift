@@ -1815,7 +1815,8 @@ struct TerminalSettingsSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
+        // Laid out as every window's Settings sheet is (W27): title, Done, one size.
+        GlassSettingsSheet("Terminal Settings", doneIdentifier: "terminal-settings-done", done: done) {
             Group {
             #if os(iOS)
             List {
@@ -1865,21 +1866,7 @@ struct TerminalSettingsSheet: View {
             }
             #endif
             }
-            .navigationTitle("Terminal Settings")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done", action: done)
-                }
-            }
         }
-        #if os(iOS)
-        .presentationDetents([.large])
-        #else
-        .frame(width: 760, height: 560)
-        #endif
     }
 }
 
@@ -2524,7 +2511,8 @@ struct GlassTintPicker: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Glass Tint")
+                // Its name, and on This Window the ↺ back to All Terminals' tint.
+                GlassSettingTitle("Glass Tint")
                 Spacer()
                 if value != "None" && !value.isEmpty {
                     Button("Clear") { value = "None" }

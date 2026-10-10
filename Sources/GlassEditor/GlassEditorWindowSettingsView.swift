@@ -49,7 +49,8 @@ struct GlassEditorSettingsSheet: View {
 
     var body: some View {
         let offered = GlassEditorSettingsSection.offered(hasWindows: hasWindows)
-        NavigationStack {
+        // Laid out as every window's Settings sheet is (W27): title, Done, one size.
+        GlassSettingsSheet("Editor Settings", doneIdentifier: "editor-settings-done", done: { isPresented = false }) {
             GlassSettingsSections(
                 selection: Binding(get: { section ?? GlassEditorSettingsSection.first(hasWindows: hasWindows) },
                                    set: { section = $0 }),
@@ -66,23 +67,7 @@ struct GlassEditorSettingsSheet: View {
                     GlassEditorSettingsView(preferences: workspace.preferences)
                 }
             }
-            .navigationTitle("Editor Settings")
-            #if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { isPresented = false }
-                }
-            }
         }
-        #if os(iOS)
-        .presentationDetents([.large])
-        #elseif os(visionOS)
-        .frame(width: 760, height: 560)
-        #else
-        .frame(width: 640, height: 540)
-        #endif
         .accessibilityIdentifier("editor-settings-sheet")
     }
 
@@ -124,7 +109,7 @@ struct GlassEditorWindowSettingsView: View {
             Section {
                 GlassWindowSettingRow(GlassEditorWindowSettings.fontSize, overrides: settings,
                                       global: preferences.fontSize, inheritsFrom: Source.allEditors) { size in
-                    LabeledContent("Text Size") {
+                    LabeledContent {
                         HStack(spacing: 12) {
                             Button("Smaller", systemImage: "textformat.size.smaller") { size.wrappedValue -= 1 }
                                 .labelStyle(.iconOnly)
@@ -137,18 +122,24 @@ struct GlassEditorWindowSettingsView: View {
                                 .disabled(size.wrappedValue >= GlassEditorTextOverrides.fontSizeRange.upperBound)
                         }
                         .buttonStyle(.bordered)
+                    } label: {
+                        GlassSettingTitle("Text Size")
                     }
                     .accessibilityIdentifier("editor-window-text-size")
                 }
                 GlassWindowSettingRow(GlassEditorWindowSettings.showsLineNumbers, overrides: settings,
                                       global: preferences.showsLineNumbers, inheritsFrom: Source.allEditors) { value in
-                    Toggle("Show Line Numbers", isOn: value)
-                        .accessibilityIdentifier("editor-window-line-numbers")
+                    GlassSettingLabeled("Show Line Numbers") {
+                        Toggle("Show Line Numbers", isOn: value)
+                            .accessibilityIdentifier("editor-window-line-numbers")
+                    }
                 }
                 GlassWindowSettingRow(GlassEditorWindowSettings.wrapsLines, overrides: settings,
                                       global: preferences.wrapsLines, inheritsFrom: Source.allEditors) { value in
-                    Toggle("Wrap Long Lines", isOn: value)
-                        .accessibilityIdentifier("editor-window-wrap")
+                    GlassSettingLabeled("Wrap Long Lines") {
+                        Toggle("Wrap Long Lines", isOn: value)
+                            .accessibilityIdentifier("editor-window-wrap")
+                    }
                 }
             } header: {
                 Text("Text")
@@ -159,7 +150,9 @@ struct GlassEditorWindowSettingsView: View {
             Section {
                 GlassWindowResetButton(overrides: settings)
             } footer: {
-                Text("Each setting here follows All Editors or Appearance until you change it for this window. The window keeps what you change with its project, on this device, and has it again the next time the project opens here.")
+                GlassWindowSettingsFooter(
+                    follows: "All Editors or Appearance",
+                    keeps: "The window keeps its settings with its project, on this device, and has them again the next time the project opens here.")
             }
         }
         .formStyle(.grouped)
@@ -168,25 +161,24 @@ struct GlassEditorWindowSettingsView: View {
 
     /// The window's glass. **On Vision Pro, Opacity only:** there the window's glass is the
     /// system's own and the layer paints no frost over it (`GlassLayerBackground`, since 7478a39),
-    /// so Frost and Material would be controls that change nothing in an editor window. Appearance
-    /// keeps both on the headset because they still reach a terminal's canvas.
+    /// so Glass and Material would be controls that change nothing in an editor window.
     @ViewBuilder
     private func glass(_ settings: Binding<GlassWindowOverrides>) -> some View {
         #if os(visionOS)
         Section {
             GlassWindowSettingRow(GlassLayerSettings.opacity, overrides: settings, global: layers.state.opacity,
                                   inheritsFrom: Source.appearance) { value in
-                GlassSettingSlider(title: "Opacity", value: value, detents: [0, 0.5, 1],
+                GlassSettingSlider(title: GlassLayerSettings.opacity.title, value: value, detents: [0, 0.5, 1],
                                    leadingAccessibilityLabel: "Transparent", trailingAccessibilityLabel: "Opaque",
                                    accessibilityIdentifier: "window-layers-opacity")
             }
         } header: {
-            Text("Glass")
+            Text("Appearance")
         } footer: {
             if reduceTransparency {
-                Text("Reduce Transparency is on in Accessibility. Every window is opaque while it stays on.")
+                Text(GlassWindowGlassFooter.reduceTransparency)
             } else {
-                Text("Only this window changes. Opacity follows Appearance until you change it here. On Vision Pro the window's glass is the system's own, so an editor window has no Frost or Material of its own.")
+                Text("Opacity paints the theme color behind the text.")
             }
         }
         .disabled(reduceTransparency)

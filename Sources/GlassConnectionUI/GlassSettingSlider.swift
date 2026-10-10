@@ -31,7 +31,7 @@ public struct GlassSettingSlider: View {
     }
 
     public var body: some View {
-        LabeledContent(title) {
+        LabeledContent {
             HStack(spacing: 12) {
                 if let accessibilityIdentifier {
                     slider.accessibilityIdentifier(accessibilityIdentifier)
@@ -46,6 +46,9 @@ public struct GlassSettingSlider: View {
                     .accessibilityHidden(true)
             }
             .frame(maxWidth: 280)
+        } label: {
+            // The name, and on a This Window page the way back beside it (`GlassSettingTitle`).
+            GlassSettingTitle(title)
         }
     }
 

@@ -152,16 +152,18 @@ struct DesktopWindowSettingsTests {
         #expect(profile(GlassWindowOverrides(), defaults: automatic, compact: false).pointer == .directTouch)
     }
 
-    @Test("Original in the toolbar sets this window's presentation and opacity, and only them")
+    @Test("Show Original sets this window's presentation and opacity, and only them, until it shows the original")
     func originalIsThisWindows() {
         var window = GlassWindowOverrides()
         window[DesktopWindowSettings.tolerance] = 0.2
+        #expect(!profile(window).showsOriginal, "All Desktops removes black, at 70%: Show Original has work to do")
         window.showDesktopOriginal()
         #expect(window[DesktopWindowSettings.backgroundRemoval] == .original)
         #expect(window[DesktopWindowSettings.opacity] == (DesktopWindowSettings.offersGlass ? 1 : nil))
         #expect(window[DesktopWindowSettings.tolerance] == 0.2)
         let drawn = profile(window)
         #expect(drawn.backgroundRemoval == .original && drawn.opacity == 1)
+        #expect(drawn.showsOriginal, "so the button is done")
     }
 
     // MARK: Checked on the way in and out

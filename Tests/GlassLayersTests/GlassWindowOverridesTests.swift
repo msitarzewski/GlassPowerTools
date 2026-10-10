@@ -213,10 +213,40 @@ struct GlassWindowOverridesTests {
         #expect(stored[S.size] == 22 && size.wrappedValue == 22)
     }
 
-    @Test("each row says where its value comes from")
-    func rowCaption() {
-        #expect(GlassWindowSettingSource.caption(isSet: false, inheritsFrom: "All Terminals") == "Same as All Terminals")
-        #expect(GlassWindowSettingSource.caption(isSet: true, inheritsFrom: "Appearance") == "This window only")
+    /// W27: no caption under a row any more. A row the window does not set shows its name alone;
+    /// one it sets carries a ↺ beside its name, back to where the setting lives.
+    @Test("a row offers a way back only while the window sets it, and the way back undoes only that row")
+    @MainActor
+    func rowReset() throws {
+        var stored = GlassWindowOverrides()
+        let overrides = Binding(get: { stored }, set: { stored = $0 })
+        #expect(GlassWindowSettingBinding.reset(GlassLayerSettings.opacity, in: overrides, inheritsFrom: "Appearance") == nil,
+                "following Appearance: the name alone, nothing to go back to")
+
+        stored[GlassLayerSettings.opacity] = 0.4
+        stored[S.size] = 22
+        let reset = try #require(GlassWindowSettingBinding.reset(GlassLayerSettings.opacity, in: overrides,
+                                                                 inheritsFrom: "Appearance"))
+        #expect(reset.help == "Reset to Appearance", "the tooltip names where the setting lives")
+        #expect(reset.accessibilityLabel == "Reset Opacity to Appearance")
+        #expect(reset.identifier == "window-setting-reset.appearance.opacity", "UI tests find it by this")
+
+        reset.action()
+        #expect(stored[GlassLayerSettings.opacity] == nil, "the window follows Appearance's opacity again")
+        #expect(stored[S.size] == 22, "and keeps everything else it set")
+        #expect(GlassWindowSettingBinding.reset(GlassLayerSettings.opacity, in: overrides, inheritsFrom: "Appearance") == nil)
+    }
+
+    @Test("the glass's strength is called Glass wherever a reset names it, under the key it always had")
+    @MainActor
+    func glassIsCalledGlass() throws {
+        var stored = GlassWindowOverrides()
+        stored[GlassLayerSettings.frost] = 0.5
+        let overrides = Binding(get: { stored }, set: { stored = $0 })
+        let reset = try #require(GlassWindowSettingBinding.reset(GlassLayerSettings.frost, in: overrides,
+                                                                 inheritsFrom: "All Desktops"))
+        #expect(reset.accessibilityLabel == "Reset Glass to All Desktops")
+        #expect(reset.identifier == "window-setting-reset.appearance.frost", "stored and synced: the key stays")
     }
 }
 

@@ -1,7 +1,11 @@
 import SwiftUI
 import GlassConnectionUI
 
-/// The Appearance controls for the layering system, for the shared settings surface.
+/// The Appearance controls for the layering system, for the shared settings surface: every
+/// window's **Opacity**, **Glass** and **Material** — the words every This Window uses too (W27).
+///
+/// No Material on Vision Pro: every window's glass there is Apple's own, and a layer paints no
+/// frost over it (`7478a39`). The stored value stays for the Mac and iPad.
 public struct GlassLayerControls: View {
     @Environment(\.glassLayers) private var layers
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -12,35 +16,35 @@ public struct GlassLayerControls: View {
         @Bindable var layers = layers
         Section {
             GlassSettingSlider(
-                title: "Opacity", value: $layers.state.opacity, detents: [0, 0.5, 1],
+                title: GlassLayerSettings.opacity.title, value: $layers.state.opacity, detents: [0, 0.5, 1],
                 leadingAccessibilityLabel: "Transparent", trailingAccessibilityLabel: "Opaque",
                 accessibilityIdentifier: "layers-opacity"
             )
             GlassSettingSlider(
-                title: "Frost", value: $layers.state.frost, detents: [0, 0.5, 1],
-                leadingAccessibilityLabel: "Clear", trailingAccessibilityLabel: "Frosted",
+                title: GlassLayerSettings.frost.title, value: $layers.state.frost, detents: [0, 0.5, 1],
+                leadingAccessibilityLabel: "No glass", trailingAccessibilityLabel: "Full glass",
                 accessibilityIdentifier: "layers-frost"
             )
-            Picker("Material", selection: $layers.state.material) {
+            #if !os(visionOS)
+            Picker(GlassLayerSettings.material.title, selection: $layers.state.material) {
                 ForEach(GlassLayerMaterial.allCases) { material in
                     Text(material.title).tag(material)
                 }
             }
             .accessibilityIdentifier("layers-material")
             .disabled(layers.state.frost == 0)
+            #endif
             Button("Reset Appearance") { layers.reset() }
                 .accessibilityIdentifier("layers-reset")
         } header: {
-            Text("Glass")
+            Text("Windows")
         } footer: {
             if reduceTransparency {
-                Text("Reduce Transparency is on in Accessibility. Every surface is opaque and frosted while it stays on.")
+                Text("Reduce Transparency is on in Accessibility. Every surface is opaque while it stays on.")
             } else {
-                Text("Opacity paints the theme color behind content. Frost changes the material behind it, including the title bar. Set both to 0% for a clear window; text and controls stay visible. These are every window's; a terminal, editor or database window can keep its own in its Settings, under This Window.")
+                Text("Opacity paints the theme color behind content, and Glass is the glass behind it, including the title bar. Set both to 0% for a clear window; text and controls stay visible. These are every window's; a window can keep its own in its Settings, under This Window.")
             }
         }
         .disabled(reduceTransparency)
     }
-
-
 }

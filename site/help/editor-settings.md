@@ -11,7 +11,7 @@ A file's settings come from the most specific level that says something:
 3. **The window** — **This Window** in the editor window's **Settings**.
 4. **The Editor's defaults** — **Settings ▸ Editor**, also shown as **All Editors** in an editor window's **Settings**.
 
-Each level stores only what you change. Anything left on **Default**, or on **Same as All Editors**, follows the level above it, so when you change the Editor's defaults, every window, project and file that never disagreed follows the change.
+Each level stores only what you change. Anything left on **Default**, or that a window hasn't changed, follows the level above it, so when you change the Editor's defaults, every window, project and file that never disagreed follows the change.
 
 **On iPhone:** there are no windows, so there is no **This Window** level, and **Settings** opens on **This File**.
 
@@ -28,13 +28,13 @@ These apply to every open document and to documents opened later, in every edito
 ## Give an editor window its own settings
 
 1. In the editor window, choose **Settings** (the gear in the toolbar). It opens on **This Window**.
-2. Under **Glass**, change **Opacity**, **Frost** and **Material**.
+2. Under **Appearance**, change **Opacity**, **Glass** and **Material**.
 3. Under **Text**, change **Text Size**, **Show Line Numbers** and **Wrap Long Lines**.
 4. Choose **Done**.
 
-Under each one, **Same as All Editors** (or **Same as Appearance**) says the window follows that setting for every window. Change it, and it reads **This window only**, with **Reset** beside it to follow again. **Reset This Window**, at the end, returns every one. Every document in the window changes at once. A project's or a file's own text settings still apply over the window's.
+Each setting follows **All Editors** (or **Appearance**) until you change it here. Once you do, a small ↺ appears beside its name; choose it to follow again. Its tooltip says what it returns to: hold the pointer over it, or on Vision Pro look at it. **Reset This Window**, at the end, returns every one. Every document in the window changes at once. A project's or a file's own text settings still apply over the window's.
 
-**On Apple Vision Pro:** the gear is in the row of controls below the window, and **Glass** has **Opacity** only. A Vision Pro window's glass is the system's own, so an editor window has no **Frost** or **Material** of its own there.
+**On Apple Vision Pro:** the gear is in the row of controls below the window, and **Appearance** has **Opacity** only. A Vision Pro window's glass is the system's own, so an editor window has no **Glass** or **Material** of its own there.
 
 The window keeps its settings with its project, on this device. Close the window and open the project again — after quitting the app too — and they're back. They don't sync to your other devices: the Editor's defaults and **Appearance** they stand in for are kept on each device too, and a project's own settings are what travel with it. A window with no project keeps its settings until you close it.
 

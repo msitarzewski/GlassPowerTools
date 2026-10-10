@@ -2,10 +2,10 @@
 //  DatabaseWindowSettingsView.swift
 //  Glass Power Tools — GlassDatabase
 //
-//  **This Window** (W24): every setting a database window can keep for itself, built from
+//  **This Window** (W24, W27): every setting a database window can keep for itself, built from
 //  GlassLayers' shared rows (W22) the way the terminal's is. Each row's control shows what the
-//  window uses now; under it, "Same as All Databases" (or Appearance) until it is changed here,
-//  then "This window only" with its own Reset. Reset This Window, at the end, returns them all.
+//  window uses now; once it is changed here, a ↺ beside its name returns it to All Databases (or
+//  Appearance). Reset This Window, at the end, returns them all.
 //
 //  Reached from the gear in the window's toolbar, which opens **Database Settings**: This Window
 //  first, then All Databases (the same page as Settings ▸ Databases). On the Mac the gear was a
@@ -74,24 +74,10 @@ struct DatabaseSettingsSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
+        // Laid out as every window's Settings sheet is (W27): title, Done, one size.
+        GlassSettingsSheet("Database Settings", doneIdentifier: "database-settings-done", done: done) {
             sections
-                .navigationTitle("Database Settings")
-                #if os(iOS)
-                .navigationBarTitleDisplayMode(.inline)
-                #endif
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Done", action: done)
-                            .accessibilityIdentifier("database-settings-done")
-                    }
-                }
         }
-        #if os(iOS)
-        .presentationDetents([.large])
-        #else
-        .frame(width: 760, height: 560)
-        #endif
     }
 
     @ViewBuilder private var sections: some View {
@@ -169,20 +155,20 @@ struct DatabaseWindowSettingsView: View {
             Section {
                 GlassWindowSettingRow(GlassLayerSettings.opacity, overrides: $settings,
                                       global: global.windowOpacity, inheritsFrom: Source.appearance) { value in
-                    GlassSettingSlider(title: "Opacity", value: value, detents: [0, 0.5, 1],
+                    GlassSettingSlider(title: GlassLayerSettings.opacity.title, value: value, detents: [0, 0.5, 1],
                                        leadingAccessibilityLabel: "Transparent", trailingAccessibilityLabel: "Opaque",
                                        accessibilityIdentifier: "database-window-opacity")
                 }
                 GlassWindowSettingRow(GlassLayerSettings.frost, overrides: $settings,
                                       global: global.blurBackground, inheritsFrom: Source.appearance) { value in
-                    GlassSettingSlider(title: "Frost", value: value, detents: [0, 0.5, 1],
-                                       leadingAccessibilityLabel: "Clear", trailingAccessibilityLabel: "Frosted",
+                    GlassSettingSlider(title: GlassLayerSettings.frost.title, value: value, detents: [0, 0.5, 1],
+                                       leadingAccessibilityLabel: "No glass", trailingAccessibilityLabel: "Full glass",
                                        accessibilityIdentifier: "database-window-frost")
                 }
             } header: {
-                Text("Glass")
+                Text("Appearance")
             } footer: {
-                Text("Only this window changes. Opacity paints the canvas behind its tabs, editor and results; Frost blurs what is behind the window. The schema sidebar keeps the system's material.")
+                Text(GlassWindowGlassFooter.text(opacity: "paints the background behind the tabs, editor and results"))
             }
 
             Section {
@@ -207,12 +193,14 @@ struct DatabaseWindowSettingsView: View {
                 }
                 GlassWindowSettingRow(DatabaseWindowSettings.showLineNumbers, overrides: $settings,
                                       global: global.showLineNumbers, inheritsFrom: Source.allDatabases) { value in
-                    Toggle("Show line numbers", isOn: value)
+                    GlassSettingLabeled("Show line numbers") { Toggle("Show line numbers", isOn: value) }
                 }
                 GlassWindowSettingRow(DatabaseWindowSettings.formatsJSON, overrides: $settings,
                                       global: global.autoFormatJSONInRecordEditor,
                                       inheritsFrom: Source.allDatabases) { value in
-                    Toggle("Format JSON automatically while editing", isOn: value)
+                    GlassSettingLabeled("Format JSON automatically while editing") {
+                        Toggle("Format JSON automatically while editing", isOn: value)
+                    }
                 }
             } header: {
                 Text("Editor")
@@ -221,7 +209,9 @@ struct DatabaseWindowSettingsView: View {
             Section {
                 GlassWindowResetButton(overrides: $settings)
             } footer: {
-                Text("Every setting here follows All Databases or Appearance until you change it for this window. The next window on this database opens with them, after a relaunch too, and Open in New Window gives its window this one's. To change every window, use All Databases, or Appearance in Settings.")
+                GlassWindowSettingsFooter(
+                    follows: "All Databases or Appearance",
+                    keeps: "The next window on this database opens with this one's settings, after a relaunch too, and so does Open in New Window.")
             }
         }
         .formStyle(.grouped)

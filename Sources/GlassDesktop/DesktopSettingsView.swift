@@ -1,5 +1,6 @@
 import SwiftUI
 import GlassConnectionUI
+import GlassLayers
 
 struct DesktopGlassAppearanceControls: View {
     @Binding var opacity: Double
@@ -11,20 +12,20 @@ struct DesktopGlassAppearanceControls: View {
             GlassSettingSlider(title: "Opacity", value: $opacity,
                 leadingAccessibilityLabel: "Transparent", trailingAccessibilityLabel: "Opaque",
                 accessibilityIdentifier: "display.glass.opacity")
-            GlassSettingSlider(title: "Background Frost", value: $frost,
-                leadingAccessibilityLabel: "Clear", trailingAccessibilityLabel: "Frosted",
+            GlassSettingSlider(title: GlassLayerSettings.frost.title, value: $frost,
+                leadingAccessibilityLabel: "No glass", trailingAccessibilityLabel: "Full glass",
                 accessibilityIdentifier: "display.glass.frost")
             HStack {
                 Button("Clear") { frost = 0 }.accessibilityIdentifier("display.glass.clear")
                 Button("Frosted") { frost = 0.5 }.accessibilityIdentifier("display.glass.frosted")
             }.buttonStyle(.borderless)
         } header: {
-            Text("Glass")
+            Text("Appearance")
         } footer: {
             if reduceTransparency {
                 Text("Reduce Transparency is on in Accessibility. The desktop uses an opaque Original presentation.")
             } else {
-                Text("Opacity fades the entire desktop. Frost changes the material behind it. Set both to 0% for a clear canvas; controls stay visible.")
+                Text("Opacity fades the entire desktop, and Glass is the glass behind it. Set both to 0% for a clear canvas; controls stay visible.")
             }
         }.disabled(reduceTransparency)
     }

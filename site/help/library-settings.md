@@ -11,31 +11,31 @@ Settings for the whole app are in one place. This page covers opening Settings, 
 
 ## Change how transparent windows are
 
-Choose **Appearance**. The **Glass** section has:
+Choose **Appearance**. The **Windows** section has:
 
 - **Opacity**: how strongly the theme color is painted behind content, from transparent to opaque.
-- **Frost**: how strongly the background behind a window is blurred, from clear to frosted. **On Mac:** the title bar follows this setting too.
-- **Material**: the kind of frost: **Light**, **Medium**, **Heavy** or **Max**. It is unavailable while **Frost** is at 0%.
-- **Reset Appearance**: returns to the starting settings: **Opacity** 0%, **Frost** 100% and **Material** **Heavy**.
+- **Glass**: how much glass is behind a window, from none to full. **On Mac:** the title bar follows this setting too.
+- **Material** (**on Mac, iPad and iPhone**): the kind of glass: **Light**, **Medium**, **Heavy** or **Max**. It is unavailable while **Glass** is at 0%.
+- **Reset Appearance**: returns to the starting settings: **Opacity** 0%, **Glass** 100% and **Material** **Heavy**.
 
-The sliders settle on 0%, 50% and 100% when you drag near them. Text and controls stay fully visible at every setting. For a completely clear window, set **Opacity** and **Frost** to 0%.
+The sliders settle on 0%, 50% and 100% when you drag near them. Text and controls stay fully visible at every setting. For a completely clear window, set **Opacity** and **Glass** to 0%.
 
-**On Vision Pro:** windows use the system's own glass. **Opacity** paints the theme color over it; **Frost** and **Material** do not add a second layer to the library's windows. A terminal window's glass is its **Frost**: at 0% the window is completely clear.
+**On Vision Pro:** windows use the system's own glass, so there is no **Material** to choose. **Opacity** paints the theme color over the glass; **Glass** does not add a second layer to the library's windows. In a terminal window, **Glass** is the window's own glass: at 0% the window is completely clear.
 
 These settings also apply to terminal windows. They are kept on each device.
 
 ### One window's own glass
 
-A window can keep its own **Opacity**, **Frost** and **Material** in place of these: terminal, editor and database windows. (A remote desktop window has its own glass settings instead; see its This Window.)
+A window can keep its own **Opacity**, **Glass** and **Material** in place of these: terminal, editor and database windows. (A remote desktop window has its own glass settings instead; see its This Window.)
 
-- In a terminal, open its tools menu, choose **Settings**, then **This Window**, where these are **Opacity**, **Blur** and **Frost**; see [Give a terminal window its own settings](terminal-settings.md#give-a-terminal-window-its-own-settings).
-- In an editor window, choose **Settings** (gear) in its toolbar, then **This Window**, which has **Opacity**, and **Frost** and **Material** on Mac and iPad; see [Give an editor window its own settings](editor-settings.md#give-an-editor-window-its-own-settings).
-- In a database window, choose **Settings** (gear) in its toolbar, then **This Window**, which has **Opacity** and **Frost**; see [Give a database window its own settings](database-workspace.md#give-a-database-window-its-own-settings).
+- In a terminal, open its tools menu, choose **Settings**, then **This Window**, which has **Opacity** and **Glass**, and **Material** on iPad; see [Give a terminal window its own settings](terminal-settings.md#give-a-terminal-window-its-own-settings).
+- In an editor window, choose **Settings** (gear) in its toolbar, then **This Window**, which has **Opacity**, and **Glass** and **Material** on Mac and iPad; see [Give an editor window its own settings](editor-settings.md#give-an-editor-window-its-own-settings).
+- In a database window, choose **Settings** (gear) in its toolbar, then **This Window**, which has **Opacity** and **Glass**; see [Give a database window its own settings](database-workspace.md#give-a-database-window-its-own-settings).
 
-Each says **Same as Appearance** until you change it there, and only that window changes. Whatever a window hasn't set follows **Appearance**.
+Each follows **Appearance** until you change it there, and only that window changes. A setting the window has changed shows a small ↺ beside its name, which returns it to **Appearance**. Whatever a window hasn't set follows **Appearance**.
 
 > [!NOTE]
-> When **Reduce Transparency** is on in the system's Accessibility settings, every window is opaque and frosted, and these controls are unavailable until you turn it off.
+> When **Reduce Transparency** is on in the system's Accessibility settings, every window is opaque, and these controls are unavailable until you turn it off.
 
 ## General
 

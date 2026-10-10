@@ -2,12 +2,13 @@
 //  DesktopWindowSettingsView.swift
 //  Glass Power Tools — GlassDesktop
 //
-//  **This Window** (W25): Desktop Settings' first page, in every desktop window. Every desktop
+//  **This Window** (W25, W27): Desktop Settings' first page, in every desktop window. Every desktop
 //  setting the window can keep for itself is a GlassLayers row (W22): its control shows what the
-//  window uses now, and under it "Same as All Desktops" until it is changed here, then "This window
-//  only" with its own Reset. Beside them, this session's live controls — Match Window Size, the
-//  display shown, Desktop Resolution, Local Scale — which were already this page's ("This Window",
-//  Local Scale) and are not settings. Reset This Window, at the end, returns every row.
+//  window uses now, and once it is changed here a ↺ beside its name returns it to All Desktops.
+//  Beside them, this session's live controls — Match Window Size, the display shown, Desktop
+//  Resolution, Local Scale — which were already this page's ("This Window", Local Scale) and are
+//  not settings. Show Original, under Presentation, was glassDT's toolbar button. Reset This
+//  Window, at the end, returns every row.
 //
 
 import SwiftUI
@@ -39,11 +40,19 @@ struct DesktopWindowSettingsView: View {
             Section {
                 GlassWindowResetButton(overrides: $session.windowSettings)
             } footer: {
-                Text("Every setting marked Same as All Desktops follows Settings ▸ Desktops until you change it here, and only this window changes. This window keeps its own settings on this device and has them again the next time this desktop opens. Match Window Size, the display shown, the resolution and Local Scale last for this session.")
+                GlassWindowSettingsFooter(
+                    follows: Self.allDesktops,
+                    keeps: "The window keeps its settings on this device and has them again the next time this desktop opens. Match Window Size, the display shown, the resolution and Local Scale last for this session.")
             }
         }
         .formStyle(.grouped)
-        .padding()
+        // No extra padding: a grouped form brings its own margins, as every This Window's does.
+    }
+
+    /// What the window draws with now, for Show Original.
+    private var profile: DesktopWindowProfile {
+        DesktopWindowProfile(window: session.windowSettings, defaults: defaults, compactScreen: compactScreen,
+                             reduceTransparency: reduceTransparency)
     }
 
     /// The presentation the window chose, before Reduce Transparency: what the sections below
@@ -58,23 +67,23 @@ struct DesktopWindowSettingsView: View {
         Section {
             GlassWindowSettingRow(DesktopWindowSettings.opacity, overrides: $session.windowSettings,
                                   global: defaults.opacity, inheritsFrom: Self.allDesktops) { value in
-                GlassSettingSlider(title: "Opacity", value: value, detents: [0, 0.5, 1],
+                GlassSettingSlider(title: DesktopWindowSettings.opacity.title, value: value, detents: [0, 0.5, 1],
                                    leadingAccessibilityLabel: "Transparent", trailingAccessibilityLabel: "Opaque",
                                    accessibilityIdentifier: "desktop-window-opacity")
             }
             GlassWindowSettingRow(DesktopWindowSettings.frost, overrides: $session.windowSettings,
                                   global: defaults.frost, inheritsFrom: Self.allDesktops) { value in
-                GlassSettingSlider(title: "Background Frost", value: value, detents: [0, 0.5, 1],
-                                   leadingAccessibilityLabel: "Clear", trailingAccessibilityLabel: "Frosted",
+                GlassSettingSlider(title: DesktopWindowSettings.frost.title, value: value, detents: [0, 0.5, 1],
+                                   leadingAccessibilityLabel: "No glass", trailingAccessibilityLabel: "Full glass",
                                    accessibilityIdentifier: "desktop-window-frost")
             }
         } header: {
-            Text("Glass")
+            Text("Appearance")
         } footer: {
             if reduceTransparency {
-                Text("Reduce Transparency is on in Accessibility. The desktop is opaque, with Original presentation, while it stays on.")
+                Text("Reduce Transparency is on in Accessibility, so the desktop is opaque, with Original presentation, while it stays on.")
             } else {
-                Text("Opacity fades this desktop. Background Frost changes the material behind it. Set both to 0% for a clear canvas; the controls stay visible.")
+                Text(GlassWindowGlassFooter.text(opacity: "fades the desktop"))
             }
         }
         .disabled(reduceTransparency)
@@ -86,15 +95,23 @@ struct DesktopWindowSettingsView: View {
         Section {
             GlassWindowSettingRow(DesktopWindowSettings.backgroundRemoval, overrides: $session.windowSettings,
                                   global: defaults.backgroundRemoval, inheritsFrom: Self.allDesktops) { value in
-                Picker("Presentation", selection: value) {
-                    ForEach(TransparencyMode.allCases, id: \.self) { Text($0.title).tag($0) }
+                GlassSettingLabeled(DesktopWindowSettings.backgroundRemoval.title) {
+                    Picker(DesktopWindowSettings.backgroundRemoval.title, selection: value) {
+                        ForEach(TransparencyMode.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                    .accessibilityIdentifier("desktop-window-presentation")
                 }
-                .accessibilityIdentifier("desktop-window-presentation")
             }
+            // glassDT's toolbar Original, here since W27: this window's Presentation and Opacity
+            // at once, which is why it is not a Presentation choice.
+            Button("Show Original") { session.windowSettings.showDesktopOriginal() }
+                .disabled(profile.showsOriginal)
+                .help("The complete desktop image, opaque, in this window")
+                .accessibilityIdentifier("display.glass.original")
         } header: {
             Text("Background Removal")
         } footer: {
-            Text("Matching colors anywhere in the desktop can become transparent. Original restores the complete image.")
+            Text("Matching colors anywhere in the desktop can become transparent. Show Original returns this window to the complete image, opaque.")
         }
         .disabled(reduceTransparency)
         if chosenMode == .removeColor {
@@ -102,11 +119,13 @@ struct DesktopWindowSettingsView: View {
                 GlassWindowSettingRow(DesktopWindowSettings.keyColor, overrides: $session.windowSettings,
                                       global: DesktopKeyColor.hex(defaults.keyColor),
                                       inheritsFrom: Self.allDesktops) { hex in
-                    ColorPicker("Background Color", selection: DesktopKeyColor.binding(Binding(
-                        get: { DesktopKeyColor.color(hex.wrappedValue) ?? defaults.keyColor },
-                        set: { hex.wrappedValue = DesktopKeyColor.hex($0) }
-                    )), supportsOpacity: false)
-                    .accessibilityIdentifier("desktop-window-color")
+                    GlassSettingLabeled(DesktopWindowSettings.keyColor.title) {
+                        ColorPicker(DesktopWindowSettings.keyColor.title, selection: DesktopKeyColor.binding(Binding(
+                            get: { DesktopKeyColor.color(hex.wrappedValue) ?? defaults.keyColor },
+                            set: { hex.wrappedValue = DesktopKeyColor.hex($0) }
+                        )), supportsOpacity: false)
+                        .accessibilityIdentifier("desktop-window-color")
+                    }
                     LabeledContent("Color Code") {
                         Text(hex.wrappedValue).monospaced().textSelection(.enabled)
                             .accessibilityIdentifier("desktop-window-hex")
@@ -126,14 +145,14 @@ struct DesktopWindowSettingsView: View {
             Section("Edges") {
                 GlassWindowSettingRow(DesktopWindowSettings.tolerance, overrides: $session.windowSettings,
                                       global: defaults.tolerance, inheritsFrom: Self.allDesktops) { value in
-                    LabeledContent("Tolerance") {
+                    GlassSettingLabeled(DesktopWindowSettings.tolerance.title) {
                         Slider(value: value, in: DesktopDefaults.toleranceRange) { Text("Tolerance") }
                             .accessibilityIdentifier("desktop-window-tolerance")
                     }
                 }
                 GlassWindowSettingRow(DesktopWindowSettings.edgeSoftness, overrides: $session.windowSettings,
                                       global: defaults.edgeSoftness, inheritsFrom: Self.allDesktops) { value in
-                    LabeledContent("Edge Softness") {
+                    GlassSettingLabeled(DesktopWindowSettings.edgeSoftness.title) {
                         Slider(value: value, in: DesktopDefaults.edgeSoftnessRange) { Text("Edge Softness") }
                             .accessibilityIdentifier("desktop-window-edge-softness")
                     }
@@ -181,11 +200,13 @@ struct DesktopWindowSettingsView: View {
             if session.connection.protocol == .rdp {
                 GlassWindowSettingRow(DesktopWindowSettings.detail, overrides: $session.windowSettings,
                                       global: defaults.detail, inheritsFrom: Self.allDesktops) { value in
-                    Picker("Detail", selection: value) {
-                        ForEach(DesktopSourceScale.allCases, id: \.self) { Text($0.title).tag($0) }
+                    GlassSettingLabeled(DesktopWindowSettings.detail.title) {
+                        Picker(DesktopWindowSettings.detail.title, selection: value) {
+                            ForEach(DesktopSourceScale.allCases, id: \.self) { Text($0.title).tag($0) }
+                        }
+                        .disabled(!session.matchWindow)
+                        .accessibilityIdentifier("desktop-window-detail")
                     }
-                    .disabled(!session.matchWindow)
-                    .accessibilityIdentifier("desktop-window-detail")
                 }
             }
             Menu("Desktop Resolution") {
@@ -246,10 +267,12 @@ struct DesktopWindowSettingsView: View {
             GlassWindowSettingRow(DesktopWindowSettings.pointer, overrides: $session.windowSettings,
                                   global: defaults.pointer(compactScreen: compactScreen),
                                   inheritsFrom: Self.allDesktops) { value in
-                Picker("Pointer", selection: value) {
-                    ForEach(DesktopPointerMode.allCases, id: \.self) { Text($0.title).tag($0) }
+                GlassSettingLabeled(DesktopWindowSettings.pointer.title) {
+                    Picker(DesktopWindowSettings.pointer.title, selection: value) {
+                        ForEach(DesktopPointerMode.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                    .accessibilityIdentifier("display.pointer-mode")
                 }
-                .accessibilityIdentifier("display.pointer-mode")
             }
         } header: {
             Text("Touch")

@@ -25,12 +25,12 @@ The window is at least 800 × 440 points. With **Match Window Size** on, resizin
 
 ## Glass
 
-In **Desktop Settings** > **This Window**, the **Glass** section changes how this window sits in your space:
+In **Desktop Settings** > **This Window**, the **Appearance** section changes how this window sits in your space:
 
 - **Opacity** fades the whole desktop, from transparent to opaque.
-- **Background Frost** changes the material behind it, from clear to frosted.
+- **Glass** is the glass behind it, from none to full.
 
-Set both to 0% for a clear canvas; the controls stay visible. Only this window changes, and it keeps these on this device for the next time this desktop opens. To change every desktop window, use **All Desktops**, beside **This Window**, or **Settings** > **Desktops**, which are the same page; there **Clear** and **Frosted** set the frost in one step. A window follows **All Desktops** until you set its own; see [Give a desktop window its own settings](desktop-sessions.md#give-a-desktop-window-its-own-settings). **On Mac** the same **Glass** settings apply: the desktop window fades over a frosted or clear backdrop showing what is behind it.
+Set both to 0% for a clear canvas; the controls stay visible. Only this window changes, and it keeps these on this device for the next time this desktop opens. To change every desktop window, use **All Desktops**, beside **This Window**, or **Settings** > **Desktops**, which are the same page; there **Clear** and **Frosted** set **Glass** in one step. A window follows **All Desktops** until you set its own; see [Give a desktop window its own settings](desktop-sessions.md#give-a-desktop-window-its-own-settings). **On Mac** the same settings apply: the desktop window fades over a frosted or clear backdrop showing what is behind it.
 
 > [!NOTE]
 > When Reduce Transparency is on in Accessibility settings, the glass controls are unavailable and the desktop is shown opaque with **Original** presentation.
@@ -46,6 +46,6 @@ Background removal makes parts of the remote image transparent, so a remote wind
 
 Matching colors anywhere on the desktop become transparent, including inside apps. Under **Edges**, **Tolerance** decides how close a color must be to match, and **Edge Softness** blends the border.
 
-To go back, choose **Original** in the **Desktop Settings** toolbar: this window shows the complete image, at full opacity. **Reset This Window** returns the window to **All Desktops**' settings.
+To go back, choose **Show Original**, under **Presentation**: this window shows the complete image, at full opacity. **Reset This Window** returns the window to **All Desktops**' settings.
 
 Each desktop window keeps its own presentation, color, tolerance and edge softness on this device, for the next time that desktop opens, except **Remove Wallpaper**, which lasts for the session that chose its image. To choose them for every desktop window, use **Background Removal** in **All Desktops** (the same as **Settings** > **Desktops**); it offers **Original**, **Remove Black** and **Remove Background Color**.

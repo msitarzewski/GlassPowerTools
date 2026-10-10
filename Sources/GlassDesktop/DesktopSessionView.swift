@@ -255,30 +255,12 @@ public struct DesktopSessionView: View {
                 chooseWallpaper = true
             }
         }) {
-            NavigationStack {
+            // Laid out as every window's Settings sheet is (W27): title, Done, one size. Original,
+            // which was a toolbar button here, is on This Window, under Presentation.
+            GlassSettingsSheet("Desktop Settings", doneIdentifier: "session.display.done",
+                               done: { showDisplayOptions = false }) {
                 displayOptions
-                    .navigationTitle("Desktop Settings")
-                    #if os(iOS)
-                    .navigationBarTitleDisplayMode(.inline)
-                    #endif
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Done") { showDisplayOptions = false }
-                                .accessibilityIdentifier("session.display.done")
-                        }
-                        ToolbarItem(placement: .confirmationAction) {
-                            // The complete image, in this window: its own Presentation and Opacity.
-                            Button("Original") { session.windowSettings.showDesktopOriginal() }
-                                .accessibilityIdentifier("display.glass.original")
-                                .disabled(profile.backgroundRemoval == .original && profile.opacity == 1)
-                        }
-                    }
             }
-            #if os(iOS)
-            .presentationDetents([.large])
-            #else
-            .frame(width: 760, height: 560)
-            #endif
         }
         .onDisappear { alerts = DesktopSessionAlertPresentation(); session.close() }
         .onChange(of: session.shouldClosePresentation) { _, shouldClose in

@@ -86,11 +86,11 @@ A database window can keep settings of its own, so one window can have larger te
 
 **This Window** has:
 
-- **Glass**: **Opacity** and **Frost**, which otherwise follow **Appearance**. They change the canvas behind the window's tabs, editor and results; the schema sidebar keeps the system's material.
+- **Appearance**: **Opacity** and **Glass**, which otherwise follow **Appearance** in Settings. They change the canvas behind the window's tabs, editor and results; the schema sidebar keeps the system's material.
 - **Query**: **Result row limit**.
 - **Editor**: **SQL editor text**, **Results grid text**, **Show line numbers** and **Format JSON automatically while editing**.
 
-Under each one, **Same as All Databases** (or **Same as Appearance**) says the window follows that setting for every window. Change it, and it reads **This window only**, with **Reset** beside it to follow again. **Reset This Window**, at the end, returns every one. Only this window changes, and it changes at once.
+Each setting follows **All Databases** (or **Appearance**) until you change it here. Once you do, a small ↺ appears beside its name; choose it to follow again. Its tooltip says what it returns to: hold the pointer over it, or on Vision Pro look at it. **Reset This Window**, at the end, returns every one. Only this window changes, and it changes at once.
 
 A database window doesn't reopen when the app relaunches, so its settings are kept for its database: the next window you open on that database starts with them, after a relaunch too. **Open in New Window**, in the schema browser, gives the new window the settings of the one you opened it from. They're kept on this device.
 

@@ -244,7 +244,7 @@ struct BoundedStepperRow: View {
     let accessibilityHint: String
 
     var body: some View {
-        LabeledContent(title) {
+        LabeledContent {
             HStack(spacing: 8) {
                 Text(value, format: .number.grouping(.automatic))
                     .monospacedDigit()
@@ -258,6 +258,9 @@ struct BoundedStepperRow: View {
                     .accessibilityValue(Text(value, format: .number))
                     .accessibilityHint(accessibilityHint)
             }
+        } label: {
+            // The name, and on This Window the ↺ back to All Databases (`GlassSettingTitle`).
+            GlassSettingTitle(title)
         }
     }
 }
@@ -269,7 +272,7 @@ struct BoundedDoubleStepperRow: View {
     let suffix: String
 
     var body: some View {
-        LabeledContent(title) {
+        LabeledContent {
             HStack(spacing: 8) {
                 Text("\(Int(value.rounded())) \(suffix)")
                     .monospacedDigit()
@@ -282,6 +285,8 @@ struct BoundedDoubleStepperRow: View {
                     .accessibilityLabel(title)
                     .accessibilityValue("\(Int(value.rounded())) \(suffix)")
             }
+        } label: {
+            GlassSettingTitle(title)
         }
     }
 }

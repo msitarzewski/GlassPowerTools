@@ -895,3 +895,31 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   content area, the terminal's nested 34-pt / ≈23.75 continuous corners; split views' own system glass is the open
   question). W27 owns settings sheets/rows/help; W28 owns scenes/backgrounds and reports help wording. Captures of both
   go to the owner before anything installs.
+- **Owner (~14:30):** "The connections window on vision pro is pretty large and doesn't honor transparency apparently.
+  It would be super cool to have it detect idle and minimize itself into an orb ... activates when looked at - restores to
+  the full window size." Transparency → added to **W28**. Idle → orb, restore, default size → **W29** (reuses the existing
+  `minimized` window and `GlassWindowRecoveryManager`). visionOS gives apps no gaze: the orb can respond visibly when
+  looked at (system hover effect), restoring takes a pinch.
+- **W28 finding (~14:45):** on visionOS 27 a NavigationSplitView/NavigationStack in a `.plain` window always draws its own
+  system glass (UIKit columns report `preferredContainerBackgroundStyle = .automatic`); no public modifier removes it
+  (`glassBackgroundEffect(displayMode:)`, toolbar/scroll backgrounds, split styles, TabView wrapping tried;
+  `containerBackground(for: .navigation)` unavailable on visionOS). Evidence: `$SP/w28/evidence-navigation-glass.png`.
+  Plan approved: shared glass in GlassLayers; desktop full match; split-view windows (database, editor, Files,
+  Connections) keep system navigation (D40) with Opacity in the nested canvas; a Database prototype without the split
+  view, behind one switch, for the owner to compare.
+- **Owner on the orb (~14:40):** "This is a good outcome, much better than auto anything. highlight is th business. can we
+  put the active connection count in there?" → W29: count on the orb, required.
+- **Owner (~14:55), Vision Pro on a mobile link, sharing a Mac:** "no scaling or bandwidth streaming control / quality
+  setting. I see one window with both screens proportionally displayed. I'd like two screens, independently controllable
+  like a real desktop setup ... Solve it?" Found: VNCKit always requests the whole framebuffer; `RFBLinkQualityGovernor`
+  only moves Tight JPEG quality (nothing adapts if the Mac never sends Tight); `selectedScreenID` shows one display but
+  fetches all. → **W30**: one window per display sharing one RFB session, input offset per display, region-limited update
+  requests, Quality (Automatic/Best/Balanced/Data Saver: JPEG, colour depth, frame pacing), a live throughput readout;
+  proven against the TigerVNC Docker fixture with two screens and a rate-limited proxy; never his real machines.
+- **W27 merged (Settings sheets).** Captions gone; `GlassSettingTitle` + `glassSettingReset` environment draw a tiny ↺
+  (tooltip "Reset to <source>", id `window-setting-reset.<key>`) beside a set row's name; `GlassSettingLabeled` for system
+  controls. Vocabulary: Opacity / Glass (key `appearance.frost`) / Material; Material and Interactive Glass hidden on
+  visionOS (keys kept); section headers "Appearance" (This Window) and "Windows" (Settings ▸ Appearance). One
+  `GlassSettingsSheet`: Done `.confirmationAction`; visionOS 820×860 (was 760×560), Mac 760×560, iOS `.large`. Desktop's
+  "Original" → This Window ▸ Background Removal ▸ Show Original. Shared footers. Suites on main: layers 43, connection UI
+  40, terminal 724, editor 150, database 317, desktop 185. Mac/iPad layouts built but not looked at.

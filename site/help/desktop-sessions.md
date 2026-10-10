@@ -45,12 +45,12 @@ Anything about how a desktop window looks and behaves can be set for that window
 
 **This Window** has:
 
-- **Glass** (**on Mac and Apple Vision Pro**): **Opacity** and **Background Frost**. See [Remote desktops on Apple Vision Pro](desktop-vision-pro.md#glass).
-- **Background Removal**: **Presentation**, with **Background Color**, **Tolerance** and **Edge Softness**. See [Remove the remote desktop's background](desktop-vision-pro.md#remove-the-remote-desktops-background).
+- **Appearance** (**on Mac and Apple Vision Pro**): **Opacity** and **Glass**. See [Remote desktops on Apple Vision Pro](desktop-vision-pro.md#glass).
+- **Background Removal**: **Presentation**, with **Background Color**, **Tolerance** and **Edge Softness**, and **Show Original**, which shows this window's complete desktop image, opaque, in one step. See [Remove the remote desktop's background](desktop-vision-pro.md#remove-the-remote-desktops-background).
 - **Remote Desktop**: **Detail** (RDP). See [Resolution, scaling and zoom](desktop-display-and-scaling.md#sharper-text-on-high-resolution-displays-rdp).
 - **Touch** (**on iPad and iPhone**): **Pointer**. See [Keyboard, pointer, clipboard and audio](desktop-input.md#point-and-click).
 
-Under each one, **Same as All Desktops** says the window follows the setting every desktop window shares. Change it, and it reads **This window only**, with **Reset** beside it to follow again. **Reset This Window**, at the end, returns every one. Only this window changes, at once.
+Each setting follows **All Desktops** until you change it here. Once you do, a small ↺ appears beside its name; choose it to follow again. Its tooltip says what it returns to: hold the pointer over it, or on Vision Pro look at it. **Reset This Window**, at the end, returns every one. Only this window changes, at once.
 
 A desktop's window keeps its own settings on this device. Desktop windows are not reopened when you quit the app, but the next time you connect to the same desktop here, its window has them again. They are not synced to your other devices, and removing the desktop removes them.
 

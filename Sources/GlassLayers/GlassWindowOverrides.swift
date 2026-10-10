@@ -320,9 +320,11 @@ public extension View {
 public enum GlassLayerSettings {
     /// Theme paint behind content, 0…1 (Appearance ▸ Opacity).
     public static let opacity = GlassWindowSetting<Double>.unit("appearance.opacity", title: "Opacity")
-    /// Strength of the frost material, 0…1 (Appearance ▸ Frost).
-    public static let frost = GlassWindowSetting<Double>.unit("appearance.frost", title: "Frost")
-    /// Which material the frost is (Appearance ▸ Material).
+    /// Strength of the glass behind content, 0…1 (Appearance ▸ Glass). Shown as **Glass** in
+    /// every window since W27 (it was Frost, Blur or Background Frost); the key keeps its name,
+    /// because it is stored and synced.
+    public static let frost = GlassWindowSetting<Double>.unit("appearance.frost", title: "Glass")
+    /// Which material the glass is (Appearance ▸ Material).
     public static let material = GlassWindowSetting<GlassLayerMaterial>.choice("appearance.material", title: "Material")
 
     public static var keys: Set<String> { [opacity.key, frost.key, material.key] }
