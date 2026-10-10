@@ -2527,10 +2527,9 @@ struct SFTPBrowserView: View {
             let client = try await sshConnection.openSFTPClient()
             self.sftpClient = client
 
-            // Resolve home directory as starting path
-            let homePath = try await client.getRealPath(atPath: ".")
-            currentPath = homePath
-            navigationStack = [homePath]
+            let start = try await Self.startingFolder(requested: initialPath, client: client)
+            currentPath = start
+            navigationStack = [start]
 
             await loadDirectory()
         } catch {
@@ -6127,5 +6126,22 @@ extension SFTPBrowserView {
             TerminalRemoteDropLog.uploadFailed(error)
             throw TerminalRemoteDropFailure.didNotFinish
         }
+    }
+}
+
+// MARK: - Where the browser opens
+
+extension SFTPBrowserView {
+    /// The folder the browser opens at: the one it was asked for (Open Folder Here passes the
+    /// shell's own working directory) when the host says it is a folder, else home. Until
+    /// 2026-10-09 the connection set home after the requested folder had been applied, so Open
+    /// Folder Here always opened the home folder (owner, on the Vision Pro).
+    static func startingFolder(requested: String?, client: SFTPClient) async throws -> String {
+        let home = try await client.getRealPath(atPath: ".")
+        guard let requested, requested.hasPrefix("/"), requested != home else { return home }
+        guard let attributes = try? await client.getAttributes(at: requested),
+              let permissions = attributes.permissions,
+              permissions & 0o170000 == 0o040000 else { return home }
+        return requested
     }
 }
