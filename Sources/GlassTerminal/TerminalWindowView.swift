@@ -95,6 +95,9 @@ struct TerminalWindowView: View {
     var onTerminalContextChange: ((_ title: String?, _ directory: String?) -> Void)? = nil
     @Environment(SessionManager.self) private var sessionManager
     @Environment(SettingsManager.self) private var settingsManager
+    /// For Open in Editor: the composition root's way to the editor. Optional, as in a window
+    /// without one the item is simply not offered.
+    @Environment(GlassTerminalRuntime.self) private var terminalRuntime: GlassTerminalRuntime?
     #if os(iOS)
     @Environment(IOSAppRouter.self) private var iOSRouter
     #endif
@@ -518,6 +521,45 @@ struct TerminalWindowView: View {
     private func configureFind() {
         let session = session
         find.configure(model: terminalHostModel) { [weak session] in session?.tmuxFindTarget }
+    }
+
+    /// The folder this shell reported over OSC 7, when it is a path.
+    private var reportedFolder: String? {
+        terminalHostModel.currentDirectory.flatMap { $0.hasPrefix("/") ? $0 : nil }
+    }
+
+    /// Whether this shell's folder can be found: reported over OSC 7, or asked of tmux.
+    private var canOpenWorkingFolder: Bool {
+        reportedFolder != nil || session.survivesClose
+    }
+
+    /// Finds the folder this shell is in — in tmux, asked of tmux, since what was reported goes
+    /// stale — and hands it to `open`.
+    private func withWorkingFolder(_ open: @escaping @MainActor (String) -> Void) {
+        let reported = reportedFolder
+        Task {
+            if let directory = await session.workingDirectory(reported: reported) { open(directory) }
+        }
+    }
+
+    /// Opens a folder on this machine as an editor project, as Files' Open in Editor does. Nil
+    /// where no editor is wired in, and then not offered.
+    private var openFolderInEditor: (@MainActor (String) -> Void)? {
+        guard let open = terminalRuntime?.openFolderAsProject else { return nil }
+        let serverID = session.server.id
+        return { open(serverID, $0) }
+    }
+
+    /// What a pinch and hold on the folder button offers (owner, 2026-10-09: "an Open in Editor
+    /// option on pinch and hold on the folder icon").
+    @ViewBuilder
+    private var workingFolderActions: some View {
+        Button("Open in Files", systemImage: "folder") { withWorkingFolder(openFolderHere) }
+        if let openFolderInEditor {
+            Button("Open in Editor", systemImage: "chevron.left.forwardslash.chevron.right") {
+                withWorkingFolder(openFolderInEditor)
+            }
+        }
     }
 
     /// Opens this session's current directory in the file browser.
@@ -1377,21 +1419,20 @@ struct TerminalWindowView: View {
             // Finder for a local shell, SFTP for a remote one, both arriving where the user is.
             // In tmux the reported directory is stale, so the button is always there and the
             // directory is asked of tmux when it is pressed.
-            let reported = terminalHostModel.currentDirectory.flatMap { $0.hasPrefix("/") ? $0 : nil }
-            if reported != nil || session.survivesClose {
+            if canOpenWorkingFolder {
                 Button {
-                    Task {
-                        if let directory = await session.workingDirectory(reported: reported) { openFolderHere(directory) }
-                    }
+                    withWorkingFolder(openFolderHere)
                 } label: {
                     Image(systemName: "folder")
                 }
+                // Pinch and hold (right-click on a Mac): the same folder in the editor instead.
+                .contextMenu { workingFolderActions }
                 #if os(visionOS)
                 .buttonStyle(.borderless)
                 #endif
                 .accessibilityLabel("Open Folder Here")
                 .accessibilityIdentifier("terminal-open-folder-here")
-                .help(session.survivesClose ? "Open this shell's folder over SFTP" : "Open \(reported ?? "") over SFTP")
+                .help(session.survivesClose ? "Open this shell's folder over SFTP" : "Open \(reportedFolder ?? "") over SFTP")
             }
 
 
@@ -1468,6 +1509,14 @@ struct TerminalWindowView: View {
                     session.clearScreen()
                 } label: {
                     Label("Clear", systemImage: "trash")
+                }
+
+                if canOpenWorkingFolder, openFolderInEditor != nil {
+                    Button {
+                        if let openFolderInEditor { withWorkingFolder(openFolderInEditor) }
+                    } label: {
+                        Label("Open Folder in Editor", systemImage: "chevron.left.forwardslash.chevron.right")
+                    }
                 }
 
                 #if DEBUG
