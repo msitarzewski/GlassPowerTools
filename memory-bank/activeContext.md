@@ -30,9 +30,11 @@ anything touching real servers (SSH and database tests use the disposable test V
 ## 2026-10-09 — where things stand
 
 **Installed:** Mac **0.4.320** (2026-10-09 13:10: closed-window crash fix, Active count at launch, terminal
-right-click menu; 4 windows reopened, 15/15 sessions, no crash). iPhone and Vision Pro **0.4.321** (a28dc68: Active
-names a Connect workgroup's row by its terminal, as the window does). The Mac's 0.4.321 is built in `$SP/dd-mac`, to
-install at the owner's word (he was working).
+right-click menu; 4 windows reopened, 15/15 sessions, no crash). iPhone and Vision Pro **0.4.322** (a28dc68: Active
+names a Connect workgroup's row by its terminal; 54a66d5: Active asks nothing until the library has loaded, so it fills
+in at launch). The Mac's 0.4.322 is built in `$SP/dd-mac`, to install at the owner's word (he was working).
+W15 (agent `w15-vision-windows`, worktree): Vision Pro/iPad tab groups back on relaunch; moving tabs between windows
+on Vision Pro by drag and drop in the grid view (owner's idea), with Move to New Window / Move to ▸ menus as fallback.
 The Mac reopened its 4 listed windows once (`Reopen: 4 listed … 4 reopening`; later asks "already taken"), 15 of 15
 tmux sessions attached, no crash. Places were not yet recorded by the 0.4.317 that quit, so positions come back from
 the next quit on. Everything committed; nothing pushed. Current task note:

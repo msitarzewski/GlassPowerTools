@@ -701,3 +701,11 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   the server, and Active titled the row with it. A workgroup with one terminal and the server's name is now titled by
   `TerminalWorkgroupOpening.label(_:on: .active)`; a named workgroup, or several terminals, keeps its name. Test fails
   without it. 0.4.321 installed on the iPhone and Vision Pro (relaunched); Mac stays on 0.4.320 for now.
+- **54a66d5 — Active empty at launch on the headset.** Owner: "the Active didn't auto populate... I had to refresh it"
+  (Vision Pro, relaunched with Active showing). A capability's saved machines come from the catalog, readable only
+  after the library loads (`catalogDidLoad`); Active asked first, got nothing, and deb5d2f's 5-minute throttle then
+  kept the library's own ask from running. `refreshRunningSessions` now asks nothing before `isLoaded`. Test
+  reproduces the empty answer and fails without the fix. 0.4.322 on iPhone and Vision Pro.
+- **W15 started** (agent, worktree): tab groups restored on relaunch on Vision Pro and iPad (app-owned records, W12's
+  pattern, W13's open-together path), and tabs moved between windows on Vision Pro — the owner: "maybe we do that with
+  grid view? drag and drop" — drag a grid card onto another window; Move to New Window / Move to ▸ as fallback.
