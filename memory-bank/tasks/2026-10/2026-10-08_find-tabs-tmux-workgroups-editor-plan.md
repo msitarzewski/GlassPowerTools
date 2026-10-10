@@ -696,3 +696,8 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
 - Suites: terminal 654 tests in 52 suites, shell 232 in 46, all passed. Building 0.4.320.
 - **Installed 0.4.320 on the Mac** (13:10): `Reopen: quitting with 4 windows listed`, then 4 reopened once; 15 of 15
   sessions attached; no crash report or exception. The iPhone refused it while locked (CoreDevice 4016).
+- **a28dc68 — Active's name for a terminal on the headset.** Owner, on the Vision Pro (0.4.320): Active's row said
+  "Terminal on <host>" while the window had the terminal's name. Connect on iOS/visionOS makes a workgroup named after
+  the server, and Active titled the row with it. A workgroup with one terminal and the server's name is now titled by
+  `TerminalWorkgroupOpening.label(_:on: .active)`; a named workgroup, or several terminals, keeps its name. Test fails
+  without it. 0.4.321 installed on the iPhone and Vision Pro (relaunched); Mac stays on 0.4.320 for now.
