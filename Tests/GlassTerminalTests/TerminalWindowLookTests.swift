@@ -1,5 +1,7 @@
 import Foundation
+import SwiftUI
 import Testing
+import GlassConnectionUI
 import GlassShell
 import GlassLayers
 @testable import GlassTerminal
@@ -288,15 +290,29 @@ struct TerminalWindowLookTests {
     }
 }
 
-/// A Vision Pro terminal's canvas corner fits the square rows inside it (owner, on the headset,
-/// 2026-10-10: "the mismatched radii bothers me", then of 14/36-point corners round a square tmux
-/// status line, "it should be smaller to fit in the corner").
+/// A Vision Pro terminal's three shapes nest from Apple's corner in, at even insets (owner,
+/// 2026-10-10: "the radius of the window itself, our output area, and the terminal itself";
+/// "Larger outside, smaller inside").
 @Suite("A Vision Pro terminal's corners")
 @MainActor
 struct VisionTerminalCornerTests {
-    @Test func theCanvasCornerFitsTheRowsInsideIt() {
-        #expect(TerminalWindowView.visionCanvasCornerRadius == TerminalWindowView.visionRowsInset,
-                "concentric with the square rows, their inset in")
-        #expect(TerminalWindowView.visionCanvasCornerRadius == 10)
+    @Test func theCanvasNestsInTheWindowAndTheRowsInTheCanvas() {
+        let window = GlassWindowShape.spatialWindowCornerRadius
+        let canvas = TerminalWindowView.visionCanvasCornerRadius
+        #expect(canvas == window - TerminalWindowView.visionCanvasEdgeInset, "concentric with Apple's corner")
+        #expect(canvas < window && canvas > 0, "larger outside, smaller inside")
+        #expect(TerminalWindowView.visionRowsInset == canvas, "square rows nest in the canvas corner")
+    }
+
+    @Test func theCanvasSitsTheSameDistanceFromEveryEdgeWhateverTheOrnaments() {
+        for (title, controls) in [(true, true), (false, true), (false, false)] {
+            let padding = TerminalWindowView.visionCanvasPadding(showsTitle: title, showsControls: controls)
+            let side = title || controls ? GlassWindowShape.spatialCanvasInset : 0
+            let edge = TerminalWindowView.visionCanvasEdgeInset
+            #expect(padding.top + (title ? GlassWindowShape.spatialTitleInset : 0) == edge, "top, title \(title)")
+            #expect(padding.bottom + (controls ? GlassWindowShape.spatialControlsInset : 0) == edge, "bottom, controls \(controls)")
+            #expect(padding.leading + side == edge && padding.trailing + side == edge, "sides")
+            #expect(padding.top >= 0 && padding.bottom >= 0 && padding.leading >= 0, "never negative")
+        }
     }
 }

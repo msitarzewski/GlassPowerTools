@@ -315,25 +315,27 @@ struct TerminalWindowView: View {
         // state. The canvas keeps its own theme painting; a window whose look sets a blur adds its
         // own backdrop on top (W20), otherwise the shared window backdrop is the only frost.
         GlassLayeredWindow(
-            showTitle: isTerminalActive && showsConnectionOrnament,
+            showTitle: visionShowsTitle,
             showControls: isTerminalActive,
             paintsTheme: false
         ) {
-            VStack(spacing: 0) {
-                terminalContent
-                    .padding(Self.visionCanvasInset)
-            }
-            .modifier(GlassWindowBackground(
-                interactive: effectiveInteractiveGlass,
-                material: resolvedMaterial,
-                blurAmount: windowLookBlur,
-                appearance: windowTheme.resolvedAppearance
-            ))
+            terminalContent
+                .padding(Self.visionCanvasPadding(showsTitle: visionShowsTitle, showsControls: isTerminalActive))
         } title: {
             connectionLabel
         } controls: {
             bottomStatusBar
         }
+        // Three shapes nest from Apple's corner in (owner, 2026-10-10): the window's frost, when it
+        // has one, is the whole window in the window's own corner; the canvas sits an even
+        // `visionCanvasEdgeInset` inside it; the rows an even `visionRowsInset` inside that.
+        .modifier(GlassWindowBackground(
+            interactive: effectiveInteractiveGlass,
+            material: resolvedMaterial,
+            blurAmount: windowLookBlur,
+            appearance: windowTheme.resolvedAppearance,
+            cornerRadius: GlassWindowShape.spatialWindowCornerRadius
+        ))
         #elseif os(macOS)
         terminalContent
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -744,7 +746,7 @@ struct TerminalWindowView: View {
             )
             .background(Color.clear)
             .overlay(Color.white.opacity(showVisualBell ? 0.3 : 0).allowsHitTesting(false))
-            .padding(.horizontal, terminalCanvasPadding * 2)
+            .padding(.horizontal, terminalCanvasHorizontalPadding)
             .padding(.vertical, terminalCanvasPadding)
         }
         .clipShape(RoundedRectangle(cornerRadius: terminalCanvasCornerRadius, style: .continuous))
@@ -960,20 +962,48 @@ struct TerminalWindowView: View {
         #endif
     }
 
-    /// On Vision Pro, how far the terminal canvas sits inside the window's paint.
-    static let visionCanvasInset: CGFloat = 10
-
-    /// On Vision Pro, how far the terminal's rows sit inside its canvas, top and bottom.
-    static let visionRowsInset: CGFloat = 10
-
-    /// A Vision Pro terminal's canvas corner, concentric with the square rows inside it: their
-    /// inset, so a full-width row such as tmux's status line sits snugly in the corner. The owner,
-    /// on the headset (2026-10-10): the corner "should be smaller to fit in the corner" — made
-    /// concentric with the window instead (9b9fc26), it was 14 or 36 points around a square
-    /// status line 10 points in, and the window's own edge is not drawn to be concentric with.
-    static var visionCanvasCornerRadius: CGFloat {
-        GlassWindowShape.concentricCornerRadius(outer: visionRowsInset, inset: 0)
+    /// The rows' inset at the sides: on Vision Pro the same as at top and bottom, so square rows
+    /// nest evenly in the canvas corner; elsewhere twice it, as before.
+    private var terminalCanvasHorizontalPadding: CGFloat {
+        #if os(visionOS)
+        Self.visionRowsInset
+        #else
+        terminalCanvasPadding * 2
+        #endif
     }
+
+    /// **A Vision Pro terminal's three shapes, nested from Apple's corner in** (owner, 2026-10-10,
+    /// with an annotated capture: "the radius of the window itself, our output area, and the
+    /// terminal itself"; "Larger outside, smaller inside"). The window's corner is Apple's
+    /// (`GlassWindowShape.spatialWindowCornerRadius`); the canvas sits `visionCanvasEdgeInset`
+    /// inside the window's edge on every side, whether or not the ornaments show, so it never
+    /// moves as the window gains or loses focus; its corner is concentric with the window's; and
+    /// the rows sit `visionRowsInset` inside it on every side, square, concentric with that.
+    static let visionCanvasEdgeInset: CGFloat = 34
+
+    /// How far the rows sit inside the canvas, on every side: the canvas corner, so square rows
+    /// such as tmux's status line sit snugly in it without clipping.
+    static var visionRowsInset: CGFloat { visionCanvasCornerRadius }
+
+    /// The canvas corner: the window's corner less the canvas's inset (46 − 34 = 12).
+    static var visionCanvasCornerRadius: CGFloat {
+        GlassWindowShape.concentricCornerRadius(outer: GlassWindowShape.spatialWindowCornerRadius,
+                                                inset: visionCanvasEdgeInset)
+    }
+
+    /// The padding inside `GlassNativeWindowFrame` that puts the canvas `visionCanvasEdgeInset`
+    /// from the window's edge: the frame insets for the ornaments it shows, this makes up the rest.
+    static func visionCanvasPadding(showsTitle: Bool, showsControls: Bool) -> EdgeInsets {
+        let side = showsTitle || showsControls ? GlassWindowShape.spatialCanvasInset : 0
+        return EdgeInsets(
+            top: visionCanvasEdgeInset - (showsTitle ? GlassWindowShape.spatialTitleInset : 0),
+            leading: visionCanvasEdgeInset - side,
+            bottom: visionCanvasEdgeInset - (showsControls ? GlassWindowShape.spatialControlsInset : 0),
+            trailing: visionCanvasEdgeInset - side)
+    }
+
+    /// Whether a Vision Pro terminal shows its connection title ornament.
+    private var visionShowsTitle: Bool { isTerminalActive && showsConnectionOrnament }
 
     private var terminalCanvasCornerRadius: CGFloat {
         #if os(macOS)
@@ -983,7 +1013,7 @@ struct TerminalWindowView: View {
         #elseif os(iOS)
         UIDevice.current.userInterfaceIdiom == .phone ? 0 : 18
         #else
-        // Concentric with the rows inside it, which are square and `visionRowsInset` in.
+        // Concentric with the window's corner around it, and with the square rows inside it.
         Self.visionCanvasCornerRadius
         #endif
     }
@@ -2270,6 +2300,7 @@ struct GlassWindowBackground: ViewModifier {
     let material: Material
     let blurAmount: Double
     let appearance: TerminalThemeAppearance
+    var cornerRadius: CGFloat = 24
 
     func body(content: Content) -> some View {
         content.background {
@@ -2289,7 +2320,8 @@ struct GlassWindowBackground: ViewModifier {
             material: material,
             blurAmount: blurAmount,
             interactive: interactive,
-            colorScheme: canvasColorScheme
+            colorScheme: canvasColorScheme,
+            cornerRadius: cornerRadius
         )
     }
 

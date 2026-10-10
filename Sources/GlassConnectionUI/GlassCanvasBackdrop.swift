@@ -7,17 +7,22 @@ public struct GlassCanvasBackdrop: View {
     private let blurAmount: Double
     private let interactive: Bool
     private let colorScheme: ColorScheme?
+    private let cornerRadius: CGFloat
 
+    /// - Parameter cornerRadius: the canvas card's 24 by default; a Vision Pro terminal's frost is
+    ///   the whole window, in the window's own corner.
     public init(
         material: Material = .ultraThinMaterial,
         blurAmount: Double,
         interactive: Bool = false,
-        colorScheme: ColorScheme? = nil
+        colorScheme: ColorScheme? = nil,
+        cornerRadius: CGFloat = 24
     ) {
         self.material = material
         self.blurAmount = blurAmount.isFinite ? min(1, max(0, blurAmount)) : 0
         self.interactive = interactive
         self.colorScheme = colorScheme
+        self.cornerRadius = cornerRadius
     }
 
     public var body: some View {
@@ -32,14 +37,14 @@ public struct GlassCanvasBackdrop: View {
 
     private var materialLayers: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .fill(material)
 
             #if os(visionOS)
             if interactive {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(.clear)
-                    .glassBackgroundEffect(in: .rect(cornerRadius: 24))
+                    .glassBackgroundEffect(in: .rect(cornerRadius: cornerRadius))
             }
             #endif
         }

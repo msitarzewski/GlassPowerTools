@@ -35,8 +35,8 @@ public struct GlassNativeWindowFrame<Content: View, Title: View, Controls: View>
             // The side inset is the one a canvas card's corner is concentric with
             // (`GlassWindowShape.spatialCanvasCornerRadius`).
             .padding(.horizontal, showTitle || showControls ? GlassWindowShape.spatialCanvasInset : 0)
-            .padding(.top, showTitle ? 34 : 0)
-            .padding(.bottom, showControls ? 26 : 0)
+            .padding(.top, showTitle ? GlassWindowShape.spatialTitleInset : 0)
+            .padding(.bottom, showControls ? GlassWindowShape.spatialControlsInset : 0)
             // Visibility changes must not replace the live canvas host.
             .ornament(
                 visibility: showTitle ? .visible : .hidden,

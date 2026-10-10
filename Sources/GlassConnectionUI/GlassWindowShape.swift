@@ -30,6 +30,12 @@ public enum GlassWindowShape {
     /// title and control ornaments.
     public static let spatialCanvasInset: CGFloat = 22
 
+    /// How far `GlassNativeWindowFrame` insets content at the top, clear of the title ornament.
+    public static let spatialTitleInset: CGFloat = 34
+
+    /// How far `GlassNativeWindowFrame` insets content at the bottom, clear of the controls ornament.
+    public static let spatialControlsInset: CGFloat = 26
+
     /// A canvas inside that inset, concentric with the window: 46 − 22 = 24, the corner the
     /// family's canvas card already has (`GlassCanvasBackdrop`, the desktop's session card).
     public static var spatialCanvasCornerRadius: CGFloat {
