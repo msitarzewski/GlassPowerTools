@@ -981,14 +981,17 @@ struct TerminalWindowView: View {
     /// the rows sit `visionRowsInset` inside it on every side, square, concentric with that.
     static let visionCanvasEdgeInset: CGFloat = 34
 
-    /// How far the rows sit inside the canvas, on every side: the canvas corner, so square rows
-    /// such as tmux's status line sit snugly in it without clipping.
-    static var visionRowsInset: CGFloat { visionCanvasCornerRadius }
+    /// How far the rows sit inside the canvas, on every side. The rows are square: the terminal
+    /// view itself has no corner on Vision Pro (owner, 2026-10-10: "remove that radius all
+    /// together").
+    static let visionRowsInset: CGFloat = 12
 
-    /// The canvas corner: the window's corner less the canvas's inset (46 − 34 = 12).
+    /// The canvas corner: continuous, like Apple's window corner, and begun where Apple's begins
+    /// along each edge so the gap round it reads even (46 − 34 / 1.528 ≈ 24). The circular rule
+    /// gave 12, which the owner found "too small and still uneven".
     static var visionCanvasCornerRadius: CGFloat {
-        GlassWindowShape.concentricCornerRadius(outer: GlassWindowShape.spatialWindowCornerRadius,
-                                                inset: visionCanvasEdgeInset)
+        GlassWindowShape.continuousConcentricCornerRadius(outer: GlassWindowShape.spatialWindowCornerRadius,
+                                                          inset: visionCanvasEdgeInset)
     }
 
     /// The padding inside `GlassNativeWindowFrame` that puts the canvas `visionCanvasEdgeInset`

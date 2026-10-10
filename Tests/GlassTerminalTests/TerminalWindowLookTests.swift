@@ -299,9 +299,12 @@ struct VisionTerminalCornerTests {
     @Test func theCanvasNestsInTheWindowAndTheRowsInTheCanvas() {
         let window = GlassWindowShape.spatialWindowCornerRadius
         let canvas = TerminalWindowView.visionCanvasCornerRadius
-        #expect(canvas == window - TerminalWindowView.visionCanvasEdgeInset, "concentric with Apple's corner")
+        #expect(canvas == window - TerminalWindowView.visionCanvasEdgeInset / GlassWindowShape.continuousCornerExtent,
+                "begun where Apple's continuous corner begins, so the gap reads even")
+        #expect(canvas > window - TerminalWindowView.visionCanvasEdgeInset,
+                "larger than the circular rule's 12, which read too small and uneven")
         #expect(canvas < window && canvas > 0, "larger outside, smaller inside")
-        #expect(TerminalWindowView.visionRowsInset == canvas, "square rows nest in the canvas corner")
+        #expect(TerminalWindowView.visionRowsInset == 12)
     }
 
     @Test func theCanvasSitsTheSameDistanceFromEveryEdgeWhateverTheOrnaments() {

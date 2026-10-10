@@ -147,3 +147,13 @@ struct GlassConcentricCornerTests {
         #expect(GlassWindowShape.concentricCornerRadius(outer: 8, inset: 10) == 0, "never below square")
     }
 }
+
+@Suite("Continuous concentric corners")
+struct GlassContinuousConcentricCornerTests {
+    @Test func theInnerCurveBeginsWhereTheOuterBegins() {
+        let r = GlassWindowShape.continuousConcentricCornerRadius(outer: 46, inset: 34)
+        #expect(abs(r * GlassWindowShape.continuousCornerExtent + 34 - 46 * GlassWindowShape.continuousCornerExtent) < 0.001,
+                "both curves meet the straight edge at the same place")
+        #expect(GlassWindowShape.continuousConcentricCornerRadius(outer: 10, inset: 100) == 0, "never below square")
+    }
+}

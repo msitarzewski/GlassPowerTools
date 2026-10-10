@@ -62,4 +62,18 @@ public enum GlassWindowShape {
     public static func concentricCornerRadius(outer: CGFloat, inset: CGFloat) -> CGFloat {
         max(0, outer - inset)
     }
+
+    /// How far along each edge a continuous ("squircle") corner of radius 1 blends into the
+    /// straight side: Apple's continuous corners reach about 1.528 times their radius.
+    public static let continuousCornerExtent: CGFloat = 1.528
+
+    /// The corner of a continuous-cornered shape drawn `inset` points inside one with `outer`
+    /// continuous corners, so both curves begin at the same place along each edge and the gap
+    /// reads even. The circular rule (`concentricCornerRadius`) left the diagonal gap visibly wider
+    /// than the sides round Apple's window corner: measured in the visionOS simulator, 64 pixels
+    /// along the diagonal against 46 at the side (2026-10-10; the owner: "it feels too small and
+    /// still uneven").
+    public static func continuousConcentricCornerRadius(outer: CGFloat, inset: CGFloat) -> CGFloat {
+        max(0, outer - inset / continuousCornerExtent)
+    }
 }

@@ -1958,11 +1958,7 @@ private final class SwiftTermEngine: TerminalEngine {
         terminalView.isOpaque = false
         terminalView.backgroundColor = .clear
         terminalView.clearsContextBeforeDrawing = false
-        #if os(iOS)
-        terminalView.layer.cornerRadius = UIDevice.current.userInterfaceIdiom == .phone ? 0 : 18
-        #else
-        terminalView.layer.cornerRadius = 18
-        #endif
+        terminalView.layer.cornerRadius = SwiftTermHostView.terminalViewCornerRadius
         terminalView.layer.masksToBounds = true
         terminalView.isAccessibilityElement = true
         terminalView.accessibilityLabel = "Terminal"
@@ -2334,6 +2330,17 @@ private final class TerminalRendererHostView: UIView {
 }
 
 public struct SwiftTermHostView: UIViewRepresentable {
+    /// The terminal view's own corner: none on iPhone, and none on Vision Pro, where its rows sit
+    /// square inside the canvas's corner (owner, 2026-10-10: "the inner radius on the terminal
+    /// itself... remove that radius all together"); iPad keeps its 18.
+    static var terminalViewCornerRadius: CGFloat {
+        #if os(visionOS)
+        0
+        #else
+        UIDevice.current.userInterfaceIdiom == .phone ? 0 : 18
+        #endif
+    }
+
     @ObservedObject var model: SwiftTermHostModel
     let theme: SwiftTermTheme
     let runtimeSettings: SwiftTermRuntimeSettings
@@ -2452,11 +2459,7 @@ public struct SwiftTermHostView: UIViewRepresentable {
             onTitleChanged: onTitleChanged,
             onBell: onBell
         )
-        #if os(iOS)
-        let cornerRadius: CGFloat = UIDevice.current.userInterfaceIdiom == .phone ? 0 : 18
-        #else
-        let cornerRadius: CGFloat = 18
-        #endif
+        let cornerRadius = SwiftTermHostView.terminalViewCornerRadius
         if uiView.layer.cornerRadius != cornerRadius {
             uiView.layer.cornerRadius = cornerRadius
         }
