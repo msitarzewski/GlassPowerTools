@@ -1201,7 +1201,7 @@ struct ThemeEditorView: View {
                 .opacity(settingsManager.windowOpacity)
             if let tint = TerminalGlassTint.color(for: settingsManager.glassTint) {
                 Rectangle()
-                    .fill(tint.opacity(0.12 * settingsManager.windowOpacity))
+                    .fill(tint.opacity(TerminalCanvasTint.strength(canvasOpacity: settingsManager.windowOpacity)))
             }
         }
         .modifier(GlassWindowBackground(

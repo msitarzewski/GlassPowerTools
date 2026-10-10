@@ -18,6 +18,9 @@ struct WorkgroupEditorContext: Identifiable {
     var openingView: LayoutPreset.OpeningView = .tabs
     var autoFocusOnActivity = false
     var gridCardWidth: Double? = nil
+    /// The look the workgroup's window opens with (W20): a captured window's, or the one being
+    /// edited's, kept as it is.
+    var look: TerminalSessionOverride? = nil
 
     static func new(
         name: String = "Workgroup",
@@ -41,7 +44,8 @@ struct WorkgroupEditorContext: Identifiable {
             workspaceLayout: preset.workspaceLayout,
             openingView: preset.openingView,
             autoFocusOnActivity: preset.autoFocusOnActivity,
-            gridCardWidth: preset.gridCardWidth
+            gridCardWidth: preset.gridCardWidth,
+            look: preset.look
         )
     }
 
@@ -60,8 +64,17 @@ struct WorkgroupEditorContext: Identifiable {
             workspaceLayout: preset.workspaceLayout,
             openingView: preset.openingView,
             autoFocusOnActivity: preset.autoFocusOnActivity,
-            gridCardWidth: preset.gridCardWidth
+            gridCardWidth: preset.gridCardWidth,
+            look: preset.look
         )
+    }
+
+    /// The look the saved workgroup keeps (W20). A window saved as a workgroup takes the window's
+    /// look, none included, and so does a copy or an edit of a workgroup keep its own; one made by
+    /// hand keeps the look of the workgroup it replaces, as it keeps how that one opens.
+    func lookToSave(replacing replaced: LayoutPreset?) -> TerminalSessionOverride? {
+        if workspaceLayout != nil || original != nil { return look }
+        return look ?? replaced?.look
     }
 }
 
@@ -614,6 +627,7 @@ struct WorkgroupEditorView: View {
         preset.autoFocusOnActivity = replaced?.autoFocusOnActivity ?? autoFocusOnActivity
         #endif
         preset.gridCardWidth = context.gridCardWidth ?? replaced?.gridCardWidth
+        preset.look = context.lookToSave(replacing: replaced)
         onSave(preset)
         dismiss()
     }

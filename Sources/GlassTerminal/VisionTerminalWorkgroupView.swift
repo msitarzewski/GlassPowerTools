@@ -62,28 +62,16 @@ private struct VisionTerminalPreview: View {
     let session: TerminalSession
     @Environment(SettingsManager.self) private var settings
     @Environment(\.scenePhase) private var scenePhase
+    /// The window's look (W20): a card looks like the terminal it shows.
+    @Environment(\.terminalWorkgroupLook) private var workgroupLook
     @State private var image: UIImage?
 
-    private var previewMaterial: Material {
-        switch settings.sessionOverride(for: session.id)?.glassFrost ?? settings.glassFrost {
-        case "thin": .thinMaterial
-        case "regular": .regularMaterial
-        case "thick": .thickMaterial
-        default: .ultraThinMaterial
-        }
-    }
-
     var body: some View {
-        let override = settings.sessionOverride(for: session.id)
-        let appearance = TerminalGlassAppearance.resolved(
-            globalOpacity: settings.windowOpacity,
-            globalBlur: settings.blurBackground,
-            sessionOverride: override
-        )
+        let look = TerminalLook.resolved(workgroupLook?.look, settings: settings)
         ZStack {
-            settings.currentTheme.canvasBackgroundColor.color.opacity(appearance.opacity)
-            if let tint = TerminalGlassTint.color(for: override?.glassTint ?? settings.glassTint) {
-                tint.opacity(0.12 * appearance.opacity)
+            settings.currentTheme.canvasBackgroundColor.color.opacity(look.opacity)
+            if let tint = look.tintColor {
+                tint.opacity(TerminalCanvasTint.strength(canvasOpacity: look.opacity))
             }
             if let image {
                 Image(uiImage: image).resizable().scaledToFit()
@@ -92,8 +80,8 @@ private struct VisionTerminalPreview: View {
             }
         }
         .modifier(GlassWindowBackground(
-            interactive: false, material: previewMaterial,
-            blurAmount: appearance.blur, appearance: settings.currentTheme.resolvedAppearance
+            interactive: false, material: look.material,
+            blurAmount: look.blur, appearance: settings.currentTheme.resolvedAppearance
         ))
         .clipShape(.rect(cornerRadius: 12))
         .allowsHitTesting(false)
@@ -212,6 +200,10 @@ struct VisionTerminalWorkgroupView: View {
                 showingSavedHostPicker = true
             }
         )
+        // W20: this window's look, for every terminal, card and sheet in it. A terminal moved in
+        // takes it, since it is drawn here now.
+        .environment(\.terminalWorkgroupLook, TerminalWorkgroupLook(
+            workgroupID: workgroupID, look: sessionManager.workgroup(for: workgroupID)?.look))
     }
 
     private var liveSelectedSessionID: UUID? {

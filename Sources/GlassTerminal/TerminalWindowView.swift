@@ -104,9 +104,14 @@ struct TerminalWindowView: View {
     #if !os(macOS)
     /// W15: a tab dragged onto this terminal moves into its window.
     @Environment(\.terminalTabDrop) private var terminalTabDrop
+    /// W20: the workgroup this terminal is drawn in, whose look it shows.
+    @Environment(\.terminalWorkgroupLook) private var workgroupLook
+    #else
+    /// W20: the Mac terminal window this pane is in, whose look it shows.
+    @Environment(MacWorkspaceWindowController.self) private var macWindow: MacWorkspaceWindowController?
     #endif
     @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiateWithoutColor
-    
+
     @State private var find = TerminalFindController()
     @State private var showingTerminalSettings = false
     #if os(iOS)
@@ -120,7 +125,6 @@ struct TerminalWindowView: View {
     @State private var aiAssistantDirectory: String?
     @State private var showingErrorCard = false
     @State private var aiAssistant = AIAssistant()
-    @State private var terminalSettingsTab: TerminalSettingsModalTab = .terminal
     @ObservedObject private var terminalHostModel: SwiftTermHostModel
     @State private var errorCheckTask: Task<Void, Never>?
     @State private var terminalAudioManager = TerminalAudioManager()
@@ -306,8 +310,8 @@ struct TerminalWindowView: View {
     private var terminalSurface: some View {
         #if os(visionOS)
         // Stage 2 layering proof: the window chrome and its backdrop come from the one layering
-        // state. The canvas keeps its own theme painting; a per-session override adds its own
-        // backdrop on top, otherwise the shared window backdrop is the only frost.
+        // state. The canvas keeps its own theme painting; a window whose look sets a blur adds its
+        // own backdrop on top (W20), otherwise the shared window backdrop is the only frost.
         GlassLayeredWindow(
             showTitle: isTerminalActive && showsConnectionOrnament,
             showControls: isTerminalActive,
@@ -320,7 +324,7 @@ struct TerminalWindowView: View {
             .modifier(GlassWindowBackground(
                 interactive: effectiveInteractiveGlass,
                 material: resolvedMaterial,
-                blurAmount: sessionOverrideBlur,
+                blurAmount: windowLookBlur,
                 appearance: settingsManager.currentTheme.resolvedAppearance
             ))
         } title: {
@@ -668,7 +672,7 @@ struct TerminalWindowView: View {
             terminalDisplayBackground
             if let tintColor = tintColor {
                 Rectangle()
-                    .fill(tintColor.opacity(0.12 * effectiveWindowOpacity))
+                    .fill(tintColor.opacity(TerminalCanvasTint.strength(canvasOpacity: effectiveWindowOpacity)))
                     .allowsHitTesting(false)
             }
             #else
@@ -677,7 +681,7 @@ struct TerminalWindowView: View {
             terminalDisplayBackground
             if let tintColor = tintColor {
                 Rectangle()
-                    .fill(tintColor.opacity(0.12 * effectiveWindowOpacity))
+                    .fill(tintColor.opacity(TerminalCanvasTint.strength(canvasOpacity: effectiveWindowOpacity)))
                     .allowsHitTesting(false)
             }
             #endif
@@ -1010,52 +1014,50 @@ struct TerminalWindowView: View {
             .opacity(effectiveWindowOpacity)
     }
 
-    private var tintColor: Color? {
-        TerminalGlassTint.color(for: effectiveGlassTint)
+    // MARK: - The window's look (W20)
+
+    /// The look of the window this terminal is in: a Mac terminal window's, or its workgroup's on
+    /// Vision Pro, iPad and iPhone. Nil when the window has none, and for a terminal in no window.
+    private var windowLook: TerminalSessionOverride? {
+        #if os(macOS)
+        macWindow?.look
+        #else
+        workgroupLook?.look
+        #endif
     }
 
-    private var effectiveGlassFrost: String {
-        settingsManager.sessionOverride(for: session.id)?.glassFrost ?? settingsManager.glassFrost
+    /// Settings ▸ Overrides edits the window's look, read live from whatever holds it; nil when
+    /// this terminal is in no window that keeps one, and Overrides is then not offered.
+    private var windowLookBinding: Binding<TerminalSessionOverride?>? {
+        #if os(macOS)
+        guard let macWindow else { return nil }
+        return Binding(get: { macWindow.look }, set: { macWindow.setLook($0) })
+        #else
+        guard let workgroupID = workgroupLook?.workgroupID else { return nil }
+        let manager = sessionManager
+        return Binding(get: { manager.workgroup(for: workgroupID)?.look },
+                       set: { manager.setLook($0, forWorkgroup: workgroupID) })
+        #endif
     }
 
-    private var effectiveGlassAppearance: TerminalGlassAppearance {
-        TerminalGlassAppearance.resolved(
-            globalOpacity: settingsManager.windowOpacity,
-            globalBlur: settingsManager.blurBackground,
-            sessionOverride: settingsManager.sessionOverride(for: session.id)
-        )
+    /// What this terminal is drawn with: the window's look over the terminal settings.
+    private var look: TerminalLook {
+        TerminalLook.resolved(windowLook, settings: settingsManager)
     }
 
-    private var effectiveWindowOpacity: Double {
-        effectiveGlassAppearance.opacity
-    }
+    private var tintColor: Color? { look.tintColor }
 
-    private var effectiveBlurBackground: Double {
-        effectiveGlassAppearance.blur
-    }
+    private var effectiveWindowOpacity: Double { look.opacity }
+
+    private var effectiveBlurBackground: Double { look.blur }
 
     /// Blur painted by the canvas itself. On visionOS the shared window backdrop already frosts
-    /// at the global level, so the canvas only adds frost when this session overrides it.
-    private var sessionOverrideBlur: Double {
-        settingsManager.sessionOverride(for: session.id)?.blurBackground ?? 0
-    }
+    /// at the global level, so the canvas only adds frost when the window's look sets one.
+    private var windowLookBlur: Double { look.windowBlur ?? 0 }
 
-    private var effectiveInteractiveGlass: Bool {
-        settingsManager.sessionOverride(for: session.id)?.interactiveGlass ?? settingsManager.interactiveGlass
-    }
+    private var effectiveInteractiveGlass: Bool { look.interactiveGlass }
 
-    private var effectiveGlassTint: String {
-        settingsManager.sessionOverride(for: session.id)?.glassTint ?? settingsManager.glassTint
-    }
-
-    private var resolvedMaterial: Material {
-        switch effectiveGlassFrost {
-        case "thin": return .thinMaterial
-        case "regular": return .regularMaterial
-        case "thick": return .thickMaterial
-        default: return .ultraThinMaterial
-        }
-    }
+    private var resolvedMaterial: Material { look.material }
 
     private func duplicateSession() {
         Task {
@@ -1109,9 +1111,11 @@ struct TerminalWindowView: View {
 
     private func presentDuplicatedTerminal(_ duplicatedSession: TerminalSession) {
         #if os(visionOS)
+        // A new window with this one's look (W20), as Move Tab to New Window keeps it.
         let workgroupID = sessionManager.createWorkgroup(
             name: duplicatedSession.server.name,
-            colorTag: duplicatedSession.server.colorTag
+            colorTag: duplicatedSession.server.colorTag,
+            look: windowLook
         )
         guard sessionManager.appendSession(duplicatedSession, toWorkgroup: workgroupID) else {
             sessionManager.discardWorkgroupIfEmpty(workgroupID)
@@ -1129,7 +1133,8 @@ struct TerminalWindowView: View {
         let existingWorkgroupID = iOSRouter.terminalWorkgroupID
         let workgroupID = existingWorkgroupID ?? sessionManager.createWorkgroup(
             name: duplicatedSession.server.name,
-            colorTag: duplicatedSession.server.colorTag
+            colorTag: duplicatedSession.server.colorTag,
+            look: windowLook
         )
         guard sessionManager.appendSession(duplicatedSession, toWorkgroup: workgroupID) else {
             if existingWorkgroupID == nil {
@@ -1146,13 +1151,13 @@ struct TerminalWindowView: View {
         }
         iOSRouter.showTerminal(workgroupID: workgroupID)
         #else
-        openWindow(
-            id: "workspace",
-            value: MacLiveSessionWorkspaceRouter.launchRequest(
-                for: duplicatedSession,
-                sessionManager: sessionManager
-            )
+        var request = MacLiveSessionWorkspaceRouter.launchRequest(
+            for: duplicatedSession,
+            sessionManager: sessionManager
         )
+        // A new window with this one's look (W20), as Move Tab to New Window keeps it.
+        request.look = windowLook
+        openWindow(id: "workspace", value: request)
         #endif
     }
 
@@ -1255,7 +1260,6 @@ struct TerminalWindowView: View {
     }
 
     private func openTerminalSettings() {
-        terminalSettingsTab = .terminal
         showingTerminalSettings = true
     }
 
@@ -1697,6 +1701,33 @@ struct TerminalWindowView: View {
     }
 
     private var terminalSettingsModal: some View {
+        TerminalSettingsSheet(session: session, windowLook: windowLookBinding) {
+            showingTerminalSettings = false
+        }
+    }
+}
+
+/// **Terminal Settings**, from a terminal's tools menu ▸ Settings: the terminal settings, the
+/// window's look (**Overrides**, W20) and, for an SSH session, its port forwards. A Mac's local
+/// pane opens the same sheet without Port Forwarding (W20); the app's Settings stay on ⌘,.
+struct TerminalSettingsSheet: View {
+    /// The SSH session it was opened from; nil for a Mac's local shell, which has no forwards.
+    let session: TerminalSession?
+    /// The window's look, when the terminal is in a window that keeps one.
+    let windowLook: Binding<TerminalSessionOverride?>?
+    let done: () -> Void
+
+    @Environment(SettingsManager.self) private var settingsManager
+    /// Each opening starts on Terminal.
+    @State private var tab: TerminalSettingsModalTab = .terminal
+
+    init(session: TerminalSession?, windowLook: Binding<TerminalSessionOverride?>?, done: @escaping () -> Void) {
+        self.session = session
+        self.windowLook = windowLook
+        self.done = done
+    }
+
+    var body: some View {
         NavigationStack {
             Group {
             #if os(iOS)
@@ -1706,22 +1737,24 @@ struct TerminalWindowView: View {
                         .environment(settingsManager)
                         .navigationTitle("Terminal")
                 }
-                if UIDevice.current.userInterfaceIdiom == .pad {
-                    NavigationLink("Session Appearance") {
-                        TerminalOverridesSettingsView(session: session)
+                if UIDevice.current.userInterfaceIdiom == .pad, let windowLook {
+                    NavigationLink("Window Appearance") {
+                        TerminalOverridesSettingsView(look: windowLook)
                             .environment(settingsManager)
-                            .navigationTitle("Session Appearance")
+                            .navigationTitle("Window Appearance")
                     }
                 }
-                NavigationLink("Port Forwarding") {
-                    TerminalPortForwardingSettingsView(session: session)
-                        .navigationTitle("Port Forwarding")
+                if let session {
+                    NavigationLink("Port Forwarding") {
+                        TerminalPortForwardingSettingsView(session: session)
+                            .navigationTitle("Port Forwarding")
+                    }
                 }
             }
             #else
             GlassSettingsSections(
-                selection: $terminalSettingsTab,
-                options: TerminalSettingsModalTab.allCases,
+                selection: $tab,
+                options: TerminalSettingsModalTab.offered(hasSession: session != nil, hasWindowLook: windowLook != nil),
                 title: { $0.title },
                 pickerIdentifier: "terminal-settings-section-picker"
             ) { tab in
@@ -1731,10 +1764,14 @@ struct TerminalWindowView: View {
                         TerminalSettingsView()
                             .environment(settingsManager)
                     case .overrides:
-                        TerminalOverridesSettingsView(session: session)
-                            .environment(settingsManager)
+                        if let windowLook {
+                            TerminalOverridesSettingsView(look: windowLook)
+                                .environment(settingsManager)
+                        }
                     case .portForwarding:
-                        TerminalPortForwardingSettingsView(session: session)
+                        if let session {
+                            TerminalPortForwardingSettingsView(session: session)
+                        }
                     }
                 }
             }
@@ -1746,9 +1783,7 @@ struct TerminalWindowView: View {
             #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") {
-                        showingTerminalSettings = false
-                    }
+                    Button("Done", action: done)
                 }
             }
         }
@@ -1840,36 +1875,52 @@ enum TerminalSettingsModalTab: String, CaseIterable, Hashable {
         case .portForwarding: "Port Forwarding"
         }
     }
+
+    /// The sections a terminal's Settings shows (W20): Overrides when its window keeps a look,
+    /// Port Forwarding for an SSH session — never for a Mac's local shell.
+    static func offered(hasSession: Bool, hasWindowLook: Bool) -> [Self] {
+        allCases.filter { tab in
+            switch tab {
+            case .terminal: true
+            case .overrides: hasWindowLook
+            case .portForwarding: hasSession
+            }
+        }
+    }
 }
 
+/// **Overrides**: the window's look (W20). Each control shows the window's value, or the terminal
+/// setting it follows, and setting one sets it for every tab in the window. **Reset Overrides**
+/// returns the window to the settings.
 struct TerminalOverridesSettingsView: View {
-    @Bindable var session: TerminalSession
+    @Binding var look: TerminalSessionOverride?
     @Environment(SettingsManager.self) private var settingsManager
 
-    private var sessionOverride: TerminalSessionOverride {
-        settingsManager.sessionOverride(for: session.id) ?? TerminalSessionOverride()
+    init(look: Binding<TerminalSessionOverride?>) {
+        _look = look
+    }
+
+    /// One field of the look: the window's value, else the setting's; setting it keeps the rest.
+    private func field<Value>(_ keyPath: WritableKeyPath<TerminalSessionOverride, Value?>,
+                              otherwise setting: @escaping () -> Value) -> Binding<Value> {
+        let look = $look
+        return Binding(
+            get: { look.wrappedValue?[keyPath: keyPath] ?? setting() },
+            set: { value in
+                var changed = look.wrappedValue ?? TerminalSessionOverride()
+                changed[keyPath: keyPath] = value
+                look.wrappedValue = changed.normalized
+            }
+        )
     }
 
     var body: some View {
-        @Bindable var settings = settingsManager
+        let settings = settingsManager
 
         Form {
-            Section("Session") {
-                LabeledContent("Name", value: session.server.name)
-                LabeledContent("Host", value: "\(session.server.username)@\(session.server.host)")
-                LabeledContent("Status", value: session.state.displayName)
-            }
-
-            Section("Glass (this session)") {
+            Section("Glass (this window)") {
                 #if os(visionOS)
-                Picker("Frost", selection: Binding(
-                    get: { sessionOverride.glassFrost ?? settings.glassFrost },
-                    set: { newValue in
-                        settings.updateSessionOverride(for: session.id) { override in
-                            override.glassFrost = newValue
-                        }
-                    }
-                )) {
+                Picker("Frost", selection: field(\.glassFrost) { settings.glassFrost }) {
                     Text("Light").tag("ultraThin")
                     Text("Medium").tag("thin")
                     Text("Heavy").tag("regular")
@@ -1877,17 +1928,7 @@ struct TerminalOverridesSettingsView: View {
                 }
                 #endif
 
-                Slider(
-                    value: Binding(
-                        get: { sessionOverride.windowOpacity ?? settings.windowOpacity },
-                        set: { newValue in
-                            settings.updateSessionOverride(for: session.id) { override in
-                                override.windowOpacity = newValue
-                            }
-                        }
-                    ),
-                    in: 0.0...1.0
-                ) {
+                Slider(value: field(\.windowOpacity) { settings.windowOpacity }, in: 0.0...1.0) {
                     Text("Opacity")
                 } minimumValueLabel: {
                     Text("Transparent")
@@ -1895,17 +1936,7 @@ struct TerminalOverridesSettingsView: View {
                     Text("Opaque")
                 }
 
-                Slider(
-                    value: Binding(
-                        get: { sessionOverride.blurBackground ?? settings.blurBackground },
-                        set: { newValue in
-                            settings.updateSessionOverride(for: session.id) { override in
-                                override.blurBackground = newValue
-                            }
-                        }
-                    ),
-                    in: 0.0...1.0
-                ) {
+                Slider(value: field(\.blurBackground) { settings.blurBackground }, in: 0.0...1.0) {
                     Text("Blur")
                 } minimumValueLabel: {
                     Text("None")
@@ -1914,49 +1945,25 @@ struct TerminalOverridesSettingsView: View {
                 }
 
                 #if os(visionOS)
-                Toggle(
-                    "Interactive glass",
-                    isOn: Binding(
-                        get: { sessionOverride.interactiveGlass ?? settings.interactiveGlass },
-                        set: { newValue in
-                            settings.updateSessionOverride(for: session.id) { override in
-                                override.interactiveGlass = newValue
-                            }
-                        }
-                    )
-                )
+                Toggle("Interactive glass", isOn: field(\.interactiveGlass) { settings.interactiveGlass })
                 #endif
 
                 #if os(visionOS)
-                Text("Opacity and blur remain independent. Set both to zero for a completely transparent terminal. These overrides apply only to this live session and do not sync.")
+                Text("Opacity and blur remain independent. Set both to zero, with no tint, for a completely transparent terminal. These apply to every tab in this window and stay with it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 #else
-                Text("Tint, opacity, and blur affect only this terminal canvas; window chrome remains system glass. These overrides apply only to this live session and do not sync.")
+                Text("Tint, opacity, and blur affect only the terminal canvas; window chrome remains system glass. These apply to every tab in this window and stay with it.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 #endif
 
-                GlassTintPicker(
-                    value: Binding(
-                        get: { sessionOverride.glassTint ?? settings.glassTint },
-                        set: { newValue in
-                            settings.updateSessionOverride(for: session.id) { override in
-                                override.glassTint = newValue
-                            }
-                        }
-                    )
-                )
+                GlassTintPicker(value: field(\.glassTint) { settings.glassTint })
 
                 Button("Reset Overrides", role: .destructive) {
-                    settings.updateSessionOverride(for: session.id) { override in
-                        override.glassFrost = nil
-                        override.windowOpacity = nil
-                        override.blurBackground = nil
-                        override.interactiveGlass = nil
-                        override.glassTint = nil
-                    }
+                    look = nil
                 }
+                .disabled(look == nil)
             }
         }
         .formStyle(.grouped)
@@ -2395,7 +2402,7 @@ struct TerminalCanvasBackground: View {
             Color(red: color.red, green: color.green, blue: color.blue)
                 .opacity(clampedOpacity)
             if let tint {
-                tint.opacity(0.12 * clampedOpacity)
+                tint.opacity(TerminalCanvasTint.strength(canvasOpacity: clampedOpacity))
             }
         }
     }

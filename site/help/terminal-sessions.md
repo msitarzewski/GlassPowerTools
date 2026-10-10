@@ -32,7 +32,7 @@ To work with several tabs at once, ⌘-click them in the sidebar, or ⇧-click t
 
 **On iPad and iPhone:** the plus button (**New Terminal Tab**) adds a terminal to the current set. iPad shows the terminals as tabs; iPhone lists them in a menu at the top. To move a terminal into another open set, touch and hold its tab on iPad, or open the menu at the top on iPhone, and choose **Move Tab To**, then the set. On iPad, **Move Tab to New Window** opens it in a window of its own (when the set has other terminals). The terminal keeps running; a set whose last terminal leaves closes, and the screen shows the set it went to.
 
-**After a relaunch on Vision Pro, iPad and iPhone** (the app quit, crashed or was updated), the terminal windows and sets you had open come back once the library has loaded: their terminals in the same order, the same one selected, with their names. Each terminal kept in tmux goes back into its own session, with everything still running there (see [Keep terminals running with tmux](terminal-tmux.md)). Any other terminal in it comes back as a new terminal on the same machine; what was running in it is gone. A window or set comes back only when a terminal in it is kept in tmux.
+**After a relaunch on Vision Pro, iPad and iPhone** (the app quit, crashed or was updated), the terminal windows and sets you had open come back once the library has loaded: their terminals in the same order, the same one selected, with their names and the window's look. Each terminal kept in tmux goes back into its own session, with everything still running there (see [Keep terminals running with tmux](terminal-tmux.md)). Any other terminal in it comes back as a new terminal on the same machine; what was running in it is gone. A window or set comes back only when a terminal in it is kept in tmux.
 
 - **On Vision Pro** each comes back as its own window, and every terminal in it connects. A window you closed doesn't come back; its terminals keep running, and **Active** lists them.
 - **On iPad and iPhone** the set that was on screen is shown again, and only its terminal on screen connects; the others connect when you switch to them, and the other sets are in **Active**.
@@ -66,7 +66,7 @@ The pictures are only pictures: nothing is typed into a terminal, and no termina
 
 ## The session's tools menu
 
-Each SSH terminal has a tools menu: the gear button in its toolbar on Mac, or in its bottom bar on Vision Pro. It holds **Search**, **Clear**, **Snippets**, **Start Recording…**, **Recordings**, **Duplicate Session**, **Reconnect**, **Disconnect** (**Detach** for a terminal kept in tmux), and **Settings** for this session's appearance and port forwards.
+Each SSH terminal has a tools menu: the gear button in its toolbar on Mac, or in its bottom bar on Vision Pro. It holds **Search**, **Clear**, **Snippets**, **Start Recording…**, **Recordings**, **Duplicate Session**, **Reconnect**, **Disconnect** (**Detach** for a terminal kept in tmux), and **Settings**: the terminal settings, **Overrides** for the window's look (see [Give a terminal window its own look](terminal-settings.md#give-a-terminal-window-its-own-look)), and the session's port forwards.
 
 **On iPhone and iPad:** the tools menu and the buttons below are in **Tools**, at the bottom of the terminal and on the bar above the on-screen keyboard. **On iPhone held sideways**, **Tools** is in the top bar beside **+** and ⚡, so the terminal gets the whole height.
 
@@ -131,7 +131,7 @@ While input is recorded, the terminal shows **INPUT REC**. Choose **Stop Recordi
 
 ## The Mac's local shell
 
-**On Mac:** choose **Local Terminal** in the library toolbar, or **Connect** on this Mac's **Local Shell** service. A local pane's tools menu adds **New Local Terminal Window** and, after the shell exits, **Restart**. **Open Folder Here** opens the shell's directory in Finder. A local terminal starts with your Mac's environment, as Terminal.app's do (so `ssh` finds your agent), and tells programs it is Glass Power Tools through `TERM_PROGRAM`.
+**On Mac:** choose **Local Terminal** in the library toolbar, or **Connect** on this Mac's **Local Shell** service. A local pane's tools menu adds **New Local Terminal Window** and, after the shell exits, **Restart**. Its **Settings** opens the same Terminal Settings as an SSH terminal's, without port forwarding. **Open Folder Here** opens the shell's directory in Finder. A local terminal starts with your Mac's environment, as Terminal.app's do (so `ssh` finds your agent), and tells programs it is Glass Power Tools through `TERM_PROGRAM`.
 
 **Secure Keyboard Entry**, in the toolbar and the **Terminal** menu, stops other apps from reading what you type in the focused terminal.
 

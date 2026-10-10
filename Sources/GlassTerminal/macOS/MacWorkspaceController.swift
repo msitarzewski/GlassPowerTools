@@ -1455,6 +1455,10 @@ final class MacWorkspaceWindowController {
     @ObservationIgnored private(set) var placement: MacWorkspaceWindowPlacement?
     /// The place read from the record, for the window's first appearance only.
     @ObservationIgnored private var placementToRestore: MacWorkspaceWindowPlacement?
+    /// The window's look (W20): every tab in it draws with it, local panes and SSH ones, and a
+    /// tab moved in takes it. Nil follows the terminal settings. Saved with the window's tabs;
+    /// a new window opens with its request's (a saved Workgroup's, or the window its tabs left).
+    private(set) var look: TerminalSessionOverride?
 
     /// Makes the window's tabs and writes nothing: SwiftUI makes controllers it throws away, and a
     /// window macOS restores after a crash must come back as it was saved, not be rewritten by
@@ -1486,6 +1490,7 @@ final class MacWorkspaceWindowController {
         var savesNow = false
         var unsaved = false
         var failure: String?
+        var resolvedLook: TerminalSessionOverride?
         let transferred = request.transferredTabTicketID.flatMap { transferBroker.claim($0) } ?? []
         if let first = transferred.first {
             // The move already happened: the source window has let the tabs go, so this one
@@ -1494,6 +1499,7 @@ final class MacWorkspaceWindowController {
             resolvedSelectedTabID = request.initialSelectedTabID.flatMap { requested in
                 transferred.first(where: { $0.workspaceID == requested })?.workspaceID
             } ?? first.workspaceID
+            resolvedLook = request.look?.normalized
             savesNow = true
         } else {
             // A moved tab's ticket dies with the process. After a crash macOS hands the window
@@ -1505,6 +1511,7 @@ final class MacWorkspaceWindowController {
                 resolvedSelectedTabID = restored.selectedTabID
                 placement = restored.placement
                 placementToRestore = restored.placement
+                resolvedLook = restored.look
             case .unreadable(let reason):
                 let fallback = makeTab(MacWorkspaceTabRequest(workspaceID: UUID(), startsEmpty: true))
                 fallback.markNotRestored(reason)
@@ -1521,11 +1528,13 @@ final class MacWorkspaceWindowController {
                 resolvedSelectedTabID = request.initialSelectedTabID.flatMap { requested in
                     resolvedTabs.first(where: { $0.workspaceID == requested })?.workspaceID
                 } ?? resolvedTabs[0].workspaceID
+                resolvedLook = request.look?.normalized
                 unsaved = true
             }
         }
         tabs = resolvedTabs
         selectedTabID = resolvedSelectedTabID
+        look = resolvedLook
         restorationFailure = failure
         hasUnsavedState = unsaved
         collapseSelection()
@@ -1559,6 +1568,16 @@ final class MacWorkspaceWindowController {
     func savePlacement(_ placement: MacWorkspaceWindowPlacement) {
         guard let placement = placement.validated(), placement != self.placement else { return }
         self.placement = placement
+        persist()
+    }
+
+    /// Gives the window a look, or none (W20), from any tab's Settings ▸ Overrides: every tab
+    /// draws with it at once, and it is saved with the tabs. Never over a record that couldn't be
+    /// read (`persist`); a saved Workgroup is changed only by saving the window as it.
+    func setLook(_ look: TerminalSessionOverride?) {
+        let kept = look?.normalized
+        guard kept != self.look else { return }
+        self.look = kept
         persist()
     }
 
@@ -1631,9 +1650,11 @@ final class MacWorkspaceWindowController {
             savedTabs.append(.init(label: tab.tabLabel, root: savedRoot,
                                    focusedSessionIndex: tab.focusedPaneID.flatMap { indices[$0] } ?? indices[root.paneIDs[0]]!))
         }
-        let preset = LayoutPreset(name: name, colorTag: selectedTab.workgroupColor ?? .blue,
+        var preset = LayoutPreset(name: name, colorTag: selectedTab.workgroupColor ?? .blue,
                                   sessionIntents: intents,
                                   workspaceLayout: .init(tabs: savedTabs, selectedTabIndex: selectedIndex))
+        // The window's look goes with it, so the workgroup opens looking as this window does (W20).
+        preset.look = look
         guard preset.isValidForPersistence else { throw MacWorkspaceStateError.invalidPaneIntent }
         return preset
     }
@@ -1987,6 +2008,9 @@ final class MacWorkspaceWindowController {
             transferredTabTicketID: ticketID
         )
         request.initialSelectedTabID = selectionOrder.last(where: movingIDs.contains) ?? movingIDs[0]
+        // The new window looks like the one they left, as a Safari profile's tab keeps its
+        // profile in a new window (W20). Dragged into another window, a tab takes that one's.
+        request.look = look
         return request
     }
 
@@ -2037,7 +2061,8 @@ final class MacWorkspaceWindowController {
         let state = MacWorkspaceWindowRestorationState(
             tabs: tabs.map(\.restorationDescriptor),
             selectedTabID: selectedTabID,
-            placement: placement
+            placement: placement,
+            look: look
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]

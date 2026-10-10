@@ -2207,6 +2207,9 @@ struct TerminalWorkgroup: Identifiable, Equatable, Sendable {
     var colorTag: ServerColorTag
     var sessionIDs: [UUID]
     var selectedSessionID: UUID?
+    /// Its window's look (W20): every terminal in it draws with it, and one moved in takes it.
+    /// Nil follows the terminal settings.
+    var look: TerminalSessionOverride? = nil
 }
 
 /// A device-local replacement, deliberately excluded from the shared recipe.
@@ -2534,6 +2537,11 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
     /// When it was last saved, here or on another device: its sync clock (2026-10-08). Nil for a
     /// workgroup saved before workgroups synced, which counts from `createdAt`.
     var modifiedAt: Date? = nil
+    /// The look its window opens with (W20): tint, opacity, blur and the rest, each unset one
+    /// following the terminal settings. Saved from a window that had one, and synced with the
+    /// rest of the workgroup (D51). Optional and without a schema change, so a build from before
+    /// it still reads the workgroup; such a build drops the look only if it saves it again.
+    var look: TerminalSessionOverride? = nil
 
     init(
         id: UUID = UUID(),
@@ -2634,6 +2642,7 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
         case createdAt
         case lastUsed
         case modifiedAt
+        case look
     }
 
     init(from decoder: Decoder) throws {
@@ -2644,6 +2653,8 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         lastUsed = try container.decodeIfPresent(Date.self, forKey: .lastUsed)
         modifiedAt = try container.decodeIfPresent(Date.self, forKey: .modifiedAt)
+        // A look that can't be read costs the workgroup its look, never the workgroup (W20).
+        look = TerminalSessionOverride.lenientlyDecoded(from: container, forKey: .look)
         workspaceLayout = try container.decodeIfPresent(WorkspaceLayout.self, forKey: .workspaceLayout)
         openingView = try container.decodeIfPresent(OpeningView.self, forKey: .openingView) ?? .tabs
         autoFocusOnActivity = try container.decodeIfPresent(Bool.self, forKey: .autoFocusOnActivity) ?? false
@@ -2674,5 +2685,6 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
         try container.encode(createdAt, forKey: .createdAt)
         try container.encodeIfPresent(lastUsed, forKey: .lastUsed)
         try container.encodeIfPresent(modifiedAt, forKey: .modifiedAt)
+        try container.encodeIfPresent(look?.normalized, forKey: .look)
     }
 }

@@ -4448,18 +4448,19 @@ struct glas_shTests {
         #expect(settings.snippets.isEmpty)
     }
 
-    @Test @MainActor func settingsManagerSessionOverride() {
-        let settings = SettingsManager(loadImmediately: false)
-        let sessionID = UUID()
+    /// W20: the override is a window's look now, kept by its workgroup off the Mac.
+    @Test @MainActor func workgroupKeepsItsWindowLook() {
+        let manager = SessionManager(loadImmediately: false)
+        let workgroupID = manager.createWorkgroup(name: "alpha", colorTag: .blue)
 
-        #expect(settings.sessionOverride(for: sessionID) == nil)
+        #expect(manager.workgroup(for: workgroupID)?.look == nil)
 
-        settings.updateSessionOverride(for: sessionID) { override in
-            override.backgroundFill = 0.8
-            override.interactiveGlass = false
-        }
+        var look = TerminalSessionOverride()
+        look.backgroundFill = 0.8
+        look.interactiveGlass = false
+        manager.setLook(look, forWorkgroup: workgroupID)
 
-        let result = settings.sessionOverride(for: sessionID)
+        let result = manager.workgroup(for: workgroupID)?.look
         #expect(result?.backgroundFill == 0.8)
         #expect(result?.interactiveGlass == false)
     }
@@ -6969,33 +6970,32 @@ struct glas_shTests {
         #expect(TerminalGlassAppearance.resolved(
             globalOpacity: globalOpacity,
             globalBlur: globalBlur,
-            sessionOverride: nil
+            look: nil
         ) == .init(opacity: 0.25, blur: 0.75))
         #expect(TerminalGlassAppearance.resolved(
             globalOpacity: globalOpacity,
             globalBlur: globalBlur,
-            sessionOverride: TerminalSessionOverride(windowOpacity: 1)
+            look: TerminalSessionOverride(windowOpacity: 1)
         ) == .init(opacity: 1, blur: 0.75))
         #expect(TerminalGlassAppearance.resolved(
             globalOpacity: globalOpacity,
             globalBlur: globalBlur,
-            sessionOverride: TerminalSessionOverride(blurBackground: 0)
+            look: TerminalSessionOverride(blurBackground: 0)
         ) == .init(opacity: 0.25, blur: 0))
         #expect(TerminalGlassAppearance.resolved(
             globalOpacity: globalOpacity,
             globalBlur: globalBlur,
-            sessionOverride: TerminalSessionOverride(windowOpacity: 0, blurBackground: 1)
+            look: TerminalSessionOverride(windowOpacity: 0, blurBackground: 1)
         ) == .init(opacity: 0, blur: 1))
     }
 
-    @Test @MainActor func appearanceSettingsRoundTripCanonicalGlobalAndSessionValues() throws {
+    @Test @MainActor func appearanceSettingsRoundTripCanonicalGlobalValues() throws {
         let suiteName = "sh.glas.tests.appearance.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults.forTest(suiteName: suiteName))
         defaults.removePersistentDomain(forName: suiteName)
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
         defaults.set(0.91, forKey: UserDefaultsKeys.backgroundFill)
-        let sessionID = UUID()
         let settings = SettingsManager(
             loadImmediately: false,
             settingsDefaults: defaults,
@@ -7003,10 +7003,6 @@ struct glas_shTests {
         )
         settings.windowOpacity = 0.37
         settings.blurBackground = 0.64
-        settings.updateSessionOverride(for: sessionID) { override in
-            override.windowOpacity = 0
-            override.blurBackground = 1
-        }
         settings.saveSettings()
 
         // Opacity and blur are the shared GlassLayers state now; nothing writes the legacy keys.
@@ -7022,8 +7018,6 @@ struct glas_shTests {
         )
         #expect(reloaded.windowOpacity == 0.37)
         #expect(reloaded.blurBackground == 0.64)
-        #expect(reloaded.sessionOverride(for: sessionID)?.windowOpacity == 0)
-        #expect(reloaded.sessionOverride(for: sessionID)?.blurBackground == 1)
     }
 
     @Test @MainActor func appearanceMigrationPrefersCanonicalOpacityAndMigratesBooleanOrNumericBlur() throws {

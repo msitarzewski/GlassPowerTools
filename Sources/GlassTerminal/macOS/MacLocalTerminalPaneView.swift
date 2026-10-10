@@ -30,6 +30,8 @@ struct MacLocalTerminalPaneView: View {
     /// shell when it asked for this local shell by name (D8); nil in previews and tests.
     @Environment(GlassTerminalRuntime.self) private var terminalRuntime: GlassTerminalRuntime?
     @Environment(\.openWindow) private var openWindow
+    /// The terminal window this pane is in: its look, which Settings ▸ Overrides sets (W20).
+    @Environment(MacWorkspaceWindowController.self) private var terminalWindow: MacWorkspaceWindowController?
     @ObservedObject var hostModel: SwiftTermHostModel
     @ObservedObject var processState: SwiftTermLocalProcessState
     @State private var aiAssistant = AIAssistant()
@@ -42,6 +44,7 @@ struct MacLocalTerminalPaneView: View {
     @State private var showingSnippets = false
     @State private var showingRecordings = false
     @State private var showingRecordingConsent = false
+    @State private var showingTerminalSettings = false
     @State private var showingDisconnectConfirmation = false
     @State private var recordingError: String?
     @State private var terminalColumns = 120
@@ -96,11 +99,13 @@ struct MacLocalTerminalPaneView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background {
+                // The window's look over the terminal settings, as its SSH panes draw (W20).
+                let look = TerminalLook.resolved(terminalWindow?.look, settings: settingsManager)
                 TerminalCanvasBackground(
                     color: settingsManager.currentTheme.background,
-                    tint: TerminalGlassTint.color(for: settingsManager.glassTint),
-                    opacity: settingsManager.windowOpacity,
-                    blur: settingsManager.blurBackground,
+                    tint: look.tintColor,
+                    opacity: look.opacity,
+                    blur: look.blur,
                     appearance: settingsManager.currentTheme.resolvedAppearance
                 )
             }
@@ -250,6 +255,11 @@ struct MacLocalTerminalPaneView: View {
         .sheet(isPresented: $showingRecordings, onDismiss: restoreTerminalFocus) {
             MacLocalRecordingHistoryView {
                 showingRecordings = false
+            }
+        }
+        .sheet(isPresented: $showingTerminalSettings, onDismiss: restoreTerminalFocus) {
+            TerminalSettingsSheet(session: nil, windowLook: windowLookBinding) {
+                showingTerminalSettings = false
             }
         }
         .confirmationDialog(
@@ -443,9 +453,10 @@ struct MacLocalTerminalPaneView: View {
 
             Divider()
 
-            SettingsLink {
-                Label("Settings", systemImage: "gearshape")
-            }
+            // Terminal Settings, as an SSH terminal's gear opens them (W20); the app's Settings
+            // window stays on ⌘, and in the app menu.
+            Button("Settings", systemImage: "gearshape") { presentTerminalSettings() }
+                .accessibilityIdentifier("local-terminal-settings")
         } label: {
             Image(systemName: "gearshape")
         }
@@ -525,6 +536,19 @@ struct MacLocalTerminalPaneView: View {
     private func presentRecordings() {
         hostModel.setFocusOwnershipAllowed(false)
         showingRecordings = true
+    }
+
+    /// Terminal Settings, as an SSH terminal's gear opens it (W20): Terminal and Overrides, which
+    /// sets this window's look. No Port Forwarding: a local shell has no connection to forward.
+    private func presentTerminalSettings() {
+        hostModel.setFocusOwnershipAllowed(false)
+        showingTerminalSettings = true
+    }
+
+    /// The window's look, for Overrides; nil outside a terminal window (previews).
+    private var windowLookBinding: Binding<TerminalSessionOverride?>? {
+        guard let terminalWindow else { return nil }
+        return Binding(get: { terminalWindow.look }, set: { terminalWindow.setLook($0) })
     }
 
     /// Answers the shell's waiting request, at most once for this pane. Does nothing when the

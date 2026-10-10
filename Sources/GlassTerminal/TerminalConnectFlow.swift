@@ -483,11 +483,13 @@ struct TerminalConnectFlow: ViewModifier {
         isOpeningWorkgroup = true
         Task { @MainActor in
             defer { isOpeningWorkgroup = false }
-            // The workgroup's own id, so opening it again finds these terminals (W4b).
+            // The workgroup's own id, so opening it again finds these terminals (W4b), and its
+            // look for the window (W20).
             let workgroupID = sessionManager.createWorkgroup(
                 id: preset.id,
                 name: preset.name,
-                colorTag: preset.colorTag
+                colorTag: preset.colorTag,
+                look: preset.look
             )
             var failures = notOpened + plan.failures
 

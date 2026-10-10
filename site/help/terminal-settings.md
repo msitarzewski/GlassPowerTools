@@ -1,6 +1,6 @@
 # Terminal settings, themes and snippets
 
-The terminal adds three pages to Settings: **Connections**, **Terminal** and **Snippets**. This page covers what each controls, editing themes, per-session appearance, importing an SSH config file, and Tailscale.
+The terminal adds three pages to Settings: **Connections**, **Terminal** and **Snippets**. This page covers what each controls, editing themes, giving a terminal window its own look, importing an SSH config file, and Tailscale.
 
 ## Connections
 
@@ -31,11 +31,16 @@ The terminal adds three pages to Settings: **Connections**, **Terminal** and **S
 
 **Sync terminal settings**, under **iCloud Sync**, keeps your themes the same on every device. It also syncs your Workgroups and your reconnect, closing, scrollback, bell, cursor, initial size and tint preferences. It never syncs passwords, keys, saved connections, host keys or snippets.
 
-## Change one session's appearance
+## Give a terminal window its own look
 
-In a terminal, open the tools menu and choose **Settings**, then **Overrides**. **On iPad**, the row is **Session Appearance**.
+A terminal window can have its own tint, opacity and blur, so you can tell your windows apart at a glance. In any tab of the window, open the tools menu and choose **Settings**, then **Overrides**. **On iPad**, the row is **Window Appearance**. **On Mac**, a local terminal's tools menu opens the same **Settings**; the app's own Settings are in the app menu, or press ⌘,.
 
-Set **Opacity**, **Blur** and a tint for this session only. **On Vision Pro**, also **Frost** and **Interactive glass**. **Reset Overrides** returns to your settings. Overrides do not sync.
+Set **Opacity**, **Blur** and a **Glass Tint**. **On Vision Pro**, also **Frost** and **Interactive glass**. Every tab in the window changes at once. Anything you leave unset follows your settings, and **Reset Overrides** returns the window to them. A tint colours the terminal whatever its opacity; for a completely clear terminal, set **Opacity** and **Blur** to zero and choose no tint.
+
+- A tab you move into another window takes that window's look. **Move Tab to New Window** gives the new window the look of the one the tab left.
+- The look stays with the window: it comes back when the app relaunches.
+- **On Mac**, the tab icons in the window's sidebar take its tint.
+- **On Mac**, **Save Workspace as Workgroup…** saves the window's look with the Workgroup, and the Workgroup opens with it, on every device where **Sync terminal settings** is on. Changing a window's look doesn't change a saved Workgroup; to update one, save the window again under its name and choose **Replace**.
 
 ## Snippets
 

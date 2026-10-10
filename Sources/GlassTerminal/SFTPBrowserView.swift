@@ -2612,17 +2612,14 @@ struct SFTPBrowserView: View {
     nonisolated static let remoteEditorConfiguration = GlassEditorConfiguration()
 
     private var remoteEditorSurfaceCondition: SurfaceCondition {
-        let sessionOverride = settingsManager.sessionOverride(for: sessionID)
-        let appearance = TerminalGlassAppearance.resolved(
-            globalOpacity: settingsManager.windowOpacity,
-            globalBlur: settingsManager.blurBackground,
-            sessionOverride: sessionOverride
+        // The look of the terminal window this browser's session is in (W20).
+        let look = TerminalLook.resolved(
+            TerminalWindowLooks.look(ofWindowHolding: sessionID, sessionManager: sessionManager),
+            settings: settingsManager
         )
-        let material = MaterialWeight(
-            rawValue: sessionOverride?.glassFrost ?? settingsManager.glassFrost
-        ) ?? .ultraThin
+        let material = MaterialWeight(rawValue: look.frost) ?? .ultraThin
         return SurfaceCondition(
-            windowOpacity: appearance.opacity,
+            windowOpacity: look.opacity,
             backing: .material(material)
         )
     }

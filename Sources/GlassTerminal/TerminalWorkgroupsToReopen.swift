@@ -48,6 +48,9 @@ nonisolated struct TerminalWorkgroupReopenRecord: Codable, Equatable, Sendable {
     var selectedIndex: Int
     /// iPhone and iPad: the workgroup on screen when the app last ran, shown again.
     var isShown: Bool
+    /// Its window's look (W20), which it comes back with. Absent from lists written before it;
+    /// an earlier build reading the list ignores it.
+    var look: TerminalSessionOverride? = nil
 }
 
 /// The workgroups to reopen at the next launch, for the whole run (W15). One per process.
@@ -184,7 +187,7 @@ final class TerminalWorkgroupsToReopen {
             return TerminalWorkgroupReopenRecord(
                 id: workgroup.id, name: workgroup.name, colorTag: workgroup.colorTag, terminals: terminals,
                 selectedIndex: kept.firstIndex { $0.id == workgroup.selectedSessionID } ?? 0,
-                isShown: workgroup.id == shown)
+                isShown: workgroup.id == shown, look: workgroup.look)
         }
         return Array(listed.prefix(maximumWorkgroups))
     }
@@ -240,7 +243,8 @@ extension TerminalWorkgroupOpening {
         var result = Reopened()
         guard !isOpen(record.id, in: sessionManager) else { return result }
         let servers = sessionManager.serverManager.servers
-        let workgroupID = sessionManager.createWorkgroup(id: record.id, name: record.name, colorTag: record.colorTag)
+        let workgroupID = sessionManager.createWorkgroup(id: record.id, name: record.name, colorTag: record.colorTag,
+                                                         look: record.look)
         var selected: UUID?
         for (index, terminal) in record.terminals.enumerated() {
             let called = displayName(of: terminal)

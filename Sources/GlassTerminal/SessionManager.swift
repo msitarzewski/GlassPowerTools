@@ -566,11 +566,15 @@ class SessionManager {
         return session(for: selectedSessionID)
     }
 
+    /// A new, empty workgroup — a window on Vision Pro, a set of tabs on iPad and iPhone — with
+    /// `look` for its window (W20): a saved Workgroup's, the one a tab moved out of, or none. One
+    /// already open under `id` is left as it is, look and all.
     @discardableResult
     func createWorkgroup(
         id: UUID = UUID(),
         name: String,
-        colorTag: ServerColorTag
+        colorTag: ServerColorTag,
+        look: TerminalSessionOverride? = nil
     ) -> UUID {
         guard workgroups.contains(where: { $0.id == id }) == false else { return id }
         workgroups.append(TerminalWorkgroup(
@@ -578,9 +582,25 @@ class SessionManager {
             name: name,
             colorTag: colorTag,
             sessionIDs: [],
-            selectedSessionID: nil
+            selectedSessionID: nil,
+            look: look?.normalized
         ))
         return id
+    }
+
+    /// Gives a workgroup's window a look, or none (W20): every terminal in it, and every one
+    /// moved in later, draws with it. Kept for the next launch by the reopen list, which follows
+    /// the workgroups; a saved Workgroup is never changed by it.
+    func setLook(_ look: TerminalSessionOverride?, forWorkgroup workgroupID: UUID) {
+        guard let index = workgroups.firstIndex(where: { $0.id == workgroupID }) else { return }
+        let kept = look?.normalized
+        guard workgroups[index].look != kept else { return }
+        workgroups[index].look = kept
+    }
+
+    /// The look of the workgroup a terminal is in now (W20): after a move, the one it moved to.
+    func look(ofWorkgroupHolding sessionID: UUID) -> TerminalSessionOverride? {
+        workgroups.first { $0.sessionIDs.contains(sessionID) }?.look
     }
 
     @discardableResult

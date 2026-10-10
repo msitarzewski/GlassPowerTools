@@ -115,12 +115,14 @@ enum TerminalTabMoves {
     }
 
     /// **Move to New Window**: a new workgroup holding only this terminal, named for its machine
-    /// as Connect names one (so Active and the window name it by the terminal). Returns the new
+    /// as Connect names one (so Active and the window name it by the terminal), with the look of
+    /// the window it left, as a Mac's Move Tab to New Window keeps it (W20). Returns the new
     /// workgroup's id, or nil when nothing moved.
     static func moveToNewWorkgroup(_ sessionID: UUID, in manager: SessionManager) -> UUID? {
-        guard workgroup(holding: sessionID, in: manager) != nil,
+        guard let source = workgroup(holding: sessionID, in: manager),
               let session = manager.session(for: sessionID) else { return nil }
-        let created = manager.createWorkgroup(name: session.server.name, colorTag: session.server.colorTag)
+        let created = manager.createWorkgroup(name: session.server.name, colorTag: session.server.colorTag,
+                                              look: source.look)
         guard move(sessionID, to: created, at: 0, in: manager) != .refused else {
             manager.discardWorkgroupIfEmpty(created)
             return nil

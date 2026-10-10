@@ -18,7 +18,7 @@
       {"slug": "terminal-files", "title": "Browse and transfer files over SFTP", "summary": "Open the file browser, upload and download, create, rename, move and delete items, and edit remote files in the Editor."},
       {"slug": "terminal-port-forwarding", "title": "Forward ports through an SSH session", "summary": "Add local, remote and SOCKS5 port forwards to a live SSH session, start and stop them, and fix common failures."},
       {"slug": "terminal-workgroups", "title": "Save and open terminal Workgroups", "summary": "Create Workgroups of terminal tabs with startup commands, open them on each platform, and swap in SSH for Mac-only local tabs."},
-      {"slug": "terminal-settings", "title": "Terminal settings, themes and snippets", "summary": "The Connections, Terminal and Snippets settings pages, theme editing, per-session appearance, SSH config import and Tailscale."}
+      {"slug": "terminal-settings", "title": "Terminal settings, themes and snippets", "summary": "The Connections, Terminal and Snippets settings pages, theme editing, a terminal window's own look, SSH config import and Tailscale."}
     ]},
     {"name": "Databases", "pages": [
       {"slug": "database-add-service", "title": "Add a database service", "summary": "Add a MySQL, PostgreSQL or SQLite database to a host, fill in its fields, and make it read-only."},

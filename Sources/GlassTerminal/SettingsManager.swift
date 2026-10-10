@@ -192,7 +192,6 @@ class SettingsManager {
         get { windowOpacity }
         set { windowOpacity = newValue }
     }
-    var sessionOverrides: [String: TerminalSessionOverride] = [:]
     var layoutPresets: [LayoutPreset] = []
     var tailscaleTailnet: String = ""
     private(set) var iCloudSyncEnabled: Bool = true
@@ -331,14 +330,10 @@ class SettingsManager {
         if let savedGlassTint = settingsDefaults.string(forKey: UserDefaultsKeys.glassTint) {
             glassTint = savedGlassTint
         }
-        if let data = settingsDefaults.data(forKey: UserDefaultsKeys.sessionOverrides) {
-            do {
-                sessionOverrides = try JSONDecoder().decode([String: TerminalSessionOverride].self, from: data)
-            } catch {
-                Logger.settings.error("Failed to load session overrides: \(error)")
-                sessionOverrides = [:]
-            }
-        }
+        // W20: a terminal window owns its look now. The per-session overrides were kept by the id
+        // of a live session, which no later session has, so every one left here belongs to a
+        // connection that has ended; nothing reads them, and they go.
+        settingsDefaults.removeObject(forKey: UserDefaultsKeys.sessionOverrides)
 
         if let savedTailnet = settingsDefaults.string(forKey: UserDefaultsKeys.tailscaleTailnet) {
             tailscaleTailnet = savedTailnet
@@ -374,13 +369,6 @@ class SettingsManager {
         )
         initialTerminalColumns = initialGeometry.columns
         initialTerminalRows = initialGeometry.rows
-        sessionOverrides = sessionOverrides.reduce(into: [:]) { result, element in
-            var override = element.value
-            override.canonicalizeAppearance()
-            if override != TerminalSessionOverride() {
-                result[element.key] = override
-            }
-        }
         settingsDefaults.set(autoReconnect, forKey: UserDefaultsKeys.autoReconnect)
         settingsDefaults.set(confirmBeforeClosing, forKey: UserDefaultsKeys.confirmBeforeClosing)
         settingsDefaults.set(saveScrollback, forKey: UserDefaultsKeys.saveScrollback)
@@ -405,29 +393,7 @@ class SettingsManager {
         settingsDefaults.removeObject(forKey: UserDefaultsKeys.backgroundFill)
         settingsDefaults.removeObject(forKey: UserDefaultsKeys.glassMaterialStyle)
         settingsDefaults.removeObject(forKey: UserDefaultsKeys.interactiveGlassEffects)
-        do {
-            let data = try JSONEncoder().encode(sessionOverrides)
-            settingsDefaults.set(data, forKey: UserDefaultsKeys.sessionOverrides)
-        } catch {
-            Logger.settings.error("Failed to save session overrides: \(error)")
-        }
         scheduleICloudSettingsPush()
-    }
-
-    func sessionOverride(for sessionID: UUID) -> TerminalSessionOverride? {
-        sessionOverrides[sessionID.uuidString]
-    }
-
-    func updateSessionOverride(for sessionID: UUID, mutate: (inout TerminalSessionOverride) -> Void) {
-        var override = sessionOverride(for: sessionID) ?? TerminalSessionOverride()
-        mutate(&override)
-        override.canonicalizeAppearance()
-        if override == TerminalSessionOverride() {
-            sessionOverrides.removeValue(forKey: sessionID.uuidString)
-        } else {
-            sessionOverrides[sessionID.uuidString] = override
-        }
-        saveSettings()
     }
 
     nonisolated static func unitValue(_ value: Double) -> Double {
@@ -1843,14 +1809,15 @@ struct TerminalGlassAppearance: Equatable {
         self.blur = SettingsManager.unitValue(blur)
     }
 
+    /// The window's look where it sets opacity or blur, the settings' otherwise (W20).
     static func resolved(
         globalOpacity: Double,
         globalBlur: Double,
-        sessionOverride: TerminalSessionOverride?
+        look: TerminalSessionOverride?
     ) -> Self {
         Self(
-            opacity: sessionOverride?.windowOpacity ?? globalOpacity,
-            blur: sessionOverride?.blurBackground ?? globalBlur
+            opacity: look?.windowOpacity ?? globalOpacity,
+            blur: look?.blurBackground ?? globalBlur
         )
     }
 

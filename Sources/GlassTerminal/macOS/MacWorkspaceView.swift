@@ -96,6 +96,14 @@ struct MacWorkspaceView: View {
         windowController.tabs.first { $0.workspaceID == id }
     }
 
+    /// The tint this window's own look gives it, if any (W20) — not the terminal setting, which
+    /// every window shares and so tells none apart. The sidebar takes it, as a Reminders list
+    /// takes its colour: every tab's icon, in place of its Workgroup's colour, and the list's
+    /// tint, which the selection follows where the system lets it.
+    private var windowTint: Color? {
+        windowController.look?.glassTint.flatMap(TerminalGlassTint.color(for:))
+    }
+
     /// One tab: rename, as before. Several, ⌘- or ⇧-clicked (W8, owner, 2026-10-08): move them
     /// to a new window together, or close them. Rename is for one tab only.
     @ViewBuilder
@@ -159,13 +167,13 @@ struct MacWorkspaceView: View {
                 }
             } icon: {
                 Image(systemName: "apple.terminal")
-                    .foregroundStyle(controller.workgroupColor?.color ?? .secondary)
+                    .foregroundStyle(windowTint ?? controller.workgroupColor?.color ?? .secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             // While a terminal in the tab is printing, a wave moves under the row.
             .background {
                 if controller.isProducingOutput {
-                    MacTerminalActivityWave(color: controller.workgroupColor?.color ?? .accentColor)
+                    MacTerminalActivityWave(color: windowTint ?? controller.workgroupColor?.color ?? .accentColor)
                         .padding(.horizontal, -6)
                         .transition(.opacity)
                 }
@@ -195,6 +203,7 @@ struct MacWorkspaceView: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             tabList
                 .listStyle(.sidebar)
+                .tint(windowTint)
                 // A wider ceiling than 360: the sidebar carries a title and a monospaced subtitle
                 // per tab, and a user with long session names could not widen past truncation.
                 .navigationSplitViewColumnWidth(min: 180, ideal: 240, max: 520)
@@ -447,6 +456,9 @@ struct MacWorkspaceView: View {
         } message: {
             Text(workspaceSaveError ?? "")
         }
+        // Every pane, sheet and picture in the window draws with the window's look, and a tab's
+        // Settings ▸ Overrides sets it (W20). Outermost, so the overview and sheets have it too.
+        .environment(windowController)
     }
 
     private var currentWorkgroupPreset: LayoutPreset? {
@@ -585,7 +597,8 @@ struct MacWorkspaceView: View {
                 name: preset.name,
                 colorTag: preset.colorTag,
                 sessionIntents: preset.sessionIntents,
-                workspaceLayout: preset.workspaceLayout
+                workspaceLayout: preset.workspaceLayout,
+                look: preset.look
             )
         } catch {
             workspaceSaveError = error.localizedDescription
@@ -747,6 +760,8 @@ private struct MacWorkspaceTabContent: View {
     @Environment(SessionManager.self) private var sessionManager
     @Environment(SettingsManager.self) private var settingsManager
     @Environment(\.openWindow) private var openWindow
+    /// The window this tab is in, for its look (W20).
+    @Environment(MacWorkspaceWindowController.self) private var terminalWindow: MacWorkspaceWindowController?
 
     private let onNewTab: () -> Void
     private let onCloseEmptyTab: () -> Void
@@ -852,11 +867,12 @@ private struct MacWorkspaceTabContent: View {
         } else if let failure = controller.restorationFailure {
             MacWorkspaceUnrestoredTab(reason: failure, close: onCloseEmptyTab)
         } else {
+            let look = TerminalLook.resolved(terminalWindow?.look, settings: settingsManager)
             MacWorkspaceEmptyTab(
                 theme: settingsManager.currentTheme,
-                tint: TerminalGlassTint.color(for: settingsManager.glassTint),
-                opacity: settingsManager.windowOpacity,
-                blur: settingsManager.blurBackground,
+                tint: look.tintColor,
+                opacity: look.opacity,
+                blur: look.blur,
                 startLocal: { controller.addPane(intent: .local, axis: .horizontal) },
                 startSSH: { controller.requestSSHPane(axis: .horizontal) }
             )
