@@ -818,3 +818,11 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   text an even 12 in (18), and whether to round the text area's corners. **Awaiting his answer.**
 - **eac2ee7 — W22 merged (D58).** Suites: terminal 720, shell 238, layers 42, connection UI 39. W23 (editor), W24
   (database), W25 (desktop) started on its contract.
+- **cfd5094 — Apple's window back, three levels nested.** The owner (annotated capture, 11:46; then "Let's get apple's
+  default window back in this mix. It will help me a lot."): the terminal scene drops `.plain` so Apple's window draws
+  its glass in its own corner (46); the canvas sits an even 34 pt inside the window edge on every side whatever the
+  ornaments (no more jump on focus), corner 46 − 34 = 12; rows an even 12 pt inside, square. The frosted backdrop (the
+  grey card he marked, `GlassCanvasBackdrop`, was a 24-pt card around the canvas, shown when the window sets blur) now
+  fills the window in the window's corner. Diagnosed with temporary coloured outlines in the visionOS simulator (never
+  committed); clean capture sent before install. Earlier "I do not want borders" was about my added glass border; this
+  is Apple's default window, which he asked for. 0.4.334 on Vision Pro and iPhone.
