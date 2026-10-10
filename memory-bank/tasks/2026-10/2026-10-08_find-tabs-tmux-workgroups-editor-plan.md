@@ -960,3 +960,8 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
 - **Installed 0.4.339 (HEAD b0822da) on iPhone and Vision Pro (~17:20)**, both exit 0; Vision Pro relaunched. Screen
   unlocked 17:18: GlassTerminalTests 724/724 pass, including `workspaceUsesNativeTitle` — the locked-screen caveat on
   f213d4a/928baaa/2b4f75f is cleared. Mac still 0.4.329, at the owner's word.
+- **Owner (~17:25, Vision Pro, image of Connections):** "the your library screen can remove the black backgorund now,
+  yes? Fix the margins to Apple default." Done: the library's detail no longer wraps in the embedded canvas panel (no
+  Opacity paint, no 34/12-pt inset); the overview uses `.scenePadding()` on visionOS (24 elsewhere). Connections is
+  visionOS's own window: neither Opacity nor Glass changes it (help updated). Shell 254, layers 48, connection UI 43
+  pass; simulator capture checked.

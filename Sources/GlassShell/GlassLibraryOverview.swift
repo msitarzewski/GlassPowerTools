@@ -111,7 +111,12 @@ struct GlassLibraryOverview: View {
                 connectionsSection
                 if !statistics.mostUsed.isEmpty { mostUsedSection }
             }
+            #if os(visionOS)
+            // Apple's own margins for the window it is in.
+            .scenePadding()
+            #else
             .padding(24)
+            #endif
             .frame(maxWidth: 760, alignment: .leading)
             .frame(maxWidth: .infinity)
         }

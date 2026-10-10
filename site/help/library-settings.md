@@ -20,7 +20,7 @@ Choose **Appearance**. The **Windows** section has:
 
 The sliders settle on 0%, 50% and 100% when you drag near them. Text and controls stay fully visible at every setting. For a completely clear window, set **Opacity** and **Glass** to 0%.
 
-**On Vision Pro:** there is no **Material** to choose. **Glass** is a window's own glass: at 100% it looks like any visionOS window, and at 0% there is none. **Opacity** paints only the area a window's content sits in (a terminal's text, a remote desktop's screen, the editor's text, a database's workspace, the Files list, the Connections detail), never the whole window. Terminal and remote desktop windows are completely clear with both at 0%. Connections, Files, the editor and the database keep visionOS's own glass behind their columns, so **Glass** doesn't make them clearer.
+**On Vision Pro:** there is no **Material** to choose. **Glass** is a window's own glass: at 100% it looks like any visionOS window, and at 0% there is none. **Opacity** paints only the area a window's content sits in (a terminal's text, a remote desktop's screen, the editor's text, a database's workspace, the Files list), never the whole window. Terminal and remote desktop windows are completely clear with both at 0%. Files, the editor and the database keep visionOS's own glass behind their columns, so **Glass** doesn't make them clearer. Connections is visionOS's own window: neither setting changes it.
 
 These settings also apply to terminal windows. They are kept on each device.
 
