@@ -718,3 +718,8 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   `GlassLayeredWindow` → `GlassNativeWindowFrame` adds no glass or clip and `GlassLayerBackground(cornerRadius: 0)`
   fills square; plus the Files window's header to match the Mac's modern format (owner). W17: the editor fully
   functional on visionOS (owner: "markdown preview, syntax highlighting etc."), parity audit first.
+- **1c7c65c — Open in Editor from a terminal.** Owner: "an Open in Editor option on pinch and hold on the folder icon
+  and an open in Editor in the context toolbar item". The folder button's context menu offers Open in Files and Open in
+  Editor; the tools ("…") menu has Open Folder in Editor; both use `runtime.openFolderAsProject` (read from the
+  environment, optional) with the folder from `workingDirectory(reported:)`. UI only, no unit test; suites passed.
+  0.4.324 on iPhone and Vision Pro.
