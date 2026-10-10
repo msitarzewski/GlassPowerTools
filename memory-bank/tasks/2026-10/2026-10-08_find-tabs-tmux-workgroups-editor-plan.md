@@ -762,3 +762,10 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   any tab's Settings ▸ Overrides, taken by new and moved tabs, saved with the window and saved workgroups. The local
   tab's gear Settings was a `SettingsLink` to app Settings since Stage 2 — it opens Terminal Settings in W20.
 - **Device check, 0.4.328 (2026-10-10):** the owner, on the Vision Pro: "the editor toolbar works on the headset" (W17).
+- **SSH limits (2026-10-10, owner on the Vision Pro):** "I think we've hit a cap on open tmux sessions... trying to open
+  the same sets of windows here and get an error about not being able to connect". On the SSH server (the owner's Mac,
+  default OpenSSH): one `sshd-session` from the headset carrying 8 PTYs — every terminal to a host shares one connection
+  (`SessionManager.reusableConnection`), and `MaxSessions 10` counts shells plus the app's short exec channels; when a
+  set opens with nothing connected, each terminal starts its own connection and `MaxStartups 10:30:100` drops those past
+  10. **W21 started** (agent): coalesce connection setup per route, cap terminals per connection, limit concurrent exec
+  channels, retry a refused channel on a new connection and a dropped connect with backoff, plain-words errors.
