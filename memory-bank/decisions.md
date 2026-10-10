@@ -1238,3 +1238,13 @@ after the library has loaded. A workgroup comes back if any terminal in it is in
 on the same machine; a window closed by hand stays closed; saved Workgroups are never written. Vision Pro reopens a
 window per workgroup and connects every terminal; iPad and iPhone bring all back and connect only the one on screen.
 Built in W15 (`6394fc6`); not yet tried on a device.
+
+## D56 — Synchronized settings are combined with the built-in theme under one identifier — Implemented 2026-10-10
+**Evidence:** "Failed to synchronize portable settings … Code=3" (`invalidPayload`) at every launch; from 2026-09-27
+(bf178ce renamed the built-in theme) no current build could send terminal settings: the KVS store is shared with
+glas.sh (`GPT_KVSTORE_SUFFIX = sh.glas.app`), older writers use the old built-in identifier (accepted by `validate()`),
+and combining before a send matched themes by identifier only, so the result held two built-in themes. **Decision:**
+before combining, both sides rename the built-in theme to the current identifier and keep the more recently changed
+one; selection follows. No migration, nothing deleted; an older build reading the new copy rejects it and stops syncing
+rather than overwriting. Built in W18 (`6293e69`). After-effect: the first launch with the fix applies iCloud's
+frozen copy of terminal preferences once more; changes made since 09-27 may need making again, then they sync.

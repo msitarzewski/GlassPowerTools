@@ -769,3 +769,9 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   set opens with nothing connected, each terminal starts its own connection and `MaxStartups 10:30:100` drops those past
   10. **W21 started** (agent): coalesce connection setup per route, cap terminals per connection, limit concurrent exec
   channels, retry a refused channel on a new connection and a dropped connect with backoff, plain-words errors.
+- **6293e69 — W18 merged (D56).** Code=3 is `invalidPayload` (payload cases are numbered first). Terminal settings had
+  not synced from any current build since bf178ce (2026-09-27): the shared KVS store holds a copy from glas.sh or an
+  older build with the old built-in theme id; combining before a send made two built-in themes. Fixed by canonicalising
+  both sides first. Logging names the case and detail; Settings caption in plain words. Suites: terminal 676, shell 238.
+  Not installed yet (waiting to ship with W21). A stray README.md edit (a trailing space on "What it does", 00:14,
+  likely the owner trying the editor) is left uncommitted and untouched.
