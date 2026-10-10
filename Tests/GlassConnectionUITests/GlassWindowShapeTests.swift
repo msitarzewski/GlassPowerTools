@@ -64,6 +64,10 @@ struct GlassWindowShapeTests {
         "\"desktop-session\"": (("DesktopSessionView.swift",
                                  [".glassSpatialWindowGlass(strength:", "GlassWindowShape.spatialNestedCanvasCornerRadius"]),
                                 "it draws Apple's glass itself; the remote screen is its canvas, nested in Apple's corner"),
+        // W30: a display's own window is the same session view, onto one display.
+        "DesktopDisplayWindowValue.windowID": (("DesktopSessionView.swift",
+                                                [".glassSpatialWindowGlass(strength:", "GlassWindowShape.spatialNestedCanvasCornerRadius"]),
+                                               "a display's window is the desktop's session view: the same glass and canvas"),
         "\"database-workspace\"": (("DatabaseWorkspaceView.swift",
                                     ["DatabaseSpatialCanvas(", ".glassSpatialWindowGlass(strength:"]),
                                    "the split view draws the window's glass and the workspace is its canvas; without the split view (DatabaseSpatialLayout) it draws Apple's glass itself"),

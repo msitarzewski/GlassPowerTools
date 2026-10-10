@@ -50,9 +50,11 @@ Anything about how a desktop window looks and behaves can be set for that window
 - **Remote Desktop**: **Detail** (RDP). See [Resolution, scaling and zoom](desktop-display-and-scaling.md#sharper-text-on-high-resolution-displays-rdp).
 - **Touch** (**on iPad and iPhone**): **Pointer**. See [Keyboard, pointer, clipboard and audio](desktop-input.md#point-and-click).
 
+For Screen Sharing (VNC), and for any computer with several displays, a third page sits between them: **Connection**, with **Quality** and what the network carries now, and **Display Windows**. These belong to the desktop's connection rather than to one window, so every window of the desktop shows and changes the same ones. See [Several displays](desktop-display-and-scaling.md#several-displays) and [Quality and the network](desktop-display-and-scaling.md#quality-and-the-network-screen-sharing).
+
 Each setting follows **All Desktops** until you change it here. Once you do, a small ↺ appears beside its name; choose it to follow again. Its tooltip says what it returns to: hold the pointer over it, or on Vision Pro look at it. **Reset This Window**, at the end, returns every one. Only this window changes, at once.
 
-A desktop's window keeps its own settings on this device. Desktop windows are not reopened when you quit the app, but the next time you connect to the same desktop here, its window has them again. They are not synced to your other devices, and removing the desktop removes them.
+A desktop's window keeps its own settings on this device. Desktop windows are not reopened when you quit the app, but the next time you connect to the same desktop here, its window has them again. A display's window keeps its own too, for that display. They are not synced to your other devices, and removing the desktop removes them all.
 
 **This Window** also holds this session's own controls, which start over each time the desktop opens: **Match Window Size**, the display shown, **Desktop Resolution** and **Local Scale**. **Remove Wallpaper** and its image also last only for the session.
 
@@ -60,7 +62,7 @@ Some settings are only ever the desktop's, or this device's. The account, passwo
 
 ## Leave a session
 
-- **On Apple Vision Pro, Mac and iPad:** close the desktop's window. The session ends.
+- **On Apple Vision Pro, Mac and iPad:** close the desktop's window. The session ends. If its displays are in windows of their own, it ends when the last of them closes; until then **Connect** brings the desktop's window back onto the same connection.
 - **On iPhone:** choose the back chevron.
 - When the remote computer ends the session cleanly after the desktop has appeared, for example because you signed out, the window closes by itself.
 

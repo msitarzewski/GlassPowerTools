@@ -6,6 +6,7 @@ import GlassConnectionKit
 import GlassLayers
 import GlasSecretStore
 import GlassRDPTransport
+import GlassShell
 import GlassVNCTransport
 import RDPKit
 
@@ -72,25 +73,61 @@ public final class DesktopSessionModel {
     /// Displays inside the remote framebuffer, when the host publishes a layout. Fewer than two
     /// means there is nothing to choose between.
     public private(set) var screens: [GlassRemoteScreen] = []
+    /// The desktop's own window (W30): what it shows and how. Display windows have their own
+    /// (`viewports`); `presentation`, `selectedScreenID`, `windowSettings` and `pointerMode` below
+    /// are this one's, as they were the session's before a desktop could have several windows.
+    public let primaryViewport: DesktopViewport
+    /// The windows open onto this session; it ends when the last one closes.
+    public private(set) var viewports: [DesktopViewport] = []
     /// Nil shows the whole framebuffer. Otherwise the identifier of the single display on screen.
     public var selectedScreenID: UInt32? {
-        didSet { if selectedScreenID != oldValue { updateCursorImage() } }
+        get { primaryViewport.selectedScreenID }
+        set { primaryViewport.selectedScreenID = newValue }
     }
     /// The server's latest copy, in every form it offered; the session view puts it on the local
     /// clipboard (D42a).
     public private(set) var remoteClipboard: GlassClipboardContent?
-    /// What the renderer draws with. Its mode, opacity, key colour, tolerance and edge softness are
-    /// the window's settings resolved over All Desktops' (`apply`, W25); its zoom, pan and tilt are
-    /// this session's own.
-    public var presentation = PresentationSettings()
-    /// This window's own settings over All Desktops' (W25), kept on this device for the desktop it
-    /// shows (`DesktopWindowSettingsStore`), so its window has them again the next time it opens.
-    public var windowSettings: GlassWindowOverrides {
-        didSet { if windowSettings != oldValue { app.windowSettings.save(windowSettings, for: connection.id) } }
+    /// What the desktop's window draws with. Its mode, opacity, key colour, tolerance and edge
+    /// softness are the window's settings resolved over All Desktops' (`apply`, W25); its zoom, pan
+    /// and tilt are the window's own.
+    public var presentation: PresentationSettings {
+        get { primaryViewport.presentation }
+        set { primaryViewport.presentation = newValue }
     }
+    /// The desktop's window's own settings over All Desktops' (W25), kept on this device for the
+    /// desktop it shows (`DesktopWindowSettingsStore`), so its window has them again the next time.
+    public var windowSettings: GlassWindowOverrides {
+        get { primaryViewport.windowSettings }
+        set { primaryViewport.windowSettings = newValue }
+    }
+    /// What the connection trades for bytes (W30), from the desktop's own window's settings. VNC
+    /// acts on it; RDP ignores it.
+    public var streamQuality = GlassDesktopStreamQuality.automatic {
+        didSet {
+            guard streamQuality != oldValue else { return }
+            let target = transport, value = streamQuality
+            Task { await target.setStreamQuality(value) }
+        }
+    }
+    /// What the link is doing, about once a second, while connected (VNC).
+    public private(set) var linkStatistics: GlassDesktopLinkStatistics?
+    /// One window, or a window for each display (W30), from the desktop's own window's settings.
+    public var displayWindows = DesktopDisplayWindows.standard
+    /// Displays whose windows the desktop's window should open now (`DesktopSessionView`), taken
+    /// with `takeDisplayWindowRequests`.
+    public private(set) var displayWindowRequests: [UInt32] = []
+    /// Display windows closed by hand during this session, which `displayWindows` does not reopen.
+    private var dismissedDisplays: Set<UInt32> = []
+    private var appliedDisplayWindows = false
+    private var requestedRegions: [GlassRemoteRegion]??
+    /// Whether this device can open a second window; nil asks the device, at the point of use
+    /// (rules 43, 55). A test sets it.
+    var canOpenDisplayWindows: Bool?
     #if DEBUG
     /// Screenshots only (`App/GlassDemoMode.swift`): Desktop Settings ▸ This Window opens over the window.
     var demoOpensSettings = false
+    /// Screenshots only: and on its Connection page (W30).
+    var demoOpensConnection = false
     #endif
     public var matchWindow = true { didSet { if matchWindow != oldValue { cancelResize() } } }
     public var needsCredentials = false
@@ -105,6 +142,11 @@ public final class DesktopSessionModel {
     public private(set) var cursorImage: CGImage?
     public private(set) var cursorBitmap: DesktopCursorBitmap?
     public private(set) var cursorVisible = true
+    /// The desktop's window's pointer; each display window has its own (`DesktopViewport`).
+    public var pointerMode: DesktopPointerMode {
+        get { primaryViewport.pointerMode }
+        set { primaryViewport.pointerMode = newValue }
+    }
     public private(set) var transport: any GlassDesktopTransport
     private let app: DesktopAppModel
     private let operations: DesktopSessionOperations
@@ -142,8 +184,6 @@ public final class DesktopSessionModel {
     static let maximumServerSizeCorrections = 3
     /// Pixels per point of the display this window is on, reported by the view.
     private var displayScale: Double = 1
-    /// How a touch screen drives the remote pointer.
-    public var pointerMode = DesktopPointerMode.trackpad
     /// Whether the software keyboard has been asked for. Neither protocol reports remote text focus,
     /// so this is always the user's explicit choice rather than something detected.
     public var wantsKeyboard = false
@@ -173,10 +213,11 @@ public final class DesktopSessionModel {
         self.connection = connection
         self.app = app
         self.operations = operations
-        self.windowSettings = app.windowSettings.settings(for: connection.id)
+        self.primaryViewport = DesktopViewport(key: DesktopWindowKey(endpoint: connection.id), store: app.windowSettings)
         self.transport = Self.makeTransport(for: connection)
         self.wallpaperRoot = wallpaperRoot
         self.wallpaperStore = DesktopWallpaperStore(root: wallpaperRoot)
+        primaryViewport.session = self
     }
 
     isolated deinit {
@@ -190,22 +231,94 @@ public final class DesktopSessionModel {
         if let frame { .init(width: frame.width, height: frame.height) } else { connection.desktop }
     }
 
-    /// The part of the framebuffer on screen: one selected display, or the whole image.
-    public var visibleRegion: DesktopRegion {
+    /// The part of the framebuffer on screen in the desktop's window: one selected display, or the whole image.
+    public var visibleRegion: DesktopRegion { region(for: primaryViewport) }
+
+    /// The part of the framebuffer a window shows: its display, or the whole image.
+    public func region(for viewport: DesktopViewport) -> DesktopRegion {
         guard let frame else { return .whole(width: connection.desktop.width, height: connection.desktop.height) }
-        guard let id = selectedScreenID, let screen = screens.first(where: { $0.id == id }),
-              screen.x >= 0, screen.y >= 0, screen.width > 0, screen.height > 0,
-              screen.x + screen.width <= frame.width, screen.y + screen.height <= frame.height else {
-            return .whole(width: frame.width, height: frame.height)
-        }
-        return .init(origin: .init(x: screen.x, y: screen.y),
-                     size: DesktopSize(width: screen.width, height: screen.height))
+        return DesktopDisplayLayout.region(screenID: viewport.selectedScreenID, screens: screens,
+                                           framebuffer: DesktopSize(width: frame.width, height: frame.height))
     }
 
-    /// A display that disappeared, or a host that stopped publishing a layout, returns to the whole image.
+    /// A display that disappeared, or a host that stopped publishing a layout, returns the
+    /// desktop's window to the whole image. A display's own window keeps its display, and shows the
+    /// whole image (`region(for:)`) until the display is back.
     private func reconcileSelectedScreen() {
-        guard let id = selectedScreenID else { return }
-        if !screens.contains(where: { $0.id == id }) { selectedScreenID = nil }
+        guard let id = primaryViewport.selectedScreenID else { return }
+        if !screens.contains(where: { $0.id == id }) { primaryViewport.selectedScreenID = nil }
+    }
+
+    // MARK: Windows onto this session (W30)
+
+    /// A window opened onto this session. Its display is asked for from now on.
+    public func attach(_ viewport: DesktopViewport) {
+        guard !closed, !viewports.contains(where: { $0 === viewport }) else { return }
+        viewport.session = self
+        viewports.append(viewport)
+        if let display = viewport.key.display { dismissedDisplays.remove(display) }
+        updateRequestedRegions()
+    }
+
+    /// A window closed. The session ends with its last window; a display window closed by hand
+    /// is not reopened by `displayWindows` during this session.
+    public func detach(_ viewport: DesktopViewport) {
+        guard viewports.contains(where: { $0 === viewport }) else { return }
+        viewports.removeAll { $0 === viewport }
+        if let display = viewport.key.display, !closed, !shouldClosePresentation { dismissedDisplays.insert(display) }
+        if viewports.isEmpty { close() } else { updateRequestedRegions() }
+    }
+
+    /// The window that answers for the session — credentials, trust, the display windows to
+    /// open: the desktop's own while it is open, else the first display window.
+    public var leadViewport: DesktopViewport? {
+        viewports.contains(where: { $0 === primaryViewport }) ? primaryViewport : viewports.first
+    }
+
+    /// A display window for this session, with its own settings for that display.
+    public func displayViewport(for display: UInt32) -> DesktopViewport {
+        if let open = viewports.first(where: { $0.key.display == display }) { return open }
+        return DesktopViewport(key: DesktopWindowKey(endpoint: connection.id, display: display), store: app.windowSettings)
+    }
+
+    /// The displays to open windows for, once: the desktop's window opens them.
+    public func takeDisplayWindowRequests() -> [UInt32] {
+        defer { displayWindowRequests = [] }
+        return displayWindowRequests
+    }
+
+    /// A window's display or visibility changed.
+    func viewportDidChange() {
+        updateRequestedRegions()
+        updateCursorImage()
+    }
+
+    /// Asks the transport only for what is on screen: the displays of the windows that are.
+    private func updateRequestedRegions() {
+        let framebuffer = frame.map { DesktopSize(width: $0.width, height: $0.height) }
+        let regions = DesktopDisplayLayout.requestedRegions(
+            onScreen: viewports.filter(\.isOnScreen).map { region(for: $0) }, windows: viewports.count,
+            framebuffer: framebuffer)
+        guard requestedRegions != .some(regions) else { return }
+        requestedRegions = .some(regions)
+        let target = transport
+        Task { await target.setVisibleRegions(regions) }
+    }
+
+    /// What the transport was last asked for: nil for the whole framebuffer, empty for nothing.
+    var currentRequestedRegions: [GlassRemoteRegion]? { requestedRegions ?? nil }
+
+    /// A host with several displays and a window for each: the desktop's window shows the main
+    /// display, and the others open in their own — once per connection, and never one closed by
+    /// hand. Only where a second window can open.
+    private func applyDisplayWindows() {
+        guard !appliedDisplayWindows, screens.count > 1, displayWindows == .windowPerDisplay,
+              canOpenDisplayWindows ?? GlassWindowPresentation.canOpenWindows else { return }
+        appliedDisplayWindows = true
+        guard let main = DesktopDisplayLayout.mainScreen(screens) else { return }
+        if primaryViewport.selectedScreenID == nil { primaryViewport.selectedScreenID = main.id }
+        let shown = Set(viewports.compactMap(\.selectedScreenID)).union([primaryViewport.selectedScreenID].compactMap { $0 })
+        displayWindowRequests = screens.map(\.id).filter { !shown.contains($0) && !dismissedDisplays.contains($0) }
     }
     public var isConnected: Bool { state == .connected }
     var failurePresentation: DesktopFailurePresentation? {
@@ -321,6 +434,10 @@ public final class DesktopSessionModel {
             credential: RDPCredential(username: account.isEmpty ? DesktopConnection.passwordOnlyAccount : account,
                                       domain: domain, password: password))
         observe(attempt: attempt)
+        // The connection opens at the level and over the displays its windows ask for (W30).
+        await attempt.transport.setStreamQuality(streamQuality)
+        await attempt.transport.setVisibleRegions(currentRequestedRegions)
+        try requireCurrent(attempt.id)
         try await operations.connect(attempt.transport, configuration)
         do { try requireCurrent(attempt.id) }
         catch { await operations.disconnect(attempt.transport); throw error }
@@ -499,6 +616,11 @@ public final class DesktopSessionModel {
         return DesktopSize.fitting(width: width, height: height)
     }
 
+    /// A VNC host with several displays keeps its own layout (W30). SetDesktopSize carries a whole
+    /// layout, so asking for one desktop the size of a window would fold its displays into one —
+    /// on a Mac, its real displays. Neither Match Window Size nor Desktop Resolution asks then.
+    public var holdsDisplayLayout: Bool { connection.protocol == .vnc && screens.count > 1 }
+
     private func capabilitiesAllow(_ size: DesktopSize) -> Bool {
         guard let capabilities else { return true }
         return capabilities.supports(width: size.width, height: size.height)
@@ -524,7 +646,7 @@ public final class DesktopSessionModel {
         // Every new geometry supersedes pending work, including a return to the
         // already acknowledged size or a request outside negotiated limits.
         cancelResize()
-        guard isConnected, let capabilities,
+        guard isConnected, let capabilities, !holdsDisplayLayout,
               size != lastRequestedSize || currentScaleFactor != lastRequestedScaleFactor,
               capabilities.supports(width: size.width, height: size.height) else { return }
         let attempt = attemptID, revision = resizeRevision, target = transport, pause = operations.delay
@@ -556,6 +678,9 @@ public final class DesktopSessionModel {
         try requireCurrent(attempt)
         guard revision == resizeRevision else { throw CancellationError() }
         try size.validate()
+        guard !holdsDisplayLayout else {
+            throw GlassRDPError.unsupported("This computer has several displays, so its resolution is left as it is. Change it on the computer itself.")
+        }
         guard isConnected, let capabilities, capabilities.supports(width: size.width, height: size.height) else {
             throw GlassRDPError.unsupported("The server has not offered this desktop size.")
         }
@@ -635,6 +760,7 @@ public final class DesktopSessionModel {
         audio.stop()
         frame = nil; capabilities = nil; remoteClipboard = nil
         screens = []; selectedScreenID = nil
+        linkStatistics = nil; displayWindowRequests = []; appliedDisplayWindows = false
         cursor = .systemDefault; cursorBitmap = nil; cursorImage = nil
         pointerPosition = nil; cursorVisible = true
         lastRequestedSize = nil
@@ -715,6 +841,10 @@ public final class DesktopSessionModel {
             guard state == .connecting || isConnected else { return }
             screens = value
             reconcileSelectedScreen()
+            applyDisplayWindows()
+            updateRequestedRegions()
+        case .linkStatistics(let value):
+            if isConnected { linkStatistics = value }
         case .clipboard(let value): if isConnected, snapshot.clipboardEnabled { remoteClipboard = value }
         case .audio(let sample):
             guard isConnected, snapshot.audioEnabled else { return }
@@ -727,6 +857,7 @@ public final class DesktopSessionModel {
         let previous = frame
         frame = value
         hadDesktop = true
+        if previous?.width != value.width || previous?.height != value.height { updateRequestedRegions() }
         updateCursorImage()
         recordFirstDesktopIfReady(snapshot: connection)
         followServerSizeChange(from: previous, to: value)

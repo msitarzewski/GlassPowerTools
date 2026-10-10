@@ -1,6 +1,7 @@
 import SwiftUI
 import GlassConnectionUI
 import GlassLayers
+import GlassRDPTransport
 
 struct DesktopGlassAppearanceControls: View {
     @Binding var opacity: Double
@@ -45,12 +46,22 @@ struct DesktopAllDesktopsStorage: DynamicProperty {
     @AppStorage(DesktopPreferenceKey.edgeSoftness) var edgeSoftness = DesktopDefaults.standard.edgeSoftness
     @AppStorage(DesktopPreferenceKey.detail) var detail = DesktopSourceScale.automatic.rawValue
     @AppStorage(DesktopPreferenceKey.pointer) var pointer = ""
+    @AppStorage(DesktopPreferenceKey.quality) var quality = GlassDesktopStreamQuality.automatic.rawValue
+    @AppStorage(DesktopPreferenceKey.displays) var displays = ""
 
     /// What is stored, kept in range.
     var defaults: DesktopDefaults {
         DesktopDefaults(storedOpacity: opacity, frost: frost, backgroundRemoval: backgroundRemoval,
                         red: red, green: green, blue: blue, tolerance: tolerance, edgeSoftness: edgeSoftness,
-                        detail: detail, pointer: pointer)
+                        detail: detail, pointer: pointer, quality: quality, displays: displays)
+    }
+
+    var streamQuality: Binding<GlassDesktopStreamQuality> {
+        Binding(get: { defaults.quality }, set: { quality = $0.rawValue })
+    }
+
+    var displayWindows: Binding<DesktopDisplayWindows> {
+        Binding(get: { defaults.resolvedDisplays }, set: { displays = $0.rawValue })
     }
 
     var mode: Binding<TransparencyMode> {
@@ -125,6 +136,21 @@ public struct DesktopSettingsView: View {
                 Text("Remote Desktop")
             } footer: {
                 Text("RDP only. Detail asks for more remote pixels per point while Match Window Size is on, so text stays sharp on a high-resolution display. Automatic follows the display the window is on.")
+            }
+            // W30: what a VNC connection trades for bytes, and what a host's several displays get.
+            Section {
+                Picker("Quality", selection: allDesktops.streamQuality) {
+                    ForEach(GlassDesktopStreamQuality.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                .accessibilityIdentifier("display.stream-quality")
+                Picker("Display Windows", selection: allDesktops.displayWindows) {
+                    ForEach(DesktopDisplayWindows.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                .accessibilityIdentifier("display.display-windows")
+            } header: {
+                Text("Screen Sharing (VNC)")
+            } footer: {
+                Text("\(DesktopConnectionSettingsSections.qualityFooter) Display Windows is for a computer with several displays: one window showing them, or a window for each, opened when it connects.")
             }
             if DesktopWindowSettings.offersTouchPointer {
                 Section {

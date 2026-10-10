@@ -15,6 +15,7 @@ swift build --disable-keychain
 | `GlassVNCProbe` | a real VNC host you name | negotiation and a first real frame |
 | `GlassRDPFunctionalProbe` | the disposable xrdp fixture (`Docker/xrdp`) | the functional checks below |
 | `GlassVNCFunctionalProbe` | the disposable TigerVNC fixture (`Docker/tigervnc`) | the functional checks below |
+| `GlassVNCDisplaysProbe` | the same fixture with a picture workload (`Docker/tigervnc-displays`) | two displays, region requests, quality levels (below) |
 
 The first two read the password from a file (`<host> <port> <username> <password-file>`) so it
 never appears on a command line. The functional harnesses were moved from glassDT's
@@ -83,3 +84,29 @@ It writes `final-frame.ppm` (`sips -s format png final-frame.ppm --out final-fra
 it). Without the container argument the same probe only reports, so it can be pointed at any VNC
 server: `GlassVNCFunctionalProbe <host> <port> <username-or-empty> <evidence-dir> <seconds> < password-file`.
 This is standard RFB interoperability only. Apple Remote Desktop authentication needs a real Mac.
+
+### Two displays and quality (`Docker/tigervnc-displays`)
+
+`Docker/tigervnc-displays/run.sh [evidence-directory]` builds the TigerVNC image above, then one on
+top of it with `python3-tk` and `glass-animate` (a generated picture workload: a grainy colour panel
+cycling through frames and a band of changing bars, about 15 frames a second). It is a separate image
+because adding packages to the base image made its `keyboard_input` check fail (measured on
+2026-10-10; the cause was not investigated). `GlassVNCDisplaysProbe` (VNCKit, plus `GlassDesktop` for
+the app's own coordinate mapping) then:
+
+- asks Xvnc for two screens with SetDesktopSize — 1280 × 800 at the origin and 1024 × 768 at
+  (1280, 32) — the way TigerVNC's viewer asks for several monitors (Xvnc makes a second RandR output
+  only when a client asks for one), and checks `two_screens_reported` from ExtendedDesktopSize;
+- starts the workload on each screen;
+- `region_request_one_display`: asks only for display 2 and checks that every rectangle arriving
+  lies inside it;
+- `input_to_display_two`: maps the middle of a 640 × 384-point window showing display 2 with
+  `DesktopCoordinates.map` and reads the pointer back with `xdotool` (expects 1792, 416);
+- measures bytes per second for the whole framebuffer and single displays at each quality level,
+  changing colour depth mid-session, and checks `quality_switches_decode` (the session survived);
+- runs Automatic over a local proxy that carries the server's bytes at 2000 and at 600 kbit/s, and
+  checks the level it settles on (Data Saver, Lowest).
+
+Evidence: `results.jsonl` and `two-displays.ppm`, the final framebuffer decoded from the protocol.
+Standard RFB only: Apple's server is not reachable from Docker, and its display layout (encoding 1105)
+is tested only against byte layouts written from published reverse engineering.

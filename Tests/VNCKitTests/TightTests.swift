@@ -6,7 +6,7 @@ import CoreGraphics
 import UniformTypeIdentifiers
 @testable import VNCKit
 
-/// Tight (encoding 7) and the link-quality governor (2026-09-30).
+/// Tight (encoding 7), 2026-09-30.
 @Suite("Tight encoding")
 struct TightTests {
     /// A zlib stream that keeps its state across rectangles, as a Tight server's does.
@@ -125,29 +125,6 @@ struct TightTests {
         await #expect(throws: RFBError.self) { _ = try await decode([0x40, 9], rect: .init(x: 0, y: 0, width: 1, height: 1), fb: fb) }
     }
 
-    // MARK: Governor
-
-    @Test func governorChangesQualityOnlyAfterThreeAgreeingMeasurements() {
-        var governor = RFBLinkQualityGovernor()
-        #expect(governor.jpegQuality == 8)
-        // 100 KB in 1 s = 800 kb/s: a slow link wants quality 4.
-        #expect(governor.observe(bytes: 100_000, seconds: 1) == nil)
-        #expect(governor.observe(bytes: 100_000, seconds: 1) == nil)
-        #expect(governor.observe(bytes: 100_000, seconds: 1) == .some(4))
-        #expect(governor.jpegQuality == 4)
-        // One fast burst does not flip it back.
-        #expect(governor.observe(bytes: 4_000_000, seconds: 1) == nil)
-        #expect(governor.observe(bytes: 100_000, seconds: 1) == nil)
-        #expect(governor.jpegQuality == 4)
-        // A fast link, measured three times, goes lossless.
-        for _ in 0..<2 { _ = governor.observe(bytes: 4_000_000, seconds: 1) }
-        #expect(governor.observe(bytes: 4_000_000, seconds: 1) == .some(nil))
-        #expect(governor.jpegQuality == nil)
-    }
-
-    @Test func smallUpdatesSayNothingAboutTheLink() {
-        var governor = RFBLinkQualityGovernor()
-        for _ in 0..<10 { #expect(governor.observe(bytes: 2_000, seconds: 1) == nil) }
-        #expect(governor.jpegQuality == 8)
-    }
+    // The governor moved with W30 to `StreamingTests` (AutomaticQualityTests): it now measures every
+    // encoding and chooses a level, not only Tight's JPEG quality.
 }

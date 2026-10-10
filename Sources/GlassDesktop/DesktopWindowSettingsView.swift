@@ -19,6 +19,8 @@ import GlassRDPTransport
 /// This Window: the desktop window's own settings over All Desktops', and its session's controls.
 struct DesktopWindowSettingsView: View {
     @Bindable var session: DesktopSessionModel
+    /// The window these settings are for (W30): the desktop's own, or one display's.
+    @Bindable var viewport: DesktopViewport
     /// All Desktops now, which each row follows until it is set here.
     let defaults: DesktopDefaults
     let compactScreen: Bool
@@ -38,7 +40,7 @@ struct DesktopWindowSettingsView: View {
             zoom
             if DesktopWindowSettings.offersTouchPointer { touch }
             Section {
-                GlassWindowResetButton(overrides: $session.windowSettings)
+                GlassWindowResetButton(overrides: $viewport.windowSettings)
             } footer: {
                 GlassWindowSettingsFooter(
                     follows: Self.allDesktops,
@@ -51,27 +53,27 @@ struct DesktopWindowSettingsView: View {
 
     /// What the window draws with now, for Show Original.
     private var profile: DesktopWindowProfile {
-        DesktopWindowProfile(window: session.windowSettings, defaults: defaults, compactScreen: compactScreen,
+        DesktopWindowProfile(window: viewport.windowSettings, defaults: defaults, compactScreen: compactScreen,
                              reduceTransparency: reduceTransparency)
     }
 
     /// The presentation the window chose, before Reduce Transparency: what the sections below
     /// it are about.
     private var chosenMode: TransparencyMode {
-        session.windowSettings.value(of: DesktopWindowSettings.backgroundRemoval, over: defaults.backgroundRemoval)
+        viewport.windowSettings.value(of: DesktopWindowSettings.backgroundRemoval, over: defaults.backgroundRemoval)
     }
 
     // MARK: Glass (Mac and Vision Pro)
 
     private var glass: some View {
         Section {
-            GlassWindowSettingRow(DesktopWindowSettings.opacity, overrides: $session.windowSettings,
+            GlassWindowSettingRow(DesktopWindowSettings.opacity, overrides: $viewport.windowSettings,
                                   global: defaults.opacity, inheritsFrom: Self.allDesktops) { value in
                 GlassSettingSlider(title: DesktopWindowSettings.opacity.title, value: value, detents: [0, 0.5, 1],
                                    leadingAccessibilityLabel: "Transparent", trailingAccessibilityLabel: "Opaque",
                                    accessibilityIdentifier: "desktop-window-opacity")
             }
-            GlassWindowSettingRow(DesktopWindowSettings.frost, overrides: $session.windowSettings,
+            GlassWindowSettingRow(DesktopWindowSettings.frost, overrides: $viewport.windowSettings,
                                   global: defaults.frost, inheritsFrom: Self.allDesktops) { value in
                 GlassSettingSlider(title: DesktopWindowSettings.frost.title, value: value, detents: [0, 0.5, 1],
                                    leadingAccessibilityLabel: "No glass", trailingAccessibilityLabel: "Full glass",
@@ -93,7 +95,7 @@ struct DesktopWindowSettingsView: View {
 
     @ViewBuilder private var backgroundRemoval: some View {
         Section {
-            GlassWindowSettingRow(DesktopWindowSettings.backgroundRemoval, overrides: $session.windowSettings,
+            GlassWindowSettingRow(DesktopWindowSettings.backgroundRemoval, overrides: $viewport.windowSettings,
                                   global: defaults.backgroundRemoval, inheritsFrom: Self.allDesktops) { value in
                 GlassSettingLabeled(DesktopWindowSettings.backgroundRemoval.title) {
                     Picker(DesktopWindowSettings.backgroundRemoval.title, selection: value) {
@@ -104,7 +106,7 @@ struct DesktopWindowSettingsView: View {
             }
             // glassDT's toolbar Original, here since W27: this window's Presentation and Opacity
             // at once, which is why it is not a Presentation choice.
-            Button("Show Original") { session.windowSettings.showDesktopOriginal() }
+            Button("Show Original") { viewport.windowSettings.showDesktopOriginal() }
                 .disabled(profile.showsOriginal)
                 .help("The complete desktop image, opaque, in this window")
                 .accessibilityIdentifier("display.glass.original")
@@ -116,7 +118,7 @@ struct DesktopWindowSettingsView: View {
         .disabled(reduceTransparency)
         if chosenMode == .removeColor {
             Section {
-                GlassWindowSettingRow(DesktopWindowSettings.keyColor, overrides: $session.windowSettings,
+                GlassWindowSettingRow(DesktopWindowSettings.keyColor, overrides: $viewport.windowSettings,
                                       global: DesktopKeyColor.hex(defaults.keyColor),
                                       inheritsFrom: Self.allDesktops) { hex in
                     GlassSettingLabeled(DesktopWindowSettings.keyColor.title) {
@@ -143,14 +145,14 @@ struct DesktopWindowSettingsView: View {
         }
         if chosenMode != .original {
             Section("Edges") {
-                GlassWindowSettingRow(DesktopWindowSettings.tolerance, overrides: $session.windowSettings,
+                GlassWindowSettingRow(DesktopWindowSettings.tolerance, overrides: $viewport.windowSettings,
                                       global: defaults.tolerance, inheritsFrom: Self.allDesktops) { value in
                     GlassSettingLabeled(DesktopWindowSettings.tolerance.title) {
                         Slider(value: value, in: DesktopDefaults.toleranceRange) { Text("Tolerance") }
                             .accessibilityIdentifier("desktop-window-tolerance")
                     }
                 }
-                GlassWindowSettingRow(DesktopWindowSettings.edgeSoftness, overrides: $session.windowSettings,
+                GlassWindowSettingRow(DesktopWindowSettings.edgeSoftness, overrides: $viewport.windowSettings,
                                       global: defaults.edgeSoftness, inheritsFrom: Self.allDesktops) { value in
                     GlassSettingLabeled(DesktopWindowSettings.edgeSoftness.title) {
                         Slider(value: value, in: DesktopDefaults.edgeSoftnessRange) { Text("Edge Softness") }
@@ -178,7 +180,7 @@ struct DesktopWindowSettingsView: View {
     @ViewBuilder private var remoteDesktop: some View {
         if session.screens.count > 1 {
             Section {
-                Picker("Show", selection: $session.selectedScreenID) {
+                Picker("Show", selection: $viewport.selectedScreenID) {
                     Text("All Displays").tag(UInt32?.none)
                     ForEach(session.screens) { screen in
                         Text("\(screenName(screen)) (\(screen.width) × \(screen.height))").tag(UInt32?.some(screen.id))
@@ -187,7 +189,9 @@ struct DesktopWindowSettingsView: View {
             } header: {
                 Text("Displays")
             } footer: {
-                Text("This computer sends one image covering all of its displays. Showing a single display fills the window with it, and uses no more of the network.")
+                Text(session.connection.protocol == .vnc
+                     ? "Showing one display fills this window with it, and the computer sends only the displays that have a window on screen: a display whose window is closed or in the background costs nothing. Open another display in a window of its own from Displays in the window's controls."
+                     : "Showing one display fills this window with it. The computer still sends every display.")
             }
         }
         Section {
@@ -195,10 +199,10 @@ struct DesktopWindowSettingsView: View {
                 LabeledContent("Current Resolution", value: "\(frame.width) × \(frame.height)")
             }
             Toggle("Match Window Size", isOn: $session.matchWindow)
-                .disabled(session.capabilities == nil)
+                .disabled(session.capabilities == nil || session.holdsDisplayLayout || !viewport.isPrimary)
                 .accessibilityIdentifier("display.match-window")
             if session.connection.protocol == .rdp {
-                GlassWindowSettingRow(DesktopWindowSettings.detail, overrides: $session.windowSettings,
+                GlassWindowSettingRow(DesktopWindowSettings.detail, overrides: $viewport.windowSettings,
                                       global: defaults.detail, inheritsFrom: Self.allDesktops) { value in
                     GlassSettingLabeled(DesktopWindowSettings.detail.title) {
                         Picker(DesktopWindowSettings.detail.title, selection: value) {
@@ -216,55 +220,56 @@ struct DesktopWindowSettingsView: View {
                         Task { await session.setSourceSize(size) }
                     }.disabled(!(session.capabilities?.supports(width: size.width, height: size.height) ?? false))
                 }
-            }.disabled(session.capabilities == nil)
+            }.disabled(session.capabilities == nil || session.holdsDisplayLayout)
         } header: {
             Text("Remote Desktop")
         } footer: {
-            if session.capabilities == nil {
+            if session.holdsDisplayLayout {
+                Text("This computer has several displays, so its resolution is left as it is: one desktop the size of a window would fold its displays into one. Change resolution on the computer itself; a smaller one sends fewer pixels.")
+            } else if session.capabilities == nil {
                 Text("Source resizing becomes available when the server offers display control.")
             } else if session.connection.protocol == .rdp {
                 Text("Match Window Size adjusts the remote desktop as you resize this window. Detail asks for more remote pixels per point, so text stays sharp on a high-resolution display without changing how large it looks. Automatic follows this display. Higher settings send more pixels over the network, and a server that ignores the request will show a smaller interface.")
             } else {
-                Text("Match Window Size adjusts the remote desktop as you resize this window.")
+                Text("Match Window Size changes the remote computer's own resolution as you resize this window. A smaller desktop sends fewer pixels.")
             }
         }
     }
 
     private func screenName(_ screen: GlassRemoteScreen) -> String {
-        guard let index = session.screens.firstIndex(where: { $0.id == screen.id }) else { return "Display" }
-        return screen.isPrimary ? "Main Display" : "Display \(index + 1)"
+        DesktopDisplayLayout.name(of: screen.id, in: session.screens)
     }
 
     // MARK: Zoom: this session's
 
     private var zoom: some View {
         Section {
-            GlassSettingSlider(title: "Local Scale", value: $session.presentation.zoom,
+            GlassSettingSlider(title: "Local Scale", value: $viewport.presentation.zoom,
                                range: DesktopZoomLimits.minimum...DesktopZoomLimits.maximum, detents: [1],
                                leadingAccessibilityLabel: "Fitted to the window",
                                trailingAccessibilityLabel: "Double size",
                                accessibilityIdentifier: "display.local-scale")
             Button("Actual Size") {
-                session.presentation.zoom = 1
-                session.presentation.panX = 0
-                session.presentation.panY = 0
+                viewport.presentation.zoom = 1
+                viewport.presentation.panX = 0
+                viewport.presentation.panY = 0
             }
-                .disabled(session.presentation.zoom == 1 && session.presentation.panX == 0 && session.presentation.panY == 0)
+                .disabled(viewport.presentation.zoom == 1 && viewport.presentation.panX == 0 && viewport.presentation.panY == 0)
                 .accessibilityIdentifier("display.local-scale.reset")
         } header: {
             Text("Zoom")
         } footer: {
-            Text("Local scale enlarges the image in this window without changing the remote resolution. 100% is the desktop fitted to the window, which is as small as it goes.")
+            Text("Local scale enlarges the image in this window without changing the remote resolution. 100% is the desktop fitted to the window, which is as small as it goes. Scaling here does not change what the network carries.")
         }
     }
 
     // MARK: Touch (iPad and iPhone)
 
     private var touch: some View {
-        let pointer = session.windowSettings.value(of: DesktopWindowSettings.pointer,
+        let pointer = viewport.windowSettings.value(of: DesktopWindowSettings.pointer,
                                                    over: defaults.pointer(compactScreen: compactScreen))
         return Section {
-            GlassWindowSettingRow(DesktopWindowSettings.pointer, overrides: $session.windowSettings,
+            GlassWindowSettingRow(DesktopWindowSettings.pointer, overrides: $viewport.windowSettings,
                                   global: defaults.pointer(compactScreen: compactScreen),
                                   inheritsFrom: Self.allDesktops) { value in
                 GlassSettingLabeled(DesktopWindowSettings.pointer.title) {

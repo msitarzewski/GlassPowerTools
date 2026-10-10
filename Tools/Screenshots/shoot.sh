@@ -5,8 +5,8 @@
 # front of the one being captured.
 # Surfaces: library, editor, editor-window, editor-settings, preview, terminal, terminal-window,
 # terminal-settings, terminal-move, files, database, database-window, database-settings, diagram,
-# desktop, desktop-window, desktop-settings, connections-host, orb, orb-looked-at, orb-later,
-# orb-later-desktop
+# desktop, desktop-window, desktop-settings, desktop-displays, desktop-quality, connections-host, orb,
+# orb-looked-at, orb-later, orb-later-desktop
 # (see App/GlassDemoMode.swift). The orb surfaces need DEMO_ARGS="--demo-idle-seconds 5".
 set -euo pipefail
 SIM="$1"; SURFACE="$2"; OUT="$3"; SETTLE="${4:-8}"

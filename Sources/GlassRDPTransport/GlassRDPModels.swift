@@ -152,6 +152,8 @@ public enum GlassRDPEvent: Sendable, Equatable {
     case audio(GlassRDPAudioSample)
     /// The displays inside the remote framebuffer. Empty means the host published no layout.
     case screens([GlassRemoteScreen])
+    /// What the link is doing, about once a second (VNC).
+    case linkStatistics(GlassDesktopLinkStatistics)
 }
 
 public enum GlassRDPError: Error, Sendable, Equatable, LocalizedError {

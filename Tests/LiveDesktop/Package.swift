@@ -18,6 +18,11 @@ let package = Package(
         .executableTarget(name: "GlassRDPFunctionalProbe",
                           dependencies: [.product(name: "GlassRDPTransport", package: "GlassPowerTools")]),
         .executableTarget(name: "GlassVNCFunctionalProbe",
-                          dependencies: [.product(name: "VNCKit", package: "GlassPowerTools")])
+                          dependencies: [.product(name: "VNCKit", package: "GlassPowerTools")]),
+        // W30, run by Docker/tigervnc-displays/run.sh: two screens, region requests, input mapped
+        // into a display by the app's own `DesktopCoordinates`, and bytes per second per quality level.
+        .executableTarget(name: "GlassVNCDisplaysProbe",
+                          dependencies: [.product(name: "VNCKit", package: "GlassPowerTools"),
+                                         .product(name: "GlassDesktop", package: "GlassPowerTools")])
     ]
 )

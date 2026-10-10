@@ -10,11 +10,21 @@ Each desktop opens in its own window with the service's name at the top and a ro
 |---|---|
 | **Settings** (gear) | Opens **Desktop Settings**. |
 | **Clipboard** | Sends or copies clipboard text, and sends Control–Alt–Delete. See [Keyboard, pointer, clipboard and audio](desktop-input.md). |
+| **Displays** (two rectangles) | Only for a computer with more than one display: chooses the display this window shows, and opens another display in a window of its own. |
+| **Quality** (gauge) | Only for Screen Sharing (VNC): chooses how much picture the connection carries, under a line showing what it carries now. |
 | **Escape** | Sends the Escape key. |
 | **Tab** | Sends the Tab key. |
 | **Input** (keyboard) | Opens **Send Text**, where you type text and choose **Send** to type it on the remote computer. |
 
 The window is at least 800 × 440 points. With **Match Window Size** on, resizing the window changes the remote computer's resolution to match. See [Resolution, scaling and zoom](desktop-display-and-scaling.md).
+
+## A window for each display
+
+When a computer with several displays connects, each display opens in a window of its own, as if you had a monitor for each: the desktop's window shows the main display, and the others open beside it. Place, resize, zoom and tilt each window on its own; the pointer and keys go to the display of the window you are using, and the pointer is drawn in whichever window shows the display it is on. All of them share one connection.
+
+Close a display's window when you don't need it: the others stay connected, and that display stops using the network. Closing the last window ends the session. To open a display again, choose **Displays** and the display under **Open in a New Window**.
+
+To keep every display in one window instead, set **Display Windows** to **One Window** in **Desktop Settings** > **Connection**, or for every desktop in **Settings** > **Desktops**. See [Several displays](desktop-display-and-scaling.md#several-displays).
 
 ## Input in the headset
 

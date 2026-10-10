@@ -28,13 +28,41 @@ Higher settings send more pixels over the network. A server that ignores the sca
 
 Open **Desktop Resolution** and choose **1280 × 800**, **1920 × 1080**, **2560 × 1440** or **3840 × 2160**. Sizes the server does not accept are unavailable. Choosing one turns **Match Window Size** off, so resizing the window no longer changes the resolution. Turn **Match Window Size** on again to go back.
 
-## Show one display of a multi-display computer (VNC)
+## Several displays
 
-When a VNC server sends one image covering several displays, a **Displays** section appears. In **Show**, choose **All Displays**, **Main Display** or another display. A single display fills the window and uses no more of the network.
+A computer with several displays sends one image covering all of them. When it says where each display sits in that image, **Displays** appears in the window's controls and a **Displays** section in **This Window**:
+
+- **Show** chooses what this window shows: **All Displays**, **Main Display** or another display. A single display fills the window.
+- **Open in a New Window** (in the **Displays** control) opens a display in a window of its own, on Apple Vision Pro, Mac and iPad. Each window has its own display, zoom, tilt and settings, and the pointer and keys go to the display of the window you use. All of a desktop's windows share one connection.
+- **Display Windows**: **A Window for Each Display** opens one window per display whenever the desktop connects; **One Window** keeps them together. It starts as **A Window for Each Display** on Apple Vision Pro and **One Window** elsewhere, and can be set in **Settings** > **Desktops**, or for one desktop in **Desktop Settings** > **Connection**.
+
+**Screen Sharing (VNC):** the computer is asked only for the displays that have a window on screen. A display whose window is closed or in the background costs nothing on the network, and its picture is fetched again when its window returns. Closing a display's window leaves the others connected; closing the last ends the session.
+
+While a VNC computer has several displays, the app does not change its resolution: **Match Window Size** and **Desktop Resolution** are unavailable, because one desktop the size of a window would fold its displays into one.
+
+If the computer does not say where its displays are, the window shows them as one picture and **Displays** does not appear.
+
+## Quality and the network (Screen Sharing)
+
+**Quality**, in the window's controls and in **Desktop Settings** > **Connection**, chooses how much picture a VNC connection carries. It belongs to the connection, so it applies to every window of the desktop.
+
+| Quality | What the computer is asked to send |
+|---|---|
+| **Automatic** (default) | Measures how fast the picture arrives and moves between the levels below as the connection changes: down quickly on a slow link, up slowly once it is fast again. |
+| **Best** | Every pixel exactly, in full color, as fast as the connection allows. |
+| **Balanced** | Full color, with photos and video compressed as JPEG where the computer offers it. |
+| **Data Saver** | Thousands of colors, stronger compression and JPEG, at most 15 updates a second. |
+| **Lowest** | The strongest compression and JPEG, at most 8 updates a second; 256 colors where the computer does not send JPEG. |
+
+A Mac's Screen Sharing has not been seen to send JPEG to apps other than Apple's own, so on a Mac the levels work through colors, compression and how often the picture is asked for. They never go below thousands of colors there: older versions of macOS ended the session when asked for fewer.
+
+On the **Connection** page, under **Quality**, the figures show what the network is carrying now, updated every second: **Receiving** (for example `1.2 Mbit/s`), **Updates** per second, the **Level** in effect (with **Automatic**, the level it chose), **Color**, the **Encoding** the computer is using, and **Fetching** (the whole desktop, only the displays on screen, or nothing). The **Quality** control in the window shows the same as one line above its choices, and on Mac, iPad and iPhone the line also appears in the bar at the bottom of the window.
+
+Zooming or shrinking the picture in the window does not change what the network carries: the computer sends its own pixels either way. To send fewer pixels, lower the remote resolution, or show fewer displays.
 
 ## Zoom in this window
 
-**Local Scale**, under **Zoom**, enlarges the image in this window without changing the remote resolution. 100% is the whole desktop fitted to the window, the smallest it goes; 200% is the largest. **Actual Size** returns to 100% and re-centers the image.
+**Local Scale**, under **Zoom**, enlarges the image in this window without changing the remote resolution or what the network carries. 100% is the whole desktop fitted to the window, the smallest it goes; 200% is the largest. **Actual Size** returns to 100% and re-centers the image.
 
 **On Apple Vision Pro:** pinching selects rather than zooms. Use **Local Scale**, or make the window larger.
 
@@ -50,4 +78,4 @@ When a new desktop window would open at its smallest size, it opens at the servi
 
 **Actual Size** sets zoom back to 100%. **Reset This Window** returns every setting the window keeps to **All Desktops**' settings. Neither changes the remote resolution.
 
-**Match Window Size**, the display shown, a fixed resolution and **Local Scale** last for the session: each time a desktop opens, it starts with **Match Window Size** on, every display and 100%.
+**Match Window Size**, the display shown, a fixed resolution and **Local Scale** last for the session: each time a desktop opens, it starts with **Match Window Size** on, every display (or, with **A Window for Each Display**, the main display) and 100%. **Quality** and **Display Windows** are settings, kept like the window's others.

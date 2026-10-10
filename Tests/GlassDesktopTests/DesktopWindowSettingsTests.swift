@@ -344,7 +344,7 @@ struct DesktopWindowSettingsTests {
         """
         let records = DesktopWindowSettingsStore.read(Data(json.utf8))
         #expect(records.count == 1)
-        let kept = try #require(records[EndpointID(rawValue: alpha)]?.windowSettings)
+        let kept = try #require(records[DesktopWindowKey(endpoint: EndpointID(rawValue: alpha))]?.windowSettings)
         #expect(kept[DesktopWindowSettings.opacity] == 0.25)
         #expect(kept.keys == ["desktop.opacity", "desktop.future"], "a newer build's setting survives this one")
         #expect(DesktopWindowSettingsStore.read(Data("[1, 2]".utf8)).isEmpty)

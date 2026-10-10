@@ -38,6 +38,32 @@ public struct GlassDesktopScenes: Scene {
         .restorationBehavior(.disabled)
         .defaultLaunchBehavior(.suppressed)
         #endif
+
+        // W30: one window per display of a multi-display host, onto the desktop window's
+        // connection. Keyed by desktop and display, so opening a display that already has a window
+        // brings it forward. Not restored, like the desktop's own window: its connection is not.
+        WindowGroup(id: DesktopDisplayWindowValue.windowID, for: DesktopDisplayWindowValue.self) { $value in
+            DesktopDisplayWindowHost(runtime: runtime, value: value)
+                .glassLayers(runtime.layers)
+        }
+        #if os(visionOS)
+        .windowStyle(.plain)
+        // Beside the desktop's other windows, as one monitor stands beside another, rather than
+        // in front of them.
+        .defaultWindowPlacement { _, context in
+            if let beside = context.windows.last(where: {
+                $0.id == DesktopDisplayWindowValue.windowID || $0.id == "desktop-session"
+            }) {
+                return WindowPlacement(.trailing(beside))
+            }
+            return WindowPlacement()
+        }
+        #endif
+        #if !os(iOS)
+        .defaultSize(width: 1280, height: 800)
+        .restorationBehavior(.disabled)
+        .defaultLaunchBehavior(.suppressed)
+        #endif
     }
 }
 
@@ -50,6 +76,10 @@ struct DesktopSessionHost: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openWindow) private var openWindow
     @State private var loaded = false
+    /// The desktop's session still open in its display windows after its own window closed (W30),
+    /// looked up once as the window appears: this window joins it rather than connecting again.
+    @State private var liveSession: DesktopSessionModel?
+    @State private var lookedForLiveSession = false
 
     /// The ⚡ in this window: bring the library forward on its Active list.
     private var showActive: (@MainActor () -> Void)? {
@@ -81,7 +111,14 @@ struct DesktopSessionHost: View {
 
     private var content: some View {
         Group {
-            if let endpointID, let connection = runtime.connection(for: endpointID) {
+            if let live = liveSession {
+                DesktopSessionView(session: live, viewport: live.primaryViewport,
+                                   onOutcome: { runtime.reportOutcome($0, for: endpointID) },
+                                   onClose: { dismiss() },
+                                   showActiveConnections: showActive)
+            } else if !lookedForLiveSession {
+                ProgressView().controlSize(.large)
+            } else if let endpointID, let connection = runtime.connection(for: endpointID) {
                 DesktopSessionView(connection: connection, app: runtime.app,
                                    onOutcome: { runtime.reportOutcome($0, for: endpointID) },
                                    onClose: { dismiss() },
@@ -95,6 +132,11 @@ struct DesktopSessionHost: View {
             } else {
                 ProgressView().controlSize(.large)
             }
+        }
+        .onAppear {
+            guard !lookedForLiveSession else { return }
+            liveSession = endpointID.flatMap { runtime.app.liveSession(for: $0) }
+            lookedForLiveSession = true
         }
         .task {
             await runtime.loadIfNeeded()

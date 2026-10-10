@@ -7,18 +7,22 @@ import GlassRDPTransport
 import AppKit
 struct DesktopMetalSurface: NSViewRepresentable {
     let session: DesktopSessionModel
+    /// The window this surface is in (W30); nil is the desktop's own.
+    var viewport: DesktopViewport?
     var inputEnabled = true
     func makeNSView(context: Context) -> DesktopMTKView { DesktopMTKView(session: session, inputEnabled: inputEnabled) }
-    func updateNSView(_ view: DesktopMTKView, context: Context) { view.update(session, inputEnabled: inputEnabled) }
+    func updateNSView(_ view: DesktopMTKView, context: Context) { view.update(session, viewport: viewport, inputEnabled: inputEnabled) }
     static func dismantleNSView(_ view: DesktopMTKView, coordinator: ()) { view.shutdown() }
 }
 #else
 import UIKit
 struct DesktopMetalSurface: UIViewRepresentable {
     let session: DesktopSessionModel
+    /// The window this surface is in (W30); nil is the desktop's own.
+    var viewport: DesktopViewport?
     var inputEnabled = true
     func makeUIView(context: Context) -> DesktopMTKView { DesktopMTKView(session: session, inputEnabled: inputEnabled) }
-    func updateUIView(_ view: DesktopMTKView, context: Context) { view.update(session, inputEnabled: inputEnabled) }
+    func updateUIView(_ view: DesktopMTKView, context: Context) { view.update(session, viewport: viewport, inputEnabled: inputEnabled) }
     static func dismantleUIView(_ view: DesktopMTKView, coordinator: ()) { view.shutdown() }
 }
 #endif
@@ -29,6 +33,9 @@ final class DesktopMTKView: MTKView {
     private var renderer: DesktopMetalRenderer?
     private(set) var inputEnabled = true
     private weak var session: DesktopSessionModel?
+    /// The window: its display, zoom, pan and pointer (W30). Nil is the desktop's own window.
+    private weak var viewport: DesktopViewport?
+    private var shown: DesktopViewport? { viewport ?? session?.primaryViewport }
     private weak var inputTransport: (any GlassDesktopTransport)?
     private var pressedKeys = Set<UInt16>()
     private var lastCapsLock: Bool?
@@ -146,8 +153,10 @@ final class DesktopMTKView: MTKView {
         #endif
     }
 
-    func update(_ session: DesktopSessionModel, inputEnabled: Bool = true) {
+    func update(_ session: DesktopSessionModel, viewport: DesktopViewport? = nil, inputEnabled: Bool = true) {
         if self.session !== session { shutdown(); configure(session) }
+        self.viewport = viewport
+        let shown = viewport ?? session.primaryViewport
         if inputTransport !== session.transport || session.isConnected != wasConnected {
             input?.stop()
             input = DesktopInput(session: session.transport) { [weak session] in session?.errorMessage = $0 }
@@ -157,8 +166,8 @@ final class DesktopMTKView: MTKView {
         }
         setInputEnabled(inputEnabled)
         #if os(iOS)
-        if pointerMode != session.pointerMode {
-            pointerMode = session.pointerMode
+        if pointerMode != shown.pointerMode {
+            pointerMode = shown.pointerMode
             trackpad = nil
             input?.send(.release)
         }
@@ -166,8 +175,8 @@ final class DesktopMTKView: MTKView {
         if wantsSoftwareKeyboard, !isFirstResponder { becomeFirstResponder() }
         #endif
         renderer?.frame = session.frame
-        renderer?.region = session.visibleRegion
-        renderer?.settings = session.presentation
+        renderer?.region = session.region(for: shown)
+        renderer?.settings = shown.presentation
         renderer?.setWallpaper(session.wallpaperURL)
         #if os(macOS)
         if let window { GlassWindowChrome.installTitlebarMaterial(in: window) }
@@ -226,9 +235,10 @@ final class DesktopMTKView: MTKView {
     }
 
     private func point(_ location: CGPoint, clamp: Bool = false) -> DesktopPoint? {
-        guard inputEnabled, let session, session.isConnected else { return nil }
-        // Input follows the visible region, so clicks land on the display actually being shown.
-        let region = session.visibleRegion
+        guard inputEnabled, let session, let shown, session.isConnected else { return nil }
+        // Input follows this window's region, so clicks land on the display it shows: a point in a
+        // display window lands inside that display's rectangle of the framebuffer (W30).
+        let region = session.region(for: shown)
         let mapped = DesktopCoordinates.map(x: location.x, y: location.y, viewWidth: bounds.width,
                                       viewHeight: bounds.height, desktop: region.size,
                                       origin: region.origin, clamp: clamp)
@@ -436,7 +446,7 @@ final class DesktopMTKView: MTKView {
     /// The controller is a value type, so it is mutated in place here and stored back. Reading a copy
     /// and mutating that would silently discard the cursor position.
     private func withTrackpad(_ body: (inout TrackpadPointerController) -> [TrackpadAction]) {
-        let region = session?.visibleRegion ?? .whole(width: 1, height: 1)
+        let region = session.flatMap { session in shown.map { session.region(for: $0) } } ?? .whole(width: 1, height: 1)
         if trackpad == nil {
             trackpad = TrackpadPointerController(region: region, viewSize: bounds.size,
                                                  position: session?.pointerPosition)
@@ -474,12 +484,12 @@ final class DesktopMTKView: MTKView {
         guard gesture.state == .began || gesture.state == .changed else { return }
         // While the image is zoomed in, two fingers move the view instead of scrolling the desktop,
         // because otherwise the parts outside the window would be unreachable.
-        if let session, session.presentation.zoom > 1 {
-            let panned = PresentationSettings.clampedPan(x: session.presentation.panX + delta.x,
-                                                         y: session.presentation.panY + delta.y,
-                                                         zoom: session.presentation.zoom, viewport: bounds.size)
-            session.presentation.panX = panned.x
-            session.presentation.panY = panned.y
+        if let shown, shown.presentation.zoom > 1 {
+            let panned = PresentationSettings.clampedPan(x: shown.presentation.panX + delta.x,
+                                                         y: shown.presentation.panY + delta.y,
+                                                         zoom: shown.presentation.zoom, viewport: bounds.size)
+            shown.presentation.panX = panned.x
+            shown.presentation.panY = panned.y
             return
         }
         guard let point = point(gesture.location(in: self), clamp: true) else { return }
@@ -488,23 +498,23 @@ final class DesktopMTKView: MTKView {
 
     #if !os(visionOS)
     @objc private func pinchGesture(_ gesture: UIPinchGestureRecognizer) {
-        guard inputEnabled, let session else { return }
+        guard inputEnabled, let shown else { return }
         switch gesture.state {
         case .began:
             #if os(iOS)
             endTrackpadInteraction()
             #endif
             input?.send(.release)
-            pinchStartZoom = session.presentation.zoom
+            pinchStartZoom = shown.presentation.zoom
         case .changed:
             let candidate = pinchStartZoom * Double(gesture.scale)
             let bounded = min(DesktopZoomLimits.maximum, max(DesktopZoomLimits.minimum, candidate))
             // Settle on 100% so an exact one-to-one image is reachable with fingers.
-            session.presentation.zoom = abs(bounded - 1) < 0.02 ? 1 : bounded
-            let panned = PresentationSettings.clampedPan(x: session.presentation.panX, y: session.presentation.panY,
-                                                         zoom: session.presentation.zoom, viewport: bounds.size)
-            session.presentation.panX = panned.x
-            session.presentation.panY = panned.y
+            shown.presentation.zoom = abs(bounded - 1) < 0.02 ? 1 : bounded
+            let panned = PresentationSettings.clampedPan(x: shown.presentation.panX, y: shown.presentation.panY,
+                                                         zoom: shown.presentation.zoom, viewport: bounds.size)
+            shown.presentation.panX = panned.x
+            shown.presentation.panY = panned.y
         default:
             break
         }

@@ -44,7 +44,10 @@ struct DesktopSessionAlertPresentation: Equatable {
 public struct DesktopSessionView: View {
     private let onClose: (@MainActor () -> Void)?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openWindow) private var openWindow
     @State private var session: DesktopSessionModel
+    /// This window onto the session (W30): the desktop's own, or one display's.
+    @State private var viewport: DesktopViewport
     @State private var showDisplayOptions = false
     @State private var settingsSection = DesktopSessionSettingsSection.thisWindow
     @State private var requestWallpaperAfterDisplay = false
@@ -80,7 +83,22 @@ public struct DesktopSessionView: View {
         self.onClose = onClose
         self.onOutcome = onOutcome
         self.showActiveConnections = showActiveConnections
-        _session = State(initialValue: DesktopSessionModel(connection: connection, app: app))
+        let model = DesktopSessionModel(connection: connection, app: app)
+        _session = State(initialValue: model)
+        _viewport = State(initialValue: model.primaryViewport)
+    }
+
+    /// A window onto a session that is already open (W30): a display window, or the desktop's own
+    /// window reopened while its display windows kept the connection.
+    init(session: DesktopSessionModel, viewport: DesktopViewport,
+         onOutcome: (@MainActor (GlassRDPState) -> Void)? = nil,
+         onClose: (@MainActor () -> Void)? = nil,
+         showActiveConnections: (@MainActor () -> Void)? = nil) {
+        self.onClose = onClose
+        self.onOutcome = onOutcome
+        self.showActiveConnections = showActiveConnections
+        _session = State(initialValue: session)
+        _viewport = State(initialValue: viewport)
     }
 
     /// A session built elsewhere: the simulator fixture, and the screenshot demo.
@@ -90,6 +108,7 @@ public struct DesktopSessionView: View {
         onOutcome = nil
         self.showActiveConnections = showActiveConnections
         _session = State(initialValue: previewSession)
+        _viewport = State(initialValue: previewSession.primaryViewport)
     }
     #endif
 
@@ -98,13 +117,29 @@ public struct DesktopSessionView: View {
             // The window's own settings (W25), for everything drawn in it: GlassLayers' contract.
             // This view is the window's root and its settings' owner, so it resolves them from the
             // session it hands down (`profile`); what it presents reads them from here.
-            .glassWindowOverrides(session.windowSettings)
+            .glassWindowOverrides(viewport.windowSettings)
     }
 
     /// What this window draws and drives with: its own settings over All Desktops' (W25).
     private var profile: DesktopWindowProfile {
-        DesktopWindowProfile(window: session.windowSettings, defaults: allDesktops.defaults,
+        DesktopWindowProfile(window: viewport.windowSettings, defaults: allDesktops.defaults,
                              compactScreen: compactScreen, reduceTransparency: reduceTransparency)
+    }
+
+    /// The window that answers for the session: credentials, trust, display windows to open.
+    private var isLead: Bool { session.viewports.isEmpty || session.leadViewport === viewport }
+
+    /// The desktop's name, and the display when this window shows one.
+    private var windowTitle: String {
+        guard let display = viewport.selectedScreenID, session.screens.count > 1 else { return session.connection.name }
+        return "\(session.connection.name) · \(DesktopDisplayLayout.name(of: display, in: session.screens))"
+    }
+
+    /// Match Window Size follows the desktop's own window only: a display window shows part of the
+    /// desktop, and its size says nothing about the size the desktop should be.
+    private func matchWindow(_ size: CGSize) {
+        guard viewport.isPrimary else { return }
+        session.resize(width: size.width, height: size.height, displayScale: displayScale)
     }
 
     private var compactScreen: Bool {
@@ -131,7 +166,7 @@ public struct DesktopSessionView: View {
                 .clipShape(.rect(cornerRadius: GlassWindowShape.spatialNestedCanvasCornerRadius, style: .continuous))
                 .padding(GlassWindowShape.spatialNestedCanvasPadding(showsTitle: true, showsControls: true))
         } title: {
-            Label(session.connection.name, systemImage: "desktopcomputer")
+            Label(windowTitle, systemImage: "desktopcomputer")
                 .font(.headline).lineLimit(1).padding(.horizontal, 20).padding(.vertical, 10)
         } controls: {
             nativeControls
@@ -144,7 +179,7 @@ public struct DesktopSessionView: View {
             .modifier(DesktopClipboardBridge(session: session))
             #if os(macOS)
             .frame(minWidth: DesktopWindowSizing.floor.width, minHeight: DesktopWindowSizing.floor.height)
-            .background { DesktopWindowSizer(desktop: session.connection.desktop) }
+            .background { DesktopWindowSizer(desktop: viewport.isPrimary ? session.connection.desktop : session.region(for: viewport).size) }
             #endif
         #endif
     }
@@ -154,20 +189,20 @@ public struct DesktopSessionView: View {
             GeometryReader { geometry in
                 ZStack {
                     ZStack {
-                        DesktopMetalSurface(session: session, inputEnabled: remoteInputEnabled)
+                        DesktopMetalSurface(session: session, viewport: viewport, inputEnabled: remoteInputEnabled)
                         cursor(in: geometry.size)
                     }
                     #if os(visionOS)
                     .modifier(DesktopPinchProbe())
                     #endif
                     #if !os(visionOS)
-                    .rotation3DEffect(.degrees(reduceMotion ? 0 : session.presentation.pitch), axis: (x: 1, y: 0, z: 0))
-                    .rotation3DEffect(.degrees(reduceMotion ? 0 : session.presentation.yaw), axis: (x: 0, y: 1, z: 0))
+                    .rotation3DEffect(.degrees(reduceMotion ? 0 : viewport.presentation.pitch), axis: (x: 1, y: 0, z: 0))
+                    .rotation3DEffect(.degrees(reduceMotion ? 0 : viewport.presentation.yaw), axis: (x: 0, y: 1, z: 0))
                     #endif
                     // Only the remote image is zoomed and panned. The panels below must stay
                     // legible and inside the window whatever the image is doing.
-                    .scaleEffect(session.presentation.zoom)
-                    .offset(x: session.presentation.panX, y: session.presentation.panY)
+                    .scaleEffect(viewport.presentation.zoom)
+                    .offset(x: viewport.presentation.panX, y: viewport.presentation.panY)
 
                     if session.frame == nil {
                         connectionStatus
@@ -178,13 +213,13 @@ public struct DesktopSessionView: View {
                 }
                 .onChange(of: geometry.size, initial: true) { _, size in
                     // Detail first: the size asked for is the window's at the window's scale.
-                    session.apply(profile)
-                    session.resize(width: size.width, height: size.height, displayScale: displayScale)
+                    session.apply(profile, to: viewport)
+                    matchWindow(size)
                 }
-                .onChange(of: session.capabilities) { _, _ in session.resize(width: geometry.size.width, height: geometry.size.height, displayScale: displayScale) }
-                .onChange(of: session.isConnected) { _, value in if value { session.resize(width: geometry.size.width, height: geometry.size.height, displayScale: displayScale) } }
-                .onChange(of: session.matchWindow) { _, value in if value { session.resize(width: geometry.size.width, height: geometry.size.height, displayScale: displayScale) } }
-                .onChange(of: displayScale) { _, _ in session.resize(width: geometry.size.width, height: geometry.size.height, displayScale: displayScale) }
+                .onChange(of: session.capabilities) { _, _ in matchWindow(geometry.size) }
+                .onChange(of: session.isConnected) { _, value in if value { matchWindow(geometry.size) } }
+                .onChange(of: session.matchWindow) { _, value in if value { matchWindow(geometry.size) } }
+                .onChange(of: displayScale) { _, _ in matchWindow(geometry.size) }
             }
             .background {
                 // visionOS: nothing. The window's own glass is behind the image, including
@@ -194,13 +229,13 @@ public struct DesktopSessionView: View {
                 // headset whenever the desktop is see-through: faded, or with a colour removed. An
                 // opaque desktop keeps its black letterbox (owner, 2026-09-30: "I don't have a
                 // transparency setting here?").
-                if session.frame == nil || (session.presentation.mode == .original && session.presentation.opacity >= 1) {
+                if session.frame == nil || (viewport.presentation.mode == .original && viewport.presentation.opacity >= 1) {
                     Color.black
                 } else {
                     GlassCanvasBackdrop(blurAmount: profile.frost)
                 }
                 #elseif !os(visionOS)
-                if session.frame == nil || session.presentation.mode == .original { Color.black }
+                if session.frame == nil || viewport.presentation.mode == .original { Color.black }
                 #endif
             }
             if session.failurePresentation == nil, session.rendererError == nil, let error = session.errorMessage {
@@ -239,22 +274,35 @@ public struct DesktopSessionView: View {
             if failure != nil { session.wantsKeyboard = false }
         }
         .task {
-            session.apply(profile)
+            session.apply(profile, to: viewport)
             #if DEBUG
             if session.demoOpensSettings {
                 // Screenshots: This Window over the window it changes, once the window is up.
                 session.demoOpensSettings = false
                 Task { @MainActor in
                     try? await Task.sleep(for: .seconds(2))
-                    settingsSection = .thisWindow
+                    settingsSection = session.demoOpensConnection ? .connection : .thisWindow
                     showDisplayOptions = true
                 }
             }
             #endif
-            await session.start()
+            // A display window joins the connection its desktop's window opened (W30).
+            if viewport.isPrimary { await session.start() }
         }
         // A setting changed here, in All Desktops, or by Reduce Transparency: drawn at once.
-        .onChange(of: profile) { _, value in session.apply(value) }
+        .onChange(of: profile) { _, value in session.apply(value, to: viewport) }
+        // W30: this window onto the session, for as long as it is open; the session ends with the
+        // last. A window in the background asks the server for nothing.
+        .onAppear { session.attach(viewport) }
+        .onChange(of: scenePhase, initial: true) { _, phase in viewport.isOnScreen = phase != .background }
+        // A window for each display: the lead window opens them when the layout arrives.
+        .onChange(of: session.displayWindowRequests, initial: true) { _, requests in
+            guard isLead, !requests.isEmpty, GlassWindowPresentation.canOpenWindows else { return }
+            for display in session.takeDisplayWindowRequests() {
+                openWindow(id: DesktopDisplayWindowValue.windowID,
+                           value: DesktopDisplayWindowValue(endpoint: session.connection.id.rawValue, display: display))
+            }
+        }
         .sheet(isPresented: $showDisplayOptions, onDismiss: {
             if requestWallpaperAfterDisplay {
                 requestWallpaperAfterDisplay = false
@@ -268,7 +316,7 @@ public struct DesktopSessionView: View {
                 displayOptions
             }
         }
-        .onDisappear { alerts = DesktopSessionAlertPresentation(); session.close() }
+        .onDisappear { alerts = DesktopSessionAlertPresentation(); session.detach(viewport) }
         .onChange(of: session.shouldClosePresentation) { _, shouldClose in
             if shouldClose { if let onClose { onClose() } else { dismiss() } }
         }
@@ -282,7 +330,7 @@ public struct DesktopSessionView: View {
             }
         }
         .sheet(isPresented: Binding(
-            get: { session.needsCredentials },
+            get: { session.needsCredentials && isLead },
             set: { if !$0 && session.needsCredentials { session.cancelCredentialEntry() } }
         ), onDismiss: {
             alerts.credentialSheetDidDismiss()
@@ -369,6 +417,10 @@ public struct DesktopSessionView: View {
                 Circle().fill(session.isConnected ? .green : .secondary).frame(width: 6, height: 6)
                 Text(session.status)
                 if let frame = session.frame { Text("\(frame.width) × \(frame.height)").monospacedDigit() }
+                if session.isConnected, let statistics = session.linkStatistics {
+                    Text(DesktopLinkReadout.line(statistics)).monospacedDigit().lineLimit(1)
+                        .accessibilityIdentifier("session.readout")
+                }
                 Spacer()
                 Button("Esc") { session.sendKey(0x01) }.disabled(!session.isConnected)
                 Button("Tab") { session.sendKey(0x0f) }.disabled(!session.isConnected)
@@ -406,6 +458,10 @@ public struct DesktopSessionView: View {
                     Button("Copy Remote Clipboard") { copyRemoteClipboard() }.disabled(!session.isConnected || session.remoteClipboard == nil)
                     Button("Control–Alt–Delete") { session.sendSecureAttention() }.disabled(!session.isConnected)
                 }.help("Clipboard")
+
+                // W30: a host's displays, each in a window of its own; and what the connection carries.
+                DesktopDisplaysMenu(session: session, viewport: viewport)
+                DesktopQualityMenu(session: session)
     }
 
     @ViewBuilder private var connectionStatus: some View {
@@ -440,6 +496,8 @@ public struct DesktopSessionView: View {
     }
 
     private func presentCurrentAlert() {
+        // One window asks: the session's questions are not each display window's (W30).
+        guard isLead else { return }
         alerts.presentCurrent(trust: session.trustRequest, displayError: session.rendererError,
                               credentialsRequested: session.needsCredentials)
     }
@@ -465,7 +523,7 @@ public struct DesktopSessionView: View {
         Group {
             #if os(iOS)
             List {
-                ForEach(DesktopSessionSettingsSection.allCases, id: \.self) { section in
+                ForEach(DesktopSessionSettingsSection.offered(for: session), id: \.self) { section in
                     NavigationLink(section.title) {
                         settingsForm(section).navigationTitle(section.title)
                     }
@@ -473,7 +531,7 @@ public struct DesktopSessionView: View {
             }
             #else
             GlassSettingsSections(selection: $settingsSection,
-                options: DesktopSessionSettingsSection.allCases,
+                options: DesktopSessionSettingsSection.offered(for: session),
                 title: { $0.title }, pickerIdentifier: "desktop.settings.section") { section in
                 settingsForm(section)
             }
@@ -484,22 +542,34 @@ public struct DesktopSessionView: View {
     @ViewBuilder private func settingsForm(_ section: DesktopSessionSettingsSection) -> some View {
         switch section {
         case .thisWindow:
-            DesktopWindowSettingsView(session: session, defaults: allDesktops.defaults, compactScreen: compactScreen) {
+            DesktopWindowSettingsView(session: session, viewport: viewport, defaults: allDesktops.defaults, compactScreen: compactScreen) {
                 requestWallpaperAfterDisplay = true
                 showDisplayOptions = false
             }
+        case .connection:
+            // W30: Display Windows, Quality and what the link carries now; every window's the same.
+            DesktopConnectionSettingsView(session: session, defaults: allDesktops.defaults)
         case .allDesktops:
             // Settings ▸ Desktops itself: what every window follows until it sets its own.
             DesktopSettingsView()
         }
     }
 
+    /// Whether the remote pointer is on the display this window shows (W30): a host's pointer is
+    /// drawn in the window of the display it is on, and only there.
+    private func pointerIsShown(_ point: DesktopPoint?) -> Bool {
+        let region = session.region(for: viewport)
+        guard let point else { return viewport.isPrimary }
+        return point.x >= region.origin.x && point.y >= region.origin.y
+            && point.x < region.origin.x + region.size.width && point.y < region.origin.y + region.size.height
+    }
+
     @ViewBuilder private func cursor(in size: CGSize) -> some View {
         if session.cursorVisible, session.isConnected, session.cursorBitmap == nil || session.cursorImage == nil,
-           session.pointerMode == .trackpad, let absolute = session.pointerPosition {
+           viewport.pointerMode == .trackpad, let absolute = session.pointerPosition, pointerIsShown(absolute) {
             // Relative pointing is unusable without seeing the pointer, and a host does not always
             // send one. Draw a stand-in so the cursor is never invisible while a finger steers it.
-            let region = session.visibleRegion
+            let region = session.region(for: viewport)
             let scale = min(size.width / Double(region.size.width), size.height / Double(region.size.height))
             let local = DesktopPoint(x: absolute.x - region.origin.x, y: absolute.y - region.origin.y)
             Image(systemName: "cursorarrow")
@@ -512,8 +582,9 @@ public struct DesktopSessionView: View {
                 .allowsHitTesting(false).accessibilityHidden(true)
                 .accessibilityIdentifier("session.pointer")
         }
-        if session.cursorVisible, let bitmap = session.cursorBitmap, let image = session.cursorImage, session.isConnected {
-            let region = session.visibleRegion
+        if session.cursorVisible, let bitmap = session.cursorBitmap, let image = session.cursorImage, session.isConnected,
+           pointerIsShown(session.pointerPosition) {
+            let region = session.region(for: viewport)
             let desktop = region.size
             let scale = min(size.width / Double(desktop.width), size.height / Double(desktop.height))
             let fallback = DesktopPoint(x: region.origin.x + desktop.width / 2, y: region.origin.y + desktop.height / 2)
@@ -606,10 +677,21 @@ private struct RemoteTextEntry: View {
 
 
 /// Desktop Settings' pages (W25): the window's own settings first, then every window's — the
-/// shape of a terminal's Settings (This Window, All Terminals).
+/// shape of a terminal's Settings (This Window, All Terminals). Between them (W30), the desktop's
+/// connection, which all its windows share: offered for VNC and for a host with several displays.
 private enum DesktopSessionSettingsSection: CaseIterable, Hashable {
-    case thisWindow, allDesktops
-    var title: String { self == .thisWindow ? "This Window" : "All Desktops" }
+    case thisWindow, connection, allDesktops
+    var title: String {
+        switch self {
+        case .thisWindow: "This Window"
+        case .connection: "Connection"
+        case .allDesktops: "All Desktops"
+        }
+    }
+
+    @MainActor static func offered(for session: DesktopSessionModel) -> [Self] {
+        allCases.filter { $0 != .connection || DesktopConnectionSettingsView.isOffered(for: session) }
+    }
 }
 
 #if os(macOS)

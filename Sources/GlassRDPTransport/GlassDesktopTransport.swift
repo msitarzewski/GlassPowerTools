@@ -16,9 +16,20 @@ public protocol GlassDesktopTransport: Actor {
     func synchronize(capsLock: Bool, numLock: Bool, scrollLock: Bool) async throws
     func resize(width: Int, height: Int, desktopScale: Int) async throws
     func sendClipboard(_ content: GlassClipboardContent) async throws
+    /// The parts of the framebuffer on screen: nil for all of it, empty for none. A protocol that
+    /// can ask for part of the picture asks only for these.
+    func setVisibleRegions(_ regions: [GlassRemoteRegion]?) async
+    /// How to trade picture for bytes, for a protocol whose client chooses it.
+    func setStreamQuality(_ quality: GlassDesktopStreamQuality) async
 }
 
 public extension GlassDesktopTransport {
+    /// RDP asks for no part of the picture: the server sends what changed. Declared in the
+    /// protocol, so a session reached through `any GlassDesktopTransport` finds VNC's own.
+    func setVisibleRegions(_ regions: [GlassRemoteRegion]?) async {}
+    /// RDP negotiates its codecs with the server.
+    func setStreamQuality(_ quality: GlassDesktopStreamQuality) async {}
+
     func keyboard(scancode: UInt16, extended: Bool = false, isDown: Bool) async throws {
         try await keyboard(scancode: scancode, extended: extended, isDown: isDown, isRepeat: false)
     }

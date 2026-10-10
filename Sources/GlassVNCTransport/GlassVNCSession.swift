@@ -22,6 +22,8 @@ public struct GlassVNCConfiguration: Sendable, Equatable {
 /// as RDP set-1 scancodes from the native surfaces and is translated to X11 keysyms here.
 public actor GlassVNCSession: GlassDesktopTransport {
     private static let logger = Logger(subsystem: "app.glassdt.vnc", category: "session")
+    /// For this run of the app (W30): Macs not to ask for their display layout again.
+    static let layoutRefusals = HostSet()
     public nonisolated let frames: AsyncStream<GlassRDPFrame>
     public nonisolated let events: AsyncStream<GlassRDPEvent>
     private let frameContinuation: AsyncStream<GlassRDPFrame>.Continuation
@@ -35,6 +37,10 @@ public actor GlassVNCSession: GlassDesktopTransport {
     private var pointer = (x: 0, y: 0)
     private var capsLockOn: Bool?
     private var scrollRemainder = (vertical: 0, horizontal: 0)
+    /// Kept across connections, and handed to each new client before it runs, so a session opens
+    /// at the level and over the area its windows asked for.
+    private var quality = GlassDesktopStreamQuality.automatic
+    private var regions: [GlassRemoteRegion]?
     private let sequence = FrameSequence()
     private let delivered = FrameDelivery()
     private let makeClient: @Sendable (VNCConfiguration, VNCClientCallbacks) throws -> VNCClient
@@ -64,7 +70,13 @@ public actor GlassVNCSession: GlassDesktopTransport {
         let eventSink = eventContinuation, frameSink = frameContinuation, sequence = sequence, delivered = delivered
         delivered.reset()
         var callbacks = VNCClientCallbacks()
-        callbacks.connected = { _ in eventSink.yield(.state(.connected)) }
+        let layoutKey = "\(host.lowercased()):\(configuration.port)"
+        let asksForLayout = !Self.layoutRefusals.contains(layoutKey)
+        let apple = FrameDelivery()
+        callbacks.connected = { info in
+            if info.isAppleScreenSharing { apple.note() }
+            eventSink.yield(.state(.connected))
+        }
         callbacks.desktopResizeSupported = {
             eventSink.yield(.displayCapabilities(.init(maximumMonitors: 1, maximumArea: UInt64(RFBLimits.maximumPixels))))
         }
@@ -86,14 +98,19 @@ public actor GlassVNCSession: GlassDesktopTransport {
         callbacks.cutText = { eventSink.yield(.clipboard(GlassClipboardContent(text: $0))) }
         callbacks.screens = { screens in
             eventSink.yield(.screens(screens.map {
-                // RFB does not mark a primary screen; the one at the framebuffer origin is treated as it.
+                // ExtendedDesktopSize does not mark a primary screen, so the one at the framebuffer
+                // origin is treated as it; Apple's layout marks its main display.
                 GlassRemoteScreen(id: $0.id, x: $0.x, y: $0.y, width: $0.width, height: $0.height,
-                                  isPrimary: $0.x == 0 && $0.y == 0)
+                                  isPrimary: $0.isMain ?? ($0.x == 0 && $0.y == 0))
             }))
         }
+        callbacks.statistics = { eventSink.yield(.linkStatistics(Self.statistics($0))) }
         let client = try makeClient(VNCConfiguration(host: host, port: configuration.port, username: configuration.username,
                                                      password: configuration.password, sharedSession: true,
-                                                     clipboardEnabled: configuration.clipboardEnabled), callbacks)
+                                                     clipboardEnabled: configuration.clipboardEnabled,
+                                                     requestsAppleDisplayLayout: asksForLayout), callbacks)
+        client.setQuality(Self.quality(quality))
+        client.setRequestedRegions(Self.rectangles(regions))
         self.client = client
         activeID = id
         stopRequested = false
@@ -106,6 +123,14 @@ public actor GlassVNCSession: GlassDesktopTransport {
                 // shown, that is a normal ending rather than a failure to report.
                 let normalEnd = error == .cancelled || (error == .connectionClosed && delivered.any)
                 failure = normalEnd ? nil : error.localizedDescription
+                // A Mac that broke the protocol after being asked for its display layout — a form
+                // known only from reverse engineering — is not asked again while the app runs, so
+                // Reconnect works, with its displays as one picture (W30).
+                if case .protocolViolation = error, asksForLayout, apple.any {
+                    Self.layoutRefusals.insert(layoutKey)
+                    Self.logger.error("event=apple-display-layout-refused")
+                    failure = (failure ?? "") + " Reconnect connects without asking this Mac where its displays are."
+                }
             } catch { failure = error.localizedDescription }
             await self?.finished(id: id, error: failure)
         }
@@ -234,6 +259,63 @@ public actor GlassVNCSession: GlassDesktopTransport {
         catch let error as RFBError { throw GlassRDPError.unsupported(error.localizedDescription) }
     }
 
+    // MARK: What the link carries
+
+    // Both are `async` on purpose: the protocol's defaults are, and in an async context Swift
+    // prefers an async overload, so a synchronous method here lost to the default that does
+    // nothing (found by `qualityAndRegionsSetBeforeConnectingShapeTheOpeningMessages`).
+
+    /// Only these parts of the framebuffer are asked for (`VNCClient.setRequestedRegions`).
+    public func setVisibleRegions(_ regions: [GlassRemoteRegion]?) async {
+        guard regions != self.regions else { return }
+        self.regions = regions
+        client?.setRequestedRegions(Self.rectangles(regions))
+    }
+
+    public func setStreamQuality(_ quality: GlassDesktopStreamQuality) async {
+        guard quality != self.quality else { return }
+        self.quality = quality
+        Self.logger.notice("event=quality requested=\(quality.rawValue, privacy: .public)")
+        client?.setQuality(Self.quality(quality))
+    }
+
+    static func quality(_ quality: GlassDesktopStreamQuality) -> VNCQuality {
+        switch quality {
+        case .automatic: .automatic
+        case .best: .best
+        case .balanced: .balanced
+        case .dataSaver: .dataSaver
+        case .lowest: .lowest
+        }
+    }
+
+    static func level(_ quality: VNCQuality) -> GlassDesktopStreamQuality {
+        switch quality {
+        case .automatic: .automatic
+        case .best: .best
+        case .balanced: .balanced
+        case .dataSaver: .dataSaver
+        case .lowest: .lowest
+        }
+    }
+
+    static func rectangles(_ regions: [GlassRemoteRegion]?) -> [RFBRectangle]? {
+        regions?.compactMap {
+            guard $0.x >= 0, $0.y >= 0, $0.width > 0, $0.height > 0,
+                  $0.x <= RFBLimits.maximumDimension, $0.y <= RFBLimits.maximumDimension else { return nil }
+            return RFBRectangle(x: $0.x, y: $0.y, width: min($0.width, RFBLimits.maximumDimension),
+                                height: min($0.height, RFBLimits.maximumDimension))
+        }
+    }
+
+    static func statistics(_ value: VNCLinkStatistics) -> GlassDesktopLinkStatistics {
+        GlassDesktopLinkStatistics(bytesPerSecond: value.bytesPerSecond, updatesPerSecond: value.updatesPerSecond,
+                                   quality: level(value.quality), level: level(value.profile.level),
+                                   colourDepth: value.profile.colourDepth.rawValue, encoding: value.encoding?.name,
+                                   measuredKilobitsPerSecond: value.measuredKilobitsPerSecond,
+                                   regionLimited: value.regionLimited, paused: value.paused)
+    }
+
     // MARK: Cursor conversion
 
     /// Repacks a top-down VNC cursor into the MS-RDPBCGR 32-bit pointer layout the shared cursor
@@ -257,6 +339,14 @@ public actor GlassVNCSession: GlassDesktopTransport {
         return GlassRDPCursorImage(width: image.width, height: image.height, hotSpotX: hotSpotX, hotSpotY: hotSpotY,
                                    xorBitsPerPixel: 32, xorMask: xor, andMask: and, paletteEntries: nil)
     }
+}
+
+/// Hosts whose Mac ended a session in a protocol error once asked for its display layout.
+final class HostSet: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: Set<String> = []
+    func contains(_ value: String) -> Bool { lock.withLock { values.contains(value) } }
+    func insert(_ value: String) { lock.withLock { _ = values.insert(value) } }
 }
 
 private final class FrameDelivery: @unchecked Sendable {

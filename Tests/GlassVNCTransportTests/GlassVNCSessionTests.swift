@@ -81,7 +81,11 @@ struct GlassVNCSessionTests {
         await #expect(throws: GlassRDPError.self) { try await session.resize(width: 800, height: 600, desktopScale: 100) }
         await session.disconnect()
         var terminal: GlassRDPEvent?
-        for await event in session.events { terminal = event; break }
+        // The link's statistics arrive once a second while connected (W30); the ending is a state.
+        for await event in session.events {
+            if case .linkStatistics = event { continue }
+            terminal = event; break
+        }
         #expect(terminal == .state(.disconnected))
     }
 
@@ -155,5 +159,91 @@ struct VNCSessionEndingTests {
             }
         }
         #expect(last == .failed(RFBError.connectionClosed.localizedDescription))
+    }
+}
+
+/// W30: the session carries its windows' displays and its quality into the client, and the
+/// client's statistics out to the app.
+@Suite("What the link carries")
+struct VNCStreamSettingsTests {
+    @Test func qualityAndRegionsSetBeforeConnectingShapeTheOpeningMessages() async throws {
+        let source = MemoryByteSource(handshake(width: 3000, height: 1600), holdsOpen: true)
+        let sink = MemoryByteSink()
+        let session = GlassVNCSession { configuration, callbacks in
+            VNCClient(configuration: configuration, callbacks: callbacks, source: source, sink: sink, close: { await source.close() })
+        }
+        // Through the protocol, as the desktop's session model calls it (rule 53).
+        let transport: any GlassDesktopTransport = session
+        await transport.setStreamQuality(.dataSaver)
+        await transport.setVisibleRegions([GlassRemoteRegion(x: 2000, y: 0, width: 1000, height: 600)])
+        try await session.connect(GlassVNCConfiguration(host: "fixture", password: "pw"))
+        for await event in session.events where event == .state(.connected) { break }
+        let written = await sink.written
+        // After the version, the security type and ClientInit: SetPixelFormat at 16 bits.
+        #expect(Array(written[14..<34]) == [0, 0, 0, 0, 16, 16, 0, 1, 0, 31, 0, 63, 0, 31, 11, 5, 0, 0, 0, 0])
+        // And the first request is for the one display on screen, in full.
+        let request: [UInt8] = [3, 0] + UInt16(2000).bigEndianBytes + UInt16(0).bigEndianBytes
+            + UInt16(1000).bigEndianBytes + UInt16(600).bigEndianBytes
+        let found = (0...(written.count - request.count)).contains { Array(written[$0..<($0 + request.count)]) == request }
+        #expect(found)
+        await session.disconnect()
+    }
+
+    @Test func statisticsAndRegionsTranslate() {
+        let statistics = VNCLinkStatistics(bytesPerSecond: 125_000, updatesPerSecond: 12, profile: .dataSaver, quality: .automatic,
+                                           encoding: .zrle, measuredKilobitsPerSecond: 2_000, regionLimited: true, paused: false,
+                                           totalBytes: 1)
+        let translated = GlassVNCSession.statistics(statistics)
+        #expect(translated == GlassDesktopLinkStatistics(bytesPerSecond: 125_000, updatesPerSecond: 12, quality: .automatic,
+                                                         level: .dataSaver, colourDepth: 16, encoding: "ZRLE",
+                                                         measuredKilobitsPerSecond: 2_000, regionLimited: true, paused: false))
+        #expect(GlassVNCSession.rectangles(nil) == nil)
+        #expect(GlassVNCSession.rectangles([]) == [])
+        #expect(GlassVNCSession.rectangles([GlassRemoteRegion(x: 10, y: 20, width: 30, height: 40),
+                                            GlassRemoteRegion(x: -1, y: 0, width: 5, height: 5)])
+                == [RFBRectangle(x: 10, y: 20, width: 30, height: 40)], "a region that is not one is dropped")
+        for quality in GlassDesktopStreamQuality.allCases {
+            #expect(GlassVNCSession.level(GlassVNCSession.quality(quality)) == quality)
+        }
+    }
+}
+
+/// W30: a Mac's display layout is read from a form known only from reverse engineering. If a Mac
+/// breaks the protocol once asked for it, the next connection does not ask, so Reconnect works.
+@Suite("Apple display layout fallback")
+struct AppleLayoutFallbackTests {
+    @Test func aMacThatBreaksTheProtocolIsNotAskedForItsLayoutAgain() async throws {
+        var mac: [UInt8] = Array("RFB 003.889\n".utf8)
+        mac += [1, 1]
+        mac += UInt32(0).bigEndianBytes
+        mac += UInt16(2).bigEndianBytes + UInt16(2).bigEndianBytes + RFBPixelFormat.client.wireBytes + UInt32(0).bigEndianBytes
+        let greeting = mac
+        // An update with a rectangle outside the framebuffer: a protocol violation.
+        let broken = mac + [0, 0, 0, 1] + UInt16(1).bigEndianBytes + UInt16(0).bigEndianBytes
+            + UInt16(2).bigEndianBytes + UInt16(1).bigEndianBytes + Int32(0).bigEndianBytes
+        final class Asked: @unchecked Sendable { var values: [Bool] = [] }
+        let asked = Asked()
+        let host = "mac-\(UUID().uuidString.prefix(8)).example"
+
+        let first = GlassVNCSession { configuration, callbacks in
+            asked.values.append(configuration.requestsAppleDisplayLayout)
+            return VNCClient(configuration: configuration, callbacks: callbacks, source: MemoryByteSource(broken), sink: MemoryByteSink())
+        }
+        try await first.connect(GlassVNCConfiguration(host: host, password: "pw"))
+        var failure: String?
+        for await event in first.events {
+            if case .state(.failed(let message)) = event { failure = message; break }
+            if event == .state(.disconnected) { break }
+        }
+        #expect(failure?.hasSuffix("Reconnect connects without asking this Mac where its displays are.") == true)
+
+        let second = GlassVNCSession { configuration, callbacks in
+            asked.values.append(configuration.requestsAppleDisplayLayout)
+            return VNCClient(configuration: configuration, callbacks: callbacks, source: MemoryByteSource(greeting), sink: MemoryByteSink())
+        }
+        try await second.connect(GlassVNCConfiguration(host: host, password: "pw"))
+        for await event in second.events where event == .state(.connected) { break }
+        await second.disconnect()
+        #expect(asked.values == [true, false])
     }
 }

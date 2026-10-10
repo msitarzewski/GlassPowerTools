@@ -45,6 +45,7 @@ import Foundation
 import SwiftUI
 import GlassConnectionKit
 import GlassLayers
+import GlassRDPTransport
 #if os(macOS)
 import AppKit
 #else
@@ -54,6 +55,8 @@ import UIKit
 extension TransparencyMode: GlassWindowSettingValue {}
 extension DesktopSourceScale: GlassWindowSettingValue {}
 extension DesktopPointerMode: GlassWindowSettingValue {}
+extension GlassDesktopStreamQuality: GlassWindowSettingValue {}
+extension DesktopDisplayWindows: GlassWindowSettingValue {}
 
 // MARK: - The settings a desktop window can keep
 
@@ -84,9 +87,16 @@ nonisolated enum DesktopWindowSettings {
     /// iPad and iPhone: how touch drives the pointer.
     static let pointer = GlassWindowSetting<DesktopPointerMode>.choice("desktop.pointer", title: "Pointer")
 
+    /// VNC: what the connection trades for bytes (W30). One connection carries every window of a
+    /// desktop, and its colour depth and encodings are the connection's, so this is the desktop's
+    /// own window's setting; its display windows show and change that one.
+    static let quality = GlassWindowSetting<GlassDesktopStreamQuality>.choice("desktop.quality", title: "Quality")
+    /// A host with several displays: one window, or one each (W30). The desktop's own window's.
+    static let displays = GlassWindowSetting<DesktopDisplayWindows>.choice("desktop.displays", title: "Displays")
+
     static var keys: Set<String> {
         [opacity.key, frost.key, backgroundRemoval.key, keyColor.key, tolerance.key, edgeSoftness.key,
-         detail.key, pointer.key]
+         detail.key, pointer.key, quality.key, displays.key]
     }
 
     /// Where Opacity and Glass apply: a see-through window, on the Mac and the headset.
@@ -141,6 +151,10 @@ enum DesktopPreferenceKey {
     static let detail = "display.source.scale"
     /// Empty for Automatic.
     static let pointer = "display.pointer.mode"
+    /// VNC Quality (W30).
+    static let quality = "display.stream.quality"
+    /// Empty for this device's standard: a window for each display on Vision Pro, one elsewhere.
+    static let displays = "display.screens.windows"
 }
 
 /// Settings ▸ Desktops (**All Desktops**): what every desktop window on this device uses until it
@@ -161,13 +175,19 @@ struct DesktopDefaults: Equatable, Sendable {
     var detail: DesktopSourceScale = .automatic
     /// Nil is Automatic: Trackpad on a compact screen, Direct Touch otherwise.
     var pointer: DesktopPointerMode?
+    var quality: GlassDesktopStreamQuality = .automatic
+    /// Nil is this device's standard (`DesktopDisplayWindows.standard`).
+    var displays: DesktopDisplayWindows?
 
     init() {}
 
     /// The stored values, kept in range: what another build or a hand edit left is never drawn
     /// out of range, and an unknown choice is the standard one.
     init(storedOpacity: Double, frost: Double, backgroundRemoval: String, red: Double, green: Double, blue: Double,
-         tolerance: Double, edgeSoftness: Double, detail: String, pointer: String) {
+         tolerance: Double, edgeSoftness: Double, detail: String, pointer: String, quality: String = "",
+         displays: String = "") {
+        self.quality = GlassDesktopStreamQuality(rawValue: quality) ?? .automatic
+        self.displays = DesktopDisplayWindows(rawValue: displays)
         self.opacity = storedOpacity.isFinite ? min(1, max(0, storedOpacity)) : Self.standard.opacity
         self.frost = frost.isFinite ? min(1, max(0, frost)) : Self.standard.frost
         let mode = TransparencyMode(rawValue: backgroundRemoval) ?? .original
@@ -186,6 +206,9 @@ struct DesktopDefaults: Equatable, Sendable {
     func pointer(compactScreen: Bool) -> DesktopPointerMode {
         pointer ?? .standard(forCompactScreen: compactScreen)
     }
+
+    /// What every desktop does with several displays on this device.
+    var resolvedDisplays: DesktopDisplayWindows { displays ?? .standard }
 }
 
 // MARK: - What a desktop window uses
@@ -202,6 +225,10 @@ struct DesktopWindowProfile: Equatable {
     let detail: DesktopSourceScale
     /// Nil where touch has no pointer choice (Mac, Vision Pro): the session's own is left alone.
     let pointer: DesktopPointerMode?
+    /// The connection's, from the desktop's own window (W30).
+    let quality: GlassDesktopStreamQuality
+    /// The desktop's own window's (W30).
+    let displays: DesktopDisplayWindows
 
     /// - Parameters:
     ///   - glass: whether Opacity and Glass apply here (`offersGlass`); where they
@@ -229,6 +256,8 @@ struct DesktopWindowProfile: Equatable {
         self.pointer = touch
             ? window.value(of: DesktopWindowSettings.pointer, over: defaults.pointer(compactScreen: compactScreen))
             : nil
+        self.quality = window.value(of: DesktopWindowSettings.quality, over: defaults.quality)
+        self.displays = window.value(of: DesktopWindowSettings.displays, over: defaults.resolvedDisplays)
     }
 
     /// Whether the window already shows what **Show Original** asks for: the complete image, opaque.
@@ -236,19 +265,27 @@ struct DesktopWindowProfile: Equatable {
 }
 
 extension DesktopSessionModel {
-    /// Draws and drives this session with its window's settings (W25). Only what a window can set:
-    /// zoom, pan, tilt and the display shown stay the session's own, and nothing changes that is
-    /// already so — a changed Detail asks the server for the window again.
-    func apply(_ profile: DesktopWindowProfile) {
-        var drawn = presentation
+    /// Draws and drives this session's desktop window with its settings (W25).
+    func apply(_ profile: DesktopWindowProfile) { apply(profile, to: primaryViewport) }
+
+    /// Draws and drives one window with its settings. Only what a window can set: zoom, pan, tilt
+    /// and the display shown stay the window's own, and nothing changes that is already so. What
+    /// belongs to the connection — Detail, Quality, Displays — comes from the desktop's own window
+    /// only (W30): a changed Detail asks the server for the window again, a changed Quality changes
+    /// what the connection asks for.
+    func apply(_ profile: DesktopWindowProfile, to viewport: DesktopViewport) {
+        var drawn = viewport.presentation
         drawn.mode = profile.backgroundRemoval
         drawn.opacity = profile.opacity
         drawn.keyColor = profile.keyColor
         drawn.threshold = profile.tolerance
         drawn.feather = profile.edgeSoftness
-        if drawn != presentation { presentation = drawn }
+        if drawn != viewport.presentation { viewport.presentation = drawn }
+        if let pointer = profile.pointer, viewport.pointerMode != pointer { viewport.pointerMode = pointer }
+        guard viewport.isPrimary else { return }
         if sourceScale != profile.detail { sourceScale = profile.detail }
-        if let pointer = profile.pointer, pointerMode != pointer { pointerMode = pointer }
+        if streamQuality != profile.quality { streamQuality = profile.quality }
+        if displayWindows != profile.displays { displayWindows = profile.displays }
     }
 }
 
@@ -327,8 +364,9 @@ struct DesktopWindowRecord: Codable, Equatable {
     }
 }
 
-/// Each desktop window's own settings on this device (W25), by the desktop's endpoint id — the
-/// window's identity (`GlassDesktopScenes`). Kept as one record per window under `key`, read
+/// Each desktop window's own settings on this device (W25), by the window's key — the desktop's
+/// endpoint id for its own window (`GlassDesktopScenes`), and endpoint and display for a display's
+/// window (W30), so each display keeps its own. Kept as one record per window under `key`, read
 /// leniently: an entry that can't be read costs only itself, keys a newer build wrote are kept,
 /// and a window that sets nothing has no entry. Never in the synced catalog: like All Desktops,
 /// a window's look belongs to the device it is on.
@@ -339,7 +377,7 @@ public final class DesktopWindowSettingsStore {
     static let maximumCount = 1024
 
     private let defaults: UserDefaults?
-    private var records: [EndpointID: DesktopWindowRecord]
+    private var records: [DesktopWindowKey: DesktopWindowRecord]
 
     /// - Parameter defaults: where to keep them; nil keeps them in memory only (a preview, the
     ///   screenshot demo, a test that doesn't look).
@@ -348,27 +386,34 @@ public final class DesktopWindowSettingsStore {
         records = Self.read(defaults?.data(forKey: Self.key))
     }
 
-    /// The window's own settings for this desktop; empty when it follows All Desktops.
-    func settings(for id: EndpointID) -> GlassWindowOverrides {
-        records[id]?.windowSettings ?? GlassWindowOverrides()
+    /// The desktop's own window's settings; empty when it follows All Desktops.
+    func settings(for id: EndpointID) -> GlassWindowOverrides { settings(for: DesktopWindowKey(endpoint: id)) }
+
+    /// A window's own settings; empty when it follows All Desktops.
+    func settings(for key: DesktopWindowKey) -> GlassWindowOverrides {
+        records[key]?.windowSettings ?? GlassWindowOverrides()
     }
 
-    /// Keeps `settings` for this desktop's window — all of it except what lasts a session only.
-    func save(_ settings: GlassWindowOverrides, for id: EndpointID) {
+    func save(_ settings: GlassWindowOverrides, for id: EndpointID) { save(settings, for: DesktopWindowKey(endpoint: id)) }
+
+    /// Keeps `settings` for this window — all of it except what lasts a session only.
+    func save(_ settings: GlassWindowOverrides, for key: DesktopWindowKey) {
         let kept = DesktopWindowSettings.persistable(settings)
-        guard records[id]?.windowSettings != kept else { return }
+        guard records[key]?.windowSettings != kept else { return }
         if kept.isEmpty {
-            records.removeValue(forKey: id)
+            records.removeValue(forKey: key)
         } else {
-            guard records[id] != nil || records.count < Self.maximumCount else { return }
-            records[id] = DesktopWindowRecord(windowSettings: kept)
+            guard records[key] != nil || records.count < Self.maximumCount else { return }
+            records[key] = DesktopWindowRecord(windowSettings: kept)
         }
         write()
     }
 
-    /// The desktop is gone: so is what its window kept.
+    /// The desktop is gone: so is what its windows kept, its displays' included.
     func remove(_ id: EndpointID) {
-        guard records.removeValue(forKey: id) != nil else { return }
+        let gone = records.keys.filter { $0.endpoint == id }
+        guard !gone.isEmpty else { return }
+        for key in gone { records.removeValue(forKey: key) }
         write()
     }
 
@@ -378,23 +423,24 @@ public final class DesktopWindowSettingsStore {
             defaults.removeObject(forKey: Self.key)
             return
         }
-        let byKey = Dictionary(uniqueKeysWithValues: records.map { ($0.key.rawValue.uuidString, $0.value) })
+        let byKey = Dictionary(uniqueKeysWithValues: records.map { ($0.key.storageKey, $0.value) })
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         guard let data = try? encoder.encode(byKey) else { return }
         defaults.set(data, forKey: Self.key)
     }
 
-    static func read(_ data: Data?) -> [EndpointID: DesktopWindowRecord] {
+    static func read(_ data: Data?) -> [DesktopWindowKey: DesktopWindowRecord] {
         guard let data, let byKey = try? JSONDecoder().decode([String: DesktopWindowRecord].self, from: data) else {
             return [:]
         }
-        var records: [EndpointID: DesktopWindowRecord] = [:]
+        var records: [DesktopWindowKey: DesktopWindowRecord] = [:]
         for (key, record) in byKey.sorted(by: { $0.key < $1.key }) {
-            guard records.count < maximumCount, let id = UUID(uuidString: key), !record.windowSettings.isEmpty else {
+            guard records.count < maximumCount, let windowKey = DesktopWindowKey(storageKey: key),
+                  !record.windowSettings.isEmpty else {
                 continue
             }
-            records[EndpointID(rawValue: id)] = record
+            records[windowKey] = record
         }
         return records
     }

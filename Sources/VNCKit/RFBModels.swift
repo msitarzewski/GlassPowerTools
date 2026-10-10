@@ -72,16 +72,21 @@ public enum RFBEncoding: Int32, Sendable {
     case desktopSize = -223
     case lastRect = -224
     case extendedDesktopSize = -308
+    /// Apple's own display layout (0x451), asked for only from Apple's server (`RFBServerDialect`).
+    /// Apple does not document it; its form here is from published reverse engineering (see
+    /// `RFBAppleDisplayLayout`). It is how a Mac tells a client where each display sits.
+    case appleDisplayLayout = 1105
 
     static let advertised: [RFBEncoding] = [.tight, .zrle, .hextile, .zlib, .copyRect, .rre, .raw,
                                             .cursor, .desktopSize, .extendedDesktopSize, .lastRect]
 
-    /// The SetEncodings list: the encodings above, then, when the link calls for it, Tight's JPEG
-    /// quality level (-32 + 0…9). Without a quality level a server keeps Tight lossless.
+    /// The SetEncodings list for the whole framebuffer at Tight's JPEG quality level (-32 + 0…9).
+    /// Without a quality level a server keeps Tight lossless. `setEncodingsValues(profile:copyRect:)`
+    /// is the full form (`VNCStreaming.swift`).
     static func setEncodingsValues(jpegQuality: Int?) -> [Int32] {
-        var values = advertised.map(\.rawValue)
-        if let jpegQuality { values.append(-32 + Int32(min(9, max(0, jpegQuality)))) }
-        return values
+        let profile = VNCStreamProfile(level: .balanced, colourDepth: .full, jpegQuality: jpegQuality,
+                                       compressionLevel: nil, maximumUpdatesPerSecond: nil)
+        return setEncodingsValues(profile: profile, copyRect: true)
     }
 }
 
@@ -149,6 +154,9 @@ public struct VNCServerInfo: Equatable, Sendable {
     public let negotiatedVersion: RFBProtocolVersion
     public let securityType: RFBSecurityType
     public let serverPixelFormat: RFBPixelFormat
+
+    /// Apple's Screen Sharing, which announces RFB 003.889 (`RFBServerDialect`).
+    public var isAppleScreenSharing: Bool { RFBServerDialect(version: serverVersion) == .apple }
 }
 
 /// One display inside the shared framebuffer, from the ExtendedDesktopSize pseudo-encoding.
@@ -162,8 +170,13 @@ public struct VNCScreen: Equatable, Sendable, Identifiable {
     public let height: Int
     public let flags: UInt32
 
-    public init(id: UInt32, x: Int, y: Int, width: Int, height: Int, flags: UInt32) {
+    /// Whether the server marks this the main display; nil when the protocol has no such mark
+    /// (ExtendedDesktopSize does not; Apple's layout does).
+    public let isMain: Bool?
+
+    public init(id: UInt32, x: Int, y: Int, width: Int, height: Int, flags: UInt32, isMain: Bool? = nil) {
         self.id = id; self.x = x; self.y = y; self.width = width; self.height = height; self.flags = flags
+        self.isMain = isMain
     }
 
     /// Screens outside the framebuffer, or with no area, cannot be shown and are discarded.
@@ -220,37 +233,4 @@ public extension UInt32 {
 
 public extension Int32 {
     var bigEndianBytes: [UInt8] { UInt32(bitPattern: self).bigEndianBytes }
-}
-
-/// Chooses Tight's JPEG quality from how fast update data actually arrives, as TigerVNC's viewer
-/// does: a fast link stays lossless, a slower one trades fidelity for frames. The rate is measured
-/// over updates large enough to mean something, and a new quality is chosen only after three
-/// measurements agree, so a single burst does not flip the picture back and forth.
-struct RFBLinkQualityGovernor: Sendable {
-    /// nil = lossless.
-    private(set) var jpegQuality: Int? = 8
-    private var pendingQuality: Int??
-    private var agreeing = 0
-
-    static func quality(forKilobitsPerSecond rate: Double) -> Int? {
-        switch rate {
-        case 16_000...: nil
-        case 4_000..<16_000: 8
-        case 1_000..<4_000: 6
-        default: 4
-        }
-    }
-
-    /// One update: its bytes and how long reading it took. Returns the new quality when it changes.
-    mutating func observe(bytes: Int, seconds: Double) -> Int?? {
-        guard bytes >= 16 * 1024, seconds > 0.001 else { return nil }
-        let wanted = Self.quality(forKilobitsPerSecond: Double(bytes) * 8 / 1000 / seconds)
-        guard wanted != jpegQuality else { pendingQuality = nil; agreeing = 0; return nil }
-        if pendingQuality == .some(wanted) { agreeing += 1 } else { pendingQuality = .some(wanted); agreeing = 1 }
-        guard agreeing >= 3 else { return nil }
-        jpegQuality = wanted
-        pendingQuality = nil
-        agreeing = 0
-        return .some(wanted)
-    }
 }

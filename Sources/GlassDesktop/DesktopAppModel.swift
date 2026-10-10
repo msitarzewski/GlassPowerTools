@@ -73,6 +73,11 @@ public final class DesktopAppModel {
     func noteClosed(_ session: DesktopSessionModel) {
         liveSessions.removeAll { $0 === session }
     }
+
+    /// The open session for a desktop, which its desktop window and display windows share (W30).
+    public func liveSession(for id: EndpointID) -> DesktopSessionModel? {
+        liveSessions.first { $0.connection.id == id }
+    }
     public private(set) var isLoaded = false
     public var errorMessage: String?
     public let notices: DesktopNotices
