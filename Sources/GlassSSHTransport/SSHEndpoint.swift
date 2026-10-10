@@ -124,13 +124,30 @@ public struct SSHTransportIdentity: Sendable, Hashable {
 public struct SSHTransportOwnership: Sendable, Equatable {
     public private(set) var owners: Set<UUID> = []
     public private(set) var isClosing = false
+    /// The server refused a session channel on this connection (W21): it carries the owners it has
+    /// and takes no more, so the next terminal goes to another connection.
+    public private(set) var refusesNewOwners = false
 
     public init() {}
 
     public mutating func acquire(_ owner: UUID) -> Bool {
+        acquire(owner, limit: .max)
+    }
+
+    /// Registers `owner` unless the connection is closing, refuses newcomers, or already has `limit`
+    /// owners (W21). An owner already registered is accepted again. One check-and-insert, so
+    /// concurrent callers on the owning actor can never take a connection past `limit`.
+    public mutating func acquire(_ owner: UUID, limit: Int) -> Bool {
         guard !isClosing else { return false }
+        if owners.contains(owner) { return true }
+        guard !refusesNewOwners, owners.count < limit else { return false }
         owners.insert(owner)
         return true
+    }
+
+    /// Keeps the owners there are and takes no new ones (W21).
+    public mutating func refuseNewOwners() {
+        refusesNewOwners = true
     }
 
     /// Returns true exactly once, when the final owner releases the transport.

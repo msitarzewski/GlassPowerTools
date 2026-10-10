@@ -1,4 +1,5 @@
 import Foundation
+@preconcurrency import Citadel
 import NIOCore
 @preconcurrency import NIOSSH
 
@@ -22,6 +23,12 @@ public enum SSHTransportError: Error, Sendable, Equatable {
     case cancelled
     case tunnelBindFailed(port: Int, reason: String)
     case sftpUnavailable
+    /// The server refused a session channel — a shell, a command or SFTP — on a connection already
+    /// carrying as many as it allows (OpenSSH's `MaxSessions`, W21).
+    case sessionLimitReached
+    /// The server kept closing new connections before they were set up, as OpenSSH does past
+    /// `MaxStartups` while others are still signing in (W21). Given after the retries.
+    case serverBusy
 }
 
 extension SSHTransportError: LocalizedError {
@@ -44,6 +51,8 @@ extension SSHTransportError: LocalizedError {
         case .cancelled: return "The SSH operation was cancelled"
         case .tunnelBindFailed(let port, let reason): return "Failed to bind port \(port): \(reason)"
         case .sftpUnavailable: return "SFTP is not available on this connection"
+        case .sessionLimitReached: return "The server refused another session on this connection"
+        case .serverBusy: return "The server turned the connection away while others were signing in"
         }
     }
 }
@@ -79,6 +88,14 @@ public extension SSHTransportError {
             case .cancelled: return "The connection to \(address) was cancelled."
             case .tunnelBindFailed(let port, let reason): return "Could not open local port \(port): \(reason)"
             case .sftpUnavailable: return "SFTP is not available on \(address)."
+            case .sessionLimitReached:
+                return "The server at \(address) limits how many sessions one connection can carry (MaxSessions), "
+                    + "and it refused this one on a new connection too. Close a terminal to it, "
+                    + "or raise MaxSessions in its sshd_config."
+            case .serverBusy:
+                return "\(address) kept closing the connection before it could sign in, as SSH servers do when "
+                    + "too many connections are opening at once (MaxStartups). Wait a moment and reconnect; "
+                    + "if it keeps happening, raise MaxStartups in its sshd_config."
             }
         }
         if let channelError = error as? ChannelError {
@@ -118,6 +135,44 @@ public extension SSHTransportError {
 
     static func shouldRetryWithLegacyAlgorithms(_ error: Error, enabled: Bool) -> Bool {
         enabled && isKeyExchangeNegotiationFailure(error)
+    }
+
+    /// The server would not open a session channel here (W21): OpenSSH answers past `MaxSessions`
+    /// with SSH_MSG_CHANNEL_OPEN_FAILURE, which NIOSSH raises as `channelSetupRejected`.
+    static func isSessionChannelRefused(_ error: Error) -> Bool {
+        if let transportError = error as? SSHTransportError { return transportError == .sessionLimitReached }
+        if let nioError = error as? NIOSSHError, nioError.type == .channelSetupRejected { return true }
+        return String(describing: error).localizedCaseInsensitiveContains("channelsetuprejected")
+    }
+
+    /// The server never answered a session channel open — Citadel gives up after 15 seconds. The
+    /// connection is likely dead though its socket looks open (W21): a terminal joining or
+    /// reconnecting onto it would wait the same 15 seconds every time.
+    static func isSessionOpenUnanswered(_ error: Error) -> Bool {
+        (error as? CitadelError) == .channelCreationFailed
+    }
+
+    /// The server closed or reset a connection before it was set up (W21). Past `MaxStartups`
+    /// OpenSSH writes "Exceeded MaxStartups" and closes; NIOSSH reads that line as text before a
+    /// banner, so the client sees only the connection end. Closed cleanly, Citadel's handshake
+    /// handler goes away with `Disconnected`; closed with the client's banner unread, it is a
+    /// reset (`ECONNRESET`) — both seen against a loopback server doing exactly that
+    /// (`SSHConnectionLimitsTests`). Worth another try after a pause. A refused port, a timeout,
+    /// a host key or a rejected sign-in is not.
+    static func isDroppedDuringSetup(_ error: Error) -> Bool {
+        if let channelError = error as? ChannelError {
+            switch channelError {
+            case .eof, .ioOnClosedChannel, .alreadyClosed, .inputClosed, .outputClosed: return true
+            default: return false
+            }
+        }
+        if let ioError = error as? IOError {
+            return [ECONNRESET, EPIPE, ECONNABORTED].contains(ioError.errnoCode)
+        }
+        if String(describing: type(of: error)) == "Disconnected" { return true }
+        let raw = String(describing: error)
+        return raw.localizedCaseInsensitiveContains("exceeded maxstartups")
+            || raw.localizedCaseInsensitiveContains("connection reset by peer")
     }
 
     static func isChannelClosedError(_ error: Error) -> Bool {

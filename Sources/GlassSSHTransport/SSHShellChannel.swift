@@ -104,6 +104,13 @@ public actor SSHShellChannel {
         } catch {
             if Task.isCancelled { finish(.cancelled); return }
             if SSHTransportError.isChannelClosedError(error) { finish(.remoteClosed); return }
+            // The server would not open the channel (MaxSessions), or never answered: `start` says
+            // so, rather than that the channel closed, so the opener can try another connection (W21).
+            if SSHTransportError.isSessionChannelRefused(error) {
+                failReady(SSHTransportError.sessionLimitReached)
+            } else if SSHTransportError.isSessionOpenUnanswered(error) {
+                failReady(error)
+            }
             finish(.failed(String(describing: error)))
         }
     }

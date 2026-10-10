@@ -118,11 +118,21 @@ extension HostKeyTrustChallenge {
 }
 
 class SSHConnection {
+    /// Every terminal's connections, shared per route within what the server allows (W21): a
+    /// terminal joins a connection with room — connected or still signing in — and a full one, six
+    /// terminals, makes the next open another. See `SSHConnectionLimits`.
+    nonisolated static let transportPool = SSHTransportPool<SSHTransport>(limits: .standard)
+
     private var transport: SSHTransport?
+    /// Another terminal's connection this one was told to share (`shareTransport`): its credentials
+    /// open a further connection when it is full, so a shared terminal never reads them again.
+    private var sharedTransport: SSHTransport?
     private var shell: SSHShellChannel?
     private var eventTask: Task<Void, Never>?
     private var shellTask: Task<Void, Never>?
     private var isTransportConnected = false
+    /// `disconnect` ran: a connect still on its way gives back what it gets (W21).
+    private var isDisconnected = false
     private let ownerID = UUID()
     private let trustDecider = TerminalHostTrustDecider()
     private var terminalRows: Int = TerminalGeometry.default.rows
@@ -133,21 +143,22 @@ class SSHConnection {
 
     // MARK: - Transport sharing (SessionManager duplicates / SFTP-over-terminal)
 
-    var hasReusableTransport: Bool { transport != nil && isTransportConnected }
+    var hasReusableTransport: Bool { (transport != nil && isTransportConnected) || sharedTransport != nil }
 
     func canShareTransport(for server: ServerConfiguration, jumpHostChain: [ServerConfiguration]) -> Bool {
         guard let transport, isTransportConnected else { return false }
         return transport.identity == Self.makeRoute(for: server, jumpHostChain: jumpHostChain).identity
     }
 
-    /// Adopts another connection's live transport. Ownership is reference-counted by the engine.
+    /// Shares another connection's route and credentials. `connect` then joins that connection
+    /// when it has room, or another to the same route, or opens one with the same credentials
+    /// (W21: before, it joined the connection whatever it carried). Ownership is reference-counted
+    /// by the engine.
     @discardableResult
     func shareTransport(from connection: SSHConnection) async -> Bool {
-        guard transport == nil, let other = connection.transport, connection.isTransportConnected else { return false }
-        guard await other.acquire(owner: ownerID) else { return false }
-        transport = other
-        isTransportConnected = true
-        startEventPump(other)
+        guard transport == nil, sharedTransport == nil,
+              let other = connection.transport, connection.isTransportConnected else { return false }
+        sharedTransport = other
         return true
     }
 
@@ -225,34 +236,52 @@ class SSHConnection {
         guard let session else { throw SSHError.sessionNotFound }
         let server = session.server
         if let transport, isTransportConnected {
-            try await startChannels(transport, server: server)
+            if let shell = try await openShellIfTerminal(on: transport) { startShellTask(shell) }
             return
         }
-        guard let preparation else { throw SSHError.invalidCredentialPreparation }
-        let normalizedHost = Self.normalizedHost(server.host)
-        guard !normalizedHost.isEmpty else { throw SSHError.invalidHost(server.host) }
-        guard (1...65_535).contains(server.port) else { throw SSHError.invalidPort(server.port) }
-        guard preparation.jumpHosts.count == jumpHostChain.count else { throw SSHError.invalidCredentialPreparation }
 
-        var materials: [UUID: SessionAuthenticationMaterial] = [preparation.target.serverID: preparation.target.material]
-        for hop in preparation.jumpHosts { materials[hop.serverID] = hop.material }
+        // W21: the connection comes from the pool — this terminal's own when nothing to its route
+        // has room, made from its prepared credentials (or the shared connection's), otherwise one
+        // already open or signing in. The shell opens in the same call, so a server that refuses it
+        // a session channel (MaxSessions) gets this terminal on another connection.
+        let route: SSHRoute
+        let candidate: SSHTransport
+        if let shared = sharedTransport {
+            route = shared.route
+            candidate = shared.makeSibling(trustDecider: trustDecider)
+        } else {
+            guard let preparation else { throw SSHError.invalidCredentialPreparation }
+            let normalizedHost = Self.normalizedHost(server.host)
+            guard !normalizedHost.isEmpty else { throw SSHError.invalidHost(server.host) }
+            guard (1...65_535).contains(server.port) else { throw SSHError.invalidPort(server.port) }
+            guard preparation.jumpHosts.count == jumpHostChain.count else { throw SSHError.invalidCredentialPreparation }
+
+            var materials: [UUID: SessionAuthenticationMaterial] = [preparation.target.serverID: preparation.target.material]
+            for hop in preparation.jumpHosts { materials[hop.serverID] = hop.material }
+            route = Self.makeRoute(for: server, jumpHostChain: jumpHostChain)
+            candidate = SSHTransport(
+                route: route,
+                credentials: PreparedCredentialResolver(materials: materials),
+                trustStore: SecretStoreHostTrustStore(configuration: KeychainManager.hostTrustConfig),
+                trustDecider: trustDecider
+            )
+        }
 
         session.setConnectionProgress(.resolvingDNS)
-        let route = Self.makeRoute(for: server, jumpHostChain: jumpHostChain)
-        let transport = SSHTransport(
-            route: route,
-            credentials: PreparedCredentialResolver(materials: materials),
-            trustStore: SecretStoreHostTrustStore(configuration: KeychainManager.hostTrustConfig),
-            trustDecider: trustDecider
-        )
-        _ = await transport.acquire(owner: ownerID)
-        self.transport = transport
-        startEventPump(transport)
+        // The connection this terminal would make: its sign-in stages show while it is the one.
+        startEventPump(candidate)
         if !jumpHostChain.isEmpty, let first = jumpHostChain.first {
             session.appendLine(TerminalLine(text: "Connecting via jump host \(first.name) (\(first.host):\(first.port))...", style: .system))
         }
+        let opened: (transport: SSHTransport, value: SSHShellChannel?)
         do {
-            try await transport.connect()
+            opened = try await Self.transportPool.openSession(route, owner: ownerID, candidate: candidate) { @MainActor [weak self] transport in
+                guard let self else { throw SSHError.sessionNotFound }
+                guard !self.isDisconnected else { throw SSHError.notConnected }
+                self.adopt(transport, candidate: candidate)
+                self.session?.setConnectionProgress(.authenticating)
+                return try await self.openShellIfTerminal(on: transport)
+            }
         } catch let error as SSHTransportError {
             await teardownTransport()
             switch error {
@@ -272,17 +301,35 @@ class SSHConnection {
             await teardownTransport()
             throw error
         }
+        // Closed while it connected: give the connection back rather than hold it for nobody.
+        guard !isDisconnected else {
+            if let shell = opened.value { await shell.close() }
+            await Self.transportPool.release(opened.transport, owner: ownerID)
+            throw SSHError.notConnected
+        }
+        // The pool holds this owner on `opened.transport` from here; `disconnect` releases it.
+        transport = opened.transport
+        sharedTransport = nil
         isTransportConnected = true
-        session.setConnectionProgress(.authenticating)
-        try await startChannels(transport, server: server)
+        if let shell = opened.value { startShellTask(shell) }
     }
 
-    private func startChannels(_ transport: SSHTransport, server: ServerConfiguration) async throws {
+    /// The connection the pool gave this terminal. Events come from it from now on; a candidate the
+    /// pool did not use is dropped with its pump, never connected.
+    private func adopt(_ transport: SSHTransport, candidate: SSHTransport) {
+        guard transport !== candidate || eventTask == nil else { return }
+        startEventPump(transport)
+    }
+
+    private func openShellIfTerminal(on transport: SSHTransport) async throws -> SSHShellChannel? {
         guard let session else { throw SSHError.sessionNotFound }
-        guard session.purpose == .terminal else { return }
+        guard session.purpose == .terminal else { return nil }
         _ = await session.prepareInitialTerminalPresentation()
         session.setConnectionProgress(.startingShell)
-        let shell = try await transport.openShell(pty: SSHPTYRequest(columns: terminalColumns, rows: terminalRows))
+        return try await transport.openShell(pty: SSHPTYRequest(columns: terminalColumns, rows: terminalRows))
+    }
+
+    private func startShellTask(_ shell: SSHShellChannel) {
         self.shell = shell
         shellTask = Task { [weak self] in
             for await output in shell.output {
@@ -423,6 +470,7 @@ class SSHConnection {
     }
 
     func disconnect() async {
+        isDisconnected = true
         eventTask?.cancel(); eventTask = nil
         shellTask?.cancel(); shellTask = nil
         if let shell { await shell.close() }
@@ -432,9 +480,10 @@ class SSHConnection {
 
     private func teardownTransport() async {
         isTransportConnected = false
+        sharedTransport = nil
         guard let transport else { return }
         self.transport = nil
-        await transport.release(owner: ownerID)
+        await Self.transportPool.release(transport, owner: ownerID)
     }
 
     static func isKeyExchangeNegotiationFailure(_ error: Error) -> Bool {
@@ -488,6 +537,16 @@ class SSHConnection {
             case .invalidSSHKey:
                 return "The selected SSH key could not be parsed. Verify key contents and passphrase."
             }
+        }
+
+        // W21: the server's own limits, named so the person knows which setting it is.
+        if let transportError = error as? SSHTransportError,
+           transportError == .sessionLimitReached || transportError == .serverBusy {
+            return SSHTransportError.userFacingMessage(
+                for: transportError,
+                endpoint: SSHEndpoint(host: server.host, port: server.port, username: server.username),
+                usesPrivateKey: server.authMethod == .sshKey
+            )
         }
 
         if let channelError = error as? ChannelError {

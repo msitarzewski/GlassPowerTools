@@ -58,7 +58,7 @@ public enum SSHTransportEvent: Sendable, Equatable {
 ///
 /// Ownership: callers `acquire(owner:)` and `release(owner:)`; the final release closes the
 /// connection. `close()` closes regardless. A closing transport refuses new owners.
-public actor SSHTransport {
+public actor SSHTransport: SSHPooledTransport {
     public nonisolated let route: SSHRoute
     public nonisolated let identity: SSHTransportIdentity
     public nonisolated let events: AsyncStream<SSHTransportEvent>
@@ -80,22 +80,44 @@ public actor SSHTransport {
     private var missedKeepAlives = 0
     /// Keys trusted for this transport's lifetime only (`.trust(remember: false)`), by host:port.
     private var sessionTrustedKeys: [String: Set<String>] = [:]
+    /// Exec channels open at once on this connection, and those waiting for one (W21).
+    private let commandLimit: Int
+    private var commandPermits: SSHPermitQueue
+    /// Tests run `execute` without a server through this; nil in the app.
+    private var commandRunnerForTesting: (@Sendable (String) async throws -> String)?
 
     public init(
         route: SSHRoute,
         credentials: any SSHCredentialResolver,
         trustStore: any SSHHostTrustStore,
-        trustDecider: (any SSHHostTrustDecider)? = nil
+        trustDecider: (any SSHHostTrustDecider)? = nil,
+        commandLimit: Int = SSHConnectionLimits.standard.commandsPerConnection
     ) {
         self.route = route
         self.identity = route.identity
         self.credentials = credentials
         self.trustStore = trustStore
         self.trustDecider = trustDecider
+        self.commandLimit = max(1, commandLimit)
+        self.commandPermits = SSHPermitQueue(limit: commandLimit)
         let (stream, continuation) = AsyncStream<SSHTransportEvent>.makeStream()
         events = stream
         eventContinuation = continuation
         _ = SSHEngineAlgorithms.registerHostKeyAlgorithmsOnce
+    }
+
+    /// Another, unconnected transport for the same route, credentials and trust: a further
+    /// connection when this one is full or the server refused it a session (W21). The credential
+    /// material is the material this one already holds; nothing is read again.
+    public nonisolated func makeSibling(trustDecider decider: (any SSHHostTrustDecider)?) -> SSHTransport {
+        SSHTransport(route: route, credentials: credentials, trustStore: trustStore,
+                     trustDecider: decider ?? trustDecider, commandLimit: commandLimit)
+    }
+
+    /// `SSHPooledTransport`'s sibling: the same trust decider as this one.
+    public nonisolated func makeSibling() -> Self {
+        Self(route: route, credentials: credentials, trustStore: trustStore,
+             trustDecider: trustDecider, commandLimit: commandLimit)
     }
 
     /// The GlasSecretStore-backed configuration: credentials and pinned host keys from the
@@ -120,6 +142,15 @@ public actor SSHTransport {
 
     @discardableResult
     public func acquire(owner: UUID) -> Bool { ownership.acquire(owner) }
+
+    /// Registers `owner` only while fewer than `limit` own this connection (W21). Atomic on this
+    /// actor, so terminals opening together can never take it past the limit.
+    public func acquire(owner: UUID, limit: Int) -> Bool { ownership.acquire(owner, limit: limit) }
+
+    public var ownerCount: Int { ownership.owners.count }
+
+    /// The server refused a session here: keep the owners, take no more (W21).
+    public func refuseNewOwners() { ownership.refuseNewOwners() }
 
     /// Releases one owner; closes the connection when the last owner leaves.
     public func release(owner: UUID) async {
@@ -275,6 +306,15 @@ public actor SSHTransport {
         }
         emit(.stage(.authenticating))
         guard client != nil else { throw SSHTransportError.connectionFailed }
+        // Every owner left while this was signing in, and the teardown has run: close what just
+        // opened rather than leave a connection nobody holds (W21 shares connections in flight).
+        if ownership.isClosing {
+            let opened = [client].compactMap { $0 } + jumpClients.reversed()
+            client = nil
+            jumpClients.removeAll()
+            for c in opened { try? await c.close() }
+            throw SSHTransportError.notConnected
+        }
         emit(.connected)
         startKeepAlive(options: target.options)
     }
@@ -373,16 +413,65 @@ public actor SSHTransport {
     /// Bound on `execute` output unless the caller raises it explicitly (S1).
     public static let defaultMaximumResponseBytes = 8 * 1024 * 1024
 
+    ///
+    /// W21: at most `commandLimit` commands run at once on one connection, each an exec channel the
+    /// server counts against `MaxSessions` with the shells; the rest wait their turn, for no longer
+    /// than `timeout`.
     public func execute(_ command: String, maxResponseBytes: Int = SSHTransport.defaultMaximumResponseBytes, timeout: Duration = .seconds(3_600)) async throws -> String {
+        try await takeCommandPermit(waitingAtMost: timeout)
+        defer { returnCommandPermit() }
+        if let commandRunnerForTesting { return try await commandRunnerForTesting(command) }
         guard let client, client.isConnected else { throw SSHTransportError.notConnected }
-        let buffer = try await client.executeCommand(command, maxResponseSize: maxResponseBytes, executionTimeout: TimeAmount(timeout))
-        return String(buffer: buffer)
+        do {
+            let buffer = try await client.executeCommand(command, maxResponseSize: maxResponseBytes, executionTimeout: TimeAmount(timeout))
+            return String(buffer: buffer)
+        } catch where SSHTransportError.isSessionChannelRefused(error) {
+            Logger.sshConnections.notice("SSH: the server refused a command channel; \(self.ownership.owners.count, privacy: .public) owners on this connection")
+            throw SSHTransportError.sessionLimitReached
+        }
+    }
+
+    /// Commands running now, and waiting (tests and diagnostics).
+    public var commandsRunning: Int { commandPermits.inUse }
+    public var commandsWaiting: Int { commandPermits.waitingCount }
+
+    func setCommandRunnerForTesting(_ runner: (@Sendable (String) async throws -> String)?) {
+        commandRunnerForTesting = runner
+    }
+
+    private func takeCommandPermit(waitingAtMost timeout: Duration) async throws {
+        if commandPermits.tryTake() { return }
+        let id = UUID()
+        let expiry = Task { [weak self] in
+            guard (try? await Task.sleep(for: timeout)) != nil else { return }
+            await self?.withdrawCommandWaiter(id, throwing: CitadelError.commandExecutionTimedOut)
+        }
+        defer { expiry.cancel() }
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+                commandPermits.enqueue(id, continuation)
+            }
+        } onCancel: {
+            Task { [weak self] in await self?.withdrawCommandWaiter(id, throwing: CancellationError()) }
+        }
+    }
+
+    private func withdrawCommandWaiter(_ id: UUID, throwing error: any Error) {
+        commandPermits.withdraw(id)?.resume(throwing: error)
+    }
+
+    private func returnCommandPermit() {
+        commandPermits.give()?.resume()
     }
 
     /// Opens an SFTP subsystem channel over the existing connection.
     public func openSFTP() async throws -> any SFTPSession {
         guard let client, client.isConnected else { throw SSHTransportError.notConnected }
-        return try await CitadelSFTPSession.open(over: client)
+        do {
+            return try await CitadelSFTPSession.open(over: client)
+        } catch where SSHTransportError.isSessionChannelRefused(error) {
+            throw SSHTransportError.sessionLimitReached
+        }
     }
 
     /// A raw direct-tcpip channel to `host:port` as seen from the server. Low level; prefer
