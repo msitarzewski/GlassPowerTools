@@ -31,7 +31,7 @@ anything touching real servers (SSH and database tests use the disposable test V
 
 **Installed:** Mac **0.4.320** (2026-10-09 13:10: closed-window crash fix, Active count at launch, terminal
 right-click menu; 4 windows reopened, 15/15 sessions, no crash). iPhone **0.4.320** (13:20, once unlocked);
-Vision Pro 0.4.318 (asleep at 0.4.319); its 0.4.320 build is in `$SP/dd-vision`, to install when the owner wears it.
+Vision Pro **0.4.320** (installed and relaunched once awake). All three devices on one build.
 The Mac reopened its 4 listed windows once (`Reopen: 4 listed … 4 reopening`; later asks "already taken"), 15 of 15
 tmux sessions attached, no crash. Places were not yet recorded by the 0.4.317 that quit, so positions come back from
 the next quit on. Everything committed; nothing pushed. Current task note:
