@@ -832,3 +832,11 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   `GlassWindowShape.continuousConcentricCornerRadius`: 46 − 34 / 1.528 ≈ 24; SwiftTerm view's layer corner 0 on visionOS
   (`SwiftTermHostView.terminalViewCornerRadius`; iPad keeps 18). Side-by-side simulator crop sent; owner on 0.4.335:
   "Yep, I like this much better... good work!" Settled.
+- **9e4d304 — W23 merged (editor windows, D58).** This Window in the editor's Settings (gear): opacity (+ frost and
+  material off visionOS), text size, line numbers, wrapping; file/project text settings still win over the window;
+  ⌘+/⌘−/⌘0 change the window's own size when it has one. Editor windows aren't restored, so settings are kept per
+  project on this device (`com.glasspowertools.editor.projects.device-windows`), not synced. Fixed along the way:
+  reopening a local project created a fresh record and synced its bare name over the list's record. Suites: editor
+  150, editor UI 310 (1 known), editor core 117, shell 238, layers 42, terminal 721. To do once W24/W25 land: the
+  `GlassLayerControls` footer and `site/help/library-settings.md` still say only terminal windows keep their own
+  settings. Agent stopped after merge (it kept background work running).
