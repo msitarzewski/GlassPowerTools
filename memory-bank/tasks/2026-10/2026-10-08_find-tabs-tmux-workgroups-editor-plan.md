@@ -807,3 +807,7 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   chose **every kind of window now**. **W22 started** (agent): the shared per-window overlay contract, Appearance (glass
   layers) per window, and every terminal setting per window (W20's look migrated). Then W23–W25 adopt it for the editor,
   database and desktop windows.
+- **672d32a — corner fits the rows.** Owner, on the headset, of 9b9fc26's 14/36-point corners: "it should be smaller to
+  fit in the corner" (a square tmux status line 10 points in; the window edge isn't drawn, so concentric with it meant
+  nothing visible). The canvas corner is now concentric with the rows inside it: `visionRowsInset` = 10. 0.4.332 on the
+  Vision Pro. W22 told to leave that region alone.
