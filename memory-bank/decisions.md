@@ -1229,3 +1229,12 @@ windows, and the app's own reopen list stood aside; the owner: "that restart was
 (`5722124`); the terminal window scene declines restoration, and the app's own records, which know each window's
 tabs, reopen them. Positions are to be kept in those records too (W12), and the list read by whichever window
 appears first and kept current while running, so a crash reopens the same windows.
+
+## D55 — Vision Pro, iPad and iPhone reopen their tab groups from the app's own list — Implemented 2026-10-09
+**Owner:** "We should also work on restoring tab groups on relaunch with vision OS and iPad OS." **Decision:** as D54
+for the Mac: the terminal scene keeps declining system restoration, and the app keeps its own list
+(`terminalWorkgroupsToReopen`, App Group defaults), current while it runs so a crash restores too, taken once per launch
+after the library has loaded. A workgroup comes back if any terminal in it is in tmux; plain shells in it start again
+on the same machine; a window closed by hand stays closed; saved Workgroups are never written. Vision Pro reopens a
+window per workgroup and connects every terminal; iPad and iPhone bring all back and connect only the one on screen.
+Built in W15 (`6394fc6`); not yet tried on a device.

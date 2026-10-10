@@ -723,3 +723,15 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   Editor; the tools ("…") menu has Open Folder in Editor; both use `runtime.openFolderAsProject` (read from the
   environment, optional) with the folder from `workingDirectory(reported:)`. UI only, no unit test; suites passed.
   0.4.324 on iPhone and Vision Pro.
+- **ef88118 — selection lost to output.** Owner: "I can't select text in terminals... it seems to be deselected with a
+  refresh of screen". SwiftTerm's `feedPrepare` sets `selection.active = false` on every chunk while mouse reporting
+  is allowed (`AppleTerminalView.swift:2744`, SwiftTerm 1.20). `SwiftTermSelectionKeeper` takes the selection before
+  each feed and puts it back after Find's hit is reapplied, where its text still is (rows shifted by trimmed lines).
+  3 tests through the real remote view; mutations (no restore; no text check) fail them. The first full run caught the
+  keeper moving Find's hit before Find reapplied it (`TerminalFindTests` scrollback test) — order fixed. 0.4.325 on
+  iPhone and Vision Pro.
+- **6394fc6 — W15 merged** (D55): tab groups back after relaunch on Vision Pro/iPad/iPhone; tabs move between Vision Pro
+  windows (grid card drag, Move Tab to New Window, Move Tab To ▸; iPad menus; iPhone switcher). 16 tests, each failed
+  under its mutation (M1–M16 in the agent's report). Suites after merge: terminal 674, shell 234. Untried on a device:
+  the drag, menus on the tab ornament, reopen at launch, iPad's new-window handoff. Behaviour change: a Vision Pro
+  window whose workgroup disappears now closes. Log: subsystem `sh.glas`, category `reopen`.
