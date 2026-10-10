@@ -41,7 +41,7 @@ W17 merged (`f70da14`): the editor on Vision Pro — its toolbar (was on the spl
 draw), Markdown preview reachable, Projects + ▸ New Document / Open…, rule 64 deferrals for the editor view and SQL focus.
 W16 merged (`02711b3`): visionOS `.plain` windows paint in the window shape (46 pt; 24 pt inset card,
 `GlassWindowShape`); Files names its folder in the system window title with an ancestors menu. W20 merged (`d274577`, D57): a terminal window owns its look; local tab gear opens Terminal Settings.
-**Vision Pro on 0.4.332** (672d32a corner fits the rows), iPhone on 0.4.331, Mac on 0.4.329.
+**iPhone and Vision Pro on 0.4.333** (W22 per-window terminal settings), Mac on 0.4.329.
 **All three on 0.4.329** (2026-10-10 09:36: W18 settings sync, W19 Mac names, W20 window look, W21 SSH limits). Mac:
 4 windows reopened, 16/16 sessions, no crash; no settings-sync failure logged after relaunch (first time since 09-27);
 pool log lines (`sh.glas`/`ssh`) present.
