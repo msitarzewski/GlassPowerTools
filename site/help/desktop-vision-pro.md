@@ -19,26 +19,25 @@ The window is at least 800 × 440 points. With **Match Window Size** on, resizin
 ## Input in the headset
 
 - Look at a point on the desktop and pinch to click there. Pinch and drag to drag.
-- Pinching is how you select in visionOS, so it does not zoom the desktop. To see more detail, make the window larger, or use **Local Scale** in **Desktop Settings** > **Display**.
+- Pinching is how you select in visionOS, so it does not zoom the desktop. To see more detail, make the window larger, or use **Local Scale** in **Desktop Settings** > **This Window**.
 - A connected keyboard types directly into the remote computer, and a connected trackpad or mouse points and clicks. To take the keyboard back from the desktop, press ⇧⌘Esc; the desktop has the keyboard again the next time you pinch it.
 - Without a keyboard, use **Input** to send text, and **Escape** and **Tab** for those keys.
 
 ## Glass
 
-In **Desktop Settings** > **Appearance**, the **Glass** section changes how the window sits in your space:
+In **Desktop Settings** > **This Window**, the **Glass** section changes how this window sits in your space:
 
 - **Opacity** fades the whole desktop, from transparent to opaque.
 - **Background Frost** changes the material behind it, from clear to frosted.
-- **Clear** and **Frosted** set the frost in one step.
 
-Set both to 0% for a clear canvas; the controls stay visible. These choices are remembered on this device and apply to the next desktop you open. **On Mac** the same **Glass** section is in each desktop's **Desktop Settings** > **Appearance** and in **Settings** > **Desktops**: the desktop window fades over a frosted or clear backdrop showing what is behind it.
+Set both to 0% for a clear canvas; the controls stay visible. Only this window changes, and it keeps these on this device for the next time this desktop opens. To change every desktop window, use **All Desktops**, beside **This Window**, or **Settings** > **Desktops**, which are the same page; there **Clear** and **Frosted** set the frost in one step. A window follows **All Desktops** until you set its own; see [Give a desktop window its own settings](desktop-sessions.md#give-a-desktop-window-its-own-settings). **On Mac** the same **Glass** settings apply: the desktop window fades over a frosted or clear backdrop showing what is behind it.
 
 > [!NOTE]
 > When Reduce Transparency is on in Accessibility settings, the glass controls are unavailable and the desktop is shown opaque with **Original** presentation.
 
 ## Remove the remote desktop's background
 
-Background removal makes parts of the remote image transparent, so a remote window can float over your surroundings or your other windows. In **Desktop Settings** > **Appearance**, choose a **Presentation**:
+Background removal makes parts of the remote image transparent, so a remote window can float over your surroundings or your other windows. In **Desktop Settings** > **This Window**, under **Background Removal**, choose a **Presentation**:
 
 - **Original** — the complete image.
 - **Remove Black** — black areas become transparent.
@@ -47,8 +46,6 @@ Background removal makes parts of the remote image transparent, so a remote wind
 
 Matching colors anywhere on the desktop become transparent, including inside apps. Under **Edges**, **Tolerance** decides how close a color must be to match, and **Edge Softness** blends the border.
 
-To go back, choose **Original** in the **Desktop Settings** toolbar; this also sets opacity back to full. **Reset Presentation** in **Display** resets presentation, zoom and, on Apple Vision Pro, frost.
+To go back, choose **Original** in the **Desktop Settings** toolbar: this window shows the complete image, at full opacity. **Reset This Window** returns the window to **All Desktops**' settings.
 
-**On Apple Vision Pro:** your presentation choice, color, tolerance and edge softness are remembered for the next desktop, except **Remove Wallpaper**.
-
-**On Mac, iPad and iPhone:** these choices apply to the current session only.
+Each desktop window keeps its own presentation, color, tolerance and edge softness on this device, for the next time that desktop opens, except **Remove Wallpaper**, which lasts for the session that chose its image. To choose them for every desktop window, use **Background Removal** in **All Desktops** (the same as **Settings** > **Desktops**); it offers **Original**, **Remove Black** and **Remove Background Color**.

@@ -34,7 +34,7 @@
       {"slug": "desktop-add-service", "title": "Add a remote desktop", "summary": "Add an RDP or VNC Desktop service to a host, what each field means, and how to edit or remove it."},
       {"slug": "desktop-import-rdp-file", "title": "Import an RDP file", "summary": "Turn a .rdp file into a host with a Desktop service, what the import keeps, and which files it refuses."},
       {"slug": "desktop-sign-in-and-trust", "title": "Sign in and trust a remote computer", "summary": "NLA and TLS fallback, VNC password or Mac account sign-in, verifying RDP certificates, and what is not supported."},
-      {"slug": "desktop-sessions", "title": "Connect to and leave a remote desktop", "summary": "Open a desktop, enter a password when asked, read status and failures, reconnect, and close a session."},
+      {"slug": "desktop-sessions", "title": "Connect to and leave a remote desktop", "summary": "Open a desktop, enter a password when asked, read status and failures, reconnect, give a desktop window its own settings, and close a session."},
       {"slug": "desktop-vision-pro", "title": "Remote desktops on Apple Vision Pro", "summary": "The desktop window's controls, headset input, glass opacity and frost, and removing the remote background."},
       {"slug": "desktop-display-and-scaling", "title": "Resolution, scaling and zoom", "summary": "Match Window Size, Detail, fixed resolutions, choosing a display, and zooming the image in the window."},
       {"slug": "desktop-input", "title": "Keyboard, pointer, clipboard and audio", "summary": "Typing, key buttons, pointer modes and gestures, exchanging clipboard text, and remote audio."}

@@ -75,7 +75,8 @@ public final class GlassDesktopRuntime {
 
     public init(layers: GlassLayerStore? = nil, app: DesktopAppModel? = nil) {
         self.layers = layers ?? GlassLayerStore()
-        self.app = app ?? DesktopAppModel()
+        // A window's own settings (W25) are kept on this device, beside All Desktops'.
+        self.app = app ?? DesktopAppModel(windowSettings: DesktopWindowSettingsStore(defaults: .standard))
     }
 
     func enqueue(_ request: Request) {

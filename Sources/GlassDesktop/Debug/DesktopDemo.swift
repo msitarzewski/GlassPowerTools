@@ -2,13 +2,18 @@
 import Foundation
 import CoreGraphics
 import GlassConnectionKit
+import GlassLayers
 import GlassRDPTransport
 
 /// Screenshots only (`App/GlassDemoMode.swift`): a desktop window whose remote screen is a picture
 /// the app drew itself. The same server-less session as `DesktopGlassWindowPreview`: the
 /// operations do nothing, nothing is contacted, and the picture is the only frame it receives.
 extension GlassDesktopRuntime {
-    public func requestDemoDesktop(name: String, host: String, picture: CGImage) async {
+    /// With `windowSettings`, the window keeps settings of its own (W25); with `opensSettings`,
+    /// Desktop Settings ▸ This Window opens over it.
+    public func requestDemoDesktop(name: String, host: String, picture: CGImage,
+                                   windowSettings: GlassWindowOverrides = GlassWindowOverrides(),
+                                   opensSettings: Bool = false) async {
         let width = picture.width, height = picture.height
         // BGRA in memory, which is what the renderer uploads (`DesktopMetalRenderer`).
         var pixels = Data(count: width * height * 4)
@@ -24,7 +29,8 @@ extension GlassDesktopRuntime {
         }
         guard drawn else { return }
 
-        // Throwaway storage, so the demo never writes into the run's desktop list.
+        // Throwaway storage, so the demo never writes into the run's desktop list; its window's
+        // settings are kept in memory only (the store's default).
         let app = DesktopAppModel(storageDirectory: FileManager.default.temporaryDirectory
             .appendingPathComponent("glass-demo-\(UUID())"))
         await app.load()
@@ -34,6 +40,8 @@ extension GlassDesktopRuntime {
         operations.disconnect = { _ in }
         operations.resize = { _, _, _ in }
         let model = DesktopSessionModel(connection: connection, app: app, operations: operations)
+        model.windowSettings = windowSettings
+        model.demoOpensSettings = opensSettings
         do {
             try await model.connect(username: "ann", domain: nil, password: "")
             await model.receive(.state(.connected), attempt: model.attemptID, connection: connection)
@@ -43,6 +51,15 @@ extension GlassDesktopRuntime {
         } catch { return }
         demoSessions[connection.id] = model
         enqueue(.show(connectionID: connection.id))
+    }
+
+    /// Screenshots only: a desktop window with settings of its own (W25).
+    public static var demoWindowSettings: GlassWindowOverrides {
+        var window = GlassWindowOverrides()
+        window[DesktopWindowSettings.opacity] = 0.85
+        window[DesktopWindowSettings.frost] = 0.6
+        window[DesktopWindowSettings.detail] = .oneAndAHalf
+        return window
     }
 }
 #endif

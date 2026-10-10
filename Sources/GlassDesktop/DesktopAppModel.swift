@@ -76,6 +76,8 @@ public final class DesktopAppModel {
     public private(set) var isLoaded = false
     public var errorMessage: String?
     public let notices: DesktopNotices
+    /// Each desktop window's own settings on this device (W25), by the desktop's endpoint id.
+    public let windowSettings: DesktopWindowSettingsStore
     public let storageDirectory: URL
     private var repository: DesktopRepository?
     private let accessGroup: String?
@@ -85,10 +87,14 @@ public final class DesktopAppModel {
 
     /// `store` is the shell's catalog (D26); `storageDirectory` survives only for the managed
     /// files a desktop record can still point at, not for the records themselves.
+    /// `windowSettings` defaults to memory only: the app passes one over this device's defaults
+    /// (`GlassDesktopRuntime`), and a test or preview keeps nothing.
     public init(storageDirectory: URL? = nil, accessGroup: String? = nil,
                 repository: DesktopRepository? = nil,
-                credentialAccess: DesktopCredentialAccess? = nil, notices: DesktopNotices = .shared) {
+                credentialAccess: DesktopCredentialAccess? = nil, notices: DesktopNotices = .shared,
+                windowSettings: DesktopWindowSettingsStore? = nil) {
         self.notices = notices
+        self.windowSettings = windowSettings ?? DesktopWindowSettingsStore(defaults: nil)
         let directory = storageDirectory ?? URL.applicationSupportDirectory
             .appendingPathComponent("GlassPowerTools/Desktop", isDirectory: true)
         self.storageDirectory = directory
@@ -245,6 +251,8 @@ public final class DesktopAppModel {
             // The shell removes the host record and cascades to this capability (D25); this
             // deletes only what the capability itself stored.
             connections = try await requireRepository().delete(connection.id)
+            // What its window kept on this device goes with it (W25; D26: every store cleaned up).
+            windowSettings.remove(connection.id)
             // And the password it held. Removing the record alone left the credential in the
             // Keychain — synced, on every device — with nothing pointing at it. Deleting an item
             // another device already removed is not an error.

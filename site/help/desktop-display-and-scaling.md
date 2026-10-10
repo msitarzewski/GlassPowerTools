@@ -1,6 +1,6 @@
 # Resolution, scaling and zoom
 
-A remote desktop has two sizes: the resolution the remote computer draws at, and how large that image appears in your window. This page covers both, in **Desktop Settings** > **Display**. Open **Desktop Settings** with **Settings** (gear) in the desktop window.
+A remote desktop has two sizes: the resolution the remote computer draws at, and how large that image appears in your window. This page covers both, in **Desktop Settings** > **This Window**. Open **Desktop Settings** with **Settings** (gear) in the desktop window.
 
 ## Let the remote resolution follow the window
 
@@ -22,7 +22,7 @@ If the server changes its own size, for example after you sign in, the app asks 
 - **Automatic** follows the display the window is on. This is the default.
 - **100%**, **150%**, **200%** ask for that many pixels per point.
 
-Higher settings send more pixels over the network. A server that ignores the scale shows a smaller interface. **Detail** needs **Match Window Size** on, and your choice is remembered for every RDP desktop on this device.
+Higher settings send more pixels over the network. A server that ignores the scale shows a smaller interface. **Detail** needs **Match Window Size** on. Set here, it is this desktop window's own, kept on this device; **Detail** in **All Desktops** (the same as **Settings** > **Desktops**) sets it for every desktop window that hasn't set its own. See [Give a desktop window its own settings](desktop-sessions.md#give-a-desktop-window-its-own-settings).
 
 ## Choose a fixed resolution
 
@@ -34,7 +34,7 @@ When a VNC server sends one image covering several displays, a **Displays** sect
 
 ## Zoom in this window
 
-**Local Scale** enlarges the image in this window without changing the remote resolution. 100% is the whole desktop fitted to the window, the smallest it goes; 200% is the largest. **Actual Size** returns to 100% and re-centers the image.
+**Local Scale**, under **Zoom**, enlarges the image in this window without changing the remote resolution. 100% is the whole desktop fitted to the window, the smallest it goes; 200% is the largest. **Actual Size** returns to 100% and re-centers the image.
 
 **On Apple Vision Pro:** pinching selects rather than zooms. Use **Local Scale**, or make the window larger.
 
@@ -48,4 +48,6 @@ When a new desktop window would open at its smallest size, it opens at the servi
 
 ## Reset
 
-**Reset Presentation** sets zoom back to 100% and presentation back to **Original**. It does not change the remote resolution.
+**Actual Size** sets zoom back to 100%. **Reset This Window** returns every setting the window keeps to **All Desktops**' settings. Neither changes the remote resolution.
+
+**Match Window Size**, the display shown, a fixed resolution and **Local Scale** last for the session: each time a desktop opens, it starts with **Match Window Size** on, every display and 100%.

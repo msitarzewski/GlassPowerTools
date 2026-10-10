@@ -72,11 +72,16 @@ enum GlassDemoMode {
             // Put there by Tools/Screenshots/shoot.sh, from make-demo-db.py.
             database.requestDemoDatabase(file: URL.documentsDirectory.appending(path: "demo-shop.sqlite"), name: "shop",
                                          showsDiagram: surface == "diagram")
-        case "desktop":
+        case "desktop", "desktop-window", "desktop-settings":
             let renderer = ImageRenderer(content: DemoRemoteScreen())
             renderer.scale = 1
             guard let picture = renderer.cgImage else { return }
-            await desktop.requestDemoDesktop(name: "bravo", host: "192.0.2.20", picture: picture)
+            // `desktop-window`: a window with settings of its own (W25); `desktop-settings`: and
+            // Desktop Settings ▸ This Window open over it.
+            await desktop.requestDemoDesktop(
+                name: "bravo", host: "192.0.2.20", picture: picture,
+                windowSettings: surface == "desktop" ? GlassWindowOverrides() : GlassDesktopRuntime.demoWindowSettings,
+                opensSettings: surface == "desktop-settings")
         default:
             break
         }

@@ -1,6 +1,6 @@
 # Connect to and leave a remote desktop
 
-This page covers opening a remote desktop, entering a password when one is needed, what the status messages mean, and how to reconnect or close a session.
+This page covers opening a remote desktop, entering a password when one is needed, what the status messages mean, how to reconnect, giving a desktop window its own settings, and closing a session.
 
 ## Connect
 
@@ -39,6 +39,25 @@ A problem that does not end the session, such as a key the server cannot accept,
 
 If a certificate needs checking first, you see **Verify Remote Computer** instead. See [Sign in and trust a remote computer](desktop-sign-in-and-trust.md).
 
+## Give a desktop window its own settings
+
+Anything about how a desktop window looks and behaves can be set for that window alone: a see-through window for one computer and an opaque one for another, or a different **Detail** for each. Choose **Settings** (gear) in the desktop window to open **Desktop Settings**: it opens on **This Window**. **All Desktops**, beside it, is the same page as **Settings** > **Desktops** and changes every desktop window on this device. **On iPad and iPhone**, choose **This Window** or **All Desktops** from the list.
+
+**This Window** has:
+
+- **Glass** (**on Mac and Apple Vision Pro**): **Opacity** and **Background Frost**. See [Remote desktops on Apple Vision Pro](desktop-vision-pro.md#glass).
+- **Background Removal**: **Presentation**, with **Background Color**, **Tolerance** and **Edge Softness**. See [Remove the remote desktop's background](desktop-vision-pro.md#remove-the-remote-desktops-background).
+- **Remote Desktop**: **Detail** (RDP). See [Resolution, scaling and zoom](desktop-display-and-scaling.md#sharper-text-on-high-resolution-displays-rdp).
+- **Touch** (**on iPad and iPhone**): **Pointer**. See [Keyboard, pointer, clipboard and audio](desktop-input.md#point-and-click).
+
+Under each one, **Same as All Desktops** says the window follows the setting every desktop window shares. Change it, and it reads **This window only**, with **Reset** beside it to follow again. **Reset This Window**, at the end, returns every one. Only this window changes, at once.
+
+A desktop's window keeps its own settings on this device. Desktop windows are not reopened when you quit the app, but the next time you connect to the same desktop here, its window has them again. They are not synced to your other devices, and removing the desktop removes them.
+
+**This Window** also holds this session's own controls, which start over each time the desktop opens: **Match Window Size**, the display shown, **Desktop Resolution** and **Local Scale**. **Remove Wallpaper** and its image also last only for the session.
+
+Some settings are only ever the desktop's, or this device's. The account, password, domain, authentication, certificate, **Desktop size**, **Share clipboard** and **Remote audio** belong to the service: edit it in the library, and the change applies the next time the desktop connects. **Important Session Notices** is for every desktop on this device.
+
 ## Leave a session
 
 - **On Apple Vision Pro, Mac and iPad:** close the desktop's window. The session ends.
@@ -50,4 +69,4 @@ You can also see and close every open desktop from the ⚡ **Active** list, wher
 When the app moves to the background, or the desktop window loses focus, keys and mouse buttons you were holding are released on the remote computer, so nothing stays pressed.
 
 > [!NOTE]
-> **On Apple Vision Pro and Mac:** desktop windows are not restored when you quit and reopen the app. Connect again from the library.
+> **On Apple Vision Pro and Mac:** desktop windows are not restored when you quit and reopen the app. Connect again from the library; each window has its own settings again when you do.

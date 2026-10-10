@@ -3,6 +3,7 @@ import CoreGraphics
 import ImageIO
 import Observation
 import GlassConnectionKit
+import GlassLayers
 import GlasSecretStore
 import GlassRDPTransport
 import GlassVNCTransport
@@ -78,7 +79,19 @@ public final class DesktopSessionModel {
     /// The server's latest copy, in every form it offered; the session view puts it on the local
     /// clipboard (D42a).
     public private(set) var remoteClipboard: GlassClipboardContent?
+    /// What the renderer draws with. Its mode, opacity, key colour, tolerance and edge softness are
+    /// the window's settings resolved over All Desktops' (`apply`, W25); its zoom, pan and tilt are
+    /// this session's own.
     public var presentation = PresentationSettings()
+    /// This window's own settings over All Desktops' (W25), kept on this device for the desktop it
+    /// shows (`DesktopWindowSettingsStore`), so its window has them again the next time it opens.
+    public var windowSettings: GlassWindowOverrides {
+        didSet { if windowSettings != oldValue { app.windowSettings.save(windowSettings, for: connection.id) } }
+    }
+    #if DEBUG
+    /// Screenshots only (`App/GlassDemoMode.swift`): Desktop Settings ▸ This Window opens over the window.
+    var demoOpensSettings = false
+    #endif
     public var matchWindow = true { didSet { if matchWindow != oldValue { cancelResize() } } }
     public var needsCredentials = false
     public var trustRequest: DesktopTrustRequest?
@@ -160,6 +173,7 @@ public final class DesktopSessionModel {
         self.connection = connection
         self.app = app
         self.operations = operations
+        self.windowSettings = app.windowSettings.settings(for: connection.id)
         self.transport = Self.makeTransport(for: connection)
         self.wallpaperRoot = wallpaperRoot
         self.wallpaperStore = DesktopWallpaperStore(root: wallpaperRoot)

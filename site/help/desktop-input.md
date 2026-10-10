@@ -29,12 +29,12 @@ Buttons for keys that are hard to type:
 
 **On Mac:** the mouse or trackpad moves the remote pointer. Left, right and middle buttons, the back and forward buttons, and vertical and horizontal scrolling are sent. Over VNC the forward button is not available.
 
-**On iPad and iPhone:** choose how touch works in **Desktop Settings** > **Display** > **Touch** > **Pointer**:
+**On iPad and iPhone:** choose how touch works in **Desktop Settings** > **This Window** > **Touch** > **Pointer**:
 
 - **Trackpad** — the default on iPhone and in a narrow iPad window. Drag anywhere to move the pointer, tap to click where it sits, and tap with two fingers to right-click. Tap, then drag, to move something. If the remote computer does not draw a pointer, the app draws one so you can see where it is.
 - **Direct Touch** — the default in a full-width iPad window. Touching the screen presses the button at that point, which suits a large screen or Apple Pencil.
 
-In both modes, two fingers scroll the remote desktop, and a connected trackpad or mouse moves the pointer when you hover. Your choice is remembered on this device.
+In both modes, two fingers scroll the remote desktop, and a connected trackpad or mouse moves the pointer when you hover. The choice is this desktop window's, kept on this device. To choose for every desktop window, use **Pointer** in **All Desktops** (the same as **Settings** > **Desktops**), where **Automatic** chooses as described above. See [Give a desktop window its own settings](desktop-sessions.md#give-a-desktop-window-its-own-settings).
 
 ## Share the clipboard
 

@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 import GlassRDPTransport
 import GlassConnectionUI
+import GlassLayers
 import GlassShell
 #if os(macOS)
 import AppKit
@@ -45,20 +46,12 @@ public struct DesktopSessionView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var session: DesktopSessionModel
     @State private var showDisplayOptions = false
-    @State private var settingsSection = DesktopSessionSettingsSection.appearance
+    @State private var settingsSection = DesktopSessionSettingsSection.thisWindow
     @State private var requestWallpaperAfterDisplay = false
-    // The desktop's glass, saved on this device: the headset's and, since 2026-09-30, the Mac's.
-    #if os(visionOS) || os(macOS)
-    @AppStorage(DesktopGlassPreferenceKey.material) private var glassAmount = 0.25
-    @AppStorage(DesktopGlassPreferenceKey.opacity) private var savedOpacity = 1.0
-    @AppStorage("display.glass.mode") private var savedMode = TransparencyMode.original.rawValue
-    @AppStorage("display.glass.red") private var savedRed = 1.0
-    @AppStorage("display.glass.green") private var savedGreen = 0.0
-    @AppStorage("display.glass.blue") private var savedBlue = 1.0
-    @AppStorage("display.glass.tolerance") private var savedTolerance = 0.04
-    @AppStorage("display.glass.feather") private var savedFeather = 0.02
-    @State private var restoredPresentation = false
-    #endif
+    /// Settings ▸ Desktops on this device, which this window follows until it sets its own (W25).
+    /// Until W25 the window wrote its presentation back into these as it changed, so one window's
+    /// Desktop Settings changed every desktop's; now it changes only its own (`windowSettings`).
+    private var allDesktops = DesktopAllDesktopsStorage()
     @State private var chooseWallpaper = false
     @State private var showTextInput = false
     @State private var alerts = DesktopSessionAlertPresentation()
@@ -66,9 +59,7 @@ public struct DesktopSessionView: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.displayScale) private var displayScale
-    @AppStorage("display.source.scale") private var savedSourceScale = DesktopSourceScale.automatic.rawValue
     #if os(iOS)
-    @AppStorage("display.pointer.mode") private var savedPointerMode = ""
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
 
@@ -103,13 +94,35 @@ public struct DesktopSessionView: View {
     #endif
 
     public var body: some View {
+        window
+            // The window's own settings (W25), for everything drawn in it: GlassLayers' contract.
+            // This view is the window's root and its settings' owner, so it resolves them from the
+            // session it hands down (`profile`); what it presents reads them from here.
+            .glassWindowOverrides(session.windowSettings)
+    }
+
+    /// What this window draws and drives with: its own settings over All Desktops' (W25).
+    private var profile: DesktopWindowProfile {
+        DesktopWindowProfile(window: session.windowSettings, defaults: allDesktops.defaults,
+                             compactScreen: compactScreen, reduceTransparency: reduceTransparency)
+    }
+
+    private var compactScreen: Bool {
+        #if os(iOS)
+        horizontalSizeClass == .compact
+        #else
+        false
+        #endif
+    }
+
+    @ViewBuilder private var window: some View {
         #if os(visionOS)
         GlassNativeWindowFrame {
             sessionContent
                 .modifier(DesktopClipboardBridge(session: session))
                 .padding(10)
                 .background {
-                    GlassCanvasBackdrop(blurAmount: reduceTransparency ? 1 : glassAmount)
+                    GlassCanvasBackdrop(blurAmount: profile.frost)
                         .allowsHitTesting(false)
                 }
                 .clipShape(.rect(cornerRadius: 24))
@@ -158,7 +171,8 @@ public struct DesktopSessionView: View {
                     }
                 }
                 .onChange(of: geometry.size, initial: true) { _, size in
-                    session.sourceScale = DesktopSourceScale(rawValue: savedSourceScale) ?? .automatic
+                    // Detail first: the size asked for is the window's at the window's scale.
+                    session.apply(profile)
                     session.resize(width: size.width, height: size.height, displayScale: displayScale)
                 }
                 .onChange(of: session.capabilities) { _, _ in session.resize(width: geometry.size.width, height: geometry.size.height, displayScale: displayScale) }
@@ -177,7 +191,7 @@ public struct DesktopSessionView: View {
                 if session.frame == nil || (session.presentation.mode == .original && session.presentation.opacity >= 1) {
                     Color.black
                 } else {
-                    GlassCanvasBackdrop(blurAmount: reduceTransparency ? 1 : glassAmount)
+                    GlassCanvasBackdrop(blurAmount: profile.frost)
                 }
                 #elseif !os(visionOS)
                 if session.frame == nil || session.presentation.mode == .original { Color.black }
@@ -219,18 +233,22 @@ public struct DesktopSessionView: View {
             if failure != nil { session.wantsKeyboard = false }
         }
         .task {
-            #if os(iOS)
-            session.pointerMode = DesktopPointerMode(rawValue: savedPointerMode)
-                ?? .standard(forCompactScreen: horizontalSizeClass == .compact)
-            #endif
-            #if os(visionOS) || os(macOS)
-            if !restoredPresentation {
-                restoreGlassPresentation()
-                restoredPresentation = true
+            session.apply(profile)
+            #if DEBUG
+            if session.demoOpensSettings {
+                // Screenshots: This Window over the window it changes, once the window is up.
+                session.demoOpensSettings = false
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(2))
+                    settingsSection = .thisWindow
+                    showDisplayOptions = true
+                }
             }
             #endif
             await session.start()
         }
+        // A setting changed here, in All Desktops, or by Reduce Transparency: drawn at once.
+        .onChange(of: profile) { _, value in session.apply(value) }
         .sheet(isPresented: $showDisplayOptions, onDismiss: {
             if requestWallpaperAfterDisplay {
                 requestWallpaperAfterDisplay = false
@@ -249,12 +267,10 @@ public struct DesktopSessionView: View {
                                 .accessibilityIdentifier("session.display.done")
                         }
                         ToolbarItem(placement: .confirmationAction) {
-                            Button("Original") {
-                                session.presentation.mode = .original
-                                session.presentation.opacity = 1
-                            }
+                            // The complete image, in this window: its own Presentation and Opacity.
+                            Button("Original") { session.windowSettings.showDesktopOriginal() }
                                 .accessibilityIdentifier("display.glass.original")
-                                .disabled(session.presentation.mode == .original && session.presentation.opacity == 1)
+                                .disabled(profile.backgroundRemoval == .original && profile.opacity == 1)
                         }
                     }
             }
@@ -264,21 +280,6 @@ public struct DesktopSessionView: View {
             .frame(width: 760, height: 560)
             #endif
         }
-        #if os(visionOS) || os(macOS)
-        .onChange(of: savedOpacity) { _, value in
-            if restoredPresentation && !reduceTransparency { session.presentation.opacity = value }
-        }
-        .onChange(of: session.presentation) { _, value in
-            guard restoredPresentation else { return }
-            // Imported wallpaper references live only for this session.
-            if !reduceTransparency {
-                savedMode = value.mode == .removeWallpaper ? TransparencyMode.original.rawValue : value.mode.rawValue
-                savedOpacity = value.opacity
-            }
-            savedRed = Double(value.keyColor.x); savedGreen = Double(value.keyColor.y); savedBlue = Double(value.keyColor.z)
-            savedTolerance = Double(value.threshold); savedFeather = Double(value.feather)
-        }
-        #endif
         .onDisappear { alerts = DesktopSessionAlertPresentation(); session.close() }
         .onChange(of: session.shouldClosePresentation) { _, shouldClose in
             if shouldClose { if let onClose { onClose() } else { dismiss() } }
@@ -291,17 +292,6 @@ public struct DesktopSessionView: View {
             case .connected, .failed: onOutcome?(state)
             default: break
             }
-        }
-        .onChange(of: reduceTransparency, initial: true) { _, reduced in
-            #if os(visionOS) || os(macOS)
-            if reduced {
-                session.presentation.mode = .original
-                session.presentation.opacity = 1
-            }
-            else if restoredPresentation { restoreGlassPresentation() }
-            #else
-            if reduced { session.presentation.mode = .original }
-            #endif
         }
         .sheet(isPresented: Binding(
             get: { session.needsCredentials },
@@ -328,9 +318,6 @@ public struct DesktopSessionView: View {
             case .failure(let error): session.errorMessage = error.localizedDescription
             }
         }
-        #if os(iOS)
-        .onChange(of: session.pointerMode) { _, mode in savedPointerMode = mode.rawValue }
-        #endif
         .onChange(of: session.trustRequest, initial: true) { _, _ in presentCurrentAlert() }
         .onChange(of: session.rendererError, initial: true) { _, _ in presentCurrentAlert() }
         .alert(alerts.active?.title ?? "Session", isPresented: Binding(
@@ -389,22 +376,6 @@ public struct DesktopSessionView: View {
     }
     #endif
 
-    #if os(visionOS) || os(macOS)
-    private func restoreGlassPresentation() {
-        session.presentation.opacity = reduceTransparency ? 1 : savedOpacity
-        session.presentation.keyColor = SIMD3(Float(savedRed), Float(savedGreen), Float(savedBlue))
-        session.presentation.threshold = savedTolerance.isFinite ? Float(min(0.25, max(0, savedTolerance))) : 0.04
-        session.presentation.feather = savedFeather.isFinite ? Float(min(0.12, max(0, savedFeather))) : 0.02
-        let mode = TransparencyMode(rawValue: savedMode) ?? .original
-        session.presentation.mode = reduceTransparency || mode == .removeWallpaper ? .original : mode
-    }
-    #endif
-
-    private func screenName(_ screen: GlassRemoteScreen) -> String {
-        guard let index = session.screens.firstIndex(where: { $0.id == screen.id }) else { return "Display" }
-        return screen.isPrimary ? "Main Display" : "Display \(index + 1)"
-    }
-
     private var sessionStatusBar: some View {
         HStack(spacing: 12) {
                 Circle().fill(session.isConnected ? .green : .secondary).frame(width: 6, height: 6)
@@ -430,7 +401,12 @@ public struct DesktopSessionView: View {
     }
 
     @ViewBuilder private var sessionActions: some View {
-                Button("Settings", systemImage: "gearshape") { session.releaseInput(); showDisplayOptions.toggle() }
+                Button("Settings", systemImage: "gearshape") {
+                    session.releaseInput()
+                    // Each opening starts on This Window, as a terminal's Settings does.
+                    if !showDisplayOptions { settingsSection = .thisWindow }
+                    showDisplayOptions.toggle()
+                }
                     .labelStyle(.iconOnly)
                     .help("Settings")
                     .accessibilityIdentifier("session.display")
@@ -519,190 +495,15 @@ public struct DesktopSessionView: View {
 
     @ViewBuilder private func settingsForm(_ section: DesktopSessionSettingsSection) -> some View {
         switch section {
-        case .appearance: appearanceSettings
-        case .display: sourceDisplaySettings
+        case .thisWindow:
+            DesktopWindowSettingsView(session: session, defaults: allDesktops.defaults, compactScreen: compactScreen) {
+                requestWallpaperAfterDisplay = true
+                showDisplayOptions = false
+            }
+        case .allDesktops:
+            // Settings ▸ Desktops itself: what every window follows until it sets its own.
+            DesktopSettingsView()
         }
-    }
-
-    private var appearanceSettings: some View {
-        Form {
-            #if os(visionOS) || os(macOS)
-            DesktopGlassAppearanceControls(opacity: $session.presentation.opacity, frost: $glassAmount)
-            #endif
-            Section {
-                Picker("Presentation", selection: $session.presentation.mode) {
-                    ForEach(TransparencyMode.allCases, id: \.self) { Text($0.title).tag($0) }
-                }.disabled(reduceTransparency)
-                    .accessibilityIdentifier("display.presentation")
-            } header: {
-                Text("Background Removal")
-            } footer: {
-                Text("Matching colors anywhere in the desktop can become transparent. Original restores the complete image.")
-            }
-            if session.presentation.mode == .removeColor {
-                Section {
-                    ColorPicker("Background Color", selection: backgroundColor, supportsOpacity: false)
-                        .accessibilityIdentifier("display.glass.color")
-                    LabeledContent("Color Code") {
-                        Text(backgroundColorHex).monospaced().textSelection(.enabled)
-                            .accessibilityIdentifier("display.glass.hex")
-                        Button("Copy", systemImage: "doc.on.doc") { copyBackgroundColorCode() }
-                            .labelStyle(.iconOnly).help("Copy Color Code")
-                    }
-                    Button("Use Magenta") { session.presentation.keyColor = [1, 0, 1] }
-                } header: {
-                    Text("Desktop Background")
-                } footer: {
-                    Text("Set the remote desktop background to this solid color. Matching colors inside apps are removed too.")
-                }
-            }
-            if session.presentation.mode != .original {
-                Section("Edges") {
-                    LabeledContent("Tolerance") {
-                        Slider(value: $session.presentation.threshold, in: 0...0.25) { Text("Tolerance") }
-                    }
-                    LabeledContent("Edge Softness") {
-                        Slider(value: $session.presentation.feather, in: 0...0.12) { Text("Edge Softness") }
-                    }
-                }
-            }
-            if session.presentation.mode == .removeWallpaper {
-                Section {
-                    Button("Choose Wallpaper Image") {
-                        requestWallpaperAfterDisplay = true
-                        showDisplayOptions = false
-                    }.accessibilityIdentifier("display.wallpaper.choose")
-                } header: {
-                    Text("Wallpaper")
-                } footer: {
-                    Text("Choose the remote desktop's image. It is stretched to match the desktop; different placement or compression can leave visible edges. The reference is kept for this session only.")
-                }
-            }
-        }.formStyle(.grouped).padding()
-    }
-
-    private var sourceDisplaySettings: some View {
-        Form {
-            if session.screens.count > 1 {
-                Section {
-                    Picker("Show", selection: $session.selectedScreenID) {
-                        Text("All Displays").tag(UInt32?.none)
-                        ForEach(session.screens) { screen in
-                            Text("\(screenName(screen)) (\(screen.width) × \(screen.height))").tag(UInt32?.some(screen.id))
-                        }
-                    }.accessibilityIdentifier("display.screen")
-                } header: {
-                    Text("Displays")
-                } footer: {
-                    Text("This computer sends one image covering all of its displays. Showing a single display fills the window with it, and uses no more of the network.")
-                }
-            }
-            Section {
-                if let frame = session.frame {
-                    LabeledContent("Current Resolution", value: "\(frame.width) × \(frame.height)")
-                }
-                Toggle("Match Window Size", isOn: $session.matchWindow)
-                    .disabled(session.capabilities == nil)
-                    .accessibilityIdentifier("display.match-window")
-                if session.connection.protocol == .rdp {
-                    Picker("Detail", selection: Binding(
-                        get: { DesktopSourceScale(rawValue: savedSourceScale) ?? .automatic },
-                        set: { savedSourceScale = $0.rawValue; session.sourceScale = $0 }
-                    )) {
-                        ForEach(DesktopSourceScale.allCases, id: \.self) { Text($0.title).tag($0) }
-                    }
-                    .disabled(session.capabilities == nil || !session.matchWindow)
-                    .accessibilityIdentifier("display.source-scale")
-                }
-                Menu("Desktop Resolution") {
-                    ForEach([DesktopSize(width: 1280, height: 800), .standard, DesktopSize(width: 2560, height: 1440), DesktopSize(width: 3840, height: 2160)], id: \.self) { size in
-                        Button("\(size.width) × \(size.height)") {
-                            session.matchWindow = false
-                            Task { await session.setSourceSize(size) }
-                        }.disabled(!(session.capabilities?.supports(width: size.width, height: size.height) ?? false))
-                    }
-                }.disabled(session.capabilities == nil)
-            } header: {
-                Text("Remote Desktop")
-            } footer: {
-                if session.capabilities == nil {
-                    Text("Source resizing becomes available when the server offers display control.")
-                } else if session.connection.protocol == .rdp {
-                    Text("Match Window Size adjusts the remote desktop as you resize this window. Detail asks for more remote pixels per point, so text stays sharp on a high-resolution display without changing how large it looks. Automatic follows this display. Higher settings send more pixels over the network, and a server that ignores the request will show a smaller interface.")
-                } else {
-                    Text("Match Window Size adjusts the remote desktop as you resize this window.")
-                }
-            }
-            #if os(iOS)
-            Section {
-                Picker("Pointer", selection: $session.pointerMode) {
-                    ForEach(DesktopPointerMode.allCases, id: \.self) { Text($0.title).tag($0) }
-                }.accessibilityIdentifier("display.pointer-mode")
-            } header: {
-                Text("Touch")
-            } footer: {
-                Text(session.pointerMode == .trackpad
-                     ? "Drag anywhere to move the pointer, tap to click where it sits, and tap with two fingers to right click. Tap then drag to move something."
-                     : "Touching the screen presses the button at that point, which suits a large screen or a stylus.")
-            }
-            #endif
-            Section {
-                GlassSettingSlider(title: "Local Scale", value: $session.presentation.zoom,
-                                   range: DesktopZoomLimits.minimum...DesktopZoomLimits.maximum, detents: [1],
-                                   leadingAccessibilityLabel: "Fitted to the window",
-                                   trailingAccessibilityLabel: "Double size",
-                                   accessibilityIdentifier: "display.local-scale")
-                Button("Actual Size") {
-                    session.presentation.zoom = 1
-                    session.presentation.panX = 0
-                    session.presentation.panY = 0
-                }
-                    .disabled(session.presentation.zoom == 1 && session.presentation.panX == 0 && session.presentation.panY == 0)
-                    .accessibilityIdentifier("display.local-scale.reset")
-            } header: {
-                Text("This Window")
-            } footer: {
-                Text("Local scale enlarges the image in this window without changing the remote resolution. 100% is the desktop fitted to the window, which is as small as it goes.")
-            }
-            Section {
-                Button("Reset Presentation") {
-                    session.presentation = PresentationSettings()
-                    #if os(visionOS) || os(macOS)
-                    glassAmount = 0.25
-                    #endif
-                }.accessibilityIdentifier("display.reset")
-            }
-        }.formStyle(.grouped).padding()
-    }
-
-    private var backgroundColor: Binding<Color> {
-        Binding(get: {
-            let color = session.presentation.keyColor
-            return Color(.sRGB, red: Double(color.x), green: Double(color.y), blue: Double(color.z), opacity: 1)
-        }, set: { color in
-            #if os(macOS)
-            guard let rgb = NSColor(color).usingColorSpace(.sRGB) else { return }
-            session.presentation.keyColor = [Float(rgb.redComponent), Float(rgb.greenComponent), Float(rgb.blueComponent)]
-            #else
-            var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
-            guard UIColor(color).getRed(&red, green: &green, blue: &blue, alpha: &alpha) else { return }
-            session.presentation.keyColor = [Float(red), Float(green), Float(blue)]
-            #endif
-        })
-    }
-
-    private var backgroundColorHex: String {
-        let rgb = session.presentation.keyColor
-        return String(format: "#%02X%02X%02X", Int((rgb.x * 255).rounded()), Int((rgb.y * 255).rounded()), Int((rgb.z * 255).rounded()))
-    }
-
-    private func copyBackgroundColorCode() {
-        #if os(macOS)
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(backgroundColorHex, forType: .string)
-        #else
-        UIPasteboard.general.string = backgroundColorHex
-        #endif
     }
 
     @ViewBuilder private func cursor(in size: CGSize) -> some View {
@@ -816,9 +617,11 @@ private struct RemoteTextEntry: View {
 }
 
 
+/// Desktop Settings' pages (W25): the window's own settings first, then every window's — the
+/// shape of a terminal's Settings (This Window, All Terminals).
 private enum DesktopSessionSettingsSection: CaseIterable, Hashable {
-    case appearance, display
-    var title: String { self == .appearance ? "Appearance" : "Display" }
+    case thisWindow, allDesktops
+    var title: String { self == .thisWindow ? "This Window" : "All Desktops" }
 }
 
 #if os(macOS)
