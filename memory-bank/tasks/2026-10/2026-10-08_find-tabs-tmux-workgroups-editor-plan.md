@@ -761,3 +761,4 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   first one in the order yes?"; asked, he chose "the window owns it"): one look per terminal window/tab group, set from
   any tab's Settings ▸ Overrides, taken by new and moved tabs, saved with the window and saved workgroups. The local
   tab's gear Settings was a `SettingsLink` to app Settings since Stage 2 — it opens Terminal Settings in W20.
+- **Device check, 0.4.328 (2026-10-10):** the owner, on the Vision Pro: "the editor toolbar works on the headset" (W17).
