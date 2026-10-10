@@ -783,3 +783,8 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   and waves take the window's tint; iPad "Window Appearance". Tint now a fixed 12%. Suites: terminal 705, shell 238.
   To check: sidebar selection highlight with `.tint` (unverified), 12% legibility, Vision Pro Overrides on a tab.
 - Waiting for W21 (SSH limits); then one build on all three (owner: "install all three when W21 lands").
+- **W21 committed** after the screen was unlocked (locked, the file-protected stores refused writes: ~270 tests and a
+  SIGTRAP in the shell suite, environment only). Suites: terminal 707, shell 238, SSH transport 82. 6 terminals per
+  connection, 2 handshakes and 2 commands per connection at once, retries, plain-words MaxStartups/MaxSessions errors.
+  Found, not changed: on a shared connection's loss only one terminal gets `.lost` (the others see their shell end);
+  database/desktop tunnels still connect outside the pool.
