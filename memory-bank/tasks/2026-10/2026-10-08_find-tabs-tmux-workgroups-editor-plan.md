@@ -866,3 +866,6 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   (faded if visionOS allows; else on/off); **Opacity** stays the black canvas's paint. Opacity 0 + Blur 0 = 100% clear,
   as the help already says. Check in the simulator (fade vs on/off, background-window behaviour) and send a capture
   before installing.
+- **Compacting (13:15).** Owner: "Yeah" to the transparency proposal; "i also want to address the settings... we have some
+  UX issue in there now." Next session: transparency first (simulator capture before install), then ask what the Settings
+  UX issues are, then the Mac install at his word.
