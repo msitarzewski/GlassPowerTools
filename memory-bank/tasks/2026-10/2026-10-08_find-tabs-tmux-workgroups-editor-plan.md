@@ -811,3 +811,10 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   fit in the corner" (a square tmux status line 10 points in; the window edge isn't drawn, so concentric with it meant
   nothing visible). The canvas corner is now concentric with the rows inside it: `visionRowsInset` = 10. 0.4.332 on the
   Vision Pro. W22 told to leave that region alone.
+- **Corners, three levels (owner's annotated screenshot, 11:46):** window (the grey frosted paint: inset 22 with a
+  24-pt corner — not Apple's shape), output area (black canvas, 10 pt), terminal text (square; 20 pt in at the sides,
+  10 at top/bottom). Diagnosed in the visionOS simulator with temporary coloured outlines (never committed): yellow
+  window edge 46, red canvas. Proposed to the owner: frosted area fills the window at 46; canvas an even 16 in (30);
+  text an even 12 in (18), and whether to round the text area's corners. **Awaiting his answer.**
+- **eac2ee7 — W22 merged (D58).** Suites: terminal 720, shell 238, layers 42, connection UI 39. W23 (editor), W24
+  (database), W25 (desktop) started on its contract.

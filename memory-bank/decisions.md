@@ -1259,3 +1259,15 @@ Settings ▸ Overrides; new and moved-in tabs take it; Move Tab to New Window an
 Per-session overrides removed (keyed by ids no later session has). Tint drawn at a fixed 12% (it was 12% × opacity,
 invisible at the default 0%). Built in W20 (`d274577`). Limit: a build before W20 that re-saves a synced workgroup
 drops its look.
+
+## D58 — Any setting can be overridden per window, through one shared overlay — Implemented (terminal) 2026-10-10
+**Owner:** "the original idea was that anything in the system settings could be overridden per window"; asked the
+scope, chose **every kind of window now**. **Decision:** GlassLayers owns the mechanism (W22, `eac2ee7`):
+`GlassWindowSetting` declares one overridable setting under a stable key (`<capability>.<name>`, `appearance.*`
+reserved), `GlassWindowOverrides` is a window's overlay (only what it sets; lenient decoding; unknown keys kept; ≤64
+entries), carried in the environment from the window root; `GlassLayeredWindow`/`Panel` draw a window's own Appearance
+from it; `GlassWindowSettingRow` shows "Same as …"/"This window only" with Reset. Terminal windows cover theme, font,
+cursor, bell, scrollback, tint, interactive glass and Appearance; W20's look (D57) is part of it and still written in
+W20's format for earlier builds. Initial size and connection/security/device settings stay global. Editor, database and
+desktop windows adopt it in W23–W25. Caveat: visionOS layers paint no frost since `7478a39`, so per-window
+Frost/Material there change nothing.
