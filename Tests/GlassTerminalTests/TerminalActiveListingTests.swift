@@ -36,6 +36,41 @@ struct TerminalActiveListingTests {
         manager.closeWorkgroup(group)
     }
 
+    @Test("A workgroup Connect made for one terminal is named as its window names it; a named workgroup keeps its name")
+    func connectWorkgroupTakesTheTerminalsName() {
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+        let capability = GlassTerminalCapability(runtime: runtime)
+        let manager = runtime.sessionManager
+        func open(_ server: String, inWorkgroup name: String, count: Int = 1) -> (UUID, [TerminalSession]) {
+            let group = manager.createWorkgroup(name: name, colorTag: .blue)
+            let sessions = (0..<count).map { _ in session(named: server) }
+            for session in sessions {
+                manager.registerSession(session)
+                session.state = .connected
+                _ = manager.appendSession(session, toWorkgroup: group)
+            }
+            return (group, sessions)
+        }
+        func title(_ group: UUID) -> String? {
+            capability.openSessions().first { $0.id == GlassTerminalCapability.sessionID(workgroupID: group) }?.title
+        }
+
+        // As Connect makes it on iPhone and Vision Pro: named after the server.
+        let (connected, terminals) = open("Terminal on alpha", inWorkgroup: "Terminal on alpha")
+        #expect(title(connected) == "Terminal on alpha", "nothing names the terminal yet: the server")
+        terminals[0].rename(to: "Glass Power Tools")
+        #expect(title(connected) == "Glass Power Tools",
+                "the owner, on the Vision Pro: Active said \"Terminal on …\" while the window had the name")
+
+        let (named, inNamed) = open("Terminal on bravo", inWorkgroup: "Backend")
+        inNamed[0].rename(to: "api")
+        #expect(title(named) == "Backend", "a workgroup with a name of its own keeps it")
+
+        let (several, _) = open("Terminal on charlie", inWorkgroup: "Terminal on charlie", count: 2)
+        #expect(title(several) == "Terminal on charlie", "several terminals: the workgroup's name")
+        for group in [connected, named, several] { manager.closeWorkgroup(group) }
+    }
+
     @Test("W6: a machine skipped because asking would need something says why, in plain words")
     func skippedMachinesSayWhy() {
         let server = ServerConfiguration(name: "alpha", host: "alpha.example.com", port: 22, username: "casey")

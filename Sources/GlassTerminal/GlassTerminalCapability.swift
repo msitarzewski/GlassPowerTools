@@ -341,7 +341,7 @@ public final class GlassTerminalCapability: GlassCapability {
             guard !live.isEmpty else { return nil }
             return GlassOpenSession(
                 id: Self.sessionID(workgroupID: workgroup.id),
-                title: workgroup.name,
+                title: Self.title(of: workgroup, live: live),
                 subtitle: Self.subtitle(for: live),
                 symbolName: symbolName,
                 // The machines this workgroup is on: its servers are the shell's endpoints (D26).
@@ -360,6 +360,16 @@ public final class GlassTerminalCapability: GlassCapability {
                 }
             )
         }
+    }
+
+    /// A workgroup Connect made for one terminal is named after its server ("Terminal on alpha"),
+    /// so its row is named as its window names the terminal (W11): the name it was given, its
+    /// program's title, its repository. The owner, on the Vision Pro (2026-10-09): Active said
+    /// "Terminal on …" while the window had the name. A workgroup with a name of its own, or with
+    /// several terminals, keeps its name.
+    static func title(of workgroup: TerminalWorkgroup, live: [TerminalSession]) -> String {
+        guard live.count == 1, let only = live.first, workgroup.name == only.server.name else { return workgroup.name }
+        return TerminalWorkgroupOpening.label(only, on: .active)
     }
 
     /// D44: a row says when its terminals are in tmux, and ending it is a detach when they all

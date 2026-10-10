@@ -166,6 +166,8 @@ enum TerminalWorkgroupOpening {
         case switcher
         /// The connection ornament above a terminal.
         case connectionOrnament
+        /// Active's row for a workgroup Connect made for one terminal.
+        case active
     }
 
     /// What a terminal is called on `surface`: one answer for all of them, by the rule the Mac's
