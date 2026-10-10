@@ -26,7 +26,13 @@ These settings also apply to terminal windows. They are kept on each device.
 
 ### One window's own glass
 
-A window can keep its own **Opacity**, **Frost** and **Material** in place of these. Today that's terminal windows: open a terminal's tools menu, choose **Settings**, then **This Window**, where these are **Opacity**, **Blur** and **Frost**. Each says **Same as Appearance** until you change it there, and only that window changes; see [Give a terminal window its own settings](terminal-settings.md#give-a-terminal-window-its-own-settings). Whatever a window hasn't set follows **Appearance**.
+A window can keep its own **Opacity**, **Frost** and **Material** in place of these: terminal, editor and database windows. (A remote desktop window has its own glass settings instead; see its This Window.)
+
+- In a terminal, open its tools menu, choose **Settings**, then **This Window**, where these are **Opacity**, **Blur** and **Frost**; see [Give a terminal window its own settings](terminal-settings.md#give-a-terminal-window-its-own-settings).
+- In an editor window, choose **Settings** (gear) in its toolbar, then **This Window**, which has **Opacity**, and **Frost** and **Material** on Mac and iPad; see [Give an editor window its own settings](editor-settings.md#give-an-editor-window-its-own-settings).
+- In a database window, choose **Settings** (gear) in its toolbar, then **This Window**, which has **Opacity** and **Frost**; see [Give a database window its own settings](database-workspace.md#give-a-database-window-its-own-settings).
+
+Each says **Same as Appearance** until you change it there, and only that window changes. Whatever a window hasn't set follows **Appearance**.
 
 > [!NOTE]
 > When **Reduce Transparency** is on in the system's Accessibility settings, every window is opaque and frosted, and these controls are unavailable until you turn it off.

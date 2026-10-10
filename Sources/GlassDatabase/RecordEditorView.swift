@@ -10,6 +10,7 @@ import SwiftUI
 import GlassDBKit
 import GlassEditorCore
 import GlassEditorUI
+import GlassLayers
 
 enum RecordJSONText {
     static func compact(_ text: String) throws -> String {
@@ -323,6 +324,8 @@ enum RecordValueError: LocalizedError {
 
 struct RecordEditorView: View {
     @Environment(SettingsManager.self) private var settingsManager
+    /// The window's own settings (W24): a sheet takes its window's.
+    @Environment(\.glassWindowOverrides) private var windowSettings
     @Environment(\.colorScheme) private var colorScheme
 
     enum RecordEditorMode {
@@ -336,6 +339,11 @@ struct RecordEditorView: View {
     var dialect: DatabaseDialect?
     let onSave: ([StagedEdit], RecordEditorMode) -> Void
     let onDiscard: () -> Void
+
+    /// The window's settings over All Databases' (W24).
+    private var windowProfile: DatabaseWindowProfile {
+        DatabaseWindowProfile.resolved(windowSettings, settings: settingsManager)
+    }
 
     private var isAddMode: Bool {
         if case .add = mode { return true }
@@ -828,7 +836,7 @@ struct RecordEditorView: View {
                     isNull: value.isNull,
                     useDefault: false
                 )
-                if settingsManager.autoFormatJSONInRecordEditor,
+                if windowProfile.formatsJSON,
                    edit.isJSON,
                    !edit.isNull,
                    let formatted = try? RecordJSONText.pretty(edit.editText) {
@@ -861,7 +869,7 @@ struct RecordEditorView: View {
             jsonEditorModels[edit.columnIndex] = GlassEditorModel(
                 snapshot: snapshot,
                 configuration: GlassEditorConfiguration(
-                    showsLineNumbers: settingsManager.showLineNumbers
+                    showsLineNumbers: windowProfile.showLineNumbers
                 ),
                 theme: colorScheme == .dark ? .glassDark : .glassLight,
                 language: .json,

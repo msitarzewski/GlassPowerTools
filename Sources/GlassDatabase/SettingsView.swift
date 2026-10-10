@@ -44,6 +44,12 @@ struct SettingsView: View {
             #if os(iOS)
             iOSWorkspaceSection
             #endif
+            if DatabaseWindowSettingsView.isOffered {
+                Section {
+                } footer: {
+                    Text("These change every database window. To change one window — its glass, result row limit, text sizes, line numbers or JSON formatting — choose Settings (gear) in its toolbar, then This Window.")
+                }
+            }
         }
         .formStyle(.grouped)
     }
@@ -229,7 +235,8 @@ struct SettingsView: View {
 
 }
 
-private struct BoundedStepperRow: View {
+/// A stepper with its value beside it; also This Window's (`DatabaseWindowSettingsView`).
+struct BoundedStepperRow: View {
     let title: String
     @Binding var value: Int
     let range: ClosedRange<Int>
@@ -255,7 +262,7 @@ private struct BoundedStepperRow: View {
     }
 }
 
-private struct BoundedDoubleStepperRow: View {
+struct BoundedDoubleStepperRow: View {
     let title: String
     @Binding var value: Double
     let range: ClosedRange<Double>

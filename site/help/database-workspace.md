@@ -1,6 +1,6 @@
 # The database workspace
 
-This page covers connecting to a database, finding your way around the workspace, the overview and its charts, the schema browser's commands, the Mutation Log and ending a session.
+This page covers connecting to a database, finding your way around the workspace, the overview and its charts, the schema browser's commands, the Mutation Log, ending a session, and giving a database window its own settings.
 
 ## Connect
 
@@ -69,9 +69,31 @@ If the server closes the connection, the workspace shows **Disconnected** and ke
 
 ## Database settings
 
-Open **Settings** and choose **Databases**:
+Open **Settings** and choose **Databases**. The same page is **All Databases** in a database window's own settings, under the gear in its toolbar.
 
 - **Result row limit** and **Query history limit** keep memory use bounded.
 - **Redact literals in query history** replaces quoted strings and numbers before a statement is kept in history. It never changes what is sent to the database.
 - **Notify when a query fails** shows a private notification with no SQL, schema names or server details.
 - **SQL editor text** and **Results grid text** set their text sizes, with line numbers and JSON formatting in the record editor.
+
+## Give a database window its own settings
+
+A database window can keep settings of its own, so one window can have larger text or lighter glass than the rest. Choose **Settings** (gear) in the workspace's toolbar, then **This Window**. **All Databases**, beside it, changes every database window.
+
+- **On Mac:** the gear is at the end of the toolbar, and Settings opens on **This Window**. The app's own Settings are still in the app menu, or press ⌘,.
+- **On iPad:** the gear is in the toolbar at the bottom, or in the ⋯ menu when the window is narrow. Choose **This Window** from the list.
+- **On Vision Pro:** the gear is in the bar below the window, and Settings opens on **This Window**.
+
+**This Window** has:
+
+- **Glass**: **Opacity** and **Frost**, which otherwise follow **Appearance**. They change the canvas behind the window's tabs, editor and results; the schema sidebar keeps the system's material.
+- **Query**: **Result row limit**.
+- **Editor**: **SQL editor text**, **Results grid text**, **Show line numbers** and **Format JSON automatically while editing**.
+
+Under each one, **Same as All Databases** (or **Same as Appearance**) says the window follows that setting for every window. Change it, and it reads **This window only**, with **Reset** beside it to follow again. **Reset This Window**, at the end, returns every one. Only this window changes, and it changes at once.
+
+A database window doesn't reopen when the app relaunches, so its settings are kept for its database: the next window you open on that database starts with them, after a relaunch too. **Open in New Window**, in the schema browser, gives the new window the settings of the one you opened it from. They're kept on this device.
+
+Some settings are only ever for every window. **Query history limit**, **Redact literals in query history** and **Notify when a query fails** govern the history and notifications every window shares, and **Show schema sidebar when space allows** only decides how a new window starts on iPad. **Read-only** belongs to the database service; see [Make a service read-only](database-add-service.md#make-a-service-read-only). **Material**, in **Appearance**, doesn't change a database window, so **This Window** doesn't offer it.
+
+**On iPhone:** the workspace is a screen rather than a window, so **Settings**, in the ⋯ menu, opens **All Databases**.

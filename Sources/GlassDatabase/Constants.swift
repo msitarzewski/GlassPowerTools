@@ -41,6 +41,9 @@ enum UserDefaultsKeys {
     static let autoFormatJSONInRecordEditor = "glassdb.autoFormatJSONInRecordEditor"
     static let redactQueryHistoryLiterals = "glassdb.redactQueryHistoryLiterals"
     static let queryFailureNotificationPreference = "glassdb.queryFailureNotificationPreference"
+    /// W24: each database's window settings (`DatabaseWindowSettingsStore`). New in the merged
+    /// product, so no glassdb installation has it.
+    static let windowSettings = "glassdb.windowSettings"
 }
 
 enum KeychainServiceNames {
@@ -684,6 +687,8 @@ struct DatabaseCommands: Commands {
 /// the group at the trailing edge without misusing modal action placements.
 struct DatabasePersistentToolbar: ToolbarContent {
     let openSQL: () -> Void
+    /// The window's Settings (W24): This Window, then All Databases. The app's stay on ⌘,.
+    @Environment(\.databaseShowSettings) private var showSettings
 
     var body: some ToolbarContent {
         ToolbarItemGroup(placement: databaseToolbarPlacement) {
@@ -692,10 +697,20 @@ struct DatabasePersistentToolbar: ToolbarContent {
             }
             .help("Show the SQL editor")
 
-            SettingsLink {
-                Label("Settings", systemImage: "gearshape")
+            if let showSettings {
+                Button {
+                    showSettings()
+                } label: {
+                    Label("Settings", systemImage: "gearshape")
+                }
+                .help("Settings for this window and every database window")
+                .accessibilityIdentifier("database-workspace-settings")
+            } else {
+                SettingsLink {
+                    Label("Settings", systemImage: "gearshape")
+                }
+                .help("Open Settings")
             }
-            .help("Open Settings")
         }
     }
 }

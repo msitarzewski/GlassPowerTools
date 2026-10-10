@@ -23,7 +23,7 @@
     {"name": "Databases", "pages": [
       {"slug": "database-add-service", "title": "Add a database service", "summary": "Add a MySQL, PostgreSQL or SQLite database to a host, fill in its fields, and make it read-only."},
       {"slug": "database-encryption-and-tunnel", "title": "Encryption and the SSH tunnel", "summary": "Turn on TLS, choose how the certificate is verified, understand the unencrypted warning, and connect through the host's SSH service."},
-      {"slug": "database-workspace", "title": "The database workspace", "summary": "Connect, browse databases and schemas, read the overview and charts, use schema commands and the Mutation Log, and reconnect."},
+      {"slug": "database-workspace", "title": "The database workspace", "summary": "Connect, browse databases and schemas, read the overview and charts, use schema commands and the Mutation Log, reconnect, and give a window its own settings."},
       {"slug": "database-data-grid", "title": "Browse table data", "summary": "Switch table views, sort, filter and page rows, manage columns, analyze, follow foreign keys and export."},
       {"slug": "database-schema-diagram", "title": "See a database's diagram", "summary": "Every table, column and foreign key as a live diagram, in three dimensions on Vision Pro."},
       {"slug": "database-edit-rows", "title": "Edit rows and structure", "summary": "Edit, add, delete and paste rows with a review before every write, and change columns, indexes and foreign keys."},

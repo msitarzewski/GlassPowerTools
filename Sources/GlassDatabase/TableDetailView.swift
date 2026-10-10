@@ -1374,11 +1374,18 @@ struct DataTabView: View {
 
     @Environment(DatabaseSessionManager.self) private var sessionManager
     @Environment(SettingsManager.self) private var settingsManager
+    /// This window's own settings (W24), over All Databases'.
+    @Environment(\.glassWindowOverrides) private var windowSettings
     @Environment(\.openWindow) private var openWindow
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.editMode) private var editMode
     #endif
+
+    /// What this grid and its editor draw with: the window's settings over All Databases' (W24).
+    private var windowProfile: DatabaseWindowProfile {
+        DatabaseWindowProfile.resolved(windowSettings, settings: settingsManager)
+    }
 
     @State private var tableQueryText = ""
     @State private var tableSelectedRange = NSRange(location: 0, length: 0)
@@ -1666,8 +1673,8 @@ struct DataTabView: View {
                 // SQL editor area remains subordinate to the user-controlled canvas.
                 SQLEditorSurface(
                     text: queryTextBinding,
-                    fontSize: CGFloat(settingsManager.editorFontSize),
-                    showLineNumbers: settingsManager.showLineNumbers,
+                    fontSize: CGFloat(windowProfile.editorFontSize),
+                    showLineNumbers: windowProfile.showLineNumbers,
                     selection: selectedRangeBinding,
                     isActive: isWorkspaceActive,
                     schemaIdentifiers: effectiveCompletionIdentifiers + columnMeta.map(\.name),
@@ -1681,7 +1688,7 @@ struct DataTabView: View {
                     textViewIdentifier: "db-query-editor"
                 )
                 .frame(height: editorHeight)
-                .databaseCanvasSurface(opacity: settingsManager.windowOpacity, strength: 0.045)
+                .databaseCanvasSurface(opacity: windowProfile.glass.opacity, strength: 0.045)
                 // Suggestions float over the editor's bottom edge instead of
                 // occupying a layout row, so their appearance never reflows
                 // the grid below.
@@ -1692,7 +1699,7 @@ struct DataTabView: View {
                     completionBar
                         .padding(
                             .leading,
-                            10 + (settingsManager.showLineNumbers ? EditorMetrics.gutterWidth : 0)
+                            10 + (windowProfile.showLineNumbers ? EditorMetrics.gutterWidth : 0)
                         )
                         .padding(.trailing, 10)
                         .padding(.bottom, 8)
@@ -3018,17 +3025,18 @@ struct DataTabView: View {
     private var emptyResultsGrid: some View {
         VStack(spacing: 0) {
             GeometryReader { geometry in
+                let profile = windowProfile
                 VStack(spacing: 0) {
                     HStack(spacing: 0) {
                         Text("#")
-                            .font(.system(size: settingsManager.dataGridFontSize, weight: .semibold))
+                            .font(.system(size: profile.dataGridFontSize, weight: .semibold))
                             .frame(width: rowNumWidth)
                         Spacer(minLength: 0)
                     }
                     .frame(height: 36)
                     .databaseCanvasPinnedSurface(
-                        opacity: settingsManager.windowOpacity,
-                        blur: settingsManager.blurBackground
+                        opacity: profile.glass.opacity,
+                        blur: profile.glass.blur
                     )
                     .accessibilityHidden(true)
                     VStack(spacing: 0) {
@@ -3036,14 +3044,14 @@ struct DataTabView: View {
                             HStack(spacing: 0) {
                                 Color.clear.frame(width: rowNumWidth)
                                     .databaseCanvasPinnedSurface(
-                                        opacity: settingsManager.windowOpacity,
-                                        blur: settingsManager.blurBackground
+                                        opacity: profile.glass.opacity,
+                                        blur: profile.glass.blur
                                     )
                                 Color.clear
                             }
                             .frame(height: rowHeight)
                             .background(index.isMultiple(of: 2) ? Color.clear : Color.primary.opacity(
-                                DatabaseGlassAppearance(opacity: settingsManager.windowOpacity, blur: 0)
+                                DatabaseGlassAppearance(opacity: profile.glass.opacity, blur: 0)
                                     .surfaceAlpha(strength: 0.02)
                             ))
                         }
@@ -3070,7 +3078,9 @@ struct DataTabView: View {
     private func dataGrid(_ result: QueryResult) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             GeometryReader { geometry in
-                let fontSize = settingsManager.dataGridFontSize
+                // One read of the window's settings for the whole grid, not one per cell (W24).
+                let profile = windowProfile
+                let fontSize = profile.dataGridFontSize
                 let visibleIndices = gridVisibleColumnIndices(for: result)
                 let automaticWidths = columnWidths(columns: result.columns, rows: result.rows)
                 let widths = visibleIndices.map { index in
@@ -3105,8 +3115,8 @@ struct DataTabView: View {
                                                 : Color.clear
                                         )
                                         .databaseCanvasPinnedSurface(
-                                            opacity: settingsManager.windowOpacity,
-                                            blur: settingsManager.blurBackground
+                                            opacity: profile.glass.opacity,
+                                            blur: profile.glass.blur
                                         )
                                         .visualEffect { content, proxy in
                                             content.offset(x: max(0, -proxy.frame(in: .scrollView(axis: .horizontal)).minX))
@@ -3161,7 +3171,7 @@ struct DataTabView: View {
                                                 isFrozen
                                                     ? AnyShapeStyle(Color.primary.opacity(
                                                         DatabaseGlassAppearance(
-                                                            opacity: settingsManager.windowOpacity,
+                                                            opacity: profile.glass.opacity,
                                                             blur: 0
                                                         ).surfaceAlpha()
                                                     ))
@@ -3188,8 +3198,8 @@ struct DataTabView: View {
                                     Color.clear
                                         .frame(width: rowNumWidth, height: rowHeight)
                                         .databaseCanvasPinnedSurface(
-                                            opacity: settingsManager.windowOpacity,
-                                            blur: settingsManager.blurBackground
+                                            opacity: profile.glass.opacity,
+                                            blur: profile.glass.blur
                                         )
                                         .visualEffect { content, proxy in
                                             content.offset(x: max(0, -proxy.frame(in: .scrollView(axis: .horizontal)).minX))
@@ -3207,7 +3217,7 @@ struct DataTabView: View {
                                         ? Color.clear
                                         : Color.primary.opacity(
                                             DatabaseGlassAppearance(
-                                                opacity: settingsManager.windowOpacity,
+                                                opacity: profile.glass.opacity,
                                                 blur: 0
                                             ).surfaceAlpha(strength: 0.02)
                                         )
@@ -3219,8 +3229,8 @@ struct DataTabView: View {
                                     .font(.system(size: fontSize, weight: .semibold))
                                     .frame(width: rowNumWidth, alignment: .center)
                                     .databaseCanvasPinnedSurface(
-                                        opacity: settingsManager.windowOpacity,
-                                        blur: settingsManager.blurBackground
+                                        opacity: profile.glass.opacity,
+                                        blur: profile.glass.blur
                                     )
                                     .visualEffect { content, proxy in
                                         content.offset(x: max(0, -proxy.frame(in: .scrollView(axis: .horizontal)).minX))
@@ -3254,7 +3264,7 @@ struct DataTabView: View {
                                         isFrozen
                                             ? AnyShapeStyle(Color.primary.opacity(
                                                 DatabaseGlassAppearance(
-                                                    opacity: settingsManager.windowOpacity,
+                                                    opacity: profile.glass.opacity,
                                                     blur: 0
                                                 ).surfaceAlpha()
                                             ))
@@ -3305,8 +3315,8 @@ struct DataTabView: View {
                             }
                             .frame(height: headerHeight)
                             .databaseCanvasPinnedSurface(
-                                opacity: settingsManager.windowOpacity,
-                                blur: settingsManager.blurBackground
+                                opacity: profile.glass.opacity,
+                                blur: profile.glass.blur
                             )
                         }
                     }
@@ -3330,7 +3340,7 @@ struct DataTabView: View {
                 ? Color.clear
                 : Color.primary.opacity(
                     DatabaseGlassAppearance(
-                        opacity: settingsManager.windowOpacity,
+                        opacity: windowProfile.glass.opacity,
                         blur: 0
                     ).surfaceAlpha(strength: 0.02)
                 )
@@ -3803,7 +3813,7 @@ struct DataTabView: View {
     // MARK: - Column Widths
 
     private func columnWidths(columns: [ColumnInfo], rows: [[DatabaseValue]]) -> [CGFloat] {
-        let charWidth = settingsManager.dataGridFontSize * 0.65
+        let charWidth = windowProfile.dataGridFontSize * 0.65
         return columns.enumerated().map { colIndex, col in
             let headerLen = CGFloat(col.name.count)
             var maxDataLen: CGFloat = 0
@@ -5779,6 +5789,12 @@ struct DDLTabView: View {
 
     @Environment(DatabaseSessionManager.self) private var sessionManager
     @Environment(SettingsManager.self) private var settingsManager
+    /// This window's own settings (W24), over All Databases'.
+    @Environment(\.glassWindowOverrides) private var windowSettings
+
+    private var windowProfile: DatabaseWindowProfile {
+        DatabaseWindowProfile.resolved(windowSettings, settings: settingsManager)
+    }
     @State private var ddl: String?
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -5832,11 +5848,11 @@ struct DDLTabView: View {
             } else if let ddl {
                 ScrollView {
                     Text(AttributedString(SQLHighlighter.highlight(ddl)))
-                        .font(.system(size: settingsManager.editorFontSize, design: .monospaced))
+                        .font(.system(size: windowProfile.editorFontSize, design: .monospaced))
                         .textSelection(.enabled)
                         .padding(20)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .databaseCanvasSurface(opacity: settingsManager.windowOpacity, strength: 0.045)
+                        .databaseCanvasSurface(opacity: windowProfile.glass.opacity, strength: 0.045)
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                         .padding(20)
                 }

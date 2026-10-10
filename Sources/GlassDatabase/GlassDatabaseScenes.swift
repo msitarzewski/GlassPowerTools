@@ -25,7 +25,8 @@ public struct GlassDatabaseScenes: Scene {
             if let workspaceID {
                 let request = sessionManager.workspaceRequest(for: workspaceID)
                 DatabaseWorkspaceView(sessionID: request.sessionID,
-                                      initialSelection: request.initialSelection)
+                                      initialSelection: request.initialSelection,
+                                      windowSettings: sessionManager.openingWindowSettings(for: request))
                     .environment(runtime)
                     .environment(sessionManager)
                     .environment(settingsManager)
@@ -157,7 +158,8 @@ public struct GlassDatabaseBootstrap<Content: View>: View {
         // iPhone routes the workspace inside the primary scene; iPad keeps `openWindow`.
         if let request = router.workspaceRequest,
            runtime.sessionManager.sessions[request.sessionID] != nil {
-            DatabaseWorkspaceView(sessionID: request.sessionID, initialSelection: request.initialSelection)
+            DatabaseWorkspaceView(sessionID: request.sessionID, initialSelection: request.initialSelection,
+                                  windowSettings: runtime.sessionManager.openingWindowSettings(for: request))
                 .id(request.id)
         } else {
             content
@@ -176,7 +178,8 @@ public struct GlassDatabaseBootstrap<Content: View>: View {
         case .showFailure(let message):
             failureMessage = message
         #if DEBUG
-        case .demoConnect(let config, let showsDiagram):
+        case .demoConnect(let config, let showsDiagram, let windowSettings, let opensSettings):
+            runtime.demoOpensSettings = opensSettings
             Task {
                 do {
                     let sessionID = try await runtime.sessionManager.connect(config: config, password: "", openForward: nil)
@@ -188,7 +191,8 @@ public struct GlassDatabaseBootstrap<Content: View>: View {
                     // Straight to a table: the grid is the shot, and the overview would show the
                     // simulator's file path.
                     present(DatabaseWorkspaceWindowRequest.additional(
-                        sessionID: sessionID, initialSelection: .table(database: "main", table: "orders"), id: sessionID))
+                        sessionID: sessionID, initialSelection: .table(database: "main", table: "orders"), id: sessionID,
+                        windowSettings: windowSettings))
                 } catch {
                     failureMessage = DatabaseConnectionFailure.message(for: error, config: config)
                 }

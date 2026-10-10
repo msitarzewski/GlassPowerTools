@@ -49,8 +49,10 @@ public final class GlassDatabaseRuntime {
         /// Show the failure alert with this message (a link with nothing behind it).
         case showFailure(String)
         #if DEBUG
-        /// Screenshots (App/GlassDemoMode.swift): connect to this configuration without saving it.
-        case demoConnect(DatabaseConnectionConfig, showsDiagram: Bool)
+        /// Screenshots (App/GlassDemoMode.swift): connect to this configuration without saving it,
+        /// in a window with these settings of its own (W24), and This Window open over it.
+        case demoConnect(DatabaseConnectionConfig, showsDiagram: Bool, windowSettings: GlassWindowOverrides?,
+                         opensSettings: Bool)
         #endif
     }
     private(set) var requestSerial = 0
@@ -88,15 +90,38 @@ public final class GlassDatabaseRuntime {
 
     #if DEBUG
     /// Screenshots only: the real SQLite engine on a demo file, in a workspace, with nothing saved
-    /// to the library. The file is imported the way a person's own would be.
-    public func requestDemoDatabase(file: URL, name: String, showsDiagram: Bool = false) {
+    /// to the library. The file is imported the way a person's own would be. With
+    /// `windowSettings`, the window keeps them as its own (W24); with `opensSettings`, Settings ▸
+    /// This Window opens over it.
+    public func requestDemoDatabase(file: URL, name: String, showsDiagram: Bool = false,
+                                    windowSettings: GlassWindowOverrides? = nil, opensSettings: Bool = false) {
         do {
             let imported = try SQLiteFileImporter.importFile(at: file)
             enqueue(.demoConnect(DatabaseConnectionConfig(name: name, engine: .sqlite, host: imported.path,
-                                                          port: 0, username: ""), showsDiagram: showsDiagram))
+                                                          port: 0, username: ""), showsDiagram: showsDiagram,
+                                 windowSettings: windowSettings, opensSettings: opensSettings))
         } catch {
             enqueue(.showFailure("The demo database could not be opened: \(error.localizedDescription)"))
         }
+    }
+
+    /// Screenshots only: a database window's own settings (W24) — lighter glass, larger text and
+    /// a smaller row limit — over the demo's Appearance.
+    public static var demoWindowSettings: GlassWindowOverrides {
+        var window = GlassWindowOverrides()
+        window[GlassLayerSettings.opacity] = 0.35
+        window[DatabaseWindowSettings.dataGridFontSize] = 16
+        window[DatabaseWindowSettings.editorFontSize] = 16
+        window[DatabaseWindowSettings.resultRowLimit] = 500
+        return window
+    }
+
+    /// Screenshots only: This Window opens over the next workspace window, once.
+    @ObservationIgnored var demoOpensSettings = false
+
+    func takeDemoOpensSettings() -> Bool {
+        defer { demoOpensSettings = false }
+        return demoOpensSettings
     }
     #endif
 

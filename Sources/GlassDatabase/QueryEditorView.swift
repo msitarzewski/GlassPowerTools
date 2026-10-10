@@ -460,6 +460,8 @@ struct QueryEditorView: View {
 
     @Environment(DatabaseSessionManager.self) private var sessionManager
     @Environment(SettingsManager.self) private var settingsManager
+    /// This window's own settings (W24): its result row limit.
+    @Environment(\.glassWindowOverrides) private var windowSettings
     @Environment(\.openWindow) private var openWindow
 
     @State private var showingHistory = false
@@ -956,7 +958,8 @@ struct QueryEditorView: View {
                 currentResult = try await sessionManager.executeQuery(
                     statement.text,
                     sessionID: sessionID,
-                    editorRowLimit: settingsManager.resultRowLimit
+                    editorRowLimit: DatabaseWindowProfile.resolved(windowSettings, settings: settingsManager)
+                        .resultRowLimit
                 )
                 // Keep a server-error result visible and stop the batch even
                 // when the adapter reports it without throwing.

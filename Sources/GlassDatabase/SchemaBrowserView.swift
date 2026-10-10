@@ -8,6 +8,7 @@
 
 import SwiftUI
 import GlassDBKit
+import GlassLayers
 import os
 
 private struct SchemaMutationTarget: Identifiable {
@@ -50,6 +51,8 @@ struct SchemaBrowserView: View {
 
     @Environment(DatabaseSessionManager.self) private var sessionManager
     @Environment(\.openWindow) private var openWindow
+    /// This window's own settings (W24), which Open in New Window hands to the window it opens.
+    @Environment(\.glassWindowOverrides) private var windowSettings
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
@@ -496,7 +499,8 @@ struct SchemaBrowserView: View {
         Button("Open in New Window", systemImage: "macwindow.badge.plus") {
             let request = DatabaseWorkspaceWindowRequest.additional(
                 sessionID: sessionID,
-                initialSelection: .database(database)
+                initialSelection: .database(database),
+                windowSettings: windowSettings
             )
             openWindow(
                 id: "database-workspace",

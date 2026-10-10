@@ -17,7 +17,6 @@ import SwiftUI
 @Observable
 final class DatabaseIOSRouter {
     var workspaceRequest: DatabaseWorkspaceWindowRequest?
-    var showsSettings = false
 
     func showWorkspace(_ request: DatabaseWorkspaceWindowRequest) {
         workspaceRequest = request
@@ -25,10 +24,6 @@ final class DatabaseIOSRouter {
 
     func showConnections() {
         workspaceRequest = nil
-    }
-
-    func showSettings() {
-        showsSettings = true
     }
 }
 #endif

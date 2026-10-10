@@ -72,6 +72,11 @@ enum GlassDemoMode {
             // Put there by Tools/Screenshots/shoot.sh, from make-demo-db.py.
             database.requestDemoDatabase(file: URL.documentsDirectory.appending(path: "demo-shop.sqlite"), name: "shop",
                                          showsDiagram: surface == "diagram")
+        case "database-window", "database-settings":
+            // A database window with settings of its own (W24), and This Window open over it.
+            database.requestDemoDatabase(file: URL.documentsDirectory.appending(path: "demo-shop.sqlite"), name: "shop",
+                                         windowSettings: GlassDatabaseRuntime.demoWindowSettings,
+                                         opensSettings: surface == "database-settings")
         case "desktop", "desktop-window", "desktop-settings":
             let renderer = ImageRenderer(content: DemoRemoteScreen())
             renderer.scale = 1

@@ -84,6 +84,10 @@ struct DatabaseWorkspaceWindowRequest: Hashable, Codable, Identifiable {
     let id: UUID
     let sessionID: UUID
     let initialSelection: WorkspaceSelection
+    /// The settings the window opens with (W24), when its opener hands it some — Open in New
+    /// Window hands over its own. Nil opens with those its database kept
+    /// (`DatabaseWindowSettingsStore.opening`).
+    var windowSettings: GlassWindowOverrides?
 
     static func primary(sessionID: UUID) -> Self {
         Self(id: sessionID, sessionID: sessionID, initialSelection: .connection)
@@ -92,9 +96,10 @@ struct DatabaseWorkspaceWindowRequest: Hashable, Codable, Identifiable {
     static func additional(
         sessionID: UUID,
         initialSelection: WorkspaceSelection = .connection,
-        id: UUID = UUID()
+        id: UUID = UUID(),
+        windowSettings: GlassWindowOverrides? = nil
     ) -> Self {
-        Self(id: id, sessionID: sessionID, initialSelection: initialSelection)
+        Self(id: id, sessionID: sessionID, initialSelection: initialSelection, windowSettings: windowSettings)
     }
 }
 
@@ -234,13 +239,22 @@ struct DatabaseWorkspaceView: View {
     /// from `session`, which goes away on a dropped connection while the drafts must not.
     @State private var draftConnectionID: UUID?
     @State private var hasRestoredDrafts = false
+    /// This window's own settings (W24), over All Databases' and Appearance's: handed to every
+    /// view in the window from its root, and kept for its database on every change.
+    @State private var windowSettings: GlassWindowOverrides
+    /// Database Settings (This Window, All Databases), from the toolbar's gear.
+    @State private var showingSettings = false
 
     private var session: DatabaseSession? {
         sessionManager.session(for: sessionID)
     }
 
-    init(sessionID: UUID, initialSelection: WorkspaceSelection = .connection) {
+    /// - Parameter windowSettings: what the window opens with
+    ///   (`DatabaseWindowSettingsStore.opening`).
+    init(sessionID: UUID, initialSelection: WorkspaceSelection = .connection,
+         windowSettings: GlassWindowOverrides = GlassWindowOverrides()) {
         self.sessionID = sessionID
+        _windowSettings = State(initialValue: windowSettings)
         let initialTabState = WorkspaceTabState(initialSelection: initialSelection)
         _tabState = State(initialValue: initialTabState)
         _queryDocuments = State(initialValue: Dictionary(uniqueKeysWithValues: initialTabState.tabs.compactMap {
@@ -408,6 +422,33 @@ struct DatabaseWorkspaceView: View {
                 )
             }
         }
+        // W24: This Window. Kept for the database on every change, because the window itself is
+        // not reopened after a relaunch and its database's next window is what takes them.
+        .onChange(of: windowSettings) { _, settings in
+            guard let connectionID = draftConnectionID ?? session?.connectionConfig.id else { return }
+            DatabaseWindowSettingsStore.shared.record(settings, for: connectionID)
+        }
+        .sheet(isPresented: $showingSettings) {
+            DatabaseSettingsSheet(windowSettings: DatabaseWindowSettingsView.isOffered ? $windowSettings : nil) {
+                showingSettings = false
+            }
+            .environment(settingsManager)
+        }
+        .environment(\.databaseShowSettings, DatabaseShowSettingsAction { showingSettings = true })
+        #if DEBUG
+        .onAppear {
+            // Screenshots: Settings ▸ This Window over the demo's window (`GlassDemoMode`).
+            if runtime?.takeDemoOpensSettings() == true { showingSettings = true }
+        }
+        #endif
+        // The window's root: every view in it, and every sheet it presents, resolves its settings
+        // from here (`DatabaseWindowProfile`).
+        .glassWindowOverrides(windowSettings)
+    }
+
+    /// What this window draws and behaves with: its own settings over All Databases'.
+    private var windowProfile: DatabaseWindowProfile {
+        DatabaseWindowProfile.resolved(windowSettings, settings: settingsManager)
     }
 
     // MARK: - Durable Drafts
@@ -881,22 +922,17 @@ struct DatabaseWorkspaceView: View {
                 .accessibilityHint("Reloads the active connection or database overview")
             }
 
+            // Database Settings: This Window first, then All Databases (W24). On iOS this opened
+            // nothing — a phone's router flag nobody read, and a "settings" window iOS doesn't have.
             Button {
-                #if os(iOS)
-                if UIDevice.current.userInterfaceIdiom == .phone {
-                    iOSRouter.showSettings()
-                } else {
-                    openWindow(id: "settings")
-                }
-                #else
-                openWindow(id: "settings")
-                #endif
+                showingSettings = true
             } label: {
                 Label("Settings", systemImage: "gearshape")
             }
-            .help("Open Settings")
+            .help("Settings for this window and every database window")
             .accessibilityLabel("Settings")
-            .accessibilityHint("Opens settings")
+            .accessibilityHint("Opens settings for this window and every database window")
+            .accessibilityIdentifier("database-workspace-settings")
         }
         #endif
     }
@@ -990,11 +1026,12 @@ struct DatabaseWorkspaceView: View {
         }
         // Keep Apple-provided titlebar and sidebar materials intact. The SQL
         // tab strip belongs to the live database canvas and follows the same
-        // user-controlled opacity and blur as its editor and results grid.
+        // user-controlled opacity and blur as its editor and results grid —
+        // this window's own, when it keeps them (W24).
         .modifier(DatabaseWorkspaceBackground(
             material: .ultraThinMaterial,
-            fillOpacity: settingsManager.windowOpacity,
-            blurAmount: settingsManager.blurBackground
+            fillOpacity: windowProfile.glass.opacity,
+            blurAmount: windowProfile.glass.blur
         ))
     }
 

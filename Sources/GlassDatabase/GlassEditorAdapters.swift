@@ -11,6 +11,7 @@
 import SwiftUI
 import GlassEditorCore
 import GlassEditorUI
+import GlassLayers
 
 extension EnvironmentValues {
     /// Identity of the SQL document whose editor should claim the keyboard
@@ -191,8 +192,15 @@ struct SQLEditorSurface: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(SettingsManager.self) private var settingsManager
+    /// The window's own glass (W24), over Appearance's.
+    @Environment(\.glassWindowOverrides) private var windowSettings
 
     @State private var model: GlassEditorModel
+
+    /// The canvas this editor sits on: its window's opacity and frost.
+    private var canvas: DatabaseGlassAppearance {
+        DatabaseWindowProfile.resolved(windowSettings, settings: settingsManager).glass
+    }
 
     init(
         text: Binding<String>,
@@ -271,8 +279,7 @@ struct SQLEditorSurface: View {
                 model.configuration.isEditable = newValue
             }
             .onChange(of: colorScheme) { applyEnvironment() }
-            .onChange(of: settingsManager.windowOpacity) { applyEnvironment() }
-            .onChange(of: settingsManager.blurBackground) { applyEnvironment() }
+            .onChange(of: canvas) { applyEnvironment() }
             .onChange(of: schemaIdentifiers) { _, identifiers in
                 model.completionProvider = SQLEditorCompletionProvider(
                     schemaIdentifiers: identifiers
@@ -286,9 +293,10 @@ struct SQLEditorSurface: View {
     /// `.blur(strength:)`, not a material weight).
     private func applyEnvironment() {
         model.theme = colorScheme == .dark ? .glassDark : .glassLight
+        let surface = canvas
         model.updateSurface(SurfaceCondition(
-            windowOpacity: settingsManager.windowOpacity,
-            backing: .blur(strength: settingsManager.blurBackground),
+            windowOpacity: surface.opacity,
+            backing: .blur(strength: surface.blur),
             ambient: .unknown
         ))
     }

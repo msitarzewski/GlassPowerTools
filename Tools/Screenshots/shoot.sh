@@ -4,8 +4,8 @@
 # The app is reinstalled first: visionOS restores a previous launch's windows, which would stand in
 # front of the one being captured.
 # Surfaces: library, editor, editor-window, editor-settings, preview, terminal, terminal-window,
-# terminal-settings, files, database, diagram, desktop, desktop-window, desktop-settings
-# (see App/GlassDemoMode.swift).
+# terminal-settings, files, database, database-window, database-settings, diagram, desktop,
+# desktop-window, desktop-settings (see App/GlassDemoMode.swift).
 set -euo pipefail
 SIM="$1"; SURFACE="$2"; OUT="$3"; SETTLE="${4:-8}"
 HOSTS="alpha@192.0.2.10:ssh+database|bravo@192.0.2.20:ssh+rdp|nas@192.0.2.30:ssh|build@192.0.2.40:ssh|win@192.0.2.50:rdp"
@@ -15,7 +15,7 @@ if [ -n "${APP:-}" ]; then
   xcrun simctl install "$SIM" "$APP"
 fi
 # The database surface opens a made-up shop, built fresh and placed in the app's Documents.
-if [ "$SURFACE" = "database" ] || [ "$SURFACE" = "diagram" ]; then
+if [ "${SURFACE%%-*}" = "database" ] || [ "$SURFACE" = "diagram" ]; then
   DATA="$(xcrun simctl get_app_container "$SIM" com.glasspowertools data)"
   mkdir -p "$DATA/Documents"
   python3 "$(dirname "$0")/make-demo-db.py" "$DATA/Documents/demo-shop.sqlite" >/dev/null
