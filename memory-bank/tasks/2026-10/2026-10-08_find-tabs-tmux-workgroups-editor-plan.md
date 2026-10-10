@@ -840,3 +840,22 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   150, editor UI 310 (1 known), editor core 117, shell 238, layers 42, terminal 721. To do once W24/W25 land: the
   `GlassLayerControls` footer and `site/help/library-settings.md` still say only terminal windows keep their own
   settings. Agent stopped after merge (it kept background work running).
+- **8574c75 — W25 merged (desktop windows).** This Window in the desktop's settings sheet: opacity (fades the image,
+  own key `desktop.opacity`), background frost, presentation/key colour/tolerance/softness, Detail (RDP), Pointer
+  (iPad/iPhone); zoom/pan/tilt stay the session's; kept per desktop on this device (`desktop.windows`). Before, that
+  sheet wrote device-wide settings, so one window changed every desktop. Suites: desktop 185.
+- **a3b35fb — W24 merged (database windows).** This Window: opacity, frost (database draws its own, also visionOS), row
+  limit, SQL/grid text sizes, line numbers, JSON formatting; kept per database on this device (`glassdb.windowSettings`).
+  The gear did nothing on iPad/iPhone before. Shared Appearance footer + library-settings help now name terminal,
+  editor and database windows. Suites: database 317, DBKit 27, plus all others green. Merge conflicts were only demo
+  surfaces in `App/GlassDemoMode.swift` and the `shoot.sh` comment (kept both sides).
+- Agents' notes left for later: the "This window only" caption (W22's `GlassWindowSettingSource`, `.foregroundStyle(.tint)`)
+  is low-contrast blue on the headset's grey glass; detached database results/diagram windows have no This Window.
+- **REGRESSION, top of the next round (owner, 2026-10-10 ~13:00):** "We've lost complete transparency... 100% transparent
+  glass (the whole point of the app)... when the window is focused... when it's in the background on visionOS it will
+  go 100% transparent." Cause: cfd5094 dropped `.plain` from the visionOS terminal scene, so Apple's window glass is
+  always behind a focused terminal; the corners now nest inside it. To decide next round: keep Apple's window shape
+  but let the glass go when the window's opacity/blur are 0 (e.g. `.glassBackgroundEffect(displayMode:)` on the root,
+  `.never` for a clear window — verify on visionOS 27 that it removes the default window's glass), or return to
+  `.plain` and keep the nested 34-pt/24-pt geometry with no visible outer edge. Check with the owner before changing
+  the look (memory: confirm visual asks).
