@@ -8,6 +8,8 @@ import GlassConnectionUI
 /// and controls ornaments. Mac, iPad and iPhone adapt from that.
 public struct GlassLayeredWindow<Content: View, Title: View, Controls: View>: View {
     @Environment(\.glassLayers) private var layers
+    /// The window's own Appearance, over the app's (W22): set at the window's root.
+    @Environment(\.glassWindowOverrides) private var windowOverrides
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private let showTitle: Bool
@@ -52,7 +54,8 @@ public struct GlassLayeredWindow<Content: View, Title: View, Controls: View>: Vi
     }
 
     private var resolved: GlassLayerState {
-        GlassLayerResolution.resolve(layers.state, reduceTransparency: reduceTransparency, paintsTheme: paintsTheme)
+        GlassLayerResolution.resolve(layers.state, window: windowOverrides, reduceTransparency: reduceTransparency,
+                                     paintsTheme: paintsTheme)
     }
 
     private var layered: some View {
@@ -101,6 +104,8 @@ public enum GlassLayeredPanelRole: Sendable {
 /// through (observed on the Mac, 2026-09-10).
 public struct GlassLayeredPanel<Content: View>: View {
     @Environment(\.glassLayers) private var layers
+    /// The overrides of the window the panel is in (W22), so a sheet looks like its window.
+    @Environment(\.glassWindowOverrides) private var windowOverrides
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private let cornerRadius: CGFloat
@@ -123,7 +128,8 @@ public struct GlassLayeredPanel<Content: View>: View {
 
     public var body: some View {
         if paintsOwnSurface {
-            let state = GlassLayerResolution.resolve(layers.state, reduceTransparency: reduceTransparency)
+            let state = GlassLayerResolution.resolve(layers.state, window: windowOverrides,
+                                                     reduceTransparency: reduceTransparency)
             content
                 .background {
                     GlassLayerBackground(state: state, cornerRadius: cornerRadius)
@@ -191,5 +197,13 @@ public enum GlassLayerResolution {
             return GlassLayerState(opacity: 0, frost: state.frost, material: state.material)
         }
         return state
+    }
+
+    /// What a window draws (W22): the app's state with the window's own Appearance over it, field
+    /// by field (`GlassLayerSettings`), then Reduce Transparency and a self-painting surface as
+    /// above. A window that sets nothing draws exactly the app's.
+    public static func resolve(_ state: GlassLayerState, window overrides: GlassWindowOverrides,
+                               reduceTransparency: Bool, paintsTheme: Bool = true) -> GlassLayerState {
+        resolve(state.overlaid(by: overrides), reduceTransparency: reduceTransparency, paintsTheme: paintsTheme)
     }
 }

@@ -2612,9 +2612,9 @@ struct SFTPBrowserView: View {
     nonisolated static let remoteEditorConfiguration = GlassEditorConfiguration()
 
     private var remoteEditorSurfaceCondition: SurfaceCondition {
-        // The look of the terminal window this browser's session is in (W20).
+        // The look of the terminal window this browser's session is in (W20, W22).
         let look = TerminalLook.resolved(
-            TerminalWindowLooks.look(ofWindowHolding: sessionID, sessionManager: sessionManager),
+            TerminalWindowLooks.settings(ofWindowHolding: sessionID, sessionManager: sessionManager),
             settings: settingsManager
         )
         let material = MaterialWeight(rawValue: look.frost) ?? .ultraThin

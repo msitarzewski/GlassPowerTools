@@ -2,6 +2,7 @@
 import AppKit
 import Foundation
 import Testing
+import GlassLayers
 @testable import GlassTerminal
 
 /// W20 (owner, 2026-10-09, in a Mac terminal window): "I was testing to see if there was a way to
@@ -15,8 +16,9 @@ import Testing
 @MainActor
 @Suite("A Mac terminal window owns its look", .serialized)
 struct MacWindowLookTests {
-    private let red = TerminalSessionOverride(windowOpacity: 0.4, glassTint: "#FF2D55")
-    private let blue = TerminalSessionOverride(blurBackground: 0.2, glassTint: "#007AFF")
+    /// W20's two looks, as the window settings they are now (W22).
+    private let red = TerminalSessionOverride(windowOpacity: 0.4, glassTint: "#FF2D55").windowSettings
+    private let blue = TerminalSessionOverride(blurBackground: 0.2, glassTint: "#007AFF").windowSettings
     private let server = ServerConfiguration(name: "alpha", host: "alpha.example.com", username: "ann")
 
     private func withDefaults(_ body: (UserDefaults) throws -> Void) throws {
@@ -59,18 +61,17 @@ struct MacWindowLookTests {
     func savedWithTheWindow() throws {
         try withDefaults { defaults in
             let w = window(defaults, tabs: 2)
-            w.setLook(red)
-            #expect(w.look == red)
+            w.setWindowSettings(red)
+            #expect(w.windowSettings == red)
             let back = relaunched(w.windowID, defaults)
-            #expect(back.look == red, "back with its look")
+            #expect(back.windowSettings == red, "back with its look")
             #expect(back.tabs.map(\.workspaceID) == w.tabs.map(\.workspaceID))
 
-            w.setLook(nil)
-            #expect(relaunched(w.windowID, defaults).look == nil, "reset: back to the settings")
-            w.setLook(TerminalSessionOverride())
+            w.setWindowSettings(GlassWindowOverrides())
+            #expect(relaunched(w.windowID, defaults).windowSettings.isEmpty, "reset: back to the settings")
             let saved = try #require(defaults.data(forKey: recordKey(w.windowID)))
             let object = try #require(JSONSerialization.jsonObject(with: saved) as? [String: Any])
-            #expect(object["look"] == nil, "a look that sets nothing is not saved")
+            #expect(object["look"] == nil && object["windowSettings"] == nil, "a look that sets nothing is not saved")
         }
     }
 
@@ -78,7 +79,7 @@ struct MacWindowLookTests {
     func recordsReadLeniently() throws {
         try withDefaults { defaults in
             let w = window(defaults, tabs: 2)
-            w.setLook(red)
+            w.setWindowSettings(red)
             let key = recordKey(w.windowID)
             let saved = try #require(defaults.data(forKey: key))
             var object = try #require(JSONSerialization.jsonObject(with: saved) as? [String: Any])
@@ -87,12 +88,12 @@ struct MacWindowLookTests {
             object.removeValue(forKey: "look")
             defaults.set(try JSONSerialization.data(withJSONObject: object), forKey: key)
             let old = relaunched(w.windowID, defaults)
-            #expect(old.look == nil && old.tabs.count == 2 && old.restorationFailure == nil)
+            #expect(old.windowSettings.isEmpty && old.tabs.count == 2 && old.restorationFailure == nil)
 
             object["look"] = ["glassTint": 12]
             defaults.set(try JSONSerialization.data(withJSONObject: object), forKey: key)
             let unreadable = relaunched(w.windowID, defaults)
-            #expect(unreadable.look == nil && unreadable.tabs.count == 2 && unreadable.restorationFailure == nil,
+            #expect(unreadable.windowSettings.isEmpty && unreadable.tabs.count == 2 && unreadable.restorationFailure == nil,
                     "its tabs still come back")
         }
     }
@@ -101,19 +102,19 @@ struct MacWindowLookTests {
     func workgroupOpensWithItsLook() throws {
         try withDefaults { defaults in
             var preset = LayoutPreset(name: "Builds", sessionIntents: [.init(serverID: server.id), .init(serverID: server.id)])
-            preset.look = blue
+            preset.windowSettings = blue
             let requests = try MacWorkgroupLauncher.launch(preset: preset, broker: MacStartupCommandBroker(),
                                                            openWindow: { _ in })
             let request = try #require(requests.first)
-            #expect(request.look == blue)
+            #expect(request.windowSettings == blue)
             let opened = MacWorkspaceWindowController(request: request, defaults: defaults)
-            #expect(opened.look == blue)
+            #expect(opened.windowSettings == blue)
             opened.windowDidOpen()
-            #expect(relaunched(opened.windowID, defaults).look == blue, "and keeps it after a relaunch")
+            #expect(relaunched(opened.windowID, defaults).windowSettings == blue, "and keeps it after a relaunch")
 
             // The scene's value travels as JSON: the look goes with it.
             let decoded = try JSONDecoder().decode(MacWorkspaceLaunchRequest.self, from: JSONEncoder().encode(request))
-            #expect(decoded.look == blue)
+            #expect(decoded.windowSettings == blue)
         }
     }
 
@@ -122,10 +123,10 @@ struct MacWindowLookTests {
         try withDefaults { defaults in
             let w = window(defaults, tabs: 2)
             let plain = try w.capturePreset(name: "Desk", servers: [server])
-            #expect(plain.look == nil)
-            w.setLook(red)
+            #expect(plain.windowSettings.isEmpty)
+            w.setWindowSettings(red)
             let tinted = try w.capturePreset(name: "Desk", servers: [server])
-            #expect(tinted.look == red)
+            #expect(tinted.windowSettings == red)
         }
     }
 
@@ -133,18 +134,18 @@ struct MacWindowLookTests {
     func draggedInTakesTheLook() throws {
         try withDefaults { defaults in
             let source = window(defaults, tabs: 2), destination = window(defaults)
-            source.setLook(red)
-            destination.setLook(blue)
+            source.setWindowSettings(red)
+            destination.setWindowSettings(blue)
             let shownSource = show(source), shownDestination = show(destination)
             defer {
                 MacWorkspacePreviewRegistry.shared.remove(source.windowID)
                 MacWorkspacePreviewRegistry.shared.remove(destination.windowID)
             }
             let moving = source.tabs[1].workspaceID
-            #expect(MacWorkspacePreviewRegistry.shared.look(ofWindowWithTab: moving) == red)
+            #expect(MacWorkspacePreviewRegistry.shared.windowSettings(ofWindowWithTab: moving) == red)
             #expect(destination.acceptDroppedTab(.init(windowID: source.windowID, workspaceID: moving), at: 0))
-            #expect(MacWorkspacePreviewRegistry.shared.look(ofWindowWithTab: moving) == blue, "drawn with its new window's look")
-            #expect(source.look == red && destination.look == blue)
+            #expect(MacWorkspacePreviewRegistry.shared.windowSettings(ofWindowWithTab: moving) == blue, "drawn with its new window's look")
+            #expect(source.windowSettings == red && destination.windowSettings == blue)
             withExtendedLifetime((shownSource, shownDestination)) {}
         }
     }
@@ -154,14 +155,14 @@ struct MacWindowLookTests {
         try withDefaults { defaults in
             let broker = MacWorkspaceTransferBroker()
             let source = window(defaults, tabs: 2, transferBroker: broker)
-            source.setLook(red)
+            source.setWindowSettings(red)
             source.select(source.tabs[1].workspaceID)
             let request = try #require(source.transferSelectedTab())
-            #expect(request.look == red)
+            #expect(request.windowSettings == red)
             let made = MacWorkspaceWindowController(request: request, transferBroker: broker, defaults: defaults)
-            #expect(made.tabs.count == 1 && made.look == red)
-            #expect(relaunched(made.windowID, defaults).look == red, "saved with it")
-            #expect(source.look == red, "the window it left keeps its own")
+            #expect(made.tabs.count == 1 && made.windowSettings == red)
+            #expect(relaunched(made.windowID, defaults).windowSettings == red, "saved with it")
+            #expect(source.windowSettings == red, "the window it left keeps its own")
         }
     }
 }

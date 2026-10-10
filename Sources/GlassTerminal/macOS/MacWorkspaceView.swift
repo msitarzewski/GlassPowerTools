@@ -96,12 +96,12 @@ struct MacWorkspaceView: View {
         windowController.tabs.first { $0.workspaceID == id }
     }
 
-    /// The tint this window's own look gives it, if any (W20) — not the terminal setting, which
+    /// The tint this window's own settings give it, if any (W20) — not the terminal setting, which
     /// every window shares and so tells none apart. The sidebar takes it, as a Reminders list
     /// takes its colour: every tab's icon, in place of its Workgroup's colour, and the list's
     /// tint, which the selection follows where the system lets it.
     private var windowTint: Color? {
-        windowController.look?.glassTint.flatMap(TerminalGlassTint.color(for:))
+        windowController.windowSettings[TerminalWindowSettings.tint].flatMap(TerminalGlassTint.color(for:))
     }
 
     /// One tab: rename, as before. Several, ⌘- or ⇧-clicked (W8, owner, 2026-10-08): move them
@@ -293,7 +293,8 @@ struct MacWorkspaceView: View {
                 (tab.state.root?.panes ?? []).filter { $0.intent.kind == .ssh }.map { pane in
                     Task { @MainActor in
                         await tab.prepareSSHPaneIfNeeded(
-                            pane, sessionManager: sessionManager, settingsManager: settingsManager
+                            pane, sessionManager: sessionManager, settingsManager: settingsManager,
+                            window: windowController.windowSettings
                         )
                     }
                 }
@@ -456,8 +457,10 @@ struct MacWorkspaceView: View {
         } message: {
             Text(workspaceSaveError ?? "")
         }
-        // Every pane, sheet and picture in the window draws with the window's look, and a tab's
-        // Settings ▸ Overrides sets it (W20). Outermost, so the overview and sheets have it too.
+        // Every pane, sheet and picture in the window draws with the window's own settings, and a
+        // tab's Settings ▸ This Window sets them (W20, W22). Outermost, so the overview and sheets
+        // have them too: the controller for editing, the settings themselves for drawing.
+        .glassWindowOverrides(windowController.windowSettings)
         .environment(windowController)
     }
 
@@ -598,7 +601,7 @@ struct MacWorkspaceView: View {
                 colorTag: preset.colorTag,
                 sessionIntents: preset.sessionIntents,
                 workspaceLayout: preset.workspaceLayout,
-                look: preset.look
+                windowSettings: preset.windowSettings
             )
         } catch {
             workspaceSaveError = error.localizedDescription
@@ -643,7 +646,8 @@ struct MacWorkspaceView: View {
     /// Starts a tab's local shells now, not when its view first draws: a pane started only by
     /// its view waited on SwiftUI, and could be left with no shell at all.
     private func startLocalPanes(of tab: MacWorkspaceController) {
-        tab.startLocalPanes(sessionManager: sessionManager, settingsManager: settingsManager) {
+        tab.startLocalPanes(sessionManager: sessionManager, settingsManager: settingsManager,
+                            window: windowController.windowSettings) {
             closeTab(tab.workspaceID)
         }
     }
@@ -760,8 +764,8 @@ private struct MacWorkspaceTabContent: View {
     @Environment(SessionManager.self) private var sessionManager
     @Environment(SettingsManager.self) private var settingsManager
     @Environment(\.openWindow) private var openWindow
-    /// The window this tab is in, for its look (W20).
-    @Environment(MacWorkspaceWindowController.self) private var terminalWindow: MacWorkspaceWindowController?
+    /// The settings of the window this tab is in (W20, W22).
+    @Environment(\.glassWindowOverrides) private var windowSettings
 
     private let onNewTab: () -> Void
     private let onCloseEmptyTab: () -> Void
@@ -867,12 +871,12 @@ private struct MacWorkspaceTabContent: View {
         } else if let failure = controller.restorationFailure {
             MacWorkspaceUnrestoredTab(reason: failure, close: onCloseEmptyTab)
         } else {
-            let look = TerminalLook.resolved(terminalWindow?.look, settings: settingsManager)
+            let profile = TerminalWindowProfile.resolved(windowSettings, settings: settingsManager)
             MacWorkspaceEmptyTab(
-                theme: settingsManager.currentTheme,
-                tint: look.tintColor,
-                opacity: look.opacity,
-                blur: look.blur,
+                theme: profile.theme,
+                tint: profile.look.tintColor,
+                opacity: profile.look.opacity,
+                blur: profile.look.blur,
                 startLocal: { controller.addPane(intent: .local, axis: .horizontal) },
                 startSSH: { controller.requestSSHPane(axis: .horizontal) }
             )
@@ -1015,7 +1019,8 @@ private struct MacWorkspaceTabContent: View {
                         await controller.prepareSSHPaneIfNeeded(
                             pane,
                             sessionManager: sessionManager,
-                            settingsManager: settingsManager
+                            settingsManager: settingsManager,
+                            window: windowSettings
                         )
                     }
             }

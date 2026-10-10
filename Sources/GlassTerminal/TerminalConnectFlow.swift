@@ -310,7 +310,7 @@ struct TerminalConnectFlow: ViewModifier {
         case .openWorkgroup(let preset):
             openWorkgroup(preset)
         #if DEBUG
-        case .demoReplay(let name, let output):
+        case .demoReplay(let name, let output, let windowSettings, let opensSettings):
             // No SSHConnection is ever started: the sinks swallow typing and resizes, and the
             // transcript goes straight to the emulator, queued until the window's view attaches.
             let server = ServerConfiguration(name: name, host: "192.0.2.10", username: "ann")
@@ -319,8 +319,9 @@ struct TerminalConnectFlow: ViewModifier {
                                           terminalResizeSink: { _, _ in })
             sessionManager.registerSession(session)
             session.state = .connected
+            session.demoOpensSettings = opensSettings
             session.feedTerminalData(output)
-            presentTerminalWindow(for: session)
+            presentTerminalWindow(for: session, windowSettings: windowSettings)
         case .demoFiles(let name, let path):
             // The same connectionless session: the browser cannot open SFTP over it and says so,
             // which leaves its window, title and toolbar to look at.
@@ -484,12 +485,12 @@ struct TerminalConnectFlow: ViewModifier {
         Task { @MainActor in
             defer { isOpeningWorkgroup = false }
             // The workgroup's own id, so opening it again finds these terminals (W4b), and its
-            // look for the window (W20).
+            // settings for the window (W20, W22).
             let workgroupID = sessionManager.createWorkgroup(
                 id: preset.id,
                 name: preset.name,
                 colorTag: preset.colorTag,
-                look: preset.look
+                windowSettings: preset.windowSettings
             )
             var failures = notOpened + plan.failures
 
@@ -668,11 +669,14 @@ struct TerminalConnectFlow: ViewModifier {
 
 
 
-    private func presentTerminalWindow(for session: TerminalSession) {
+    /// A new window for `session`, keeping `windowSettings` as its own (a demo's; Connect gives none).
+    private func presentTerminalWindow(for session: TerminalSession,
+                                       windowSettings: GlassWindowOverrides = GlassWindowOverrides()) {
         #if os(visionOS)
         let workgroupID = sessionManager.createWorkgroup(
             name: session.server.name,
-            colorTag: session.server.colorTag
+            colorTag: session.server.colorTag,
+            windowSettings: windowSettings
         )
         guard sessionManager.appendSession(session, toWorkgroup: workgroupID) else {
             sessionManager.closeSession(session)
@@ -684,7 +688,8 @@ struct TerminalConnectFlow: ViewModifier {
         #elseif os(iOS)
         let workgroupID = sessionManager.createWorkgroup(
             name: session.server.name,
-            colorTag: session.server.colorTag
+            colorTag: session.server.colorTag,
+            windowSettings: windowSettings
         )
         guard sessionManager.appendSession(session, toWorkgroup: workgroupID) else {
             sessionManager.closeSession(session)
@@ -694,13 +699,9 @@ struct TerminalConnectFlow: ViewModifier {
         }
         iOSRouter.showTerminal(workgroupID: workgroupID)
         #else
-        openWindow(
-            id: "workspace",
-            value: MacLiveSessionWorkspaceRouter.launchRequest(
-                for: session,
-                sessionManager: sessionManager
-            )
-        )
+        var request = MacLiveSessionWorkspaceRouter.launchRequest(for: session, sessionManager: sessionManager)
+        request.windowSettings = windowSettings
+        openWindow(id: "workspace", value: request)
         #endif
     }
     

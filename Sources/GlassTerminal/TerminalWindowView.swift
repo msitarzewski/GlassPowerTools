@@ -104,12 +104,14 @@ struct TerminalWindowView: View {
     #if !os(macOS)
     /// W15: a tab dragged onto this terminal moves into its window.
     @Environment(\.terminalTabDrop) private var terminalTabDrop
-    /// W20: the workgroup this terminal is drawn in, whose look it shows.
-    @Environment(\.terminalWorkgroupLook) private var workgroupLook
+    /// W20, W22: the workgroup this terminal is drawn in, whose settings This Window edits.
+    @Environment(\.terminalWorkgroupID) private var workgroupID
     #else
-    /// W20: the Mac terminal window this pane is in, whose look it shows.
+    /// W20, W22: the Mac terminal window this pane is in, whose settings This Window edits.
     @Environment(MacWorkspaceWindowController.self) private var macWindow: MacWorkspaceWindowController?
     #endif
+    /// W22: the settings of the window this terminal is in, which it draws and behaves with.
+    @Environment(\.glassWindowOverrides) private var windowSettings
     @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiateWithoutColor
 
     @State private var find = TerminalFindController()
@@ -325,7 +327,7 @@ struct TerminalWindowView: View {
                 interactive: effectiveInteractiveGlass,
                 material: resolvedMaterial,
                 blurAmount: windowLookBlur,
-                appearance: settingsManager.currentTheme.resolvedAppearance
+                appearance: windowTheme.resolvedAppearance
             ))
         } title: {
             connectionLabel
@@ -350,12 +352,12 @@ struct TerminalWindowView: View {
                 // iOS has an opaque page behind the terminal, not spatial
                 // passthrough. Match that backing to the selected terminal
                 // theme so transparent dark themes never blend into white.
-                .background(settingsManager.currentTheme.canvasBackgroundColor.color)
+                .background(windowTheme.canvasBackgroundColor.color)
                 .modifier(GlassWindowBackground(
                     interactive: false,
                     material: resolvedMaterial,
                     blurAmount: effectiveBlurBackground,
-                    appearance: settingsManager.currentTheme.resolvedAppearance
+                    appearance: windowTheme.resolvedAppearance
                 ))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -370,7 +372,7 @@ struct TerminalWindowView: View {
                 .frame(maxWidth: .infinity)
                 // The terminal's own colour, not the system bar's: a light grey band under a
                 // dark terminal read as a separate panel (2026-10-04).
-                .background(settingsManager.currentTheme.canvasBackgroundColor.color)
+                .background(windowTheme.canvasBackgroundColor.color)
                 .environment(\.colorScheme, themeColorScheme ?? systemColorScheme)
             }
         }
@@ -498,6 +500,18 @@ struct TerminalWindowView: View {
     }
 
     private func handleTerminalAppear() {
+        #if DEBUG
+        // Screenshots (App/GlassDemoMode.swift): This Window, over the window it changes.
+        // Once the window is on screen and its tab chosen: a sheet asked for as it first appears
+        // is not presented.
+        if session.demoOpensSettings {
+            session.demoOpensSettings = false
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(2))
+                showingTerminalSettings = true
+            }
+        }
+        #endif
         rejectPendingHostKeyChallengeInStrictMode()
         updateTerminalFocusOwnership(
             competingControlPresented: session.pendingHostKeyChallenge != nil || showingErrorCard
@@ -688,13 +702,8 @@ struct TerminalWindowView: View {
             SwiftTermHostView(
                 model: terminalHostModel,
                 theme: swiftTermTheme,
-                runtimeSettings: SwiftTermRuntimeSettings(
-                    cursorStyle: settingsManager.cursorStyle,
-                    blinkingCursor: settingsManager.blinkingCursor,
-                    scrollbackLines: settingsManager.saveScrollback
-                        ? settingsManager.maxScrollbackLines
-                        : 0
-                ),
+                // The window's cursor and scrollback over the settings' (W22).
+                runtimeSettings: profile.runtimeSettings,
                 allowsFocusOwnership: terminalCanOwnFocus,
                 onSendData: { data in
                     session.sendTerminalData(data)
@@ -722,10 +731,10 @@ struct TerminalWindowView: View {
                     // it; no view state is written there (W10).
                     session.updateTerminalGeometry(rows: rows, columns: cols)
                 },
-                onBell: {
-                    guard settingsManager.bellEnabled else { return }
+                onBell: { [profile = profile] in
+                    guard profile.bellEnabled else { return }
                     terminalAudioManager.playBell()
-                    if settingsManager.visualBell {
+                    if profile.visualBell {
                         withAnimation(.easeInOut(duration: 0.1)) { showVisualBell = true }
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                             withAnimation(.easeInOut(duration: 0.1)) { showVisualBell = false }
@@ -843,13 +852,13 @@ struct TerminalWindowView: View {
     }
 
     private var swiftTermTheme: SwiftTermTheme {
-        var theme = settingsManager.currentTheme.swiftTermTheme
+        var theme = windowTheme.swiftTermTheme
         theme.fontSize = terminalHostModel.resolvedFontSize(defaultSize: theme.fontSize)
         return theme
     }
 
     private var fontActions: TerminalFontActions {
-        let defaultSize = settingsManager.currentTheme.swiftTermTheme.fontSize
+        let defaultSize = windowTheme.swiftTermTheme.fontSize
         return TerminalFontActions(
             increase: { terminalHostModel.adjustFontSize(by: 1, defaultSize: defaultSize) },
             decrease: { terminalHostModel.adjustFontSize(by: -1, defaultSize: defaultSize) },
@@ -982,11 +991,11 @@ struct TerminalWindowView: View {
     #if os(macOS)
     private var macTerminalCanvasBackground: some View {
         TerminalCanvasBackground(
-            color: settingsManager.currentTheme.background,
+            color: windowTheme.background,
             tint: tintColor,
             opacity: effectiveWindowOpacity,
             blur: effectiveBlurBackground,
-            appearance: settingsManager.currentTheme.resolvedAppearance
+            appearance: windowTheme.resolvedAppearance
         )
     }
     #endif
@@ -1025,43 +1034,39 @@ struct TerminalWindowView: View {
     private var terminalDisplayBackground: some View {
         // Opacity is deliberately separate from the window's blur layer.
         // Zero leaves the terminal canvas completely unpainted.
-        let bg = settingsManager.currentTheme.canvasBackgroundColor
+        let bg = windowTheme.canvasBackgroundColor
 
         Rectangle()
             .fill(bg.color)
             .opacity(effectiveWindowOpacity)
     }
 
-    // MARK: - The window's look (W20)
+    // MARK: - The window's settings (W20, W22)
 
-    /// The look of the window this terminal is in: a Mac terminal window's, or its workgroup's on
-    /// Vision Pro, iPad and iPhone. Nil when the window has none, and for a terminal in no window.
-    private var windowLook: TerminalSessionOverride? {
-        #if os(macOS)
-        macWindow?.look
-        #else
-        workgroupLook?.look
-        #endif
-    }
-
-    /// Settings ▸ Overrides edits the window's look, read live from whatever holds it; nil when
-    /// this terminal is in no window that keeps one, and Overrides is then not offered.
-    private var windowLookBinding: Binding<TerminalSessionOverride?>? {
+    /// Settings ▸ This Window edits the window's settings, read live from whatever holds them; nil
+    /// when this terminal is in no window that keeps any, and This Window is then not offered.
+    private var windowSettingsBinding: Binding<GlassWindowOverrides>? {
         #if os(macOS)
         guard let macWindow else { return nil }
-        return Binding(get: { macWindow.look }, set: { macWindow.setLook($0) })
+        return Binding(get: { macWindow.windowSettings }, set: { macWindow.setWindowSettings($0) })
         #else
-        guard let workgroupID = workgroupLook?.workgroupID else { return nil }
+        guard let workgroupID else { return nil }
         let manager = sessionManager
-        return Binding(get: { manager.workgroup(for: workgroupID)?.look },
-                       set: { manager.setLook($0, forWorkgroup: workgroupID) })
+        return Binding(get: { manager.workgroup(for: workgroupID)?.windowSettings ?? GlassWindowOverrides() },
+                       set: { manager.setWindowSettings($0, forWorkgroup: workgroupID) })
         #endif
     }
 
-    /// What this terminal is drawn with: the window's look over the terminal settings.
-    private var look: TerminalLook {
-        TerminalLook.resolved(windowLook, settings: settingsManager)
+    /// What this terminal draws and behaves with: its window's settings over the terminal
+    /// settings (`\.glassWindowOverrides`, set at the window's root).
+    private var profile: TerminalWindowProfile {
+        TerminalWindowProfile.resolved(windowSettings, settings: settingsManager)
     }
+
+    /// The window's theme, with its font, else the settings'.
+    private var windowTheme: TerminalTheme { profile.theme }
+
+    private var look: TerminalLook { profile.look }
 
     private var tintColor: Color? { look.tintColor }
 
@@ -1069,8 +1074,8 @@ struct TerminalWindowView: View {
 
     private var effectiveBlurBackground: Double { look.blur }
 
-    /// Blur painted by the canvas itself. On visionOS the shared window backdrop already frosts
-    /// at the global level, so the canvas only adds frost when the window's look sets one.
+    /// Blur painted by the canvas itself, on visionOS: only when the window sets one. A `.plain`
+    /// window has no glass of its own, and none is added around a terminal at the settings' level.
     private var windowLookBlur: Double { look.windowBlur ?? 0 }
 
     private var effectiveInteractiveGlass: Bool { look.interactiveGlass }
@@ -1133,7 +1138,7 @@ struct TerminalWindowView: View {
         let workgroupID = sessionManager.createWorkgroup(
             name: duplicatedSession.server.name,
             colorTag: duplicatedSession.server.colorTag,
-            look: windowLook
+            windowSettings: windowSettings
         )
         guard sessionManager.appendSession(duplicatedSession, toWorkgroup: workgroupID) else {
             sessionManager.discardWorkgroupIfEmpty(workgroupID)
@@ -1152,7 +1157,7 @@ struct TerminalWindowView: View {
         let workgroupID = existingWorkgroupID ?? sessionManager.createWorkgroup(
             name: duplicatedSession.server.name,
             colorTag: duplicatedSession.server.colorTag,
-            look: windowLook
+            windowSettings: windowSettings
         )
         guard sessionManager.appendSession(duplicatedSession, toWorkgroup: workgroupID) else {
             if existingWorkgroupID == nil {
@@ -1174,7 +1179,7 @@ struct TerminalWindowView: View {
             sessionManager: sessionManager
         )
         // A new window with this one's look (W20), as Move Tab to New Window keeps it.
-        request.look = windowLook
+        request.windowSettings = windowSettings
         openWindow(id: "workspace", value: request)
         #endif
     }
@@ -1376,7 +1381,7 @@ struct TerminalWindowView: View {
     /// The terminal theme's own light or dark, so controls drawn on its colour read; nil for an
     /// automatic theme, which follows the system.
     private var themeColorScheme: ColorScheme? {
-        settingsManager.currentTheme.resolvedAppearance.colorScheme
+        windowTheme.resolvedAppearance.colorScheme
     }
 
     /// An iPhone on its side: compact height.
@@ -1719,36 +1724,37 @@ struct TerminalWindowView: View {
     }
 
     private var terminalSettingsModal: some View {
-        TerminalSettingsSheet(session: session, windowLook: windowLookBinding) {
+        TerminalSettingsSheet(session: session, windowSettings: windowSettingsBinding) {
             showingTerminalSettings = false
         }
     }
 }
 
-/// **Terminal Settings**, from a terminal's tools menu ▸ Settings: the terminal settings, the
-/// window's look (**Overrides**, W20) and, for an SSH session, its port forwards. A Mac's local
-/// pane opens the same sheet without Port Forwarding (W20); the app's Settings stay on ⌘,.
+/// **Terminal Settings**, from a terminal's tools menu ▸ Settings: the window's own settings
+/// (**This Window**, W20, W22), the settings every terminal shares (**All Terminals**) and, for an
+/// SSH session, its port forwards. A Mac's local pane opens the same sheet without Port Forwarding
+/// (W20); the app's Settings stay on ⌘,.
 struct TerminalSettingsSheet: View {
     /// The SSH session it was opened from; nil for a Mac's local shell, which has no forwards.
     let session: TerminalSession?
-    /// The window's look, when the terminal is in a window that keeps one.
-    let windowLook: Binding<TerminalSessionOverride?>?
+    /// The window's own settings, when the terminal is in a window that keeps them.
+    let windowSettings: Binding<GlassWindowOverrides>?
     let done: () -> Void
 
     @Environment(SettingsManager.self) private var settingsManager
-    /// Each opening starts on This Window when the terminal's window keeps a look, else on All
+    /// Each opening starts on This Window when the terminal's window keeps settings, else on All
     /// Terminals.
     @State private var tab: TerminalSettingsModalTab
 
-    init(session: TerminalSession?, windowLook: Binding<TerminalSessionOverride?>?, done: @escaping () -> Void) {
+    init(session: TerminalSession?, windowSettings: Binding<GlassWindowOverrides>?, done: @escaping () -> Void) {
         self.session = session
-        self.windowLook = windowLook
+        self.windowSettings = windowSettings
         self.done = done
-        _tab = State(initialValue: Self.firstTab(hasWindowLook: windowLook != nil))
+        _tab = State(initialValue: Self.firstTab(hasWindowSettings: windowSettings != nil))
     }
 
-    static func firstTab(hasWindowLook: Bool) -> TerminalSettingsModalTab {
-        hasWindowLook ? .overrides : .terminal
+    static func firstTab(hasWindowSettings: Bool) -> TerminalSettingsModalTab {
+        hasWindowSettings ? .overrides : .terminal
     }
 
     var body: some View {
@@ -1756,9 +1762,9 @@ struct TerminalSettingsSheet: View {
             Group {
             #if os(iOS)
             List {
-                if UIDevice.current.userInterfaceIdiom == .pad, let windowLook {
+                if UIDevice.current.userInterfaceIdiom == .pad, let windowSettings {
                     NavigationLink("This Window") {
-                        TerminalOverridesSettingsView(look: windowLook)
+                        TerminalOverridesSettingsView(settings: windowSettings)
                             .environment(settingsManager)
                             .navigationTitle("This Window")
                     }
@@ -1778,7 +1784,8 @@ struct TerminalSettingsSheet: View {
             #else
             GlassSettingsSections(
                 selection: $tab,
-                options: TerminalSettingsModalTab.offered(hasSession: session != nil, hasWindowLook: windowLook != nil),
+                options: TerminalSettingsModalTab.offered(hasSession: session != nil,
+                                                          hasWindowSettings: windowSettings != nil),
                 title: { $0.title },
                 pickerIdentifier: "terminal-settings-section-picker"
             ) { tab in
@@ -1788,8 +1795,8 @@ struct TerminalSettingsSheet: View {
                         TerminalSettingsView()
                             .environment(settingsManager)
                     case .overrides:
-                        if let windowLook {
-                            TerminalOverridesSettingsView(look: windowLook)
+                        if let windowSettings {
+                            TerminalOverridesSettingsView(settings: windowSettings)
                                 .environment(settingsManager)
                         }
                     case .portForwarding:
@@ -1903,98 +1910,16 @@ enum TerminalSettingsModalTab: String, CaseIterable, Hashable {
         }
     }
 
-    /// The sections a terminal's Settings shows (W20): Overrides when its window keeps a look,
+    /// The sections a terminal's Settings shows (W20): This Window when its window keeps settings,
     /// Port Forwarding for an SSH session — never for a Mac's local shell.
-    static func offered(hasSession: Bool, hasWindowLook: Bool) -> [Self] {
+    static func offered(hasSession: Bool, hasWindowSettings: Bool) -> [Self] {
         allCases.filter { tab in
             switch tab {
             case .terminal: true
-            case .overrides: hasWindowLook
+            case .overrides: hasWindowSettings
             case .portForwarding: hasSession
             }
         }
-    }
-}
-
-/// **Overrides**: the window's look (W20). Each control shows the window's value, or the terminal
-/// setting it follows, and setting one sets it for every tab in the window. **Reset Overrides**
-/// returns the window to the settings.
-struct TerminalOverridesSettingsView: View {
-    @Binding var look: TerminalSessionOverride?
-    @Environment(SettingsManager.self) private var settingsManager
-
-    init(look: Binding<TerminalSessionOverride?>) {
-        _look = look
-    }
-
-    /// One field of the look: the window's value, else the setting's; setting it keeps the rest.
-    private func field<Value>(_ keyPath: WritableKeyPath<TerminalSessionOverride, Value?>,
-                              otherwise setting: @escaping () -> Value) -> Binding<Value> {
-        let look = $look
-        return Binding(
-            get: { look.wrappedValue?[keyPath: keyPath] ?? setting() },
-            set: { value in
-                var changed = look.wrappedValue ?? TerminalSessionOverride()
-                changed[keyPath: keyPath] = value
-                look.wrappedValue = changed.normalized
-            }
-        )
-    }
-
-    var body: some View {
-        let settings = settingsManager
-
-        Form {
-            Section("Glass (this window)") {
-                #if os(visionOS)
-                Picker("Frost", selection: field(\.glassFrost) { settings.glassFrost }) {
-                    Text("Light").tag("ultraThin")
-                    Text("Medium").tag("thin")
-                    Text("Heavy").tag("regular")
-                    Text("Max").tag("thick")
-                }
-                #endif
-
-                Slider(value: field(\.windowOpacity) { settings.windowOpacity }, in: 0.0...1.0) {
-                    Text("Opacity")
-                } minimumValueLabel: {
-                    Text("Transparent")
-                } maximumValueLabel: {
-                    Text("Opaque")
-                }
-
-                Slider(value: field(\.blurBackground) { settings.blurBackground }, in: 0.0...1.0) {
-                    Text("Blur")
-                } minimumValueLabel: {
-                    Text("None")
-                } maximumValueLabel: {
-                    Text("Maximum")
-                }
-
-                #if os(visionOS)
-                Toggle("Interactive glass", isOn: field(\.interactiveGlass) { settings.interactiveGlass })
-                #endif
-
-                #if os(visionOS)
-                Text("Only this window changes: every tab in it, and it keeps its look after a relaunch. Opacity and blur remain independent; set both to zero, with no tint, for a completely transparent terminal. To change every window, use All Terminals, and Appearance in Settings for the window glass.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                #else
-                Text("Tint, opacity, and blur affect only the terminal canvas; window chrome remains system glass. These apply to every tab in this window and stay with it.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                #endif
-
-                GlassTintPicker(value: field(\.glassTint) { settings.glassTint })
-
-                Button("Reset Overrides", role: .destructive) {
-                    look = nil
-                }
-                .disabled(look == nil)
-            }
-        }
-        .formStyle(.grouped)
-        .padding()
     }
 }
 

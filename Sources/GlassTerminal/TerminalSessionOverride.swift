@@ -13,6 +13,10 @@
 //  The type keeps its name and its coding: the fields, their clamping and the legacy keys it reads
 //  are what a window's look needs. Unset fields follow the terminal settings.
 //
+//  W22: a window keeps every setting it overrides as a `GlassWindowOverrides`; this type is now the
+//  format of W20's five within it — what records keep under `look`, so a build from W20 on still
+//  reads them (`TerminalWindowSettingsCoding`, `TerminalSessionOverride.windowSettings`).
+//
 
 import SwiftUI
 import GlassShell

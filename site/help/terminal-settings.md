@@ -1,6 +1,6 @@
 # Terminal settings, themes and snippets
 
-The terminal adds three pages to Settings: **Connections**, **Terminal** and **Snippets**. This page covers what each controls, editing themes, giving a terminal window its own look, importing an SSH config file, and Tailscale.
+The terminal adds three pages to Settings: **Connections**, **Terminal** and **Snippets**. This page covers what each controls, editing themes, giving a terminal window its own settings, importing an SSH config file, and Tailscale.
 
 ## Connections
 
@@ -15,7 +15,7 @@ The terminal adds three pages to Settings: **Connections**, **Terminal** and **S
 ## Terminal
 
 - **Theme**: the current theme and its font. **Edit Theme** opens the theme editor.
-- **Canvas**: a tint for the terminal background. **On Vision Pro**, **Interactive glass** too. Opacity and frost are shared with every window and set in Settings under **Appearance**.
+- **Canvas**: a tint for the terminal background. **On Vision Pro**, **Interactive glass** too. Opacity and frost are shared with every window and set in Settings under **Appearance**. A window can keep its own of these and more; see [Give a terminal window its own settings](#give-a-terminal-window-its-own-settings).
 - **Font Family** (**SF Mono**, **Monaco**, **Menlo** or **Courier New**) and **Font Size** (10 to 24 points).
 - **Initial Terminal Size**: **Columns** and **Rows** for a new terminal before its window is measured.
 - **Cursor Style** (**Block**, **Underline** or **Bar**) and **Blinking cursor**.
@@ -31,16 +31,29 @@ The terminal adds three pages to Settings: **Connections**, **Terminal** and **S
 
 **Sync terminal settings**, under **iCloud Sync**, keeps your themes the same on every device. It also syncs your Workgroups and your reconnect, closing, scrollback, bell, cursor, initial size and tint preferences. It never syncs passwords, keys, saved connections, host keys or snippets.
 
-## Give a terminal window its own look
+## Give a terminal window its own settings
 
-A terminal window can have its own tint, opacity and blur, so you can tell your windows apart at a glance. In any tab of the window, open the tools menu and choose **Settings**: it opens on **This Window**. **All Terminals**, beside it, changes every terminal window. **On Mac**, a local terminal's tools menu opens the same **Settings**; the app's own Settings are in the app menu, or press ⌘,.
+Anything about how a terminal window looks and behaves can be set for that window alone, so you can tell your windows apart at a glance, or keep a larger font in one. In any tab of the window, open the tools menu and choose **Settings**: it opens on **This Window**. **All Terminals**, beside it, changes every terminal window. **On Mac**, a local terminal's tools menu opens the same **Settings**; the app's own Settings are in the app menu, or press ⌘,.
 
-Set **Opacity**, **Blur** and a **Glass Tint**. **On Vision Pro**, also **Frost** and **Interactive glass**. Every tab in the window changes at once. Anything you leave unset follows your settings, and **Reset Overrides** returns the window to them. The window's outer glass on Vision Pro follows **Appearance** in Settings, which every Glass window shares. A tint colours the terminal whatever its opacity; for a completely clear terminal, set **Opacity** and **Blur** to zero and choose no tint.
+**This Window** has:
 
-- A tab you move into another window takes that window's look. **Move Tab to New Window** gives the new window the look of the one the tab left.
-- The look stays with the window: it comes back when the app relaunches.
+- **Glass**: **Opacity**, **Blur** and a **Glass Tint**. **On iPad and Vision Pro**, also **Frost**; **on Vision Pro**, **Interactive glass**.
+- **Theme**: any theme from your theme library, its **Font Family** and its **Font Size**.
+- **Cursor**: **Cursor Style** and **Blinking cursor**.
+- **Bell and Scrollback**: **Bell enabled**, **Visual bell**, **Keep scrollback during session** and **Max scrollback lines**.
+
+Under each one, **Same as All Terminals** (or **Same as Appearance**, or **Same as Settings**) says the window follows that setting for every window. Change it, and it reads **This window only**, with **Reset** beside it to follow again. **Reset This Window**, at the end, returns every one. Every tab in the window changes at once.
+
+**Opacity**, **Blur** and **Frost** are the window's own **Appearance**: change them here and only this window changes; change them in Settings under **Appearance** and every window that hasn't set its own changes. A tint colours the terminal whatever its opacity; for a completely clear terminal, set **Opacity** and **Blur** to zero and choose no tint. **On Vision Pro**, nothing is drawn around a terminal window's canvas: its glass is the canvas.
+
+A theme comes from your theme library, which syncs with **Sync terminal settings**. If a window's theme isn't on this device yet, the window uses the theme from **All Terminals** until it arrives.
+
+Some settings are only ever for every window: **Initial Terminal Size** (a window that is already open has its own size), and the settings for connections, host keys, Tailscale, SSH keys, local shells, recordings, snippets and sync.
+
+- A tab you move into another window takes that window's settings. **Move Tab to New Window** gives the new window the settings of the one the tab left.
+- The settings stay with the window: they come back when the app relaunches.
 - **On Mac**, the tab icons in the window's sidebar take its tint.
-- **On Mac**, **Save Workspace as Workgroup…** saves the window's look with the Workgroup, and the Workgroup opens with it, on every device where **Sync terminal settings** is on. Changing a window's look doesn't change a saved Workgroup; to update one, save the window again under its name and choose **Replace**.
+- **On Mac**, **Save Workspace as Workgroup…** saves the window's settings with the Workgroup, and the Workgroup opens with them, on every device where **Sync terminal settings** is on. Changing a window's settings doesn't change a saved Workgroup; to update one, save the window again under its name and choose **Replace**. A device not yet updated still opens it with the window's glass and tint.
 
 ## Snippets
 

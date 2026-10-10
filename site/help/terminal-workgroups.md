@@ -20,7 +20,7 @@ With **Sync terminal settings** on (Settings ▸ **Terminal**, under **iCloud Sy
 ## Create a Workgroup
 
 - **On Vision Pro, iPad and iPhone:** choose the plus button (**New workgroup**) above the list. To capture the SSH terminals you have open now, choose the button beside it (**Save current SSH sessions as workgroup**). Each terminal in tmux is saved with its session.
-- **On Mac:** arrange tabs and split panes in a terminal window, then choose **Save Workspace as Workgroup…** in its toolbar. This saves the window's tabs, its split layout, the tmux session each terminal is in, and the window's look (see [Give a terminal window its own look](terminal-settings.md#give-a-terminal-window-its-own-look)), which the Workgroup opens with on every device. With no Workgroup selected, **New Workgroup** in the detail also starts an empty one.
+- **On Mac:** arrange tabs and split panes in a terminal window, then choose **Save Workspace as Workgroup…** in its toolbar. This saves the window's tabs, its split layout, the tmux session each terminal is in, and the window's own settings (see [Give a terminal window its own settings](terminal-settings.md#give-a-terminal-window-its-own-settings)), which the Workgroup opens with on every device. With no Workgroup selected, **New Workgroup** in the detail also starts an empty one.
 
 In **New Workgroup**:
 

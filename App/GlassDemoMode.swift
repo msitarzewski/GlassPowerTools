@@ -56,6 +56,11 @@ enum GlassDemoMode {
             await openEditor(editor, preview: surface == "preview")
         case "terminal":
             terminal.requestDemoReplay(name: "alpha", output: Data(terminalTranscript.utf8))
+        case "terminal-window", "terminal-settings":
+            // A window with settings of its own (W22), and This Window open over it.
+            terminal.requestDemoReplay(name: "alpha", output: Data(terminalTranscript.utf8),
+                                       windowSettings: GlassTerminalRuntime.demoWindowSettings,
+                                       opensSettings: surface == "terminal-settings")
         case "files":
             // The window and its header; with nothing connected, the list says so.
             terminal.requestDemoFiles(name: "alpha", path: "/home/ann/shop")

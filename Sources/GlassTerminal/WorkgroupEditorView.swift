@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import GlassLayers
 
 struct WorkgroupEditorContext: Identifiable {
     let id = UUID()
@@ -18,9 +19,9 @@ struct WorkgroupEditorContext: Identifiable {
     var openingView: LayoutPreset.OpeningView = .tabs
     var autoFocusOnActivity = false
     var gridCardWidth: Double? = nil
-    /// The look the workgroup's window opens with (W20): a captured window's, or the one being
-    /// edited's, kept as it is.
-    var look: TerminalSessionOverride? = nil
+    /// The settings the workgroup's window opens with (W20's look, W22): a captured window's, or
+    /// the one being edited's, kept as they are.
+    var windowSettings = GlassWindowOverrides()
 
     static func new(
         name: String = "Workgroup",
@@ -45,7 +46,7 @@ struct WorkgroupEditorContext: Identifiable {
             openingView: preset.openingView,
             autoFocusOnActivity: preset.autoFocusOnActivity,
             gridCardWidth: preset.gridCardWidth,
-            look: preset.look
+            windowSettings: preset.windowSettings
         )
     }
 
@@ -65,16 +66,17 @@ struct WorkgroupEditorContext: Identifiable {
             openingView: preset.openingView,
             autoFocusOnActivity: preset.autoFocusOnActivity,
             gridCardWidth: preset.gridCardWidth,
-            look: preset.look
+            windowSettings: preset.windowSettings
         )
     }
 
-    /// The look the saved workgroup keeps (W20). A window saved as a workgroup takes the window's
-    /// look, none included, and so does a copy or an edit of a workgroup keep its own; one made by
-    /// hand keeps the look of the workgroup it replaces, as it keeps how that one opens.
-    func lookToSave(replacing replaced: LayoutPreset?) -> TerminalSessionOverride? {
-        if workspaceLayout != nil || original != nil { return look }
-        return look ?? replaced?.look
+    /// The window settings the saved workgroup keeps (W20, W22). A window saved as a workgroup
+    /// takes the window's, none included, and so does a copy or an edit of a workgroup keep its
+    /// own; one made by hand keeps those of the workgroup it replaces, as it keeps how that one
+    /// opens.
+    func windowSettingsToSave(replacing replaced: LayoutPreset?) -> GlassWindowOverrides {
+        if workspaceLayout != nil || original != nil || !windowSettings.isEmpty { return windowSettings }
+        return replaced?.windowSettings ?? GlassWindowOverrides()
     }
 }
 
@@ -627,7 +629,7 @@ struct WorkgroupEditorView: View {
         preset.autoFocusOnActivity = replaced?.autoFocusOnActivity ?? autoFocusOnActivity
         #endif
         preset.gridCardWidth = context.gridCardWidth ?? replaced?.gridCardWidth
-        preset.look = context.lookToSave(replacing: replaced)
+        preset.windowSettings = context.windowSettingsToSave(replacing: replaced)
         onSave(preset)
         dismiss()
     }

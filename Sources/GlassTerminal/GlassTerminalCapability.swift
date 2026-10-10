@@ -75,7 +75,8 @@ public final class GlassTerminalRuntime {
         #if DEBUG
         /// Screenshots (App/GlassDemoMode.swift): a session that connects to nothing, showing a
         /// recorded transcript in the real terminal window. Typing goes nowhere.
-        case demoReplay(name: String, output: Data)
+        /// `windowSettings` for its window (W22), and This Window opened over it when asked.
+        case demoReplay(name: String, output: Data, windowSettings: GlassWindowOverrides, opensSettings: Bool)
         /// Screenshots: the Files window over a session that connects to nothing, opened at
         /// `path`. It shows the window's frame and header, and the browser's own "not connected"
         /// state where a listing would be.
@@ -229,8 +230,24 @@ public final class GlassTerminalRuntime {
         showLibraryPanel?(Self.workgroupsPanelID)
     }
     #if DEBUG
-    /// Screenshots only: a terminal window on `name` showing `output`, with no connection behind it.
-    public func requestDemoReplay(name: String, output: Data) { enqueue(.demoReplay(name: name, output: output)) }
+    /// Screenshots only: a terminal window on `name` showing `output`, with no connection behind it,
+    /// keeping `windowSettings` as its own (W22); with `opensSettings`, Settings ▸ This Window opens
+    /// over it.
+    public func requestDemoReplay(name: String, output: Data,
+                                  windowSettings: GlassWindowOverrides = GlassWindowOverrides(),
+                                  opensSettings: Bool = false) {
+        enqueue(.demoReplay(name: name, output: output, windowSettings: windowSettings, opensSettings: opensSettings))
+    }
+    /// Screenshots only: a terminal window's own settings (W22) — lighter glass with a tint, a
+    /// larger font and a bar cursor — over the demo's Appearance.
+    public static var demoWindowSettings: GlassWindowOverrides {
+        var window = GlassWindowOverrides()
+        window[GlassLayerSettings.opacity] = 0.35
+        window[TerminalWindowSettings.tint] = "#FF2D55"
+        window[TerminalWindowSettings.fontSize] = 18
+        window[TerminalWindowSettings.cursorStyle] = "Bar"
+        return window
+    }
     /// Screenshots only: the Files window on `name` at `path`, with no connection behind it.
     public func requestDemoFiles(name: String, path: String) { enqueue(.demoFiles(name: name, path: path)) }
     #endif

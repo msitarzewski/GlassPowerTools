@@ -36,7 +36,7 @@ public struct GlassLayerControls: View {
             if reduceTransparency {
                 Text("Reduce Transparency is on in Accessibility. Every surface is opaque and frosted while it stays on.")
             } else {
-                Text("Opacity paints the theme color behind content. Frost changes the material behind it, including the title bar. Set both to 0% for a clear window; text and controls stay visible.")
+                Text("Opacity paints the theme color behind content. Frost changes the material behind it, including the title bar. Set both to 0% for a clear window; text and controls stay visible. These are every window's; a terminal window can keep its own in its Settings, under This Window.")
             }
         }
         .disabled(reduceTransparency)

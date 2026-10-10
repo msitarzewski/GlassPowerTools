@@ -4,6 +4,7 @@ import AppKit
 import Observation
 import GlassTerminalEmulator
 import GlassShell
+import GlassLayers
 import SwiftUI
 
 /// Discovery only: windows remain the sole owners of their sessions and tabs.
@@ -111,15 +112,16 @@ final class MacWorkspacePreviewRegistry {
             .union(built.filter { $0.value.contains { $0.controller != nil } }.keys)
     }
 
-    /// The look of the window on screen holding this tab (W20), for its pictures elsewhere — the
-    /// overview, Show All Terminals, a Workgroup's running terminals.
-    func look(ofWindowWithTab workspaceID: UUID) -> TerminalSessionOverride? {
-        shownControllers.first { $0.tabs.contains { $0.workspaceID == workspaceID } }?.look
+    /// The settings of the window on screen holding this tab (W20, W22), for its pictures
+    /// elsewhere — the overview, Show All Terminals, a Workgroup's running terminals.
+    func windowSettings(ofWindowWithTab workspaceID: UUID) -> GlassWindowOverrides {
+        shownControllers.first { $0.tabs.contains { $0.workspaceID == workspaceID } }?.windowSettings
+            ?? GlassWindowOverrides()
     }
 
-    /// The look of the window on screen holding this live session (W20).
-    func look(ofWindowHolding sessionID: UUID) -> TerminalSessionOverride? {
-        locate(sessionID: sessionID)?.controller.look
+    /// The settings of the window on screen holding this live session (W20, W22).
+    func windowSettings(ofWindowHolding sessionID: UUID) -> GlassWindowOverrides {
+        locate(sessionID: sessionID)?.controller.windowSettings ?? GlassWindowOverrides()
     }
 
     func tabs(for workgroupID: UUID) -> [MacWorkspaceController] {
@@ -263,20 +265,20 @@ struct MacTerminalPreview: View {
     let model: SwiftTermHostModel?
     let status: String
     var alwaysVisible = false
-    /// Its window's look (W20), so the picture looks like the tab.
-    var look: TerminalSessionOverride? = nil
+    /// Its window's settings (W20, W22), so the picture looks like the tab.
+    var windowSettings = GlassWindowOverrides()
     @State private var image: NSImage?
     @State private var visible = false
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
-        let resolved = TerminalLook.resolved(look, settings: settings)
+        let resolved = TerminalWindowProfile.resolved(windowSettings, settings: settings)
         ZStack {
-            TerminalCanvasBackground(color: settings.currentTheme.background,
-                                     tint: resolved.tintColor,
-                                     opacity: resolved.opacity,
-                                     blur: resolved.blur,
-                                     appearance: settings.currentTheme.resolvedAppearance)
+            TerminalCanvasBackground(color: resolved.theme.background,
+                                     tint: resolved.look.tintColor,
+                                     opacity: resolved.look.opacity,
+                                     blur: resolved.look.blur,
+                                     appearance: resolved.theme.resolvedAppearance)
             if let image {
                 Image(nsImage: image).resizable().scaledToFit()
             } else {
@@ -318,10 +320,10 @@ struct MacWorkspacePreview: View {
     var alwaysVisible = false
 
     var body: some View {
-        // The tab's window's look (W20): pictures here show in the overview, Show All Terminals
-        // and a Workgroup's running terminals, each of them a tab of some window.
-        let look = MacWorkspacePreviewRegistry.shared.look(ofWindowWithTab: controller.workspaceID)
-        let resolved = TerminalLook.resolved(look, settings: settings)
+        // The tab's window's settings (W20, W22): pictures here show in the overview, Show All
+        // Terminals and a Workgroup's running terminals, each of them a tab of some window.
+        let window = MacWorkspacePreviewRegistry.shared.windowSettings(ofWindowWithTab: controller.workspaceID)
+        let resolved = TerminalWindowProfile.resolved(window, settings: settings)
         GeometryReader { geometry in
             if let root = controller.state.root {
                 let layout = MacWorkspaceLayout(root: root,
@@ -332,18 +334,18 @@ struct MacWorkspacePreview: View {
                             MacTerminalPreview(model: controller.previewModel(for: pane.id),
                                                status: controller.previewStatus(for: pane.id),
                                                alwaysVisible: alwaysVisible,
-                                               look: look)
+                                               windowSettings: window)
                                 .frame(width: max(1, frame.width - 2), height: max(1, frame.height - 2))
                                 .position(x: frame.midX, y: frame.midY)
                         }
                     }
                 }
             } else {
-                TerminalCanvasBackground(color: settings.currentTheme.background,
-                                         tint: resolved.tintColor,
-                                         opacity: resolved.opacity,
-                                         blur: resolved.blur,
-                                         appearance: settings.currentTheme.resolvedAppearance).overlay {
+                TerminalCanvasBackground(color: resolved.theme.background,
+                                         tint: resolved.look.tintColor,
+                                         opacity: resolved.look.opacity,
+                                         blur: resolved.look.blur,
+                                         appearance: resolved.theme.resolvedAppearance).overlay {
                     Label("Empty tab", systemImage: "apple.terminal").foregroundStyle(.secondary)
                 }
             }

@@ -7,6 +7,7 @@
 
 import SwiftUI
 import GlassShell
+import GlassLayers
 #if os(visionOS)
 import GlassTerminalEmulator
 import UIKit
@@ -62,14 +63,15 @@ private struct VisionTerminalPreview: View {
     let session: TerminalSession
     @Environment(SettingsManager.self) private var settings
     @Environment(\.scenePhase) private var scenePhase
-    /// The window's look (W20): a card looks like the terminal it shows.
-    @Environment(\.terminalWorkgroupLook) private var workgroupLook
+    /// The window's settings (W20, W22): a card looks like the terminal it shows.
+    @Environment(\.glassWindowOverrides) private var windowSettings
     @State private var image: UIImage?
 
     var body: some View {
-        let look = TerminalLook.resolved(workgroupLook?.look, settings: settings)
+        let profile = TerminalWindowProfile.resolved(windowSettings, settings: settings)
+        let look = profile.look
         ZStack {
-            settings.currentTheme.canvasBackgroundColor.color.opacity(look.opacity)
+            profile.theme.canvasBackgroundColor.color.opacity(look.opacity)
             if let tint = look.tintColor {
                 tint.opacity(TerminalCanvasTint.strength(canvasOpacity: look.opacity))
             }
@@ -81,7 +83,7 @@ private struct VisionTerminalPreview: View {
         }
         .modifier(GlassWindowBackground(
             interactive: false, material: look.material,
-            blurAmount: look.blur, appearance: settings.currentTheme.resolvedAppearance
+            blurAmount: look.blur, appearance: profile.theme.resolvedAppearance
         ))
         .clipShape(.rect(cornerRadius: 12))
         .allowsHitTesting(false)
@@ -200,10 +202,11 @@ struct VisionTerminalWorkgroupView: View {
                 showingSavedHostPicker = true
             }
         )
-        // W20: this window's look, for every terminal, card and sheet in it. A terminal moved in
-        // takes it, since it is drawn here now.
-        .environment(\.terminalWorkgroupLook, TerminalWorkgroupLook(
-            workgroupID: workgroupID, look: sessionManager.workgroup(for: workgroupID)?.look))
+        // W20, W22: this window's own settings, for every terminal, card and sheet in it — and for
+        // its glass (`GlassLayeredWindow`). A terminal moved in takes them, since it is drawn here
+        // now. The workgroup's id is where This Window writes them.
+        .glassWindowOverrides(sessionManager.workgroup(for: workgroupID)?.windowSettings ?? GlassWindowOverrides())
+        .environment(\.terminalWorkgroupID, workgroupID)
     }
 
     private var liveSelectedSessionID: UUID? {

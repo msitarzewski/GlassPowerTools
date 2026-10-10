@@ -1254,9 +1254,9 @@ struct glas_shTests {
             "All Terminals",
             "Port Forwarding",
         ], "named for what they change, the window's own first")
-        #expect(TerminalSettingsSheet.firstTab(hasWindowLook: true) == .overrides,
+        #expect(TerminalSettingsSheet.firstTab(hasWindowSettings: true) == .overrides,
                 "opened from a terminal in a window, Settings starts on that window")
-        #expect(TerminalSettingsSheet.firstTab(hasWindowLook: false) == .terminal)
+        #expect(TerminalSettingsSheet.firstTab(hasWindowSettings: false) == .terminal)
     }
 
     @Test @MainActor func disabledICloudSyncDoesNotObserveOrWrite() {
@@ -4456,16 +4456,16 @@ struct glas_shTests {
         let manager = SessionManager(loadImmediately: false)
         let workgroupID = manager.createWorkgroup(name: "alpha", colorTag: .blue)
 
-        #expect(manager.workgroup(for: workgroupID)?.look == nil)
+        #expect(manager.workgroup(for: workgroupID)?.windowSettings.isEmpty == true)
 
         var look = TerminalSessionOverride()
         look.backgroundFill = 0.8
         look.interactiveGlass = false
-        manager.setLook(look, forWorkgroup: workgroupID)
+        manager.setWindowSettings(look.windowSettings, forWorkgroup: workgroupID)
 
-        let result = manager.workgroup(for: workgroupID)?.look
-        #expect(result?.backgroundFill == 0.8)
-        #expect(result?.interactiveGlass == false)
+        let result = manager.workgroup(for: workgroupID)?.windowSettings
+        #expect(result?[GlassLayerSettings.opacity] == 0.8)
+        #expect(result?[TerminalWindowSettings.interactiveGlass] == false)
     }
 
     // MARK: - Layout Persistence Tests
@@ -6973,22 +6973,22 @@ struct glas_shTests {
         #expect(TerminalGlassAppearance.resolved(
             globalOpacity: globalOpacity,
             globalBlur: globalBlur,
-            look: nil
+            window: GlassWindowOverrides()
         ) == .init(opacity: 0.25, blur: 0.75))
         #expect(TerminalGlassAppearance.resolved(
             globalOpacity: globalOpacity,
             globalBlur: globalBlur,
-            look: TerminalSessionOverride(windowOpacity: 1)
+            window: TerminalSessionOverride(windowOpacity: 1).windowSettings
         ) == .init(opacity: 1, blur: 0.75))
         #expect(TerminalGlassAppearance.resolved(
             globalOpacity: globalOpacity,
             globalBlur: globalBlur,
-            look: TerminalSessionOverride(blurBackground: 0)
+            window: TerminalSessionOverride(blurBackground: 0).windowSettings
         ) == .init(opacity: 0.25, blur: 0))
         #expect(TerminalGlassAppearance.resolved(
             globalOpacity: globalOpacity,
             globalBlur: globalBlur,
-            look: TerminalSessionOverride(windowOpacity: 0, blurBackground: 1)
+            window: TerminalSessionOverride(windowOpacity: 0, blurBackground: 1).windowSettings
         ) == .init(opacity: 0, blur: 1))
     }
 

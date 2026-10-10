@@ -463,7 +463,7 @@ struct TerminalSettingsView: View {
                     .onChange(of: settings.glassTint) { _, _ in
                         settings.saveSettings()
                     }
-                Text("These change every terminal window. To change one window, open Settings from its tools menu and choose This Window. Opacity, frost and material are shared with every Glass window: change them in Appearance. Tint applies only to the terminal canvas.")
+                Text("These change every terminal window. To change one window — its glass, tint, theme, font, cursor, bell or scrollback — open Settings from its tools menu and choose This Window. Opacity, frost and material are shared with every Glass window: change them in Appearance. Tint applies only to the terminal canvas.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

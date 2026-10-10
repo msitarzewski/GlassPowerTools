@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import GlassLayers
 import Observation
 import WidgetKit
 import GlasSecretStore
@@ -567,14 +568,14 @@ class SessionManager {
     }
 
     /// A new, empty workgroup — a window on Vision Pro, a set of tabs on iPad and iPhone — with
-    /// `look` for its window (W20): a saved Workgroup's, the one a tab moved out of, or none. One
-    /// already open under `id` is left as it is, look and all.
+    /// `windowSettings` for its window (W20, W22): a saved Workgroup's, the one a tab moved out
+    /// of, or none. One already open under `id` is left as it is, settings and all.
     @discardableResult
     func createWorkgroup(
         id: UUID = UUID(),
         name: String,
         colorTag: ServerColorTag,
-        look: TerminalSessionOverride? = nil
+        windowSettings: GlassWindowOverrides = GlassWindowOverrides()
     ) -> UUID {
         guard workgroups.contains(where: { $0.id == id }) == false else { return id }
         workgroups.append(TerminalWorkgroup(
@@ -583,24 +584,23 @@ class SessionManager {
             colorTag: colorTag,
             sessionIDs: [],
             selectedSessionID: nil,
-            look: look?.normalized
+            windowSettings: windowSettings
         ))
         return id
     }
 
-    /// Gives a workgroup's window a look, or none (W20): every terminal in it, and every one
-    /// moved in later, draws with it. Kept for the next launch by the reopen list, which follows
-    /// the workgroups; a saved Workgroup is never changed by it.
-    func setLook(_ look: TerminalSessionOverride?, forWorkgroup workgroupID: UUID) {
-        guard let index = workgroups.firstIndex(where: { $0.id == workgroupID }) else { return }
-        let kept = look?.normalized
-        guard workgroups[index].look != kept else { return }
-        workgroups[index].look = kept
+    /// Gives a workgroup's window its own settings, or none (W20, W22): every terminal in it, and
+    /// every one moved in later, draws and behaves with them. Kept for the next launch by the
+    /// reopen list, which follows the workgroups; a saved Workgroup is never changed by it.
+    func setWindowSettings(_ settings: GlassWindowOverrides, forWorkgroup workgroupID: UUID) {
+        guard let index = workgroups.firstIndex(where: { $0.id == workgroupID }),
+              workgroups[index].windowSettings != settings else { return }
+        workgroups[index].windowSettings = settings
     }
 
-    /// The look of the workgroup a terminal is in now (W20): after a move, the one it moved to.
-    func look(ofWorkgroupHolding sessionID: UUID) -> TerminalSessionOverride? {
-        workgroups.first { $0.sessionIDs.contains(sessionID) }?.look
+    /// The settings of the workgroup a terminal is in now (W20): after a move, the one it moved to.
+    func windowSettings(ofWorkgroupHolding sessionID: UUID) -> GlassWindowOverrides {
+        workgroups.first { $0.sessionIDs.contains(sessionID) }?.windowSettings ?? GlassWindowOverrides()
     }
 
     @discardableResult

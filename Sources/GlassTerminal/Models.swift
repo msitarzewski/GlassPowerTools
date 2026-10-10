@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import GlassLayers
 import Foundation
 import CoreGraphics
 import Security
@@ -355,6 +356,11 @@ class TerminalSession: Identifiable, Hashable {
 
     let id: UUID
     var server: ServerConfiguration
+    #if DEBUG
+    /// Screenshots only (App/GlassDemoMode.swift): Settings ▸ This Window opens over this
+    /// terminal's window as it first appears, once.
+    @ObservationIgnored var demoOpensSettings = false
+    #endif
     /// The terminal emulator belongs to the live session rather than any one
     /// presentation. Adaptive tab/sidebar changes may reconstruct views, but
     /// must not discard scrollback, search state, or pending terminal input.
@@ -2207,9 +2213,9 @@ struct TerminalWorkgroup: Identifiable, Equatable, Sendable {
     var colorTag: ServerColorTag
     var sessionIDs: [UUID]
     var selectedSessionID: UUID?
-    /// Its window's look (W20): every terminal in it draws with it, and one moved in takes it.
-    /// Nil follows the terminal settings.
-    var look: TerminalSessionOverride? = nil
+    /// Its window's own settings (W22, from W20's look): every terminal in it draws and behaves
+    /// with them, and one moved in takes them. Empty follows the settings.
+    var windowSettings = GlassWindowOverrides()
 }
 
 /// A device-local replacement, deliberately excluded from the shared recipe.
@@ -2537,11 +2543,12 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
     /// When it was last saved, here or on another device: its sync clock (2026-10-08). Nil for a
     /// workgroup saved before workgroups synced, which counts from `createdAt`.
     var modifiedAt: Date? = nil
-    /// The look its window opens with (W20): tint, opacity, blur and the rest, each unset one
-    /// following the terminal settings. Saved from a window that had one, and synced with the
-    /// rest of the workgroup (D51). Optional and without a schema change, so a build from before
-    /// it still reads the workgroup; such a build drops the look only if it saves it again.
-    var look: TerminalSessionOverride? = nil
+    /// The settings its window opens with (W22, from W20's look): glass, tint, theme, font and the
+    /// rest, each unset one following its setting. Saved from a window that had any, and synced
+    /// with the rest of the workgroup (D51). Kept under two keys and without a schema change
+    /// (`TerminalWindowSettingsCoding`): a build from W20 on still reads the look, and one from
+    /// before W22 drops the rest only if it saves the workgroup again.
+    var windowSettings = GlassWindowOverrides()
 
     init(
         id: UUID = UUID(),
@@ -2643,6 +2650,7 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
         case lastUsed
         case modifiedAt
         case look
+        case windowSettings
     }
 
     init(from decoder: Decoder) throws {
@@ -2653,8 +2661,8 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         lastUsed = try container.decodeIfPresent(Date.self, forKey: .lastUsed)
         modifiedAt = try container.decodeIfPresent(Date.self, forKey: .modifiedAt)
-        // A look that can't be read costs the workgroup its look, never the workgroup (W20).
-        look = TerminalSessionOverride.lenientlyDecoded(from: container, forKey: .look)
+        // Settings that can't be read cost the workgroup those settings, never the workgroup (W20, W22).
+        windowSettings = TerminalWindowSettingsCoding.decode(from: container, look: .look, settings: .windowSettings)
         workspaceLayout = try container.decodeIfPresent(WorkspaceLayout.self, forKey: .workspaceLayout)
         openingView = try container.decodeIfPresent(OpeningView.self, forKey: .openingView) ?? .tabs
         autoFocusOnActivity = try container.decodeIfPresent(Bool.self, forKey: .autoFocusOnActivity) ?? false
@@ -2685,6 +2693,6 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
         try container.encode(createdAt, forKey: .createdAt)
         try container.encodeIfPresent(lastUsed, forKey: .lastUsed)
         try container.encodeIfPresent(modifiedAt, forKey: .modifiedAt)
-        try container.encodeIfPresent(look?.normalized, forKey: .look)
+        try TerminalWindowSettingsCoding.encode(windowSettings, into: &container, look: .look, settings: .windowSettings)
     }
 }

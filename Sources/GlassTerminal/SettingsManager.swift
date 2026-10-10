@@ -1809,15 +1809,16 @@ struct TerminalGlassAppearance: Equatable {
         self.blur = SettingsManager.unitValue(blur)
     }
 
-    /// The window's look where it sets opacity or blur, the settings' otherwise (W20).
+    /// The window's opacity and blur where it sets them — Appearance's opacity and frost, as the
+    /// window overrides them (W22) — the settings' otherwise (W20).
     static func resolved(
         globalOpacity: Double,
         globalBlur: Double,
-        look: TerminalSessionOverride?
+        window: GlassWindowOverrides
     ) -> Self {
         Self(
-            opacity: look?.windowOpacity ?? globalOpacity,
-            blur: look?.blurBackground ?? globalBlur
+            opacity: window.value(of: GlassLayerSettings.opacity, over: globalOpacity),
+            blur: window.value(of: GlassLayerSettings.frost, over: globalBlur)
         )
     }
 

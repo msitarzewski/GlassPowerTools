@@ -24,6 +24,10 @@ The sliders settle on 0%, 50% and 100% when you drag near them. Text and control
 
 These settings also apply to terminal windows. They are kept on each device.
 
+### One window's own glass
+
+A window can keep its own **Opacity**, **Frost** and **Material** in place of these. Today that's terminal windows: open a terminal's tools menu, choose **Settings**, then **This Window**, where these are **Opacity**, **Blur** and **Frost**. Each says **Same as Appearance** until you change it there, and only that window changes; see [Give a terminal window its own settings](terminal-settings.md#give-a-terminal-window-its-own-settings). Whatever a window hasn't set follows **Appearance**.
+
 > [!NOTE]
 > When **Reduce Transparency** is on in the system's Accessibility settings, every window is opaque and frosted, and these controls are unavailable until you turn it off.
 

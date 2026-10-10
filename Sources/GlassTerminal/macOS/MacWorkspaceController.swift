@@ -2,6 +2,7 @@
 #if os(macOS)
 import Foundation
 import Observation
+import GlassLayers
 import GlassTerminalEmulator
 import os
 
@@ -715,8 +716,11 @@ final class MacWorkspaceController {
         return recorder
     }
 
-    /// Start every local pane independently of SwiftUI's lazy tab presentation.
-    func startLocalPanes(sessionManager: SessionManager, settingsManager: SettingsManager, onEmpty: @escaping () -> Void) {
+    /// Start every local pane independently of SwiftUI's lazy tab presentation, with the settings
+    /// of the window it is in (W22) — what its view draws with once it is shown.
+    func startLocalPanes(sessionManager: SessionManager, settingsManager: SettingsManager,
+                         window: GlassWindowOverrides = GlassWindowOverrides(), onEmpty: @escaping () -> Void) {
+        let profile = TerminalWindowProfile.resolved(window, settings: settingsManager)
         for pane in state.root?.panes ?? [] where pane.intent.kind == .local {
             // The session a new pane of the workgroup was given goes back to the workgroup (W4b).
             if let name = pane.intent.localTmuxSession {
@@ -730,12 +734,8 @@ final class MacWorkspaceController {
                     directory: pane.intent.localDirectory ?? settingsManager.localWorkingDirectory,
                     tmuxSession: pane.intent.localTmuxSession
                 ),
-                theme: settingsManager.currentTheme.swiftTermTheme,
-                runtimeSettings: SwiftTermRuntimeSettings(
-                    cursorStyle: settingsManager.cursorStyle,
-                    blinkingCursor: settingsManager.blinkingCursor,
-                    scrollbackLines: settingsManager.saveScrollback ? settingsManager.maxScrollbackLines : 0
-                ),
+                theme: profile.theme.swiftTermTheme,
+                runtimeSettings: profile.runtimeSettings,
                 onOutputData: { recorder.recordOutput($0) },
                 onInputData: { recorder.recordInput($0) },
                 onResize: { recorder.recordResize(width: $0, height: $1) },
@@ -977,14 +977,14 @@ final class MacWorkspaceController {
         findRequest = TerminalFindRequest(nonce: findRequest.nonce &+ 1, command: command)
     }
 
-    private func prepareOffscreenRenderer(for session: TerminalSession, settingsManager: SettingsManager) {
+    private func prepareOffscreenRenderer(for session: TerminalSession, settingsManager: SettingsManager,
+                                          window: GlassWindowOverrides) {
         let model = session.terminalHostModel
+        // The window's settings (W22), as its pane draws with them once shown.
+        let profile = TerminalWindowProfile.resolved(window, settings: settingsManager)
         SwiftTermHostView(model: model,
-            theme: settingsManager.currentTheme.swiftTermTheme,
-            runtimeSettings: SwiftTermRuntimeSettings(
-                cursorStyle: settingsManager.cursorStyle,
-                blinkingCursor: settingsManager.blinkingCursor,
-                scrollbackLines: settingsManager.saveScrollback ? settingsManager.maxScrollbackLines : 0),
+            theme: profile.theme.swiftTermTheme,
+            runtimeSettings: profile.runtimeSettings,
             allowsFocusOwnership: false,
             onSendData: { [weak session] data in session?.sendTerminalData(data) },
             onResize: { [weak session, weak model] columns, rows in
@@ -999,7 +999,8 @@ final class MacWorkspaceController {
     func prepareSSHPaneIfNeeded(
         _ pane: MacWorkspacePane,
         sessionManager: SessionManager,
-        settingsManager: SettingsManager
+        settingsManager: SettingsManager,
+        window: GlassWindowOverrides = GlassWindowOverrides()
     ) async {
         guard !isClosed,
               pane.intent.kind == .ssh,
@@ -1039,7 +1040,7 @@ final class MacWorkspaceController {
                           isSamePane(pane) else { return }
                     sessionsByPaneID[pane.id] = pendingSession
                     observeOutput(of: pendingSession.terminalHostModel)
-                    prepareOffscreenRenderer(for: pendingSession, settingsManager: settingsManager)
+                    prepareOffscreenRenderer(for: pendingSession, settingsManager: settingsManager, window: window)
                 }
             )
             guard !isClosed,
@@ -1455,10 +1456,11 @@ final class MacWorkspaceWindowController {
     @ObservationIgnored private(set) var placement: MacWorkspaceWindowPlacement?
     /// The place read from the record, for the window's first appearance only.
     @ObservationIgnored private var placementToRestore: MacWorkspaceWindowPlacement?
-    /// The window's look (W20): every tab in it draws with it, local panes and SSH ones, and a
-    /// tab moved in takes it. Nil follows the terminal settings. Saved with the window's tabs;
-    /// a new window opens with its request's (a saved Workgroup's, or the window its tabs left).
-    private(set) var look: TerminalSessionOverride?
+    /// The window's own settings (W20's look, W22): every tab in it draws and behaves with them,
+    /// local panes and SSH ones, and a tab moved in takes them. Empty follows the settings. Saved
+    /// with the window's tabs; a new window opens with its request's (a saved Workgroup's, or the
+    /// window its tabs left).
+    private(set) var windowSettings = GlassWindowOverrides()
 
     /// Makes the window's tabs and writes nothing: SwiftUI makes controllers it throws away, and a
     /// window macOS restores after a crash must come back as it was saved, not be rewritten by
@@ -1490,7 +1492,7 @@ final class MacWorkspaceWindowController {
         var savesNow = false
         var unsaved = false
         var failure: String?
-        var resolvedLook: TerminalSessionOverride?
+        var resolvedSettings = GlassWindowOverrides()
         let transferred = request.transferredTabTicketID.flatMap { transferBroker.claim($0) } ?? []
         if let first = transferred.first {
             // The move already happened: the source window has let the tabs go, so this one
@@ -1499,7 +1501,7 @@ final class MacWorkspaceWindowController {
             resolvedSelectedTabID = request.initialSelectedTabID.flatMap { requested in
                 transferred.first(where: { $0.workspaceID == requested })?.workspaceID
             } ?? first.workspaceID
-            resolvedLook = request.look?.normalized
+            resolvedSettings = request.windowSettings
             savesNow = true
         } else {
             // A moved tab's ticket dies with the process. After a crash macOS hands the window
@@ -1511,7 +1513,7 @@ final class MacWorkspaceWindowController {
                 resolvedSelectedTabID = restored.selectedTabID
                 placement = restored.placement
                 placementToRestore = restored.placement
-                resolvedLook = restored.look
+                resolvedSettings = restored.windowSettings
             case .unreadable(let reason):
                 let fallback = makeTab(MacWorkspaceTabRequest(workspaceID: UUID(), startsEmpty: true))
                 fallback.markNotRestored(reason)
@@ -1528,13 +1530,13 @@ final class MacWorkspaceWindowController {
                 resolvedSelectedTabID = request.initialSelectedTabID.flatMap { requested in
                     resolvedTabs.first(where: { $0.workspaceID == requested })?.workspaceID
                 } ?? resolvedTabs[0].workspaceID
-                resolvedLook = request.look?.normalized
+                resolvedSettings = request.windowSettings
                 unsaved = true
             }
         }
         tabs = resolvedTabs
         selectedTabID = resolvedSelectedTabID
-        look = resolvedLook
+        windowSettings = resolvedSettings
         restorationFailure = failure
         hasUnsavedState = unsaved
         collapseSelection()
@@ -1571,13 +1573,13 @@ final class MacWorkspaceWindowController {
         persist()
     }
 
-    /// Gives the window a look, or none (W20), from any tab's Settings ▸ Overrides: every tab
-    /// draws with it at once, and it is saved with the tabs. Never over a record that couldn't be
-    /// read (`persist`); a saved Workgroup is changed only by saving the window as it.
-    func setLook(_ look: TerminalSessionOverride?) {
-        let kept = look?.normalized
-        guard kept != self.look else { return }
-        self.look = kept
+    /// Gives the window its own settings, or none (W20, W22), from any tab's Settings ▸ This
+    /// Window: every tab draws and behaves with them at once, and they are saved with the tabs.
+    /// Never over a record that couldn't be read (`persist`); a saved Workgroup is changed only by
+    /// saving the window as it.
+    func setWindowSettings(_ settings: GlassWindowOverrides) {
+        guard settings != windowSettings else { return }
+        windowSettings = settings
         persist()
     }
 
@@ -1653,8 +1655,8 @@ final class MacWorkspaceWindowController {
         var preset = LayoutPreset(name: name, colorTag: selectedTab.workgroupColor ?? .blue,
                                   sessionIntents: intents,
                                   workspaceLayout: .init(tabs: savedTabs, selectedTabIndex: selectedIndex))
-        // The window's look goes with it, so the workgroup opens looking as this window does (W20).
-        preset.look = look
+        // The window's settings go with it, so the workgroup opens as this window is (W20, W22).
+        preset.windowSettings = windowSettings
         guard preset.isValidForPersistence else { throw MacWorkspaceStateError.invalidPaneIntent }
         return preset
     }
@@ -2009,8 +2011,8 @@ final class MacWorkspaceWindowController {
         )
         request.initialSelectedTabID = selectionOrder.last(where: movingIDs.contains) ?? movingIDs[0]
         // The new window looks like the one they left, as a Safari profile's tab keeps its
-        // profile in a new window (W20). Dragged into another window, a tab takes that one's.
-        request.look = look
+        // profile in a new window (W20, W22). Dragged into another window, a tab takes that one's.
+        request.windowSettings = windowSettings
         return request
     }
 
@@ -2062,7 +2064,7 @@ final class MacWorkspaceWindowController {
             tabs: tabs.map(\.restorationDescriptor),
             selectedTabID: selectedTabID,
             placement: placement,
-            look: look
+            windowSettings: windowSettings
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]

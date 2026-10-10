@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import GlassShell
+import GlassLayers
 @testable import GlassTerminal
 
 /// W20 (owner, 2026-10-09): "I was testing to see if there was a way to give a color/tint to the
@@ -11,8 +12,9 @@ import GlassShell
 @MainActor
 @Suite("A terminal window owns its look")
 struct TerminalWindowLookTests {
-    private let red = TerminalSessionOverride(windowOpacity: 0.4, glassTint: "#FF2D55")
-    private let blue = TerminalSessionOverride(blurBackground: 0.2, glassTint: "#007AFF")
+    /// W20's two looks, as the window settings they are now (W22).
+    private let red = TerminalSessionOverride(windowOpacity: 0.4, glassTint: "#FF2D55").windowSettings
+    private let blue = TerminalSessionOverride(blurBackground: 0.2, glassTint: "#007AFF").windowSettings
 
     private func server(_ name: String) -> ServerConfiguration {
         var server = ServerConfiguration(name: name, host: "\(name).example.com", username: "ann")
@@ -43,11 +45,11 @@ struct TerminalWindowLookTests {
     @Test("each field the window's look sets wins; each it leaves unset follows the terminal settings")
     func resolution() {
         let settings = (frost: "regular", opacity: 0.25, blur: 0.75, interactive: true, tint: "None")
-        func resolved(_ look: TerminalSessionOverride?) -> TerminalLook {
-            TerminalLook(look: look, frost: settings.frost, opacity: settings.opacity, blur: settings.blur,
+        func resolved(_ window: GlassWindowOverrides) -> TerminalLook {
+            TerminalLook(window: window, frost: settings.frost, opacity: settings.opacity, blur: settings.blur,
                          interactiveGlass: settings.interactive, tint: settings.tint)
         }
-        let plain = resolved(nil)
+        let plain = resolved(GlassWindowOverrides())
         #expect(plain.frost == "regular" && plain.opacity == 0.25 && plain.blur == 0.75)
         #expect(plain.interactiveGlass && plain.tint == "None" && plain.tintColor == nil && plain.windowBlur == nil)
 
@@ -57,7 +59,7 @@ struct TerminalWindowLookTests {
         #expect(tinted.blur == 0.75 && tinted.windowBlur == nil, "left to the settings")
         #expect(tinted.frost == "regular" && tinted.interactiveGlass)
 
-        let frosted = resolved(TerminalSessionOverride(glassFrost: "thick", blurBackground: 0, interactiveGlass: false))
+        let frosted = resolved(TerminalSessionOverride(glassFrost: "thick", blurBackground: 0, interactiveGlass: false).windowSettings)
         #expect(frosted.frost == "thick" && frosted.blur == 0 && frosted.windowBlur == 0 && !frosted.interactiveGlass)
         #expect(frosted.opacity == 0.25)
     }
@@ -71,10 +73,10 @@ struct TerminalWindowLookTests {
 
     @Test("Settings offers This Window only with a window to keep the look, and Port Forwarding only for SSH")
     func settingsSections() {
-        #expect(TerminalSettingsModalTab.offered(hasSession: true, hasWindowLook: true) == [.overrides, .terminal, .portForwarding])
-        #expect(TerminalSettingsModalTab.offered(hasSession: false, hasWindowLook: true) == [.overrides, .terminal],
+        #expect(TerminalSettingsModalTab.offered(hasSession: true, hasWindowSettings: true) == [.overrides, .terminal, .portForwarding])
+        #expect(TerminalSettingsModalTab.offered(hasSession: false, hasWindowSettings: true) == [.overrides, .terminal],
                 "a Mac's local shell: no connection to forward")
-        #expect(TerminalSettingsModalTab.offered(hasSession: true, hasWindowLook: false) == [.terminal, .portForwarding])
+        #expect(TerminalSettingsModalTab.offered(hasSession: true, hasWindowSettings: false) == [.terminal, .portForwarding])
     }
 
     @Test("a look that sets nothing, or only out-of-range values, is kept clamped, or not at all")
@@ -97,12 +99,12 @@ struct TerminalWindowLookTests {
         manager.appendSession(one, toWorkgroup: group)
         manager.appendSession(two, toWorkgroup: group)
 
-        manager.setLook(red, forWorkgroup: group)
-        #expect(manager.look(ofWorkgroupHolding: one.id) == red)
-        #expect(manager.look(ofWorkgroupHolding: two.id) == red, "every tab in the window")
+        manager.setWindowSettings(red, forWorkgroup: group)
+        #expect(manager.windowSettings(ofWorkgroupHolding: one.id) == red)
+        #expect(manager.windowSettings(ofWorkgroupHolding: two.id) == red, "every tab in the window")
 
-        manager.setLook(TerminalSessionOverride(), forWorkgroup: group)
-        #expect(manager.workgroup(for: group)?.look == nil, "reset: back to the settings, nothing kept")
+        manager.setWindowSettings(GlassWindowOverrides(), forWorkgroup: group)
+        #expect(manager.workgroup(for: group)?.windowSettings.isEmpty == true, "reset: back to the settings, nothing kept")
     }
 
     @Test("a tab moved into another window takes that window's look; moved to a new window it keeps its own")
@@ -110,31 +112,31 @@ struct TerminalWindowLookTests {
         let manager = SessionManager(loadImmediately: false)
         let alpha = server("alpha")
         let a1 = terminal(alpha, in: manager), a2 = terminal(alpha, in: manager), b1 = terminal(alpha, in: manager)
-        let left = manager.createWorkgroup(name: "Left", colorTag: .blue, look: red)
-        let right = manager.createWorkgroup(name: "Right", colorTag: .blue, look: blue)
+        let left = manager.createWorkgroup(name: "Left", colorTag: .blue, windowSettings: red)
+        let right = manager.createWorkgroup(name: "Right", colorTag: .blue, windowSettings: blue)
         manager.appendSession(a1, toWorkgroup: left)
         manager.appendSession(a2, toWorkgroup: left)
         manager.appendSession(b1, toWorkgroup: right)
 
         #expect(TerminalTabMoves.move(a1.id, to: right, at: nil, in: manager) == .moved(sourceClosed: false))
-        #expect(manager.look(ofWorkgroupHolding: a1.id) == blue, "dragged in, it takes the window's look")
-        #expect(manager.workgroup(for: right)?.look == blue && manager.workgroup(for: left)?.look == red,
+        #expect(manager.windowSettings(ofWorkgroupHolding: a1.id) == blue, "dragged in, it takes the window's look")
+        #expect(manager.workgroup(for: right)?.windowSettings == blue && manager.workgroup(for: left)?.windowSettings == red,
                 "neither window's look changed")
 
         let created = try #require(TerminalTabMoves.moveToNewWorkgroup(b1.id, in: manager))
-        #expect(manager.workgroup(for: created)?.look == blue, "a new window looks like the one it left")
+        #expect(manager.workgroup(for: created)?.windowSettings == blue, "a new window looks like the one it left")
     }
 
     @Test("a workgroup opened again keeps its look; a new one starts from the look it is given")
     func createdWithLook() {
         let manager = SessionManager(loadImmediately: false)
         let id = UUID()
-        manager.createWorkgroup(id: id, name: "Saved", colorTag: .blue, look: red)
-        #expect(manager.workgroup(for: id)?.look == red)
-        manager.createWorkgroup(id: id, name: "Saved", colorTag: .blue, look: blue)
-        #expect(manager.workgroup(for: id)?.look == red, "already open: left as it is")
-        let empty = manager.createWorkgroup(name: "Empty", colorTag: .blue, look: TerminalSessionOverride())
-        #expect(manager.workgroup(for: empty)?.look == nil)
+        manager.createWorkgroup(id: id, name: "Saved", colorTag: .blue, windowSettings: red)
+        #expect(manager.workgroup(for: id)?.windowSettings == red)
+        manager.createWorkgroup(id: id, name: "Saved", colorTag: .blue, windowSettings: blue)
+        #expect(manager.workgroup(for: id)?.windowSettings == red, "already open: left as it is")
+        let empty = manager.createWorkgroup(name: "Empty", colorTag: .blue, windowSettings: GlassWindowOverrides())
+        #expect(manager.workgroup(for: empty)?.windowSettings.isEmpty == true)
     }
 
     @Test("a window's look comes back after a relaunch (W15's list), and a list from before it still reads")
@@ -150,12 +152,12 @@ struct TerminalWindowLookTests {
             defer { manager.closeAllSessions() }
 
             let kept = terminal(alpha, tmux: "glass-1", in: manager)
-            let group = manager.createWorkgroup(name: "alpha", colorTag: .blue, look: red)
+            let group = manager.createWorkgroup(name: "alpha", colorTag: .blue, windowSettings: red)
             manager.appendSession(kept, toWorkgroup: group)
             let records = TerminalWorkgroupsToReopen.records(of: manager.workgroups, session: manager.session(for:),
                                                              isSaved: { _ in true }, leaving: [], shown: nil)
             let record = try #require(records.first)
-            #expect(record.look == red, "listed with its look")
+            #expect(record.windowSettings == red, "listed with its look")
 
             // The next launch: written, read back, reopened under its own id.
             defaults.set(try JSONEncoder().encode(records), forKey: TerminalWorkgroupsToReopen.key)
@@ -163,12 +165,13 @@ struct TerminalWindowLookTests {
             manager.closeWorkgroup(group)
             #expect(TerminalWorkgroupOpening.reopen(read, connectsWhenShown: true, sessionManager: manager,
                                                     settingsManager: settings).opened)
-            #expect(manager.workgroup(for: group)?.look == red, "back with the look it had")
+            #expect(manager.workgroup(for: group)?.windowSettings == red, "back with the look it had")
 
             var old = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode([record])) as? [[String: Any]])
             old[0].removeValue(forKey: "look")
             defaults.set(try JSONSerialization.data(withJSONObject: old), forKey: TerminalWorkgroupsToReopen.key)
-            #expect(TerminalWorkgroupsToReopen.read(defaults).first?.look == nil, "a list from before W20 still reads")
+            #expect(TerminalWorkgroupsToReopen.read(defaults).first?.windowSettings.isEmpty == true,
+                    "a list from before W20 still reads")
             #expect(TerminalWorkgroupsToReopen.read(defaults).count == 1)
         }
     }
@@ -178,12 +181,12 @@ struct TerminalWindowLookTests {
     @Test("a saved Workgroup keeps its look through saving and reading, and never saves an empty one")
     func presetRoundTrip() throws {
         var preset = LayoutPreset(name: "Builds", serverIDs: [UUID()])
-        preset.look = red
+        preset.windowSettings = red
         let decoded = try JSONDecoder().decode(LayoutPreset.self, from: JSONEncoder().encode(preset))
-        #expect(decoded.look == red)
+        #expect(decoded.windowSettings == red)
         #expect(decoded == preset)
 
-        preset.look = TerminalSessionOverride()
+        preset.windowSettings = GlassWindowOverrides()
         let empty = try json(preset)
         #expect(empty["look"] == nil, "a look that sets nothing is not saved, nor synced")
     }
@@ -194,13 +197,13 @@ struct TerminalWindowLookTests {
         var object = try json(preset)
         #expect(object["look"] == nil)
         let old = try JSONDecoder().decode(LayoutPreset.self, from: JSONSerialization.data(withJSONObject: object))
-        #expect(old.look == nil && old.isValidForPersistence)
+        #expect(old.windowSettings.isEmpty && old.isValidForPersistence)
 
         let unreadables: [Any] = ["red", ["glassFrost": 7], 42]
         for unreadable in unreadables {
             object["look"] = unreadable
             let decoded = try JSONDecoder().decode(LayoutPreset.self, from: JSONSerialization.data(withJSONObject: object))
-            #expect(decoded.look == nil && decoded.id == preset.id && decoded.isValidForPersistence,
+            #expect(decoded.windowSettings.isEmpty && decoded.id == preset.id && decoded.isValidForPersistence,
                     "the workgroup still reads, and still opens")
         }
     }
@@ -212,7 +215,7 @@ struct TerminalWindowLookTests {
     func presetReadableByEarlierBuilds() throws {
         var preset = LayoutPreset(name: "Builds", serverIDs: [UUID()])
         let without = try json(preset)
-        preset.look = red
+        preset.windowSettings = red
         var with = try json(preset)
         #expect(with["look"] != nil)
         #expect(with["schemaVersion"] as? Int == 4, "the schema an earlier build reads")
@@ -241,31 +244,32 @@ struct TerminalWindowLookTests {
         try await Task.sleep(for: .milliseconds(50))
 
         var preset = LayoutPreset(name: "Builds", serverIDs: [UUID()])
-        preset.look = red
+        preset.windowSettings = red
         mac.upsertLayoutPreset(preset)
         for _ in 0..<200 where !headset.layoutPresets.contains(where: { $0.id == preset.id }) {
             try await Task.sleep(for: .milliseconds(10))
         }
-        #expect(headset.layoutPresets.first { $0.id == preset.id }?.look == red)
+        #expect(headset.layoutPresets.first { $0.id == preset.id }?.windowSettings == red)
     }
 
     @Test("saving a window as a Workgroup keeps the window's look, none included; editing keeps the Workgroup's")
     func editorKeepsTheLook() {
         var saved = LayoutPreset(name: "Builds", serverIDs: [UUID()])
-        saved.look = red
+        saved.windowSettings = red
         let layout = LayoutPreset.WorkspaceLayout(tabs: [.init(label: nil, root: .session(0), focusedSessionIndex: 0)],
                                                   selectedTabIndex: 0)
 
         let plainWindow = WorkgroupEditorContext(original: nil, name: "Builds", colorTag: .blue,
                                                  sessionIntents: saved.sessionIntents, workspaceLayout: layout)
-        #expect(plainWindow.lookToSave(replacing: saved) == nil, "the window had no look: the Workgroup has none")
+        #expect(plainWindow.windowSettingsToSave(replacing: saved).isEmpty, "the window had no look: the Workgroup has none")
         let tintedWindow = WorkgroupEditorContext(original: nil, name: "Builds", colorTag: .blue,
-                                                  sessionIntents: saved.sessionIntents, workspaceLayout: layout, look: blue)
-        #expect(tintedWindow.lookToSave(replacing: saved) == blue)
+                                                  sessionIntents: saved.sessionIntents, workspaceLayout: layout,
+                                                  windowSettings: blue)
+        #expect(tintedWindow.windowSettingsToSave(replacing: saved) == blue)
 
-        #expect(WorkgroupEditorContext.edit(saved).lookToSave(replacing: nil) == red)
-        #expect(WorkgroupEditorContext.duplicate(saved).lookToSave(replacing: nil) == red)
-        #expect(WorkgroupEditorContext.new(name: "Builds").lookToSave(replacing: saved) == red,
+        #expect(WorkgroupEditorContext.edit(saved).windowSettingsToSave(replacing: nil) == red)
+        #expect(WorkgroupEditorContext.duplicate(saved).windowSettingsToSave(replacing: nil) == red)
+        #expect(WorkgroupEditorContext.new(name: "Builds").windowSettingsToSave(replacing: saved) == red,
                 "made by hand over it: keeps the look of the one it replaces, as it keeps how it opens")
     }
 

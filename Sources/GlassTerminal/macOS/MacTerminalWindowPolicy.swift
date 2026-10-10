@@ -11,6 +11,8 @@ enum MacTerminalToolbarItemID {
 
 struct MacTerminalWindowReader: NSViewRepresentable {
     @Environment(\.glassLayers) private var layers
+    /// The window's own Appearance over the app's (W22).
+    @Environment(\.glassWindowOverrides) private var windowOverrides
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     let tabbingIdentifier: String
     var onWindow: (NSWindow) -> Void
@@ -73,7 +75,7 @@ struct MacTerminalWindowReader: NSViewRepresentable {
 
     private func configure(_ window: NSWindow?, coordinator: Coordinator) {
         guard let window, !Self.hasClosed(window) else { return }
-        let state = GlassLayerResolution.resolve(layers.state, reduceTransparency: reduceTransparency)
+        let state = GlassLayerResolution.resolve(layers.state, window: windowOverrides, reduceTransparency: reduceTransparency)
         MacTerminalWindowPolicy.apply(window, tabbingIdentifier: tabbingIdentifier, overviewPresented: overviewPresented, layers: state)
         coordinator.observeWindowClose(window, action: onClose)
         coordinator.interceptWindowClose(window, shouldConfirm: shouldConfirmClose)

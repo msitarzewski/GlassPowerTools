@@ -430,9 +430,9 @@ struct MacWorkspaceLaunchRequest: Codable, Hashable, Sendable {
     /// its live sessions never enter the Codable scene value.
     let transferredTabTicketID: UUID?
     var initialSelectedTabID: UUID? = nil
-    /// The look a new window opens with (W20): a saved Workgroup's, or the window its tabs moved
-    /// out of. A window reopened from its record has its record's instead.
-    var look: TerminalSessionOverride? = nil
+    /// The settings a new window opens with (W20's look, W22): a saved Workgroup's, or the window
+    /// its tabs moved out of. A window reopened from its record has its record's instead.
+    var windowSettings = GlassWindowOverrides()
 
     var workspaceID: UUID { tabs[0].workspaceID }
     var startsEmpty: Bool { tabs[0].startsEmpty }
@@ -530,7 +530,7 @@ struct MacWorkspaceLaunchRequest: Codable, Hashable, Sendable {
                 UUID.self,
                 forKey: .transferredTabTicketID
             )
-            look = TerminalSessionOverride.lenientlyDecoded(from: container, forKey: .look)
+            windowSettings = GlassWindowOverrides.lenientlyDecoded(from: container, forKey: .windowSettings)
             return
         }
 
@@ -578,21 +578,22 @@ struct MacWorkspaceWindowRestorationState: Codable, Equatable, Sendable {
     /// Where the window was (W12). Absent from records saved before it, and from windows that
     /// have not been placed yet; an earlier version reading a record ignores it.
     let placement: MacWorkspaceWindowPlacement?
-    /// The window's look (W20), which every tab in it draws with. Absent when it has none, and
-    /// from records saved before it; an earlier version reading a record ignores it.
-    let look: TerminalSessionOverride?
+    /// The window's own settings (W20's look, W22), which every tab in it draws and behaves with.
+    /// Absent when it sets none, and from records saved before them; an earlier version reading a
+    /// record ignores what it doesn't know (`TerminalWindowSettingsCoding`).
+    let windowSettings: GlassWindowOverrides
 
     init(tabs: [MacWorkspaceTabDescriptor], selectedTabID: UUID, placement: MacWorkspaceWindowPlacement? = nil,
-         look: TerminalSessionOverride? = nil) {
+         windowSettings: GlassWindowOverrides = GlassWindowOverrides()) {
         schemaVersion = Self.currentSchemaVersion
         self.tabs = tabs
         self.selectedTabID = selectedTabID
         self.placement = placement
-        self.look = look?.normalized
+        self.windowSettings = windowSettings
     }
 
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, tabs, selectedTabID, placement, look
+        case schemaVersion, tabs, selectedTabID, placement, look, windowSettings
     }
 
     init(from decoder: any Decoder) throws {
@@ -602,8 +603,17 @@ struct MacWorkspaceWindowRestorationState: Codable, Equatable, Sendable {
         selectedTabID = try container.decode(UUID.self, forKey: .selectedTabID)
         // A place that can't be read costs the window its place, never its tabs (W12).
         placement = (try? container.decodeIfPresent(MacWorkspaceWindowPlacement.self, forKey: .placement))?.validated()
-        // Nor a look its tabs (W20).
-        look = TerminalSessionOverride.lenientlyDecoded(from: container, forKey: .look)
+        // Nor settings its tabs (W20, W22).
+        windowSettings = TerminalWindowSettingsCoding.decode(from: container, look: .look, settings: .windowSettings)
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(schemaVersion, forKey: .schemaVersion)
+        try container.encode(tabs, forKey: .tabs)
+        try container.encode(selectedTabID, forKey: .selectedTabID)
+        try container.encodeIfPresent(placement, forKey: .placement)
+        try TerminalWindowSettingsCoding.encode(windowSettings, into: &container, look: .look, settings: .windowSettings)
     }
 
     func validated() -> MacWorkspaceWindowRestorationState? {
@@ -850,8 +860,8 @@ enum MacWorkgroupLauncher {
         }
         var request = MacWorkspaceLaunchRequest(tabs: requests)
         request.initialSelectedTabID = requests[layout.selectedTabIndex].workspaceID
-        // The window opens with the look the workgroup was saved with (W20).
-        request.look = preset.look
+        // The window opens with the settings the workgroup was saved with (W20, W22).
+        request.windowSettings = preset.windowSettings
         openWindow(request)
         return [request]
     }

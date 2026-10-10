@@ -19,6 +19,7 @@
 
 import Foundation
 import Observation
+import GlassLayers
 import OSLog
 #if os(visionOS)
 import SwiftUI
@@ -48,9 +49,47 @@ nonisolated struct TerminalWorkgroupReopenRecord: Codable, Equatable, Sendable {
     var selectedIndex: Int
     /// iPhone and iPad: the workgroup on screen when the app last ran, shown again.
     var isShown: Bool
-    /// Its window's look (W20), which it comes back with. Absent from lists written before it;
-    /// an earlier build reading the list ignores it.
-    var look: TerminalSessionOverride? = nil
+    /// Its window's own settings (W20's look, W22's rest), which it comes back with. Absent from
+    /// lists written before them; an earlier build reading the list ignores what it doesn't know.
+    var windowSettings = GlassWindowOverrides()
+
+    init(id: UUID, name: String, colorTag: ServerColorTag, terminals: [Terminal], selectedIndex: Int,
+         isShown: Bool, windowSettings: GlassWindowOverrides = GlassWindowOverrides()) {
+        self.id = id
+        self.name = name
+        self.colorTag = colorTag
+        self.terminals = terminals
+        self.selectedIndex = selectedIndex
+        self.isShown = isShown
+        self.windowSettings = windowSettings
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, colorTag, terminals, selectedIndex, isShown, look, windowSettings
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        colorTag = try container.decode(ServerColorTag.self, forKey: .colorTag)
+        terminals = try container.decode([Terminal].self, forKey: .terminals)
+        selectedIndex = try container.decode(Int.self, forKey: .selectedIndex)
+        isShown = try container.decode(Bool.self, forKey: .isShown)
+        // Settings that can't be read cost the workgroup those settings, never its terminals.
+        windowSettings = TerminalWindowSettingsCoding.decode(from: container, look: .look, settings: .windowSettings)
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(colorTag, forKey: .colorTag)
+        try container.encode(terminals, forKey: .terminals)
+        try container.encode(selectedIndex, forKey: .selectedIndex)
+        try container.encode(isShown, forKey: .isShown)
+        try TerminalWindowSettingsCoding.encode(windowSettings, into: &container, look: .look, settings: .windowSettings)
+    }
 }
 
 /// The workgroups to reopen at the next launch, for the whole run (W15). One per process.
@@ -187,7 +226,7 @@ final class TerminalWorkgroupsToReopen {
             return TerminalWorkgroupReopenRecord(
                 id: workgroup.id, name: workgroup.name, colorTag: workgroup.colorTag, terminals: terminals,
                 selectedIndex: kept.firstIndex { $0.id == workgroup.selectedSessionID } ?? 0,
-                isShown: workgroup.id == shown, look: workgroup.look)
+                isShown: workgroup.id == shown, windowSettings: workgroup.windowSettings)
         }
         return Array(listed.prefix(maximumWorkgroups))
     }
@@ -244,7 +283,7 @@ extension TerminalWorkgroupOpening {
         guard !isOpen(record.id, in: sessionManager) else { return result }
         let servers = sessionManager.serverManager.servers
         let workgroupID = sessionManager.createWorkgroup(id: record.id, name: record.name, colorTag: record.colorTag,
-                                                         look: record.look)
+                                                         windowSettings: record.windowSettings)
         var selected: UUID?
         for (index, terminal) in record.terminals.enumerated() {
             let called = displayName(of: terminal)
