@@ -749,3 +749,15 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
 - 0.4.327 on the iPhone; the Vision Pro's battery died (install refused, 4016). Owner: "Keep building while it charges?"
   Started **W18** (settings sync error Code=3 at every launch; never write the real iCloud store) and **W19** (open Mac
   tabs pick up `@glass-name` given elsewhere; Mac SSH tabs in tmux show the pane's program title). W16 still running.
+- **02711b3 — W16 merged.** visionOS `.plain` windows (Files, editor) painted a square theme plate
+  (`GlassLayeredWindow` `cornerRadius: 0`); now the window's shape: 46 pt measured against the system glass, 24 pt for
+  the inset card (`GlassConnectionUI/GlassWindowShape.swift`); Mac/iPad unchanged. Dropping `.plain` made Files and the
+  editor nearly black (theme over the window glass), so `.plain` stays. Files on the headset: folder as navigation
+  title (system title ornament) with `toolbarTitleMenu` of ancestors; breadcrumb kept off the visionOS bar (it hides the
+  title). Untried on the device: the title menu, the 70 pt empty band under the Files toolbar (pre-existing), Reduce
+  Transparency. Owner's calls: plain windows show a lighter tint than the library at the same opacity; round the remote
+  desktop image or not. Frost does nothing in visionOS plain windows (pre-existing).
+- **W20 started** (owner, on the Mac: "a way to give a color/tint to the tab group… It should inherit the settings of the
+  first one in the order yes?"; asked, he chose "the window owns it"): one look per terminal window/tab group, set from
+  any tab's Settings ▸ Overrides, taken by new and moved tabs, saved with the window and saved workgroups. The local
+  tab's gear Settings was a `SettingsLink` to app Settings since Stage 2 — it opens Terminal Settings in W20.
