@@ -18,11 +18,18 @@ struct GlassActiveConnectionsTests {
         var sessions: [GlassOpenSession] = []
         var running: [GlassRunningSession] = []
         private(set) var asked = 0
+        /// As the terminal's saved servers: none until the library's catalog has been read.
+        var knowsMachinesOnlyAfterLoad = false
+        private var catalogLoaded = false
         init(kind: HostServiceKind, displayName: String) { self.kind = kind; self.displayName = displayName }
         func open(service: HostServiceLink, host: HostProfile,
                   report: @escaping @MainActor (GlassCapabilityOutcome) -> Void) { report(.dismissed) }
         func openSessions() -> [GlassOpenSession] { sessions }
-        func runningSessions() async -> [GlassRunningSession] { asked += 1; return running }
+        func catalogDidLoad() { catalogLoaded = true }
+        func runningSessions() async -> [GlassRunningSession] {
+            asked += 1
+            return !knowsMachinesOnlyAfterLoad || catalogLoaded ? running : []
+        }
     }
 
     private func running(_ id: String, on endpoint: EndpointID) -> GlassRunningSession {
@@ -134,6 +141,27 @@ struct GlassActiveConnectionsTests {
         await model.refreshRunningSessionsIfDue(now: .now + GlassShellModel.runningSessionsMaxAge + .seconds(1))
         #expect(terminal.asked == 2)
         #expect(model.activeConnectionsPanel().count == 14)
+    }
+
+    @Test("Nothing is asked before the library has loaded, so an early ask can't leave Active empty")
+    func noAskBeforeTheLibraryLoads() async throws {
+        let (model, root, store) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let terminalOnAlpha = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on alpha")
+        try await store.upsert(try HostProfile(displayName: "alpha", address: "192.0.2.1", services: [terminalOnAlpha]))
+        let terminal = StubCapability(kind: .ssh, displayName: "Terminal")
+        terminal.knowsMachinesOnlyAfterLoad = true
+        terminal.running = (1...15).map { running("tmux:glass-\($0)", on: terminalOnAlpha.endpointID) }
+        model.registry.register(terminal)
+
+        // The owner, on the Vision Pro (0.4.320): the app relaunched with Active showing, Active
+        // asked before the terminal had its saved servers, and the empty answer stood.
+        await model.refreshRunningSessions()
+        #expect(terminal.asked == 0, "not before the library has loaded")
+        await model.load()
+        await model.refreshRunningSessionsIfDue()
+        #expect(terminal.asked == 1)
+        #expect(model.activeConnectionsPanel().count == 15)
     }
 
     @Test("W6: a session open here comes forward when chosen and stays listed; a skipped machine says why")

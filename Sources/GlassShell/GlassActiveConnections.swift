@@ -97,9 +97,13 @@ public extension GlassShellModel {
         }
     }
 
-    /// Asks every capability what is running on its hosts (D44). One pass at a time.
+    /// Asks every capability what is running on its hosts (D44). One pass at a time, and none
+    /// before the library has loaded: a capability reads its saved machines from the catalog
+    /// (`catalogDidLoad`), and asked earlier it knows none. The owner, on the Vision Pro
+    /// (2026-10-09): the app relaunched with Active showing, Active asked first, and that empty
+    /// answer stood until a manual refresh. The library asks once it has loaded.
     func refreshRunningSessions() async {
-        guard !isCheckingRunningSessions else { return }
+        guard isLoaded, !isCheckingRunningSessions else { return }
         isCheckingRunningSessions = true
         defer { isCheckingRunningSessions = false }
         let report = await registry.runningReport()
