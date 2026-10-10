@@ -56,6 +56,9 @@ enum GlassDemoMode {
             await openEditor(editor, preview: surface == "preview")
         case "terminal":
             terminal.requestDemoReplay(name: "alpha", output: Data(terminalTranscript.utf8))
+        case "files":
+            // The window and its header; with nothing connected, the list says so.
+            terminal.requestDemoFiles(name: "alpha", path: "/home/ann/shop")
         case "database", "diagram":
             // Put there by Tools/Screenshots/shoot.sh, from make-demo-db.py.
             database.requestDemoDatabase(file: URL.documentsDirectory.appending(path: "demo-shop.sqlite"), name: "shop",

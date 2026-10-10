@@ -140,12 +140,17 @@ public struct GlassTerminalScenes: Scene {
                     .trackWindowPresence(key: "html-preview-missing", recovery: windowRecoveryManager)
             }
         }
-        .windowStyle(.plain)
+        // The system's window: a web page wants no transparency, and its glass and shape are the
+        // system's (W16). It was `.plain` with a 28-point glass of its own drawn inside.
         .defaultSize(width: 1000, height: 800)
         .restorationBehavior(.disabled)
         #endif
         // Glass here too, for the same reason as the Mac's: `.windowStyle(.plain)` means the
-        // scene paints nothing at all of its own.
+        // scene paints nothing at all of its own. **Still `.plain`, on purpose** (W16, 2026-10-09):
+        // here the browser's own system glass lies *over* the theme paint, so the opacity setting
+        // tints the glass. In the system's window the paint lies over the window's glass instead,
+        // and the same setting read nearly black in the simulator. The plain window's missing
+        // shape is `GlassLayeredWindow`'s to supply (`GlassWindowShape`).
         WindowGroup(id: "sftp", for: SFTPBrowserContext.self) { $context in
             GlassLayeredWindow {
                 if let context, sessionManager.session(for: context.sessionID) != nil {

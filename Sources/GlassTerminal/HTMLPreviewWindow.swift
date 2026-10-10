@@ -41,9 +41,6 @@ struct HTMLPreviewWindow: View {
             .navigationTitle("HTML Preview")
             .toolbar { previewToolbar }
         }
-        #if os(visionOS)
-        .glassBackgroundEffect(in: .rect(cornerRadius: 28))
-        #endif
         .onAppear {
             loadURL()
             setupAutoReload()

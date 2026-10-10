@@ -76,6 +76,10 @@ public final class GlassTerminalRuntime {
         /// Screenshots (App/GlassDemoMode.swift): a session that connects to nothing, showing a
         /// recorded transcript in the real terminal window. Typing goes nowhere.
         case demoReplay(name: String, output: Data)
+        /// Screenshots: the Files window over a session that connects to nothing, opened at
+        /// `path`. It shows the window's frame and header, and the browser's own "not connected"
+        /// state where a listing would be.
+        case demoFiles(name: String, path: String)
         #endif
     }
     private(set) var requestSerial = 0
@@ -227,6 +231,8 @@ public final class GlassTerminalRuntime {
     #if DEBUG
     /// Screenshots only: a terminal window on `name` showing `output`, with no connection behind it.
     public func requestDemoReplay(name: String, output: Data) { enqueue(.demoReplay(name: name, output: output)) }
+    /// Screenshots only: the Files window on `name` at `path`, with no connection behind it.
+    public func requestDemoFiles(name: String, path: String) { enqueue(.demoFiles(name: name, path: path)) }
     #endif
     public func requestShowTailscale() { enqueue(.showTailscale) }
 

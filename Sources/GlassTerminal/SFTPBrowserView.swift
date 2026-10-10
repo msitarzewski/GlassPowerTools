@@ -581,7 +581,9 @@ struct SFTPBrowserView: View {
                 // `currentPath` — the whole path as a title, which reads as a string of text
                 // rather than a place (reported 2026-09-18). The editor's file list shows the
                 // same header, because both are browsers over the same kind of thing.
-                .glassPathHeader(currentPath)
+                // On the headset the title's menu goes up a level or more, as the breadcrumb does
+                // in the Mac's toolbar (W16).
+                .glassPathHeader(currentPath, openAncestor: { path in Task { await navigateTo(path) } })
                 .searchable(text: $filterText, prompt: "Filter files...")
                 .terminalTextInputDefaults()
                 .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -2471,9 +2473,14 @@ struct SFTPBrowserView: View {
             }
         }
 
+        // Not on the headset: there the bar's middle is the title's, and a breadcrumb in it left
+        // the window with no title at all. The folder is the title there and the title's menu
+        // holds the folders above it (`glassPathHeader`, W16).
+        #if !os(visionOS)
         ToolbarItem(placement: .principal) {
             pathBreadcrumb
         }
+        #endif
     }
 
     private var pathBreadcrumb: some View {

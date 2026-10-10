@@ -32,7 +32,9 @@ public struct GlassNativeWindowFrame<Content: View, Title: View, Controls: View>
             // `NavigationSplitView` — must reach the window's edges, or visionOS draws its sidebar
             // surface inside the inset and the result is a darker rectangle floating in the middle
             // of the window with a visible seam on every side. A live canvas keeps its padding.
-            .padding(.horizontal, showTitle || showControls ? 22 : 0)
+            // The side inset is the one a canvas card's corner is concentric with
+            // (`GlassWindowShape.spatialCanvasCornerRadius`).
+            .padding(.horizontal, showTitle || showControls ? GlassWindowShape.spatialCanvasInset : 0)
             .padding(.top, showTitle ? 34 : 0)
             .padding(.bottom, showControls ? 26 : 0)
             // Visibility changes must not replace the live canvas host.

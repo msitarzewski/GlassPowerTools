@@ -58,9 +58,21 @@ public struct GlassLayeredWindow<Content: View, Title: View, Controls: View>: Vi
     private var layered: some View {
         content
             .background {
-                GlassLayerBackground(state: resolved, cornerRadius: 0)
+                GlassLayerBackground(state: resolved, cornerRadius: paintCornerRadius)
                     .ignoresSafeArea()
             }
+    }
+
+    /// **The window's shape, on the headset.** This paint fills the window, and a plain visionOS
+    /// window has no shape to keep it in: painted square, it showed as dark square corners outside
+    /// the rounded glass the content draws (Files and the editor, 2026-10-09). On a Mac or iPad the
+    /// window shapes itself, and the paint stays square underneath.
+    private var paintCornerRadius: CGFloat {
+        #if os(visionOS)
+        GlassWindowShape.paintCornerRadius(spatial: true, insetForOrnaments: showTitle || showControls)
+        #else
+        GlassWindowShape.paintCornerRadius(spatial: false, insetForOrnaments: false)
+        #endif
     }
 }
 

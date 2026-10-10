@@ -647,6 +647,20 @@ final class GlassTerminalUITests: XCTestCase {
         press(files)
         acceptTrustPromptIfShown()
 
+        #if os(visionOS)
+        // On the headset the folder is the window's own title, above the window, with the folders
+        // above it in the title's menu; nothing is drawn inside the window for it (W16). Written
+        // 2026-10-09 and not yet run on visionOS: it needs the SSH test host from the simulator.
+        let title = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", fixture.user)).firstMatch
+        guard title.waitForExistence(timeout: 45) else {
+            dumpTree("no-sftp-title")
+            if let failure = connectionFailureText() { XCTFail("connection failed: \(failure)") }
+            else { XCTFail("the Files window is not titled with its folder") }
+            return
+        }
+        snap("30-sftp-header")
+        #else
         let header = app.descendants(matching: .any)
             .matching(identifier: "glass-path-header").firstMatch
         guard header.waitForExistence(timeout: 45) else {
@@ -667,6 +681,7 @@ final class GlassTerminalUITests: XCTestCase {
                          app: app, name: "terminal-30-sftp-header")
         #endif
         snap("30-sftp-header")
+        #endif
     }
 
     func testConnectsToRealHostThroughTheShell() throws {

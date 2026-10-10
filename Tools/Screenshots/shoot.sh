@@ -3,7 +3,7 @@
 #   APP=<path to the built .app> Tools/Screenshots/shoot.sh <simulator-udid> <surface> <out.png> [seconds]
 # The app is reinstalled first: visionOS restores a previous launch's windows, which would stand in
 # front of the one being captured.
-# Surfaces: library, editor, preview, terminal, database, diagram, desktop (see App/GlassDemoMode.swift).
+# Surfaces: library, editor, preview, terminal, files, database, diagram, desktop (see App/GlassDemoMode.swift).
 set -euo pipefail
 SIM="$1"; SURFACE="$2"; OUT="$3"; SETTLE="${4:-8}"
 HOSTS="alpha@192.0.2.10:ssh+database|bravo@192.0.2.20:ssh+rdp|nas@192.0.2.30:ssh|build@192.0.2.40:ssh|win@192.0.2.50:rdp"

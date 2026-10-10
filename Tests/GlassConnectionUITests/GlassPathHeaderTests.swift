@@ -54,6 +54,24 @@ struct GlassPathHeaderTests {
         #expect(GlassPathLocation.abbreviatingHome(home, home: home) == "~")
     }
 
+    @Test func theFoldersAboveAreOfferedNearestFirstEachWithThePathThatOpensIt() {
+        // The headset's window title menu: the folder is the title, and these are the way up.
+        let ancestors = GlassPathLocation(path: "/home/ann/shop").ancestors
+        #expect(ancestors.map(\.name) == ["ann", "home", "/"])
+        #expect(ancestors.map(\.path) == ["/home/ann", "/home", "/"])
+    }
+
+    @Test func theRootHasNothingAboveItAndItsChildrenHaveOnlyTheRoot() {
+        #expect(GlassPathLocation(path: "/").ancestors.isEmpty)
+        #expect(GlassPathLocation(path: "/home").ancestors == [GlassPathAncestor(name: "/", path: "/")])
+    }
+
+    @Test func aRelativeOrAbbreviatedPathKeepsItsOwnSpelling() {
+        let ancestors = GlassPathLocation(path: "~/Software/glass").ancestors
+        #expect(ancestors.map(\.path) == ["~/Software", "~"], "no root invented in front of `~`")
+        #expect(GlassPathLocation(path: "sensor").ancestors.isEmpty)
+    }
+
     @Test func aPathOutsideHomeIsLeftAlone() {
         let home = "/Users/ann"
         #expect(GlassPathLocation.abbreviatingHome("/etc/hosts", home: home) == "/etc/hosts")

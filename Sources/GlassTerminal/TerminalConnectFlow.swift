@@ -321,6 +321,20 @@ struct TerminalConnectFlow: ViewModifier {
             session.state = .connected
             session.feedTerminalData(output)
             presentTerminalWindow(for: session)
+        case .demoFiles(let name, let path):
+            // The same connectionless session: the browser cannot open SFTP over it and says so,
+            // which leaves its window, title and toolbar to look at.
+            let server = ServerConfiguration(name: name, host: "192.0.2.10", username: "ann")
+            let session = TerminalSession(server: server,
+                                          terminalWriteSink: { _ in },
+                                          terminalResizeSink: { _, _ in })
+            sessionManager.registerSession(session)
+            #if os(iOS)
+            _ = path // The phone's sheet takes no starting folder.
+            iOSRouter.showSFTP(sessionID: session.id)
+            #else
+            openWindow(id: "sftp", value: SFTPBrowserContext(sessionID: session.id, initialPath: path))
+            #endif
         #endif
         case .addServer(let draft):
             addServerDraft = AddServerRequest(draft: draft)
