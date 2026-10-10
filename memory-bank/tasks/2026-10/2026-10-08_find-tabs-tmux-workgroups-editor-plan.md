@@ -859,3 +859,10 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   `.never` for a clear window — verify on visionOS 27 that it removes the default window's glass), or return to
   `.plain` and keep the nested 34-pt/24-pt geometry with no visible outer edge. Check with the owner before changing
   the look (memory: confirm visual asks).
+- **Owner's diagnosis (13:10):** "we're assigning transparency to the terminal (the black part), not the Apple provided
+  window on vision OS so the most transparent it gets is Apple's light glass texture." Proposed (awaiting his yes):
+  terminal scene back to `.plain`, and draw Apple's glass ourselves (`.glassBackgroundEffect(in: GlassWindowShape.spatialWindow)`,
+  same material and bevel, 46-pt shape), driven by the window's **Blur**: 0 → no glass (fully clear), up → Apple's glass
+  (faded if visionOS allows; else on/off); **Opacity** stays the black canvas's paint. Opacity 0 + Blur 0 = 100% clear,
+  as the help already says. Check in the simulator (fade vs on/off, background-window behaviour) and send a capture
+  before installing.
