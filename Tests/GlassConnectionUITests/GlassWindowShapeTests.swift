@@ -138,3 +138,14 @@ struct GlassWindowShapeTests {
         return files
     }
 }
+
+/// Nested corners on the headset stay concentric (owner, 2026-10-10: "the mismatched radii
+/// bothers me").
+@Suite("Concentric corners")
+struct GlassConcentricCornerTests {
+    @Test func aShapeInsideAnotherKeepsTheSameDistanceRoundTheCorner() {
+        #expect(GlassWindowShape.concentricCornerRadius(outer: 24, inset: 10) == 14)
+        #expect(GlassWindowShape.concentricCornerRadius(outer: 46, inset: 10) == 36)
+        #expect(GlassWindowShape.concentricCornerRadius(outer: 8, inset: 10) == 0, "never below square")
+    }
+}

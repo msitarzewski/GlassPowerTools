@@ -319,7 +319,7 @@ struct TerminalWindowView: View {
         ) {
             VStack(spacing: 0) {
                 terminalContent
-                    .padding(10)
+                    .padding(Self.visionCanvasInset)
             }
             .modifier(GlassWindowBackground(
                 interactive: effectiveInteractiveGlass,
@@ -949,6 +949,17 @@ struct TerminalWindowView: View {
         #endif
     }
 
+    /// On Vision Pro, how far the terminal canvas sits inside the window's paint.
+    static let visionCanvasInset: CGFloat = 10
+
+    /// A Vision Pro terminal's canvas corner: the window paint's corner (`GlassLayeredWindow`, which
+    /// insets for the ornaments while they show) less the inset between them.
+    static func visionCanvasCornerRadius(ornamentsShown: Bool) -> CGFloat {
+        GlassWindowShape.concentricCornerRadius(
+            outer: GlassWindowShape.paintCornerRadius(spatial: true, insetForOrnaments: ornamentsShown),
+            inset: visionCanvasInset)
+    }
+
     private var terminalCanvasCornerRadius: CGFloat {
         #if os(macOS)
         // Square. The window already has Apple's rounded glass edge and clips to it, so a second
@@ -957,7 +968,9 @@ struct TerminalWindowView: View {
         #elseif os(iOS)
         UIDevice.current.userInterfaceIdiom == .phone ? 0 : 18
         #else
-        18
+        // Concentric with the window's paint around it, `visionCanvasInset` inside it: the card
+        // while the ornaments show, the whole window when they don't.
+        Self.visionCanvasCornerRadius(ornamentsShown: isTerminalActive)
         #endif
     }
 

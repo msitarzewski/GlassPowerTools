@@ -48,4 +48,12 @@ public enum GlassWindowShape {
         guard spatial else { return 0 }
         return insetForOrnaments ? spatialCanvasCornerRadius : spatialWindowCornerRadius
     }
+
+    /// The corner of a shape drawn `inset` points inside one with `outer` corners, so the two
+    /// curves stay the same distance apart all the way round: outer − inset, never below zero.
+    /// The owner, on the Vision Pro (2026-10-10): "the mismatched radii bothers me" — a terminal's
+    /// canvas sat 10 points inside a 24-point card with 18-point corners of its own.
+    public static func concentricCornerRadius(outer: CGFloat, inset: CGFloat) -> CGFloat {
+        max(0, outer - inset)
+    }
 }
