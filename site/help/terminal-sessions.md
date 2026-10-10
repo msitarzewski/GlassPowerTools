@@ -1,10 +1,12 @@
 # Work in a terminal
 
-This page covers terminal windows and tabs, Show All Terminals, the session's tools menu, text size, search, pasting, dropping files, snippets, recording, and the Mac's local shell.
+This page covers terminal windows and tabs, moving tabs between windows, what comes back after a relaunch, Show All Terminals, the session's tools menu, text size, search, pasting, dropping files, snippets, recording, and the Mac's local shell.
 
 ## Windows and tabs
 
 **On Vision Pro:** each connection opens a terminal window. To add a terminal to the same window, press ⌘T or choose **New Terminal Tab** (the plus button), then pick a saved host. With two or more terminals, a tab bar appears, and **Terminal View** switches between **Tabs**, **Grid** and **Carousel**. In Grid or Carousel, use **Previous** and **Next**, then **Open Terminal** to return to that terminal's tab.
+
+To move a terminal to another window, touch and hold its tab, or its card in **Grid** or **Carousel**, and choose **Move Tab to New Window** (when the window has other tabs), or **Move Tab To** and then the window. **Move Tab To** lists the terminal windows that are open, named as **Active** names them. In **Grid** you can also drag a card onto another terminal window: dropped on a card in that window's grid, it takes that card's place; dropped anywhere else on the window, it goes after the last tab. Dragging a card onto another card in the same grid moves it there. A moved terminal keeps running, with its connection, its tmux session and its name, and a window whose last tab leaves closes.
 
 **On Mac:** terminals open in a terminal window with tabs. Each tab can be split into panes.
 
@@ -28,7 +30,14 @@ A tab is named after what is running in it: the title a program set (Claude Code
 
 To work with several tabs at once, ⌘-click them in the sidebar, or ⇧-click to select a range; the window shows the tab you clicked last. Right-click the selection for **Move 3 Tabs to New Window** (with however many you chose), which opens one window holding them in their order, still running, or **Close 3 Tabs**, which asks first under the same rules as closing one. **Move Tab to New Window**, in the **Terminal** menu and under **Tab Actions** in the toolbar, moves the selected tabs too; when they are every tab in the window, that window closes. To bring windows together, drag a tab from the sidebar onto another terminal window, anywhere on it, sidebar open or not: it moves there with its terminals still running, and a window whose last tab leaves closes. Dropped on the other window's sidebar, it lands where you drop it; dragging a tab within the sidebar reorders it. Double-click a tab, or right-click it, to rename it. Closing a tab that has an SSH session, a recording, a connection in progress or running commands asks first. A terminal kept in tmux doesn't count: closing it leaves it running, and **Active** lists it (see [Keep terminals running with tmux](terminal-tmux.md)). A Mac's local terminals kept in tmux work the same way, listed under This Mac. Closing a tab never changes a saved Workgroup.
 
-**On iPad and iPhone:** the plus button (**New Terminal Tab**) adds a terminal to the current set. iPad shows the terminals as tabs; iPhone lists them in a menu at the top.
+**On iPad and iPhone:** the plus button (**New Terminal Tab**) adds a terminal to the current set. iPad shows the terminals as tabs; iPhone lists them in a menu at the top. To move a terminal into another open set, touch and hold its tab on iPad, or open the menu at the top on iPhone, and choose **Move Tab To**, then the set. On iPad, **Move Tab to New Window** opens it in a window of its own (when the set has other terminals). The terminal keeps running; a set whose last terminal leaves closes, and the screen shows the set it went to.
+
+**After a relaunch on Vision Pro, iPad and iPhone** (the app quit, crashed or was updated), the terminal windows and sets you had open come back once the library has loaded: their terminals in the same order, the same one selected, with their names. Each terminal kept in tmux goes back into its own session, with everything still running there (see [Keep terminals running with tmux](terminal-tmux.md)). Any other terminal in it comes back as a new terminal on the same machine; what was running in it is gone. A window or set comes back only when a terminal in it is kept in tmux.
+
+- **On Vision Pro** each comes back as its own window, and every terminal in it connects. A window you closed doesn't come back; its terminals keep running, and **Active** lists them.
+- **On iPad and iPhone** the set that was on screen is shown again, and only its terminal on screen connects; the others connect when you switch to them, and the other sets are in **Active**.
+- A set whose last terminal ended, or that you closed in **Active**, doesn't come back. A terminal on a machine you removed, or one that allows legacy algorithms (which asks each time), is left out, and a message says so.
+- Your saved Workgroups are never changed by this.
 
 **On Vision Pro, iPad and iPhone**, a terminal is named the way the Mac names its tabs: the name you gave it, else the title its program set, else its Git repository, else its folder, else its server. For a terminal kept in tmux, these come from its tmux session, so a name you give a tab on your Mac shows on your other devices too, without reconnecting. In a repository, the repository and branch come before the machine's address. To rename a terminal, touch and hold its tab (on Vision Pro, its tab or its card in **Grid** and **Carousel**), or open the menu at the top on iPhone, and choose **Rename Tab…**. Leave the name blank, or choose **Use Automatic Name**, to go back to the automatic name. A terminal kept in tmux keeps the name on its session, so every device shows it.
 

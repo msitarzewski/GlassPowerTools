@@ -101,6 +101,10 @@ struct TerminalWindowView: View {
     #if os(iOS)
     @Environment(IOSAppRouter.self) private var iOSRouter
     #endif
+    #if !os(macOS)
+    /// W15: a tab dragged onto this terminal moves into its window.
+    @Environment(\.terminalTabDrop) private var terminalTabDrop
+    #endif
     @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiateWithoutColor
     
     @State private var find = TerminalFindController()
@@ -736,8 +740,16 @@ struct TerminalWindowView: View {
         // Files and photos dropped from another app go up to the host, and their paths there are
         // typed (W14). SwiftUI's own drop target, so nothing UIKit is built here (rule 64). A Mac
         // pane takes its drop in the workspace, which knows a local shell from an SSH one.
-        .onDrop(of: TerminalRemoteDrops.acceptedTypes, isTargeted: nil) { providers in
-            TerminalRemoteDrops.shared.receive(providers, on: session)
+        .onDrop(of: TerminalRemoteDrops.acceptedTypes + [TerminalTabTransfer.typeIdentifier],
+                isTargeted: nil) { providers in
+            // A terminal tab dragged here (W15) moves into this window; it is never a file to
+            // upload, and where nothing takes tabs the drop is refused.
+            if TerminalTabTransfer.isCarried(by: providers) {
+                guard let terminalTabDrop else { return false }
+                TerminalTabTransfer.load(from: providers, terminalTabDrop)
+                return true
+            }
+            return TerminalRemoteDrops.shared.receive(providers, on: session)
         }
         #endif
         .onTapGesture {

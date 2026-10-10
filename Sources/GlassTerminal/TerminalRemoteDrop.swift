@@ -470,7 +470,9 @@ final class TerminalRemoteDrops {
     /// refuses it, which the system shows by sending the items back.
     @discardableResult
     func receive(_ providers: [NSItemProvider], on session: TerminalSession) -> Bool {
-        guard let drop = SFTPIncomingDrop(providers: providers) else { return false }
+        // A dragged terminal tab (W15) is data too, and is never uploaded as a file.
+        guard !TerminalTabTransfer.isCarried(by: providers),
+              let drop = SFTPIncomingDrop(providers: providers) else { return false }
         return receive(drop, on: session, insert: Self.typeIntoTerminal(of: session))
     }
 

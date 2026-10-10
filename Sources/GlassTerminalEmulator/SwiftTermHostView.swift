@@ -2396,6 +2396,20 @@ public struct SwiftTermHostView: UIViewRepresentable {
         context.coordinator.lastRuntimeSettings = runtimeSettings
         let host = TerminalRendererHostView()
         if let engine = model.retainedRenderer() {
+            #if os(visionOS)
+            // **A terminal moving in from another window is installed after this update too**
+            // (W15, 2026-10-09). Its view is still in the other window's host; taking it into
+            // this one inside SwiftUI's layout moves a view with a keyboard accessory between
+            // scenes, which is the focus change the headset's layout crash came from (rule 64).
+            if engine.hostView.window != nil {
+                let model = model
+                DispatchQueue.main.async { [weak host, weak coordinator = context.coordinator] in
+                    guard let host, let coordinator, let engine = model.retainedRenderer() else { return }
+                    Self.install(engine, in: host, model: model, coordinator: coordinator)
+                }
+                return host
+            }
+            #endif
             Self.install(engine, in: host, model: model, coordinator: context.coordinator)
             return host
         }

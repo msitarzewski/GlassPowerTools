@@ -26,6 +26,7 @@ The switch can only be turned on once a connection has found tmux on the machine
 - Detaching from tmux yourself (its prefix key, then **d**) closes the terminal and leaves the session running.
 - A Workgroup remembers each terminal's session and opens on it again. Its startup command runs only when the session is new, never into one still running. See [Save and open terminal Workgroups](terminal-workgroups.md).
 - A new terminal never takes a session a saved Workgroup keeps on that machine.
+- **On Vision Pro, iPad and iPhone**, after the app quits, crashes or is updated, the terminal windows and sets holding terminals in tmux come back, each terminal on its own session (see [Work in a terminal](terminal-sessions.md#windows-and-tabs)).
 
 If the machine doesn't have tmux, the terminal says so and opens an ordinary shell instead.
 

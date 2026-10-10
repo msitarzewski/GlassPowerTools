@@ -151,10 +151,13 @@ final class IOSAppRouter {
         sftpContext = nil
         mostRecentTerminalWorkgroupID = workgroupID
         terminalWorkgroupID = workgroupID
+        // W15: the workgroup on screen is shown again after a relaunch.
+        TerminalWorkgroupsToReopen.shared.noteShown(workgroupID)
     }
 
     func showConnections() {
         sftpContext = nil
+        TerminalWorkgroupsToReopen.shared.noteShown(nil, replacing: terminalWorkgroupID)
         terminalWorkgroupID = nil
     }
 

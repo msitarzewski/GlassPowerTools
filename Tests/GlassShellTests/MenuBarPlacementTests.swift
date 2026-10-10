@@ -403,6 +403,24 @@ struct MenuBarPlacementTests {
         #expect(source[start.lowerBound..<end.lowerBound].contains(".restorationBehavior(.disabled)"))
     }
 
+    /// The same on Vision Pro (W15, 2026-10-09): a terminal window comes back after a relaunch from
+    /// the app's own list, which knows its tabs and their tmux sessions and is told when a window
+    /// is closed by hand — never from visionOS's restoration, which would hand back a window with
+    /// a workgroup id nothing in memory holds.
+    @Test("Vision Pro's terminal windows are reopened by the app, never restored by visionOS")
+    func visionTerminalWindowsAreNotRestoredBySystem() throws {
+        let file = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/GlassTerminal/GlassTerminalScenes.swift")
+        let source = try String(contentsOf: file, encoding: .utf8)
+        let start = try #require(source.range(of: #"WindowGroup(id: "terminal", for: UUID.self)"#))
+        let end = try #require(source.range(of: ".commands { PlatformTerminalCommands", range: start.upperBound..<source.endIndex))
+        let scene = source[start.lowerBound..<end.lowerBound]
+        #expect(scene.contains(".restorationBehavior(.disabled)"))
+        #expect(scene.contains("TerminalWorkgroupWindowPresence(workgroupID: workgroupID)"),
+                "the app's list hears when each window opens and closes")
+    }
+
     private func swiftSources() throws -> [URL] {
         let root = URL(fileURLWithPath: #filePath)      // …/Tests/GlassShellTests/this file
             .deletingLastPathComponent()                 // …/Tests/GlassShellTests

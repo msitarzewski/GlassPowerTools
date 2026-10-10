@@ -260,6 +260,13 @@ struct TerminalConnectFlow: ViewModifier {
         .onChange(of: runtime.requestSerial) { _, _ in
             for request in runtime.takeRequests() { handle(request) }
         }
+        #if os(visionOS) || os(iOS)
+        // W15: the last run's terminal windows and tabs, once the library has loaded (until then
+        // the terminal knows no saved servers) — once per launch, whichever window asks first.
+        .onChange(of: runtime.catalogLoads, initial: true) { _, _ in
+            reopenWorkgroupsFromLastRun()
+        }
+        #endif
         #if DEBUG || GLASS_STRESS_HARNESS
         // W10: `--stress-terminal` (TerminalStressHarness.swift); never in a shipped build.
         .task {
@@ -567,6 +574,55 @@ struct TerminalConnectFlow: ViewModifier {
         } catch {
             connectionFailureMessage = error.localizedDescription
         }
+    }
+    #endif
+
+    #if os(visionOS) || os(iOS)
+    // MARK: - Reopening after a relaunch (W15)
+
+    /// The workgroups the last run left, back as they were (`TerminalWorkgroupsToReopen`): on
+    /// Vision Pro a window each, every terminal connecting; on iPhone and iPad the tabs, with the
+    /// workgroup that was on screen shown again and only its selected terminal connecting — the
+    /// others connect when shown (W4b). Each terminal in tmux attaches to its own session. Taken
+    /// once per launch and only from a catalog that loaded: one that failed leaves the list for
+    /// the next launch. From then on the list follows this run's workgroups.
+    private func reopenWorkgroupsFromLastRun() {
+        // The catalog loads again with every change another device makes; only the first counts.
+        guard !TerminalWorkgroupsToReopen.shared.hasTaken,
+              let records = TerminalWorkgroupsToReopen.shared.takeOnce(
+                askedBy: "the Connections window", catalogLoaded: serverManager.familyCatalogLoaded) else { return }
+        #if os(visionOS)
+        let connectsWhenShown = false
+        #else
+        let connectsWhenShown = true
+        #endif
+        var failures: [String] = []
+        var reopened: [UUID] = []
+        for record in records {
+            let result = TerminalWorkgroupOpening.reopen(record, connectsWhenShown: connectsWhenShown,
+                                                         sessionManager: sessionManager, settingsManager: settingsManager)
+            failures += result.failures
+            if result.opened { reopened.append(record.id) }
+        }
+        TerminalWorkgroupsToReopen.shared.keepCurrent(sessionManager)
+        #if os(visionOS)
+        for workgroupID in reopened { openWindow(id: "terminal", value: workgroupID) }
+        guard !reopened.isEmpty else {
+            if !failures.isEmpty { connectionFailureMessage = failures.joined(separator: "\n") }
+            return
+        }
+        let notReopened = failures
+        Task { @MainActor in
+            let all = notReopened + (await TerminalWorkgroupOpening.connectReopened(
+                reopened, sessionManager: sessionManager, settingsManager: settingsManager))
+            if !all.isEmpty { connectionFailureMessage = all.joined(separator: "\n") }
+        }
+        #else
+        if let shown = records.first(where: \.isShown)?.id, reopened.contains(shown) {
+            iOSRouter.showTerminal(workgroupID: shown)
+        }
+        if !failures.isEmpty { connectionFailureMessage = failures.joined(separator: "\n") }
+        #endif
     }
     #endif
 

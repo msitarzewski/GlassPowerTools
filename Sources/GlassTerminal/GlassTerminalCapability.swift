@@ -235,6 +235,27 @@ public final class GlassTerminalRuntime {
         requestSerial &+= 1
     }
 
+    /// Changes each time the library's catalog has loaded (`catalogDidLoad`): until the first, the
+    /// terminal knows no saved servers. W15 reopens the last run's workgroups once it has, as
+    /// Active waits for it (54a66d5).
+    private(set) var catalogLoads = 0
+
+    func noteCatalogLoaded() {
+        catalogLoads &+= 1
+    }
+
+    /// iPad: workgroups waiting for the new window opened to show them — **Move Tab to New Window**
+    /// (W15) — taken by that window as it appears, oldest first.
+    @ObservationIgnored private var workgroupsAwaitingWindow: [UUID] = []
+
+    func requestWindow(showing workgroupID: UUID) {
+        workgroupsAwaitingWindow.append(workgroupID)
+    }
+
+    func takeWorkgroupAwaitingWindow() -> UUID? {
+        workgroupsAwaitingWindow.isEmpty ? nil : workgroupsAwaitingWindow.removeFirst()
+    }
+
     func takeRequests() -> [Request] {
         defer { pendingRequests.removeAll() }
         return pendingRequests
@@ -555,6 +576,8 @@ public final class GlassTerminalCapability: GlassCapability {
     /// next write reconciled the catalog to match it.
     public func catalogDidLoad() {
         runtime.sessionManager.serverManager.reloadFromStore()
+        // W15: the last run's terminal windows and tabs can come back now.
+        runtime.noteCatalogLoaded()
     }
 
     public func libraryToolbarItems() -> AnyView {
@@ -675,6 +698,14 @@ public struct GlassTerminalBootstrap<Content: View>: View {
                     .environment(\.glassEditorFileScreen, runtime.editorFileScreen)
             } else {
                 SFTPBrowserNotFoundView(context: router.sftpContext)
+            }
+        }
+        // iPad: a window opened by Move Tab to New Window shows the tab's new workgroup (W15).
+        // Once, as the window appears — after the Group, whose modifiers each of its views gets.
+        .onAppear {
+            if let workgroupID = runtime.takeWorkgroupAwaitingWindow(),
+               runtime.sessionManager.workgroup(for: workgroupID) != nil {
+                router.showTerminal(workgroupID: workgroupID)
             }
         }
         #else

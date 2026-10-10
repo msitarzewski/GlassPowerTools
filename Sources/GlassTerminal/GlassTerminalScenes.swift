@@ -106,6 +106,9 @@ public struct GlassTerminalScenes: Scene {
                     .environment(settingsManager)
                 .glassLayers(runtime.layers)
                     .trackWindowPresence(key: "terminal-workgroup-\(workgroupID.uuidString)", recovery: windowRecoveryManager)
+                    // W15: an open window comes back after a relaunch; one closed by hand does not.
+                    // The app's own list, not the system's restoration, which stays off below.
+                    .modifier(TerminalWorkgroupWindowPresence(workgroupID: workgroupID))
             } else {
                 ContentUnavailableView(
                     "Terminal Workgroup Not Found",

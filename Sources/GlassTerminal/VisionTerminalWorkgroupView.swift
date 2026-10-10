@@ -124,6 +124,8 @@ struct VisionTerminalWorkgroupView: View {
     #if os(iOS)
     @Environment(IOSAppRouter.self) private var iOSRouter
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    /// iPad: **Move Tab to New Window** opens another window; an iPhone has one.
+    @Environment(\.supportsMultipleWindows) private var supportsMultipleWindows
     #endif
     /// The ⚡: the way to every live connection. Optional because a view rendered outside the
     /// composed app has no runtime.
@@ -137,9 +139,13 @@ struct VisionTerminalWorkgroupView: View {
     /// The terminal being renamed, and the name typed (W11): as a Mac tab's Rename Tab….
     @State private var renamingSession: TerminalSession?
     @State private var renameText = ""
+    /// Set once this view has left a workgroup that emptied, so it leaves once.
+    @State private var didLeaveEmptiedWorkgroup = false
     #if os(visionOS)
     @State var spatialPresentation = VisionTerminalPresentationState()
     @FocusState private var overviewFocused: Bool
+    /// The grid card a dragged tab is over (W15).
+    @State private var dropTargetSessionID: UUID?
 
     private var presentation: VisionTerminalPresentation {
         get { spatialPresentation.mode }
@@ -194,6 +200,12 @@ struct VisionTerminalWorkgroupView: View {
             sessionManager.selectSession(newSelection, inWorkgroup: workgroupID)
             connectShownSlot()
         }
+        // W15: a workgroup whose last tab moved to another window, or that Active closed, is
+        // gone: its window closes, as a Mac window does when its last tab leaves; an iPhone or
+        // iPad goes back to the library.
+        .onChange(of: sessionManager.workgroup(for: workgroupID) == nil) { wasGone, isGone in
+            if !wasGone, isGone { leaveEmptiedWorkgroup() }
+        }
         .focusedSceneValue(
             \.platformNewTerminalAction,
             PlatformNewTerminalAction(title: "New Terminal Tab") {
@@ -235,6 +247,100 @@ struct VisionTerminalWorkgroupView: View {
             Button("Use Automatic Name", systemImage: "arrow.uturn.backward") { session.rename(to: nil) }
         }
     }
+
+    /// A tab's menu, as the Mac's names it.
+    @ViewBuilder
+    private func tabActions(for session: TerminalSession) -> some View {
+        renameActions(for: session)
+        TerminalTabMoveActions(workgroupID: workgroupID, canMoveToNewWindow: canMoveToNewWindow,
+                               moveToNewWindow: { moveToNewWindow(session) },
+                               move: { destination in move(session, to: destination) })
+    }
+
+    // MARK: Moving tabs (W15, 2026-10-09)
+    //
+    // The owner, on the Vision Pro: "We also have no way to move tabs from one window to another."
+    // A tab's menu moves it — its terminal still running, the same session — to a new window or
+    // into another open one, whose name the menu shows as Active does. On Vision Pro a grid card
+    // also drags onto another terminal window. A window whose last tab leaves closes.
+
+    /// A new window for a tab that leaves others behind; on iPhone there is only the one window.
+    private var canMoveToNewWindow: Bool {
+        guard sessionManager.sessions(inWorkgroup: workgroupID).count > 1 else { return false }
+        #if os(visionOS)
+        return true
+        #else
+        return supportsMultipleWindows && runtime != nil
+        #endif
+    }
+
+    private func moveToNewWindow(_ session: TerminalSession) {
+        guard let created = TerminalTabMoves.moveToNewWorkgroup(session.id, in: sessionManager) else { return }
+        #if os(visionOS)
+        openWindow(id: "terminal", value: created)
+        #else
+        // A new library window, which shows the workgroup as it appears.
+        runtime?.requestWindow(showing: created)
+        openWindow(id: "main")
+        #endif
+        afterMovingOut()
+    }
+
+    private func move(_ session: TerminalSession, to destination: UUID) {
+        guard case .moved(let sourceClosed) = TerminalTabMoves.move(session.id, to: destination, at: nil,
+                                                                    in: sessionManager) else { return }
+        #if os(visionOS)
+        // Brings the window it went to forward.
+        openWindow(id: "terminal", value: destination)
+        #else
+        // The last tab gone, the screen follows it rather than going back to the library.
+        if sourceClosed { iOSRouter.showTerminal(workgroupID: destination) }
+        #endif
+        afterMovingOut()
+    }
+
+    private func afterMovingOut() {
+        if sessionManager.workgroup(for: workgroupID) == nil {
+            leaveEmptiedWorkgroup()
+        } else {
+            synchronizeSelection()
+        }
+    }
+
+    /// This workgroup is gone: on Vision Pro its window closes; on iPhone and iPad, a window still
+    /// showing it goes back to the library.
+    private func leaveEmptiedWorkgroup() {
+        guard !didLeaveEmptiedWorkgroup else { return }
+        didLeaveEmptiedWorkgroup = true
+        #if os(visionOS)
+        dismiss()
+        #else
+        if iOSRouter.terminalWorkgroupID == workgroupID { iOSRouter.showConnections() }
+        #endif
+    }
+
+    #if os(visionOS)
+    /// Tabs dragged here: from another window they move in at `index` (nil: after the last) and
+    /// are selected; from this one, one takes the place it is dropped on.
+    @discardableResult
+    private func acceptDroppedTabs(_ tabs: [TerminalTabTransfer], at index: Int?) -> Bool {
+        var moved = false
+        var position = index
+        for tab in tabs {
+            switch TerminalTabMoves.move(tab.sessionID, to: workgroupID, at: position, in: sessionManager) {
+            case .refused:
+                continue
+            case .reordered:
+                moved = true
+            case .moved:
+                moved = true
+                position = position.map { $0 + 1 }
+            }
+        }
+        if moved { synchronizeSelection() }
+        return moved
+    }
+    #endif
 
     private var connectionFailureBinding: Binding<Bool> {
         Binding(
@@ -385,7 +491,7 @@ struct VisionTerminalWorkgroupView: View {
                             .foregroundStyle(VisionTerminalStatus.color(for: session.state))
                             .accessibilityValue(session.state.displayName)
                     }
-                    .contextMenu { renameActions(for: session) }
+                    .contextMenu { tabActions(for: session) }
                 }
             }
             .toolbarVisibility(presentation == .tabs && sessions.count > 1 ? .visible : .hidden, for: .tabBar)
@@ -400,6 +506,8 @@ struct VisionTerminalWorkgroupView: View {
                     onSessionRequestedClose: { closeSessionTab(session) }
                 )
                 .environment(\.visionTerminalPresentation, sessions.count > 1 ? presentationBinding : nil)
+                // A grid card from another window, dropped on the terminal: it joins this window.
+                .environment(\.terminalTabDrop, { tabs in _ = acceptDroppedTabs(tabs, at: nil) })
                 .opacity(active ? 1 : 0)
                 .allowsHitTesting(active)
                 .accessibilityHidden(!active)
@@ -455,8 +563,8 @@ struct VisionTerminalWorkgroupView: View {
                 if presentation == .grid {
                     ScrollView {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 24)], spacing: 24) {
-                            ForEach(sessions) { session in
-                                overviewCard(session, on: .grid)
+                            ForEach(Array(sessions.enumerated()), id: \.element.id) { index, session in
+                                draggableCard(session, at: index)
                             }
                         }
                         .padding(28)
@@ -480,6 +588,12 @@ struct VisionTerminalWorkgroupView: View {
                     .clipped()
                     .animation(.easeInOut(duration: 0.2), value: selectedSessionID)
                 }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .contentShape(.rect)
+            // A tab from another window dropped anywhere but on a card joins after the last.
+            .dropDestination(for: TerminalTabTransfer.self) { tabs, _ in
+                acceptDroppedTabs(tabs, at: nil)
             }
         }
         .focusable(presentation != .tabs)
@@ -516,6 +630,11 @@ struct VisionTerminalWorkgroupView: View {
                     .strokeBorder(selectedSessionID == session.id ? Color.accentColor : .clear,
                                   lineWidth: 3)
             }
+            // Where a dragged tab would land.
+            .background {
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color.accentColor.opacity(dropTargetSessionID == session.id ? 0.22 : 0))
+            }
             .contentShape(.interaction, RoundedRectangle(cornerRadius: 14))
         }
         .buttonStyle(.plain)
@@ -523,9 +642,26 @@ struct VisionTerminalWorkgroupView: View {
         // The system highlight fills it with an oversized gaze capsule.
         .hoverEffectDisabled()
         .focusEffectDisabled()
-        .contextMenu { renameActions(for: session) }
+        .contextMenu { tabActions(for: session) }
         .accessibilityLabel("Open \(TerminalWorkgroupOpening.label(session, on: surface)) terminal")
         .accessibilityValue(session.state.displayName)
+    }
+
+    /// A grid card that drags (W15; the owner: "maybe we do that with grid view? drag and drop"):
+    /// onto another terminal window to move the tab there, still running, or onto another card
+    /// here to take its place. The card itself takes a dropped tab at its own place.
+    private func draggableCard(_ session: TerminalSession, at index: Int) -> some View {
+        overviewCard(session, on: .grid)
+            .draggable(TerminalTabTransfer(workgroupID: workgroupID, sessionID: session.id))
+            .dropDestination(for: TerminalTabTransfer.self) { tabs, _ in
+                acceptDroppedTabs(tabs, at: index)
+            } isTargeted: { targeted in
+                if targeted {
+                    dropTargetSessionID = session.id
+                } else if dropTargetSessionID == session.id {
+                    dropTargetSessionID = nil
+                }
+            }
     }
 
     private func moveOverviewSelection(_ delta: Int, sessions: [TerminalSession]) {
@@ -609,7 +745,7 @@ struct VisionTerminalWorkgroupView: View {
                     .foregroundStyle(workgroup.colorTag.color)
             }
         }
-        .contextMenu { renameActions(for: session) }
+        .contextMenu { tabActions(for: session) }
     }
 
     #if os(iOS)
@@ -666,10 +802,10 @@ struct VisionTerminalWorkgroupView: View {
                         .tag(Optional(session.id))
                 }
             }
-            // The terminal on screen, as a Mac tab's menu names it (W11).
+            // The terminal on screen, as a Mac tab's menu names it (W11), and where it can move (W15).
             if let shown = sessions.first(where: { $0.id == selectedSessionID }) ?? sessions.first {
                 Divider()
-                renameActions(for: shown)
+                tabActions(for: shown)
             }
         } label: {
             HStack(spacing: 5) {
@@ -692,11 +828,12 @@ struct VisionTerminalWorkgroupView: View {
     }
     #endif
 
-    /// iPhone: the slot on screen connects if it needs to, and the hidden ones wait to be shown
-    /// (W4b). iPad and Vision Pro keep every terminal connected for their previews.
+    /// iPhone and iPad: the slot on screen connects if it needs to, and the hidden ones wait to be
+    /// shown (W4b). An iPad makes slots only for a workgroup it reopens at launch (W15); one it
+    /// opens otherwise has no slots, and this does nothing. Vision Pro keeps every terminal
+    /// connected for its previews.
     private func connectShownSlot() {
         #if os(iOS)
-        guard usesCompactPhoneNavigation else { return }
         Task { @MainActor in
             do {
                 try await TerminalWorkgroupOpening.connectShownSlot(in: workgroupID, sessionManager: sessionManager,
@@ -773,7 +910,7 @@ struct VisionTerminalWorkgroupView: View {
         if closesLastSession {
             closeWorkgroupOnce()
             #if os(visionOS)
-            dismiss()
+            leaveEmptiedWorkgroup()
             #else
             iOSRouter.showConnections()
             #endif
@@ -795,6 +932,45 @@ struct VisionTerminalWorkgroupView: View {
         guard !didCloseWorkgroup else { return }
         didCloseWorkgroup = true
         sessionManager.closeWorkgroup(workgroupID)
+    }
+}
+
+/// A tab's **Move Tab to New Window** and **Move Tab To** (W15). A view of its own, so the other
+/// windows' names it shows are read here: read by the terminal window itself, a name changing in
+/// any window would redraw every terminal window.
+private struct TerminalTabMoveActions: View {
+    let workgroupID: UUID
+    let canMoveToNewWindow: Bool
+    let moveToNewWindow: () -> Void
+    let move: (UUID) -> Void
+    @Environment(SessionManager.self) private var sessionManager
+
+    /// The other workgroups a tab can go to: on Vision Pro those with a window open, elsewhere
+    /// every one with live terminals (iPhone and iPad show one at a time; Active lists the rest).
+    private var destinations: [TerminalTabMoves.Destination] {
+        #if os(visionOS)
+        TerminalTabMoves.destinations(from: workgroupID, among: TerminalWorkgroupsToReopen.shared.openWindowIDs,
+                                      in: sessionManager)
+        #else
+        TerminalTabMoves.destinations(from: workgroupID, among: nil, in: sessionManager)
+        #endif
+    }
+
+    var body: some View {
+        let destinations = self.destinations
+        if canMoveToNewWindow || !destinations.isEmpty {
+            Divider()
+        }
+        if canMoveToNewWindow {
+            Button("Move Tab to New Window", systemImage: "macwindow.badge.plus", action: moveToNewWindow)
+        }
+        if !destinations.isEmpty {
+            Menu("Move Tab To", systemImage: "rectangle.portrait.and.arrow.right") {
+                ForEach(destinations) { destination in
+                    Button(destination.title) { move(destination.id) }
+                }
+            }
+        }
     }
 }
 #endif
