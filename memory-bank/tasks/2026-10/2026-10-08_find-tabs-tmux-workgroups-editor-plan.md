@@ -957,3 +957,6 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   ids; 30/30 alone, 4/4 full after); 2b4f75f W30. Split from one index with `$SP/w29-onmain.patch` and `w29b.patch`
   applied `--cached`. All touched suites pass except `workspaceUsesNativeTitle` (fails identically on pre-merge code
   while locked; no Mac terminal file changed) — rerun when unlocked.
+- **Installed 0.4.339 (HEAD b0822da) on iPhone and Vision Pro (~17:20)**, both exit 0; Vision Pro relaunched. Screen
+  unlocked 17:18: GlassTerminalTests 724/724 pass, including `workspaceUsesNativeTitle` — the locked-screen caveat on
+  f213d4a/928baaa/2b4f75f is cleared. Mac still 0.4.329, at the owner's word.
