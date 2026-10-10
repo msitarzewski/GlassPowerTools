@@ -3,9 +3,9 @@
 //  Glass Power Tools — GlassShell
 //
 //  Window recovery on visionOS (moved from glas.sh's WindowRecoveryManager on 2026-09-10): when
-//  the last visible window closes, decide whether to park the library as the minimized spinner,
-//  leave the space empty (the quit gesture), or bring the library back. Every scene that should
-//  count as "visible" attaches `trackWindowPresence(key:recovery:)`.
+//  the last visible window closes, decide whether to park the library as its orb
+//  (`GlassConnectionsOrb`), leave the space empty (the quit gesture), or bring the library back.
+//  Every scene that should count as "visible" attaches `trackWindowPresence(key:recovery:)`.
 //
 
 import SwiftUI
@@ -18,8 +18,19 @@ public final class GlassWindowRecoveryManager {
     public init() {}
 
     public private(set) var visibleWindowKeys: Set<String> = []
+    /// The Connections window hidden behind its orb for idle (W29), by an id of its own. The
+    /// window still exists, so the orb brings it back by dismissing itself rather than opening
+    /// another, and a second Connections window opened meanwhile knows it is the second.
+    public private(set) var connectionsPushedAside: UUID?
+    public var isConnectionsPushedAside: Bool { connectionsPushedAside != nil }
     private var recoveryTask: Task<Void, Never>?
     private var openWindowAction: OpenWindowAction?
+
+    /// The Connections window `instance` is about to be pushed aside for its orb.
+    public func connectionsWillShrink(_ instance: UUID) { connectionsPushedAside = instance }
+
+    /// The Connections window that was pushed aside is on screen again.
+    public func connectionsWindowIsBack() { connectionsPushedAside = nil }
 
     public func setOpenWindowAction(_ action: OpenWindowAction) {
         openWindowAction = action
@@ -37,8 +48,8 @@ public final class GlassWindowRecoveryManager {
     }
 
     /// When the last visible window closes, decide what to bring back:
-    /// - Connections (`main`) was the last window  → park it as the minimized spinner.
-    /// - the minimized spinner was the last window → leave the space empty (this is the quit gesture).
+    /// - Connections (`main`) was the last window  → park it as its orb.
+    /// - the orb was the last window               → leave the space empty (this is the quit gesture).
     /// - a terminal / SFTP / preview was the last  → reopen Connections.
     /// The 220ms debounce avoids firing during window-to-window handoffs.
     private func scheduleRecoveryIfNeeded(lastClosed: String) {

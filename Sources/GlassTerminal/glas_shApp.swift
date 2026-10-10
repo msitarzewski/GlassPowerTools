@@ -269,31 +269,6 @@ struct MainBootstrapView<Content: View>: View {
 }
 
 
-/// Slowly spinning terminal icon shown when Connections is closed as the last window.
-/// Tapping it restores the full Connections window and dismisses this proxy.
-struct MinimizedConnectionsView: View {
-    @Environment(\.openWindow) private var openWindow
-    @Environment(\.dismissWindow) private var dismissWindow
-
-    var body: some View {
-        Button {
-            openWindow(id: "main")
-            dismissWindow(id: "minimized")
-        } label: {
-            Image(systemName: "terminal")
-                .font(.system(size: 56))
-                .foregroundStyle(.secondary)
-                .symbolEffect(.rotate, options: .repeat(.continuous))
-                .padding(28)
-                .background(.regularMaterial, in: .circle)
-        }
-        .buttonStyle(.plain)
-        .terminalHoverHighlight()
-        .help("Open Connections")
-        .accessibilityLabel("Open Connections")
-    }
-}
-
 struct SFTPBrowserNotFoundView: View {
     let context: SFTPBrowserContext?
     @Environment(\.dismissWindow) private var dismissWindow

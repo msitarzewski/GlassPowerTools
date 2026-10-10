@@ -20,6 +20,7 @@ import GlassTerminal
 import GlassLayers
 import GlassDatabase
 import GlassDesktop
+import GlassShell
 
 @MainActor
 enum GlassDemoMode {
@@ -37,7 +38,7 @@ enum GlassDemoMode {
 
     static func run(editor: GlassEditorRuntime, terminal: GlassTerminalRuntime,
                     database: GlassDatabaseRuntime, desktop: GlassDesktopRuntime,
-                    layers: GlassLayerStore) async {
+                    layers: GlassLayerStore, shell: GlassShellModel) async {
         guard !didRun, let surface = requestedSurface else { return }
         didRun = true
         // The theme colour behind content, so a window reads against the simulator's bright room.
@@ -82,6 +83,34 @@ enum GlassDemoMode {
             // and either title drags into the other window.
             terminal.requestDemoReplay(name: "alpha", output: Data(terminalTranscript.utf8))
             terminal.requestDemoReplay(name: "bravo", output: Data("ann@bravo:~$ ".utf8))
+        case "connections-host":
+            // The Connections window at its first size with a machine's details showing (W29).
+            while !shell.isLoaded { try? await Task.sleep(for: .milliseconds(100)) }
+            if let alpha = shell.hosts.first(where: { $0.displayName == "alpha" }) { shell.showHost(alpha.id) }
+        case "orb", "orb-looked-at":
+            // Connections shrunk into its orb by the real idle path (W29): two terminals open, so
+            // it is not the only window and Active counts two. Needs `--demo-idle-seconds <n>`;
+            // `orb-looked-at` shows the effect the system draws while the orb is looked at.
+            #if os(visionOS)
+            GlassConnectionsOrb.demoShowsLookedAt = surface == "orb-looked-at"
+            #endif
+            terminal.requestDemoReplay(name: "alpha", output: Data(terminalTranscript.utf8))
+            terminal.requestDemoReplay(name: "bravo", output: Data("ann@bravo:~$ ".utf8))
+        case "orb-later", "orb-later-desktop":
+            // For `GlassConnectionsOrbUITests`: one other window after 20 s, so the test uses
+            // Connections before it opens in front — a terminal, whose Connections control is a
+            // way back, or a desktop, whose ⚡ is. One each: a second would stand in front of the
+            // first, and the runner's taps reach only the window in front.
+            try? await Task.sleep(for: .seconds(20))
+            if surface == "orb-later" {
+                terminal.requestDemoReplay(name: "alpha", output: Data(terminalTranscript.utf8))
+            } else {
+                let renderer = ImageRenderer(content: DemoRemoteScreen())
+                renderer.scale = 1
+                guard let picture = renderer.cgImage else { return }
+                await desktop.requestDemoDesktop(name: "bravo", host: "192.0.2.20", picture: picture,
+                                                 windowSettings: GlassWindowOverrides(), opensSettings: false)
+            }
         case "files":
             // The window and its header; with nothing connected, the list says so.
             terminal.requestDemoFiles(name: "alpha", path: "/home/ann/shop")

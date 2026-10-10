@@ -191,6 +191,9 @@ public struct GlassShellSettingsView: View {
     }
 
     @AppStorage(GlassAvailabilityMonitor.settingKey) private var showsAvailability = false
+    #if os(visionOS)
+    @AppStorage(GlassConnectionsIdleShrink.settingKey) private var idleShrinkSeconds = GlassConnectionsIdleShrink.standard.rawValue
+    #endif
 
     private var general: some View {
         Group {
@@ -202,6 +205,19 @@ public struct GlassShellSettingsView: View {
         } footer: {
             Text("A dot beside each service: green when it answers, orange when it answers slowly, red when it does not. This device opens a connection to each service's port about once a minute while the library is on screen, and closes it at once. It never signs in.")
         }
+        #if os(visionOS)
+        // W29: the Connections window shrinking into its orb.
+        Section {
+            Picker("Shrink Connections when idle", selection: Binding(
+                get: { GlassConnectionsIdleShrink(storedSeconds: idleShrinkSeconds) },
+                set: { idleShrinkSeconds = $0.rawValue })) {
+                ForEach(GlassConnectionsIdleShrink.allCases) { Text($0.title).tag($0) }
+            }
+            .accessibilityIdentifier("settings-connections-idle-shrink")
+        } footer: {
+            Text("While other windows are open, Connections becomes a small orb after this long without a tap, scroll or typing in it. Look at the orb to see its name; pinch it to bring the window back as it was.")
+        }
+        #endif
         Section("Host Library") {
             LabeledContent("Storage", value: model.hasSharedContainer ? "App group container" : "This app's container")
             Text(model.hostLibraryStatus).font(.footnote).foregroundStyle(.secondary)

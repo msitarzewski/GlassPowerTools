@@ -54,4 +54,15 @@ A terminal kept in tmux says so under its name, and its action is **Detach** ins
 
 ## Bring the library back on Vision Pro
 
-If you close the library window while nothing else is open, a small window with a spinning terminal symbol takes its place. Tap it to open the library again. Close that small window too to leave nothing open. If you close your last session window, the library opens again.
+When you leave the library window alone, it gets out of the way. After two minutes with no tap, scroll or typing in it, while another of the app's windows is open, it shrinks into a small glass orb in the same place. The orb shows the app's prompt, `>_`, and under it ⚡ and the number of sessions **Active** lists, when there are any.
+
+- Look at the orb: it grows a little and shows **Connections** beneath it.
+- Tap it (look and pinch) to bring the library window back where it was, at the size it was, showing what it showed before.
+- ⚡ in a session, or **Connections** in a terminal window, also brings the library window back, and the orb goes.
+
+The library window keeps its size while it is the only window open, while a sheet, alert or menu is open over it, while you are typing in it, and while a connection you started from it is still connecting. To wait longer, or never shrink, change **Settings** ▸ **General** ▸ **Shrink Connections when idle**; see [Settings](library-settings.md#general).
+
+> [!NOTE]
+> Vision Pro does not tell apps where you are looking, so looking at the orb shows its name and a tap brings the window back. With **Dwell Control** on (**Settings** ▸ **Accessibility** ▸ **Interaction** ▸ **Dwell Control**), holding your gaze on the orb taps it.
+
+If you close the library window while nothing else is open, the orb takes its place. Tap it to open the library again. Close the orb too to leave nothing open. If you close your last session window, the library opens again.

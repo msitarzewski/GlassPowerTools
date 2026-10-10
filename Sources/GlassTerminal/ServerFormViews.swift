@@ -34,15 +34,6 @@ extension View {
     }
 
     @ViewBuilder
-    func terminalHoverHighlight() -> some View {
-        #if os(visionOS)
-        self.hoverEffect(.highlight)
-        #else
-        self
-        #endif
-    }
-
-    @ViewBuilder
     func terminalPlatformGlassBackground(cornerRadius: CGFloat) -> some View {
         #if os(visionOS)
         self.glassBackgroundEffect(in: .rect(cornerRadius: cornerRadius))

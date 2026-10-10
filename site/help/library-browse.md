@@ -4,7 +4,7 @@ The library is the window that lists every machine you use, called a host, and t
 
 ## Find your way around the library
 
-**On Vision Pro:** A tab bar beside the library window holds **All**, **Favorites**, **Recent** and **Collections**, followed by a tab for each panel, such as **Active** and **SSH Keys**. The window shows the list of hosts on the left and the selected host's details on the right. **Add Host**, **Settings** and **Active Connections** (⚡) sit in a bar below the window.
+**On Vision Pro:** A tab bar beside the library window holds **All**, **Favorites**, **Recent** and **Collections**, followed by a tab for each panel, such as **Active** and **SSH Keys**. The window shows the list of hosts on the left and the selected host's details on the right. **Add Host**, **Settings** and **Active Connections** (⚡) sit in a bar below the window. Left alone while other windows are open, the library shrinks into a small orb; tap the orb to bring it back. See [Bring the library back on Vision Pro](library-connect.md#bring-the-library-back-on-vision-pro).
 
 **On Mac:** The library window is titled **Connections**. Its sidebar has a **Library** section with **All Connections**, **Favorites**, **Recent** and **Active**, each with a count. Below it are **Collections** (once any host belongs to one), **Keys** with **SSH Keys**, and sections such as **Workgroups**. The middle column lists hosts and the right column shows the selected host. **Add Host** (+) is in the toolbar above the host list, and ⚡ is at the top right.
 

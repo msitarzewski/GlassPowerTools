@@ -97,6 +97,12 @@ public final class GlassShellModel: GlassServiceStore {
     public internal(set) var isCheckingRunningSessions = false
     /// When the machines last answered what runs on them; nil before the first answer.
     var runningSessionsCheckedAt: ContinuousClock.Instant?
+    /// Connections handed to a capability that has not reported back yet, and when each began
+    /// (W29). Removed on the capability's one report, whatever it says.
+    private(set) var connectAttempts: [UUID: ContinuousClock.Instant] = [:]
+    /// When the oldest unanswered connection began: while one waits, the headset's Connections
+    /// window does not shrink into its orb under the person who just pressed Connect.
+    public var connectingSince: ContinuousClock.Instant? { connectAttempts.values.min() }
 
     public func showHost(_ id: HostID) { hostToShow = id }
 
@@ -1555,7 +1561,10 @@ public final class GlassShellModel: GlassServiceStore {
             return
         }
         let hostID = host.id
+        let attempt = UUID()
+        connectAttempts[attempt] = .now
         capability.open(service: service, host: owner, hostAccess: hostAccess(for: hostID)) { [weak self] outcome in
+            self?.connectAttempts[attempt] = nil
             guard let self, case .connected = outcome else { return }
             let now = Date()
             self.preferences[host: hostID].lastConnected = now

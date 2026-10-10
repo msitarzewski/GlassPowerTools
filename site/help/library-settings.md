@@ -41,6 +41,8 @@ Each follows **Appearance** until you change it there, and only that window chan
 
 Under **Library**, **Show service availability** (off by default) puts a dot beside each service in the library: green when it answers, orange when it answers slowly, red when it does not. While the library is on screen, this device opens a connection to each service's port about once a minute and closes it at once; it never signs in. A database reached through its machine's SSH connection, and this Mac's own terminal, have no dot. A service you're connected to always shows a green dot, with this setting on or off.
 
+**On Vision Pro:** **Shrink Connections when idle** sets how long the library window waits, with no tap, scroll or typing in it, before it shrinks into a small orb while other windows are open: **Never**, **1 Minute**, **2 Minutes** (the starting setting), **5 Minutes** or **10 Minutes**. Tap the orb to bring the window back. See [Bring the library back on Vision Pro](library-connect.md#bring-the-library-back-on-vision-pro).
+
 **General** also shows the state of your host library on this device under **Host Library**: how many **Hosts** it has and whether **This device** is kept on this device only. If the file that holds favorites and recent hosts cannot be read, an orange message here explains why, and favorites and **Recent** cannot be changed until it can.
 
 ## Privacy

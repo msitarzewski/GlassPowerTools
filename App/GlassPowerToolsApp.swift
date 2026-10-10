@@ -328,6 +328,12 @@ struct GlassPowerToolsApp: App {
         } defaultValue: {
             GlassConnectionsWindow()
         }
+        // **Smaller than the system's 1280 × 720** (W29; the owner, on the headset, 2026-10-10:
+        // "The connections window on vision pro is pretty large"). The list column keeps its
+        // 360 and the detail its grouped forms; what goes is empty space. It is the size a new
+        // window opens at; the window can still be resized, and comes back from its orb at
+        // whatever size it had.
+        .defaultSize(width: GlassConnectionsWindowSize.width, height: GlassConnectionsWindowSize.height)
         #else
         let group = WindowGroup("Connections", id: "main") { mainContent }
         #if os(macOS)
@@ -369,6 +375,11 @@ struct GlassPowerToolsApp: App {
         // in this scene (or a cover presented from it), not something the shell can reach.
         .environment(model.registry)
         .trackWindowPresence(key: "main", recovery: windowRecovery)
+        #if os(visionOS)
+        // Idle for the time chosen in Settings ▸ General, with other windows open: the window
+        // shrinks into its orb, and a pinch on the orb brings it back as it was (W29).
+        .glassConnectionsIdleShrink(model: model, recovery: windowRecovery)
+        #endif
         // A text file opened from the Finder (Open With, or this app as its default editor) or
         // handed over by another app: into the editor, in the window in front or a new one.
         .onOpenURL { url in
@@ -381,7 +392,7 @@ struct GlassPowerToolsApp: App {
         #if DEBUG
         // Screenshots: `--demo-open <surface>` in a `--ui-testing` run (GlassDemoMode.swift).
         // After the bootstraps mount, so each surface's request is drained where it always is.
-        .task { await GlassDemoMode.run(editor: editor, terminal: terminal, database: database, desktop: desktop, layers: layers) }
+        .task { await GlassDemoMode.run(editor: editor, terminal: terminal, database: database, desktop: desktop, layers: layers, shell: model) }
         #endif
     }
 
@@ -410,6 +421,10 @@ struct GlassPowerToolsApp: App {
         GlassDatabaseScenes(runtime: database)
         GlassDesktopScenes(runtime: desktop)
         GlassEditorScenes(runtime: editor)
+        #if os(visionOS)
+        // The orb Connections becomes when idle or closed last, with the library's Active count.
+        GlassConnectionsOrbScene(model: model, recovery: windowRecovery)
+        #endif
         #if os(macOS)
         Settings {
             GlassShellSettingsView(model: model)
@@ -430,5 +445,14 @@ struct GlassPowerToolsApp: App {
 /// The one value the headset's Connections window shows, so opening it again brings it forward.
 struct GlassConnectionsWindow: Codable, Hashable {
     var id = "connections"
+}
+
+/// The headset Connections window's first size, in points (W29). A quarter narrower than the
+/// system's 1280: the 360-point list column beside a 600-point detail, which holds a host's
+/// grouped form at a comfortable width (the overview's four tiles wrap to two rows). Tall enough
+/// that a host with two services shows every row and Edit without scrolling; 620 cut it off.
+enum GlassConnectionsWindowSize {
+    static let width: CGFloat = 960
+    static let height: CGFloat = 700
 }
 #endif

@@ -5,7 +5,9 @@
 # front of the one being captured.
 # Surfaces: library, editor, editor-window, editor-settings, preview, terminal, terminal-window,
 # terminal-settings, terminal-move, files, database, database-window, database-settings, diagram,
-# desktop, desktop-window, desktop-settings (see App/GlassDemoMode.swift).
+# desktop, desktop-window, desktop-settings, connections-host, orb, orb-looked-at, orb-later,
+# orb-later-desktop
+# (see App/GlassDemoMode.swift). The orb surfaces need DEMO_ARGS="--demo-idle-seconds 5".
 set -euo pipefail
 SIM="$1"; SURFACE="$2"; OUT="$3"; SETTLE="${4:-8}"
 HOSTS="alpha@192.0.2.10:ssh+database|bravo@192.0.2.20:ssh+rdp|nas@192.0.2.30:ssh|build@192.0.2.40:ssh|win@192.0.2.50:rdp"
