@@ -33,9 +33,9 @@ The terminal adds three pages to Settings: **Connections**, **Terminal** and **S
 
 ## Give a terminal window its own look
 
-A terminal window can have its own tint, opacity and blur, so you can tell your windows apart at a glance. In any tab of the window, open the tools menu and choose **Settings**, then **Overrides**. **On iPad**, the row is **Window Appearance**. **On Mac**, a local terminal's tools menu opens the same **Settings**; the app's own Settings are in the app menu, or press ⌘,.
+A terminal window can have its own tint, opacity and blur, so you can tell your windows apart at a glance. In any tab of the window, open the tools menu and choose **Settings**: it opens on **This Window**. **All Terminals**, beside it, changes every terminal window. **On Mac**, a local terminal's tools menu opens the same **Settings**; the app's own Settings are in the app menu, or press ⌘,.
 
-Set **Opacity**, **Blur** and a **Glass Tint**. **On Vision Pro**, also **Frost** and **Interactive glass**. Every tab in the window changes at once. Anything you leave unset follows your settings, and **Reset Overrides** returns the window to them. A tint colours the terminal whatever its opacity; for a completely clear terminal, set **Opacity** and **Blur** to zero and choose no tint.
+Set **Opacity**, **Blur** and a **Glass Tint**. **On Vision Pro**, also **Frost** and **Interactive glass**. Every tab in the window changes at once. Anything you leave unset follows your settings, and **Reset Overrides** returns the window to them. The window's outer glass on Vision Pro follows **Appearance** in Settings, which every Glass window shares. A tint colours the terminal whatever its opacity; for a completely clear terminal, set **Opacity** and **Blur** to zero and choose no tint.
 
 - A tab you move into another window takes that window's look. **Move Tab to New Window** gives the new window the look of the one the tab left.
 - The look stays with the window: it comes back when the app relaunches.

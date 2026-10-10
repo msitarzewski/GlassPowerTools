@@ -66,7 +66,7 @@ The pictures are only pictures: nothing is typed into a terminal, and no termina
 
 ## The session's tools menu
 
-Each SSH terminal has a tools menu: the gear button in its toolbar on Mac, or in its bottom bar on Vision Pro. It holds **Search**, **Clear**, **Snippets**, **Start Recording…**, **Recordings**, **Duplicate Session**, **Reconnect**, **Disconnect** (**Detach** for a terminal kept in tmux), and **Settings**: the terminal settings, **Overrides** for the window's look (see [Give a terminal window its own look](terminal-settings.md#give-a-terminal-window-its-own-look)), and the session's port forwards.
+Each SSH terminal has a tools menu: the gear button in its toolbar on Mac, or in its bottom bar on Vision Pro. It holds **Search**, **Clear**, **Snippets**, **Start Recording…**, **Recordings**, **Duplicate Session**, **Reconnect**, **Disconnect** (**Detach** for a terminal kept in tmux), and **Settings**: **This Window** for the window's look, **All Terminals** for the settings every terminal shares (see [Give a terminal window its own look](terminal-settings.md#give-a-terminal-window-its-own-look)), and the session's port forwards.
 
 **On iPhone and iPad:** the tools menu and the buttons below are in **Tools**, at the bottom of the terminal and on the bar above the on-screen keyboard. **On iPhone held sideways**, **Tools** is in the top bar beside **+** and ⚡, so the terminal gets the whole height.
 

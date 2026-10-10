@@ -1245,15 +1245,18 @@ struct glas_shTests {
 
     @Test func terminalSettingsExposeEveryHistoricalSection() {
         #expect(TerminalSettingsModalTab.allCases == [
-            .terminal,
             .overrides,
+            .terminal,
             .portForwarding,
         ])
         #expect(TerminalSettingsModalTab.allCases.map(\.title) == [
-            "Terminal",
-            "Overrides",
+            "This Window",
+            "All Terminals",
             "Port Forwarding",
-        ])
+        ], "named for what they change, the window's own first")
+        #expect(TerminalSettingsSheet.firstTab(hasWindowLook: true) == .overrides,
+                "opened from a terminal in a window, Settings starts on that window")
+        #expect(TerminalSettingsSheet.firstTab(hasWindowLook: false) == .terminal)
     }
 
     @Test @MainActor func disabledICloudSyncDoesNotObserveOrWrite() {

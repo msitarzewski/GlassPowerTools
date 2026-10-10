@@ -1718,13 +1718,19 @@ struct TerminalSettingsSheet: View {
     let done: () -> Void
 
     @Environment(SettingsManager.self) private var settingsManager
-    /// Each opening starts on Terminal.
-    @State private var tab: TerminalSettingsModalTab = .terminal
+    /// Each opening starts on This Window when the terminal's window keeps a look, else on All
+    /// Terminals.
+    @State private var tab: TerminalSettingsModalTab
 
     init(session: TerminalSession?, windowLook: Binding<TerminalSessionOverride?>?, done: @escaping () -> Void) {
         self.session = session
         self.windowLook = windowLook
         self.done = done
+        _tab = State(initialValue: Self.firstTab(hasWindowLook: windowLook != nil))
+    }
+
+    static func firstTab(hasWindowLook: Bool) -> TerminalSettingsModalTab {
+        hasWindowLook ? .overrides : .terminal
     }
 
     var body: some View {
@@ -1732,17 +1738,17 @@ struct TerminalSettingsSheet: View {
             Group {
             #if os(iOS)
             List {
-                NavigationLink("Terminal") {
-                    TerminalSettingsView()
-                        .environment(settingsManager)
-                        .navigationTitle("Terminal")
-                }
                 if UIDevice.current.userInterfaceIdiom == .pad, let windowLook {
-                    NavigationLink("Window Appearance") {
+                    NavigationLink("This Window") {
                         TerminalOverridesSettingsView(look: windowLook)
                             .environment(settingsManager)
-                            .navigationTitle("Window Appearance")
+                            .navigationTitle("This Window")
                     }
+                }
+                NavigationLink("All Terminals") {
+                    TerminalSettingsView()
+                        .environment(settingsManager)
+                        .navigationTitle("All Terminals")
                 }
                 if let session {
                     NavigationLink("Port Forwarding") {
@@ -1863,15 +1869,18 @@ private struct TerminalPasteReviewSheet: View {
 }
 
 
+/// The sections of a terminal's Settings, the window's own first. Named for what they change: the
+/// owner, on the Vision Pro, changed transparency and tint on the first section, then called
+/// "Terminal", saw every window change, and found no window-level control (2026-10-10).
 enum TerminalSettingsModalTab: String, CaseIterable, Hashable {
-    case terminal
     case overrides
+    case terminal
     case portForwarding
 
     var title: String {
         switch self {
-        case .terminal: "Terminal"
-        case .overrides: "Overrides"
+        case .overrides: "This Window"
+        case .terminal: "All Terminals"
         case .portForwarding: "Port Forwarding"
         }
     }
@@ -1949,7 +1958,7 @@ struct TerminalOverridesSettingsView: View {
                 #endif
 
                 #if os(visionOS)
-                Text("Opacity and blur remain independent. Set both to zero, with no tint, for a completely transparent terminal. These apply to every tab in this window and stay with it.")
+                Text("Only this window changes: every tab in it, and it keeps its look after a relaunch. Opacity and blur remain independent; set both to zero, with no tint, for a completely transparent terminal. To change every window, use All Terminals, and Appearance in Settings for the window glass.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 #else

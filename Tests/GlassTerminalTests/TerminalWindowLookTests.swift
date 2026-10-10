@@ -69,10 +69,10 @@ struct TerminalWindowLookTests {
         #expect(TerminalCanvasTint.strength(canvasOpacity: 0) == TerminalCanvasTint.strength(canvasOpacity: 1))
     }
 
-    @Test("Settings offers Overrides only with a window to keep the look, and Port Forwarding only for SSH")
+    @Test("Settings offers This Window only with a window to keep the look, and Port Forwarding only for SSH")
     func settingsSections() {
-        #expect(TerminalSettingsModalTab.offered(hasSession: true, hasWindowLook: true) == [.terminal, .overrides, .portForwarding])
-        #expect(TerminalSettingsModalTab.offered(hasSession: false, hasWindowLook: true) == [.terminal, .overrides],
+        #expect(TerminalSettingsModalTab.offered(hasSession: true, hasWindowLook: true) == [.overrides, .terminal, .portForwarding])
+        #expect(TerminalSettingsModalTab.offered(hasSession: false, hasWindowLook: true) == [.overrides, .terminal],
                 "a Mac's local shell: no connection to forward")
         #expect(TerminalSettingsModalTab.offered(hasSession: true, hasWindowLook: false) == [.terminal, .portForwarding])
     }
