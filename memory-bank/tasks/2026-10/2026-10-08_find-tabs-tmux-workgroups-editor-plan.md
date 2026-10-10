@@ -746,3 +746,6 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   editor 134 / editor UI 310 (1 known issue), database 307. Open for the owner: ⌘S for the editor's Save off the Mac
   (the database owns ⌘S there, rule 39); 13 pt default text size at headset distance. The agent kept re-sending its
   report with background work running and was stopped. Simulator "W17 Editor Vision Pro" left shut down.
+- 0.4.327 on the iPhone; the Vision Pro's battery died (install refused, 4016). Owner: "Keep building while it charges?"
+  Started **W18** (settings sync error Code=3 at every launch; never write the real iCloud store) and **W19** (open Mac
+  tabs pick up `@glass-name` given elsewhere; Mac SSH tabs in tmux show the pane's program title). W16 still running.

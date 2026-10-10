@@ -30,7 +30,7 @@ anything touching real servers (SSH and database tests use the disposable test V
 ## 2026-10-09 — where things stand
 
 **Installed:** Mac **0.4.326** (2026-10-09 23:43: everything through W15; 4 windows reopened, 16/16 sessions, no
-crash). Before that 0.4.320 (13:10: closed-window crash fix, Active count at launch, terminal right-click menu). iPhone and Vision Pro **0.4.326** (0.4.327 with W17 building) (a28dc68: Active
+crash). Before that 0.4.320 (13:10: closed-window crash fix, Active count at launch, terminal right-click menu). iPhone **0.4.327**, Vision Pro **0.4.326** (its 0.4.327 refused: battery died, CoreDevice 4016) (a28dc68: Active
 names a Connect workgroup's row by its terminal; 54a66d5: Active asks nothing until the library has loaded; d5b7d2f:
 Open Folder Here opens the shell's folder in Files, not home; 1c7c65c: Open in Editor on the folder button's pinch and
 hold and in the tools menu). The Mac has none of these since 0.4.320 (its 0.4.322 is
@@ -39,6 +39,9 @@ W15 merged (`6394fc6`, D55): tab groups back after a relaunch on Vision Pro, iPa
 Vision Pro windows by dragging grid cards or Move Tab To ▸. ef88118: a terminal's selection lasts through output.
 W17 merged (`f70da14`): the editor on Vision Pro — its toolbar (was on the split view, which visionOS does not
 draw), Markdown preview reachable, Projects + ▸ New Document / Open…, rule 64 deferrals for the editor view and SQL focus.
+W18 (agent `w18-settings-sync`): `GlassSettingsSyncError` Code=3 (likely `invalidPayload`) at every launch, read-only
+with real iCloud data. W19 (agent `w19-mac-names`): open Mac tabs follow names given on other devices; Mac SSH tabs
+in tmux show the program title.
 W16 (agent `w16-vision-framing`): dark square corners on visionOS `.plain` windows (Files first) and the Files
 window's header to match the Mac's modern one. W17 (agent `w17-vision-editor`): the editor fully working on visionOS.
 W15 (agent `w15-vision-windows`, worktree): Vision Pro/iPad tab groups back on relaunch; moving tabs between windows
