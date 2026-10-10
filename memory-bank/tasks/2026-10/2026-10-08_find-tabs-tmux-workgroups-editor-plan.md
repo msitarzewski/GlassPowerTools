@@ -709,3 +709,12 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
 - **W15 started** (agent, worktree): tab groups restored on relaunch on Vision Pro and iPad (app-owned records, W12's
   pattern, W13's open-together path), and tabs moved between windows on Vision Pro — the owner: "maybe we do that with
   grid view? drag and drop" — drag a grid card onto another window; Move to New Window / Move to ▸ as fallback.
+- **d5b7d2f — Files opened at home.** Owner, on the Vision Pro: the folder button opened Files at the home folder.
+  `SFTPBrowserView.connectAndLoad` set home after `initialPath` had been applied (every platform). Now
+  `startingFolder(requested:client:)` keeps the requested folder when the host says it is one. Test over the real
+  `SFTPClient` and W14's in-memory host fails without it; the one wiring line in `connectAndLoad` is not under test.
+  0.4.323 on iPhone and Vision Pro.
+- **W16 and W17 started** (agents, worktrees). W16: visionOS `.plain` windows paint square and dark at the corners —
+  `GlassLayeredWindow` → `GlassNativeWindowFrame` adds no glass or clip and `GlassLayerBackground(cornerRadius: 0)`
+  fills square; plus the Files window's header to match the Mac's modern format (owner). W17: the editor fully
+  functional on visionOS (owner: "markdown preview, syntax highlighting etc."), parity audit first.

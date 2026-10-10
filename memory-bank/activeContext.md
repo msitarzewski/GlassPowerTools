@@ -30,9 +30,12 @@ anything touching real servers (SSH and database tests use the disposable test V
 ## 2026-10-09 — where things stand
 
 **Installed:** Mac **0.4.320** (2026-10-09 13:10: closed-window crash fix, Active count at launch, terminal
-right-click menu; 4 windows reopened, 15/15 sessions, no crash). iPhone and Vision Pro **0.4.322** (a28dc68: Active
-names a Connect workgroup's row by its terminal; 54a66d5: Active asks nothing until the library has loaded, so it fills
-in at launch). The Mac's 0.4.322 is built in `$SP/dd-mac`, to install at the owner's word (he was working).
+right-click menu; 4 windows reopened, 15/15 sessions, no crash). iPhone and Vision Pro **0.4.323** (a28dc68: Active
+names a Connect workgroup's row by its terminal; 54a66d5: Active asks nothing until the library has loaded; d5b7d2f:
+Open Folder Here opens the shell's folder in Files, not home). The Mac has none of these since 0.4.320 (its 0.4.322 is
+built in `$SP/dd-mac`), to install at the owner's word (he was working).
+W16 (agent `w16-vision-framing`): dark square corners on visionOS `.plain` windows (Files first) and the Files
+window's header to match the Mac's modern one. W17 (agent `w17-vision-editor`): the editor fully working on visionOS.
 W15 (agent `w15-vision-windows`, worktree): Vision Pro/iPad tab groups back on relaunch; moving tabs between windows
 on Vision Pro by drag and drop in the grid view (owner's idea), with Move to New Window / Move to ▸ menus as fallback.
 The Mac reopened its 4 listed windows once (`Reopen: 4 listed … 4 reopening`; later asks "already taken"), 15 of 15
