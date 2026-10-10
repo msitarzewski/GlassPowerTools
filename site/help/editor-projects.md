@@ -5,10 +5,10 @@ A project is a folder on a machine: a folder on this device, or a folder on a se
 ## Open a folder on this device
 
 1. In the library, choose **Projects**.
-2. Choose **Open a Project…** (the plus button in the toolbar, or the button in the empty list).
+2. Choose the plus button in the toolbar, then **Open…** — or **Open a Project…** in the empty list.
 3. Choose a folder.
 
-The folder opens in an editor window and is added to **Projects**.
+The folder opens in an editor window and is added to **Projects**. Files chosen here instead open as tabs in an editor window, without a project. The same plus button has **New Document**, which opens an editor window on a new, empty document.
 
 You can also choose **Open…** in an editor window (the folder button in the toolbar, or ⌘O with a keyboard) and pick a folder. **On Mac:** choose File ▸ **Open…** (⌘O), or **Open…** in an empty editor window. A folder opened any of these ways is added to **Projects** too.
 

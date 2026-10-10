@@ -84,6 +84,19 @@ public final class GlassEditorRuntime {
         return id
     }
 
+    /// A new window holding one new, empty document, ready to type into — what ⇧⌘E opens on a Mac
+    /// and **New Document** in Projects opens elsewhere. The caller shows it: a Mac's menu opens the
+    /// window directly, the library asks through `present`.
+    ///
+    /// Off the Mac this was missing altogether: a blank document, or a file without its folder,
+    /// could be had only from inside an editor window, and an editor window only by opening a
+    /// project (2026-10-09, Vision Pro).
+    public func prepareNewEditorWindow() -> UUID {
+        let id = newWindowID()
+        workspace(for: id).newDocument()
+        return id
+    }
+
     /// A window this launch never asked for, with nothing in it — one the system brought back from
     /// an earlier launch. A workspace is never saved, so such a window can only come back empty,
     /// and blank editor windows are not restored (decided 2026-10-08). Windows with something in
@@ -491,6 +504,17 @@ public final class GlassEditorRuntime {
         presentationSerial += 1
     }
 
+    /// Shows the windows an open named: each as a window where windows exist; on a phone, the last
+    /// of them in place, since only one is on screen. One rule for an editor window's own Open…
+    /// and for the library's.
+    func show(_ windows: [UUID], with openWindow: OpenWindowAction) {
+        if GlassWindowPresentation.canOpenWindows {
+            for id in windows { openWindow(id: Self.windowID, value: id) }
+        } else if let last = windows.last {
+            present(last)
+        }
+    }
+
     /// Clears the request once something has shown it.
     public func clearPresentation() {
         requestedWindowID = nil
@@ -702,9 +726,7 @@ struct GlassEditorCommands: Commands {
             // any use (2026-09-25: *"Shift-command-e should open a new blank text document, ready
             // to edit"*). Opening a file or project from there is File ▸ Open, as before.
             Button("New Editor Window") {
-                let id = UUID()
-                runtime.workspace(for: id).newDocument()
-                openWindow(id: GlassEditorRuntime.windowID, value: id)
+                openWindow(id: GlassEditorRuntime.windowID, value: runtime.prepareNewEditorWindow())
             }
             .keyboardShortcut("e", modifiers: [.command, .shift])
             // **The panel first, a window only on a successful pick.**

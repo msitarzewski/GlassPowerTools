@@ -338,4 +338,33 @@ struct GlassEditorWindowRoutingTests {
         runtime.windowWorkspace(for: busy).openProject(try folder())
         #expect(!runtime.isRestoredBlankWindow(busy))
     }
+
+    // MARK: A blank document, from anywhere
+
+    @Test("New Document in Projects, and ⇧⌘E, open a window of their own on an empty document")
+    func aNewEditorWindowOpensOnABlankDocument() {
+        // Off the Mac this was the missing door (2026-10-09): a blank document could be made only
+        // from inside an editor window, and only a project opened one.
+        let runtime = runtime()
+        let id = runtime.prepareNewEditorWindow()
+        let workspace = runtime.workspace(for: id)
+        #expect(workspace.documents.count == 1)
+        #expect(workspace.selectedDocument?.hasNeverBeenSaved == true, "not an empty, unsaved document")
+        // Active lists it, as it lists any editor holding something.
+        #expect(runtime.openSessions().map(\.title) == ["Untitled"])
+
+        let second = runtime.prepareNewEditorWindow()
+        #expect(second != id, "a second New Document went into the first one's window")
+        #expect(runtime.workspace(for: id).documents.count == 1)
+    }
+
+    @Test("a new document's window takes a project chosen next, as ⇧⌘E's always has")
+    func aNewEditorWindowIsTheUntouchedUntitledKind() throws {
+        // The same window as ⇧⌘E's, so the rule that lets its untouched Untitled go still holds.
+        let runtime = runtime()
+        let id = runtime.prepareNewEditorWindow()
+        runtime.noteFrontmost(id)
+        #expect(runtime.openProject(try folder()) == id)
+        #expect(runtime.workspace(for: id).documents.isEmpty)
+    }
 }

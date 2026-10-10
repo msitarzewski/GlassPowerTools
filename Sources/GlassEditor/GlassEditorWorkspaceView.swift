@@ -215,9 +215,20 @@ public struct GlassEditorWorkspaceView: View {
         } detail: {
             GlassLayeredPanel(cornerRadius: 0, role: .embedded) { detail }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                #if os(visionOS)
+                // **On the headset a split view's own toolbar is not drawn; a column's is** — the
+                // database found it first (`DatabaseWorkspaceView.splitLayout`). Given to the split
+                // view, the editor's whole toolbar — Preview, Save, Open, Find, Close, the ⚡ — was
+                // missing from Vision Pro, and so was every way to see a Markdown file's preview
+                // (2026-10-09). Attached to the detail column it is the window's toolbar ornament.
+                .toolbar { toolbarContent(includingDismissal: true) }
+                .glassActiveConnectionsToolbar(show: runtime?.showActiveConnections, dismissCurrent: dismissal?.action)
+                #endif
         }
+        #if !os(visionOS)
         .toolbar { toolbarContent(includingDismissal: true) }
         .glassActiveConnectionsToolbar(show: runtime?.showActiveConnections, dismissCurrent: dismissal?.action)
+        #endif
         // **No sidebar without a project.** The sidebar is the project's file tree and holds
         // nothing else — open documents are tabs. With no project open, the control offered to
         // reveal a column that could only ever be blank, so the control goes too: a toggle whose
@@ -661,6 +672,19 @@ public struct GlassEditorWorkspaceView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
+            #if os(visionOS)
+            // Where the file is: the Mac's window subtitle. A window on the headset has no subtitle,
+            // and this line said it was here rather than dropped while nothing showed it.
+            let location = subtitle(for: document)
+            if !location.isEmpty {
+                Text(location)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.head)
+                    .accessibilityIdentifier("editor-status-location")
+            }
+            #endif
             if document.isDirty {
                 Text("Edited").font(.caption).foregroundStyle(.secondary)
             }
@@ -715,7 +739,7 @@ public struct GlassEditorWorkspaceView: View {
                     .labelStyle(.iconOnly)
             }
         }
-        ToolbarItem(placement: .navigation) {
+        ToolbarItem(placement: .editorLeading) {
             Button("New Document", systemImage: "plus") { workspace.newDocument() }
                 .help("New Document")
                 .accessibilityIdentifier("editor-new")
@@ -724,7 +748,7 @@ public struct GlassEditorWorkspaceView: View {
         // **Open…, off the Mac**, with ⌘O for a hardware keyboard. The Mac has it in the File menu,
         // which owns ⌘O there (rule 39); here there is no menu, and the only ways in were two
         // buttons on an empty window, gone the moment anything was open.
-        ToolbarItem(placement: .navigation) {
+        ToolbarItem(placement: .editorLeading) {
             Button("Open…", systemImage: "folder") { beginOpening() }
                 .keyboardShortcut("o", modifiers: .command)
                 .help("Open files, or a folder as a project")
@@ -736,7 +760,7 @@ public struct GlassEditorWorkspaceView: View {
         // here — offered back rather than re-added silently, because that list is the user's and
         // it syncs (`GlassSuggestionButton`).
         if let project = workspace.projects.first, let runtime, !runtime.isRemembered(project) {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItem(placement: .editorTrailing) {
                 GlassSuggestionButton("Save as Project",
                                       help: "Keep \(project.displayName) in Projects, on this device and your others.") {
                     runtime.remember(project)
@@ -751,7 +775,7 @@ public struct GlassEditorWorkspaceView: View {
         // **Preview**, for text that has a picture: beside the text, then alone, then back.
         if let document = workspace.selectedDocument, workspace.previewKind(for: document) != nil {
             let mode = workspace.previewModes[document.id] ?? .text
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItem(placement: .editorTrailing) {
                 Button(mode == .text ? "Show Preview" : (mode == .beside ? "Preview Only" : "Hide Preview"),
                        systemImage: mode == .text ? "eye" : (mode == .beside ? "rectangle.righthalf.filled" : "eye.slash")) {
                     workspace.previewModes[document.id] = mode.next(roomBeside: previewHasRoomBeside)
@@ -760,12 +784,12 @@ public struct GlassEditorWorkspaceView: View {
                 .accessibilityIdentifier("editor-preview-toggle")
             }
         }
-        ToolbarItem(placement: .primaryAction) {
+        ToolbarItem(placement: .editorTrailing) {
             Button("Text Settings", systemImage: "gearshape") { isShowingSettings = true }
                 .help("Text settings for this file")
                 .accessibilityIdentifier("editor-settings")
         }
-        ToolbarItem(placement: .primaryAction) {
+        ToolbarItem(placement: .editorTrailing) {
             Button("Save", systemImage: "arrow.down.document") { saveSelected() }
                 .disabled(workspace.selectedDocument?.isDirty != true)
                 .accessibilityIdentifier("editor-save")
@@ -775,13 +799,13 @@ public struct GlassEditorWorkspaceView: View {
         // here the find bar had no way in, and with one document open there is no tab strip, so no
         // close button either. The same actions the Mac's menu calls.
         if let document = workspace.selectedDocument {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItem(placement: .editorTrailing) {
                 Button("Find", systemImage: "magnifyingglass") { workspace.findIsPresented.toggle() }
                     .disabled(document.viewer != nil)
                     .keyboardShortcut("f", modifiers: .command)
                     .accessibilityIdentifier("editor-find")
             }
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItem(placement: .editorTrailing) {
                 Button("Close Document", systemImage: "xmark") { requestClose(document) }
                     .accessibilityIdentifier("editor-close-document")
             }
@@ -823,12 +847,7 @@ public struct GlassEditorWorkspaceView: View {
     /// Shows the windows an open named, other than this one: each as a window where windows
     /// exist; on a phone, the last of them in this one's place, since only one is on screen.
     private func show(_ windows: [UUID]) {
-        let others = windows.filter { $0 != windowID }
-        if GlassWindowPresentation.canOpenWindows {
-            for id in others { openWindow(id: GlassEditorRuntime.windowID, value: id) }
-        } else if let last = others.last {
-            runtime?.present(last)
-        }
+        runtime?.show(windows.filter { $0 != windowID }, with: openWindow)
     }
 
     private func saveSelected() {
@@ -922,6 +941,31 @@ public struct GlassEditorWorkspaceView: View {
         case .html: "chevron.left.slash.chevron.right"
         case .plaintext: "doc.text"
         }
+    }
+}
+
+/// Where the editor window's own actions go.
+///
+/// The bar's leading and trailing edges on a Mac, an iPad and a phone. **On Vision Pro, the
+/// window's toolbar ornament** below it — the system's, as the database's actions and Active's are
+/// there (D40: system toolbars and ornaments first). Placed in the navigation bar they would be
+/// small circles crowded into the window's top corner (`GlassConnectionLibrary.withLibraryToolbar`).
+/// The ⚡ stays in the bar, where it is in every other window on the headset.
+private extension ToolbarItemPlacement {
+    static var editorLeading: ToolbarItemPlacement {
+        #if os(visionOS)
+        .bottomOrnament
+        #else
+        .navigation
+        #endif
+    }
+
+    static var editorTrailing: ToolbarItemPlacement {
+        #if os(visionOS)
+        .bottomOrnament
+        #else
+        .primaryAction
+        #endif
     }
 }
 

@@ -454,17 +454,33 @@ private struct SQLEditorRepresentable: UIViewRepresentable {
     func updateUIView(_ view: UIView, context: Context) {
         context.coordinator.onTextChange = onModelTextChange
         context.coordinator.onSelectionChange = onModelSelectionChange
+        context.coordinator.isActive = isActive
 
+        // **Focus moves after this update, never inside it** (rule 64). Taking first responder
+        // brings up the keyboard — on Vision Pro a window and an ornament of its own, with a focus
+        // change — and giving it up asks the hosting view for its next responder; either one
+        // re-enters the SwiftUI update that called this. The terminal moved its own resign out of
+        // `updateUIView` for the same reason (`SwiftTermHostModel`). The coordinator's `isActive`
+        // is read again when the turn comes, so a tab switched away and back meanwhile keeps it.
         let textView = context.coordinator.engine.textView
+        let coordinator = context.coordinator
         if !isActive, textView.isFirstResponder {
-            textView.resignFirstResponder()
+            DispatchQueue.main.async { [weak textView, weak coordinator] in
+                guard let textView, let coordinator, !coordinator.isActive,
+                      textView.isFirstResponder else { return }
+                textView.resignFirstResponder()
+            }
         }
         if isActive,
            let focusToken,
            context.coordinator.claimedFocusToken != focusToken,
            textView.window != nil {
             context.coordinator.claimedFocusToken = focusToken
-            textView.becomeFirstResponder()
+            DispatchQueue.main.async { [weak textView, weak coordinator] in
+                guard let textView, let coordinator, coordinator.isActive,
+                      textView.window != nil else { return }
+                textView.becomeFirstResponder()
+            }
         }
     }
 }
@@ -541,6 +557,9 @@ extension SQLEditorBridgeCoordinator where Engine == GlassEditorAppKitEngine {
 final class SQLEditorBridgeCoordinator<Engine> {
     let engine: Engine
     var claimedFocusToken: UUID?
+    /// Whether this editor is the one shown, as of the last update — read again when a deferred
+    /// focus change runs (iPad and Vision Pro).
+    var isActive = false
     var onTextChange: ((String) -> Void)?
     var onSelectionChange: ((NSRange) -> Void)?
     #if os(macOS)

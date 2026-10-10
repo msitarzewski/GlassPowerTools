@@ -52,6 +52,7 @@ public struct GlassEditorProjectsPanel: View {
     private let runtime: GlassEditorRuntime
     private let reach: (GlassEditorProject) -> GlassEditorProjectReach
     @Bindable private var panel: GlassEditorProjectsPanelModel
+    @Environment(\.openWindow) private var openWindow
 
     public init(presentation: Presentation,
                 runtime: GlassEditorRuntime,
@@ -134,8 +135,22 @@ public struct GlassEditorProjectsPanel: View {
         .searchable(text: $panel.searchQuery, prompt: "Search Projects")
         .toolbar {
             ToolbarItem {
-                Button("Open a Project…", systemImage: "plus") { panel.showingOpenPanel = true }
-                    .accessibilityIdentifier("projects-add")
+                // **New Document and the one Open…, as well as a project.** Off the Mac this panel
+                // is the editor's only door, and it opened folders and nothing else: a blank
+                // document, or one file without its folder, could be had only from inside an editor
+                // window, which only a project could open (2026-10-09, Vision Pro). The Mac's File
+                // menu has both (⇧⌘E, ⌘O); this is the same pair, and Open… is the same rule.
+                Menu {
+                    Button("New Document", systemImage: "doc.badge.plus") {
+                        runtime.show([runtime.prepareNewEditorWindow()], with: openWindow)
+                    }
+                    .accessibilityIdentifier("projects-new-document")
+                    Button("Open…", systemImage: "folder") { panel.showingOpenPanel = true }
+                        .accessibilityIdentifier("projects-open")
+                } label: {
+                    Label("New or Open", systemImage: "plus")
+                }
+                .accessibilityIdentifier("projects-add")
             }
         }
     }
@@ -288,20 +303,22 @@ public struct GlassEditorProjectsPanel: View {
         Color.clear
             .frame(width: 0, height: 0)
             .accessibilityHidden(true)
-            // One folder chooser for every platform, rather than an `NSOpenPanel` here and a
-            // document picker there.
+            // One chooser for every platform, rather than an `NSOpenPanel` here and a document
+            // picker there — and the editor's one Open…: files and folders together, decided by
+            // what is chosen (`GlassEditorRuntime.open(urls:from:)`), so a folder is a project in a
+            // window of its own and files are tabs.
             .fileImporter(isPresented: $panel.showingOpenPanel,
-                          allowedContentTypes: [.folder]) { result in
+                          allowedContentTypes: [.folder, .data],
+                          allowsMultipleSelection: true) { result in
                 switch result {
-                case .success(let url):
+                case .success(let urls):
                     // A folder chosen from Files on iOS arrives security-scoped, and reading it
                     // without asking for access silently returns nothing. The project asks, and
                     // **holds** it while it is open: this used to give it back the moment this
                     // returned, while the tree was still loading. It also leaves this device a
-                    // bookmark, so the folder reopens from the list after a relaunch.
-                    if let windowID = runtime.openProject(url) {
-                        runtime.present(windowID)
-                    }
+                    // bookmark, so the folder reopens from the list after a relaunch. A file holds
+                    // its own access while its tab is open (`GlassEditorWorkspace.open(_:)`).
+                    runtime.show(runtime.open(urls: urls), with: openWindow)
                 case .failure(let error):
                     panel.message = error.localizedDescription
                 }

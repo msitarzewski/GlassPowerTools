@@ -7,9 +7,12 @@ The Editor is a text and code editor built into Glass Power Tools. This page cov
 On Apple Vision Pro, iPad and iPhone there is no File menu, so you reach the Editor from the library or from a server's files:
 
 - Choose **Projects** in the library, select a project, and choose **Open**. See [Work with projects](editor-projects.md).
+- In **Projects**, choose the plus button in the toolbar, then **New Document** for an editor window on a new, empty document, or **Open…** for files or a folder.
 - In a Terminal service's Files browser, choose **Edit** on a file, or **Open in Editor** on a folder. See [Projects on a server](editor-projects.md#open-a-folder-on-a-server).
 
 Once an editor window is open, **Open…** (the folder button in its toolbar) asks for files or a folder. With a keyboard attached, press ⌘O.
+
+**On Apple Vision Pro:** the editor window's toolbar is the row of controls below the window: **New Document**, **Open…**, **Show Preview** when the file has one, **Text Settings**, **Save**, **Find** and **Close Document**. The lightning bolt for **Active** is at the top of the window.
 
 **On Mac:** you can also use the File menu from any window:
 

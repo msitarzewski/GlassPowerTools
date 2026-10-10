@@ -29,6 +29,13 @@ struct GlassEditorPreviewPane: View {
                 GlassEditorTableView(parsed: table)
             } else if let page {
                 WebView(page)
+                    #if os(visionOS)
+                    // The page asks for a transparent background so it sits on the window's own
+                    // surface; on Vision Pro the web view painted an opaque black slab behind it
+                    // anyway, a dark hole in a glass window (2026-10-09, simulator). This is the
+                    // web view's own switch for that.
+                    .webViewContentBackground(.hidden)
+                    #endif
             } else {
                 ProgressView()
             }

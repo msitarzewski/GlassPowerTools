@@ -65,17 +65,52 @@ private struct PlatformEditor: NSViewRepresentable {
 private struct PlatformEditor: UIViewRepresentable {
     let model: GlassEditorModel
 
-    func makeCoordinator() -> GlassEditorUIKitEngine {
-        GlassEditorUIKitEngine(model: model)
+    /// Holds the engine — which owns the text view — once it exists.
+    func makeCoordinator() -> GlassEditorNextTurnBuild<GlassEditorUIKitEngine> {
+        GlassEditorNextTurnBuild()
     }
 
     func makeUIView(context: Context) -> UIView {
-        context.coordinator.containerView
+        // **The text view is built after this update, never inside it** (rule 64). SwiftUI calls
+        // this from inside its layout, and on Vision Pro a text view made here can bring up the
+        // text-effects window and move focus while that layout still runs — the terminal's
+        // headset crash. A plain host view goes in now; the engine and its `UITextView` a turn
+        // later. The model is the API, so nothing is lost meanwhile: the engine reads the text,
+        // runs, theme and configuration from it when it is built.
+        let host = GlassEditorHostView()
+        let model = model
+        context.coordinator.schedule { [weak host] in
+            guard let host else { return nil }
+            let engine = GlassEditorUIKitEngine(model: model)
+            host.install(engine.containerView)
+            return engine
+        }
+        return host
     }
 
     func updateUIView(_ view: UIView, context: Context) {
         // Nothing to push — the engine observes the model directly. See the
         // matching note in `updateNSView`.
+    }
+}
+
+/// The view SwiftUI holds for an editor; the engine's container goes inside it, filling it, once
+/// it has been built (`PlatformEditor.makeUIView`). The terminal's `TerminalRendererHostView`.
+private final class GlassEditorHostView: UIView {
+    init() {
+        super.init(frame: .zero)
+        isOpaque = false
+        backgroundColor = .clear
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { nil }
+
+    func install(_ view: UIView) {
+        guard view.superview !== self else { return }
+        view.frame = bounds
+        view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        addSubview(view)
     }
 }
 

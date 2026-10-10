@@ -50,6 +50,7 @@ The status bar shows, from left to right:
 - The language.
 - The file's line endings: **LF**, **CRLF** or **CR**. A file that mixes them shows **Mixed** with the most common one in brackets. The Editor keeps a file's line endings as they are when you save.
 - **Highlighting off — large file** when a file is too large to color. Very large files (roughly two million characters or more) are shown as plain text so the Editor stays responsive.
+- **On Apple Vision Pro:** the project and its folder, or the folder of a file opened on its own — what a Mac shows as the window's subtitle.
 - **Edited** while there are unsaved changes.
 
 **On iPhone and iPad:** a keyboard button at the end of the bar shows or hides the on-screen keyboard. The bar above the on-screen keyboard also has a button to hide it.

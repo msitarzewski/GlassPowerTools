@@ -264,21 +264,77 @@ extension EditorOnIPhoneUITests {
         XCTAssertTrue(markdown.waitForExistence(timeout: 10))
         markdown.tap()
         #if os(visionOS)
-        // Open question, recorded 2026-09-23: in the headset simulator none of the editor's toolbar
-        // buttons — Save included — reach the accessibility tree, so the Preview half cannot be
-        // driven here. Whether the toolbar is in an ornament the test cannot see or is not drawn
-        // is for the headset itself to answer.
-        throw XCTSkip("The editor's toolbar is not visible to UI tests on visionOS; Preview checked on iPhone and Mac.")
+        // A headset window has no subtitle; the file's project and folder are in the status line.
+        let location = app.staticTexts["editor-status-location"].firstMatch
+        if location.waitForExistence(timeout: 10) {
+            XCTAssertTrue(location.label.contains("DemoProject"), "the status line names \(location.label), not the project")
+        } else {
+            XCTFail("the status line does not say where the file is")
+        }
         #endif
+        // On the headset this used to stop here: none of the editor's toolbar reached the
+        // accessibility tree, because it was given to the split view and visionOS draws a
+        // column's toolbar, not a split view's. It is the window's toolbar ornament now
+        // (2026-10-09), so the same walk runs on every platform.
         let toggle = app.buttons["editor-preview-toggle"].firstMatch
         XCTAssertTrue(toggle.waitForExistence(timeout: 10), "Markdown offers no Preview button")
         toggle.tap()
         let preview = app.descendants(matching: .any).matching(identifier: "editor-preview").firstMatch
         XCTAssertTrue(preview.waitForExistence(timeout: 10), "Preview did not appear")
-        Thread.sleep(forTimeInterval: 3)   // Mermaid draws after the page loads
+        // The page itself, not only its frame: the table's header, and a node of the diagram,
+        // which exists as its own text only once Mermaid has drawn it (the fence is one string).
+        let page = app.webViews.firstMatch
+        XCTAssertTrue(page.staticTexts["Machine"].waitForExistence(timeout: 15), "the preview page drew no table")
+        XCTAssertTrue(page.staticTexts["Library"].waitForExistence(timeout: 15), "Mermaid did not draw the diagram")
         shoot(app, "21-markdown-preview")
+        #if os(visionOS)
+        // Room beside the text: beside, then alone, then gone.
+        toggle.tap()
+        toggle.tap()
+        XCTAssertTrue(preview.waitForNonExistence(timeout: 10), "a third press did not return to the text")
+        #else
         toggle.tap()
         XCTAssertTrue(app.buttons["editor-save"].waitForExistence(timeout: 10), "a second press did not return to the text")
+        #endif
+    }
+}
+
+extension EditorOnIPhoneUITests {
+    /// **A blank document without a project** (2026-10-09, Vision Pro). Off the Mac, Projects is
+    /// the editor's only door, and it opened folders and nothing else; the Mac has ⇧⌘E. The plus
+    /// button now offers New Document, which opens an editor on an empty, unsaved document.
+    func testProjectsOpensANewDocument() throws {
+        #if os(macOS)
+        throw XCTSkip("The Mac's way in is File ▸ New Editor Window (⇧⌘E).")
+        #else
+        let app = XCUIApplication()
+        app.launchArguments += ["--ui-testing", UUID().uuidString, "--ui-testing-seed-project"]
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+        #if os(visionOS)
+        let projects = app.tabBars.buttons["Projects"].waitForExistence(timeout: 15)
+            ? app.tabBars.buttons["Projects"] : app.buttons["Projects"].firstMatch
+        #else
+        let projects = app.descendants(matching: .any)
+            .matching(identifier: "glass-library-panel-editor-projects").firstMatch
+        #endif
+        XCTAssertTrue(projects.waitForExistence(timeout: 15))
+        projects.tap()
+
+        let add = app.buttons["projects-add"].firstMatch
+        XCTAssertTrue(add.waitForExistence(timeout: 10), "Projects has no plus button")
+        add.tap()
+        let newDocument = app.buttons["projects-new-document"].firstMatch
+        XCTAssertTrue(newDocument.waitForExistence(timeout: 10), "the plus button offers no New Document")
+        XCTAssertTrue(app.buttons["projects-open"].firstMatch.exists, "the plus button offers no Open…")
+        newDocument.tap()
+
+        // An editor on one untitled document.
+        XCTAssertTrue(app.buttons["editor-save"].firstMatch.waitForExistence(timeout: 15),
+                      "New Document did not open an editor")
+        XCTAssertTrue(app.staticTexts["Untitled"].firstMatch.waitForExistence(timeout: 10),
+                      "the new editor is not on an Untitled document")
+        #endif
     }
 }
 
@@ -366,4 +422,3 @@ extension EditorOnIPhoneUITests {
         print("USER-FILE responsive after preview: \(responsive)")
     }
 }
-

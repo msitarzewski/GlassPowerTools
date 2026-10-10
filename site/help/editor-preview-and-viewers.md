@@ -11,7 +11,7 @@ Preview is available for:
 - **SVG** — the drawing as an image.
 - **CSV** and **TSV** (also `.tab`) — a table.
 
-To show it, choose **Show Preview** in the toolbar (the eye). The button cycles through three states:
+To show it, choose **Show Preview** in the toolbar (the eye; on Apple Vision Pro, in the row of controls below the window). The button cycles through three states:
 
 1. **Show Preview** — the preview appears beside the text.
 2. **Preview Only** — the preview replaces the text.
