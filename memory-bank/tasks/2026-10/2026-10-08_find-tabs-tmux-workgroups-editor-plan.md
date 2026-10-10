@@ -885,3 +885,13 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   Simulator: menu move combined two one-terminal windows, the emptied one closed; title drag lifts, but a cross-window
   drop can't be driven by XCUITest — check on the headset. Suites: terminal 724 (serial), connection UI 40; visionOS +
   iOS simulator builds pass. To check: W15's help line "touch and hold its tab" on Vision Pro may not work either.
+- **Owner remote (~14:10); devices unavailable; 0.4.338 built (transparency + W26), install when he's back.**
+- **Settings UX decided (owner, ~14:15)**, from a 2×2 capture of the four This Window sheets: "We're literally in a tab
+  that says 'This window' ... remove those labels. Move the revert to a tiny icon with a tooltip next to the field's
+  label: 'Opacity (r)'"; and of my list (one vocabulary Opacity/Glass/Material; hide rows that do nothing on the headset;
+  one sheet layout; bigger sheets on Vision Pro; even footers): "I think the rest is fine, and overdue." → **W27**.
+- **Window appearance (owner, ~14:15):** "rebuild all window appearances to match the new terminal. So screen sharing,
+  database, etc." → **W28** (visionOS: plain windows drawing the shared glass at their Glass strength, Opacity on the
+  content area, the terminal's nested 34-pt / ≈23.75 continuous corners; split views' own system glass is the open
+  question). W27 owns settings sheets/rows/help; W28 owns scenes/backgrounds and reports help wording. Captures of both
+  go to the owner before anything installs.
