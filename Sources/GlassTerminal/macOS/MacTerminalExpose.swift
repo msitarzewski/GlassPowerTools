@@ -90,15 +90,16 @@ enum MacTerminalExposeModel {
     }
 
     /// The focused pane's folder. A local one under the home folder is written `~/…`; a remote
-    /// one is as its shell reported it, since the remote home is not known here.
+    /// one too when the host said its home (in tmux, W19), else as its shell reported it.
     static func folder(of tab: MacWorkspaceController, home: String?) -> String? {
         guard let pane = tab.focusedPane else { return nil }
-        let reported = tab.paneContextByPaneID[pane.id]?.directory
+        let context = tab.paneContextByPaneID[pane.id]
+        let reported = context?.directory
         switch pane.intent.kind {
         case .local:
             return (reported ?? tab.localDirectory(for: pane.id)).map { MacWorkspaceTabNaming.abbreviated($0, home: home) }
         case .ssh:
-            return reported
+            return reported.map { MacWorkspaceTabNaming.abbreviated($0, home: context?.home) }
         }
     }
 

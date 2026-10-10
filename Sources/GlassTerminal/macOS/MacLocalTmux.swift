@@ -36,8 +36,9 @@ enum MacLocalTmux {
         var claim: @Sendable (_ candidates: [String], _ launch: Launch, _ tmux: String) -> String? = { _, _, _ in nil }
         /// Gives a session the name its tab was given, or takes it away with nil (W6).
         var setGivenName: @Sendable (_ session: String, _ name: String?, _ tmux: String) -> Void = { _, _, _ in }
-        /// What a session's active pane shows (`MacLocalTmux.context`); nil when it could not be read.
-        var context: @Sendable (_ session: String, _ tmux: String) -> MacWorkspacePaneContext? = { _, _ in nil }
+        /// What every session's active pane shows, by session, in one run of tmux
+        /// (`MacLocalTmux.contexts`, W19); nil when it could not be read.
+        var contexts: @Sendable (_ tmux: String) -> [String: MacWorkspacePaneContext]? = { _ in nil }
         /// Keeps on a session the repository and branch its tab found, or takes them away (W11).
         var setRepository: @Sendable (_ session: String, _ repository: TerminalRepository?, _ tmux: String) -> Void = { _, _, _ in }
         /// The repository a session's folder is in, read from the files (W11). Stand-ins that
@@ -66,7 +67,7 @@ enum MacLocalTmux {
                     MacLocalTmux.logger.notice("tmux would not keep the name given to session \(session, privacy: .public)")
                 }
             },
-            context: { MacLocalTmux.context(session: $0, tmux: $1) },
+            contexts: { MacLocalTmux.contexts(tmux: $0) },
             setRepository: { session, repository, tmux in
                 guard let arguments = TerminalTmux.repositoryArguments(session: session, repository: repository) else { return }
                 // Argv, never a shell: a folder's name can be anything.
@@ -97,6 +98,10 @@ enum MacLocalTmux {
     }
 
     @MainActor static var server = Server.live
+
+    /// The reads that tell every local tab in tmux what its sessions show (W19). Tests put their
+    /// own here, with no interval.
+    @MainActor static var contextReads = MacLocalTmuxContextReads()
 
     /// Homebrew's folders (Apple silicon, then Intel) and MacPorts'. A GUI app's PATH has none.
     nonisolated static let packageFolders = ["/opt/homebrew/bin", "/usr/local/bin", "/opt/local/bin"]
@@ -210,6 +215,32 @@ enum MacLocalTmux {
                                     environment: [String: String] = ProcessInfo.processInfo.environment) -> MacWorkspacePaneContext? {
         run(tmux, ["-u", "display-message", "-p", "-t", "=" + session + ":", contextFormat],
             environment: environment).flatMap(parseContext)
+    }
+
+    /// What every session's active pane shows, by session name, from one run of tmux (W19): each
+    /// session's name, then what `context` asks one session for. One run answers every tab of
+    /// every window; asking per session ran tmux once for each pane. Nil when tmux could not be
+    /// asked — no server running included.
+    nonisolated static func contexts(tmux: String,
+                                     environment: [String: String] = ProcessInfo.processInfo.environment)
+        -> [String: MacWorkspacePaneContext]? {
+        run(tmux, ["-u", "list-sessions", "-F", contextsFormat], environment: environment).map(parseContexts)
+    }
+
+    /// A session's name, then `contextFormat`: pane variables in a session's line are its active
+    /// pane's, as `display-message -t =name:` answers them.
+    nonisolated static let contextsFormat = "#{session_name}\t" + contextFormat
+
+    /// Reads `contextsFormat` lines. A line that does not read is left out.
+    nonisolated static func parseContexts(_ output: String) -> [String: MacWorkspacePaneContext] {
+        var contexts: [String: MacWorkspacePaneContext] = [:]
+        for line in output.split(whereSeparator: \.isNewline) {
+            let fields = line.split(separator: "\t", maxSplits: 1, omittingEmptySubsequences: false)
+            guard fields.count == 2, !fields[0].isEmpty, contexts[String(fields[0])] == nil,
+                  let context = parseContext(String(fields[1])) else { continue }
+            contexts[String(fields[0])] = context
+        }
+        return contexts
     }
 
     /// The title last, so that it may hold anything. The same a terminal on any device asks a
@@ -442,6 +473,73 @@ enum MacLocalTmux {
             environment["LANG"] = "en_US.UTF-8"
         }
         return environment.map { "\($0.key)=\($0.value)" }.sorted()
+    }
+}
+
+// MARK: What every local tab shows, read together (W19)
+
+/// A local tab in tmux learns what its sessions show — the title a program set, the folder, the
+/// name a tab on any device gave the session — by asking this Mac's tmux, since tmux keeps all
+/// three from the terminal outside it. A tab asks when output in it comes to rest, which is also
+/// just after it attaches. Each read answers every tab that has asked, in one run of tmux
+/// (`MacLocalTmux.Server.contexts`): fifteen tabs settling together are one read, not fifteen,
+/// and a tab with nothing printing still hears of a name given on another device when any other
+/// tab's output settles. At most one read an interval; asked within it, one more at its end.
+/// Nothing is read while every terminal is quiet. On the names' queue, so a name given here
+/// reaches tmux before the next read asks for it.
+@MainActor
+final class MacLocalTmuxContextReads {
+    /// The least time between two reads.
+    let interval: Duration
+    /// How many reads ran, for tests.
+    private(set) var reads = 0
+
+    private final class Asker {
+        weak var tab: MacWorkspaceController?
+        init(_ tab: MacWorkspaceController) { self.tab = tab }
+    }
+    /// The tabs answered by every read: those that have asked, held weakly, until they close.
+    private var askers: [ObjectIdentifier: Asker] = [:]
+    private var wanted = false
+    private var running: Task<Void, Never>?
+    private var lastReadAt: ContinuousClock.Instant?
+
+    init(interval: Duration = .seconds(2)) {
+        self.interval = interval
+    }
+
+    /// `tab` wants to know what its sessions show: read now, or at the end of the interval.
+    func ask(_ tab: MacWorkspaceController) {
+        askers[ObjectIdentifier(tab)] = Asker(tab)
+        wanted = true
+        guard running == nil else { return }
+        running = Task { [weak self] in await self?.readWhileWanted() }
+    }
+
+    private func readWhileWanted() async {
+        defer { running = nil }
+        while wanted {
+            if let last = lastReadAt, ContinuousClock.now < last + interval {
+                try? await Task.sleep(until: last + interval, clock: .continuous)
+            }
+            // This read answers every ask so far; one after it starts asks again.
+            wanted = false
+            askers = askers.filter { $0.value.tab.map { !$0.isClosed } ?? false }
+            let tabs = askers.values.compactMap(\.tab)
+            let server = MacLocalTmux.server
+            guard !tabs.isEmpty, let tmux = server.executablePath() else { continue }
+            // A name given in a tab after this point is not taken back from this read.
+            let generations = tabs.map(\.givenNameGeneration)
+            lastReadAt = .now
+            reads += 1
+            let contexts = await withCheckedContinuation { continuation in
+                MacLocalTmux.nameQueue.async { continuation.resume(returning: server.contexts(tmux)) }
+            }
+            guard let contexts else { continue }
+            for (tab, generation) in zip(tabs, generations) {
+                tab.applyLocalTmuxContexts(contexts, askedAt: generation)
+            }
+        }
     }
 }
 

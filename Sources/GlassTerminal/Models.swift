@@ -476,12 +476,19 @@ class TerminalSession: Identifiable, Hashable {
     private(set) var tmuxPane: TerminalTmux.PaneState?
     /// The name someone gave this terminal, here or on another device through its session.
     private(set) var givenName: String?
-    /// Reads `tmuxPane` on devices without the Mac's tabs, which ask tmux for themselves.
+    /// Reads `tmuxPane` on devices without the Mac's tabs. On the Mac a tab turns it on for its
+    /// SSH panes (W19), and asks this Mac's own tmux for its local ones.
     #if os(macOS)
     @ObservationIgnored var readsTmuxPane = false
     #else
     @ObservationIgnored var readsTmuxPane = true
     #endif
+    /// Told what each read found (W19): a Mac tab names itself from it. `firstSinceAttach` is
+    /// true for the first read after the terminal attached, or attached again: the session may be
+    /// a new one made under the same name, which knows nothing of the name the tab had.
+    @ObservationIgnored var tmuxPaneObserved: (@MainActor (_ pane: TerminalTmux.PaneState, _ firstSinceAttach: Bool) -> Void)?
+    /// A read has answered since the terminal last attached.
+    @ObservationIgnored private var tmuxPaneReadSinceAttach = false
     /// The least time between two reads. Output settling inside it asks for one more at its end;
     /// a quiet terminal is never asked.
     @ObservationIgnored var tmuxPaneReadInterval: Duration = .seconds(5)
@@ -563,6 +570,9 @@ class TerminalSession: Identifiable, Hashable {
               let pane = TerminalTmux.parsePaneState(answer) else { return }
         if tmuxPane != pane { tmuxPane = pane }
         if generation == givenNameGeneration, givenName != pane.givenName { givenName = pane.givenName }
+        let first = !tmuxPaneReadSinceAttach
+        tmuxPaneReadSinceAttach = true
+        tmuxPaneObserved?(pane, first)
     }
 
     /// A slot just shown should connect: it never has, or it lost its connection while hidden or
@@ -999,6 +1009,7 @@ class TerminalSession: Identifiable, Hashable {
                 startupCommandTicket = nil
             }
             // What the session is called and shows (W11): a name given on another device, at once.
+            tmuxPaneReadSinceAttach = false
             readTmuxPaneIfDue()
         }
     }

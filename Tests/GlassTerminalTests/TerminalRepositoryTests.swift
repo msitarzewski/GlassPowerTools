@@ -433,6 +433,8 @@ struct TerminalRepositoryTests {
         var inRepository = true
     }
 
+    /// W19: the tab asks in its session's one read (W11's `paneStateCommand`), which says the
+    /// folder and the repository together, where it asked twice before.
     @Test("an SSH tab in tmux asks its host where the shell is and which repository that is, and keeps it on the session")
     func sshTab() async throws {
         let suite = "TerminalRepositoryTests.\(UUID())"
@@ -441,20 +443,19 @@ struct TerminalRepositoryTests {
         var server = ServerConfiguration(name: "alpha", host: "alpha.example.com", username: "ann")
         server.tmux = true
         let folder = "/home/ann/src/app/Sources"
-        let whereIsTheShell = TerminalTmux.currentPathCommand(name: "glass-5")
-        let whichRepository = TerminalRepository.remoteCommand(folder: folder)
+        let read = try #require(TerminalTmux.paneStateCommand(session: "glass-5"))
         let commands = Commands()
         let session = TerminalSession(server: server, terminalWriteSink: { _ in })
         session.tmuxSessionName = "glass-5"
+        session.tmuxPaneReadInterval = .zero
         session.tmuxCommandRunner = { command in
             commands.all.append(command)
-            switch command {
-            case whereIsTheShell: return folder + "\n"
-            case whichRepository:
-                return commands.inRepository
-                    ? "__glass_repo__\n/home/ann/src/app\n../.git\n\(commands.branch)\n/home/ann\n" : ""
-            default: return ""
-            }
+            guard command == read else { return "" }
+            // No program's title: tmux's own is the host's name.
+            let pane = [TerminalTmux.paneMarker, "/home/ann", folder, "alpha.example.com", "alpha", "", "alpha.example.com"]
+                .joined(separator: "\t") + "\n"
+            return commands.inRepository
+                ? pane + "__glass_repo__\n/home/ann/src/app\n../.git\n\(commands.branch)\n/home/ann\n" : pane
         }
         session.state = .connected
         await session.waitForTmuxAttach()
@@ -479,8 +480,8 @@ struct TerminalRepositoryTests {
 
         commands.inRepository = false
         tab.refreshRepositories()
-        #expect(await eventually { identity() == MacWorkspaceWindowIdentity(title: "alpha", subtitle: "ann@alpha.example.com:22") },
-                "outside a repository, as before")
+        #expect(await eventually { identity() == MacWorkspaceWindowIdentity(title: "Sources", subtitle: "ann@alpha.example.com:22") },
+                "outside a repository, its folder, as Active names the session (W19: the host says where the shell is)")
         let cleared = try #require(TerminalTmux.repositoryCommand(session: "glass-5", repository: nil))
         #expect(await eventually { commands.all.contains(cleared) })
         #expect(commands.all.filter { $0 == kept }.count == 1, "only a change is sent")

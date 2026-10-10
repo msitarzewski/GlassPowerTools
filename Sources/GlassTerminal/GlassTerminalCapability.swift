@@ -325,10 +325,11 @@ public final class GlassTerminalCapability: GlassCapability {
     private func loneSessions(_ manager: SessionManager) -> [GlassOpenSession] {
         let grouped = Set(manager.workgroups.flatMap(\.sessionIDs))
         // A probe (D44) is a few seconds of Active asking a host about tmux: never a row.
+        let servers = manager.serverManager.servers
         return manager.sessions.filter { !grouped.contains($0.id) && $0.purpose != .probe }.map { session in
             GlassOpenSession(
                 id: Self.sessionID(sessionID: session.id),
-                title: session.purpose == .sftp ? "SFTP on \(session.server.name)" : session.server.name,
+                title: session.purpose == .sftp ? "SFTP on \(session.server.name)" : Self.name(of: session, servers: servers),
                 subtitle: Self.subtitle(for: [session]),
                 symbolName: session.purpose == .sftp ? "folder" : symbolName,
                 endpointIDs: [EndpointID(rawValue: session.server.id)],
@@ -340,6 +341,16 @@ public final class GlassTerminalCapability: GlassCapability {
                 snapshot: { Self.preview(of: session) }
             )
         }
+    }
+
+    /// A terminal in no workgroup is called what the tab showing it is called (W19): on the Mac,
+    /// Active said the server's name while the tab said what ran there. Else what it calls
+    /// itself (`TerminalWorkgroupOpening.label`), else its server.
+    private static func name(of session: TerminalSession, servers: [ServerConfiguration]) -> String {
+        #if os(macOS)
+        if let title = MacWorkspacePreviewRegistry.shared.tabTitle(sessionID: session.id, servers: servers) { return title }
+        #endif
+        return TerminalWorkgroupOpening.label(session, on: .active)
     }
 
     private static func reveal(_ session: TerminalSession, in manager: SessionManager) {

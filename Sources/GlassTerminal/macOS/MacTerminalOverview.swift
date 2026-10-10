@@ -173,6 +173,12 @@ final class MacWorkspacePreviewRegistry {
         let name: String
     }
 
+    /// What the tab showing a live session is called, as its sidebar row says it (W19): Active's
+    /// row for the terminal says the same. Nil when no window on screen shows it.
+    func tabTitle(sessionID: UUID, servers: [ServerConfiguration]) -> String? {
+        locate(sessionID: sessionID)?.tab.windowIdentity(servers: servers).title
+    }
+
     /// Brings the window holding the session forward, on its tab.
     @discardableResult
     func reveal(sessionID: UUID) -> Bool {

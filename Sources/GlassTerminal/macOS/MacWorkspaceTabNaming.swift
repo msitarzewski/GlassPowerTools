@@ -14,13 +14,17 @@
 import Foundation
 
 /// What a pane's terminal says about itself: the title its shell or program set (OSC 0/2) and the
-/// directory it is in — read from the local shell's process, reported by a remote one (OSC 7).
-struct MacWorkspacePaneContext: Equatable {
+/// directory it is in — read from the local shell's process, reported by a remote one (OSC 7). In
+/// tmux, what tmux says the session's active pane shows, on this Mac or on a host (W19).
+nonisolated struct MacWorkspacePaneContext: Equatable, Sendable {
     var title: String?
     var directory: String?
-    /// The name a tab gave the pane's tmux session (`@glass-name`, W6): a tab attaching to it takes
-    /// it as its own. Only tmux answers this; nil everywhere else.
+    /// The name a tab on any device gave the pane's tmux session (`@glass-name`, W6). The tab
+    /// follows it (W19). Only tmux answers this; nil everywhere else.
     var givenName: String? = nil
+    /// The home folder of the account the pane's tmux session runs as, when a host said it (W19):
+    /// a remote folder is then named as Active names it, and home names nothing.
+    var home: String? = nil
 }
 
 enum MacWorkspaceTabNaming {
