@@ -1099,3 +1099,20 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   `--retina-1x --second-session --cursor 20` and `--display <retina id> --retina-1x --pointer-check`.
 - **0.4.349 (606c174) installed on Vision Pro and iPhone (~06:10); Mac build ready in $SP/dd-mac, install held until the owner's probe runs.**
 - **All three on 0.4.349 (606c174) at 11:45**; Mac running, no new crash report; headset relaunched.
+- **0.4.349 on the headset with his Mac:** "It looked like it was coming up, but then it crashed and showed one combined
+  menu screen." No app crash report on the headset today (the 11:44 Jetsam killed backupd); most likely the session
+  dropped after one of W38's new requests (CursorPos/cursor cache, SetServerScaling 0.5 for one display, or the second
+  session) and the reconnect stopped asking for the layout → one combined screen. Probe run requested (output via
+  `| tee /tmp/gpt-probe.txt`).
+- **New bug (owner):** "I can't drag select past the current screen buffer so I can't copy all of the output" — the Mac
+  local terminal is in tmux, so scrolled-off output is tmux history; drag-select doesn't auto-scroll into it. Queue after
+  the screen-sharing fix.
+- **Probe runs on his Mac (11:50–11:55, release probe):** run 1 (`--retina-1x --second-session --cursor 20`): sign-in
+  1.05 s; layout read correctly (display 1: 4112×2658 at (0,49), 2x, main; display 4: 1920×1080 at (4112,0), 1x);
+  **second session accepted**, SetDisplay(4) → framebuffer 1920×1080, first session stayed up; **no cursor messages at
+  all** (CursorPos/cache not sent to our 3.8 client — the Mac likely draws the pointer into the picture). Run 3
+  (`--scale 0.5`, all displays): confirmed 0.5 in 0.05 s, framebuffer 3016×1354, display 1 2056×1329, display 4 960×540;
+  49.7 → 28.2 Mbit/s. Run 2 (`--display 1 --retina-1x --pointer-check`): "Authentication or authorization failure"
+  after 1.9 s (likely a mistyped password; rerun). The app's drop on the headset is not explained by the probe yet;
+  suspicion: the main connection's region request racing the scaled layout (an out-of-bounds request after the
+  framebuffer shrinks). Need the headset's app log (`sudo log collect --device-udid … --last 1h`).
