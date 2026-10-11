@@ -43,8 +43,35 @@ enum MacTerminalContextMenu {
             copy(selected, to: copyPasteboard)
         })
         menu.addItem(item("Paste", enabled: pasteboardHasText()) { view.paste(view) })
-        menu.addItem(item("Select All") { view.selectAll(nil) })
+        menu.addItem(item("Select All") { selectAll(in: view) })
         return menu
+    }
+
+    // MARK: Select All over tmux's history
+
+    /// Select All: the terminal's text and, where the terminal shows a program that keeps more
+    /// than the terminal can — tmux, which draws on the alternate screen, so its history never
+    /// reaches the terminal — all of that program's history, which Copy then copies (owner,
+    /// 2026-10-11: "I can't drag select past the current screen buffer so I can't copy all of the
+    /// output"). The screen is highlighted as before; the history follows a moment later.
+    static func selectAll(in view: TerminalView) {
+        view.selectAll(nil)
+        guard let holder = view as? MacTerminalHistoryHolding else { return }
+        holder.dropHeldSelection()
+        let terminal = view.getTerminal()
+        guard terminal.isCurrentBufferAlternate, terminal.mouseMode == .off, let read = holder.fullHistory else { return }
+        holder.historyRead = Task { @MainActor [weak holder] in
+            let text = await read()
+            guard !Task.isCancelled, let holder, let text,
+                  !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            holder.heldSelection = text
+        }
+    }
+
+    /// ⌘A and nothing else held with it.
+    static func isSelectAll(_ event: NSEvent) -> Bool {
+        event.type == .keyDown && event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command
+            && event.charactersIgnoringModifiers?.lowercased() == "a"
     }
 
     // MARK: The word under the pointer
@@ -79,6 +106,7 @@ enum MacTerminalContextMenu {
 
     /// The selected text, or nil when nothing but blank space is selected.
     static func selectedText(of view: TerminalView) -> String? {
+        if let held = (view as? MacTerminalHistoryHolding)?.heldSelection { return held }
         guard view.selection.active else { return nil }
         let text = view.selection.getSelectedText()
         return text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : text
@@ -139,6 +167,25 @@ enum MacTerminalContextMenu {
         return item
     }
 
+}
+
+/// A Mac terminal view whose Select All can take a program's whole history
+/// (`SwiftTermHostModel.onFullHistory`, `MacTerminalContextMenu.selectAll`).
+@MainActor protocol MacTerminalHistoryHolding: AnyObject {
+    /// What Select All took beyond the screen; Copy copies it while it is held.
+    var heldSelection: String? { get set }
+    var historyRead: Task<Void, Never>? { get set }
+    /// Reads the history; nil where the terminal shows no such program.
+    var fullHistory: (@MainActor () async -> String?)? { get }
+}
+
+extension MacTerminalHistoryHolding {
+    /// A click starts a new selection: the history Select All took is let go.
+    func dropHeldSelection() {
+        historyRead?.cancel()
+        historyRead = nil
+        heldSelection = nil
+    }
 }
 
 /// A menu item's action, run when the item is chosen. AppKit calls it on the main thread.

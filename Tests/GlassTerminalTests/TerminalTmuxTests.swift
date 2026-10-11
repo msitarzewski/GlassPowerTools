@@ -157,6 +157,46 @@ struct TerminalTmuxTests {
         #expect(sh("\(tmux) display-message -p -t '=glass-7:' '#{pane_in_mode}'") == "0\n", "past the bottom: out of copy mode")
     }
 
+    /// The owner (2026-10-11): "I can't drag select past the current screen buffer so I can't copy
+    /// all of the output." Select All in a tmux tab takes tmux's history.
+    @Test("tmux's history reads as text: each line's trailing blanks and the empty rows below dropped")
+    func historyText() {
+        #expect(TerminalTmux.historyText("one  \ntwo\t\n\n  three\n\n\n") == "one\ntwo\n\n  three")
+        #expect(TerminalTmux.historyText("\n\n") == "")
+        #expect(TerminalTmux.historyCommand(name: "glass-2").hasPrefix(#"sh -c 'PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; tmux '\''-u'\'' '\''capture-pane'\''"#))
+    }
+
+    @Test("Select All in a tab in tmux reads the session's whole history over the connection")
+    func historyOverTheConnection() async {
+        var asked: [String] = []
+        let session = session(server(tmux: true), writes: Writes(), listing: "", commands: { asked.append($0) })
+        let read = session.terminalHostModel.onFullHistory
+        #expect(await read?() == nil, "not attached to tmux yet: nothing beyond the screen")
+        session.state = .connected
+        await session.waitForTmuxAttach()
+        asked.removeAll()
+        _ = await read?()
+        #expect(asked == [TerminalTmux.historyCommand(name: "glass-1")])
+    }
+
+    /// The command as the host's `sh` runs it, against a private tmux: every line, history first.
+    @Test("the history command reads every line of a real tmux session, wrapped lines joined",
+          .enabled(if: TerminalTmuxTests.tmux != nil))
+    func historyLive() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("tmux-history-\(UUID().uuidString.prefix(8))")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        func sh(_ command: String) -> String { Self.shell(command, ["TMUX_TMPDIR": folder.path, "PATH": "/usr/bin:/bin"]) }
+        let tmux = TerminalTmuxTests.tmux!
+        let long = String(repeating: "x", count: 100)
+        _ = sh("\(tmux) -f /dev/null new-session -d -s glass-8 -x 40 -y 10 'seq 1 300; echo \(long); sleep 600'")
+        defer { _ = sh("\(tmux) -S \(folder.path)/tmux-\(getuid())/default kill-server") }
+        Thread.sleep(forTimeInterval: 0.3)
+        let lines = TerminalTmux.historyText(sh(TerminalTmux.historyCommand(name: "glass-8"))).split(separator: "\n").map(String.init)
+        #expect(Array(lines.prefix(300)) == (1...300).map(String.init), "the history before the screen, from the first line")
+        #expect(lines.dropFirst(300).first == long, "a line wider than the pane, joined")
+    }
+
     nonisolated static let tmux: String? = ["/opt/homebrew/bin/tmux", "/usr/local/bin/tmux", "/usr/bin/tmux"]
         .first { FileManager.default.isExecutableFile(atPath: $0) }
 

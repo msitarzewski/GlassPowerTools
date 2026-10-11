@@ -94,6 +94,61 @@ struct MacTerminalContextMenuTests {
         #expect(view.selection.getSelectedText().contains("hello world"))
     }
 
+    /// The owner (2026-10-11): "I can't drag select past the current screen buffer so I can't copy
+    /// all of the output." In tmux the terminal holds only the screen; Select All takes tmux's history.
+    @Test("Select All over a program that keeps its own history takes all of it; Copy copies it; a click lets it go")
+    func selectAllTakesTheProgramsHistory() async throws {
+        let host = await HostedTerminal()
+        defer { host.close() }
+        host.model.onFullHistory = { "line 1\nline 2\nthe screen" }
+        await host.feed("\u{1B}[?1049hthe screen")
+        let view = try terminalView(host)
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name("MacTerminalContextMenuTests.history.\(UUID())"))
+        defer { pasteboard.releaseGlobally() }
+        let general = MacTerminalContextMenu.copyPasteboard
+        MacTerminalContextMenu.copyPasteboard = pasteboard
+        defer { MacTerminalContextMenu.copyPasteboard = general }
+
+        // ⌘A, as the key reaches the view.
+        view.window?.makeFirstResponder(view)
+        let commandA = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command, timestamp: 0,
+                                                     windowNumber: view.window?.windowNumber ?? 0, context: nil,
+                                                     characters: "a", charactersIgnoringModifiers: "a", isARepeat: false, keyCode: 0))
+        #expect(view.performKeyEquivalent(with: commandA))
+        #expect(view.selection.active, "the screen is highlighted")
+        for _ in 0..<50 where MacTerminalContextMenu.selectedText(of: view) != "line 1\nline 2\nthe screen" {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(MacTerminalContextMenu.selectedText(of: view) == "line 1\nline 2\nthe screen")
+        view.copy(view)
+        #expect(pasteboard.string(forType: .string) == "line 1\nline 2\nthe screen", "⌘C copies the history")
+
+        let menu = try #require(view.menu(for: try rightClick(view)))
+        pasteboard.clearContents()
+        menu.performActionForItem(at: try #require(menu.items.firstIndex { $0.title == "Copy" }))
+        #expect(pasteboard.string(forType: .string) == "line 1\nline 2\nthe screen", "and so does the menu's Copy")
+
+        let click = try rightClick(view)
+        view.mouseDown(with: try #require(NSEvent.mouseEvent(with: .leftMouseDown, location: click.locationInWindow, modifierFlags: [],
+                                                             timestamp: 0, windowNumber: click.windowNumber, context: nil,
+                                                             eventNumber: 0, clickCount: 1, pressure: 1)))
+        #expect(MacTerminalContextMenu.selectedText(of: view) != "line 1\nline 2\nthe screen", "a click starts over")
+    }
+
+    @Test("on the main screen, which keeps its own scrollback, Select All selects the terminal's text alone")
+    func selectAllOnTheMainScreen() async throws {
+        let host = await HostedTerminal()
+        defer { host.close() }
+        nonisolated(unsafe) var asked = false
+        host.model.onFullHistory = { asked = true; return "not this" }
+        await host.feed("hello world\r\n")
+        let view = try terminalView(host)
+        MacTerminalContextMenu.selectAll(in: view)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(!asked)
+        #expect(MacTerminalContextMenu.selectedText(of: view)?.contains("hello world") == true)
+    }
+
     @Test("a right-click inside the selection keeps it")
     func rightClickInsideSelection() async throws {
         let host = await HostedTerminal()

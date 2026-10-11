@@ -373,6 +373,10 @@ public final class SwiftTermHostModel: ObservableObject {
     /// listener that takes it returns true: a local tmux pane scrolls tmux's own history instead
     /// (2026-10-08). `deltaY` is positive toward earlier output; `precise` means points, else lines.
     public var onAlternateScreenScroll: (@MainActor (_ deltaY: CGFloat, _ precise: Bool) -> Bool)?
+    /// Everything a full-screen program keeps that the terminal does not, as text: a tmux
+    /// session's history and screen, which never reach the terminal because tmux draws on the
+    /// alternate screen. Select All on the Mac takes it, so Copy copies all of it (2026-10-11).
+    public var onFullHistory: (@MainActor () async -> String?)?
     @Published public private(set) var scrollPosition: Double = 1
     @Published public private(set) var pendingPasteReview: SwiftTermPasteReview?
     @Published public private(set) var pendingExternalLink: SwiftTermExternalLinkRequest?
@@ -2729,9 +2733,37 @@ private func fitMacTerminalHostWindow(
 }
 
 @MainActor
-private final class ReviewingMacTerminalView: TerminalView {
+private final class ReviewingMacTerminalView: TerminalView, MacTerminalHistoryHolding {
     var onPasteRequest: ((String, Bool) -> Void)?
     var onWindowAttachmentChanged: (() -> Void)?
+
+    // Select All over a program's history (`MacTerminalContextMenu.selectAll`).
+    var heldSelection: String?
+    var historyRead: Task<Void, Never>?
+    var fullHistoryProvider: () -> (@MainActor () async -> String?)? = { nil }
+    var fullHistory: (@MainActor () async -> String?)? { fullHistoryProvider() }
+
+    // ⌘A: SwiftTerm's Select All can't be overridden from here, so its key is taken first.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if window?.firstResponder === self, MacTerminalContextMenu.isSelectAll(event) {
+            MacTerminalContextMenu.selectAll(in: self)
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        dropHeldSelection()
+        super.mouseDown(with: event)
+    }
+
+    override func copy(_ sender: Any) {
+        if let heldSelection {
+            MacTerminalContextMenu.copy(heldSelection, to: MacTerminalContextMenu.copyPasteboard)
+        } else {
+            super.copy(sender)
+        }
+    }
 
     override var isOpaque: Bool { false }
     // Window chrome may drag, but terminal gestures belong to selection and
@@ -2786,10 +2818,12 @@ private final class MacSwiftTermEngine: TerminalEngine {
         onPasteData: @escaping (Data) -> Void,
         onRendererDiagnostics: @escaping (SwiftTermRendererDiagnostics) -> Void,
         onOSC52Decision: @escaping (SwiftTermOSC52Decision) -> Void,
-        alternateScreenScroll: @escaping () -> (@MainActor (CGFloat, Bool) -> Bool)? = { nil }
+        alternateScreenScroll: @escaping () -> (@MainActor (CGFloat, Bool) -> Bool)? = { nil },
+        fullHistory: @escaping () -> (@MainActor () async -> String?)? = { nil }
     ) {
         terminalView = ReviewingMacTerminalView(frame: .zero)
         scrollWatcher = MacAlternateScreenScrollWatcher(view: terminalView, handler: alternateScreenScroll)
+        terminalView.fullHistoryProvider = fullHistory
         self.onPasteData = onPasteData
         self.onRendererDiagnostics = onRendererDiagnostics
         self.onOSC52Decision = onOSC52Decision
@@ -3064,7 +3098,8 @@ public struct SwiftTermHostView: NSViewRepresentable {
             onOSC52Decision: { [weak model] decision in
                 model?.recordOSC52Decision(decision)
             },
-            alternateScreenScroll: { [weak model] in model?.onAlternateScreenScroll }
+            alternateScreenScroll: { [weak model] in model?.onAlternateScreenScroll },
+            fullHistory: { [weak model] in model?.onFullHistory }
         )
     }
 
@@ -3378,10 +3413,38 @@ public final class SwiftTermLocalProcessState: ObservableObject {
 }
 
 @MainActor
-private final class ReviewingMacLocalProcessTerminalView: LocalProcessTerminalView {
+private final class ReviewingMacLocalProcessTerminalView: LocalProcessTerminalView, MacTerminalHistoryHolding {
     var onPasteRequest: ((String, Bool) -> Void)?
     var onWindowAttachmentChanged: (() -> Void)?
     var onProcessOutput: ((ArraySlice<UInt8>, Duration) -> Void)?
+
+    // Select All over a program's history (`MacTerminalContextMenu.selectAll`).
+    var heldSelection: String?
+    var historyRead: Task<Void, Never>?
+    var fullHistoryProvider: () -> (@MainActor () async -> String?)? = { nil }
+    var fullHistory: (@MainActor () async -> String?)? { fullHistoryProvider() }
+
+    // ⌘A: SwiftTerm's Select All can't be overridden from here, so its key is taken first.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if window?.firstResponder === self, MacTerminalContextMenu.isSelectAll(event) {
+            MacTerminalContextMenu.selectAll(in: self)
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        dropHeldSelection()
+        super.mouseDown(with: event)
+    }
+
+    override func copy(_ sender: Any) {
+        if let heldSelection {
+            MacTerminalContextMenu.copy(heldSelection, to: MacTerminalContextMenu.copyPasteboard)
+        } else {
+            super.copy(sender)
+        }
+    }
 
     override var isOpaque: Bool { false }
     override var mouseDownCanMoveWindow: Bool { false }
@@ -3650,6 +3713,7 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
         scrollWatcher = MacAlternateScreenScrollWatcher(view: terminalView) { [weak self] in
             self?.delegateProxy.hostModel?.onAlternateScreenScroll
         }
+        terminalView.fullHistoryProvider = { [weak self] in self?.delegateProxy.hostModel?.onFullHistory }
         terminalView.onWindowAttachmentChanged = { [weak self] in
             self?.publishRendererDiagnostics()
         }

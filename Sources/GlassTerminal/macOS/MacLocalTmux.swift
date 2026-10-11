@@ -30,6 +30,9 @@ enum MacLocalTmux {
         var detachClients: @Sendable (_ name: String, _ tmux: String) -> Void
         /// Scrolls a session's history `lines` toward earlier output, or back when negative.
         var scroll: @Sendable (_ name: String, _ lines: Int, _ tmux: String) -> Void
+        /// A session's history and screen as `capture-pane` prints them, for Select All; nil when
+        /// it could not be read (`TerminalTmux.historyArguments`).
+        var history: @Sendable (_ name: String, _ tmux: String) -> String? = { _, _ in nil }
         /// Makes a session under the first free name of `candidates`, as the pane would have:
         /// the answer `TerminalTmux.parseClaim` reads, as `TerminalTmux.claimScript` prints it;
         /// nil when no session was made. Stand-ins that leave it out could not run it.
@@ -55,6 +58,7 @@ enum MacLocalTmux {
                 // One queue, so a quick up-then-down arrives in that order.
                 MacLocalTmux.scrollQueue.async { _ = MacLocalTmux.run(tmux, arguments) }
             },
+            history: { name, tmux in MacLocalTmux.run(tmux, TerminalTmux.historyArguments(session: name)) },
             claim: { candidates, launch, tmux in MacLocalTmux.claim(candidates, launch: launch, tmux: tmux) },
             setGivenName: { session, name, tmux in
                 guard let arguments = TerminalTmux.givenNameArguments(session: session, name: name) else { return }

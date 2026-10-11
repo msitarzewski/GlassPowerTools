@@ -84,6 +84,7 @@ struct MacLocalTmuxTests {
                 },
                 detachClients: { name, _ in self.lock.withLock { self._detached.append(name) } },
                 scroll: { name, lines, _ in self.lock.withLock { self._scrolled.append((name, lines)) } },
+                history: { name, _ in "history of \(name)  \n\n" },
                 // `new-session -d` refuses a running name; the next is tried.
                 claim: { candidates, launch, _ in
                     self.lock.withLock {
@@ -611,6 +612,27 @@ struct MacLocalTmuxTests {
             let plainPane = try #require(tab.focusedPaneID)
             let plain = try #require(tab.localRuntime(for: plainPane))
             #expect(plain.model.onAlternateScreenScroll == nil, "a plain shell keeps the terminal's own behaviour")
+            tab.closeAllSessions(sessionManager: SessionManager(loadImmediately: false))
+        }
+    }
+
+    @Test("Select All over a local tmux pane reads its session's history; a plain shell has none to read")
+    func history() async throws {
+        #expect(TerminalTmux.historyArguments(session: "glass-2") == ["-u", "capture-pane", "-p", "-J", "-S", "-", "-E", "-", "-t", "=glass-2:"])
+        try await withFake { _, defaults in
+            defaults.set(true, forKey: UserDefaultsKeys.localTmux)
+            let tab = localTab(defaults)
+            let pane = try #require(tab.focusedPaneID)
+            let session = try #require(tab.localTmuxSession(for: pane))
+            let runtime = try #require(tab.localRuntime(for: pane))
+            let read = try #require(runtime.model.onFullHistory, "a tmux pane reads tmux's history")
+            #expect(await read() == "history of \(session)", "trailing blanks and empty rows dropped")
+
+            defaults.set(false, forKey: UserDefaultsKeys.localTmux)
+            tab.addPane(intent: .local, axis: .horizontal)
+            let plainPane = try #require(tab.focusedPaneID)
+            let plain = try #require(tab.localRuntime(for: plainPane))
+            #expect(plain.model.onFullHistory == nil, "a plain shell's scrollback is the terminal's own")
             tab.closeAllSessions(sessionManager: SessionManager(loadImmediately: false))
         }
     }

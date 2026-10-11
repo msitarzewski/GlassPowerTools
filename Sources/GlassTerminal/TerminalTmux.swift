@@ -429,6 +429,29 @@ enum TerminalTmux {
         return "sh -c \(quoted(searchPath + tmux))"
     }
 
+    /// Everything a session's active pane holds — its history, then its screen — for Select All in
+    /// a tab showing it: the terminal never holds it, since tmux draws on the alternate screen
+    /// (2026-10-11). `-J` joins lines tmux wrapped, so a long line copies as it was printed.
+    nonisolated static func historyArguments(session: String) -> [String] {
+        ["-u", "capture-pane", "-p", "-J", "-S", "-", "-E", "-", "-t", "=" + session + ":"]
+    }
+
+    static func historyCommand(name: String) -> String {
+        "sh -c \(quoted(searchPath + "tmux " + historyArguments(session: name).map(quoted).joined(separator: " ")))"
+    }
+
+    /// What `capture-pane -J` printed, without the blanks it keeps at each line's end or the empty
+    /// rows below the last output.
+    nonisolated static func historyText(_ captured: String) -> String {
+        var lines = captured.split(separator: "\n", omittingEmptySubsequences: false).map { line -> Substring in
+            var line = line
+            while let last = line.last, last == " " || last == "\t" { line.removeLast() }
+            return line
+        }
+        while lines.last?.isEmpty == true { lines.removeLast() }
+        return lines.joined(separator: "\n")
+    }
+
     static func killCommand(name: String) -> String {
         "sh -c \(quoted(searchPath + "tmux -u kill-session -t \(quoted("=" + name))"))"
     }

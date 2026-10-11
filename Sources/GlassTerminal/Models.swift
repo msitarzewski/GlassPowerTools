@@ -618,6 +618,7 @@ class TerminalSession: Identifiable, Hashable {
         terminalHostModel.onAlternateScreenScroll = { [weak self] deltaY, precise in
             self?.scrollTmux(deltaY: deltaY, precise: precise) ?? false
         }
+        terminalHostModel.onFullHistory = { [weak self] in await self?.tmuxHistory() }
     }
 
     // MARK: Scrolling in tmux (2026-10-08)
@@ -635,6 +636,17 @@ class TerminalSession: Identifiable, Hashable {
         sendTmuxScroll()
         return true
     }
+
+    /// The tmux session's history and screen, for Select All (2026-10-11); nil outside tmux.
+    func tmuxHistory() async -> String? {
+        guard survivesClose, state == .connected, let name = tmuxSessionName,
+              let captured = try? await runTmuxCommand(TerminalTmux.historyCommand(name: name),
+                                                       maxResponseBytes: Self.historyResponseLimit) else { return nil }
+        return TerminalTmux.historyText(captured)
+    }
+
+    /// tmux keeps 2,000 lines by default and people raise it: room for a long history, still bounded.
+    static let historyResponseLimit = 16 * 1024 * 1024
 
     private func sendTmuxScroll() {
         guard !tmuxScrollInFlight, let name = tmuxSessionName else { return }
@@ -1155,10 +1167,10 @@ class TerminalSession: Identifiable, Hashable {
         }
     }
 
-    func runTmuxCommand(_ command: String) async throws -> String {
+    func runTmuxCommand(_ command: String, maxResponseBytes: Int = 256 * 1024) async throws -> String {
         if let tmuxCommandRunner { return try await tmuxCommandRunner(command) }
         guard let sshConnection else { throw SSHError.notConnected }
-        return try await sshConnection.executeRemoteCommand(command, maxResponseBytes: 256 * 1024,
+        return try await sshConnection.executeRemoteCommand(command, maxResponseBytes: maxResponseBytes,
                                                             executionTimeout: .seconds(15))
     }
 

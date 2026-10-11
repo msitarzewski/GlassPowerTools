@@ -266,6 +266,17 @@ final class MacWorkspaceController {
         }
     }
 
+    /// A local pane's tmux history and screen, for Select All (2026-10-11), read off the main thread
+    /// after any scroll on its way.
+    func localTmuxHistory(_ paneID: UUID) async -> String? {
+        let server = MacLocalTmux.server
+        guard let session = localTmuxSession(for: paneID), let tmux = server.executablePath() else { return nil }
+        let captured: String? = await withCheckedContinuation { continuation in
+            MacLocalTmux.scrollQueue.async { continuation.resume(returning: server.history(session, tmux)) }
+        }
+        return captured.map(TerminalTmux.historyText)
+    }
+
     /// Where a local pane's shell is. In tmux the process Glass started is the tmux client, whose
     /// directory never moves, so the answer is the one tmux gave.
     func localDirectory(for paneID: UUID) -> String? {
@@ -701,6 +712,7 @@ final class MacWorkspaceController {
             runtime.model.onAlternateScreenScroll = { [weak self] deltaY, precise in
                 self?.scrollLocalTmux(paneID, deltaY: deltaY, precise: precise) ?? false
             }
+            runtime.model.onFullHistory = { [weak self] in await self?.localTmuxHistory(paneID) }
         }
         return runtime
     }
