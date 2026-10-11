@@ -218,10 +218,29 @@ public final class VNCClient: Sendable {
                 }
             })
             streaming.append(Task { [weak self] in
+                var tick = 0
+                var last = (updates: 0, frames: 0, rectangles: 0, bytes: 0)
                 while !Task.isCancelled {
                     try? await Task.sleep(for: .seconds(1))
                     guard let self, !Task.isCancelled else { return }
                     self.callbacks.statistics(self.statistics)
+                    // Every five seconds, whether pictures keep coming: a session that takes input
+                    // but stops drawing is told apart from one whose Mac stopped sending (2026-10-11).
+                    tick += 1
+                    if tick % 5 == 0 {
+                        let counts = self.state.flowCounts, bytes = self.source.totalBytes
+                        let flow = self.planner.flow(at: .now)
+                        func seconds(_ value: Duration?) -> String {
+                            value.map { String(format: "%.1f", Double($0.components.seconds) + Double($0.components.attoseconds) / 1e18) } ?? "-"
+                        }
+                        let area = self.planner.requestedArea.map { "\($0.x),\($0.y),\($0.width)x\($0.height)" } ?? "none"
+                        VNCDiagnostics.record(category: "client", "event=flow connection=\(self.configuration.display.map { "display-\($0)" } ?? "desktop") "
+                            + "updates=\(counts.updates - last.updates) frames=\(counts.frames - last.frames) "
+                            + "rects=\(counts.rectangles - last.rectangles) bytes=\(bytes - last.bytes) "
+                            + "outstanding=\(flow.outstanding) sinceRequest=\(seconds(flow.sinceRequest)) waiting=\(seconds(flow.waiting)) "
+                            + "requested=\(area) scale=\(self.planner.serverScaleInForce) sending=\(self.planner.currentDisplay.map(String.init) ?? "all")")
+                        last = (counts.updates, counts.frames, counts.rectangles, bytes)
+                    }
                     // A Mac that does not answer may send nothing at all: looked at here, not only
                     // as messages arrive.
                     if let display = self.configuration.display, self.planner.displayRefused(at: .now) {
@@ -639,9 +658,11 @@ public final class VNCClient: Sendable {
                 }
                 // While waiting for its display, a one-display connection hands on no picture: what it
                 // holds is the whole desktop's, not its display's (W38).
-                if changed, !planner.holdingForDisplay {
+                let delivers = changed && !planner.holdingForDisplay
+                if delivers {
                     callbacks.frame(framebuffer.width, framebuffer.height, framebuffer.snapshot())
                 }
+                state.noteUpdate(rectangles: rectangles.count, delivered: delivers)
                 // The link's speed, from every byte this update took to arrive whatever its
                 // encoding, is what Automatic chooses its level by.
                 let elapsed = ContinuousClock.now - started
@@ -705,6 +726,11 @@ private final class ClientState: @unchecked Sendable {
         }
     }
     func notePixelRectangle() { lock.withLock { lastApple = nil } }
+    private var flow = (updates: 0, frames: 0, rectangles: 0)
+    var flowCounts: (updates: Int, frames: Int, rectangles: Int) { lock.withLock { flow } }
+    func noteUpdate(rectangles: Int, delivered: Bool) {
+        lock.withLock { flow.updates += 1; flow.rectangles += rectangles; if delivered { flow.frames += 1 } }
+    }
     private var trailing = 0
     var zrleTrailingDataCount: Int { lock.withLock { trailing } }
     func noteZRLETrailingData() -> Int { lock.withLock { trailing += 1; return trailing } }

@@ -144,6 +144,11 @@ final class RFBRectangleDecoder {
     /// Bytes left over once every tile is read throw `RFBZRLETrailingData`, after the tiles are drawn.
     static func decodeZRLETiles(_ bytes: [UInt8], rect: RFBRectangle, into framebuffer: RFBFramebuffer,
                                 pixels: RFBPixelDecoder = .native) throws {
+        // A rectangle with no area draws nothing, whatever was encoded for it. A Mac rendering at
+        // half size sends them at the seam between two displays — zero wide and hundreds high — with
+        // one byte per 64 rows: an empty raw tile each (2026-10-11, on a headset: "rect=2056,23,0x517
+        // inflated=9"). Its bytes were inflated in step, so skipping them keeps the stream in step.
+        if rect.isEmpty { return }
         var reader = ByteReader(bytes)
         var census = RFBZRLETrailingData.Census()
         var tileY = rect.y

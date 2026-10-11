@@ -115,6 +115,10 @@ struct EncodingTests {
         #expect(throws: RFBZRLETrailingData.self) { try RFBRectangleDecoder.decodeZRLETiles([2, 1, 1, 1, 2, 2, 2, 0x80, 0, 0, 0, 0x80], rect: rect, into: framebuffer) }
         #expect(throws: RFBError.self) { try RFBRectangleDecoder.decodeZRLETiles([128, 1, 2, 3, 200], rect: rect, into: framebuffer) }
         #expect(throws: RFBError.self) { try RFBRectangleDecoder.decodeZRLETiles([130, 1, 1, 1, 2, 2, 2, 0x82, 0], rect: rect, into: framebuffer) }
+        // A Mac's empty rectangle at the seam of two displays at half size: an empty raw tile per 64
+        // rows, skipped, drawing nothing.
+        try RFBRectangleDecoder.decodeZRLETiles([UInt8](repeating: 0, count: 9), rect: RFBRectangle(x: 4, y: 0, width: 0, height: 4),
+                                                into: framebuffer)
         // Bytes left over after the last tile: reported with the figures, after the tiles are drawn.
         do {
             try RFBRectangleDecoder.decodeZRLETiles([1, 1, 2, 3, 9], rect: rect, into: framebuffer)

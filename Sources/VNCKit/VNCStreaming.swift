@@ -559,6 +559,12 @@ final class RFBStreamPlanner: @unchecked Sendable {
     /// The area requests ask for now, for the log.
     var requestedArea: RFBRectangle? { lock.withLock { requestRectangle() } }
 
+    /// Requests the server holds, how long since the last went and how long the client has
+    /// waited for a message: for the log's flow line.
+    func flow(at now: ContinuousClock.Instant) -> (outstanding: Int, sinceRequest: Duration?, waiting: Duration?) {
+        lock.withLock { (outstanding, lastRequestAt.map { now - $0 }, waitingSince.map { now - $0 }) }
+    }
+
     /// A factor was asked for and no layout has confirmed it yet.
     var awaitingServerScale: Bool { lock.withLock { scaleAsked != nil } }
 
