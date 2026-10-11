@@ -15,14 +15,25 @@
 //    own, so its keys never reach this one as touches).
 //  Each of those only moves a timestamp; nothing runs per frame and nothing polls.
 //
-//  **Shrinking pushes the orb, it does not close the window.** `pushWindow` hides Connections and
-//  opens the orb centred where it was; dismissing the orb brings the same window back, at its size
-//  and place, with its selection, scroll position, tab and search exactly as they were — no state
-//  needs saving, because nothing was torn down.
+//  **The window becomes its orb** (W39). It pushed a second window, the orb, which hid Connections
+//  in the simulator and on the owner's headset until a relaunch; after `devicectl` relaunched the
+//  app at every install, both stayed on screen (owner, 2026-10-11: "The orb always appears as it
+//  should. The All Connections window never minimizes"), which developers report of `pushWindow`
+//  after a force quit or with a pinned window. So no second window: the Connections window shows
+//  the orb in the library's place and asks visionOS for the orb's size
+//  (`UIWindowScene.requestGeometryUpdate`, as W38 holds a desktop to its display's shape), and a
+//  pinch on the orb, or "Open Connections" from anywhere, grows it back to the size it had.
+//
+//  **Nothing is torn down.** The library stays in the window, laid out at the size it had, with
+//  no opacity, no hit testing and nothing for VoiceOver, so its selection, search, tab, sidebar
+//  and scroll position are exactly as they were when it grows back. Its glass and Opacity paint
+//  are its own and go out of sight with it; the orb is the icon in its own glass circle, on no
+//  panel, as it was as a window of its own.
 //
 
 import SwiftUI
 import GlassLayers
+import GlassConnectionUI
 import os
 #if os(visionOS)
 import UIKit
@@ -30,8 +41,9 @@ import UIKit
 
 #if os(visionOS)
 public extension View {
-    /// Shrinks the Connections window into its orb after the idle time chosen in Settings ▸
-    /// General, and puts the orb away when the window is back. Attach to the window's content.
+    /// Makes the Connections window its own orb after the idle time chosen in Settings ▸ General,
+    /// and the library again on a pinch on the orb or any "Open Connections". Attach to the
+    /// window's whole content: what it wraps is what goes out of sight while the window is its orb.
     func glassConnectionsIdleShrink(model: GlassShellModel, recovery: GlassWindowRecoveryManager) -> some View {
         modifier(GlassConnectionsIdleShrinkModifier(model: model, recovery: recovery))
     }
@@ -42,9 +54,25 @@ private struct GlassConnectionsIdleShrinkModifier: ViewModifier {
     let recovery: GlassWindowRecoveryManager
     @AppStorage(GlassConnectionsIdleShrink.settingKey, store: GlassUITestRun.settingsDefaults) private var storedSeconds = GlassConnectionsIdleShrink.standard.rawValue
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.pushWindow) private var pushWindow
     @Environment(\.dismissWindow) private var dismissWindow
+    @Environment(\.openWindow) private var openWindow
     @State private var probe = GlassConnectionsWindowProbe()
+    /// The library's size while the window is its orb, to grow back to; nil while it is the library.
+    @State private var orbOver: CGSize?
+    /// This window, among Connections windows: there is one orb (`anotherConnectionsWindowIsOrb`).
+    @State private var token = UUID()
+    /// The library's size while the window is its orb, kept with the window's scene, so a launch
+    /// that restores the window at the orb's size grows it back to its own. Empty otherwise.
+    @SceneStorage("connections.librarySize") private var keptLibrarySize = ""
+
+    init(model: GlassShellModel, recovery: GlassWindowRecoveryManager) {
+        self.model = model
+        self.recovery = recovery
+        // Opened to be the orb (Connections closed last): the orb from the first frame, so the
+        // window opens at the orb's size rather than as the library and then shrinking. Read, not
+        // taken: the window takes it as it appears.
+        _orbOver = State(initialValue: recovery.connectionsParkIsPending ? GlassConnectionsWindowSize.standard : nil)
+    }
 
     private var setting: GlassConnectionsIdleShrink { GlassConnectionsIdleShrink(storedSeconds: storedSeconds) }
 
@@ -56,32 +84,112 @@ private struct GlassConnectionsIdleShrinkModifier: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        content
-            .background { GlassConnectionsWindowProbeView(probe: probe).accessibilityHidden(true) }
-            #if DEBUG
-            .overlay(alignment: .topLeading) {
-                if GlassConnectionsIdleDemo.reportsScenePhase { GlassConnectionsScenePhaseMarker(phase: scenePhase) }
+        let isOrb = orbOver != nil
+        GlassConnectionsWindowLayout(library: orbOver) {
+            content
+                // Its ornaments go with it — the tab bar beside the window, the toolbar below — and
+                // inside each tab, what VoiceOver could find and a pinch could reach.
+                .environment(\.glassLibraryOutOfSight, isOrb)
+                // Out of sight, its glass and Opacity paint with it, and out of reach.
+                .animation(.easeInOut(duration: 0.2)) { $0.opacity(isOrb ? 0 : 1) }
+                .allowsHitTesting(!isOrb)
+                .accessibilityHidden(isOrb)
+            if isOrb {
+                GlassConnectionsOrb(model: model) { becomeLibrary(why: "orb") }
             }
-            #endif
-            // One wait at a time, started again whenever the setting or the window's phase changes.
-            .task(id: WatchKey(setting: setting, isActive: scenePhase == .active)) { await watch() }
-            .onChange(of: scenePhase, initial: true) { _, phase in
-                guard phase == .active else { return }
-                probe.clock.interaction()
-                // Back on screen — from the orb, from ⚡, from "Open Connections" anywhere — is a
-                // fresh start, and an orb has nothing left to stand in for. Asked for from
-                // elsewhere while it waits behind the orb, the window itself comes back:
-                // `openConnections()` names its value, so visionOS brings it forward rather than
-                // opening a second one (W29b).
-                recovery.connectionsWindowIsBack()
-                if recovery.visibleWindowKeys.contains(GlassConnectionsOrb.windowID) {
-                    dismissWindow(id: GlassConnectionsOrb.windowID)
+        }
+        .background { GlassConnectionsWindowProbeView(probe: probe).accessibilityHidden(true) }
+        #if DEBUG
+        .overlay(alignment: .topLeading) {
+            if GlassConnectionsIdleDemo.reportsScenePhase {
+                ZStack(alignment: .topLeading) {
+                    GlassConnectionsScenePhaseMarker(phase: scenePhase)
+                    GlassConnectionsWindowStateMarker(probe: probe, isOrb: isOrb, token: token)
                 }
             }
+        }
+        #endif
+        // One wait at a time, started again whenever the setting, the window's phase or what it
+        // is changes. As its orb there is nothing to wait for.
+        .task(id: WatchKey(setting: setting, isActive: scenePhase == .active, isOrb: isOrb)) { await watch() }
+        .onChange(of: scenePhase, initial: true) { _, phase in
+            guard phase == .active else { return }
+            probe.clock.interaction()
+        }
+        // "Open Connections" from anywhere — ⚡, a terminal's Connections control, the database's
+        // way back to its machine — while the window is its orb: visionOS brings forward a window
+        // already on screen and does nothing more, so the window grows back by itself.
+        .onChange(of: GlassConnectionsRequests.shared.count) { _, _ in
+            becomeLibrary(why: "asked")
+        }
+        .onAppear {
+            let parked = recovery.takeConnectionsPark()
+            if parked || orbOver != nil {
+                Logger.idle.info("Connections opened as its orb: it was closed as the last window")
+                becomeOrb(library: orbOver, why: "parked")
+            }
+        }
+        .onDisappear { recovery.connectionsWindowClosed(token) }
+        .task { await growIfRestoredAtTheOrbsSize() }
+    }
+
+    /// The window becomes its orb: the library kept, out of sight, at `library` — the window's
+    /// size now when nil, as it is for idle — and the window made the orb's size.
+    private func becomeOrb(library: CGSize?, why: String) {
+        let size = GlassConnectionsWindowSize.returning(to: library ?? probe.windowSize)
+        orbOver = size
+        keptLibrarySize = GlassConnectionsWindowSize.stored(size)
+        recovery.connectionsBecameOrb(token)
+        probe.keepLibraryAway(true)
+        probe.resize(to: GlassConnectionsWindowSize.orb, event: "orb-\(why)")
+        // In front of the windows opened over it since, as the pushed orb was, being a new
+        // window: left behind a terminal, the orb was hidden by it and out of reach (visionOS
+        // 27.2 simulator: the runner's pinch landed on the terminal). Asked of visionOS directly,
+        // not through `openConnections()`, which would count as asking for the library and grow
+        // it straight back. A window opened as its orb is in front already.
+        if library == nil {
+            openWindow(id: GlassConnectionsWindow.sceneID, value: GlassConnectionsWindow())
+        }
+    }
+
+    /// The window is the library again, at the size it had, and its idle clock starts over.
+    private func becomeLibrary(why: String) {
+        guard let library = orbOver else { return }
+        orbOver = nil
+        keptLibrarySize = ""
+        recovery.connectionsBecameLibrary(token)
+        probe.keepLibraryAway(false)
+        probe.clock.interaction()
+        probe.resize(to: library, event: "library-\(why)")
+    }
+
+    /// A launch can bring this window back at the orb's size: quit while it was the orb, visionOS
+    /// keeps the window's size but not what it showed. It shows the library, so it grows back to
+    /// the library's size kept with the scene, or to its first size.
+    private func growIfRestoredAtTheOrbsSize() async {
+        var waited = 0
+        while probe.windowSize == nil, waited < 30, !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(100))
+            waited += 1
+        }
+        guard orbOver == nil, let size = probe.windowSize else { return }
+        if GlassConnectionsWindowSize.isOrbSized(size) {
+            Logger.idle.info("Connections came back at the orb's size: growing it to the library's")
+            let library = GlassConnectionsWindowSize.returning(to: GlassConnectionsWindowSize.stored(keptLibrarySize))
+            probe.resize(to: library, event: "library-relaunch")
+        }
+        keptLibrarySize = ""
+        #if DEBUG
+        // UI tests: a size of the test's own, so growing back to "the size it had" is told apart
+        // from growing back to the first size.
+        if let demo = GlassConnectionsIdleDemo.librarySize {
+            probe.resize(to: demo, event: "library-demo")
+        }
+        #endif
     }
 
     private func watch() async {
-        guard scenePhase == .active else { return }
+        guard scenePhase == .active, orbOver == nil else { return }
         probe.clock.interaction()
         while !Task.isCancelled {
             let state = probe.state(connectingSince: model.connectingSince)
@@ -95,26 +203,20 @@ private struct GlassConnectionsIdleShrinkModifier: ViewModifier {
                 try? await Task.sleep(for: recheck + Self.slack)
             case .shrink:
                 guard !Task.isCancelled else { return }
-                // One orb: another Connections window may already stand behind it.
-                if recovery.visibleWindowKeys.contains(GlassConnectionsOrb.windowID) {
-                    // **A second Connections window does not stay beside the orb** (W34; the
-                    // owner, 2026-10-11: "The icon shows as expected, but the connections window
-                    // remains, too"). The orb stands for the window pushed aside behind it, so a
-                    // second one, idle as long, goes rather than stand beside it; the pinch brings
-                    // back the first. There should never be a second (`openConnections()`); this is
-                    // for one that exists anyway — a display window's ⚡ opened one until W34, and
-                    // visionOS can bring a window back with the app's others.
-                    if recovery.isConnectionsPushedAside {
-                        Logger.idle.info("A second Connections window idle beside the orb: closing it")
-                        dismissWindow()
-                        return
-                    }
-                    probe.clock.interaction()
-                    continue
+                // **A second Connections window does not stand beside the orb** (W34; the owner,
+                // 2026-10-11: "The icon shows as expected, but the connections window remains,
+                // too"). One orb stands for the library: a second window, idle as long, goes
+                // rather than become another, and the pinch brings back the first. There should
+                // never be a second (`openConnections()`); this is for one that exists anyway — a
+                // display window's ⚡ opened one until W34, and visionOS can bring a window back
+                // with the app's others.
+                if recovery.anotherConnectionsWindowIsOrb(than: token) {
+                    Logger.idle.info("A second Connections window idle beside the orb: closing it")
+                    dismissWindow()
+                    return
                 }
-                Logger.idle.info("Connections idle for \(String(describing: interval), privacy: .public): shrinking into the orb")
-                recovery.connectionsWillShrink()
-                pushWindow(id: GlassConnectionsOrb.windowID)
+                Logger.idle.info("Connections idle for \(String(describing: interval), privacy: .public): becoming its orb")
+                becomeOrb(library: nil, why: "idle")
                 return
             }
         }
@@ -126,6 +228,38 @@ private struct GlassConnectionsIdleShrinkModifier: ViewModifier {
     private struct WatchKey: Equatable {
         let setting: GlassConnectionsIdleShrink
         let isActive: Bool
+        let isOrb: Bool
+    }
+}
+
+/// The Connections window as its library or as its orb (W39). As its orb it is exactly the orb's
+/// window (`GlassConnectionsWindowSize.orb`, the orb centred in it), and the scene takes its size
+/// from its content (`.windowResizability(.contentSize)` on the Connections scene), so it can be
+/// made that small and no larger. As the library it takes any size, as before. The library is always the
+/// first view, in the same place in the tree whichever the window is; as the orb it is laid out
+/// at the size it had, centred behind the orb and out of sight, so nothing in it is rebuilt or
+/// squeezed.
+private struct GlassConnectionsWindowLayout: Layout {
+    /// The library's size while the window is its orb; nil while it is the library.
+    let library: CGSize?
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        if library != nil { return GlassConnectionsWindowSize.orb }
+        return subviews.first?.sizeThatFits(proposal) ?? .zero
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let center = CGPoint(x: bounds.midX, y: bounds.midY)
+        let orbSide = GlassConnectionsWindowSize.orbSide
+        for (index, subview) in subviews.enumerated() {
+            if index > 0 {
+                subview.place(at: center, anchor: .center, proposal: ProposedViewSize(width: orbSide, height: orbSide))
+            } else if let library {
+                subview.place(at: center, anchor: .center, proposal: ProposedViewSize(library))
+            } else {
+                subview.place(at: bounds.origin, anchor: .topLeading, proposal: ProposedViewSize(bounds.size))
+            }
+        }
     }
 }
 
@@ -184,6 +318,7 @@ final class GlassConnectionsWindowProbe: NSObject {
                 MainActor.assumeIsolated { self?.editingChanged(view) }
             })
         }
+        if libraryAway { applyLibraryAway() }
     }
 
     func detach() {
@@ -197,6 +332,93 @@ final class GlassConnectionsWindowProbe: NSObject {
         touchesDown = 0
         dragsOver = 0
         window = nil
+    }
+
+    // MARK: The window's size (W39)
+
+    /// The window's size now, from its scene; nil until the probe is in a window.
+    var windowSize: CGSize? {
+        guard let scene = window?.windowScene else { return nil }
+        return scene.effectiveGeometry.coordinateSpace.bounds.size
+    }
+
+    /// Bumped by every resize asked for, so an older one still waiting gives way to the newest.
+    private var resizeGeneration = 0
+
+    /// Asks visionOS to give the window `size`, once its scene's limits allow it. The limits come
+    /// from the content (`.windowResizability(.contentSize)`), and SwiftUI hands them to the scene
+    /// a moment after the content changes: a size asked for before then is held to the old ones.
+    /// So the limits are looked at every tenth of a second for two seconds, and the size asked
+    /// for once they allow it, or then anyway; what visionOS made of it is logged.
+    func resize(to size: CGSize, event: String) {
+        resizeGeneration &+= 1
+        request(size, event: event, generation: resizeGeneration, attempt: 0)
+    }
+
+    private func request(_ size: CGSize, event: String, generation: Int, attempt: Int) {
+        guard generation == resizeGeneration else { return }
+        let scene = window?.windowScene
+        let admitted = scene.map {
+            GlassConnectionsWindowSize.admits(size, minimum: $0.effectiveGeometry.minimumSize,
+                                              maximum: $0.effectiveGeometry.maximumSize)
+        } ?? false
+        guard let scene, admitted || attempt >= 20 else {
+            guard attempt < 20 else {
+                Logger.idle.error("event=\(event, privacy: .public) no-window")
+                return
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                self?.request(size, event: event, generation: generation, attempt: attempt + 1)
+            }
+            return
+        }
+        Logger.idle.notice("event=\(event, privacy: .public) width=\(size.width) height=\(size.height) waited=\(attempt)")
+        scene.requestGeometryUpdate(.Vision(size: size)) { error in
+            Logger.idle.error("event=\(event, privacy: .public) error=\(error.localizedDescription, privacy: .public)")
+        }
+        // What visionOS made of it, for the log. And the library's host once more, now the
+        // window has its new size: a window opened as its orb had no tab view to hide at first.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            let geometry = scene.effectiveGeometry
+            let bounds = geometry.coordinateSpace.bounds.size
+            Logger.idle.notice("event=\(event, privacy: .public)-geometry width=\(bounds.width) height=\(bounds.height) min=\(geometry.minimumSize.width)x\(geometry.minimumSize.height) max=\(geometry.maximumSize.width)x\(geometry.maximumSize.height)")
+            if self?.libraryAway == true { self?.applyLibraryAway() }
+        }
+    }
+
+    // MARK: The library out of reach (W39)
+
+    /// True while the window is its orb: the library is kept, and nothing in it can be found by
+    /// VoiceOver or touched.
+    private var libraryAway = false
+
+    /// Keeps the library out of VoiceOver's reach and out of touch while the window is its orb, at
+    /// its UIKit host as well: the tab view's controller, which hosts each tab on its own, whose
+    /// list hosts each row on its own again. SwiftUI's `accessibilityHidden` and `allowsHitTesting`
+    /// are set on the window's content and inside each tab; this is UIKit's own way of taking a
+    /// subtree from VoiceOver (`accessibilityElementsHidden`) and from touch, for what those may
+    /// not reach. The UI test runner lists the rows either way (visionOS 27.2 simulator), so
+    /// neither is proven by it. The orb is not inside the tab view, so it stays reachable.
+    func keepLibraryAway(_ away: Bool) {
+        libraryAway = away
+        applyLibraryAway()
+    }
+
+    private func applyLibraryAway() {
+        guard let window else { return }
+        let hosts = Self.tabBarControllers(in: window)
+        for host in hosts {
+            host.view.accessibilityElementsHidden = libraryAway
+            host.view.isUserInteractionEnabled = !libraryAway
+        }
+        if libraryAway {
+            Logger.idle.notice("event=library-away hosts=\(hosts.count)")
+        }
+    }
+
+    private static func tabBarControllers(in view: UIView) -> [UITabBarController] {
+        if let controller = view.next as? UITabBarController { return [controller] }
+        return view.subviews.flatMap { tabBarControllers(in: $0) }
     }
 
     /// The window's state for the rule, read now.
@@ -365,15 +587,26 @@ enum GlassConnectionsIdleDemo {
         return .seconds(seconds)
     }
 
-    /// UI tests only: every `--ui-testing` run marks each Connections window with its scene phase.
+    /// UI tests only: `--demo-library-size <width>x<height>` in a `--ui-testing` run gives the
+    /// Connections window that size as it opens (W39).
+    static var librarySize: CGSize? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard arguments.contains("--ui-testing"),
+              let index = arguments.firstIndex(of: "--demo-library-size"), arguments.indices.contains(index + 1)
+        else { return nil }
+        return GlassConnectionsWindowSize.stored(arguments[index + 1])
+    }
+
+    /// UI tests only: every `--ui-testing` run marks each Connections window with its scene phase,
+    /// and with what it is (library or orb) and its scene's size.
     static var reportsScenePhase: Bool { ProcessInfo.processInfo.arguments.contains("--ui-testing") }
 }
 
 #if os(visionOS)
 /// UI tests only: the Connections window's scene phase, where the runner can read it
-/// (`connections-scene-phase`). A window pushed aside for its orb stays in the tree the runner
-/// sees, rows and all, and reports them hittable (measured on the visionOS 27.0 and 27.2
-/// simulators, W34), so only the window can say whether it is on screen.
+/// (`connections-scene-phase`). A window pushed aside stays in the tree the runner sees, rows and
+/// all, and reports them hittable (measured on the visionOS 27.0 and 27.2 simulators, W34), so
+/// only the window can say whether it is on screen; one marker per window also counts them.
 private struct GlassConnectionsScenePhaseMarker: View {
     let phase: ScenePhase
 
@@ -393,6 +626,33 @@ private struct GlassConnectionsScenePhaseMarker: View {
         case .background: "background"
         @unknown default: "unknown"
         }
+    }
+}
+
+/// UI tests only: what the Connections window is and how big its scene is, where the runner can
+/// read it (`connections-window-state`): "library 960x700 1A2B3C4D" or "orb 184x184 1A2B3C4D",
+/// the last part naming the window, so a test can tell the orb is the same window (W39). The size
+/// is the scene's own, not the content's, so it says whether visionOS really made the window
+/// small. Read twice a second: nothing tells SwiftUI when a scene's size changes.
+private struct GlassConnectionsWindowStateMarker: View {
+    let probe: GlassConnectionsWindowProbe
+    let isOrb: Bool
+    let token: UUID
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 0.5)) { _ in
+            Color.clear
+                .frame(width: 1, height: 1)
+                .allowsHitTesting(false)
+                .accessibilityElement()
+                .accessibilityIdentifier("connections-window-state")
+                .accessibilityValue(value)
+        }
+    }
+
+    private var value: String {
+        let size = probe.windowSize.map { "\(Int($0.width.rounded()))x\(Int($0.height.rounded()))" } ?? "unknown"
+        return "\(isOrb ? "orb" : "library") \(size) \(token.uuidString.prefix(8))"
     }
 }
 #endif

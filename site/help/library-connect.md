@@ -54,7 +54,7 @@ A terminal kept in tmux says so under its name, and its action is **Detach** ins
 
 ## Bring the library back on Vision Pro
 
-When you leave the library window alone, it gets out of the way. After two minutes with no tap, scroll or typing in it, while another of the app's windows is open, it shrinks into a small glass orb in the same place. The orb shows the app's prompt, `>_`, and under it ⚡ and the number of sessions **Active** lists, when there are any.
+When you leave the library window alone, it gets out of the way. After two minutes with no tap, scroll or typing in it, while another of the app's windows is open, it shrinks into a small glass orb in the same place. The orb shows the app's icon, and on its rim ⚡ and the number of sessions **Active** lists, when there are any.
 
 - Look at the orb: it grows a little and shows **Connections** beneath it.
 - Tap it (look and pinch) to bring the library window back where it was, at the size it was, showing what it showed before.

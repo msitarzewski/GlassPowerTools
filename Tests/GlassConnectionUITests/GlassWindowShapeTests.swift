@@ -87,7 +87,7 @@ struct GlassWindowShapeTests {
                                     ["GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsTheme(Self.navigationOpacity)) {",
                                      ".glassSpatialWindowGlass(strength:"]),
                                    "the database draws Apple's glass itself, at the window's Glass, with Opacity's paint over it in the window's shape; its columns are our own"),
-        "\"minimized\"": (nil, "an icon in a circle; there is no window surface to shape"),
+        // W39: the orb ("minimized") is no longer a window of its own; Connections becomes it.
     ]
 
     @Test func everyPlainWindowIsRecordedWithWhatShapesIt() throws {

@@ -8,8 +8,9 @@
 //  window size."
 //
 //  The rule is here and pure, so what shrinks the window and what holds it open are tested without
-//  a headset. What the window reports to it is `GlassConnectionsIdleWatcher` (visionOS only), and
-//  the orb is `GlassConnectionsOrb`.
+//  a headset, and so are the sizes it goes between (`GlassConnectionsWindowSize`, W39). What the
+//  window reports to it, and how it becomes its orb, is `GlassConnectionsIdleWatcher` (visionOS
+//  only); the orb is `GlassConnectionsOrb`.
 //
 //  **Looking is not interacting, and cannot be.** visionOS does not tell an app where a person is
 //  looking: hover effects are drawn by the system, out of the app's process, and `onHover` reports
@@ -159,5 +160,81 @@ public struct GlassConnectionsIdleClock: Sendable, Equatable {
         }
         let idle = now - idleSince
         return idle >= interval ? .shrink : .wait(interval - idle)
+    }
+}
+
+// MARK: - The window's sizes
+
+/// The headset Connections window's sizes, in points, and the rules for going between the
+/// library's and the orb's (W39). Idle, the window becomes its own orb — the same window, made
+/// orb-sized — rather than pushing a second window over itself, which visionOS showed beside the
+/// window it should have hidden on the owner's headset after a relaunch (2026-10-11: "The orb
+/// always appears as it should. The All Connections window never minimizes").
+public enum GlassConnectionsWindowSize {
+    /// The library's first size (W29): a quarter narrower than the system's 1280, the 360-point
+    /// list column beside a 600-point detail, which holds a host's grouped form at a comfortable
+    /// width (the overview's four tiles wrap to two rows). Tall enough that a host with two
+    /// services shows every row and Edit without scrolling; 620 cut it off.
+    public static let width: CGFloat = 960
+    public static let height: CGFloat = 700
+    public static var standard: CGSize { CGSize(width: width, height: height) }
+
+    /// The orb's side: the 112-point icon, grown a little on a look, its count's badge hanging
+    /// below the rim, and the name shown beneath.
+    public static let orbSide: CGFloat = 184
+
+    /// The narrowest window visionOS makes. Asked for 184 × 184, with the scene's own limits at
+    /// exactly that, the orb's window came out 320 × 184 (visionOS 27.2 simulator, W39).
+    public static let narrowestWindow: CGFloat = 320
+
+    /// The window while it is its orb: the orb, centred in the narrowest window visionOS makes, so
+    /// what the content asks for and what visionOS gives are the same.
+    public static var orb: CGSize { CGSize(width: max(orbSide, narrowestWindow), height: orbSide) }
+
+    /// About the orb's window, which nobody gives the library on purpose. A Connections window
+    /// that comes back from a launch this small was quit as its orb, and visionOS kept its size.
+    public static func isOrbSized(_ size: CGSize) -> Bool {
+        size.width <= orb.width * 1.25 && size.height <= orb.height * 1.25
+    }
+
+    /// The size the library grows back to: the one it had before it became its orb, or its first
+    /// size when that is unknown, unusable, or no bigger than the orb itself.
+    public static func returning(to remembered: CGSize?) -> CGSize {
+        guard let remembered, usable(remembered), !isOrbSized(remembered) else { return standard }
+        return remembered
+    }
+
+    /// The library's size as the window's scene keeps it (`SceneStorage` keeps strings), so a
+    /// launch that restores the window at the orb's size can bring the library back at its own:
+    /// "960x700", or empty for none.
+    public static func stored(_ size: CGSize?) -> String {
+        guard let size, usable(size) else { return "" }
+        return "\(Int(size.width.rounded()))x\(Int(size.height.rounded()))"
+    }
+
+    /// A kept size read back; nil for none, or for anything this build did not write.
+    public static func stored(_ text: String) -> CGSize? {
+        let parts = text.split(separator: "x", omittingEmptySubsequences: false)
+        guard parts.count == 2, let width = Int(parts[0]), let height = Int(parts[1]) else { return nil }
+        let size = CGSize(width: width, height: height)
+        return usable(size) ? size : nil
+    }
+
+    /// Whether a scene held between `minimum` and `maximum` can take `size`. A limit that is zero,
+    /// negative or not finite on an axis is no limit there.
+    public static func admits(_ size: CGSize, minimum: CGSize, maximum: CGSize) -> Bool {
+        func fits(_ value: CGFloat, _ low: CGFloat, _ high: CGFloat) -> Bool {
+            let slack: CGFloat = 0.5
+            if low.isFinite, low > 0, value < low - slack { return false }
+            if high.isFinite, high > 0, value > high + slack { return false }
+            return true
+        }
+        return fits(size.width, minimum.width, maximum.width) && fits(size.height, minimum.height, maximum.height)
+    }
+
+    /// A size a window can have: finite, positive, and not absurd.
+    private static func usable(_ size: CGSize) -> Bool {
+        size.width.isFinite && size.height.isFinite && size.width > 0 && size.height > 0
+            && size.width <= 20_000 && size.height <= 20_000
     }
 }

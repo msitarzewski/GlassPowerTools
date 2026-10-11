@@ -16,6 +16,7 @@
 //
 
 import SwiftUI
+import Observation
 
 /// The one value the headset's Connections window shows, so opening it again brings it forward.
 /// Its encoded form is what visionOS keeps for the window between launches: keep the `id` key.
@@ -37,9 +38,45 @@ public extension OpenWindowAction {
     /// nothing.
     func openConnections() {
         #if os(visionOS)
+        GlassConnectionsRequests.shared.asked()
         self(id: GlassConnectionsWindow.sceneID, value: GlassConnectionsWindow())
         #else
         self(id: GlassConnectionsWindow.sceneID)
         #endif
     }
+}
+
+/// Every "Open Connections" on the headset, counted (W39).
+///
+/// Idle, the Connections window becomes its own orb (`glassConnectionsIdleShrink` in the shell):
+/// the same window, small, still on screen. Asking visionOS for a window that is already on
+/// screen brings it forward and changes nothing else, so ⚡ or a terminal's Connections control
+/// would leave the orb an orb. The window watches this count instead, and grows back into the
+/// library when it moves.
+@MainActor
+@Observable
+public final class GlassConnectionsRequests {
+    public static let shared = GlassConnectionsRequests()
+
+    /// How many times Connections has been asked for since launch.
+    public private(set) var count = 0
+
+    /// The same count, read without observing it: for a check made while SwiftUI builds a
+    /// window's views, which must not redraw the app's scenes whenever Connections is asked for.
+    @ObservationIgnored public private(set) var untrackedCount = 0
+
+    private init() {}
+
+    func asked() {
+        count &+= 1
+        untrackedCount = count
+    }
+}
+
+public extension EnvironmentValues {
+    /// True while the headset's Connections window stands as its orb (W39). The library keeps
+    /// every view and all its state, out of sight; this takes the rest away with it, inside each
+    /// tab, whose content is hosted on its own: the tab bar beside the window, the toolbar below
+    /// it, what VoiceOver could find and what a pinch could reach.
+    @Entry var glassLibraryOutOfSight = false
 }

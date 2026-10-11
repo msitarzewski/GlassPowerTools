@@ -128,8 +128,9 @@ public struct GlassTerminalScenes: Scene {
         .defaultSize(width: 1200, height: 800)
         .restorationBehavior(.disabled)
         .commands { PlatformTerminalCommands() }
-        // The orb Connections shrinks into is the shell's (`GlassConnectionsOrbScene`, W29): it
-        // shows the library's Active count, which only the shell can read.
+        // No orb scene here: Connections becomes its own orb, in its own window (the shell's
+        // `glassConnectionsIdleShrink`, W29 and W39), showing the library's Active count, which
+        // only the shell can read.
         #if DEBUG
         WindowGroup(id: "html-preview", for: HTMLPreviewContext.self) { $context in
             if let context {

@@ -343,6 +343,11 @@ struct GlassPowerToolsApp: App {
         // corner, with Opacity's paint over it (`GlassShellLibraryView`), and lays its columns
         // out itself (`GlassSpatialSplitView`).
         .windowStyle(.plain)
+        // **Its size follows its content** (W39): the library takes any size, as before (its
+        // scene's limits read 0 to unbounded), and the window as its orb is exactly the orb's,
+        // 320 × 184, so idle it can become its own orb rather than push a second window over
+        // itself (`glassConnectionsIdleShrink`).
+        .windowResizability(.contentSize)
         // **Smaller than the system's 1280 × 720** (W29; the owner, on the headset, 2026-10-10:
         // "The connections window on vision pro is pretty large"). The list column keeps its
         // 360 and the detail its grouped forms; what goes is empty space. It is the size a new
@@ -392,7 +397,8 @@ struct GlassPowerToolsApp: App {
         .trackWindowPresence(key: "main", recovery: windowRecovery)
         #if os(visionOS)
         // Idle for the time chosen in Settings ▸ General, with other windows open: the window
-        // shrinks into its orb, and a pinch on the orb brings it back as it was (W29).
+        // becomes its own orb, and a pinch on the orb brings the library back as it was (W29,
+        // W39). Opened again after Connections closed last, it opens as its orb.
         .glassConnectionsIdleShrink(model: model, recovery: windowRecovery)
         #endif
         // A text file opened from the Finder (Open With, or this app as its default editor) or
@@ -436,10 +442,6 @@ struct GlassPowerToolsApp: App {
         GlassDatabaseScenes(runtime: database)
         GlassDesktopScenes(runtime: desktop)
         GlassEditorScenes(runtime: editor)
-        #if os(visionOS)
-        // The orb Connections becomes when idle or closed last, with the library's Active count.
-        GlassConnectionsOrbScene(model: model, recovery: windowRecovery)
-        #endif
         #if os(macOS)
         Settings {
             GlassShellSettingsView(model: model)
@@ -455,14 +457,3 @@ struct GlassPowerToolsApp: App {
         #endif
     }
 }
-
-#if os(visionOS)
-/// The headset Connections window's first size, in points (W29). A quarter narrower than the
-/// system's 1280: the 360-point list column beside a 600-point detail, which holds a host's
-/// grouped form at a comfortable width (the overview's four tiles wrap to two rows). Tall enough
-/// that a host with two services shows every row and Edit without scrolling; 620 cut it off.
-enum GlassConnectionsWindowSize {
-    static let width: CGFloat = 960
-    static let height: CGFloat = 700
-}
-#endif

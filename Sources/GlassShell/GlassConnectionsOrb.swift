@@ -2,10 +2,11 @@
 //  GlassConnectionsOrb.swift
 //  Glass Power Tools — GlassShell
 //
-//  The headset's Connections window, shrunk to an orb (W29). It stands in for the window in two
-//  cases: Connections idle while other windows are open (`glassConnectionsIdleShrink`, which
-//  pushes the orb in the window's place), and Connections closed as the app's last window
-//  (`GlassWindowRecoveryManager`, which parks it here). Either way a pinch brings the window back.
+//  The headset's Connections window, shrunk to an orb (W29). Since W39 the orb is not a window of
+//  its own: the Connections window becomes it, made orb-sized, with the library kept out of sight
+//  inside (`glassConnectionsIdleShrink`). It stands in for the library in two cases: idle while
+//  other windows are open, and closed as the app's last window (`GlassWindowRecoveryManager`
+//  opens Connections again as its orb). Either way a pinch brings the library back.
 //
 //  It was glas.sh's spinner: a terminal symbol rotating without end in a material circle, which
 //  moved in the corner of the eye all day. Now it is still — the app's own icon in Apple's
@@ -17,48 +18,22 @@
 import SwiftUI
 
 #if os(visionOS)
-/// The orb's window. Plain, so the orb's own glass circle is the only thing drawn, and sized to
-/// its content: a pushed window otherwise opens at the size of the window it replaces.
-public struct GlassConnectionsOrbScene: Scene {
-    private let model: GlassShellModel
-    private let recovery: GlassWindowRecoveryManager
-
-    public init(model: GlassShellModel, recovery: GlassWindowRecoveryManager) {
-        self.model = model
-        self.recovery = recovery
-    }
-
-    public var body: some Scene {
-        // The literal, not `GlassConnectionsOrb.windowID`: GlassWindowShapeTests reads each plain
-        // scene's `id:` from the source and records this one as "minimized".
-        Window("", id: "minimized") {
-            GlassConnectionsOrb(model: model, recovery: recovery)
-                .trackWindowPresence(key: GlassConnectionsOrb.windowID, recovery: recovery)
-        }
-        .windowStyle(.plain)
-        .windowResizability(.contentSize)
-        .defaultSize(width: GlassConnectionsOrb.windowSide, height: GlassConnectionsOrb.windowSide)
-        .restorationBehavior(.disabled)
-    }
-}
-
 /// The orb: the app's icon in a glass circle, with the library's Active count when there is one.
+/// No panel behind it: the window it stands in draws none while it is the orb, so the icon and
+/// its glass circle are all there is, as when the orb was a plain window of its own.
 public struct GlassConnectionsOrb: View {
-    /// The orb's scene. "minimized" since glas.sh; the recovery manager parks Connections by it.
-    public static let windowID = "minimized"
     static let diameter: CGFloat = 112
     /// Room for the circle grown on a look, and the name shown beneath it.
-    static let windowSide: CGFloat = 184
+    static var windowSide: CGFloat { GlassConnectionsWindowSize.orbSide }
 
     private let model: GlassShellModel
-    private let recovery: GlassWindowRecoveryManager
-    @Environment(\.openWindow) private var openWindow
-    @Environment(\.dismissWindow) private var dismissWindow
+    private let restore: () -> Void
     @Environment(\.scenePhase) private var scenePhase
 
-    public init(model: GlassShellModel, recovery: GlassWindowRecoveryManager) {
+    /// - Parameter restore: grows the window back into the library.
+    init(model: GlassShellModel, restore: @escaping () -> Void) {
         self.model = model
-        self.recovery = recovery
+        self.restore = restore
     }
 
     /// The library's own number — the Active row's — so the orb never disagrees with the window
@@ -113,18 +88,6 @@ public struct GlassConnectionsOrb: View {
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             Task { await model.refreshRunningSessionsIfDue() }
-        }
-    }
-
-    /// Back to the full window. Pushed aside for idle, the window is still there behind the orb:
-    /// dismissing the orb brings it back at its size and place, as it was. Parked because it was
-    /// closed, there is no window behind it, so a new one opens.
-    private func restore() {
-        if recovery.isConnectionsPushedAside {
-            dismissWindow()
-        } else {
-            openWindow.openConnections()
-            dismissWindow(id: Self.windowID)
         }
     }
 

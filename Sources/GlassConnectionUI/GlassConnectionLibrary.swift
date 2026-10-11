@@ -37,6 +37,10 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
+    #if os(visionOS)
+    /// The window is its orb (W39): the library is kept, out of sight and out of reach.
+    @Environment(\.glassLibraryOutOfSight) private var outOfSight
+    #endif
 
     public init(items: [GlassLibraryItem<ID>], selection: Binding<ID?>,
                 scope: Binding<GlassLibraryScope>, searchText: Binding<String>,
@@ -228,7 +232,7 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
         #if os(visionOS)
         content
             .toolbar {
-                if active {
+                if active && !outOfSight {
                     ToolbarItemGroup(placement: .bottomOrnament) { toolbarActions() }
                 }
             }
@@ -405,6 +409,7 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
                 } content: {
                     withLibraryToolbar(detail(selection), active: activeTab == .category(category))
                 }
+                .modifier(VisionTabOutOfSight(outOfSight: outOfSight))
                 .tabItem { Label(category.title, systemImage: category.symbol) }
                 .tag(VisionTab.category(category))
             }
@@ -418,9 +423,25 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
                 } content: {
                     withLibraryToolbar(panel.detail(), active: activeTab == .panel(panel.id))
                 }
+                .modifier(VisionTabOutOfSight(outOfSight: outOfSight))
                 .tabItem { Label(panel.title, systemImage: panel.symbolName) }
                 .tag(VisionTab.panel(panel.id))
             }
+        }
+    }
+
+    /// A tab while the window is its orb (W39): no tab bar, no toolbar ornament — a panel's own
+    /// bottom bar, Active's selection actions, included — nothing for VoiceOver and nothing to
+    /// touch. Set inside each tab, because each tab's content is hosted on its own; the shell also
+    /// hides the tab view's UIKit host (`GlassConnectionsWindowProbe.keepLibraryAway`).
+    private struct VisionTabOutOfSight: ViewModifier {
+        let outOfSight: Bool
+
+        func body(content: Content) -> some View {
+            content
+                .toolbarVisibility(outOfSight ? .hidden : .automatic, for: .tabBar, .bottomOrnament)
+                .accessibilityHidden(outOfSight)
+                .allowsHitTesting(!outOfSight)
         }
     }
 

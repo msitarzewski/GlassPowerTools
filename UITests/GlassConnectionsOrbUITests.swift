@@ -2,12 +2,17 @@
 //  GlassConnectionsOrbUITests.swift
 //  GlassPowerToolsUITests
 //
-//  The headset's Connections window shrinking into its orb when idle, and coming back as it was
-//  (W29). Driven on the visionOS simulator with the idle time cut to seconds
+//  The headset's Connections window becoming its own orb when idle, and coming back as it was
+//  (W29, W39). Driven on the visionOS simulator with the idle time cut to seconds
 //  (`--demo-idle-seconds`, DEBUG and `--ui-testing` only). `--demo-open orb-later` opens a
 //  terminal 20 s after launch (`orb-later-desktop`, a remote desktop), so Connections is not the
 //  app's only window; each test uses Connections before it arrives, because it opens in front and
 //  the runner's taps reach only the window in front.
+//
+//  Since W39 the orb is the Connections window itself, made small, not a second window pushed
+//  over it. Each Connections window says what it is, how big its scene is and which window it is
+//  (`connections-window-state`, DEBUG), so a test can tell the orb is the same window, that
+//  visionOS really made it small, and that it grows back to the size it had.
 //
 //  The visionOS simulator cannot photograph from inside a test (rule 11): captures for the help
 //  are taken from outside with `Tools/Screenshots/shoot.sh`.
@@ -28,13 +33,18 @@ final class GlassConnectionsOrbUITests: XCTestCase {
         await MainActor.run { app?.terminate() }
     }
 
+    /// The size the tests give Connections as it opens: not its first size (960 × 700), so growing
+    /// back to "the size it had" cannot pass by growing back to the first size.
+    private static let librarySize = CGSize(width: 1100, height: 780)
+
     /// `surface` opens the other window 20 s after launch: `orb-later` a terminal, whose
     /// Connections control is a way back; `orb-later-desktop` a remote desktop, whose ⚡ is.
     private func launch(idleSeconds: Int, surface: String = "orb-later") {
         app = XCUIApplication()
         app.launchArguments += ["--ui-testing", UUID().uuidString,
                                 "--ui-testing-seed-hosts", "alpha@192.0.2.10:ssh+database|bravo@192.0.2.20:ssh",
-                                "--demo-open", surface, "--demo-idle-seconds", String(idleSeconds)]
+                                "--demo-open", surface, "--demo-idle-seconds", String(idleSeconds),
+                                "--demo-library-size", "\(Int(Self.librarySize.width))x\(Int(Self.librarySize.height))"]
         app.launch()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
         XCTAssertTrue(element("host-row-bravo").waitForExistence(timeout: 30), "bravo is not in the library")
@@ -101,19 +111,93 @@ final class GlassConnectionsOrbUITests: XCTestCase {
             .allElementsBoundByIndex.map { ($0.value as? String) ?? "" }
     }
 
-    /// The orb stands in for Connections: while it is up there is one Connections window, out of
-    /// sight. Asked of the window itself: a window pushed aside for the orb stays in the tree the
-    /// runner sees, rows and all, and reports them hittable, so counting its rows found it "on
-    /// screen" at every commit, the one the owner saw working included (W34).
-    private func assertConnectionsHidden(file: StaticString = #filePath, line: UInt = #line) {
-        let deadline = Date().addingTimeInterval(10)
-        var phases = connectionsWindowPhases()
-        while phases != ["background"], Date() < deadline {
-            Thread.sleep(forTimeInterval: 0.5)
-            phases = connectionsWindowPhases()
+    /// What a Connections window says it is (`connections-window-state`): "library" or "orb", its
+    /// scene's size, and which window it is.
+    private struct WindowState: Equatable, CustomStringConvertible {
+        let mode: String
+        let size: CGSize
+        let window: String
+
+        init?(_ text: String) {
+            let parts = text.split(separator: " ")
+            guard parts.count == 3 else { return nil }
+            let sides = parts[1].split(separator: "x").compactMap { Double($0) }
+            guard sides.count == 2 else { return nil }
+            mode = String(parts[0])
+            size = CGSize(width: sides[0], height: sides[1])
+            window = String(parts[2])
         }
-        XCTAssertEqual(phases, ["background"], "Connections stayed on screen beside its orb: its windows are \(phases)",
+
+        var description: String { "\(mode) \(Int(size.width))x\(Int(size.height)) \(window)" }
+
+        func isAbout(_ other: CGSize) -> Bool {
+            abs(size.width - other.width) <= 2 && abs(size.height - other.height) <= 2
+        }
+    }
+
+    private func connectionsWindowStates() -> [WindowState] {
+        app.descendants(matching: .any).matching(identifier: "connections-window-state")
+            .allElementsBoundByIndex.compactMap { WindowState(($0.value as? String) ?? "") }
+    }
+
+    /// Waits up to `seconds` for exactly one Connections window, in the state `matches` accepts.
+    @discardableResult
+    private func waitForConnections(_ what: String, seconds: TimeInterval = 15,
+                                    file: StaticString = #filePath, line: UInt = #line,
+                                    _ matches: (WindowState) -> Bool) -> WindowState? {
+        let deadline = Date().addingTimeInterval(seconds)
+        var states = connectionsWindowStates()
+        while !(states.count == 1 && matches(states[0])), Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.5)
+            states = connectionsWindowStates()
+        }
+        guard states.count == 1, matches(states[0]) else {
+            XCTFail("Connections is not \(what): its windows say \(states)", file: file, line: line)
+            return nil
+        }
+        return states[0]
+    }
+
+    /// The library, at the size the tests gave it, before anything shrinks it.
+    private func connectionsAsTheLibrary(file: StaticString = #filePath, line: UInt = #line) -> WindowState? {
+        waitForConnections("the library at \(Self.librarySize)", file: file, line: line) {
+            $0.mode == "library" && $0.isAbout(Self.librarySize)
+        }
+    }
+
+    /// The orb stands in for Connections by being it (W39): one Connections window, the same one,
+    /// now the orb and made small by visionOS, with nothing of the library left to reach — not its
+    /// rows, not its toolbar ornament. Asked of the window itself, because the owner's headset
+    /// showed the library beside the orb while the simulator hid it (2026-10-11).
+    private func assertConnectionsIsItsOrb(_ library: WindowState?, file: StaticString = #filePath, line: UInt = #line) {
+        // The orb is 184 points square, in the narrowest window visionOS makes: 320 points wide.
+        let orbWindow = CGSize(width: 320, height: 184)
+        let state = waitForConnections("its orb", file: file, line: line) {
+            $0.mode == "orb" && $0.size.width <= orbWindow.width + 2 && $0.size.height <= orbWindow.height + 2
+        }
+        if let library, let state {
+            XCTAssertEqual(state.window, library.window, "the orb is another window, not Connections itself",
+                           file: file, line: line)
+        }
+        // The runner lists views kept in a window whether or not anything can see them — the
+        // hidden library's rows are in its tree, as a pushed-aside window's were (W34) — so it is
+        // asked whether a row can be reached, not whether it is listed. The scene's size above
+        // is what says the library is gone: it cannot be drawn in a window that small.
+        let row = element("host-row-bravo")
+        if row.exists, row.isHittable {
+            attachTree("library-in-reach-beside-the-orb")
+            XCTFail("a library row can still be pinched beside the orb", file: file, line: line)
+        }
+        XCTAssertFalse(element("connection-library-add-host").exists, "the library's toolbar stayed beside the orb",
                        file: file, line: line)
+    }
+
+    /// Back from its orb: the same window, the library again, at the size it had.
+    private func assertConnectionsIsBack(_ library: WindowState?, file: StaticString = #filePath, line: UInt = #line) {
+        guard let library else { return }
+        waitForConnections("back at \(library)", file: file, line: line) {
+            $0.mode == "library" && $0.window == library.window && $0.isAbout(library.size)
+        }
     }
 
     private func assertOneConnectionsWindow(file: StaticString = #filePath, line: UInt = #line) {
@@ -122,27 +206,29 @@ final class GlassConnectionsOrbUITests: XCTestCase {
                        "\(bravoRows.count) Connections windows", file: file, line: line)
     }
 
-    /// While Connections is the only window it stays put; once the terminals open it shrinks into
-    /// an orb that carries Active's count, and a pinch on the orb brings the same window back with
-    /// bravo still selected.
+    /// While Connections is the only window it stays put; once the terminals open it becomes its
+    /// own orb, small, carrying Active's count, and a pinch on the orb grows the same window back
+    /// into the library, at the size it had, with bravo still selected.
     func testIdleConnectionsShrinksAndAPinchBringsItBackAsItWas() {
         launch(idleSeconds: 6)
         selectBravo()
+        let library = connectionsAsTheLibrary()
         assertNoOrb(for: 12, "Connections shrank while it was the app's only window")
 
         waitForTerminals()
         XCTAssertTrue(orb.waitForExistence(timeout: 40), "Connections did not shrink into its orb")
         attachTree("orb-up")
-        // The orb stands in for the window: Connections is out of sight while it is up (owner,
-        // 2026-10-11, on the headset: "The icon shows as expected, but the connections window
-        // remains, too").
-        assertConnectionsHidden()
+        // The orb stands in for the library: nothing of it is left beside the orb (owner,
+        // 2026-10-11, on the headset: "The orb always appears as it should. The All Connections
+        // window never minimizes").
+        assertConnectionsIsItsOrb(library)
         // A terminal is open: Active's count, said with the orb's name.
         XCTAssertNotNil(orb.label.wholeMatch(of: /Open Connections, [1-9][0-9]* active/),
                         "the orb's label carries no count: \(orb.label)")
 
         orb.tap()
         assertOrbGoes()
+        assertConnectionsIsBack(library)
         XCTAssertTrue(bravoIsShowing(), "Connections came back without bravo selected")
         assertOneConnectionsWindow()
         attachTree("restored-by-pinch")
@@ -170,21 +256,24 @@ final class GlassConnectionsOrbUITests: XCTestCase {
         attachTree("one-window-from-display-bolts")
 
         XCTAssertTrue(orb.waitForExistence(timeout: 60), "Connections did not shrink into its orb")
-        assertConnectionsHidden()
+        assertConnectionsIsItsOrb(nil)
         attachTree("display-orb-up")
     }
 
-    /// Asking for Connections from anywhere else — a terminal's own control — brings the window
-    /// back as it was and puts the orb away, rather than leaving a second window beside the first.
+    /// Asking for Connections from anywhere else — a terminal's own control — grows the orb back
+    /// into the library as it was, rather than leaving a second window beside the first.
     func testAskingForConnectionsElsewhereBringsTheSameWindowBack() {
         launch(idleSeconds: 6)
         selectBravo()
+        let library = connectionsAsTheLibrary()
         waitForTerminals()
         XCTAssertTrue(orb.waitForExistence(timeout: 40), "Connections did not shrink into its orb")
+        assertConnectionsIsItsOrb(library)
 
         terminalsConnections.tap()
         assertOrbGoes()
-        // The same window, not a second one beside it.
+        // The same window, not a second one beside it, at the size it had.
+        assertConnectionsIsBack(library)
         assertOneConnectionsWindow()
         XCTAssertTrue(bravoIsShowing(), "Connections came back without bravo selected")
         attachTree("restored-from-terminal")
@@ -194,9 +283,11 @@ final class GlassConnectionsOrbUITests: XCTestCase {
     func testTheBoltBringsTheSameWindowBackOnActive() {
         launch(idleSeconds: 6, surface: "orb-later-desktop")
         selectBravo()
+        let library = connectionsAsTheLibrary()
         XCTAssertTrue(orb.waitForExistence(timeout: 60), "Connections did not shrink into its orb")
+        assertConnectionsIsItsOrb(library)
 
-        // The library's own ⚡ is in the tree too, behind the orb; the desktop's is the one in reach.
+        // The library's own ⚡ went out of sight with it; the desktop's is the one in reach.
         var bolt: XCUIElement?
         for _ in 0..<20 where bolt == nil {
             bolt = app.buttons.matching(identifier: "active-connections-bolt").allElementsBoundByIndex.first { $0.isHittable }
@@ -205,6 +296,7 @@ final class GlassConnectionsOrbUITests: XCTestCase {
         guard let bolt else { return XCTFail("no ⚡ in reach") }
         bolt.tap()
         assertOrbGoes()
+        assertConnectionsIsBack(library)
         XCTAssertTrue(element("active-connections").waitForExistence(timeout: 10), "Connections came back without Active")
         attachTree("restored-by-bolt")
         // One window, on Active: the same one, not a second.
