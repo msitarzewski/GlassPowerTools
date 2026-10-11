@@ -1122,3 +1122,15 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   enabled by the app at launch (not in tests or UI tests). Fetch from the headset with
   `xcrun devicectl device copy from --device <id> --domain-type appDataContainer --domain-identifier com.glasspowertools
   --source Library/Caches/com.glasspowertools/Diagnostics/screen-sharing.log --destination <file>`.
+- **0.4.350 (5651ae3) on all three (~12:20).** Next: owner reproduces the two-display drop; fetch the headset's screen-sharing.log with devicectl.
+- **Headset log (0.4.350, 17:10Z) — the two-display drop explained:** main session connects (6032×2707, layout 2
+  displays); display connection for display 4 opens, SetDisplay(4) confirmed (1920×1080); main session's
+  SetServerScaling 0.5 confirmed (3016×1354); **0.9 s later the main session fails: "The ZRLE rectangle has trailing
+  data."** → apple-display-layout-refused → reconnect without the layout → one combined screen. The probe's run 3
+  (single session, whole framebuffer, scale 0.5) decoded 606 frames fine, so suspect the combination: scaled
+  framebuffer + region-limited requests (display 1 only) + a concurrent second session; or the ZRLE inflater/state across
+  a scale change (check remotex notes' ZRLE section, ~line 338, for stream resets). **Also wrong:** a decode error is
+  treated as "the Mac broke the protocol after the layout request", disabling the layout — it should not be. Next:
+  reproduce with a probe mode (regions = display 1, scale 0.5, second session on display 4), fix the decoder, keep the
+  layout. Log copy: `$SP/probe-runs/headset-screen-sharing-1710.log`. Also pending: drag-select into tmux history;
+  pointer (Mac sends no cursor messages to our 3.8 client).

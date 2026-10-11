@@ -27,6 +27,17 @@ anything touching real servers (SSH and database tests use the disposable test V
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
+## 2026-10-11 (midday) — where things stand
+
+**HEAD = latest notes commit after 5651ae3. Installed: 0.4.350 on Mac, Vision Pro and iPhone.** Two-display screen sharing
+works (D61); W38 (D64) adds Retina at 1x / Keep Display Proportions / pointer. **Open bug, top priority:** on the headset
+the main connection fails 0.9 s after SetServerScaling 0.5 with "The ZRLE rectangle has trailing data" (log via
+VNCDiagnostics, fetched with devicectl — see the task note); the failure then wrongly disables the Apple layout. Then:
+drag-select can't reach tmux history in Mac local terminals; the Mac sends no cursor messages to our RFB 3.8 client
+(pointer likely drawn into the picture); open questions (light/dark theme pair, title capsule sizes, SSH new tabs in
+the remote folder). Probe outputs/logs live only in the scratchpad (`.gitignore` covers Tests/LiveDesktop/*.txt,
+*.logarchive).
+
 ## 2026-10-11 (morning) — where things stand
 
 **HEAD 606c174+notes.** Installed: **0.4.349 on Mac, Vision Pro and iPhone** (11:45). Since the evening: W34 orb fix (a display
