@@ -1315,3 +1315,13 @@ Settings ▸ Connection shows the live figures. **Evidence:** TigerVNC fixture w
 (whole Best 87 Mbit/s → display 2 only Best 49 → whole Data Saver 5.6 → Lowest 1.3; Automatic settled Data Saver at 2
 Mbit/s and Lowest at 0.6). **Unverified on a real Mac:** Apple's layout encoding, 16-bit colour, region requests — the
 owner's checklist is in the task note.
+
+## D62 — Opacity stays on every window; the navigation windows go to their own glass — Approved 2026-10-10
+**Owner:** "The whole point of Glass Power Tools is Glass. Opacity is essential transparency is essential." Asked (after
+W32 began removing the dark inset panel, and Opacity with it, from the database, Files and the editor): Opacity tints the
+**whole window, edge to edge** (chosen); full transparency in Connections, the database, the editor and Files by
+replacing Apple's split view on visionOS — **"Yes, all four"** (chosen), accepting the loss of the system's animated
+sidebar collapse, column resizing and VoiceOver column landmarks. **Implemented so far:** whole-window Opacity behind
+the columns (`GlassNavigationWindowOpacity.behindColumns`, 6f2cb23; Connections switched with it). **In progress:** W33,
+one shared own-glass sidebar/content container for the four windows; supersedes D60's "split-view windows keep system
+glass" and its prototype switch. Never remove or hide an Opacity or Glass control to make a look work.

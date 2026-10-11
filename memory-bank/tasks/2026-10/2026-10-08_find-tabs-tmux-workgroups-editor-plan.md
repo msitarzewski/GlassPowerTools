@@ -977,3 +977,23 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   ornament vs the library's toolbar ornament) → **W31** (move GlassNativeWindowFrame controls into Apple's
   `.bottomOrnament` toolbar, or match its metrics). **Owner:** no resize for the left (sidebar) columns — never decided;
   visionOS shows no drag handle; to be tested.
+- **0.4.342 (6d132e9: orb icon, library alignment) installed on Vision Pro (relaunched) and iPhone (~17:55).**
+- **42071ef:** the orb's count badge moved over the icon after its hover effects (the look highlight, clipped to the
+  circle, cut it in half: "the count is kind of off").
+- **Owner (~18:00):** editor capture: "the headers across all of these should do a better job of matching, yes? There's
+  no hide the sidebar in the files list when an editor is open. just a big blank space at the top of the sidebar";
+  asked themes vs Apple default for the editor's background; then "Database server needs the dark background treatment
+  like connections. same with the database view and ultimately the editor." → **W32**: no dark panels on visionOS in
+  database (every surface), Files and editor; titles as column navigationTitles level with the sidebar's; editor
+  sidebar title + system sidebar toggle; margins as Connections; editor/SQL text on Apple's glass with theme syntax
+  colours (coordinator's recommendation). `DatabaseSpatialLayout.ownGlass` stays off (owner chose the split view).
+- **W31 finding:** Connections' bottom bar was hand-built too (`.controlSize(.large)`); Apple's toolbar ornament (database,
+  editor) is ~70 pt tall, pitch ~72; moving all into it makes them match (terminal's gets a little taller). Told the owner.
+- **Owner (~18:10):** "Opacity is essential transparency is essential" → D62: whole-window Opacity; all four navigation
+  windows to their own glass. **0297252 (W31)**: every bottom bar is `ToolbarItemGroup(.bottomOrnament)` (measured equal;
+  terminal's slightly taller, Connections' shorter — "smaller" was perspective). **6f2cb23 (W32 + Connections switch)**: no
+  dark inset panel in database/Files/editor, Opacity edge to edge behind the columns, column titles level, editor
+  "Files" sidebar title + `GlassSidebarToggle`, database overviews with equal tiles; database This Window hides Glass on
+  visionOS (W33 restores it). All suites green. **0.4.343** building/installing (Vision Pro + iPhone). **W33** running.
+  Open for the owner: title ornament sizes differ (terminal ≈29 pt caption, desktop ≈37 pt headline); editor text at
+  Opacity 0 is lightened/semibold with a shade (legibility), losing most syntax colour.
