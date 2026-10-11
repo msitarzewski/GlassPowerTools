@@ -1160,3 +1160,11 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   turn it on); mixed densities on screen → one connection at native, as Apple's viewer. Settings text corrected.
   Open: the pointer (didn't move while scaled; Mac sends us no cursor messages under our RFB 3.8 — try 3.889, or draw
   a local pointer).
+- **W39 (c23a6b6 / 0.4.362): the Connections window becomes its orb in place.** Owner: "The orb always appears as it
+  should. The All Connections window never minimizes" (both visible; pinching restored nothing); asked whether it
+  should transform instead. Cause: pushWindow leaves the parent visible after force-quit/relaunch or pinning (visionOS
+  fault reported by developers; our installs force-quit). Now: same window resizes to 320×184 (visionOS width floor)
+  with the orb, library kept hidden in the tree; pinch or any Open Connections grows it back (SceneStorage size);
+  separate orb scene deleted; last-window parking reopens Connections as its orb. UI 9/9 on the 27.2 simulator; shell
+  272, connection UI 49, terminal 743. **Not yet confirmed on the headset**; if the bring-forward jumps the orb, drop
+  the one openWindow in `becomeOrb`.
