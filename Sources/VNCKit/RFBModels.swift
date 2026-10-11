@@ -31,6 +31,9 @@ public struct RFBProtocolVersion: Equatable, Sendable {
 
     var wireBytes: [UInt8] { Array(String(format: "RFB %03d.%03d\n", major, minor).utf8) }
 
+    /// Apple's own revision, which a Mac announces and Apple's viewer answers.
+    public static let apple = RFBProtocolVersion(major: 3, minor: 889)
+
     static func parse(_ bytes: [UInt8]) throws -> RFBProtocolVersion {
         guard bytes.count == 12, bytes[0...3].elementsEqual("RFB ".utf8), bytes[7] == UInt8(ascii: "."), bytes[11] == 10,
               let major = Int(String(decoding: bytes[4...6], as: UTF8.self)),
@@ -171,6 +174,17 @@ public struct VNCServerInfo: Equatable, Sendable {
     /// How long this device took to compute Apple Remote Desktop's Diffie-Hellman exchange (security
     /// type 30); nil for other security types. For the log and the live probe.
     public let keyExchangeDuration: Duration?
+    /// The client messages a Mac accepts, one bit each, from its enhanced ServerInit (003.889); nil
+    /// from every other server. Most significant bit first: type `t` is bit `7 − t % 8` of byte `t / 8`.
+    public var appleCommands: [UInt8]? = nil
+    /// The session travels in Apple's record layer (`RFBAppleRecordLayer`).
+    public var encrypted = false
+
+    /// Whether the Mac accepts client message `type`, by its enhanced ServerInit.
+    public func appleAccepts(_ type: UInt8) -> Bool {
+        guard let appleCommands, Int(type / 8) < appleCommands.count else { return false }
+        return appleCommands[Int(type / 8)] & (0x80 >> (type % 8)) != 0
+    }
 
     /// Apple's Screen Sharing, which announces RFB 003.889 (`RFBServerDialect`).
     public var isAppleScreenSharing: Bool { RFBServerDialect(version: serverVersion) == .apple }

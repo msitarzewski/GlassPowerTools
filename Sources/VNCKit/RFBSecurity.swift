@@ -49,6 +49,9 @@ enum RFBSecurity {
     struct AppleRemoteDesktopResponse: Equatable {
         let encryptedCredentials: [UInt8]
         let clientPublicKey: [UInt8]
+        /// `MD5(shared secret)`: on RFB 003.889 also the key the record layer's rekey is wrapped
+        /// under (remotex's notes, "Connecting"). Held in memory for that one unwrap.
+        var wrapKey: [UInt8] = []
         var wireBytes: [UInt8] { encryptedCredentials + clientPublicKey }
     }
 
@@ -75,7 +78,7 @@ enum RFBSecurity {
         for (index, byte) in Array(password.utf8).enumerated() { credentials[64 + index] = byte }
         credentials[64 + password.utf8.count] = 0
         let encrypted = try encryptECB(algorithm: CCAlgorithm(kCCAlgorithmAES128), key: aesKey, plaintext: credentials)
-        return AppleRemoteDesktopResponse(encryptedCredentials: encrypted, clientPublicKey: clientPublicKey)
+        return AppleRemoteDesktopResponse(encryptedCredentials: encrypted, clientPublicKey: clientPublicKey, wrapKey: aesKey)
     }
 
     static func fit(_ bytes: [UInt8], to length: Int) -> [UInt8] {

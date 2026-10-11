@@ -658,13 +658,14 @@ final class RFBStreamPlanner: @unchecked Sendable {
 
     // MARK: Decisions
 
-    /// What to send now, handed to `emit` as one write while still deciding, so writes reach the
-    /// wire in the order they were decided; and when to look again if something waits on time.
+    /// What to send now, handed to `emit` a message at a time while still deciding, so writes reach
+    /// the wire in the order they were decided; and when to look again if something waits on time.
     func decide(at now: ContinuousClock.Instant, emit: ([UInt8]) -> Void) -> ContinuousClock.Instant? {
         lock.withLock {
             guard started else { return nil }
-            let (bytes, wake) = plan(at: now)
-            if !bytes.isEmpty { emit(bytes) }
+            let (messages, wake) = plan(at: now)
+            // One message at a time: on a Mac's record layer each goes in a record of its own.
+            for message in messages { emit(message) }
             // One timer at a time: a wake already due no later than this one will look again.
             if let wake, let pending = wakeAt, pending > now, pending <= wake { return nil }
             wakeAt = wake ?? wakeAt
@@ -672,9 +673,9 @@ final class RFBStreamPlanner: @unchecked Sendable {
         }
     }
 
-    private func plan(at now: ContinuousClock.Instant) -> (bytes: [UInt8], wake: ContinuousClock.Instant?) {
+    private func plan(at now: ContinuousClock.Instant) -> (messages: [[UInt8]], wake: ContinuousClock.Instant?) {
         do {
-            var out: [UInt8] = []
+            var out: [[UInt8]] = []
             let wanted = wantedProfile()
             if wanted.colourDepth != active.colourDepth {
                 let quiet = waitingSince.map { now - $0 >= Self.quietBeforeForcedFormatChange } ?? false
@@ -682,7 +683,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
                     // Stop asking until the held request is answered; look again for a quiet line.
                     return ([], now + .milliseconds(500))
                 }
-                out += wanted.colourDepth.pixelFormat.setPixelFormatMessage
+                out.append(wanted.colourDepth.pixelFormat.setPixelFormatMessage)
                 decoder = (try? RFBPixelDecoder(format: wanted.colourDepth.pixelFormat)) ?? .native
                 active = wanted
                 refresh = true; urgent = true
@@ -697,7 +698,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
                                                            appleDisplayLayout: appleDisplayLayout, appleCursor: appleCursor)
             if encodings != advertisedEncodings {
                 advertisedEncodings = encodings
-                out += RFBEncoding.setEncodingsMessage(encodings)
+                out.append(RFBEncoding.setEncodingsMessage(encodings))
             }
             // The display before the scale it wants, and the request after both.
             let displayWake = planDisplay(at: now, into: &out)
@@ -709,16 +710,16 @@ final class RFBStreamPlanner: @unchecked Sendable {
                 // With SetDisplay, the whole picture in the bounds the Mac has now: it answers it
                 // for the display it switches to (remotex, `set_display_message`'s caller).
                 displaySwitchRequest = nil
-                out += bounds.updateRequest(incremental: false)
+                out.append(bounds.updateRequest(incremental: false))
                 sent(at: now)
             } else if urgent, !paused, let rectangle = requestRectangle() {
-                out += rectangle.updateRequest(incremental: !refresh)
+                out.append(rectangle.updateRequest(incremental: !refresh))
                 sent(at: now)
             } else if holding, urgent || owed {
                 // Waiting for a layout that names the display: a pixel at a time, enough to carry it.
                 let due = urgent ? now : (lastRequestAt.map { $0 + Self.pausedRequestInterval } ?? now)
                 if due <= now {
-                    out += RFBRectangle(x: 0, y: 0, width: min(1, width), height: min(1, height)).updateRequest(incremental: !refresh)
+                    out.append(RFBRectangle(x: 0, y: 0, width: min(1, width), height: min(1, height)).updateRequest(incremental: !refresh))
                     sent(at: now)
                 } else {
                     wake = due
@@ -732,7 +733,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
                     let rectangle = paused ? RFBRectangle(x: 0, y: 0, width: min(1, width), height: min(1, height))
                                            : requestRectangle()
                     if let rectangle, !rectangle.isEmpty {
-                        out += rectangle.updateRequest(incremental: paused || !refresh)
+                        out.append(rectangle.updateRequest(incremental: paused || !refresh))
                         sent(at: now)
                     }
                 } else {
@@ -750,12 +751,12 @@ final class RFBStreamPlanner: @unchecked Sendable {
     /// display or a scale is waiting for its layout: arming is a read of the picture, and one sized
     /// for a picture that is about to shrink is what crashes the Mac's capture agent (the notes,
     /// "Resizing"). Nothing on screen arms them off.
-    private func planArming(paused: Bool, into out: inout [UInt8]) {
+    private func planArming(paused: Bool, into out: inout [[UInt8]]) {
         guard dialect == .apple, arming, appleDisplayLayout, layoutSeen, width > 0, height > 0,
               scaleAsked == nil, displayAsked == nil, !holding else { return }
         let interval = paused ? Self.pushesOff : Self.pushInterval
         if let armed, armed.interval == interval, armed.width == width, armed.height == height { return }
-        out += RFBAppleDisplayLayout.autoFramebufferUpdateMessage(interval: interval, width: width, height: height)
+        out.append(RFBAppleDisplayLayout.autoFramebufferUpdateMessage(interval: interval, width: width, height: height))
         armed = (interval, width, height)
     }
 
@@ -764,7 +765,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
 
     /// Asks a Mac for the display wanted, once it has shown it sends layouts; returns when to look
     /// again at an unanswered request.
-    private func planDisplay(at now: ContinuousClock.Instant, into out: inout [UInt8]) -> ContinuousClock.Instant? {
+    private func planDisplay(at now: ContinuousClock.Instant, into out: inout [[UInt8]]) -> ContinuousClock.Instant? {
         guard dialect == .apple, appleDisplayLayout, layoutSeen, let wanted = displayWanted else { return nil }
         if let asked = displayAsked, now - asked.at >= Self.displayAnswerTimeout {
             VNCDiagnostics.note(Self.logger, .error, category: "planner", "event=display unconfirmed=\(asked.selection.id.map(String.init) ?? "all")")
@@ -772,7 +773,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
             displayAsked = nil
         }
         if displayAsked == nil, !wanted.matches(displayInForce), displayDeclined != wanted {
-            out += RFBAppleDisplayLayout.setDisplayMessage(wanted.id)
+            out.append(RFBAppleDisplayLayout.setDisplayMessage(wanted.id))
             displayAsked = (wanted, now)
             // The whole picture after it: the Mac answers it for the display it switches to.
             displaySwitchRequest = RFBRectangle(x: 0, y: 0, width: width, height: height)
@@ -785,7 +786,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
     /// Asks a Mac for the scale the level and the displays' density want, once it has shown it sends
     /// layouts; returns when to look again at an unanswered request, or at a density change waiting
     /// to settle.
-    private func planScale(at now: ContinuousClock.Instant, into out: inout [UInt8]) -> ContinuousClock.Instant? {
+    private func planScale(at now: ContinuousClock.Instant, into out: inout [[UInt8]]) -> ContinuousClock.Instant? {
         guard dialect == .apple, appleDisplayLayout, serverScaling, layoutSeen else { return nil }
         if let asked = scaleAsked, now - asked.at >= Self.scaleAnswerTimeout {
             VNCDiagnostics.note(Self.logger, .error, category: "planner", "event=server-scale unconfirmed=\(asked.factor) inForce=\(self.scaleInForce)")
@@ -795,7 +796,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
         let settleWake = settleDensity(at: now)
         let want = scaleOverride ?? Self.combined(active.serverScale, densityFactorInUse)
         if scaleAsked == nil, !Self.sameScale(want, scaleInForce), !(scaleDeclined.map { Self.sameScale($0, want) } ?? false) {
-            out += RFBAppleDisplayLayout.setServerScalingMessage(want)
+            out.append(RFBAppleDisplayLayout.setServerScalingMessage(want))
             scaleAsked = (want, now)
             VNCDiagnostics.note(Self.logger, .default, category: "planner", "event=server-scale asked=\(want) inForce=\(self.scaleInForce) density=\(self.densityFactorInUse)")
         }

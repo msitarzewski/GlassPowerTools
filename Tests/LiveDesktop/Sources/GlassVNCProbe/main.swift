@@ -46,6 +46,8 @@ usage: GlassVNCProbe <host> <port> <username-or-empty> <password-file | -> [opti
                            last), and report both
   --cursor <seconds>       print every pointer message for this long: move the Mac's mouse meanwhile
   --pointer-check          move the Mac's pointer (no clicks) and report where the Mac says it went
+  --apple                  answer a Mac in its own revision, RFB 003.889, with its record layer: the
+                           session encrypted after sign-in (2026-10-11)
   --no-arm                 do not arm the Mac's pushes (AutoFrameBufferUpdate), as before 2026-10-11, to
                            compare: armed, a Mac should send its pointer's position and shapes
   --as-app [<seconds>]     as the app with a display window per display: a second connection for the
@@ -252,6 +254,7 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
         var pointerCheck = false
         var asAppSeconds: Double?
         var arms = true
+        var appleProtocol = false
         func bad() -> Never { FileHandle.standardError.write(Data(usage.utf8)); exit(2) }
         while let index = arguments.firstIndex(where: { $0.hasPrefix("--") }) {
             let option = arguments[index]
@@ -277,6 +280,8 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
                 cursorSeconds = length; consumed = 2
             case "--pointer-check":
                 pointerCheck = true
+            case "--apple":
+                appleProtocol = true
             case "--no-arm":
                 arms = false
             case "--as-app":
@@ -321,7 +326,8 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
         /// As `GlassVNCSession` configures it for a host it has not been refused by.
         func makeClient(_ recorder: Recorder, display: UInt32?) throws -> VNCClient {
             let client = try VNCClient(configuration: VNCConfiguration(host: host, port: port, username: username, password: password,
-                                                                       sharedSession: true, clipboardEnabled: false, display: display),
+                                                                       sharedSession: true, clipboardEnabled: false, display: display,
+                                                                       appleProtocol: appleProtocol),
                                        callbacks: recorder.callbacks())
             client.setQuality(quality)
             client.setDensityScaling(retina)
@@ -376,6 +382,12 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
             String(format: ", of which the key exchange %.3f s", Double($0.components.seconds) + Double($0.components.attoseconds) / 1e18)
         } ?? ""
         print("signed in      : \(seconds(started, connectedAt)) after connecting\(keyExchange)")
+        let answered = "\(info.negotiatedVersion.major).\(info.negotiatedVersion.minor)"
+        let encryption = client.isEncrypted ? ", the session encrypted (Apple's record layer)" : ", the session NOT encrypted after sign-in"
+        let interesting: [UInt8] = [0x09, 0x0a, 0x12, 0x17, 0x1c, 0x1d, 0x21]
+        let accepted = interesting.filter { info.appleAccepts($0) }.map { String(format: "0x%02x", $0) }.joined(separator: " ")
+        let commands: String = info.appleCommands == nil ? "" : " — the Mac accepts: " + accepted
+        print("protocol       : answered " + answered + encryption + commands)
         print("server         : RFB \(info.serverVersion.major).\(String(format: "%03d", info.serverVersion.minor)), negotiated "
               + "\(info.negotiatedVersion.major).\(info.negotiatedVersion.minor), security \(info.securityType.rawValue) "
               + "(\(info.securityType.displayName))" + (info.isAppleScreenSharing ? ", Apple Screen Sharing" : ""))

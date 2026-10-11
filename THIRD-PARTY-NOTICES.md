@@ -127,6 +127,7 @@ Small extractions rather than whole modules; each carries its attribution in the
 |---|---|
 | `MacKeyboardMapping.swift` | RDPKit 0.3.1 `Examples/RDPClient/RemoteInputCaptureView.swift` (MIT). The example app is not carried; this mapping is. |
 | `DesktopAudioPlayer.swift` | RDPKit's AVAudioEngine example player (MIT), adapted with bounded scheduling and generation safety. |
+| `Sources/VNCKit/RFBAppleRecordLayer.swift`, the 003.889 handshake in `VNCClient.swift` | remotex (MIT, Copyright (c) 2026 Andrew Chen, https://github.com/andrewtheguy/remotex): `src/vnc_record.rs`, `src/vnc_apple.rs`, `src/vnc.rs` and `docs/apple-vnc-889.md`, ported to Swift and CommonCrypto. |
 
 ## System libraries
 

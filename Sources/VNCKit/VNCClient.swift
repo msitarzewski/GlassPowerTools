@@ -21,10 +21,16 @@ public struct VNCConfiguration: Sendable {
     /// it is being sent, no picture is fetched or handed on, and a Mac that does not switch to it ends
     /// the session. Nil shows what the Mac sends.
     public var display: UInt32?
+    /// Answer a Mac in its own revision, RFB 003.889, with its record layer: the session encrypted
+    /// after sign-in, which 3.8 never asks for (`RFBAppleRecordLayer`, 2026-10-11). Off: 3.8, as
+    /// common clients answer. Other servers are answered as before either way.
+    public var appleProtocol: Bool
 
     public init(host: String, port: UInt16 = 5900, username: String = "", password: String,
                 sharedSession: Bool = true, clipboardEnabled: Bool = false, requestsAppleDisplayLayout: Bool = true,
-                allowsServerScaling: Bool = true, requestsAppleCursor: Bool = true, display: UInt32? = nil) {
+                allowsServerScaling: Bool = true, requestsAppleCursor: Bool = true, display: UInt32? = nil,
+                appleProtocol: Bool = false) {
+        self.appleProtocol = appleProtocol
         self.host = host; self.port = port; self.username = username; self.password = password
         self.sharedSession = sharedSession; self.clipboardEnabled = clipboardEnabled
         self.requestsAppleDisplayLayout = requestsAppleDisplayLayout
@@ -68,6 +74,8 @@ public final class VNCClient: Sendable {
     private let callbacks: VNCClientCallbacks
     private let source: RFBCountingByteSource
     private let sink: any RFBByteSink
+    /// Under `source` and `sink`: the bytes as they come until a Mac's rekey, then its record layer.
+    private let records: RFBAppleRecordLayer
     private let closeAction: @Sendable () async -> Void
     private let state = ClientState()
     /// What to ask the server for, and when (`VNCStreaming.swift`).
@@ -89,8 +97,10 @@ public final class VNCClient: Sendable {
                 close: @escaping @Sendable () async -> Void = {}) {
         self.configuration = configuration
         self.callbacks = callbacks
-        self.source = RFBCountingByteSource(source)
-        self.sink = sink
+        let records = RFBAppleRecordLayer(source: source, sink: sink)
+        self.records = records
+        self.source = RFBCountingByteSource(records)
+        self.sink = records
         self.closeAction = close
         (outbox, outboxContinuation) = AsyncStream.makeStream(of: [UInt8].self)
         state.setOpen(open)
@@ -162,6 +172,9 @@ public final class VNCClient: Sendable {
     /// it. Nil once a pixel rectangle has been read after it, which shows it was read right.
     public var lastAppleEncoding: RFBEncoding? { state.lastAppleEncoding }
 
+    /// The session travels in a Mac's record layer, encrypted (003.889).
+    public var isEncrypted: Bool { records.isEncrypted }
+
     /// ZRLE rectangles read with bytes left over this connection (`RFBZRLETrailingData`).
     public var zrleTrailingDataCount: Int { state.zrleTrailingDataCount }
 
@@ -199,11 +212,18 @@ public final class VNCClient: Sendable {
             state.cancelWakes()
             await closeAction()
             await streaming.first?.value
+            await records.finish()
         }
         do {
             try await state.open()
             try checkCancelled()
-            let info = try await handshake()
+            var (info, wrapKey) = try await handshake()
+            if info.negotiatedVersion == .apple {
+                try await applePrelude(wrapKey: wrapKey)
+                info.encrypted = true
+                state.setAppleProtocol()
+            }
+            wrapKey = []
             planner.start(width: info.width, height: info.height, dialect: RFBServerDialect(version: info.serverVersion),
                           appleDisplayLayout: configuration.requestsAppleDisplayLayout,
                           serverScaling: configuration.allowsServerScaling,
@@ -213,9 +233,9 @@ public final class VNCClient: Sendable {
             try await sink.write(opening.encodings)
             // The first request is on the wire before the session says it is ready; later ones go
             // through the outbox, in the order the planner decides them.
-            var first: [UInt8] = []
-            _ = planner.decide(at: .now) { first += $0 }
-            if !first.isEmpty { try await sink.write(first) }
+            var first: [[UInt8]] = []
+            _ = planner.decide(at: .now) { first.append($0) }
+            for message in first { try await sink.write(message) }
             let framebuffer = try RFBFramebuffer(width: info.width, height: info.height)
             state.setFramebufferSize(width: info.width, height: info.height)
             let (sink, outbox) = (sink, outbox)
@@ -294,9 +314,10 @@ public final class VNCClient: Sendable {
         if state.isCancelled { throw RFBError.cancelled }
     }
 
-    private func handshake() async throws -> VNCServerInfo {
+    private func handshake() async throws -> (VNCServerInfo, wrapKey: [UInt8]) {
         let serverVersion = try RFBProtocolVersion.parse(try await source.read(12))
-        let version = serverVersion.negotiated
+        let version = configuration.appleProtocol && serverVersion == .apple ? .apple : serverVersion.negotiated
+        let apple = version == .apple
         try await sink.write(version.wireBytes)
         let securityType: RFBSecurityType
         if version.minor == 3 {
@@ -313,8 +334,9 @@ public final class VNCClient: Sendable {
             securityType = try choose(offered)
             try await sink.write([securityType.rawValue])
         }
-        let keyExchange = try await authenticate(securityType, version: version)
-        try await sink.write([configuration.sharedSession ? 1 : 0])
+        let (keyExchange, wrapKey) = try await authenticate(securityType, version: version)
+        // 0x80 asks a Mac for its enhanced ServerInit (remotex's notes, "Connecting").
+        try await sink.write([(configuration.sharedSession ? 1 : 0) | (apple ? 0x80 : 0)])
         let initBytes = try await source.read(24)
         var reader = ByteReader(initBytes)
         let width = Int(try reader.u16()), height = Int(try reader.u16())
@@ -322,12 +344,69 @@ public final class VNCClient: Sendable {
         let nameLength = Int(try reader.u32())
         guard nameLength <= RFBLimits.maximumNameBytes else { throw RFBError.resourceLimit("The server name is too long.") }
         try RFBFramebuffer.validate(width: width, height: height)
-        let name = String(decoding: try await source.read(nameLength), as: UTF8.self)
+        let field = try await source.read(nameLength)
+        // A Mac's enhanced ServerInit puts 22 bytes before the name: a zero `u16`, a `u32` of flags
+        // and the 16-byte bitmap of the client messages it accepts (remotex's notes, "ServerInit's
+        // name field is not a name").
+        let enhanced = apple && field.count >= 22 && field[0] == 0
+        let name = String(decoding: enhanced ? field[22...] : field[...], as: UTF8.self)
+        guard !apple || wrapKey.count == 16 else {
+            throw RFBError.unsupported("Apple's Screen Sharing protocol needs the Mac's own sign-in (a user name and password).")
+        }
         let keyExchangeMilliseconds = keyExchange.map { Int(Self.seconds($0) * 1000) } ?? -1
-        VNCDiagnostics.note(Self.logger, .default, category: "client", "event=connected version=\(serverVersion.major).\(serverVersion.minor) security=\(securityType.rawValue) width=\(width) height=\(height) keyExchangeMs=\(keyExchangeMilliseconds)")
-        return VNCServerInfo(name: name, width: width, height: height, serverVersion: serverVersion,
-                             negotiatedVersion: version, securityType: securityType, serverPixelFormat: pixelFormat,
-                             keyExchangeDuration: keyExchange)
+        VNCDiagnostics.note(Self.logger, .default, category: "client", "event=connected version=\(serverVersion.major).\(serverVersion.minor) answered=\(version.major).\(version.minor) security=\(securityType.rawValue) width=\(width) height=\(height) keyExchangeMs=\(keyExchangeMilliseconds)")
+        let info = VNCServerInfo(name: name, width: width, height: height, serverVersion: serverVersion,
+                                 negotiatedVersion: version, securityType: securityType, serverPixelFormat: pixelFormat,
+                                 keyExchangeDuration: keyExchange, appleCommands: enhanced ? Array(field[6..<22]) : nil)
+        return (info, wrapKey)
+    }
+
+    // MARK: Apple's revision
+
+    /// What a Mac needs after ServerInit on 003.889 before anything else, then its record layer
+    /// (remotex's `apple_preface`): ViewerInfo, SetMode(control) and SetEncryption 1 and 2, back to
+    /// back in the clear, then the rekey, read in the clear too. The Mac switches both its ciphers the
+    /// moment it sends the rekey, so the layer goes up before this client writes another byte.
+    private func applePrelude(wrapKey: [UInt8]) async throws {
+        try await sink.write(RFBAppleMessages.viewerInfo)
+        try await sink.write(RFBAppleMessages.setModeControl)
+        try await sink.write(RFBAppleMessages.setEncryptionStart)
+        try await sink.write(RFBAppleMessages.enableInboundDecryption)
+        let keys = try await awaitRekey(wrapKey: wrapKey)
+        try records.install(keys)
+        VNCDiagnostics.note(Self.logger, .default, category: "client", "event=apple-record-layer active")
+    }
+
+    /// Reads the Mac's messages in the clear until the rekey, stepping over a Bell or a MiscStatus,
+    /// which it may send unasked meanwhile; anything else means the stream went somewhere unexpected.
+    private func awaitRekey(wrapKey: [UInt8]) async throws -> RFBAppleRecordKeys {
+        while true {
+            switch try await source.u8() {
+            case 0:
+                _ = try await source.u8()
+                let count = try await source.u16()
+                if count == 0 { continue }
+                var header = ByteReader(try await source.read(12))
+                _ = try header.bytes(8)
+                let encoding = try header.s32()
+                guard encoding == RFBAppleMessages.rekeyEncoding else {
+                    throw RFBError.protocolViolation("The Mac sent encoding \(encoding) before its encryption key.")
+                }
+                let body = try await source.read(RFBAppleRecordKeys.rekeyLength)
+                // Everything after the rekey is ciphertext: another rectangle here could not be read.
+                guard count == 1 else { throw RFBError.protocolViolation("The Mac sent more after its encryption key.") }
+                return try RFBAppleRecordKeys.unwrap(rekey: body, wrapKey: wrapKey).keys
+            case 2:
+                continue
+            case 0x14:
+                _ = try await source.u8()
+                let length = Int(try await source.u16())
+                guard length <= 64 else { throw RFBError.protocolViolation("The Mac sent a status message of \(length) bytes.") }
+                _ = try await source.read(length)
+            case let other:
+                throw RFBError.protocolViolation("The Mac sent message \(other) before its encryption key.")
+            }
+        }
     }
 
     static func seconds(_ duration: Duration) -> Double {
@@ -350,15 +429,16 @@ public final class VNCClient: Sendable {
         throw RFBError.unsupported("The server only offers unsupported security types (\(list)). Enable VNC password or user-account access on the host.")
     }
 
-    /// Returns how long type 30's key exchange took to compute on this device, nil for other types.
-    private func authenticate(_ type: RFBSecurityType, version: RFBProtocolVersion) async throws -> Duration? {
+    /// Returns how long type 30's key exchange took to compute on this device, nil for other types,
+    /// and type 30's wrap key (`MD5(shared secret)`), empty for other types.
+    private func authenticate(_ type: RFBSecurityType, version: RFBProtocolVersion) async throws -> (Duration?, [UInt8]) {
         switch type {
         case .none:
-            if version.minor >= 8 { try await readSecurityResult() }
+            if version.minor >= 8 { try await readSecurityResult(version) }
         case .vncAuthentication:
             let challenge = try await source.read(16)
             try await sink.write(try RFBSecurity.vncAuthenticationResponse(challenge: challenge, password: configuration.password))
-            try await readSecurityResult()
+            try await readSecurityResult(version)
         case .appleRemoteDesktop:
             let generator = try await source.u16(), keyLength = try await source.u16()
             guard (RFBLimits.minimumDiffieHellmanKeyBytes...RFBLimits.maximumDiffieHellmanKeyBytes).contains(Int(keyLength)) else {
@@ -371,19 +451,21 @@ public final class VNCClient: Sendable {
                                                                       password: configuration.password)
             let keyExchange = ContinuousClock.now - started
             try await sink.write(response.wireBytes)
-            try await readSecurityResult()
-            return keyExchange
+            try await readSecurityResult(version)
+            return (keyExchange, response.wrapKey)
         case .invalid:
             throw RFBError.protocolViolation("The server selected an invalid security type.")
         }
-        return nil
+        return (nil, [])
     }
 
-    private func readSecurityResult() async throws {
+    private func readSecurityResult(_ version: RFBProtocolVersion) async throws {
         let result = try await source.u32()
         guard result == 0 else {
             var reason = "The server rejected the credentials."
-            if let detail = try? await readReason(), !detail.isEmpty { reason = detail }
+            // A Mac sends its reason only to a 3.8 viewer; to 003.889 a refusal is the word alone,
+            // and waiting for a reason would wait out the connection (remotex's notes).
+            if version != .apple, let detail = try? await readReason(), !detail.isEmpty { reason = detail }
             throw RFBError.authenticationFailed(reason)
         }
     }
@@ -411,7 +493,16 @@ public final class VNCClient: Sendable {
         let clampedX = min(max(0, x), max(0, size.width - 1)), clampedY = min(max(0, y), max(0, size.height - 1))
         let wire = Self.unscaled(x: clampedX, y: clampedY, scale: planner.serverScaleInForce)
         state.pointerSent(picture: (clampedX, clampedY), wire: wire, at: .now)
-        try await sink.write([5, buttonMask] + UInt16(wire.x).bigEndianBytes + UInt16(wire.y).bigEndianBytes)
+        let mask = state.appleProtocol ? Self.applePointerMask(buttonMask) : buttonMask
+        try await sink.write([5, mask] + UInt16(wire.x).bigEndianBytes + UInt16(wire.y).bigEndianBytes)
+    }
+
+    /// RFB's mask with its middle (0x02) and right (0x04) buttons swapped: a Mac reads a 003.889
+    /// viewer's mask as macOS button numbers, left, right, middle, where it swaps them back for every
+    /// other version; sent by the book, a right-click lands as a middle-click (remotex's notes, "Apple's
+    /// revision reads the pointer mask as CGMouseButton numbers").
+    static func applePointerMask(_ mask: UInt8) -> UInt8 {
+        (mask & ~0x06) | (mask & 0x02) << 1 | (mask & 0x04) >> 1
     }
 
     /// A scaled framebuffer position in the unscaled framebuffer's pixels.
@@ -744,6 +835,9 @@ private final class ClientState: @unchecked Sendable {
         }
     }
     func notePixelRectangle() { lock.withLock { lastApple = nil } }
+    private var apple889 = false
+    var appleProtocol: Bool { lock.withLock { apple889 } }
+    func setAppleProtocol() { lock.withLock { apple889 = true } }
     private var flow = (updates: 0, frames: 0, rectangles: 0)
     var flowCounts: (updates: Int, frames: Int, rectangles: Int) { lock.withLock { flow } }
     func noteUpdate(rectangles: Int, delivered: Bool) {
