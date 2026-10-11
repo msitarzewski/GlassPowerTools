@@ -1153,3 +1153,10 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   worked. Fix e9a13c0: a Mac with a scale ≠ 1 in force is asked for the whole framebuffer (regions still decide the
   scale). ec226f9: Select All in a tmux tab takes `capture-pane -J -S - -E -` history (⌘A via performKeyEquivalent;
   context menu), Copy copies it. Next: owner retests two displays on 0.4.353; read the Mac's log for err -30.
+- **0.4.354 (40aa086):** with 0.4.353 the main display refreshed but display 4's own connection got 3 pictures then
+  none. The Mac's `screensharingd` counters: after the desktop connection's scale 0.5, "scale screen OpenCl updates" =
+  "SendScaledScreenRect updates" = "screen updates" (2049, 4097…) and no "unscaled classic updates" — one scale at a
+  time for every viewer. W38's per-display connection is now off (`DesktopSessionModel.opensDisplayConnections`, tests
+  turn it on); mixed densities on screen → one connection at native, as Apple's viewer. Settings text corrected.
+  Open: the pointer (didn't move while scaled; Mac sends us no cursor messages under our RFB 3.8 — try 3.889, or draw
+  a local pointer).
