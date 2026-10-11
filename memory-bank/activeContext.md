@@ -27,6 +27,19 @@ anything touching real servers (SSH and database tests use the disposable test V
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
+## 2026-10-11 (morning) — where things stand
+
+**HEAD 606c174+notes.** Installed: Vision Pro and iPhone **0.4.349** (headset not relaunched: asleep); Mac **0.4.348**,
+0.4.349 built in `$SP/dd-mac`, install held until the owner's two probe runs. Since the evening: W34 orb fix (a display
+window's ⚡ opened a second Connections window), W35 appearance audit (D63 proposed: no colorScheme light mode on Vision
+Pro), UI-test isolation (`GlassUITestRun`), right-click Copy fixed (NSObject `perform(_:)` collision), probe with a
+hidden password prompt, W36 Apple display layout (1101+1105) — **owner: "Dual screen works!!!"**, W37 new local terminals
+start in the current folder, W38 Retina at 1x / Keep Display Proportions / the Mac's pointer (D64).
+**Waiting on the owner:** `Tests/LiveDesktop/.build/release/GlassVNCProbe 127.0.0.1 5900 <user> - --retina-1x
+--second-session --cursor 20`, then `--display <retina id> --retina-1x --pointer-check`; then install Mac 0.4.349.
+**Open questions for him:** a light/dark terminal theme pair (D63 plan item 1); title capsule sizes (terminal ≈29 pt vs
+desktop ≈37 pt); SSH new tabs in the remote folder (testable on scratch).
+
 ## 2026-10-10 (evening) — where things stand
 
 **Committed today, after the 0.4.336 install:** 6eafdfd (D59, Vision Pro terminal fully clear: plain window drawing

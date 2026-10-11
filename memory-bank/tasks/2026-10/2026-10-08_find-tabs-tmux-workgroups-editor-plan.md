@@ -1097,3 +1097,4 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   (shape at density × scale; CursorPos 1100 + cursor cache 1104 on Apple servers; reappears on movement). VNCKit 84, VNC
   transport 17, desktop 202, connection UI 49, layers 50; TigerVNC two-display 6/6. Owner's probe runs pending:
   `--retina-1x --second-session --cursor 20` and `--display <retina id> --retina-1x --pointer-check`.
+- **0.4.349 (606c174) installed on Vision Pro and iPhone (~06:10); Mac build ready in $SP/dd-mac, install held until the owner's probe runs.**
