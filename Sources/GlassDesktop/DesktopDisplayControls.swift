@@ -226,9 +226,13 @@ struct DesktopDisplayWindowHost: View {
     @State private var viewport: DesktopViewport?
     @State private var looked = false
 
+    /// The ⚡ in this window, as in the desktop's own (`DesktopSessionHost`): the one Connections
+    /// window forward, on Active. `openWindow(id: "main")` names no value, so on Vision Pro it
+    /// opened a second Connections window, which then stayed beside the orb when the first shrank
+    /// into it (W34).
     private var showActive: (@MainActor () -> Void)? {
         guard let show = runtime.showActiveConnections else { return nil }
-        return { openWindow(id: "main"); show() }
+        return { openWindow.openConnections(); show() }
     }
 
     var body: some View {

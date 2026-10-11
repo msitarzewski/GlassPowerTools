@@ -99,6 +99,10 @@ public struct GlassConnectionsOrb: View {
         // Its own style: a plain button would light its whole frame on a look, a square over
         // the circle.
         .buttonStyle(GlassOrbButtonStyle())
+        // Activated in its middle, on the icon. Left to SwiftUI, the point moved down to the name
+        // when the badge came out of the icon (42071ef); the name is invisible until the orb is
+        // looked at, and the UI test's tap there reached the terminal behind the orb instead (W34).
+        .accessibilityActivationPoint(.center)
         .frame(width: Self.windowSide, height: Self.windowSide)
         .animation(.smooth, value: count)
         .help("Open Connections")

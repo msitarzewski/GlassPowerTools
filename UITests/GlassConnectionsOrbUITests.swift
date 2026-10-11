@@ -49,8 +49,8 @@ final class GlassConnectionsOrbUITests: XCTestCase {
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Open Connections")).firstMatch
     }
 
-    /// A terminal window's own Connections control: `openWindow(id: "main")`, as every "Open
-    /// Connections" in the app is.
+    /// A terminal window's own Connections control: `openWindow.openConnections()`, as every
+    /// "Open Connections" in the app is.
     private var terminalsConnections: XCUIElement {
         app.buttons.matching(NSPredicate(format: "identifier == %@ AND label == %@", "server.rack", "Connections")).firstMatch
     }
@@ -94,6 +94,28 @@ final class GlassConnectionsOrbUITests: XCTestCase {
                        "the orb stayed after Connections came back", file: file, line: line)
     }
 
+    /// Each Connections window's scene phase — `active`, `inactive` or `background` — as the window
+    /// reports it in a UI-test run (`connections-scene-phase`).
+    private func connectionsWindowPhases() -> [String] {
+        app.descendants(matching: .any).matching(identifier: "connections-scene-phase")
+            .allElementsBoundByIndex.map { ($0.value as? String) ?? "" }
+    }
+
+    /// The orb stands in for Connections: while it is up there is one Connections window, out of
+    /// sight. Asked of the window itself: a window pushed aside for the orb stays in the tree the
+    /// runner sees, rows and all, and reports them hittable, so counting its rows found it "on
+    /// screen" at every commit, the one the owner saw working included (W34).
+    private func assertConnectionsHidden(file: StaticString = #filePath, line: UInt = #line) {
+        let deadline = Date().addingTimeInterval(10)
+        var phases = connectionsWindowPhases()
+        while phases != ["background"], Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.5)
+            phases = connectionsWindowPhases()
+        }
+        XCTAssertEqual(phases, ["background"], "Connections stayed on screen beside its orb: its windows are \(phases)",
+                       file: file, line: line)
+    }
+
     private func assertOneConnectionsWindow(file: StaticString = #filePath, line: UInt = #line) {
         let one = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == 1"), object: bravoRows)
         XCTAssertEqual(XCTWaiter().wait(for: [one], timeout: 10), .completed,
@@ -111,6 +133,10 @@ final class GlassConnectionsOrbUITests: XCTestCase {
         waitForTerminals()
         XCTAssertTrue(orb.waitForExistence(timeout: 40), "Connections did not shrink into its orb")
         attachTree("orb-up")
+        // The orb stands in for the window: Connections is out of sight while it is up (owner,
+        // 2026-10-11, on the headset: "The icon shows as expected, but the connections window
+        // remains, too").
+        assertConnectionsHidden()
         // A terminal is open: Active's count, said with the orb's name.
         XCTAssertNotNil(orb.label.wholeMatch(of: /Open Connections, [1-9][0-9]* active/),
                         "the orb's label carries no count: \(orb.label)")
@@ -120,6 +146,32 @@ final class GlassConnectionsOrbUITests: XCTestCase {
         XCTAssertTrue(bravoIsShowing(), "Connections came back without bravo selected")
         assertOneConnectionsWindow()
         attachTree("restored-by-pinch")
+    }
+
+    /// A Mac's second display has a window of its own (W30), and its ⚡ brings the one Connections
+    /// window forward on Active, as the desktop's own ⚡ does. It opened a second one, which stayed
+    /// beside the orb when the first shrank into it (W34; the owner, 2026-10-11, on the headset:
+    /// "The icon shows as expected, but the connections window remains, too").
+    func testADisplayWindowsBoltLeavesNoSecondWindowBesideTheOrb() {
+        launch(idleSeconds: 30, surface: "desktop-displays")
+        // The desktop's own window and its second display's, each with ⚡ beside its Input button.
+        let desktops = app.windows.containing(NSPredicate(format: "elementType == %d AND label == %@",
+                                                          XCUIElement.ElementType.button.rawValue, "Input"))
+        let bolts = desktops.buttons.matching(identifier: "active-connections-bolt")
+        let both = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == 2"), object: bolts)
+        XCTAssertEqual(XCTWaiter().wait(for: [both], timeout: 40), .completed, "the demo's two display windows did not open")
+        for (press, bolt) in bolts.allElementsBoundByIndex.enumerated() {
+            bolt.tap()
+            XCTAssertTrue(element("active-connections").waitForExistence(timeout: 10), "⚡ \(press + 1): no Active")
+            Thread.sleep(forTimeInterval: 3)
+            let phases = connectionsWindowPhases()
+            XCTAssertEqual(phases.count, 1, "⚡ \(press + 1): \(phases.count) Connections windows")
+        }
+        attachTree("one-window-from-display-bolts")
+
+        XCTAssertTrue(orb.waitForExistence(timeout: 60), "Connections did not shrink into its orb")
+        assertConnectionsHidden()
+        attachTree("display-orb-up")
     }
 
     /// Asking for Connections from anywhere else — a terminal's own control — brings the window

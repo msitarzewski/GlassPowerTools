@@ -57,6 +57,11 @@ private struct GlassConnectionsIdleShrinkModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background { GlassConnectionsWindowProbeView(probe: probe).accessibilityHidden(true) }
+            #if DEBUG
+            .overlay(alignment: .topLeading) {
+                if GlassConnectionsIdleDemo.reportsScenePhase { GlassConnectionsScenePhaseMarker(phase: scenePhase) }
+            }
+            #endif
             // One wait at a time, started again whenever the setting or the window's phase changes.
             .task(id: WatchKey(setting: setting, isActive: scenePhase == .active)) { await watch() }
             .onChange(of: scenePhase, initial: true) { _, phase in
@@ -91,6 +96,18 @@ private struct GlassConnectionsIdleShrinkModifier: ViewModifier {
                 guard !Task.isCancelled else { return }
                 // One orb: another Connections window may already stand behind it.
                 if recovery.visibleWindowKeys.contains(GlassConnectionsOrb.windowID) {
+                    // **A second Connections window does not stay beside the orb** (W34; the
+                    // owner, 2026-10-11: "The icon shows as expected, but the connections window
+                    // remains, too"). The orb stands for the window pushed aside behind it, so a
+                    // second one, idle as long, goes rather than stand beside it; the pinch brings
+                    // back the first. There should never be a second (`openConnections()`); this is
+                    // for one that exists anyway — a display window's ⚡ opened one until W34, and
+                    // visionOS can bring a window back with the app's others.
+                    if recovery.isConnectionsPushedAside {
+                        Logger.idle.info("A second Connections window idle beside the orb: closing it")
+                        dismissWindow()
+                        return
+                    }
                     probe.clock.interaction()
                     continue
                 }
@@ -346,7 +363,38 @@ enum GlassConnectionsIdleDemo {
               let seconds = Int(arguments[index + 1]), seconds > 0 else { return nil }
         return .seconds(seconds)
     }
+
+    /// UI tests only: every `--ui-testing` run marks each Connections window with its scene phase.
+    static var reportsScenePhase: Bool { ProcessInfo.processInfo.arguments.contains("--ui-testing") }
 }
+
+#if os(visionOS)
+/// UI tests only: the Connections window's scene phase, where the runner can read it
+/// (`connections-scene-phase`). A window pushed aside for its orb stays in the tree the runner
+/// sees, rows and all, and reports them hittable (measured on the visionOS 27.0 and 27.2
+/// simulators, W34), so only the window can say whether it is on screen.
+private struct GlassConnectionsScenePhaseMarker: View {
+    let phase: ScenePhase
+
+    var body: some View {
+        Color.clear
+            .frame(width: 1, height: 1)
+            .allowsHitTesting(false)
+            .accessibilityElement()
+            .accessibilityIdentifier("connections-scene-phase")
+            .accessibilityValue(name)
+    }
+
+    private var name: String {
+        switch phase {
+        case .active: "active"
+        case .inactive: "inactive"
+        case .background: "background"
+        @unknown default: "unknown"
+        }
+    }
+}
+#endif
 #endif
 
 extension Logger {

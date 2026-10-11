@@ -1009,3 +1009,20 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   desktop 195, database 317, editor 151, editor UI 117. visionOS UI bundle: new 3/3 + ornament 3/3 pass; 15 failures
   identical on unchanged HEAD (iPhone-only Projects row, orb pinch, library sheet Save, TagField, 3 terminal) — pre-existing,
   not fixed. Simulator only; not yet judged on the headset.
+- **0.4.344 (55b13f4) installed on Vision Pro and iPhone (~19:20); headset relaunch timed out after 60 s (asleep/off-head), app not restarted there.**
+- **2026-10-11 ~00:30–01:00, owner on 0.4.344:** "The connections window looks great" (adjusting to transparency).
+  Bugs: (1) orb shows but Connections stays visible — reproduced in the simulator with a new UI check
+  (`assertConnectionsHidden`, patch `$SP/orbfix/hidden-check.patch`); NOT caused by `.plain` (fails without it too) →
+  **W34** bisecting f213d4a…55b13f4 and fixing; owner OK to revert Connections to the system window if needed ("it will
+  reduce to an icon so it doesn't need to be 100% transparent"). (2) VNC to his Mac (this Mac; two displays) from the
+  Vision Pro still shows one window with both displays → the Apple layout path (encoding 1105) isn't producing screens;
+  asked his permission to run the VNC probe from this Mac to itself with a password file he creates. (3) "we don't honor
+  light/dark appearance on visionpro. Please evaluate support across the app" → **W35** read-only audit.
+- **W34 merged (orb).** My hidden check was a false positive (a pushed-aside window stays in XCUITest's tree, `exists` and
+  `isHittable` true); `pushWindow` hides Connections at every commit, `.plain` included. Real path to the owner's symptom:
+  a VNC display window's ⚡ (`DesktopDisplayControls.swift`, W30) called `openWindow(id: "main")` → a second Connections
+  window that stayed beside the orb (first bad 2b4f75f). Fixes: `openConnections()` there; a second Connections window that
+  idles while the orb already stands in closes itself; `.accessibilityActivationPoint(.center)` on the orb (42071ef moved
+  the runner's tap onto the invisible name and broke the restore UI test only). DEBUG `connections-scene-phase` marker;
+  hidden check = phases exactly ["background"]; new test for the display ⚡. UI 15/15 on visionOS 27.0 and 27.2; shell 254,
+  connection UI 49, desktop 195. Not confirmed that the owner took the display-⚡ path (headset log collection needs root).
