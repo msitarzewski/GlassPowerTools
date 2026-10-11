@@ -1143,3 +1143,13 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   (`VNCDiagnostics.echo`, no file) and keeps anomalies' inflated bytes as `zrle-anomaly-*.bin` (git-ignored). Tests:
   VNCKit 85, GlassVNCTransport 18, GlassDesktop 202 passed. Root cause still unknown: waiting on the owner's
   `--as-app` run; 0.4.351 building for all three.
+- **0.4.351–0.4.353 (2026-10-11 afternoon) — the two-display freeze, root-caused from the Mac's own log.**
+  The zero-width ZRLE rectangles were the Mac's empty seam rectangles (`rect=2056,23,0x517 inflated=9`: an empty raw
+  tile per 64 rows) — now skipped (cae4d43). Then both screens came up but froze; the new per-connection `event=flow`
+  lines showed both connections receiving **nothing** for minutes with requests outstanding. The Mac being shared is
+  this Mac, so `log show --predicate 'process CONTAINS[c] "screensharing"'` showed it: after SetServerScaling 0.5, each
+  request for display 1's area (right edge on the seam) gave `screensharingd adjust right 2057 2056` then
+  `ScreensharingAgent ReadBackResizedScreenData err -30` (50× in 3 s), then silence for every viewer while input still
+  worked. Fix e9a13c0: a Mac with a scale ≠ 1 in force is asked for the whole framebuffer (regions still decide the
+  scale). ec226f9: Select All in a tmux tab takes `capture-pane -J -S - -E -` history (⌘A via performKeyEquivalent;
+  context menu), Copy copies it. Next: owner retests two displays on 0.4.353; read the Mac's log for err -30.
