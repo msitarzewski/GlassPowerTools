@@ -150,6 +150,12 @@ public final class VNCClient: Sendable {
         pump()
     }
 
+    /// Whether a Mac is also asked for the standard PointerPos (−232). Off; the live probe tries it.
+    public func setAsksForPointerPosition(_ on: Bool) {
+        planner.setAsksForPointerPosition(on)
+        pump()
+    }
+
     /// Whether Apple's revision's prelude identifies this client (`ViewerInfo`). On; the live probe
     /// turns it off to compare. Set before `run`.
     public func setAppleViewerInfo(_ on: Bool) { state.setSendsViewerInfo(on) }
@@ -665,6 +671,13 @@ public final class VNCClient: Sendable {
                         // Where the Mac's pointer is: the header's x and y, and nothing after them.
                         state.noteApple(.appleCursorPosition)
                         callbacks.cursorMessage(.applePosition(x: rect.x, y: rect.y))
+                        if let point = state.mapCursorPosition(x: rect.x, y: rect.y, scale: planner.serverScaleInForce,
+                                                               width: framebuffer.width, height: framebuffer.height) {
+                            callbacks.cursorPosition(point.x, point.y)
+                        }
+                    case .pointerPosition:
+                        // The standard PointerPos: the header's x and y, nothing after them.
+                        callbacks.cursorMessage(.pointerPosition(x: rect.x, y: rect.y))
                         if let point = state.mapCursorPosition(x: rect.x, y: rect.y, scale: planner.serverScaleInForce,
                                                                width: framebuffer.width, height: framebuffer.height) {
                             callbacks.cursorPosition(point.x, point.y)

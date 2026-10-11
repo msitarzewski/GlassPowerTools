@@ -37,6 +37,8 @@ public enum VNCCursorMessage: Sendable, Equatable {
     case appleSelected(id: UInt32, known: Bool)
     /// Apple's CursorPos (1100), as sent, before any scale is undone.
     case applePosition(x: Int, y: Int)
+    /// The standard PointerPos (−232), as sent.
+    case pointerPosition(x: Int, y: Int)
 }
 
 /// Apple's cursor cache (encoding 1104): shapes stored once under an id, then selected by it.

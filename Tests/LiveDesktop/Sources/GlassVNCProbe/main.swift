@@ -48,6 +48,8 @@ usage: GlassVNCProbe <host> <port> <username-or-empty> <password-file | -> [opti
   --pointer-check          move the Mac's pointer (no clicks) and report where the Mac says it went
   --apple                  answer a Mac in its own revision, RFB 003.889, with its record layer: the
                            session encrypted after sign-in (2026-10-11)
+  --pointerpos             also ask for the standard PointerPos (−232), and print every position: move the
+                           Mac's own mouse meanwhile (2026-10-11)
   --no-arm                 do not arm the Mac's pushes (AutoFrameBufferUpdate), as before 2026-10-11, to
                            compare: armed, a Mac should send its pointer's position and shapes
   --compare                with something moving on every display (a video, a clock with seconds), connect
@@ -220,6 +222,8 @@ func describe(_ message: VNCCursorMessage) -> String {
         "CursorImage (1104)     selected id \(id)" + (known ? "" : " — never stored")
     case let .applePosition(x, y):
         "CursorPos (1100)       at (\(x), \(y)) as sent"
+    case let .pointerPosition(x, y):
+        "PointerPos (-232)      at (\(x), \(y)) as sent"
     }
 }
 
@@ -260,6 +264,7 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
         var asAppSeconds: Double?
         var arms = true
         var appleProtocol = false
+        var pointerPos = false
         var compare = false
         var compareSecond = false
         func bad() -> Never { FileHandle.standardError.write(Data(usage.utf8)); exit(2) }
@@ -291,6 +296,8 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
                 compare = true
             case "--compare2":
                 compare = true; compareSecond = true
+            case "--pointerpos":
+                pointerPos = true
             case "--apple":
                 appleProtocol = true
             case "--no-arm":
@@ -386,6 +393,7 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
             client.setQuality(quality)
             client.setDensityScaling(retina)
             client.setAppleUpdateArming(arms)
+            client.setAsksForPointerPosition(pointerPos)
             return client
         }
         let client: VNCClient
@@ -583,6 +591,7 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
                 case .appleStored: "CursorImage stores"
                 case .appleSelected: "CursorImage selects"
                 case .applePosition: "CursorPos"
+                case .pointerPosition: "PointerPos (-232)"
                 }
                 counts[key, default: 0] += 1
             }

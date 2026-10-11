@@ -75,6 +75,10 @@ public enum RFBEncoding: Int32, Sendable {
     case desktopSize = -223
     case lastRect = -224
     case extendedDesktopSize = -308
+    /// The standard PointerPos pseudo-encoding (−232, libvncserver's `rfbEncodingPointerPos`): where
+    /// the server's pointer is, in the rectangle's x and y, with no payload. libvncserver, TigerVNC
+    /// and KasmVNC send it for moves this client did not make. Asked for only to try a Mac (2026-10-11).
+    case pointerPosition = -232
     /// Apple's older display list (0x44d), asked for only from Apple's server, and always beside the
     /// layout: a Mac reports its displays only to a client listing both (`RFBAppleDisplays.swift`).
     /// Stepped over: it arrives only from a Mac that does not send the layout.

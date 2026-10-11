@@ -141,6 +141,7 @@ public extension RFBEncoding {
         case .desktopSize: "DesktopSize"
         case .lastRect: "LastRect"
         case .extendedDesktopSize: "ExtendedDesktopSize"
+        case .pointerPosition: "PointerPos"
         case .appleDisplayInfo: "AppleDisplayInfo"
         case .appleDisplayLayout: "AppleDisplayLayout"
         case .appleCursorPosition: "CursorPos"
@@ -424,6 +425,8 @@ final class RFBStreamPlanner: @unchecked Sendable {
 
     // A Mac's pushes.
     private var arming = true
+    private var asksForPointerPosition = false
+    func setAsksForPointerPosition(_ on: Bool) { lock.withLock { asksForPointerPosition = on } }
     private var armingInterval = RFBStreamPlanner.pushInterval
     /// The interval and size the Mac was last armed with; nil once a layout dropped the arming.
     private var armed: (interval: UInt32, width: Int, height: Int)?
@@ -704,8 +707,9 @@ final class RFBStreamPlanner: @unchecked Sendable {
             // Paused, CopyRect stays as it was: whether it is offered is settled when something is
             // on screen again.
             let copyRect = paused ? advertisedEncodings.contains(RFBEncoding.copyRect.rawValue) : wholeFramebufferRequested()
-            let encodings = RFBEncoding.setEncodingsValues(profile: active, copyRect: copyRect, dialect: dialect,
+            var encodings = RFBEncoding.setEncodingsValues(profile: active, copyRect: copyRect, dialect: dialect,
                                                            appleDisplayLayout: appleDisplayLayout, appleCursor: appleCursor)
+            if asksForPointerPosition { encodings.append(RFBEncoding.pointerPosition.rawValue) }
             if encodings != advertisedEncodings {
                 advertisedEncodings = encodings
                 out.append(RFBEncoding.setEncodingsMessage(encodings))

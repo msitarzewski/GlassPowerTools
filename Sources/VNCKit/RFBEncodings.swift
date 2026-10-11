@@ -52,7 +52,7 @@ final class RFBRectangleDecoder {
             return 4 + length
         case .tight:
             return try await tight.decode(rect, from: source, into: framebuffer, pixels: pixels)
-        case .cursor, .desktopSize, .lastRect, .extendedDesktopSize, .appleDisplayInfo, .appleDisplayLayout,
+        case .cursor, .desktopSize, .lastRect, .extendedDesktopSize, .pointerPosition, .appleDisplayInfo, .appleDisplayLayout,
              .appleCursorPosition, .appleCursorImage:
             throw RFBError.protocolViolation("Pseudo-encodings are handled by the client, not the rectangle decoder.")
         }
