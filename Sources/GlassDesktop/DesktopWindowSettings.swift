@@ -57,6 +57,7 @@ extension DesktopSourceScale: GlassWindowSettingValue {}
 extension DesktopPointerMode: GlassWindowSettingValue {}
 extension GlassDesktopStreamQuality: GlassWindowSettingValue {}
 extension DesktopDisplayWindows: GlassWindowSettingValue {}
+extension GlassDesktopRetinaDisplays: GlassWindowSettingValue {}
 
 // MARK: - The settings a desktop window can keep
 
@@ -93,15 +94,32 @@ nonisolated enum DesktopWindowSettings {
     static let quality = GlassWindowSetting<GlassDesktopStreamQuality>.choice("desktop.quality", title: "Quality")
     /// A host with several displays: one window, or one each (W30). The desktop's own window's.
     static let displays = GlassWindowSetting<DesktopDisplayWindows>.choice("desktop.displays", title: "Displays")
+    /// A Mac's Retina displays at 1x or at their own pixels (W38). The connection's, like Quality, so
+    /// the desktop's own window's.
+    static let retina = GlassWindowSetting<GlassDesktopRetinaDisplays>.choice("desktop.retina", title: "Retina Displays")
+    /// The window resizes only in the shape of the remote display it shows (W38; the owner,
+    /// 2026-10-11: "we need a way to lock the dimensions to the actual screen ratio"). Each window's.
+    static let keepProportions = GlassWindowSetting<Bool>("desktop.keepProportions", title: "Keep Display Proportions")
 
     static var keys: Set<String> {
         [opacity.key, frost.key, backgroundRemoval.key, keyColor.key, tolerance.key, edgeSoftness.key,
-         detail.key, pointer.key, quality.key, displays.key]
+         detail.key, pointer.key, quality.key, displays.key, retina.key, keepProportions.key]
     }
 
     /// Where Opacity and Glass apply: a see-through window, on the Mac and the headset.
     /// Settings ▸ Desktops offers them only there too.
     static var offersGlass: Bool {
+        #if os(visionOS) || os(macOS)
+        true
+        #else
+        false
+        #endif
+    }
+
+    /// Where a window can be held to its display's shape (W38): Vision Pro (`requestGeometryUpdate`
+    /// with uniform resizing) and the Mac (`contentAspectRatio`). An iPad's and an iPhone's scenes
+    /// have no such restriction (`UIWindowScene.GeometryPreferences.iOS` has none).
+    static var offersProportions: Bool {
         #if os(visionOS) || os(macOS)
         true
         #else
@@ -155,6 +173,10 @@ enum DesktopPreferenceKey {
     static let quality = "display.stream.quality"
     /// Empty for this device's standard: a window for each display on Vision Pro, one elsewhere.
     static let displays = "display.screens.windows"
+    /// W38: what a Mac's Retina displays are sent at; empty for 1x.
+    static let retina = "display.stream.retina"
+    /// W38: whether a desktop window keeps its display's shape.
+    static let keepProportions = "display.window.proportions"
 }
 
 /// Settings ▸ Desktops (**All Desktops**): what every desktop window on this device uses until it
@@ -178,6 +200,10 @@ struct DesktopDefaults: Equatable, Sendable {
     var quality: GlassDesktopStreamQuality = .automatic
     /// Nil is this device's standard (`DesktopDisplayWindows.standard`).
     var displays: DesktopDisplayWindows?
+    /// A Mac's Retina displays at 1x unless chosen otherwise (W38).
+    var retina: GlassDesktopRetinaDisplays = .oneX
+    /// Windows keep their display's shape unless turned off (W38).
+    var keepProportions = true
 
     init() {}
 
@@ -185,9 +211,11 @@ struct DesktopDefaults: Equatable, Sendable {
     /// out of range, and an unknown choice is the standard one.
     init(storedOpacity: Double, frost: Double, backgroundRemoval: String, red: Double, green: Double, blue: Double,
          tolerance: Double, edgeSoftness: Double, detail: String, pointer: String, quality: String = "",
-         displays: String = "") {
+         displays: String = "", retina: String = "", keepProportions: Bool = true) {
         self.quality = GlassDesktopStreamQuality(rawValue: quality) ?? .automatic
         self.displays = DesktopDisplayWindows(rawValue: displays)
+        self.retina = GlassDesktopRetinaDisplays(rawValue: retina) ?? .oneX
+        self.keepProportions = keepProportions
         self.opacity = storedOpacity.isFinite ? min(1, max(0, storedOpacity)) : Self.standard.opacity
         self.frost = frost.isFinite ? min(1, max(0, frost)) : Self.standard.frost
         let mode = TransparencyMode(rawValue: backgroundRemoval) ?? .original
@@ -229,6 +257,10 @@ struct DesktopWindowProfile: Equatable {
     let quality: GlassDesktopStreamQuality
     /// The desktop's own window's (W30).
     let displays: DesktopDisplayWindows
+    /// The connection's, from the desktop's own window (W38).
+    let retina: GlassDesktopRetinaDisplays
+    /// This window's (W38).
+    let keepProportions: Bool
 
     /// - Parameters:
     ///   - glass: whether Opacity and Glass apply here (`offersGlass`); where they
@@ -258,6 +290,8 @@ struct DesktopWindowProfile: Equatable {
             : nil
         self.quality = window.value(of: DesktopWindowSettings.quality, over: defaults.quality)
         self.displays = window.value(of: DesktopWindowSettings.displays, over: defaults.resolvedDisplays)
+        self.retina = window.value(of: DesktopWindowSettings.retina, over: defaults.retina)
+        self.keepProportions = window.value(of: DesktopWindowSettings.keepProportions, over: defaults.keepProportions)
     }
 
     /// Whether the window already shows what **Show Original** asks for: the complete image, opaque.
@@ -270,9 +304,10 @@ extension DesktopSessionModel {
 
     /// Draws and drives one window with its settings. Only what a window can set: zoom, pan, tilt
     /// and the display shown stay the window's own, and nothing changes that is already so. What
-    /// belongs to the connection — Detail, Quality, Displays — comes from the desktop's own window
-    /// only (W30): a changed Detail asks the server for the window again, a changed Quality changes
-    /// what the connection asks for.
+    /// belongs to the connection — Detail, Quality, Displays, Retina Displays — comes from the
+    /// desktop's own window only (W30, W38): a changed Detail asks the server for the window again, a
+    /// changed Quality changes what the connection asks for. Keep Display Proportions is each
+    /// window's (W38).
     func apply(_ profile: DesktopWindowProfile, to viewport: DesktopViewport) {
         var drawn = viewport.presentation
         drawn.mode = profile.backgroundRemoval
@@ -282,10 +317,12 @@ extension DesktopSessionModel {
         drawn.feather = profile.edgeSoftness
         if drawn != viewport.presentation { viewport.presentation = drawn }
         if let pointer = profile.pointer, viewport.pointerMode != pointer { viewport.pointerMode = pointer }
+        if viewport.keepsProportions != profile.keepProportions { viewport.keepsProportions = profile.keepProportions }
         guard viewport.isPrimary else { return }
         if sourceScale != profile.detail { sourceScale = profile.detail }
         if streamQuality != profile.quality { streamQuality = profile.quality }
         if displayWindows != profile.displays { displayWindows = profile.displays }
+        if retinaDisplays != profile.retina { retinaDisplays = profile.retina }
     }
 }
 

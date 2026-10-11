@@ -48,12 +48,19 @@ struct DesktopAllDesktopsStorage: DynamicProperty {
     @AppStorage(DesktopPreferenceKey.pointer, store: GlassUITestRun.settingsDefaults) var pointer = ""
     @AppStorage(DesktopPreferenceKey.quality, store: GlassUITestRun.settingsDefaults) var quality = GlassDesktopStreamQuality.automatic.rawValue
     @AppStorage(DesktopPreferenceKey.displays, store: GlassUITestRun.settingsDefaults) var displays = ""
+    @AppStorage(DesktopPreferenceKey.retina, store: GlassUITestRun.settingsDefaults) var retina = ""
+    @AppStorage(DesktopPreferenceKey.keepProportions, store: GlassUITestRun.settingsDefaults) var keepProportions = true
 
     /// What is stored, kept in range.
     var defaults: DesktopDefaults {
         DesktopDefaults(storedOpacity: opacity, frost: frost, backgroundRemoval: backgroundRemoval,
                         red: red, green: green, blue: blue, tolerance: tolerance, edgeSoftness: edgeSoftness,
-                        detail: detail, pointer: pointer, quality: quality, displays: displays)
+                        detail: detail, pointer: pointer, quality: quality, displays: displays,
+                        retina: retina, keepProportions: keepProportions)
+    }
+
+    var retinaDisplays: Binding<GlassDesktopRetinaDisplays> {
+        Binding(get: { defaults.retina }, set: { retina = $0.rawValue })
     }
 
     var streamQuality: Binding<GlassDesktopStreamQuality> {
@@ -132,10 +139,14 @@ public struct DesktopSettingsView: View {
                     ForEach(DesktopSourceScale.allCases, id: \.self) { Text($0.title).tag($0) }
                 }
                 .accessibilityIdentifier("display.source-scale")
+                if DesktopWindowSettings.offersProportions {
+                    Toggle(DesktopWindowSettings.keepProportions.title, isOn: allDesktops.$keepProportions)
+                        .accessibilityIdentifier("display.keep-proportions")
+                }
             } header: {
                 Text("Remote Desktop")
             } footer: {
-                Text("RDP only. Detail asks for more remote pixels per point while Match Window Size is on, so text stays sharp on a high-resolution display. Automatic follows the display the window is on.")
+                Text("RDP only. Detail asks for more remote pixels per point while Match Window Size is on, so text stays sharp on a high-resolution display. Automatic follows the display the window is on.\(DesktopWindowSettings.offersProportions ? " " + DesktopWindowSettingsView.proportionsFooter : "")")
             }
             // W30: what a VNC connection trades for bytes, and what a host's several displays get.
             Section {
@@ -147,10 +158,14 @@ public struct DesktopSettingsView: View {
                     ForEach(DesktopDisplayWindows.allCases, id: \.self) { Text($0.title).tag($0) }
                 }
                 .accessibilityIdentifier("display.display-windows")
+                Picker(DesktopWindowSettings.retina.title, selection: allDesktops.retinaDisplays) {
+                    ForEach(GlassDesktopRetinaDisplays.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                .accessibilityIdentifier("display.retina")
             } header: {
                 Text("Screen Sharing (VNC)")
             } footer: {
-                Text("\(DesktopConnectionSettingsSections.qualityFooter) Display Windows is for a computer with several displays: one window showing them, or a window for each, opened when it connects.")
+                Text("\(DesktopConnectionSettingsSections.qualityFooter) Display Windows is for a computer with several displays: one window showing them, or a window for each, opened when it connects. \(DesktopConnectionSettingsSections.retinaFooter)")
             }
             if DesktopWindowSettings.offersTouchPointer {
                 Section {

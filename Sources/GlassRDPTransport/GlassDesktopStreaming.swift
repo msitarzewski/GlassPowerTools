@@ -27,6 +27,24 @@ public enum GlassDesktopStreamQuality: String, Codable, CaseIterable, Sendable {
     }
 }
 
+/// What a Mac's Retina displays are sent at (W38; the owner, 2026-10-11: "can we have the Mac chill
+/// on the 2x retina resolution when screen sharing?"). A VNC session to a Mac acts on it
+/// (`GlassVNCSession`); every other session ignores it.
+public enum GlassDesktopRetinaDisplays: String, Codable, CaseIterable, Sendable {
+    /// One pixel per point: a Retina display's picture at half its pixels each way, a quarter of the
+    /// bytes, with the quality level's own reduction on top.
+    case oneX
+    /// The display's own pixels.
+    case native
+
+    public var title: String {
+        switch self {
+        case .oneX: "Send at 1x (Recommended)"
+        case .native: "Native 2x"
+        }
+    }
+}
+
 /// A rectangle of the remote framebuffer, in its pixels.
 public struct GlassRemoteRegion: Sendable, Hashable {
     public let x: Int

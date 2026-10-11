@@ -12,7 +12,7 @@ swift build --disable-keychain
 | Probe | Against | Proves |
 |---|---|---|
 | `GlassWindowsRDPProbe` | a real RDP host you name | negotiation and a first real frame |
-| `GlassVNCProbe` | a real VNC host you name | negotiation, sign-in time, a first real frame, a Mac's displays and server-side scale |
+| `GlassVNCProbe` | a real VNC host you name | negotiation, sign-in time, a first real frame, a Mac's displays, server-side scale, one display alone, a second session, and the pointer |
 | `GlassRDPFunctionalProbe` | the disposable xrdp fixture (`Docker/xrdp`) | the functional checks below |
 | `GlassVNCFunctionalProbe` | the disposable TigerVNC fixture (`Docker/tigervnc`) | the functional checks below |
 | `GlassVNCDisplaysProbe` | the same fixture with a picture workload (`Docker/tigervnc-displays`) | two displays, region requests, quality levels (below) |
@@ -29,6 +29,26 @@ decoded — the displays the app would be given, and what the link carries. Two 
 - `--scale <factor>` asks a Mac to render at that factor, in (0, 1], once it has sent a layout, and
   reports whether a layout confirmed it, the framebuffer's new size and the link at that scale.
 - `--quality <level>` starts at `automatic`, `best`, `balanced` (the default), `dataSaver` or `lowest`.
+
+W38 added what a Mac's Retina displays, a display window's own connection and the pointer need
+checked on a real Mac:
+
+- `--display <id>` asks a Mac to send only that display (`SetDisplay`), as a display window's own
+  connection does, and reports whether a layout confirmed it. The ids are the layout records'.
+- `--retina-1x` asks a Mac for its Retina displays at 1x, times the quality level's factor (the app's
+  **Send at 1x**), and reports the factor in force against the one the app's rule wants.
+- `--second-session [<id>]` opens a second connection beside the first with the same sign-in,
+  sending display `<id>` alone (by default a display the first does not send), and reports both
+  framebuffers and scales, and whether the first stayed connected while the second ran and after it
+  closed. This is the question the app's per-display connections depend on: whether a Mac takes two
+  sessions from one viewer.
+- `--cursor <seconds>` prints every pointer message as it arrives (CursorPos, the cursor cache's stores
+  and selects, the standard Cursor and its empty "hidden" form) for that long, then counts them.
+- `--pointer-check` moves the Mac's pointer to three places (no clicks, no keys) and reports which
+  space the Mac's CursorPos answers in: its own pixels or the picture's.
+
+Against the scripted fake Mac W36 and W38 used (a socket speaking the notes' forms, not a Mac), every
+option ran to `RESULT: PASS`; only a real Mac can say whether macOS behaves the same.
 
 Build it in Release, as the app ships, so the sign-in time is the app's (a Debug build's key
 exchange is far slower):

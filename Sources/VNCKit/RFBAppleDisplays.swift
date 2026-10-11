@@ -16,6 +16,10 @@ import Foundation
 // - `SetServerScaling` asks the Mac to render the framebuffer smaller before encoding it. The next
 //   layout states the factor, and only a layout confirms it. Pointer events stay in the *unscaled*
 //   framebuffer's pixels.
+// - `SetDisplay` (0x0d) narrows the framebuffer to one display's own pixels, or puts every display
+//   back in it; the next layout names the display being sent, which is the only confirmation
+//   ("Picking a physical screen in Standard mode"; remotex's `set_display_message`). W38 sends it on
+//   a display window's own connection, so a Retina display and a 1x one can each come at 1x.
 //
 // Not checked against a Mac by this project yet: `GlassVNCProbe` prints every field so it can be.
 
@@ -155,12 +159,13 @@ public struct RFBAppleDisplayLayout: Sendable, Equatable {
     /// density × scale). Should a Mac send them unscaled instead, they would not fit the scaled
     /// framebuffer while their scaled forms would, and then the scaled forms are used.
     public func screens(inFramebufferWidth width: Int, height: Int) -> [VNCScreen] {
-        // One display selected (`SetDisplay`, which this client does not send): the framebuffer is
+        // One display selected (`SetDisplay`, sent on a display window's own connection, W38): the framebuffer is
         // that display's own pixels, while the records keep their places among all of them
         // (remotex's notes, "Picking a physical screen in Standard mode").
         if let current = currentDisplay {
             guard let record = records.first(where: { $0.id == current }) else { return [] }
-            return [VNCScreen(id: current, x: 0, y: 0, width: width, height: height, flags: record.flags, isMain: record.isMain)]
+            return [VNCScreen(id: current, x: 0, y: 0, width: width, height: height, flags: record.flags, isMain: record.isMain,
+                              density: record.nativeDensity)]
         }
         var offered: [VNCScreen] = []
         var origins: [Edges] = []
@@ -173,7 +178,7 @@ public struct RFBAppleDisplayLayout: Sendable, Equatable {
             origins.append(record.logical)
             offered.append(VNCScreen(id: record.id, x: record.backing.left, y: record.backing.top,
                                      width: record.backing.width, height: record.backing.height,
-                                     flags: record.flags, isMain: record.isMain))
+                                     flags: record.flags, isMain: record.isMain, density: density))
         }
         let fits = { (screen: VNCScreen) in screen.validated(inFramebufferWidth: width, height: height) != nil }
         let factor = serverScale
@@ -184,6 +189,17 @@ public struct RFBAppleDisplayLayout: Sendable, Equatable {
         return offered.filter(fits)
     }
 
+    /// Every display's own density, by id, whether or not it is in the framebuffer now: what a
+    /// display's picture would need to be scaled by to arrive at 1x (W38). A record whose density
+    /// cannot be told is left out.
+    public var densities: [UInt32: Double] {
+        var byID: [UInt32: Double] = [:]
+        for record in records {
+            if let density = record.nativeDensity, (1.0...4.0).contains(density) { byID[record.id] = density }
+        }
+        return byID
+    }
+
     // MARK: Scaling
 
     /// `SetServerScaling`: type 8, a reserved zero, then the factor as a big-endian `f64`, in
@@ -192,6 +208,32 @@ public struct RFBAppleDisplayLayout: Sendable, Equatable {
         let value = validScale(factor)
         return [8, 0] + value.bitPattern.bigEndianBytes
     }
+
+    // MARK: Choosing a display
+
+    /// `SetDisplay`: type 0x0d, a byte that is 1 to combine every display and 0 to send one, a
+    /// reserved `u16`, then the display's id as a big-endian `u32` (0 when combining, which the Mac
+    /// ignores). Eight bytes, as remotex's `set_display_message` writes them, measured against
+    /// macOS 26.
+    public static func setDisplayMessage(_ display: UInt32?) -> [UInt8] {
+        [0x0d, display == nil ? 1 : 0, 0, 0] + (display ?? 0).bigEndianBytes
+    }
+}
+
+/// Which of a Mac's displays a connection asks to be sent (`SetDisplay`).
+public enum RFBDisplaySelection: Sendable, Equatable {
+    /// One display, its own pixels the whole framebuffer.
+    case display(UInt32)
+    /// Every display in one framebuffer, as a Mac sends them until asked otherwise.
+    case allDisplays
+
+    /// The id `SetDisplay` carries; nil combines.
+    public var id: UInt32? {
+        if case .display(let id) = self { id } else { nil }
+    }
+
+    /// Whether a layout sending `current` (nil for all displays) is this selection.
+    func matches(_ current: UInt32?) -> Bool { id == current }
 }
 
 /// `DisplayInfo` (encoding 1101), the older display list a Mac sends a client that lists it without
@@ -240,7 +282,8 @@ extension VNCScreen {
     func scaled(by factor: Double) -> VNCScreen {
         let left = Int((Double(x) * factor).rounded(.down)), top = Int((Double(y) * factor).rounded(.down))
         let right = Int((Double(x + width) * factor).rounded(.up)), bottom = Int((Double(y + height) * factor).rounded(.up))
-        return VNCScreen(id: id, x: left, y: top, width: right - left, height: bottom - top, flags: flags, isMain: isMain)
+        return VNCScreen(id: id, x: left, y: top, width: right - left, height: bottom - top, flags: flags, isMain: isMain,
+                         density: density)
     }
 }
 

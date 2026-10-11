@@ -81,7 +81,7 @@ enum MacLayout {
 }
 
 /// The client messages in a write, by type: SetPixelFormat, SetEncodings, FramebufferUpdateRequest,
-/// SetServerScaling and PointerEvent.
+/// SetServerScaling, PointerEvent and SetDisplay.
 func clientMessages(_ bytes: [UInt8]) -> [(type: UInt8, bytes: [UInt8])] {
     var found: [(type: UInt8, bytes: [UInt8])] = []
     var index = 0
@@ -92,6 +92,7 @@ func clientMessages(_ bytes: [UInt8]) -> [(type: UInt8, bytes: [UInt8])] {
         case 2: length = 4 + (Int(bytes[index + 2]) << 8 | Int(bytes[index + 3])) * 4
         case 3, 8: length = 10
         case 5: length = 6
+        case 13: length = 8
         default: return found
         }
         guard index + length <= bytes.count else { return found }
@@ -148,16 +149,17 @@ struct AppleDisplayLayoutTests {
         let payload = MacLayout.payload(points: (2880, 900), framebuffer: (1280, 800), current: 1, displays: MacLayout.mixed)
         let layout = try #require(RFBAppleDisplayLayout(payload: payload))
         #expect(layout.screens(inFramebufferWidth: 1280, height: 800)
-                == [VNCScreen(id: 1, x: 0, y: 0, width: 1280, height: 800, flags: 0, isMain: false)])
+                == [VNCScreen(id: 1, x: 0, y: 0, width: 1280, height: 800, flags: 0, isMain: false, density: 1)])
     }
 
     @Test("two displays of mixed density: each display's own pixels, the main one marked")
     func mixedDensity() throws {
         let layout = try #require(RFBAppleDisplayLayout(payload: MacLayout.mixedPayload))
         #expect(layout.screens(inFramebufferWidth: 4480, height: 1800) == [
-            VNCScreen(id: 4, x: 0, y: 0, width: 3200, height: 1800, flags: 1, isMain: true),
-            VNCScreen(id: 1, x: 3200, y: 0, width: 1280, height: 800, flags: 0, isMain: false),
+            VNCScreen(id: 4, x: 0, y: 0, width: 3200, height: 1800, flags: 1, isMain: true, density: 2),
+            VNCScreen(id: 1, x: 3200, y: 0, width: 1280, height: 800, flags: 0, isMain: false, density: 1),
         ])
+        #expect(layout.densities == [4: 2, 1: 1], "every display's density, by id")
     }
 
     @Test("a mirror set is offered once, by its first member")
@@ -202,8 +204,8 @@ struct AppleDisplayLayoutTests {
 
     @Test("after SetServerScaling the layout states the factor, and the displays are the scaled framebuffer's pixels")
     func scaledLayout() throws {
-        let expected = [VNCScreen(id: 4, x: 0, y: 0, width: 1600, height: 900, flags: 1, isMain: true),
-                        VNCScreen(id: 1, x: 1600, y: 0, width: 640, height: 400, flags: 0, isMain: false)]
+        let expected = [VNCScreen(id: 4, x: 0, y: 0, width: 1600, height: 900, flags: 1, isMain: true, density: 2),
+                        VNCScreen(id: 1, x: 1600, y: 0, width: 640, height: 400, flags: 0, isMain: false, density: 1)]
         let layout = try #require(RFBAppleDisplayLayout(payload: MacLayout.halved()))
         #expect(layout.serverScale == 0.5)
         #expect(layout.framebufferSize?.width == 2240 && layout.framebufferSize?.height == 900)
@@ -391,8 +393,8 @@ struct AppleDisplaysClientTests {
 
         #expect(seen.screens.first?.map(\.id) == [4, 1])
         #expect(seen.screens.first?.first?.isMain == true)
-        #expect(seen.screens.last == [VNCScreen(id: 4, x: 0, y: 0, width: 1600, height: 900, flags: 1, isMain: true),
-                                      VNCScreen(id: 1, x: 1600, y: 0, width: 640, height: 400, flags: 0, isMain: false)])
+        #expect(seen.screens.last == [VNCScreen(id: 4, x: 0, y: 0, width: 1600, height: 900, flags: 1, isMain: true, density: 2),
+                                      VNCScreen(id: 1, x: 1600, y: 0, width: 640, height: 400, flags: 0, isMain: false, density: 1)])
         #expect(seen.frames.last == "2240x900")
         #expect(client.serverScale == 0.5 && !client.awaitingServerScaling)
         #expect(client.receivedAppleDisplayMetadata)

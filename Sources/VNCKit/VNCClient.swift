@@ -14,14 +14,23 @@ public struct VNCConfiguration: Sendable {
     /// Ask Apple's server to render smaller at the lower quality levels (`SetServerScaling`). Off
     /// after a Mac ended a session while a factor was unanswered (`GlassVNCSession`).
     public var allowsServerScaling: Bool
+    /// Ask Apple's server where its pointer is and for its shapes in its own cache (encodings 1100
+    /// and 1104, `RFBAppleCursor.swift`). Off after a Mac broke the protocol once it had sent one (W38).
+    public var requestsAppleCursor: Bool
+    /// A Mac's display this connection exists to show alone (`SetDisplay`, W38): until a layout says
+    /// it is being sent, no picture is fetched or handed on, and a Mac that does not switch to it ends
+    /// the session. Nil shows what the Mac sends.
+    public var display: UInt32?
 
     public init(host: String, port: UInt16 = 5900, username: String = "", password: String,
                 sharedSession: Bool = true, clipboardEnabled: Bool = false, requestsAppleDisplayLayout: Bool = true,
-                allowsServerScaling: Bool = true) {
+                allowsServerScaling: Bool = true, requestsAppleCursor: Bool = true, display: UInt32? = nil) {
         self.host = host; self.port = port; self.username = username; self.password = password
         self.sharedSession = sharedSession; self.clipboardEnabled = clipboardEnabled
         self.requestsAppleDisplayLayout = requestsAppleDisplayLayout
         self.allowsServerScaling = allowsServerScaling
+        self.requestsAppleCursor = requestsAppleCursor
+        self.display = display
     }
 }
 
@@ -41,6 +50,10 @@ public struct VNCClientCallbacks: Sendable {
     public var update: @Sendable (VNCUpdateSummary) -> Void = { _ in }
     /// What a Mac said about its displays, as it said it: for diagnostics and the live probe.
     public var appleDisplayMetadata: @Sendable (RFBAppleDisplayMetadata) -> Void = { _ in }
+    /// Where a Mac's pointer is, in the framebuffer's pixels as they arrive (W38).
+    public var cursorPosition: @Sendable (_ x: Int, _ y: Int) -> Void = { _, _ in }
+    /// Everything that arrived about the pointer, as it arrived: for diagnostics and the live probe.
+    public var cursorMessage: @Sendable (VNCCursorMessage) -> Void = { _ in }
     public init() {}
 }
 
@@ -79,6 +92,7 @@ public final class VNCClient: Sendable {
         self.closeAction = close
         (outbox, outboxContinuation) = AsyncStream.makeStream(of: [UInt8].self)
         state.setOpen(open)
+        if let display = configuration.display { planner.setDisplay(.display(display)) }
     }
 
     public var isReady: Bool { state.ready }
@@ -108,6 +122,35 @@ public final class VNCClient: Sendable {
 
     /// The factor a Mac has confirmed it renders at; 1 on every other server.
     public var serverScale: Double { planner.serverScaleInForce }
+
+    /// Retina displays at 1x (W38): a Mac is asked to render the displays being fetched at one pixel
+    /// per point — half a Retina display's pixels each way — times the quality level's own factor,
+    /// where they share a density. Off sends a Mac's displays at their own pixels.
+    public func setDensityScaling(_ on: Bool) {
+        planner.setDensityScaling(on)
+        pump()
+    }
+
+    /// Asks a Mac to send one display, its own pixels the whole framebuffer, or every display
+    /// (`SetDisplay`, W38). Sent once the Mac has sent a layout; a layout naming it confirms it.
+    public func setDisplay(_ selection: RFBDisplaySelection?) {
+        planner.setDisplay(selection)
+        pump()
+    }
+
+    /// The display a Mac's last layout says it is sending; nil for all of them, or no layout.
+    public var currentDisplay: UInt32? { planner.currentDisplay }
+
+    /// A display was asked of a Mac and no layout has confirmed it yet.
+    public var awaitingDisplay: Bool { planner.awaitingDisplay }
+
+    /// A Mac sent its pointer's position or a shape from its cache this session: a later protocol
+    /// error may be a misreading of them (W38).
+    public var receivedAppleCursor: Bool { state.appleCursor }
+
+    /// The last of a Mac's own encodings (display metadata or the pointer's) read before now: the
+    /// likeliest misreading behind a protocol error that follows it.
+    public var lastAppleEncoding: RFBEncoding? { state.lastAppleEncoding }
 
     /// A factor was asked of a Mac and no layout has confirmed it yet.
     public var awaitingServerScaling: Bool { planner.awaitingServerScale }
@@ -150,7 +193,8 @@ public final class VNCClient: Sendable {
             let info = try await handshake()
             planner.start(width: info.width, height: info.height, dialect: RFBServerDialect(version: info.serverVersion),
                           appleDisplayLayout: configuration.requestsAppleDisplayLayout,
-                          serverScaling: configuration.allowsServerScaling)
+                          serverScaling: configuration.allowsServerScaling,
+                          appleCursor: configuration.requestsAppleCursor)
             let opening = planner.openingMessages()
             try await sink.write(opening.pixelFormat)
             try await sink.write(opening.encodings)
@@ -172,6 +216,12 @@ public final class VNCClient: Sendable {
                     try? await Task.sleep(for: .seconds(1))
                     guard let self, !Task.isCancelled else { return }
                     self.callbacks.statistics(self.statistics)
+                    // A Mac that does not answer may send nothing at all: looked at here, not only
+                    // as messages arrive.
+                    if let display = self.configuration.display, self.planner.displayRefused(at: .now) {
+                        self.fail(Self.displayRefusal(display))
+                        return
+                    }
                 }
             })
             state.setReady(true)
@@ -179,10 +229,22 @@ public final class VNCClient: Sendable {
             try await updateLoop(framebuffer: framebuffer)
         } catch {
             await finish()
+            if let failure = state.failure { throw failure }
             if state.isCancelled { throw RFBError.cancelled }
             throw error
         }
         await finish()
+    }
+
+    static func displayRefusal(_ display: UInt32) -> RFBError {
+        .unsupported("The Mac did not send display \(display) on a connection of its own within ten seconds.")
+    }
+
+    /// Ends the session with this failure rather than as cancelled.
+    private func fail(_ error: RFBError) {
+        state.fail(error)
+        let close = closeAction
+        Task { await close() }
     }
 
     /// Sends what the planner decides now, and looks again when it is waiting on time.
@@ -316,6 +378,7 @@ public final class VNCClient: Sendable {
         let size = state.framebufferSize
         let clampedX = min(max(0, x), max(0, size.width - 1)), clampedY = min(max(0, y), max(0, size.height - 1))
         let wire = Self.unscaled(x: clampedX, y: clampedY, scale: planner.serverScaleInForce)
+        state.pointerSent(picture: (clampedX, clampedY), wire: wire, at: .now)
         try await sink.write([5, buttonMask] + UInt16(wire.x).bigEndianBytes + UInt16(wire.y).bigEndianBytes)
     }
 
@@ -373,8 +436,15 @@ public final class VNCClient: Sendable {
 
     private func updateLoop(framebuffer: RFBFramebuffer) async throws {
         let decoder = RFBRectangleDecoder()
+        let cursors = RFBAppleCursorCache()
+        let apple = planner.serverDialect == .apple
         while true {
             try checkCancelled()
+            // A connection for one display whose Mac did not switch to it ends: it was opened to send
+            // that display alone, and the whole desktop is not what it is for (W38).
+            if let display = configuration.display, planner.displayRefused(at: .now) {
+                throw Self.displayRefusal(display)
+            }
             planner.waitingForMessage(at: .now)
             pump()
             let type = try await source.u8()
@@ -415,9 +485,48 @@ public final class VNCClient: Sendable {
                     case .lastRect:
                         break rectangles
                     case .cursor:
-                        if rect.isEmpty { callbacks.cursor(nil) } else {
-                            let image = try await RFBRectangleDecoder.decodeCursor(rect, from: source, pixels: pixels)
+                        if rect.isEmpty {
+                            callbacks.cursorMessage(.richCursorHidden)
+                            callbacks.cursor(nil)
+                        } else {
+                            // A Mac's shape is in its points (W38): the owner's pointer on a Retina
+                            // display, drawn as its pixels, was half the size it is on the Mac.
+                            let image = try await RFBRectangleDecoder.decodeCursor(rect, from: source, pixels: pixels,
+                                                                                   pointSized: apple)
+                            callbacks.cursorMessage(.richCursor(width: rect.width, height: rect.height,
+                                                               hotSpotX: rect.x, hotSpotY: rect.y))
                             callbacks.cursor(image)
+                        }
+                    case .appleCursorImage:
+                        // A shape stored in, or selected from, the Mac's cache (`RFBAppleCursor.swift`):
+                        // the header's x and y are its hotspot and its size the shape's.
+                        state.noteApple(.appleCursorImage)
+                        let body = try await RFBAppleCursorCache.readBody(from: source)
+                        let outcome = cursors.accept(id: body.id, hotSpotX: rect.x, hotSpotY: rect.y,
+                                                     width: rect.width, height: rect.height, deflated: body.deflated)
+                        if body.deflated.isEmpty {
+                            if case .shape = outcome { callbacks.cursorMessage(.appleSelected(id: body.id, known: true)) }
+                            else { callbacks.cursorMessage(.appleSelected(id: body.id, known: false)) }
+                        } else {
+                            var decoded = false
+                            if case .shape = outcome { decoded = true }
+                            if case .unreadable(let reason) = outcome {
+                                Self.logger.error("event=apple-cursor unreadable id=\(body.id) reason=\(reason, privacy: .public)")
+                            }
+                            callbacks.cursorMessage(.appleStored(id: body.id, width: rect.width, height: rect.height,
+                                                                 hotSpotX: rect.x, hotSpotY: rect.y,
+                                                                 compressedBytes: body.deflated.count, decoded: decoded))
+                        }
+                        // A shape this client cannot draw leaves the pointer as it is: closer to the
+                        // truth than blanking it (remotex's `Cursor::Unchanged`).
+                        if case .shape(let image) = outcome { callbacks.cursor(image) }
+                    case .appleCursorPosition:
+                        // Where the Mac's pointer is: the header's x and y, and nothing after them.
+                        state.noteApple(.appleCursorPosition)
+                        callbacks.cursorMessage(.applePosition(x: rect.x, y: rect.y))
+                        if let point = state.mapCursorPosition(x: rect.x, y: rect.y, scale: planner.serverScaleInForce,
+                                                               width: framebuffer.width, height: framebuffer.height) {
+                            callbacks.cursorPosition(point.x, point.y)
                         }
                     case .desktopSize:
                         try framebuffer.resize(width: rect.width, height: rect.height)
@@ -462,6 +571,7 @@ public final class VNCClient: Sendable {
                         // DesktopSize, so a size change — a display added, a scale applied —
                         // arrives only here.
                         state.noteAppleDisplayMetadata()
+                        state.noteApple(.appleDisplayLayout)
                         let payload = try await RFBAppleDisplayLayout.readPayload(from: source)
                         guard let layout = RFBAppleDisplayLayout(payload: payload) else {
                             Self.logger.error("event=apple-display-layout unreadable bytes=\(payload.count)")
@@ -480,7 +590,8 @@ public final class VNCClient: Sendable {
                             }
                         }
                         let screens = layout.screens(inFramebufferWidth: framebuffer.width, height: framebuffer.height)
-                        planner.appleLayoutArrived(serverScale: layout.serverScale, width: framebuffer.width, height: framebuffer.height)
+                        planner.appleLayoutArrived(serverScale: layout.serverScale, width: framebuffer.width, height: framebuffer.height,
+                                                   displays: screens, densities: layout.densities, current: layout.currentDisplay)
                         let current = layout.currentDisplay.map(String.init) ?? "all"
                         Self.logger.notice("event=apple-display-layout version=\(layout.version) records=\(layout.records.count) displays=\(screens.count) framebuffer=\(layout.framebufferWidth)x\(layout.framebufferHeight) current=\(current, privacy: .public) scale=\(layout.serverScale) state=\(layout.sessionState)")
                         callbacks.appleDisplayMetadata(.layout(layout))
@@ -491,6 +602,7 @@ public final class VNCClient: Sendable {
                         // The older list, which a Mac sends instead of the layout only if it has
                         // none: stepped over, and reported.
                         state.noteAppleDisplayMetadata()
+                        state.noteApple(.appleDisplayInfo)
                         let info = try await RFBAppleDisplayInfo.read(from: source)
                         Self.logger.notice("event=apple-display-info width=\(info.width) height=\(info.height) flags=\(info.flags) displays=\(info.records.count)")
                         callbacks.appleDisplayMetadata(.displayInfo(info))
@@ -500,7 +612,11 @@ public final class VNCClient: Sendable {
                         changed = true
                     }
                 }
-                if changed { callbacks.frame(framebuffer.width, framebuffer.height, framebuffer.snapshot()) }
+                // While waiting for its display, a one-display connection hands on no picture: what it
+                // holds is the whole desktop's, not its display's (W38).
+                if changed, !planner.holdingForDisplay {
+                    callbacks.frame(framebuffer.width, framebuffer.height, framebuffer.snapshot())
+                }
                 // The link's speed, from every byte this update took to arrive whatever its
                 // encoding, is what Automatic chooses its level by.
                 let elapsed = ContinuousClock.now - started
@@ -546,14 +662,34 @@ private final class ClientState: @unchecked Sendable {
     private var width = 0, height = 0
     private var openAction: (@Sendable () async throws -> Void)?
     private var displayMetadata = false
+    private var cursorSeen = false
+    private var lastApple: RFBEncoding?
+    private var cursorSpace = RFBCursorPositionSpace()
 
     var isCancelled: Bool { lock.withLock { cancelled } }
     var ready: Bool { lock.withLock { isReady } }
     var desktopResizeSupported: Bool { lock.withLock { resizeSupported } }
     var appleDisplayMetadata: Bool { lock.withLock { displayMetadata } }
     func noteAppleDisplayMetadata() { lock.withLock { displayMetadata = true } }
+    var appleCursor: Bool { lock.withLock { cursorSeen } }
+    var lastAppleEncoding: RFBEncoding? { lock.withLock { lastApple } }
+    func noteApple(_ encoding: RFBEncoding) {
+        lock.withLock {
+            lastApple = encoding
+            if encoding == .appleCursorImage || encoding == .appleCursorPosition { cursorSeen = true }
+        }
+    }
+    func pointerSent(picture: (x: Int, y: Int), wire: (x: Int, y: Int), at now: ContinuousClock.Instant) {
+        lock.withLock { cursorSpace.pointerSent(picture: picture, wire: wire, at: now) }
+    }
+    func mapCursorPosition(x: Int, y: Int, scale: Double, width: Int, height: Int) -> (x: Int, y: Int)? {
+        lock.withLock { cursorSpace.map(x: x, y: y, scale: scale, width: width, height: height, at: .now) }
+    }
     var framebufferSize: (width: Int, height: Int) { lock.withLock { (width, height) } }
     func cancel() { lock.withLock { cancelled = true; isReady = false } }
+    private var failed: RFBError?
+    var failure: RFBError? { lock.withLock { failed } }
+    func fail(_ error: RFBError) { lock.withLock { failed = error; cancelled = true; isReady = false } }
     func setReady(_ value: Bool) { lock.withLock { isReady = value } }
     func setDesktopResizeSupported() { lock.withLock { resizeSupported = true } }
     func setFramebufferSize(width: Int, height: Int) { lock.withLock { self.width = width; self.height = height } }

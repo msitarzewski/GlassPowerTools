@@ -116,6 +116,8 @@ public final class DesktopViewport: Identifiable {
     public var isOnScreen = true {
         didSet { if isOnScreen != oldValue { session?.viewportDidChange() } }
     }
+    /// The window resizes only in its display's shape (W38), from its settings (`apply`).
+    public var keepsProportions = true
     @ObservationIgnored private let store: DesktopWindowSettingsStore?
     @ObservationIgnored weak var session: DesktopSessionModel?
 

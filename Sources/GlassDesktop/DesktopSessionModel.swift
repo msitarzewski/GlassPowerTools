@@ -107,8 +107,27 @@ public final class DesktopSessionModel {
             guard streamQuality != oldValue else { return }
             let target = transport, value = streamQuality
             Task { await target.setStreamQuality(value) }
+            for connection in displayConnections.values { connection.setQuality(value) }
         }
     }
+    /// What a Mac's Retina displays are sent at (W38), from the desktop's own window's settings: the
+    /// connection's, and each display window's own connection's.
+    public var retinaDisplays = GlassDesktopRetinaDisplays.oneX {
+        didSet {
+            guard retinaDisplays != oldValue else { return }
+            let target = transport, value = retinaDisplays
+            Task { await target.setRetinaDisplays(value) }
+            for connection in displayConnections.values { connection.setRetinaDisplays(value) }
+            updateDisplayConnections()
+        }
+    }
+    /// Display windows' own connections (W38), by window (`DesktopViewport.id`): where a Mac's
+    /// displays are of mixed density, each display window that shows one display fetches it on a
+    /// connection of its own, at that display's 1x (`DesktopDisplayConnection`).
+    public private(set) var displayConnections: [UUID: DesktopDisplayConnection] = [:]
+    /// Why display windows show their displays from the desktop's connection after all: the first
+    /// display connection that failed before showing anything, for this connection.
+    public private(set) var displayConnectionFailure: String?
     /// What the link is doing, about once a second, while connected (VNC).
     public private(set) var linkStatistics: GlassDesktopLinkStatistics?
     /// One window, or a window for each display (W30), from the desktop's own window's settings.
@@ -257,16 +276,16 @@ public final class DesktopSessionModel {
         viewport.session = self
         viewports.append(viewport)
         if let display = viewport.key.display { dismissedDisplays.remove(display) }
-        updateRequestedRegions()
+        updateDisplayConnections()
     }
 
     /// A window closed. The session ends with its last window; a display window closed by hand
-    /// is not reopened by `displayWindows` during this session.
+    /// is not reopened by `displayWindows` during this session. Its own connection closes with it.
     public func detach(_ viewport: DesktopViewport) {
         guard viewports.contains(where: { $0 === viewport }) else { return }
         viewports.removeAll { $0 === viewport }
         if let display = viewport.key.display, !closed, !shouldClosePresentation { dismissedDisplays.insert(display) }
-        if viewports.isEmpty { close() } else { updateRequestedRegions() }
+        if viewports.isEmpty { close() } else { updateDisplayConnections() }
     }
 
     /// The window that answers for the session — credentials, trust, the display windows to
@@ -289,16 +308,18 @@ public final class DesktopSessionModel {
 
     /// A window's display or visibility changed.
     func viewportDidChange() {
-        updateRequestedRegions()
+        for viewport in viewports { displayConnections[viewport.id]?.setOnScreen(viewport.isOnScreen) }
+        updateDisplayConnections()
         updateCursorImage()
     }
 
-    /// Asks the transport only for what is on screen: the displays of the windows that are.
+    /// Asks the transport only for what is on screen: the displays of the windows that are, except
+    /// those a window's own connection shows (W38).
     private func updateRequestedRegions() {
         let framebuffer = frame.map { DesktopSize(width: $0.width, height: $0.height) }
         let regions = DesktopDisplayLayout.requestedRegions(
-            onScreen: viewports.filter(\.isOnScreen).map { region(for: $0) }, windows: viewports.count,
-            framebuffer: framebuffer)
+            onScreen: viewports.filter { $0.isOnScreen && ownConnection(for: $0) == nil }.map { region(for: $0) },
+            windows: viewports.count, framebuffer: framebuffer)
         guard requestedRegions != .some(regions) else { return }
         requestedRegions = .some(regions)
         let target = transport
@@ -307,6 +328,211 @@ public final class DesktopSessionModel {
 
     /// What the transport was last asked for: nil for the whole framebuffer, empty for nothing.
     var currentRequestedRegions: [GlassRemoteRegion]? { requestedRegions ?? nil }
+
+    // MARK: A display window's own connection (W38)
+
+    /// The connection a window's picture and input go through when it is not the desktop's: its own,
+    /// once that shows a picture.
+    public func ownConnection(for viewport: DesktopViewport) -> DesktopDisplayConnection? {
+        guard let connection = displayConnections[viewport.id], connection.isShowing else { return nil }
+        return connection
+    }
+
+    /// The picture a window draws: its own connection's, or the desktop's.
+    public func pictureFrame(for viewport: DesktopViewport) -> GlassRDPFrame? {
+        ownConnection(for: viewport)?.frame ?? frame
+    }
+
+    /// The part of `pictureFrame(for:)` a window shows: all of its own connection's picture, else its
+    /// display's part of the desktop's.
+    public func pictureRegion(for viewport: DesktopViewport) -> DesktopRegion {
+        if let picture = ownConnection(for: viewport)?.frame { return .whole(width: picture.width, height: picture.height) }
+        return region(for: viewport)
+    }
+
+    /// Where a window's pointer and keys go.
+    func inputTransport(for viewport: DesktopViewport) -> any GlassDesktopTransport {
+        ownConnection(for: viewport)?.transport ?? transport
+    }
+
+    /// Whether the host's displays are of mixed density, as Apple's viewer counts it: at least one at
+    /// 1x and at least one that is not (remotex's `mixed_density`).
+    var hasMixedDensities: Bool {
+        let densities = screens.compactMap(\.density)
+        let oneX = densities.filter { abs($0 - 1) <= 0.005 }.count
+        return oneX > 0 && oneX < densities.count
+    }
+
+    /// The display a window would take a connection of its own for, if any: a display window showing
+    /// one display of a Mac whose displays are of mixed density, with Retina Displays at 1x.
+    func ownConnectionDisplay(for viewport: DesktopViewport) -> UInt32? {
+        guard !closed, isConnected, connection.protocol == .vnc, retinaDisplays == .oneX, !viewport.isPrimary,
+              displayConnectionFailure == nil, attemptCredential != nil, hasMixedDensities,
+              let display = viewport.selectedScreenID, screens.contains(where: { $0.id == display }) else { return nil }
+        return display
+    }
+
+    /// Opens the display connections the windows want and closes the rest, then asks the desktop's
+    /// connection for what is left.
+    func updateDisplayConnections() {
+        var wanted: [UUID: (viewport: DesktopViewport, display: UInt32)] = [:]
+        for viewport in viewports {
+            if let display = ownConnectionDisplay(for: viewport) { wanted[viewport.id] = (viewport, display) }
+        }
+        for (id, connection) in displayConnections where wanted[id]?.display != connection.display {
+            connection.close()
+            displayConnections.removeValue(forKey: id)
+        }
+        for (id, want) in wanted where displayConnections[id] == nil {
+            openDisplayConnection(for: want.viewport, display: want.display, id: id)
+        }
+        updateRequestedRegions()
+    }
+
+    /// The same endpoint and the credential this attempt signed in with: the person signs in once,
+    /// and nothing is stored anywhere new.
+    private func openDisplayConnection(for viewport: DesktopViewport, display: UInt32, id: UUID) {
+        guard let retained = attemptCredential, let password = retained.credential.password.toUTF8String() else { return }
+        let account = retained.credential.username == DesktopConnection.passwordOnlyAccount ? "" : retained.credential.username
+        let configuration = GlassVNCConfiguration(host: retained.connection.host, port: retained.connection.port,
+                                                  username: account, password: password,
+                                                  clipboardEnabled: false, display: display)
+        let connection = DesktopDisplayConnection(display: display, viewportID: id,
+                                                  transport: Self.makeTransport(for: retained.connection),
+                                                  disconnect: operations.disconnect)
+        connection.session = self
+        displayConnections[id] = connection
+        connection.start(configuration, quality: streamQuality, retina: retinaDisplays, onScreen: viewport.isOnScreen,
+                         connect: operations.connect)
+    }
+
+    /// A display connection connected, showed its first picture, failed or ended.
+    func displayConnectionChanged(_ connection: DesktopDisplayConnection) {
+        guard displayConnections[connection.viewportID] === connection else { return }
+        switch connection.state {
+        case .failed(let message):
+            // A Mac that will not take a second connection is not asked again for this one: its
+            // display windows show their displays from the desktop's connection, as before W38.
+            if connection.frame == nil, displayConnectionFailure == nil { displayConnectionFailure = message }
+            connection.close()
+            displayConnections.removeValue(forKey: connection.viewportID)
+        case .disconnected:
+            if connection.frame == nil, displayConnectionFailure == nil {
+                displayConnectionFailure = "The Mac closed the display's own connection."
+            }
+            connection.close()
+            displayConnections.removeValue(forKey: connection.viewportID)
+        case .connecting, .connected:
+            break
+        }
+        updateRequestedRegions()
+        updateCursorImage()
+    }
+
+    /// The pointer, as a display connection says: its shape is the session's, and its position is
+    /// mapped from that connection's picture into the desktop's.
+    func receive(_ cursor: GlassRDPCursor, from connection: DesktopDisplayConnection) {
+        guard isConnected, displayConnections[connection.viewportID] === connection else { return }
+        if case .position(let x, let y) = cursor {
+            guard let point = desktopPoint(DesktopPoint(x: x, y: y), from: connection) else { return }
+            pointerPosition = point
+        } else {
+            applyCursor(cursor)
+        }
+    }
+
+    /// A point in a display connection's picture, in the desktop's framebuffer.
+    func desktopPoint(_ point: DesktopPoint, from connection: DesktopDisplayConnection) -> DesktopPoint? {
+        guard let picture = connection.frame, picture.width > 0, picture.height > 0,
+              let screen = screens.first(where: { $0.id == connection.display }) else { return nil }
+        let x = screen.x + Int((Double(point.x) * Double(screen.width) / Double(picture.width)).rounded(.down))
+        let y = screen.y + Int((Double(point.y) * Double(screen.height) / Double(picture.height)).rounded(.down))
+        return DesktopPoint(x: min(screen.x + screen.width - 1, max(screen.x, x)),
+                            y: min(screen.y + screen.height - 1, max(screen.y, y)))
+    }
+
+    /// A window's pointer moved to `point` in its picture (`pictureRegion(for:)`): the session's
+    /// pointer, in the desktop's framebuffer.
+    public func movePointer(to point: DesktopPoint, in viewport: DesktopViewport) {
+        if let connection = ownConnection(for: viewport) {
+            if let mapped = desktopPoint(point, from: connection) { pointerPosition = mapped }
+        } else {
+            pointerPosition = point
+        }
+    }
+
+    /// Where the pointer is in a window's picture; nil when it is on a display the window does not
+    /// show.
+    public func pointerInPicture(for viewport: DesktopViewport) -> DesktopPoint? {
+        guard let point = pointerPosition else { return nil }
+        let region = region(for: viewport)
+        guard point.x >= region.origin.x, point.y >= region.origin.y,
+              point.x < region.origin.x + region.size.width, point.y < region.origin.y + region.size.height else { return nil }
+        guard let picture = ownConnection(for: viewport)?.frame, region.size.width > 0, region.size.height > 0 else { return point }
+        return DesktopPoint(x: Int(Double(point.x - region.origin.x) * Double(picture.width) / Double(region.size.width)),
+                            y: Int(Double(point.y - region.origin.y) * Double(picture.height) / Double(region.size.height)))
+    }
+
+    /// The display a window shows, or, showing all of them, the one the pointer is on.
+    func shownDisplay(for viewport: DesktopViewport) -> GlassRemoteScreen? {
+        if let id = viewport.selectedScreenID, let screen = screens.first(where: { $0.id == id }) { return screen }
+        guard let point = pointerPosition else { return DesktopDisplayLayout.mainScreen(screens) }
+        return screens.first { point.x >= $0.x && point.y >= $0.y && point.x < $0.x + $0.width && point.y < $0.y + $0.height }
+            ?? DesktopDisplayLayout.mainScreen(screens)
+    }
+
+    /// The scale a window's picture comes at from a Mac (1 is its own pixels); nil where the host
+    /// cannot be asked.
+    func pictureScale(for viewport: DesktopViewport) -> Double? {
+        if let connection = ownConnection(for: viewport) { return connection.linkStatistics?.serverScale }
+        return linkStatistics?.serverScale
+    }
+
+    /// The picture's pixels per point of the Mac's own on the display a window shows: 2 for a Retina
+    /// display at its own pixels, 1 at 1x. Nil where the host does not say.
+    func picturePixelsPerPoint(for viewport: DesktopViewport) -> Double? {
+        guard let density = shownDisplay(for: viewport)?.density else { return nil }
+        return density * (pictureScale(for: viewport) ?? 1)
+    }
+
+    /// The picture's pixels per pixel of the pointer's shape in a window: a Mac's pointer is in its
+    /// points (W38), so on a Retina display at its own pixels it covers twice its pixel count.
+    func cursorPictureScale(for viewport: DesktopViewport) -> Double {
+        guard cursorBitmap?.isPointSized == true, let perPoint = picturePixelsPerPoint(for: viewport),
+              perPoint.isFinite, perPoint > 0 else { return 1 }
+        return min(4, max(0.25, perPoint))
+    }
+
+    /// What a window is being sent (W38), for Desktop Settings ▸ Connection and the status bar:
+    /// "1728 × 1117 at 1x (50%)".
+    public func sending(for viewport: DesktopViewport) -> String? {
+        guard pictureFrame(for: viewport) != nil else { return nil }
+        let size = pictureRegion(for: viewport).size
+        var text = "\(size.width) × \(size.height)"
+        if let perPoint = picturePixelsPerPoint(for: viewport) {
+            text += " at \(DesktopLinkReadout.density(perPoint))"
+            if let scale = pictureScale(for: viewport) { text += " (\(DesktopLinkReadout.scale(scale)))" }
+        } else if let scale = pictureScale(for: viewport), scale < 0.995 {
+            text += " (\(DesktopLinkReadout.scale(scale)))"
+        }
+        return text
+    }
+
+    /// The window's shape, width over height, while it keeps its display's proportions (W38): the
+    /// picture it shows. Nil before there is a picture, with Keep Display Proportions off, and while
+    /// Match Window Size makes the remote desktop take the window's shape instead.
+    public func pictureAspect(for viewport: DesktopViewport) -> Double? {
+        guard viewport.keepsProportions, pictureFrame(for: viewport) != nil, !followsWindowSize(viewport) else { return nil }
+        let size = pictureRegion(for: viewport).size
+        guard size.width > 0, size.height > 0 else { return nil }
+        return Double(size.width) / Double(size.height)
+    }
+
+    /// Whether the remote desktop takes this window's size (Match Window Size, on a host that can):
+    /// then the window is free, and the desktop follows it.
+    func followsWindowSize(_ viewport: DesktopViewport) -> Bool {
+        viewport.isPrimary && matchWindow && capabilities != nil && !holdsDisplayLayout
+    }
 
     /// A host with several displays and a window for each: the desktop's window shows the main
     /// display, and the others open in their own — once per connection, and never one closed by
@@ -319,6 +545,13 @@ public final class DesktopSessionModel {
         if primaryViewport.selectedScreenID == nil { primaryViewport.selectedScreenID = main.id }
         let shown = Set(viewports.compactMap(\.selectedScreenID)).union([primaryViewport.selectedScreenID].compactMap { $0 })
         displayWindowRequests = screens.map(\.id).filter { !shown.contains($0) && !dismissedDisplays.contains($0) }
+    }
+
+    /// Closes every display window's own connection: the session's attempt ended or changed.
+    private func closeDisplayConnections() {
+        for connection in displayConnections.values { connection.close() }
+        displayConnections = [:]
+        displayConnectionFailure = nil
     }
     public var isConnected: Bool { state == .connected }
     var failurePresentation: DesktopFailurePresentation? {
@@ -759,6 +992,7 @@ public final class DesktopSessionModel {
         cancelResize()
         audio.stop()
         frame = nil; capabilities = nil; remoteClipboard = nil
+        closeDisplayConnections()
         screens = []; selectedScreenID = nil
         linkStatistics = nil; displayWindowRequests = []; appliedDisplayWindows = false
         cursor = .systemDefault; cursorBitmap = nil; cursorImage = nil
@@ -807,7 +1041,7 @@ public final class DesktopSessionModel {
         case .state(let value):
             let wasConnected = isConnected
             state = value
-            if value == .connected { recordFirstDesktopIfReady(snapshot: snapshot) }
+            if value == .connected { recordFirstDesktopIfReady(snapshot: snapshot); updateDisplayConnections() }
             else if case .failed(let message) = value {
                 attemptIsTerminal = true
                 clearRemoteState(); errorMessage = message; started = false
@@ -828,27 +1062,32 @@ public final class DesktopSessionModel {
             if state == .connecting || isConnected { capabilities = value }
         case .cursor(let value):
             guard isConnected else { return }
-            cursor = value
-            switch value {
-            case .hidden: cursorVisible = false
-            case .systemDefault: cursorBitmap = nil; cursorImage = nil; cursorVisible = true
-            case .position(let x, let y): pointerPosition = .init(x: x, y: y)
-            case .image(let raw):
-                do { cursorBitmap = try DesktopCursorDecoder.decode(raw); cursorVisible = true; updateCursorImage() }
-                catch { errorMessage = error.localizedDescription }
-            }
+            applyCursor(value)
         case .screens(let value):
             guard state == .connecting || isConnected else { return }
             screens = value
             reconcileSelectedScreen()
             applyDisplayWindows()
-            updateRequestedRegions()
+            updateDisplayConnections()
         case .linkStatistics(let value):
             if isConnected { linkStatistics = value }
         case .clipboard(let value): if isConnected, snapshot.clipboardEnabled { remoteClipboard = value }
         case .audio(let sample):
             guard isConnected, snapshot.audioEnabled else { return }
             do { try audio.play(sample) } catch { errorMessage = error.localizedDescription }
+        }
+    }
+
+    /// The pointer's shape, visibility or position, from whichever connection says it.
+    private func applyCursor(_ value: GlassRDPCursor) {
+        cursor = value
+        switch value {
+        case .hidden: cursorVisible = false
+        case .systemDefault: cursorBitmap = nil; cursorImage = nil; cursorVisible = true
+        case .position(let x, let y): pointerPosition = .init(x: x, y: y)
+        case .image(let raw):
+            do { cursorBitmap = try DesktopCursorDecoder.decode(raw); cursorVisible = true; updateCursorImage() }
+            catch { errorMessage = error.localizedDescription }
         }
     }
 

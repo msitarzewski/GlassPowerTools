@@ -1345,3 +1345,17 @@ record layer, which is what the notes measured.
 
 **D61 verified (2026-10-11):** on the owner's two-display Mac (one 2x Retina, one 1x external), build 0.4.348 opens each
 display in its own window on the Vision Pro — "Dual screen works!!!". The RFB 3.8 risk noted above did not bite.
+
+## D64 — Retina at 1x, one connection per display over mixed densities, windows held to their display's shape — Implemented 2026-10-11 (Mac-side unverified)
+**Owner:** "lock the dimensions to the actual screen ratio"; "can we have the Mac chill on the 2x retina resolution";
+the pointer "insanely small on the main display ... isn't visible on the second". **Decision (W38):** the factor asked
+of a Mac is Quality's × 1/density of the displays being fetched when they share one density (a 2x display alone at
+0.5); mixed densities in one request get 1 (as Apple's viewer). With a window per display over mixed densities, each
+display window opens its own connection to the endpoint (credential reused in memory, clipboard off), selects its
+display with SetDisplay (0x0d) and asks for 1x; refused → not retried, the window falls back to the main connection.
+"Retina Displays: Send at 1x (Recommended) / Native 2x" on the Connection page. Windows: "Keep Display Proportions"
+(on by default) — visionOS via UIKit `requestGeometryUpdate(.Vision(size:resizingRestrictions: .uniform))` (SwiftUI
+has none), Mac via `contentAspectRatio`; left free while Match Window Size resizes the remote. Pointer: a Mac's shape is
+in points, drawn at density × server scale; CursorPos (1100) and the cursor cache (1104) advertised on Apple servers;
+a hidden pointer returns on movement. **Needs the owner's probe run:** a second session, SetDisplay under RFB 3.8,
+1100/1104 delivery, CursorPos coordinates, hand-resizing under `.uniform` on the headset.

@@ -157,10 +157,12 @@ final class DesktopMTKView: MTKView {
         if self.session !== session { shutdown(); configure(session) }
         self.viewport = viewport
         let shown = viewport ?? session.primaryViewport
-        if inputTransport !== session.transport || session.isConnected != wasConnected {
+        // A display window with a connection of its own sends its input there (W38).
+        let target = session.inputTransport(for: shown)
+        if inputTransport !== target || session.isConnected != wasConnected {
             input?.stop()
-            input = DesktopInput(session: session.transport) { [weak session] in session?.errorMessage = $0 }
-            inputTransport = session.transport
+            input = DesktopInput(session: target) { [weak session] in session?.errorMessage = $0 }
+            inputTransport = target
             releaseFocusState()
             wasConnected = session.isConnected
         }
@@ -174,8 +176,8 @@ final class DesktopMTKView: MTKView {
         wantsSoftwareKeyboard = session.wantsKeyboard && inputEnabled
         if wantsSoftwareKeyboard, !isFirstResponder { becomeFirstResponder() }
         #endif
-        renderer?.frame = session.frame
-        renderer?.region = session.region(for: shown)
+        renderer?.frame = session.pictureFrame(for: shown)
+        renderer?.region = session.pictureRegion(for: shown)
         renderer?.settings = shown.presentation
         renderer?.setWallpaper(session.wallpaperURL)
         #if os(macOS)
@@ -237,12 +239,13 @@ final class DesktopMTKView: MTKView {
     private func point(_ location: CGPoint, clamp: Bool = false) -> DesktopPoint? {
         guard inputEnabled, let session, let shown, session.isConnected else { return nil }
         // Input follows this window's region, so clicks land on the display it shows: a point in a
-        // display window lands inside that display's rectangle of the framebuffer (W30).
-        let region = session.region(for: shown)
+        // display window lands inside that display's rectangle of the framebuffer (W30), or, on a
+        // connection of its own, in that connection's picture of it (W38).
+        let region = session.pictureRegion(for: shown)
         let mapped = DesktopCoordinates.map(x: location.x, y: location.y, viewWidth: bounds.width,
                                       viewHeight: bounds.height, desktop: region.size,
                                       origin: region.origin, clamp: clamp)
-        if let mapped { session.pointerPosition = mapped }
+        if let mapped { session.movePointer(to: mapped, in: shown) }
         return mapped
     }
 
@@ -446,10 +449,10 @@ final class DesktopMTKView: MTKView {
     /// The controller is a value type, so it is mutated in place here and stored back. Reading a copy
     /// and mutating that would silently discard the cursor position.
     private func withTrackpad(_ body: (inout TrackpadPointerController) -> [TrackpadAction]) {
-        let region = session.flatMap { session in shown.map { session.region(for: $0) } } ?? .whole(width: 1, height: 1)
+        let region = session.flatMap { session in shown.map { session.pictureRegion(for: $0) } } ?? .whole(width: 1, height: 1)
         if trackpad == nil {
             trackpad = TrackpadPointerController(region: region, viewSize: bounds.size,
-                                                 position: session?.pointerPosition)
+                                                 position: session.flatMap { session in shown.flatMap { session.pointerInPicture(for: $0) } })
         }
         guard var controller = trackpad else { return }
         controller.update(region: region, viewSize: bounds.size)
@@ -462,7 +465,7 @@ final class DesktopMTKView: MTKView {
         for action in actions {
             switch action {
             case .move(let point):
-                session?.pointerPosition = point
+                if let shown { session?.movePointer(to: point, in: shown) }
                 input?.send(.move(point))
             case .press(let button):
                 input?.send(.button(button == .right ? .right : .left, true, position))

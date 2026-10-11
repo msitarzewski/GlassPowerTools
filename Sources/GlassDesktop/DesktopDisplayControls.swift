@@ -45,6 +45,13 @@ enum DesktopLinkReadout {
         "\(Int((factor * 100).rounded()))%"
     }
 
+    /// Pixels per point of the Mac's own, as a person says it (W38): "1x", "2x", "0.75x".
+    static func density(_ perPoint: Double) -> String {
+        let rounded = (perPoint * 100).rounded() / 100
+        if rounded == rounded.rounded() { return "\(Int(rounded))x" }
+        return String(format: "%gx", rounded)
+    }
+
     /// One line for a status bar or a menu: "1.2 Mbit/s · 14 updates/s · 16-bit color · ZRLE", and
     /// "· 75% size" while a Mac sends a smaller picture.
     static func line(_ statistics: GlassDesktopLinkStatistics) -> String {
@@ -173,6 +180,14 @@ struct DesktopConnectionSettingsSections: View {
                     }
                     .accessibilityIdentifier("desktop-window-quality")
                 }
+                // W38: a Mac's Retina displays at 1x, or at their own pixels.
+                GlassWindowSettingRow(DesktopWindowSettings.retina, overrides: $primary.windowSettings,
+                                      global: defaults.retina, inheritsFrom: DesktopWindowSettingsView.allDesktops) { value in
+                    Picker(DesktopWindowSettings.retina.title, selection: value) {
+                        ForEach(GlassDesktopRetinaDisplays.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                    .accessibilityIdentifier("desktop-window-retina")
+                }
                 if let statistics = session.linkStatistics {
                     LabeledContent("Receiving", value: DesktopLinkReadout.rate(bytesPerSecond: statistics.bytesPerSecond))
                     LabeledContent("Updates", value: DesktopLinkReadout.updates(statistics.updatesPerSecond))
@@ -194,9 +209,24 @@ struct DesktopConnectionSettingsSections: View {
             } header: {
                 Text("Quality")
             } footer: {
-                Text("The figures are what the network carries now, updated every second. \(Self.qualityFooter)")
+                Text("The figures are what the network carries now, updated every second. \(Self.qualityFooter) \(Self.retinaFooter)")
             }
             .accessibilityIdentifier("desktop-window-readout")
+            // W38: what each window of this desktop is being sent, and over which connection.
+            Section {
+                ForEach(session.viewports) { window in
+                    LabeledContent(windowName(window), value: windowLine(window))
+                        .accessibilityIdentifier("desktop-window-sending")
+                }
+                if let failure = session.displayConnectionFailure {
+                    Text("A display's window could not open a connection of its own, so it shows its display from the desktop's connection at the display's own pixels. The Mac said: \(failure)")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Windows")
+            } footer: {
+                Text("Each window's picture as it arrives: its size in pixels, and at what scale of the Mac's own points. A display window marked Own Connection fetches its display on a connection of its own.")
+            }
         }
         if session.screens.count > 1 {
             Section {
@@ -215,6 +245,22 @@ struct DesktopConnectionSettingsSections: View {
             }
         }
     }
+
+    /// A window's name in the Windows list.
+    private func windowName(_ window: DesktopViewport) -> String {
+        let shown = window.selectedScreenID.map { DesktopDisplayLayout.name(of: $0, in: session.screens) } ?? "All Displays"
+        return window.isPrimary ? "Desktop Window: \(shown)" : shown
+    }
+
+    /// "1728 × 1117 at 1x (50%) · Own Connection".
+    private func windowLine(_ window: DesktopViewport) -> String {
+        var line = session.sending(for: window) ?? "Waiting for a picture"
+        if session.ownConnection(for: window) != nil { line += " · Own Connection" }
+        else if session.displayConnections[window.id] != nil { line += " · Opening its own connection" }
+        return line
+    }
+
+    static let retinaFooter = "Retina Displays is for a Mac. At 1x a Retina display arrives at one pixel per point, a quarter of its own pixels, and Quality's own reduction comes on top. A Retina display and a 1x display cannot share one scale, so when a Mac has both and a display has a window of its own, that window opens a connection of its own to the Mac with the same sign-in, and each arrives at 1x. Native 2x sends a Retina display's own pixels."
 
     static let qualityFooter = "Automatic measures the connection and moves between the levels as it changes. Best is lossless, full color. Balanced is full color, with JPEG for photos where the computer offers it. Data Saver sends thousands of colors at up to 15 updates a second; Lowest compresses hardest at up to 8, with 256 colors where the computer sends no JPEG. A Mac also sends a smaller picture at Data Saver (75% of its size) and Lowest (50%); Scale shows the size it is sending. Quality is the connection's, so it applies to every window of this desktop. Zooming or shrinking the picture here does not change what the network carries."
 }

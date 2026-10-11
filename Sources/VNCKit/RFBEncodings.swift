@@ -52,7 +52,8 @@ final class RFBRectangleDecoder {
             return 4 + length
         case .tight:
             return try await tight.decode(rect, from: source, into: framebuffer, pixels: pixels)
-        case .cursor, .desktopSize, .lastRect, .extendedDesktopSize, .appleDisplayInfo, .appleDisplayLayout:
+        case .cursor, .desktopSize, .lastRect, .extendedDesktopSize, .appleDisplayInfo, .appleDisplayLayout,
+             .appleCursorPosition, .appleCursorImage:
             throw RFBError.protocolViolation("Pseudo-encodings are handled by the client, not the rectangle decoder.")
         }
     }
@@ -259,7 +260,7 @@ final class RFBRectangleDecoder {
     /// Cursor pixels use the client pixel format, followed by a 1-bit-per-pixel bitmask with rows
     /// padded to whole bytes, most significant bit first, where 1 marks an opaque pixel.
     static func decodeCursor(_ rect: RFBRectangle, from source: any RFBByteSource,
-                             pixels: RFBPixelDecoder = .native) async throws -> VNCCursorImage {
+                             pixels: RFBPixelDecoder = .native, pointSized: Bool = false) async throws -> VNCCursorImage {
         guard rect.width <= 384, rect.height <= 384 else { throw RFBError.resourceLimit("The remote cursor is too large.") }
         let wire = try await source.read(rect.width * rect.height * pixels.bytesPerPixel)
         let pixelBytes = try pixels.bgra(wire[...], count: rect.width * rect.height, width: .pixel)
@@ -276,6 +277,7 @@ final class RFBRectangleDecoder {
                 bgra[offset + 2] = pixelBytes[offset + 2]; bgra[offset + 3] = opaque != 0 ? 255 : 0
             }
         }
-        return VNCCursorImage(width: rect.width, height: rect.height, hotSpotX: rect.x, hotSpotY: rect.y, bgra: bgra, mask: mask)
+        return VNCCursorImage(width: rect.width, height: rect.height, hotSpotX: rect.x, hotSpotY: rect.y, bgra: bgra, mask: mask,
+                              isPointSized: pointSized)
     }
 }

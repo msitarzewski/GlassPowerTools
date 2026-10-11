@@ -42,7 +42,9 @@ While a VNC computer has several displays, the app does not change its resolutio
 
 If the computer does not say where its displays are, the window shows them as one picture and **Displays** does not appear.
 
-**From a Mac:** the app asks every Mac where its displays are, and a Mac answers again whenever they change: when someone signs in, locks the screen, switches user, or adds, removes or rearranges a display. Each display's window then shows that display. A Mac sends each display at its own pixels, so beside a standard display a Retina display's picture has twice as many pixels across for the same size on the Mac. Displays that mirror each other are one display here.
+**From a Mac:** the app asks every Mac where its displays are, and a Mac answers again whenever they change: when someone signs in, locks the screen, switches user, or adds, removes or rearranges a display. Each display's window then shows that display. A Retina display is sent at 1x unless you choose otherwise; see [Retina displays from a Mac](#retina-displays-from-a-mac). Displays that mirror each other are one display here.
+
+**The pointer from a Mac:** the app asks a Mac where its pointer is and for the pointer's shapes, as Apple's own Screen Sharing does. The pointer is drawn in whichever window shows the display it is on, also when it was moved at the Mac, and at the size the Mac shows it. When the Mac hides its pointer while you type, it comes back as soon as you move it. If a Mac ends the session in a way that suggests the app misread its pointer, the message says so and **Reconnect** connects without asking: the pointer is then drawn where you last put it, until the app is opened again.
 
 If a Mac ends the session in a way that suggests the app misread its displays, the message says so and **Reconnect** connects without asking: the displays are one picture again until the app is opened again.
 
@@ -64,7 +66,30 @@ A Mac's Screen Sharing has not been seen to send JPEG to apps other than Apple's
 
 On the **Connection** page, under **Quality**, the figures show what the network is carrying now, updated every second: **Receiving** (for example `1.2 Mbit/s`), **Updates** per second, the **Level** in effect (with **Automatic**, the level it chose), **Color**, **Scale** (on a Mac: the size it is sending, `100%` at its own size), the **Encoding** the computer is using, and **Fetching** (the whole desktop, only the displays on screen, or nothing). The **Quality** control in the window shows the same as one line above its choices, ending in, for example, `75% size` while a Mac sends a smaller picture. On Mac, iPad and iPhone the line also appears in the bar at the bottom of the window.
 
-Zooming or shrinking the picture in the window does not change what the network carries: the computer sends its own pixels either way. To send fewer pixels, lower the remote resolution, show fewer displays, or, from a Mac, choose **Data Saver** or **Lowest**.
+Zooming or shrinking the picture in the window does not change what the network carries: the computer sends its own pixels either way. To send fewer pixels, lower the remote resolution, show fewer displays, or, from a Mac, keep **Retina Displays** at **Send at 1x** or choose **Data Saver** or **Lowest**.
+
+## Retina displays from a Mac
+
+**Retina Displays**, in **Desktop Settings** > **Connection** under **Quality**, chooses how a Mac sends a Retina display:
+
+- **Send at 1x (Recommended)**, the default: one pixel for each of the Mac's points, which is half a Retina display's pixels across and half down, so each update carries a quarter of the pixels. Text looks as it does on a standard display. **Quality**'s own reduction comes on top: at **Data Saver** a Retina display arrives at three eighths of its pixels across, and at **Lowest** at a quarter.
+- **Native 2x**: every pixel of the Retina display, four times as many, for the sharpest picture on a fast connection.
+
+A standard display is sent at its own pixels either way. Like **Quality**, this belongs to the connection, so it applies to every window of the desktop, and it can be set for every desktop in **Settings** > **Desktops**.
+
+A Mac draws its whole picture at one size, so a Retina display and a standard display cannot both arrive at 1x over one connection. When a Mac has both and a display has a window of its own (with **A Window for Each Display**, or **Open in a New Window**), that window opens a second connection to the Mac, signed in with the same account and password, which sends only its display, at 1x. You are not asked to sign in again, and nothing new is stored. The desktop's own window keeps the first connection, which now carries only the display it shows, and sends that at 1x too. The clipboard stays with the desktop's window. Closing the display's window closes its connection. A window showing **All Displays** of such a Mac shows each display at its own pixels, as Apple's own Screen Sharing app does.
+
+If the Mac does not accept the second connection, the display's window shows its display from the desktop's connection, at its own pixels, as before, and **Desktop Settings** > **Connection** says what the Mac answered. It is not tried again until you reconnect.
+
+Under **Windows**, the **Connection** page lists each window of the desktop and what it is being sent: its size in pixels and how many pixels for each of the Mac's points, for example `1512 × 982 at 1x (50%)`, with **Own Connection** for a display window that has a connection of its own. On Mac, iPad and iPhone the same appears in the bar at the bottom of the window.
+
+## Keep a window in its display's shape
+
+**Keep Display Proportions**, in **Desktop Settings** > **This Window** under **Remote Desktop**, lets a desktop window be resized only in the shape of the display it shows, so the picture fills it with no bars at the sides or top. It is on unless you turn it off, on Apple Vision Pro and Mac. The window takes the display's shape as soon as the picture arrives, keeping its width, and again whenever you show another display or the computer's displays change.
+
+While **Match Window Size** is changing the remote computer's resolution to fit the window, the window can take any shape and the desktop follows it instead. A Mac never changes its resolution to fit a window, so a Mac's windows always keep their display's shape.
+
+Turn it off to give a window any shape, for example to zoom into part of a display with **Local Scale**. Set in **This Window** it is that window's own; in **All Desktops** (the same as **Settings** > **Desktops**) it is every desktop window's that hasn't set its own. On iPad and iPhone a window's shape cannot be held, and the setting does not appear.
 
 ## Zoom in this window
 
@@ -78,10 +103,10 @@ Zooming or shrinking the picture in the window does not change what the network 
 
 ## Window size on Mac
 
-When a new desktop window would open at its smallest size, it opens at the service's **Desktop size** instead, one point per pixel, no larger than your screen. A desktop window cannot be made smaller than 640 × 400 points.
+When a new desktop window would open at its smallest size, it opens at the service's **Desktop size** instead, one point per pixel, no larger than your screen. A desktop window cannot be made smaller than 640 × 400 points. With **Keep Display Proportions** on, the window then takes the shape of the display it shows, and keeps it as you resize it.
 
 ## Reset
 
 **Actual Size** sets zoom back to 100%. **Reset This Window** returns every setting the window keeps to **All Desktops**' settings. Neither changes the remote resolution.
 
-**Match Window Size**, the display shown, a fixed resolution and **Local Scale** last for the session: each time a desktop opens, it starts with **Match Window Size** on, every display (or, with **A Window for Each Display**, the main display) and 100%. **Quality** and **Display Windows** are settings, kept like the window's others.
+**Match Window Size**, the display shown, a fixed resolution and **Local Scale** last for the session: each time a desktop opens, it starts with **Match Window Size** on, every display (or, with **A Window for Each Display**, the main display) and 100%. **Quality**, **Retina Displays**, **Display Windows** and **Keep Display Proportions** are settings, kept like the window's others.

@@ -11,10 +11,14 @@ public struct GlassVNCConfiguration: Sendable, Equatable {
     public var username: String
     public var password: String
     public var clipboardEnabled: Bool
+    /// A Mac's display this connection shows alone, its own pixels the whole framebuffer
+    /// (`SetDisplay`): a display window's own connection (W38). Nil shows them all, as a Mac sends them.
+    public var display: UInt32?
 
-    public init(host: String, port: UInt16 = 5900, username: String = "", password: String, clipboardEnabled: Bool = false) {
+    public init(host: String, port: UInt16 = 5900, username: String = "", password: String, clipboardEnabled: Bool = false,
+                display: UInt32? = nil) {
         self.host = host; self.port = port; self.username = username; self.password = password
-        self.clipboardEnabled = clipboardEnabled
+        self.clipboardEnabled = clipboardEnabled; self.display = display
     }
 }
 
@@ -26,6 +30,8 @@ public actor GlassVNCSession: GlassDesktopTransport {
     static let layoutRefusals = HostSet()
     /// For this run of the app (W36): Macs not to ask to scale their picture again.
     static let scalingRefusals = HostSet()
+    /// For this run of the app (W38): Macs not to ask for their pointer's position and shapes again.
+    static let cursorRefusals = HostSet()
     public nonisolated let frames: AsyncStream<GlassRDPFrame>
     public nonisolated let events: AsyncStream<GlassRDPEvent>
     private let frameContinuation: AsyncStream<GlassRDPFrame>.Continuation
@@ -36,13 +42,16 @@ public actor GlassVNCSession: GlassDesktopTransport {
     private var stopRequested = false
     private var pressedKeysyms: Set<UInt32> = []
     private var buttonMask: UInt8 = 0
-    private var pointer = (x: 0, y: 0)
+    private var pointerAt = (x: 0, y: 0)
     private var capsLockOn: Bool?
     private var scrollRemainder = (vertical: 0, horizontal: 0)
     /// Kept across connections, and handed to each new client before it runs, so a session opens
     /// at the level and over the area its windows asked for.
     private var quality = GlassDesktopStreamQuality.automatic
+    private var retina = GlassDesktopRetinaDisplays.oneX
     private var regions: [GlassRemoteRegion]?
+    /// The pointer's last shape and whether the host hid it, read on the client's task and here.
+    private let pointer = PointerMemory()
     private let sequence = FrameSequence()
     private let delivered = FrameDelivery()
     private let makeClient: @Sendable (VNCConfiguration, VNCClientCallbacks) throws -> VNCClient
@@ -75,9 +84,12 @@ public actor GlassVNCSession: GlassDesktopTransport {
         let layoutKey = "\(host.lowercased()):\(configuration.port)"
         let asksForLayout = !Self.layoutRefusals.contains(layoutKey)
         let asksToScale = !Self.scalingRefusals.contains(layoutKey)
+        let asksForCursor = !Self.cursorRefusals.contains(layoutKey)
         let apple = FrameDelivery()
+        let pointer = pointer
+        pointer.reset()
         callbacks.connected = { info in
-            if info.isAppleScreenSharing { apple.note() }
+            if info.isAppleScreenSharing { apple.note(); pointer.noteApple() }
             eventSink.yield(.state(.connected))
         }
         callbacks.desktopResizeSupported = {
@@ -95,8 +107,16 @@ public actor GlassVNCSession: GlassDesktopTransport {
             }
         }
         callbacks.cursor = { image in
-            guard let image else { eventSink.yield(.cursor(.hidden)); return }
-            if let converted = Self.cursorImage(image) { eventSink.yield(.cursor(.image(converted))) }
+            guard let image else { pointer.hide(); eventSink.yield(.cursor(.hidden)); return }
+            if let converted = Self.cursorImage(image) {
+                pointer.show(converted)
+                eventSink.yield(.cursor(.image(converted)))
+            }
+        }
+        callbacks.cursorPosition = { x, y in
+            // A pointer that moves is shown, as a Mac shows its own again when the mouse moves.
+            if let shape = pointer.moved(to: (x, y)) { eventSink.yield(.cursor(.image(shape))) }
+            eventSink.yield(.cursor(.position(x: x, y: y)))
         }
         callbacks.cutText = { eventSink.yield(.clipboard(GlassClipboardContent(text: $0))) }
         callbacks.screens = { eventSink.yield(.screens(Self.remoteScreens($0))) }
@@ -105,8 +125,11 @@ public actor GlassVNCSession: GlassDesktopTransport {
                                                      password: configuration.password, sharedSession: true,
                                                      clipboardEnabled: configuration.clipboardEnabled,
                                                      requestsAppleDisplayLayout: asksForLayout,
-                                                     allowsServerScaling: asksToScale), callbacks)
+                                                     allowsServerScaling: asksToScale,
+                                                     requestsAppleCursor: asksForCursor,
+                                                     display: configuration.display), callbacks)
         client.setQuality(Self.quality(quality))
+        client.setDensityScaling(retina == .oneX)
         client.setRequestedRegions(Self.rectangles(regions))
         self.client = client
         activeID = id
@@ -128,6 +151,15 @@ public actor GlassVNCSession: GlassDesktopTransport {
                     if let message = failure {
                         failure = message + " Reconnect connects without asking this Mac to send a smaller picture."
                     }
+                }
+                // A Mac that broke the protocol right after its pointer's position or a shape from its
+                // cache — forms known only from others' measurements — is not asked for them again
+                // while the app runs, so Reconnect works, with the pointer drawn where it was put (W38).
+                else if case .protocolViolation = error, asksForCursor, apple.any, client.receivedAppleCursor,
+                        client.lastAppleEncoding == .appleCursorImage || client.lastAppleEncoding == .appleCursorPosition {
+                    Self.cursorRefusals.insert(layoutKey)
+                    Self.logger.error("event=apple-cursor-refused")
+                    failure = (failure ?? "") + " Reconnect connects without asking this Mac where its pointer is."
                 }
                 // A Mac that broke the protocol after sending its displays — a form known only from
                 // others' measurements — is not asked for them again while the app runs, so
@@ -162,7 +194,7 @@ public actor GlassVNCSession: GlassDesktopTransport {
     }
 
     private func resetInputState() {
-        pressedKeysyms.removeAll(); buttonMask = 0; pointer = (0, 0); capsLockOn = nil; scrollRemainder = (0, 0)
+        pressedKeysyms.removeAll(); buttonMask = 0; pointerAt = (0, 0); capsLockOn = nil; scrollRemainder = (0, 0)
     }
 
     private func readyClient() throws -> VNCClient {
@@ -192,8 +224,16 @@ public actor GlassVNCSession: GlassDesktopTransport {
 
     public func movePointer(x: Int, y: Int) async throws {
         let client = try readyClient()
-        pointer = (x, y)
+        pointerAt = (x, y)
+        reshowPointer(at: (x, y))
         try await client.sendPointer(buttonMask: buttonMask, x: x, y: y)
+    }
+
+    /// A Mac hides its pointer while someone types and shows it again when the mouse moves; it does
+    /// not always send the shape again when it does (the owner, 2026-10-11: "when visible, it
+    /// disappears"). Moving it from here shows the last shape again.
+    private func reshowPointer(at point: (x: Int, y: Int)) {
+        if let shape = pointer.moved(to: point) { eventContinuation.yield(.cursor(.image(shape))) }
     }
 
     public func pointerButton(button: GlassRDPPointerButton, isDown: Bool, x: Int, y: Int) async throws {
@@ -206,7 +246,8 @@ public actor GlassVNCSession: GlassDesktopTransport {
         case .forward: throw GlassRDPError.unsupported("The forward pointer button is not available over VNC.")
         }
         if isDown { buttonMask |= bit } else { buttonMask &= ~bit }
-        pointer = (x, y)
+        pointerAt = (x, y)
+        reshowPointer(at: (x, y))
         try await client.sendPointer(buttonMask: buttonMask, x: x, y: y)
     }
 
@@ -214,7 +255,7 @@ public actor GlassVNCSession: GlassDesktopTransport {
     /// buttons 4/5 (vertical) or 7/6 (horizontal). Fractional precise-scrolling remainders accumulate.
     public func scroll(vertical: Int, horizontal: Int, x: Int, y: Int) async throws {
         let client = try readyClient()
-        pointer = (x, y)
+        pointerAt = (x, y)
         scrollRemainder.vertical += vertical
         scrollRemainder.horizontal += horizontal
         let verticalNotches = scrollRemainder.vertical / 120, horizontalNotches = scrollRemainder.horizontal / 120
@@ -234,7 +275,7 @@ public actor GlassVNCSession: GlassDesktopTransport {
 
     public func releaseInputs() async {
         guard let client, client.isReady else { pressedKeysyms.removeAll(); buttonMask = 0; return }
-        let keys = pressedKeysyms, hadButtons = buttonMask != 0, point = pointer
+        let keys = pressedKeysyms, hadButtons = buttonMask != 0, point = pointerAt
         pressedKeysyms.removeAll(); buttonMask = 0
         for keysym in keys { try? await client.sendKey(keysym: keysym, down: false) }
         if hadButtons { try? await client.sendPointer(buttonMask: 0, x: point.x, y: point.y) }
@@ -286,6 +327,15 @@ public actor GlassVNCSession: GlassDesktopTransport {
         client?.setQuality(Self.quality(quality))
     }
 
+    /// A Mac's Retina displays at 1x, or at their own pixels (W38): the factor asked of a Mac is
+    /// divided by the density of the displays being fetched, where they share one.
+    public func setRetinaDisplays(_ value: GlassDesktopRetinaDisplays) async {
+        guard value != retina else { return }
+        retina = value
+        Self.logger.notice("event=retina requested=\(value.rawValue, privacy: .public)")
+        client?.setDensityScaling(value == .oneX)
+    }
+
     static func quality(_ quality: GlassDesktopStreamQuality) -> VNCQuality {
         switch quality {
         case .automatic: .automatic
@@ -330,7 +380,7 @@ public actor GlassVNCSession: GlassDesktopTransport {
     public static func remoteScreens(_ screens: [VNCScreen]) -> [GlassRemoteScreen] {
         screens.map {
             GlassRemoteScreen(id: $0.id, x: $0.x, y: $0.y, width: $0.width, height: $0.height,
-                              isPrimary: $0.isMain ?? ($0.x == 0 && $0.y == 0))
+                              isPrimary: $0.isMain ?? ($0.x == 0 && $0.y == 0), density: $0.density)
         }
     }
 
@@ -338,7 +388,8 @@ public actor GlassVNCSession: GlassDesktopTransport {
 
     /// Repacks a top-down VNC cursor into the MS-RDPBCGR 32-bit pointer layout the shared cursor
     /// decoder consumes: bottom-up XOR rows with alpha, bottom-up 1-bpp AND rows (1 = transparent),
-    /// each AND row padded to two bytes.
+    /// each AND row padded to two bytes. The alpha is the shape's own where it has one (a Mac's
+    /// cache, W38), and its mask's elsewhere.
     static func cursorImage(_ image: VNCCursorImage) -> GlassRDPCursorImage? {
         guard (1...384).contains(image.width), (1...384).contains(image.height),
               image.bgra.count == image.width * image.height * 4, image.mask.count == image.width * image.height else { return nil }
@@ -350,12 +401,16 @@ public actor GlassVNCSession: GlassDesktopTransport {
             for x in 0..<image.width {
                 let pixel = y * image.width + x, source = pixel * 4, target = targetRow * xorStride + x * 4
                 xor[target] = image.bgra[source]; xor[target + 1] = image.bgra[source + 1]
-                xor[target + 2] = image.bgra[source + 2]; xor[target + 3] = image.mask[pixel] != 0 ? 255 : 0
+                xor[target + 2] = image.bgra[source + 2]
+                // Opaque in the mask: the shape's own alpha where it has one, else fully opaque.
+                let alpha = image.bgra[source + 3]
+                xor[target + 3] = image.mask[pixel] != 0 ? (alpha == 0 ? 255 : alpha) : 0
                 if image.mask[pixel] == 0 { and[targetRow * andStride + x / 8] |= UInt8(0x80) >> UInt8(x % 8) }
             }
         }
         return GlassRDPCursorImage(width: image.width, height: image.height, hotSpotX: hotSpotX, hotSpotY: hotSpotY,
-                                   xorBitsPerPixel: 32, xorMask: xor, andMask: and, paletteEntries: nil)
+                                   xorBitsPerPixel: 32, xorMask: xor, andMask: and, paletteEntries: nil,
+                                   isPointSized: image.isPointSized)
     }
 }
 
@@ -365,6 +420,31 @@ final class HostSet: @unchecked Sendable {
     private var values: Set<String> = []
     func contains(_ value: String) -> Bool { lock.withLock { values.contains(value) } }
     func insert(_ value: String) { lock.withLock { _ = values.insert(value) } }
+}
+
+/// The pointer's last shape and whether the host hid it (W38), shared by the client's task, which
+/// hears both, and the session, whose input moves the pointer.
+final class PointerMemory: @unchecked Sendable {
+    private let lock = NSLock()
+    private var shape: GlassRDPCursorImage?
+    private var hidden = false
+    private var apple = false
+    private var position: (x: Int, y: Int)?
+
+    func reset() { lock.withLock { shape = nil; hidden = false; apple = false; position = nil } }
+    func noteApple() { lock.withLock { apple = true } }
+    func hide() { lock.withLock { hidden = true } }
+    func show(_ value: GlassRDPCursorImage) { lock.withLock { shape = value; hidden = false } }
+
+    /// The pointer moved: the shape to show again when a Mac had hidden it, else nil.
+    func moved(to point: (x: Int, y: Int)) -> GlassRDPCursorImage? {
+        lock.withLock {
+            defer { position = point }
+            guard apple, hidden, let shape, position.map({ $0 != point }) ?? true else { return nil }
+            hidden = false
+            return shape
+        }
+    }
 }
 
 private final class FrameDelivery: @unchecked Sendable {

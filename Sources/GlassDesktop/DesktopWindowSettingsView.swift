@@ -201,6 +201,16 @@ struct DesktopWindowSettingsView: View {
             Toggle("Match Window Size", isOn: $session.matchWindow)
                 .disabled(session.capabilities == nil || session.holdsDisplayLayout || !viewport.isPrimary)
                 .accessibilityIdentifier("display.match-window")
+            if DesktopWindowSettings.offersProportions {
+                // W38: this window resizes only in its display's shape.
+                GlassWindowSettingRow(DesktopWindowSettings.keepProportions, overrides: $viewport.windowSettings,
+                                      global: defaults.keepProportions, inheritsFrom: Self.allDesktops) { value in
+                    GlassSettingLabeled(DesktopWindowSettings.keepProportions.title) {
+                        Toggle(DesktopWindowSettings.keepProportions.title, isOn: value)
+                            .accessibilityIdentifier("desktop-window-keep-proportions")
+                    }
+                }
+            }
             if session.connection.protocol == .rdp {
                 GlassWindowSettingRow(DesktopWindowSettings.detail, overrides: $viewport.windowSettings,
                                       global: defaults.detail, inheritsFrom: Self.allDesktops) { value in
@@ -224,17 +234,25 @@ struct DesktopWindowSettingsView: View {
         } header: {
             Text("Remote Desktop")
         } footer: {
-            if session.holdsDisplayLayout {
-                Text("This computer has several displays, so its resolution is left as it is: one desktop the size of a window would fold its displays into one. Change resolution on the computer itself; a smaller one sends fewer pixels.")
-            } else if session.capabilities == nil {
-                Text("Source resizing becomes available when the server offers display control.")
-            } else if session.connection.protocol == .rdp {
-                Text("Match Window Size adjusts the remote desktop as you resize this window. Detail asks for more remote pixels per point, so text stays sharp on a high-resolution display without changing how large it looks. Automatic follows this display. Higher settings send more pixels over the network, and a server that ignores the request will show a smaller interface.")
-            } else {
-                Text("Match Window Size changes the remote computer's own resolution as you resize this window. A smaller desktop sends fewer pixels.")
-            }
+            Text(remoteDesktopFooter + (DesktopWindowSettings.offersProportions ? " " + Self.proportionsFooter : ""))
         }
     }
+
+    private var remoteDesktopFooter: String {
+        if session.holdsDisplayLayout {
+            "This computer has several displays, so its resolution is left as it is: one desktop the size of a window would fold its displays into one. Change resolution on the computer itself; a smaller one sends fewer pixels."
+        } else if session.capabilities == nil {
+            "Source resizing becomes available when the server offers display control."
+        } else if session.connection.protocol == .rdp {
+            "Match Window Size adjusts the remote desktop as you resize this window. Detail asks for more remote pixels per point, so text stays sharp on a high-resolution display without changing how large it looks. Automatic follows this display. Higher settings send more pixels over the network, and a server that ignores the request will show a smaller interface."
+        } else {
+            "Match Window Size changes the remote computer's own resolution as you resize this window. A smaller desktop sends fewer pixels."
+        }
+    }
+
+    /// Keep Display Proportions, in words (W38): here and in All Desktops.
+    static let proportionsFooter = "Keep Display Proportions resizes the window only in the shape of the display it shows, so the picture fills it with no bars. While Match Window Size is changing the remote computer's resolution to fit the window, the window can take any shape, and the desktop follows it."
+
 
     private func screenName(_ screen: GlassRemoteScreen) -> String {
         DesktopDisplayLayout.name(of: screen.id, in: session.screens)

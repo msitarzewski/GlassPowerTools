@@ -81,6 +81,15 @@ public enum RFBEncoding: Int32, Sendable {
     /// It is how a Mac tells a client where each display sits, how large the framebuffer is, and at
     /// what server-side scale.
     case appleDisplayLayout = 1105
+    /// Apple's CursorPos (0x44c): where the Mac's pointer is, in the rectangle's x and y, with no
+    /// payload (remotex's notes, "Which encodings make the Mac report its displays"). Asked for only
+    /// from Apple's server (W38), so a pointer moved at the Mac, or onto another display, is drawn
+    /// where it is.
+    case appleCursorPosition = 1100
+    /// Apple's cursor cache (0x450): a shape stored once under an id, then selected by that id
+    /// (`RFBAppleCursorCache`). How Apple's own viewer gets the pointer's shape. Asked for only from
+    /// Apple's server (W38).
+    case appleCursorImage = 1104
 
     static let advertised: [RFBEncoding] = [.tight, .zrle, .hextile, .zlib, .copyRect, .rre, .raw,
                                             .cursor, .desktopSize, .extendedDesktopSize, .lastRect]
@@ -181,10 +190,14 @@ public struct VNCScreen: Equatable, Sendable, Identifiable {
     /// Whether the server marks this the main display; nil when the protocol has no such mark
     /// (ExtendedDesktopSize does not; Apple's layout does).
     public let isMain: Bool?
+    /// The display's own pixels per point, 1 or 2 (a Retina display), from Apple's layout; nil where
+    /// the server does not say (W38).
+    public let density: Double?
 
-    public init(id: UInt32, x: Int, y: Int, width: Int, height: Int, flags: UInt32, isMain: Bool? = nil) {
+    public init(id: UInt32, x: Int, y: Int, width: Int, height: Int, flags: UInt32, isMain: Bool? = nil,
+                density: Double? = nil) {
         self.id = id; self.x = x; self.y = y; self.width = width; self.height = height; self.flags = flags
-        self.isMain = isMain
+        self.isMain = isMain; self.density = density
     }
 
     /// Screens outside the framebuffer, or with no area, cannot be shown and are discarded.
@@ -195,7 +208,9 @@ public struct VNCScreen: Equatable, Sendable, Identifiable {
     }
 }
 
-/// Top-down BGRA cursor pixels with a one-byte-per-pixel opacity mask (1 = opaque).
+/// Top-down BGRA cursor pixels with a one-byte-per-pixel opacity mask (1 = opaque). The fourth
+/// byte of each pixel is its alpha: 0 or 255 for the standard Cursor encoding, and the shape's own
+/// soft edges and shadow for Apple's cursor cache.
 public struct VNCCursorImage: Equatable, Sendable {
     public let width: Int
     public let height: Int
@@ -203,10 +218,16 @@ public struct VNCCursorImage: Equatable, Sendable {
     public let hotSpotY: Int
     public let bgra: Data
     public let mask: Data
+    /// The shape is measured in the Mac's points, not the picture's pixels (W38): a Mac sends the
+    /// same shape whatever the density of the display the pointer is on, so on a Retina display
+    /// sent at its own pixels it is drawn twice as large as its pixel count (remotex's
+    /// `CursorUnit::Points`; the owner, 2026-10-11: "the mouse cursor is insanely small on the main
+    /// display").
+    public let isPointSized: Bool
 
-    public init(width: Int, height: Int, hotSpotX: Int, hotSpotY: Int, bgra: Data, mask: Data) {
+    public init(width: Int, height: Int, hotSpotX: Int, hotSpotY: Int, bgra: Data, mask: Data, isPointSized: Bool = false) {
         self.width = width; self.height = height; self.hotSpotX = hotSpotX; self.hotSpotY = hotSpotY
-        self.bgra = bgra; self.mask = mask
+        self.bgra = bgra; self.mask = mask; self.isPointSized = isPointSized
     }
 }
 

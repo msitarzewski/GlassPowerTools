@@ -1087,3 +1087,13 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   for desktop/display windows (visionOS API research), Retina at 1x — one factor when densities match; with mixed
   densities a connection per display window (SetDisplay + SetServerScaling 1/density × quality), credentials reused;
   fallback a single-factor setting; probe options for his verification.
+- **Owner (~04:55):** "the mouse cursor is insanely small on the main display (when visible, it disappears) and simply
+  isn't visible on the second, though I can activate the dock and it works." Added to **W38**: Apple's CursorPos (1100,
+  position in the rect's x/y) and cursor cache (1104, BGRA + alpha plane, per-shape zlib) per the remotex notes; we
+  advertise only Cursor (−239); draw the 2x shape at the display's scale; position mapped per display window; check
+  arming after each layout keeps cursor updates alive.
+- **W38 merged (D64):** Retina at 1x (density rule × Quality; per-display connections over mixed densities via SetDisplay;
+  refusal falls back), Keep Display Proportions (visionOS `.uniform` geometry, Mac `contentAspectRatio`), pointer
+  (shape at density × scale; CursorPos 1100 + cursor cache 1104 on Apple servers; reappears on movement). VNCKit 84, VNC
+  transport 17, desktop 202, connection UI 49, layers 50; TigerVNC two-display 6/6. Owner's probe runs pending:
+  `--retina-1x --second-session --cursor 20` and `--display <retina id> --retina-1x --pointer-check`.

@@ -21,6 +21,8 @@ public protocol GlassDesktopTransport: Actor {
     func setVisibleRegions(_ regions: [GlassRemoteRegion]?) async
     /// How to trade picture for bytes, for a protocol whose client chooses it.
     func setStreamQuality(_ quality: GlassDesktopStreamQuality) async
+    /// What a Mac's Retina displays are sent at (W38), for a protocol that can ask.
+    func setRetinaDisplays(_ value: GlassDesktopRetinaDisplays) async
 }
 
 public extension GlassDesktopTransport {
@@ -29,6 +31,8 @@ public extension GlassDesktopTransport {
     func setVisibleRegions(_ regions: [GlassRemoteRegion]?) async {}
     /// RDP negotiates its codecs with the server.
     func setStreamQuality(_ quality: GlassDesktopStreamQuality) async {}
+    /// RDP's server renders at the size and scale the monitor layout asks for.
+    func setRetinaDisplays(_ value: GlassDesktopRetinaDisplays) async {}
 
     func keyboard(scancode: UInt16, extended: Bool = false, isDown: Bool) async throws {
         try await keyboard(scancode: scancode, extended: extended, isDown: isDown, isRepeat: false)

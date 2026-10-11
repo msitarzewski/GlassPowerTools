@@ -58,6 +58,8 @@ public struct DesktopSessionView: View {
     @State private var chooseWallpaper = false
     @State private var showTextInput = false
     @State private var alerts = DesktopSessionAlertPresentation()
+    /// The picture's area, for holding a Mac window to the picture's shape (W38).
+    @State private var canvasSize = CGSize.zero
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -171,15 +173,18 @@ public struct DesktopSessionView: View {
         } controls: {
             nativeControls
         }
-        .frame(minWidth: 800, minHeight: 440)
+        .frame(minWidth: DesktopWindowAspect.spatialMinimum.width, minHeight: DesktopWindowAspect.spatialMinimum.height)
         .glassSpatialWindowGlass(strength: GlassWindowGlass.strength(frost: profile.frost,
                                                                      reduceTransparency: reduceTransparency))
+        // W38: the window resizes only in its display's shape.
+        .background { DesktopWindowAspectLock(aspect: session.pictureAspect(for: viewport)) }
         #else
         sessionContent
             .modifier(DesktopClipboardBridge(session: session))
             #if os(macOS)
             .frame(minWidth: DesktopWindowSizing.floor.width, minHeight: DesktopWindowSizing.floor.height)
             .background { DesktopWindowSizer(desktop: viewport.isPrimary ? session.connection.desktop : session.region(for: viewport).size) }
+            .background { DesktopWindowAspectLock(aspect: session.pictureAspect(for: viewport), canvas: canvasSize) }
             #endif
         #endif
     }
@@ -215,6 +220,7 @@ public struct DesktopSessionView: View {
                     // Detail first: the size asked for is the window's at the window's scale.
                     session.apply(profile, to: viewport)
                     matchWindow(size)
+                    canvasSize = size
                 }
                 .onChange(of: session.capabilities) { _, _ in matchWindow(geometry.size) }
                 .onChange(of: session.isConnected) { _, value in if value { matchWindow(geometry.size) } }
@@ -414,8 +420,12 @@ public struct DesktopSessionView: View {
         HStack(spacing: 12) {
                 Circle().fill(session.isConnected ? .green : .secondary).frame(width: 6, height: 6)
                 Text(session.status)
-                if let frame = session.frame { Text("\(frame.width) × \(frame.height)").monospacedDigit() }
-                if session.isConnected, let statistics = session.linkStatistics {
+                // What this window is sent (W38): its own connection's picture, or its part of the desktop's.
+                if let sending = session.sending(for: viewport) {
+                    Text(sending).monospacedDigit().accessibilityIdentifier("session.sending")
+                }
+                if session.isConnected,
+                   let statistics = session.ownConnection(for: viewport)?.linkStatistics ?? session.linkStatistics {
                     Text(DesktopLinkReadout.line(statistics)).monospacedDigit().lineLimit(1)
                         .accessibilityIdentifier("session.readout")
                 }
@@ -558,21 +568,20 @@ public struct DesktopSessionView: View {
     }
 
     /// Whether the remote pointer is on the display this window shows (W30): a host's pointer is
-    /// drawn in the window of the display it is on, and only there.
-    private func pointerIsShown(_ point: DesktopPoint?) -> Bool {
-        let region = session.region(for: viewport)
-        guard let point else { return viewport.isPrimary }
-        return point.x >= region.origin.x && point.y >= region.origin.y
-            && point.x < region.origin.x + region.size.width && point.y < region.origin.y + region.size.height
+    /// drawn in the window of the display it is on, and only there — where the host reports it
+    /// (W38), else where this app last put it.
+    private var pointerIsShown: Bool {
+        session.pointerPosition == nil ? viewport.isPrimary : session.pointerInPicture(for: viewport) != nil
     }
 
     @ViewBuilder private func cursor(in size: CGSize) -> some View {
+        // The window's picture: its own connection's (W38), or its part of the desktop's.
+        let region = session.pictureRegion(for: viewport)
+        let scale = min(size.width / Double(max(1, region.size.width)), size.height / Double(max(1, region.size.height)))
         if session.cursorVisible, session.isConnected, session.cursorBitmap == nil || session.cursorImage == nil,
-           viewport.pointerMode == .trackpad, let absolute = session.pointerPosition, pointerIsShown(absolute) {
+           viewport.pointerMode == .trackpad, let absolute = session.pointerInPicture(for: viewport) {
             // Relative pointing is unusable without seeing the pointer, and a host does not always
             // send one. Draw a stand-in so the cursor is never invisible while a finger steers it.
-            let region = session.region(for: viewport)
-            let scale = min(size.width / Double(region.size.width), size.height / Double(region.size.height))
             let local = DesktopPoint(x: absolute.x - region.origin.x, y: absolute.y - region.origin.y)
             Image(systemName: "cursorarrow")
                 .font(.system(size: 22))
@@ -585,18 +594,22 @@ public struct DesktopSessionView: View {
                 .accessibilityIdentifier("session.pointer")
         }
         if session.cursorVisible, let bitmap = session.cursorBitmap, let image = session.cursorImage, session.isConnected,
-           pointerIsShown(session.pointerPosition) {
-            let region = session.region(for: viewport)
+           pointerIsShown {
             let desktop = region.size
-            let scale = min(size.width / Double(desktop.width), size.height / Double(desktop.height))
             let fallback = DesktopPoint(x: region.origin.x + desktop.width / 2, y: region.origin.y + desktop.height / 2)
-            let absolute = session.pointerPosition ?? fallback
+            let absolute = session.pointerInPicture(for: viewport) ?? fallback
             let pointer = DesktopPoint(x: absolute.x - region.origin.x, y: absolute.y - region.origin.y)
-            Image(decorative: image, scale: 1).interpolation(.none).resizable()
-                .frame(width: Double(bitmap.width) * scale, height: Double(bitmap.height) * scale)
-                .position(x: (size.width - Double(desktop.width) * scale) / 2 + Double(pointer.x - bitmap.hotSpotX + bitmap.width / 2) * scale,
-                          y: (size.height - Double(desktop.height) * scale) / 2 + Double(pointer.y - bitmap.hotSpotY + bitmap.height / 2) * scale)
+            // A Mac's pointer is in its points: on a Retina display sent at its own pixels it covers
+            // twice its pixel count, so it is drawn at the size the Mac shows it (W38).
+            let drawn = scale * session.cursorPictureScale(for: viewport)
+            Image(decorative: image, scale: 1).interpolation(drawn == scale ? .none : .medium).resizable()
+                .frame(width: Double(bitmap.width) * drawn, height: Double(bitmap.height) * drawn)
+                .position(x: (size.width - Double(desktop.width) * scale) / 2 + Double(pointer.x) * scale
+                              + (Double(bitmap.width) / 2 - Double(bitmap.hotSpotX)) * drawn,
+                          y: (size.height - Double(desktop.height) * scale) / 2 + Double(pointer.y) * scale
+                              + (Double(bitmap.height) / 2 - Double(bitmap.hotSpotY)) * drawn)
                 .allowsHitTesting(false).accessibilityHidden(true)
+                .accessibilityIdentifier("session.cursor")
         }
     }
 

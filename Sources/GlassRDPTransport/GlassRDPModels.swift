@@ -86,9 +86,13 @@ public struct GlassRemoteScreen: Sendable, Equatable, Identifiable {
     public let width: Int
     public let height: Int
     public let isPrimary: Bool
+    /// The display's own pixels per point — 2 for a Retina display — where the host says (a Mac's
+    /// layout); nil otherwise (W38).
+    public let density: Double?
 
-    public init(id: UInt32, x: Int, y: Int, width: Int, height: Int, isPrimary: Bool) {
+    public init(id: UInt32, x: Int, y: Int, width: Int, height: Int, isPrimary: Bool, density: Double? = nil) {
         self.id = id; self.x = x; self.y = y; self.width = width; self.height = height; self.isPrimary = isPrimary
+        self.density = density
     }
 }
 
@@ -104,12 +108,15 @@ public struct GlassRDPCursorImage: Sendable, Equatable {
     public let andMask: Data
     /// RGB palette triplets for 4/8-bit indexed cursors, when sent by the server.
     public let paletteEntries: Data?
+    /// Measured in the host's points rather than the picture's pixels: a Mac's pointer, the same
+    /// shape on a Retina display as on a 1x one (W38). Drawn at the display's pixels per point.
+    public let isPointSized: Bool
 
     public init(width: Int, height: Int, hotSpotX: Int, hotSpotY: Int, xorBitsPerPixel: Int,
-                xorMask: Data, andMask: Data, paletteEntries: Data?) {
+                xorMask: Data, andMask: Data, paletteEntries: Data?, isPointSized: Bool = false) {
         self.width = width; self.height = height; self.hotSpotX = hotSpotX; self.hotSpotY = hotSpotY
         self.xorBitsPerPixel = xorBitsPerPixel; self.xorMask = xorMask; self.andMask = andMask
-        self.paletteEntries = paletteEntries
+        self.paletteEntries = paletteEntries; self.isPointSized = isPointSized
     }
 }
 

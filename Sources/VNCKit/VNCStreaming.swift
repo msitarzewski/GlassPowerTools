@@ -17,7 +17,11 @@ import OSLog
 // - **Where** — the request's rectangle. Only the displays that are on screen are asked for
 //   (`VNCClient.setRequestedRegions`).
 // - **How large** — on a Mac only, `SetServerScaling`: the Mac renders its framebuffer smaller
-//   before encoding it (`RFBAppleDisplays.swift`). Every encoding shrinks with the pixel count.
+//   before encoding it (`RFBAppleDisplays.swift`). Every encoding shrinks with the pixel count. A
+//   Retina display is asked for at 1x — half its pixels each way, a quarter of the bytes — unless
+//   the person chose its native pixels (W38).
+// - **Which display** — on a Mac only, `SetDisplay`: one display's own pixels, on a connection of
+//   its own (W38).
 //
 // Scaling the image on this device saves nothing: the server sends its own pixels either way. Only
 // a Mac can be asked to send fewer.
@@ -139,6 +143,8 @@ public extension RFBEncoding {
         case .extendedDesktopSize: "ExtendedDesktopSize"
         case .appleDisplayInfo: "AppleDisplayInfo"
         case .appleDisplayLayout: "AppleDisplayLayout"
+        case .appleCursorPosition: "CursorPos"
+        case .appleCursorImage: "CursorImage"
         }
     }
 }
@@ -148,10 +154,11 @@ public extension RFBEncoding {
 /// What is known of Apple's server, from others' measurements (Apple documents none of it):
 /// asked for Tight it answers with Raw, and it uses ZRLE when offered; it reports its displays only
 /// through its own layout, never ExtendedDesktopSize, and only to a client listing both its layout
-/// and `DisplayInfo`; it can render its framebuffer smaller (`RFBAppleDisplays.swift`); and older
-/// macOS versions ended the session when a client asked for fewer than 15 bits of colour. So for
-/// Apple: ZRLE first, both display encodings, server-side scaling in the lower levels, and colour no
-/// lower than 16 bits.
+/// and `DisplayInfo`; it can render its framebuffer smaller (`RFBAppleDisplays.swift`); it says
+/// where its pointer is and sends the pointer's shapes through a cache of its own
+/// (`RFBAppleCursor.swift`); and older macOS versions ended the session when a client asked for
+/// fewer than 15 bits of colour. So for Apple: ZRLE first, both display encodings, its pointer's
+/// two, server-side scaling, and colour no lower than 16 bits.
 enum RFBServerDialect: Sendable, Equatable {
     case standard, apple
 
@@ -260,7 +267,8 @@ extension RFBEncoding {
     /// CopyRect is left out while only part of the framebuffer is asked for: a copy's source could
     /// lie in a display this client is not keeping current.
     static func setEncodingsValues(profile: VNCStreamProfile, copyRect: Bool,
-                                   dialect: RFBServerDialect = .standard, appleDisplayLayout: Bool = true) -> [Int32] {
+                                   dialect: RFBServerDialect = .standard, appleDisplayLayout: Bool = true,
+                                   appleCursor: Bool = true) -> [Int32] {
         var order = advertised
         if dialect == .apple {
             // Apple's server answers a Tight preference with Raw; ZRLE first. It reports its
@@ -268,6 +276,9 @@ extension RFBEncoding {
             order.removeAll { $0 == .zrle }
             order.insert(.zrle, at: 0)
             if appleDisplayLayout { order += [.appleDisplayInfo, .appleDisplayLayout] }
+            // Where its pointer is and its shapes, as Apple's viewer gets them (W38). The standard
+            // Cursor stays listed: whichever the Mac sends is drawn.
+            if appleCursor { order += [.appleCursorPosition, .appleCursorImage] }
         }
         var values = order.filter { copyRect || $0 != .copyRect }.map(\.rawValue)
         if let quality = profile.jpegQuality { values.append(-32 + Int32(min(9, max(0, quality)))) }
@@ -302,6 +313,10 @@ extension RFBRectangle {
 
     func contains(_ other: RFBRectangle) -> Bool {
         other.x >= x && other.y >= y && other.maxX <= maxX && other.maxY <= maxY
+    }
+
+    func intersects(_ other: RFBRectangle) -> Bool {
+        x < other.maxX && other.x < maxX && y < other.maxY && other.y < maxY
     }
 
     /// The same area in a framebuffer rendered `factor` times as large: origin rounded down, far
@@ -349,6 +364,25 @@ extension RFBRectangle {
 /// again until the level wants another (remotex's notes, "Server-side scaling in Standard mode").
 /// Requests carry on meanwhile, as remotex's do: the layout arrives before any picture in the new
 /// size.
+///
+/// **Retina displays at 1x (W38).** With density scaling on, the factor asked for is the level's
+/// times one over the density of the displays being fetched: a 2x display alone, or several 2x ones,
+/// at 0.5 × the level's — the same picture Apple's viewer asks for on a 1x screen (remotex's
+/// `server_scale_for`). Which displays are being fetched is what the windows on screen ask for (the
+/// requested regions), or the one display `SetDisplay` names. A 2x display beside a 1x one in the
+/// same request has no one factor that suits both: they come at their own pixels, as Apple's viewer
+/// shows a mixed Combined Display (remotex's notes, "Combined Display over mixed densities"); a
+/// display window then takes a connection of its own (`DesktopDisplayConnection`). A change the
+/// windows cause is asked for once it has held for a second, so windows opening one after another
+/// do not make the Mac re-render the desktop at each.
+///
+/// **One display (W38).** `SetDisplay` is sent once a layout shows the Mac sends them, before the
+/// scale that display wants, with a request for the whole picture after both (remotex: "Queue the
+/// repaint while the selection is still the message in front of the Mac"). The next layout naming
+/// the display confirms it; one unconfirmed in ten seconds is given up, and the client ends the
+/// session (`VNCClient`). Until a layout says the display is being sent, only a single pixel is
+/// asked for, every two seconds — enough for the Mac to send its layout — and no picture is handed
+/// on: the whole desktop at its own pixels is what this connection exists not to fetch.
 final class RFBStreamPlanner: @unchecked Sendable {
     private static let logger = Logger(subsystem: "app.glassdt.vnc", category: "planner")
     private let lock = NSLock()
@@ -364,6 +398,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
     private var started = false
     private var dialect = RFBServerDialect.standard
     private var appleDisplayLayout = true
+    private var appleCursor = true
     /// The server has sent Tight: it can send JPEG, which it does only at 16 bits or more.
     private var serverSendsTight = false
     private var width = 0, height = 0
@@ -387,6 +422,25 @@ final class RFBStreamPlanner: @unchecked Sendable {
     private var scaleDeclined: Double?
     private var scaleOverride: Double?
 
+    // A Mac's displays (W38).
+    private var densityScaling = false
+    /// The displays in the framebuffer now, with their densities, in its current pixels.
+    private var displays: [VNCScreen] = []
+    /// Every display's density by id, from the last layout's records.
+    private var densities: [UInt32: Double] = [:]
+    /// The display the last layout says is being sent; nil for all of them.
+    private var displayInForce: UInt32?
+    private var displayWanted: RFBDisplaySelection?
+    private var displayAsked: (selection: RFBDisplaySelection, at: ContinuousClock.Instant)?
+    private var displayDeclined: RFBDisplaySelection?
+    /// The request to send with SetDisplay: the whole framebuffer as it is before the switch.
+    private var displaySwitchRequest: RFBRectangle?
+    private var startedAt: ContinuousClock.Instant?
+    /// The density factor the scale is asked with, and one waiting to have held long enough.
+    private var densityFactorInUse = 1.0
+    private var densityDecided = false
+    private var densityPending: (factor: Double, since: ContinuousClock.Instant)?
+
     // The readout.
     private struct Sample { let at: ContinuousClock.Instant; let changed: Bool; let encodingBytes: [Int32: Int] }
     private var samples: [Sample] = []
@@ -396,6 +450,8 @@ final class RFBStreamPlanner: @unchecked Sendable {
     static let pausedRequestInterval: Duration = .seconds(2)
     static let statisticsWindow: Duration = .seconds(2)
     static let scaleAnswerTimeout: Duration = .seconds(10)
+    static let displayAnswerTimeout: Duration = .seconds(10)
+    static let densitySettle: Duration = .seconds(1)
 
     /// Two factors the Mac would treat as one.
     static func sameScale(_ a: Double, _ b: Double) -> Bool { abs(a - b) < 0.005 }
@@ -423,13 +479,18 @@ final class RFBStreamPlanner: @unchecked Sendable {
     }
 
     func start(width: Int, height: Int, dialect: RFBServerDialect = .standard, appleDisplayLayout: Bool = true,
-               serverScaling: Bool = true) {
+               serverScaling: Bool = true, appleCursor: Bool = true) {
         lock.withLock {
             self.width = width; self.height = height; self.dialect = dialect
             self.appleDisplayLayout = appleDisplayLayout
             self.serverScaling = serverScaling
+            self.appleCursor = appleCursor
+            startedAt = .now
         }
     }
+
+    /// Which server this is, once the session has started.
+    var serverDialect: RFBServerDialect { lock.withLock { dialect } }
 
     /// A factor to ask a Mac for whatever the level says, in (0, 1]; nil follows the level.
     func setServerScaleOverride(_ value: Double?) {
@@ -438,10 +499,32 @@ final class RFBStreamPlanner: @unchecked Sendable {
         }
     }
 
+    /// Retina displays at 1x (W38): the factor asked of a Mac is divided by the density of the
+    /// displays being fetched, where they share one.
+    func setDensityScaling(_ value: Bool) {
+        lock.withLock {
+            guard densityScaling != value else { return }
+            densityScaling = value
+            // A choice the person made is asked for at once.
+            densityDecided = false
+        }
+    }
+
+    /// The display a Mac is asked to send (`SetDisplay`); nil asks nothing of it.
+    func setDisplay(_ value: RFBDisplaySelection?) {
+        lock.withLock {
+            guard displayWanted != value else { return }
+            displayWanted = value
+            displayDeclined = nil
+        }
+    }
+
     /// A Mac's display layout arrived, stating the scale it renders at and the framebuffer's size
     /// now. Its picture is asked for again in full: the layout may have changed the framebuffer, and
-    /// a Mac sends one at every login, lock and user switch.
-    func appleLayoutArrived(serverScale: Double, width: Int, height: Int) {
+    /// a Mac sends one at every login, lock and user switch. `displays` are the displays in the
+    /// framebuffer, `densities` every display's, and `current` the one being sent (nil for all).
+    func appleLayoutArrived(serverScale: Double, width: Int, height: Int, displays: [VNCScreen] = [],
+                            densities: [UInt32: Double] = [:], current: UInt32? = nil) {
         lock.withLock {
             let previous = scaleInForce
             layoutSeen = true
@@ -450,6 +533,14 @@ final class RFBStreamPlanner: @unchecked Sendable {
                 Self.logger.notice("event=server-scale confirmed=\(serverScale) width=\(width) height=\(height)")
                 scaleAsked = nil
                 scaleDeclined = nil
+            }
+            if !displays.isEmpty { self.displays = displays }
+            if !densities.isEmpty { self.densities = densities }
+            displayInForce = current
+            if let asked = displayAsked, asked.selection.matches(current) {
+                Self.logger.notice("event=display confirmed=\(current.map(String.init) ?? "all", privacy: .public)")
+                displayAsked = nil
+                displayDeclined = nil
             }
             // The windows' regions were in the old scale's pixels; until they say again, ask for the
             // same parts of the picture in the new one.
@@ -468,6 +559,32 @@ final class RFBStreamPlanner: @unchecked Sendable {
     /// A factor was asked for and no layout has confirmed it yet.
     var awaitingServerScale: Bool { lock.withLock { scaleAsked != nil } }
 
+    /// The display the last layout said is being sent; nil for all of them, or no layout.
+    var currentDisplay: UInt32? { lock.withLock { displayInForce } }
+
+    /// A display was asked for and no layout has confirmed it yet.
+    var awaitingDisplay: Bool { lock.withLock { displayAsked != nil } }
+
+    /// A display is wanted and not yet being sent: nothing but a pixel is asked for, and no picture
+    /// is handed on.
+    var holdingForDisplay: Bool { lock.withLock { holding } }
+
+    /// A display was asked for and no layout confirmed it in time, or a Mac sent no layout at all
+    /// within that time, so it could not be asked.
+    func displayRefused(at now: ContinuousClock.Instant) -> Bool {
+        lock.withLock {
+            guard let wanted = displayWanted, wanted.id != nil, dialect == .apple else { return false }
+            if displayDeclined == wanted { return true }
+            return !layoutSeen && startedAt.map { now - $0 >= Self.displayAnswerTimeout } == true
+        }
+    }
+
+    /// Waiting for a Mac to send the display wanted alone.
+    private var holding: Bool {
+        guard let wanted = displayWanted, wanted.id != nil, dialect == .apple, appleDisplayLayout else { return false }
+        return !wanted.matches(displayInForce) || !layoutSeen
+    }
+
     /// The messages that open the session: SetPixelFormat and SetEncodings for the level wanted.
     /// The first request follows from `decide` once the client is streaming.
     func openingMessages() -> (pixelFormat: [UInt8], encodings: [UInt8]) {
@@ -475,7 +592,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
             active = wantedProfile()
             decoder = (try? RFBPixelDecoder(format: active.colourDepth.pixelFormat)) ?? .native
             advertisedEncodings = RFBEncoding.setEncodingsValues(profile: active, copyRect: wholeFramebufferRequested(), dialect: dialect,
-                                                             appleDisplayLayout: appleDisplayLayout)
+                                                             appleDisplayLayout: appleDisplayLayout, appleCursor: appleCursor)
             started = true
             refresh = true; urgent = true
             return (active.colourDepth.pixelFormat.setPixelFormatMessage, RFBEncoding.setEncodingsMessage(advertisedEncodings))
@@ -551,22 +668,39 @@ final class RFBStreamPlanner: @unchecked Sendable {
             } else if wanted != active {
                 active = wanted
             }
-            let paused = regions?.isEmpty == true
+            let paused = regions?.isEmpty == true || holding
             // Paused, CopyRect stays as it was: whether it is offered is settled when something is
             // on screen again.
             let copyRect = paused ? advertisedEncodings.contains(RFBEncoding.copyRect.rawValue) : wholeFramebufferRequested()
             let encodings = RFBEncoding.setEncodingsValues(profile: active, copyRect: copyRect, dialect: dialect,
-                                                           appleDisplayLayout: appleDisplayLayout)
+                                                           appleDisplayLayout: appleDisplayLayout, appleCursor: appleCursor)
             if encodings != advertisedEncodings {
                 advertisedEncodings = encodings
                 out += RFBEncoding.setEncodingsMessage(encodings)
             }
+            // The display before the scale it wants, and the request after both.
+            let displayWake = planDisplay(at: now, into: &out)
             let scaleWake = planScale(at: now, into: &out)
 
             var wake: ContinuousClock.Instant?
-            if urgent, !paused, let rectangle = requestRectangle() {
+            if let bounds = displaySwitchRequest {
+                // With SetDisplay, the whole picture in the bounds the Mac has now: it answers it
+                // for the display it switches to (remotex, `set_display_message`'s caller).
+                displaySwitchRequest = nil
+                out += bounds.updateRequest(incremental: false)
+                sent(at: now)
+            } else if urgent, !paused, let rectangle = requestRectangle() {
                 out += rectangle.updateRequest(incremental: !refresh)
                 sent(at: now)
+            } else if holding, urgent || owed {
+                // Waiting for a layout that names the display: a pixel at a time, enough to carry it.
+                let due = urgent ? now : (lastRequestAt.map { $0 + Self.pausedRequestInterval } ?? now)
+                if due <= now {
+                    out += RFBRectangle(x: 0, y: 0, width: min(1, width), height: min(1, height)).updateRequest(incremental: !refresh)
+                    sent(at: now)
+                } else {
+                    wake = due
+                }
             } else if owed {
                 let interval = paused ? Self.pausedRequestInterval : active.maximumUpdatesPerSecond.map { .seconds(1) / $0 } ?? .zero
                 let due = lastRequestAt.map { $0 + interval } ?? now
@@ -584,12 +718,33 @@ final class RFBStreamPlanner: @unchecked Sendable {
                 }
             }
             if urgent, paused { urgent = false }
-            return (out, [wake, scaleWake].compactMap { $0 }.min())
+            return (out, [wake, scaleWake, displayWake].compactMap { $0 }.min())
         }
     }
 
-    /// Asks a Mac for the scale the level wants, once it has shown it sends layouts; returns when
-    /// to look again at an unanswered request.
+    /// Asks a Mac for the display wanted, once it has shown it sends layouts; returns when to look
+    /// again at an unanswered request.
+    private func planDisplay(at now: ContinuousClock.Instant, into out: inout [UInt8]) -> ContinuousClock.Instant? {
+        guard dialect == .apple, appleDisplayLayout, layoutSeen, let wanted = displayWanted else { return nil }
+        if let asked = displayAsked, now - asked.at >= Self.displayAnswerTimeout {
+            Self.logger.error("event=display unconfirmed=\(asked.selection.id.map(String.init) ?? "all", privacy: .public)")
+            displayDeclined = asked.selection
+            displayAsked = nil
+        }
+        if displayAsked == nil, !wanted.matches(displayInForce), displayDeclined != wanted {
+            out += RFBAppleDisplayLayout.setDisplayMessage(wanted.id)
+            displayAsked = (wanted, now)
+            // The whole picture after it: the Mac answers it for the display it switches to.
+            displaySwitchRequest = RFBRectangle(x: 0, y: 0, width: width, height: height)
+            refresh = true
+            Self.logger.notice("event=display asked=\(wanted.id.map(String.init) ?? "all", privacy: .public)")
+        }
+        return displayAsked.map { $0.at + Self.displayAnswerTimeout }
+    }
+
+    /// Asks a Mac for the scale the level and the displays' density want, once it has shown it sends
+    /// layouts; returns when to look again at an unanswered request, or at a density change waiting
+    /// to settle.
     private func planScale(at now: ContinuousClock.Instant, into out: inout [UInt8]) -> ContinuousClock.Instant? {
         guard dialect == .apple, appleDisplayLayout, serverScaling, layoutSeen else { return nil }
         if let asked = scaleAsked, now - asked.at >= Self.scaleAnswerTimeout {
@@ -597,13 +752,74 @@ final class RFBStreamPlanner: @unchecked Sendable {
             scaleDeclined = asked.factor
             scaleAsked = nil
         }
-        let want = scaleOverride ?? active.serverScale
+        let settleWake = settleDensity(at: now)
+        let want = scaleOverride ?? Self.combined(active.serverScale, densityFactorInUse)
         if scaleAsked == nil, !Self.sameScale(want, scaleInForce), !(scaleDeclined.map { Self.sameScale($0, want) } ?? false) {
             out += RFBAppleDisplayLayout.setServerScalingMessage(want)
             scaleAsked = (want, now)
-            Self.logger.notice("event=server-scale asked=\(want) inForce=\(self.scaleInForce)")
+            Self.logger.notice("event=server-scale asked=\(want) inForce=\(self.scaleInForce) density=\(self.densityFactorInUse)")
         }
-        return scaleAsked.map { $0.at + Self.scaleAnswerTimeout }
+        return [scaleAsked.map { $0.at + Self.scaleAnswerTimeout }, settleWake].compactMap { $0 }.min()
+    }
+
+    /// The level's factor times the density's, kept in (0, 1].
+    static func combined(_ level: Double, _ density: Double) -> Double {
+        let value = level * density
+        return value.isFinite && value > 0 ? min(1, value) : 1
+    }
+
+    /// Takes the density factor the displays being fetched want: at once the first time, and for a
+    /// display chosen with `SetDisplay`; otherwise once it has held for `densitySettle`.
+    private func settleDensity(at now: ContinuousClock.Instant) -> ContinuousClock.Instant? {
+        guard let wanted = densityFactor() else { densityPending = nil; return nil }
+        if densityDecided, Self.sameScale(wanted, densityFactorInUse) { densityPending = nil; return nil }
+        if !densityDecided || selectedDisplay != nil {
+            densityFactorInUse = wanted; densityDecided = true; densityPending = nil
+            return nil
+        }
+        if let pending = densityPending, Self.sameScale(pending.factor, wanted) {
+            guard now - pending.since >= Self.densitySettle else { return pending.since + Self.densitySettle }
+            densityFactorInUse = wanted; densityPending = nil
+            return nil
+        }
+        densityPending = (wanted, now)
+        return now + Self.densitySettle
+    }
+
+    /// The display a Mac is sending, or about to: the one asked for until a layout answers.
+    private var selectedDisplay: UInt32? {
+        if let asked = displayAsked { return asked.selection.id }
+        return displayInForce
+    }
+
+    /// One over the density of the displays being fetched, where they share one; 1 for a mix of 1x
+    /// and Retina displays, as Apple's viewer treats it, and with density scaling off. Nil when there
+    /// is nothing to say: no displays known, or nothing on screen (the factor stays as it is).
+    private func densityFactor() -> Double? {
+        guard densityScaling, dialect == .apple else { return 1 }
+        let fetched: [Double]
+        if let id = selectedDisplay {
+            guard let density = densities[id] ?? displays.first(where: { $0.id == id })?.density else { return nil }
+            fetched = [density]
+        } else if let regions {
+            guard !regions.isEmpty else { return nil }
+            fetched = displays.filter { display in
+                let rectangle = RFBRectangle(x: display.x, y: display.y, width: display.width, height: display.height)
+                return regions.contains { $0.intersects(rectangle) }
+            }.compactMap(\.density)
+        } else {
+            fetched = displays.compactMap(\.density)
+        }
+        guard !fetched.isEmpty else { return nil }
+        return Self.densityFactor(fetched)
+    }
+
+    /// Apple's viewer's rule (remotex's `mixed_density`): "mixed" is at least one 1x display and at
+    /// least one that is not. Mixed, or all 1x, is 1; otherwise one over the highest density.
+    static func densityFactor(_ densities: [Double]) -> Double {
+        let oneX = densities.filter { abs($0 - 1) <= 0.005 }.count
+        guard oneX == 0, let highest = densities.max(), highest > 1 else { return 1 }
+        return 1 / highest
     }
 
     private func sent(at now: ContinuousClock.Instant) {
@@ -627,15 +843,20 @@ final class RFBStreamPlanner: @unchecked Sendable {
     }
 
     /// The bounding rectangle of what is on screen, inside the framebuffer; the whole framebuffer
-    /// when everything is; nil when nothing is.
+    /// when everything is; nil when nothing is. A single pixel while waiting for a display.
     private func requestRectangle() -> RFBRectangle? {
         guard width > 0, height > 0 else { return nil }
+        if holding { return RFBRectangle(x: 0, y: 0, width: 1, height: 1) }
         let whole = RFBRectangle(x: 0, y: 0, width: width, height: height)
         guard let regions else { return whole }
         return RFBRectangle.bounding(regions.compactMap { $0.clipped(width: width, height: height) })
     }
 
     private func wholeFramebufferRequested() -> Bool {
+        // Waiting for a display, the pixel asked for is not a region kept current: what decides
+        // CopyRect is what will be asked for once the display is being sent, so the encodings, and
+        // the layout a Mac sends for each SetEncodings, are not sent twice.
+        if holding { return regions == nil }
         guard let rectangle = requestRectangle() else { return regions == nil }
         return rectangle.x == 0 && rectangle.y == 0 && rectangle.width == width && rectangle.height == height
     }

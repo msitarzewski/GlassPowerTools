@@ -16,11 +16,11 @@ Each desktop opens in its own window with the service's name at the top and a ro
 | **Tab** | Sends the Tab key. |
 | **Input** (keyboard) | Opens **Send Text**, where you type text and choose **Send** to type it on the remote computer. |
 
-The window is at least 800 × 440 points. With **Match Window Size** on, resizing the window changes the remote computer's resolution to match. See [Resolution, scaling and zoom](desktop-display-and-scaling.md).
+The window is at least 800 × 440 points. It keeps the shape of the display it shows as you resize it, so the picture fills it with no bars (**Keep Display Proportions**, in **Desktop Settings** > **This Window**). While **Match Window Size** is changing the remote computer's resolution to match the window, the window can take any shape instead. See [Resolution, scaling and zoom](desktop-display-and-scaling.md) and [Keep a window in its display's shape](desktop-display-and-scaling.md#keep-a-window-in-its-displays-shape).
 
 ## A window for each display
 
-When a computer with several displays connects, each display opens in a window of its own, as if you had a monitor for each: the desktop's window shows the main display, and the others open beside it. Place, resize, zoom and tilt each window on its own; the pointer and keys go to the display of the window you are using, and the pointer is drawn in whichever window shows the display it is on. All of them share one connection.
+When a computer with several displays connects, each display opens in a window of its own, as if you had a monitor for each: the desktop's window shows the main display, and the others open beside it. Place, resize, zoom and tilt each window on its own; each keeps its display's shape. The pointer and keys go to the display of the window you are using, and the pointer is drawn in whichever window shows the display it is on, at the size the computer shows it. All of them share one connection, except that a Mac with a Retina display beside a standard one gives a display's window a connection of its own, with the same sign-in, so that each display arrives at 1x; see [Retina displays from a Mac](desktop-display-and-scaling.md#retina-displays-from-a-mac).
 
 Close a display's window when you don't need it: the others stay connected, and that display stops using the network. Closing the last window ends the session. To open a display again, choose **Displays** and the display under **Open in a New Window**.
 

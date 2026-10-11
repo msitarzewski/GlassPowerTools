@@ -10,14 +10,23 @@ public struct DesktopCursorBitmap: Sendable, Equatable {
     /// Valid as a static overlay only when `requiresDesktopComposition` is false.
     public let pixels: Data
     public let requiresDesktopComposition: Bool
+    /// Measured in the host's points: drawn at the shown display's pixels per point (W38).
+    public let isPointSized: Bool
     private let legacyXOR: Data?
     private let legacyAND: Data?
 
     fileprivate init(width: Int, height: Int, hotSpotX: Int, hotSpotY: Int, pixels: Data,
-                     requiresDesktopComposition: Bool, legacyXOR: Data?, legacyAND: Data?) {
+                     requiresDesktopComposition: Bool, legacyXOR: Data?, legacyAND: Data?, isPointSized: Bool = false) {
         self.width = width; self.height = height; self.hotSpotX = hotSpotX; self.hotSpotY = hotSpotY
         self.pixels = pixels; self.requiresDesktopComposition = requiresDesktopComposition
-        self.legacyXOR = legacyXOR; self.legacyAND = legacyAND
+        self.legacyXOR = legacyXOR; self.legacyAND = legacyAND; self.isPointSized = isPointSized
+    }
+
+    /// The same shape, measured in the host's points.
+    fileprivate func pointSized(_ value: Bool) -> DesktopCursorBitmap {
+        DesktopCursorBitmap(width: width, height: height, hotSpotX: hotSpotX, hotSpotY: hotSpotY, pixels: pixels,
+                            requiresDesktopComposition: requiresDesktopComposition, legacyXOR: legacyXOR,
+                            legacyAND: legacyAND, isPointSized: value)
     }
 
     /// Returns a cursor-sized RGBA overlay. Recompute when the cursor or underlying desktop changes.
@@ -64,7 +73,7 @@ public enum DesktopCursorDecoder {
     public static func decode(_ raw: GlassRDPCursorImage) throws -> DesktopCursorBitmap {
         try decode(width: raw.width, height: raw.height, hotSpotX: raw.hotSpotX, hotSpotY: raw.hotSpotY,
                    bitsPerPixel: raw.xorBitsPerPixel, xorMask: raw.xorMask, andMask: raw.andMask,
-                   paletteEntries: raw.paletteEntries)
+                   paletteEntries: raw.paletteEntries).pointSized(raw.isPointSized)
     }
 
     static func decode(width: Int, height: Int, hotSpotX: Int, hotSpotY: Int, bitsPerPixel: Int,
