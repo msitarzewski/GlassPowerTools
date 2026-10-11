@@ -17,6 +17,7 @@
 //
 
 import Foundation
+import GlassLayers
 import Observation
 import GlassEditorCore
 
@@ -45,7 +46,7 @@ public final class GlassEditorPreferences {
 
     private let defaults: UserDefaults
 
-    public init(defaults: UserDefaults = .standard) {
+    public init(defaults: UserDefaults = GlassUITestRun.settingsDefaults) {
         self.defaults = defaults
         let stored = defaults.dictionary(forKey: Self.appearanceDefaultsKey) ?? [:]
         let fallback = GlassEditorConfiguration()

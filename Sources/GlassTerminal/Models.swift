@@ -819,7 +819,7 @@ class TerminalSession: Identifiable, Hashable {
             }
             let failedConnection = detachSSHConnection(for: .terminalError)
             let mode = HostKeyVerificationMode(
-                rawValue: UserDefaults.standard.string(forKey: UserDefaultsKeys.hostKeyVerificationMode) ?? ""
+                rawValue: GlassUITestRun.settingsDefaults.string(forKey: UserDefaultsKeys.hostKeyVerificationMode) ?? ""
             ) ?? .ask
             let message: String
             if let challenge = pendingHostKeyChallenge {

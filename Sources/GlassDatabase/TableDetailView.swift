@@ -3764,7 +3764,7 @@ struct DataTabView: View {
     private func loadColumnLayout() {
         guard let connectionID = session?.connectionConfig.id else { return }
         let key = GridColumnLayout.storageKey(connectionID: connectionID, database: database, table: table)
-        if let data = UserDefaults.standard.data(forKey: key),
+        if let data = GlassUITestRun.settingsDefaults.data(forKey: key),
            let decoded = try? JSONDecoder().decode(GridColumnLayout.self, from: data) {
             columnLayout = decoded
         }
@@ -3774,13 +3774,13 @@ struct DataTabView: View {
         guard let connectionID = session?.connectionConfig.id,
               let data = try? JSONEncoder().encode(columnLayout) else { return }
         let key = GridColumnLayout.storageKey(connectionID: connectionID, database: database, table: table)
-        UserDefaults.standard.set(data, forKey: key)
+        GlassUITestRun.settingsDefaults.set(data, forKey: key)
     }
 
     private func loadGridQueryState() {
         guard let connectionID = session?.connectionConfig.id else { return }
         let key = GridQueryState.storageKey(connectionID: connectionID, database: database, table: table)
-        guard let data = UserDefaults.standard.data(forKey: key),
+        guard let data = GlassUITestRun.settingsDefaults.data(forKey: key),
               let state = try? JSONDecoder().decode(GridQueryState.self, from: data) else {
             // A table not opened before starts at the service's own Rows per page. The setting
             // was saved and validated, then never read: every grid began at 100 (help audit).
@@ -3807,7 +3807,7 @@ struct DataTabView: View {
         )
         guard let data = try? JSONEncoder().encode(state) else { return }
         let key = GridQueryState.storageKey(connectionID: connectionID, database: database, table: table)
-        UserDefaults.standard.set(data, forKey: key)
+        GlassUITestRun.settingsDefaults.set(data, forKey: key)
     }
 
     // MARK: - Column Widths

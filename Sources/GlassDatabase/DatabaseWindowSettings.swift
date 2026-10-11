@@ -155,7 +155,7 @@ final class DatabaseWindowSettingsStore {
     /// Oldest change first.
     private(set) var records: [DatabaseWindowRecord]
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults = GlassUITestRun.settingsDefaults) {
         self.defaults = defaults
         records = Self.decode(defaults.data(forKey: UserDefaultsKeys.windowSettings))
     }

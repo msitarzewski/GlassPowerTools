@@ -45,7 +45,7 @@ public struct GlassShellSettingsView: View {
     @State private var page = GlassShellSettingsSelection.shell(.general)
     #if os(macOS) || os(visionOS)
     /// HIG: a settings window reopens on the pane last viewed.
-    @AppStorage("com.glasspowertools.settings.pane") private var storedPane = "general"
+    @AppStorage("com.glasspowertools.settings.pane", store: GlassUITestRun.settingsDefaults) private var storedPane = "general"
     #endif
     @Environment(\.dismiss) private var dismiss
     #if os(iOS)
@@ -190,9 +190,9 @@ public struct GlassShellSettingsView: View {
         }
     }
 
-    @AppStorage(GlassAvailabilityMonitor.settingKey) private var showsAvailability = false
+    @AppStorage(GlassAvailabilityMonitor.settingKey, store: GlassUITestRun.settingsDefaults) private var showsAvailability = false
     #if os(visionOS)
-    @AppStorage(GlassConnectionsIdleShrink.settingKey) private var idleShrinkSeconds = GlassConnectionsIdleShrink.standard.rawValue
+    @AppStorage(GlassConnectionsIdleShrink.settingKey, store: GlassUITestRun.settingsDefaults) private var idleShrinkSeconds = GlassConnectionsIdleShrink.standard.rawValue
     #endif
 
     private var general: some View {

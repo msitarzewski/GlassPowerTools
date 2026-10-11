@@ -224,7 +224,9 @@ class SettingsManager {
         workgroupsSyncService: GlassSettingsSyncService<ICloudWorkgroupsPayload>? = nil,
         layers: GlassLayerStore? = nil
     ) {
-        let resolvedSettingsDefaults = settingsDefaults ?? .standard
+        // The person's own store, or the run's own suite while a UI test drives the app: a UI run
+        // on the Mac wrote its themes and preferences into the real store (W35, 2026-10-11).
+        let resolvedSettingsDefaults = settingsDefaults ?? GlassUITestRun.settingsDefaults
         self.settingsDefaults = resolvedSettingsDefaults
         // Without an injected store (tests, previews) the layer state lives in the same suite as
         // the rest of the settings, and the store performs glas.sh's one-time key migration from

@@ -151,7 +151,7 @@ public final class GlassEditorProjectLibrary {
     private let defaults: UserDefaults
     private var sync: GlassSettingsSyncService<GlassEditorProjectsPayload>?
 
-    public init(defaults: UserDefaults = .standard) {
+    public init(defaults: UserDefaults = GlassUITestRun.settingsDefaults) {
         self.defaults = defaults
         payload = Self.load(from: defaults)
         #if DEBUG

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import GlassLayers
 import SwiftUI
 import GlassDBKit
 
@@ -582,7 +583,7 @@ enum MutationAuditStore {
     private static let storageKey = UserDefaultsKeys.mutationAudit
     private static let maximumRecords = 1_000
 
-    static func append(_ record: MutationAuditRecord, defaults: UserDefaults = .standard) {
+    static func append(_ record: MutationAuditRecord, defaults: UserDefaults = GlassUITestRun.settingsDefaults) {
         var records: [MutationAuditRecord] = []
         if let data = defaults.data(forKey: storageKey),
            let decoded = try? JSONDecoder().decode([MutationAuditRecord].self, from: data) {

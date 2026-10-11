@@ -19,6 +19,7 @@
 //
 
 import SwiftUI
+import GlassLayers
 
 // MARK: - Reading the store
 
@@ -26,7 +27,7 @@ extension MutationAuditStore {
 
     /// Newest first. A record that will not decode is dropped rather than failing the whole read:
     /// an audit that disappears because one entry is malformed is worse than a short audit.
-    static func records(defaults: UserDefaults = .standard) -> [MutationAuditRecord] {
+    static func records(defaults: UserDefaults = GlassUITestRun.settingsDefaults) -> [MutationAuditRecord] {
         guard let data = defaults.data(forKey: UserDefaultsKeys.mutationAudit),
               let decoded = try? JSONDecoder().decode([MutationAuditRecord].self, from: data) else {
             return []
@@ -35,13 +36,13 @@ extension MutationAuditStore {
     }
 
     static func records(forConnection connectionID: UUID,
-                        defaults: UserDefaults = .standard) -> [MutationAuditRecord] {
+                        defaults: UserDefaults = GlassUITestRun.settingsDefaults) -> [MutationAuditRecord] {
         records(defaults: defaults).filter { $0.connectionID == connectionID }
     }
 
     /// Clears the whole ring. Deliberately all-or-nothing: an audit a user can edit selectively
     /// is not an audit.
-    static func clear(defaults: UserDefaults = .standard) {
+    static func clear(defaults: UserDefaults = GlassUITestRun.settingsDefaults) {
         defaults.removeObject(forKey: UserDefaultsKeys.mutationAudit)
     }
 }

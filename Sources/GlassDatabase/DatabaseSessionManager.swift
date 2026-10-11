@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import GlassLayers
 import Observation
 import GlasSecretStore
 import os
@@ -44,7 +45,7 @@ class DatabaseSessionManager {
         case missingSession
     }
 
-    init(loadImmediately: Bool = true, defaults: UserDefaults = .standard) {
+    init(loadImmediately: Bool = true, defaults: UserDefaults = GlassUITestRun.settingsDefaults) {
         self.defaults = defaults
         if loadImmediately {
             loadIfNeeded()

@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import GlassLayers
 import Foundation
 import GlassConnectionKit
 import GlassShell
@@ -65,20 +66,20 @@ struct ConnectionPersistenceStore: @unchecked Sendable {
     }
 
     static let live = ConnectionPersistenceStore(
-        load: { UserDefaults.standard.data(forKey: UserDefaultsKeys.connections) },
+        load: { GlassUITestRun.settingsDefaults.data(forKey: UserDefaultsKeys.connections) },
         save: { data in
-            UserDefaults.standard.set(data, forKey: UserDefaultsKeys.connections)
-            guard UserDefaults.standard.data(forKey: UserDefaultsKeys.connections) == data else {
+            GlassUITestRun.settingsDefaults.set(data, forKey: UserDefaultsKeys.connections)
+            guard GlassUITestRun.settingsDefaults.data(forKey: UserDefaultsKeys.connections) == data else {
                 throw ConnectionPersistenceError.readbackMismatch
             }
         },
         restore: { data in
             if let data {
-                UserDefaults.standard.set(data, forKey: UserDefaultsKeys.connections)
+                GlassUITestRun.settingsDefaults.set(data, forKey: UserDefaultsKeys.connections)
             } else {
-                UserDefaults.standard.removeObject(forKey: UserDefaultsKeys.connections)
+                GlassUITestRun.settingsDefaults.removeObject(forKey: UserDefaultsKeys.connections)
             }
-            guard UserDefaults.standard.data(forKey: UserDefaultsKeys.connections) == data else {
+            guard GlassUITestRun.settingsDefaults.data(forKey: UserDefaultsKeys.connections) == data else {
                 throw ConnectionPersistenceError.rollbackFailed
             }
         }

@@ -23,7 +23,7 @@ public struct GlassShellLibraryView: View {
     /// The ⚡'s request, handed to the library as a binding it clears once the panel is open.
     @State private var panelRequest: String?
     /// D41: service availability dots, off unless chosen in Settings ▸ General.
-    @AppStorage(GlassAvailabilityMonitor.settingKey) private var showsAvailability = false
+    @AppStorage(GlassAvailabilityMonitor.settingKey, store: GlassUITestRun.settingsDefaults) private var showsAvailability = false
     @State private var availabilityMonitor = GlassAvailabilityMonitor()
     @Environment(\.scenePhase) private var scenePhase
 

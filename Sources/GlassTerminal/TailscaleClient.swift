@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import GlassLayers
 import Observation
 import os
 import CryptoKit
@@ -338,7 +339,7 @@ class TailscaleClient {
     }
 
     nonisolated static func credentialPresence(
-        defaults: UserDefaults = .standard,
+        defaults: UserDefaults = GlassUITestRun.settingsDefaults,
         apiKeyProvider: () throws -> String = {
             try KeychainManager.retrieveTailscaleAPIKey()
         },
@@ -391,7 +392,7 @@ class TailscaleClient {
     // MARK: - Token Resolution
 
     private func resolveToken() async throws -> String {
-        let authMethodRaw = UserDefaults.standard.string(forKey: UserDefaultsKeys.tailscaleAuthMethod) ?? "apiKey"
+        let authMethodRaw = GlassUITestRun.settingsDefaults.string(forKey: UserDefaultsKeys.tailscaleAuthMethod) ?? "apiKey"
         let authMethod = TailscaleAuthMethod(rawValue: authMethodRaw) ?? .apiKey
         Logger.tailscale.info("Resolving Tailscale credential using configured method")
 
@@ -710,7 +711,7 @@ class TailscaleClient {
         } catch {
             guard inventoryGeneration == requestGeneration else { return }
             let authMethod = TailscaleAuthMethod(rawValue:
-                UserDefaults.standard.string(forKey: UserDefaultsKeys.tailscaleAuthMethod) ?? "apiKey"
+                GlassUITestRun.settingsDefaults.string(forKey: UserDefaultsKeys.tailscaleAuthMethod) ?? "apiKey"
             ) ?? .apiKey
             switch authMethod {
             case .apiKey:

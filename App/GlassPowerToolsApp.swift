@@ -37,7 +37,9 @@ struct GlassPowerToolsApp: App {
     #endif
 
     init() {
-        let layers = GlassLayerStore()
+        // Appearance in the run's own suite while a UI test drives the app, as every other store
+        // is, with nothing migrated into it from the person's legacy suites (W35, 2026-10-11).
+        let layers = GlassUITestRun.defaults.map { GlassLayerStore(defaults: $0, legacyDefaults: []) } ?? GlassLayerStore()
         var isolatedDirectory: URL?
         #if DEBUG || GLASS_STRESS_HARNESS
         // `--ui-testing <uuid>` isolates storage and the catalog under a per-run directory so UI

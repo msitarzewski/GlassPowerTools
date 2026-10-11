@@ -64,7 +64,7 @@ class SettingsManager {
 
     init(
         loadImmediately: Bool = true,
-        defaults: UserDefaults = .standard,
+        defaults: UserDefaults = GlassUITestRun.settingsDefaults,
         layers: GlassLayerStore? = nil
     ) {
         self.defaults = defaults

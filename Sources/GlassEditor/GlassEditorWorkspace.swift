@@ -81,7 +81,7 @@ public final class GlassEditorWorkspace {
     /// project clears it again.
     public private(set) var prefersCollapsedSidebar = false
 
-    public init(preferences: GlassEditorPreferences? = nil, defaults: UserDefaults = .standard) {
+    public init(preferences: GlassEditorPreferences? = nil, defaults: UserDefaults = GlassUITestRun.settingsDefaults) {
         self.preferences = preferences ?? GlassEditorPreferences(defaults: defaults)
     }
 

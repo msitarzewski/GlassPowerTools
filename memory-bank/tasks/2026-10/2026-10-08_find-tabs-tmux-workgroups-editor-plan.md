@@ -1040,3 +1040,11 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   (4) record a decision not to build light mode on colorScheme; (5) database pinned-header ground. Also found: in
   `--ui-testing` runs terminal settings/themes use `UserDefaults.standard` (SettingsManager.swift:226-227), so Mac UI runs
   write into the real store. Composites in `$SP/w35/composites/`. Asked the owner what he saw first.
+- **Owner (~02:30):** confirmed he switched the system (Compatible Apps) appearance to light and nothing changed, as
+  expected; "fix the test bug"; "Update the mac"; asked again why a password file. **Test isolation fixed:** shared
+  `GlassUITestRun` (GlassLayers) — `defaults` (per-run suite under `--ui-testing <uuid>`, Debug only) and `settingsDefaults`
+  (that or `.standard`). Now used by: terminal SettingsManager, SharedDefaults' test suite, SSHConnection/Models/Tailscale
+  reads, the app's GlassLayerStore, the database (connections, settings, window settings, mutation log, table state,
+  credential migration marker), the desktop (window settings store, notices, all 12 @AppStorage), the shell's
+  @AppStorage (availability, idle shrink, settings pane), the editor's default stores. Left on `.standard` on purpose:
+  `ApplePersistenceIgnoreState` registration (AppKit reads it) and the legacy-domain migration. All 8 suites pass.

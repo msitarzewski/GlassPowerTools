@@ -403,7 +403,7 @@ enum KeychainManager {
     @discardableResult
     static func runMigrationsIfNeeded(
         connections: [DatabaseConnectionConfig],
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = GlassUITestRun.settingsDefaults
     ) throws -> CredentialMigrationReport {
         let migrationManager = SecretStoreMigrationManager(config: config)
         migrationManager.runScaffoldIfNeeded()

@@ -36,18 +36,18 @@ struct DesktopGlassAppearanceControls: View {
 /// Settings page, each desktop window's All Desktops, and every desktop window, which follows it
 /// until it sets its own (W25). Under glassDT's keys (`DesktopPreferenceKey`), unchanged.
 struct DesktopAllDesktopsStorage: DynamicProperty {
-    @AppStorage(DesktopPreferenceKey.opacity) var opacity = DesktopDefaults.standard.opacity
-    @AppStorage(DesktopPreferenceKey.frost) var frost = DesktopDefaults.standard.frost
-    @AppStorage(DesktopPreferenceKey.backgroundRemoval) var backgroundRemoval = TransparencyMode.original.rawValue
-    @AppStorage(DesktopPreferenceKey.keyRed) var red = Double(DesktopDefaults.standard.keyColor.x)
-    @AppStorage(DesktopPreferenceKey.keyGreen) var green = Double(DesktopDefaults.standard.keyColor.y)
-    @AppStorage(DesktopPreferenceKey.keyBlue) var blue = Double(DesktopDefaults.standard.keyColor.z)
-    @AppStorage(DesktopPreferenceKey.tolerance) var tolerance = DesktopDefaults.standard.tolerance
-    @AppStorage(DesktopPreferenceKey.edgeSoftness) var edgeSoftness = DesktopDefaults.standard.edgeSoftness
-    @AppStorage(DesktopPreferenceKey.detail) var detail = DesktopSourceScale.automatic.rawValue
-    @AppStorage(DesktopPreferenceKey.pointer) var pointer = ""
-    @AppStorage(DesktopPreferenceKey.quality) var quality = GlassDesktopStreamQuality.automatic.rawValue
-    @AppStorage(DesktopPreferenceKey.displays) var displays = ""
+    @AppStorage(DesktopPreferenceKey.opacity, store: GlassUITestRun.settingsDefaults) var opacity = DesktopDefaults.standard.opacity
+    @AppStorage(DesktopPreferenceKey.frost, store: GlassUITestRun.settingsDefaults) var frost = DesktopDefaults.standard.frost
+    @AppStorage(DesktopPreferenceKey.backgroundRemoval, store: GlassUITestRun.settingsDefaults) var backgroundRemoval = TransparencyMode.original.rawValue
+    @AppStorage(DesktopPreferenceKey.keyRed, store: GlassUITestRun.settingsDefaults) var red = Double(DesktopDefaults.standard.keyColor.x)
+    @AppStorage(DesktopPreferenceKey.keyGreen, store: GlassUITestRun.settingsDefaults) var green = Double(DesktopDefaults.standard.keyColor.y)
+    @AppStorage(DesktopPreferenceKey.keyBlue, store: GlassUITestRun.settingsDefaults) var blue = Double(DesktopDefaults.standard.keyColor.z)
+    @AppStorage(DesktopPreferenceKey.tolerance, store: GlassUITestRun.settingsDefaults) var tolerance = DesktopDefaults.standard.tolerance
+    @AppStorage(DesktopPreferenceKey.edgeSoftness, store: GlassUITestRun.settingsDefaults) var edgeSoftness = DesktopDefaults.standard.edgeSoftness
+    @AppStorage(DesktopPreferenceKey.detail, store: GlassUITestRun.settingsDefaults) var detail = DesktopSourceScale.automatic.rawValue
+    @AppStorage(DesktopPreferenceKey.pointer, store: GlassUITestRun.settingsDefaults) var pointer = ""
+    @AppStorage(DesktopPreferenceKey.quality, store: GlassUITestRun.settingsDefaults) var quality = GlassDesktopStreamQuality.automatic.rawValue
+    @AppStorage(DesktopPreferenceKey.displays, store: GlassUITestRun.settingsDefaults) var displays = ""
 
     /// What is stored, kept in range.
     var defaults: DesktopDefaults {

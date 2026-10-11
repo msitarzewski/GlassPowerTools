@@ -80,17 +80,7 @@ nonisolated enum SharedDefaults {
     /// Computed rather than stored: `UserDefaults` is thread-safe but not `Sendable`, so a static
     /// constant of it is rejected under strict concurrency. Resolving it per access costs an
     /// argument scan and is only reached in a Debug test run.
-    private static var testSuite: UserDefaults? {
-        #if DEBUG || GLASS_STRESS_HARNESS
-        let arguments = ProcessInfo.processInfo.arguments
-        guard let index = arguments.firstIndex(of: "--ui-testing"),
-              arguments.indices.contains(index + 1),
-              let identifier = UUID(uuidString: arguments[index + 1]) else { return nil }
-        return UserDefaults(suiteName: "\(suiteName).uitests.\(identifier.uuidString)")
-        #else
-        return nil
-        #endif
-    }
+    private static var testSuite: UserDefaults? { GlassUITestRun.defaults }
 
     /// True while a UI test drives the app (`--ui-testing <uuid>`). Its settings must not reach
     /// iCloud either: the key-value store is the person's own, shared with every device.

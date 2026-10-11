@@ -1,4 +1,5 @@
 import Foundation
+import GlassLayers
 import Observation
 import UserNotifications
 import GlassConnectionUI
@@ -15,7 +16,7 @@ struct DesktopNoticeDelivery {
 
 @MainActor @Observable
 public final class DesktopNotices {
-    public static let shared = DesktopNotices(defaults: .standard)
+    public static let shared = DesktopNotices(defaults: GlassUITestRun.settingsDefaults)
     public private(set) var isEnabled: Bool
     public private(set) var isRequestingAuthorization = false
     public private(set) var statusMessage: String?

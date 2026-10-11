@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import GlassLayers
 import GlassSSHTransport
 import UniformTypeIdentifiers
 import GlasSecretStore
@@ -241,7 +242,7 @@ struct GeneralSettingsView: View {
 
     private func loadTailscaleCredentialState() async {
         let storedMethod = TailscaleAuthMethod(rawValue:
-            UserDefaults.standard.string(forKey: UserDefaultsKeys.tailscaleAuthMethod) ?? "apiKey"
+            GlassUITestRun.settingsDefaults.string(forKey: UserDefaultsKeys.tailscaleAuthMethod) ?? "apiKey"
         ) ?? .apiKey
         persistedTailscaleAuthMethod = storedMethod
         tailscaleAuthMethod = storedMethod
@@ -367,7 +368,7 @@ struct GeneralSettingsView: View {
             }
             if wroteReplacement {
                 // Switch the active method only after its credential write succeeds.
-                UserDefaults.standard.set(tailscaleAuthMethod.rawValue, forKey: UserDefaultsKeys.tailscaleAuthMethod)
+                GlassUITestRun.settingsDefaults.set(tailscaleAuthMethod.rawValue, forKey: UserDefaultsKeys.tailscaleAuthMethod)
                 persistedTailscaleAuthMethod = tailscaleAuthMethod
                 NotificationCenter.default.post(name: .tailscaleCredentialsDidChange, object: nil)
             }

@@ -22,6 +22,7 @@
 //
 
 import SwiftUI
+import GlassLayers
 import os
 #if os(visionOS)
 import UIKit
@@ -39,7 +40,7 @@ public extension View {
 private struct GlassConnectionsIdleShrinkModifier: ViewModifier {
     let model: GlassShellModel
     let recovery: GlassWindowRecoveryManager
-    @AppStorage(GlassConnectionsIdleShrink.settingKey) private var storedSeconds = GlassConnectionsIdleShrink.standard.rawValue
+    @AppStorage(GlassConnectionsIdleShrink.settingKey, store: GlassUITestRun.settingsDefaults) private var storedSeconds = GlassConnectionsIdleShrink.standard.rawValue
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.pushWindow) private var pushWindow
     @Environment(\.dismissWindow) private var dismissWindow

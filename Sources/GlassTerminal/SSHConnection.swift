@@ -14,6 +14,7 @@
 //
 
 import Foundation
+import GlassLayers
 import GlasSecretStore
 import GlassSSHTransport
 import NIOCore
@@ -201,7 +202,7 @@ class SSHConnection {
 
     static func hostKeyVerificationMode() -> HostKeyVerificationMode {
         HostKeyVerificationMode(
-            rawValue: UserDefaults.standard.string(forKey: UserDefaultsKeys.hostKeyVerificationMode) ?? ""
+            rawValue: GlassUITestRun.settingsDefaults.string(forKey: UserDefaultsKeys.hostKeyVerificationMode) ?? ""
         ) ?? .ask
     }
 
@@ -347,7 +348,7 @@ class SSHConnection {
                 break
             case .failed(let message):
                 if case .connected = self.session?.state { self.session?.reportError(message) }
-                let autoReconnect = UserDefaults.standard.bool(forKey: UserDefaultsKeys.autoReconnect)
+                let autoReconnect = GlassUITestRun.settingsDefaults.bool(forKey: UserDefaultsKeys.autoReconnect)
                 self.session?.attemptAutoReconnect(autoReconnectEnabled: autoReconnect)
             }
         }
@@ -380,7 +381,7 @@ class SSHConnection {
                 case .lost(let message):
                     self.isTransportConnected = false
                     if case .connected = self.session?.state { self.session?.reportError(message) }
-                    let autoReconnect = UserDefaults.standard.bool(forKey: UserDefaultsKeys.autoReconnect)
+                    let autoReconnect = GlassUITestRun.settingsDefaults.bool(forKey: UserDefaultsKeys.autoReconnect)
                     self.session?.attemptAutoReconnect(autoReconnectEnabled: autoReconnect)
                 case .closed:
                     self.isTransportConnected = false

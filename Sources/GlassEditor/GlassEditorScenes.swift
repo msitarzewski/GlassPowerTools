@@ -47,7 +47,7 @@ public final class GlassEditorRuntime {
     public let layers: GlassLayerStore
     private let defaults: UserDefaults
 
-    public init(layers: GlassLayerStore? = nil, defaults: UserDefaults = .standard) {
+    public init(layers: GlassLayerStore? = nil, defaults: UserDefaults = GlassUITestRun.settingsDefaults) {
         self.layers = layers ?? GlassLayerStore()
         self.defaults = defaults
         self.preferences = GlassEditorPreferences(defaults: defaults)
