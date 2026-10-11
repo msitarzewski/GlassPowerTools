@@ -41,3 +41,10 @@ SetDisplayConfiguration virtual displays, media stream (SRTP, HEVC via VideoTool
 
 ## State
 - 2026-10-11 PLAN → BUILD (step 1).
+- **0ffdfb1** step 1 built behind `VNCConfiguration.appleProtocol` (off in the app): `RFBAppleRecordLayer.swift`
+  (record layer, rekey, `RFBAppleMessages`), VNCClient 003.889 handshake/prelude/rekey/mask, planner emits one
+  message per call, `VNCServerInfo.appleCommands`/`encrypted`. dbaec46 arming (AutoFrameBufferUpdate after each
+  layout) also not yet installed. Tests: VNCKit 93, GlassVNCTransport 18, GlassDesktop 203 passed (incl. a scripted
+  Mac through a real type-30 exchange to a picture in records). Probe `--apple` (and `--no-arm`, `--cursor N`).
+  **Next:** owner runs `GlassVNCProbe 127.0.0.1 5900 <user> - --apple --cursor 20`; if it signs in encrypted with a
+  picture, turn `appleProtocol` on in GlassVNCSession for Macs (keep 3.8 fallback if the Mac refuses), install.
