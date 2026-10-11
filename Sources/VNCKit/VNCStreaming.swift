@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 // What this client asks a server to send, and how often: the levers that move bytes on the wire.
 //
@@ -15,8 +16,11 @@ import Foundation
 //   often, its changes merged in between.
 // - **Where** — the request's rectangle. Only the displays that are on screen are asked for
 //   (`VNCClient.setRequestedRegions`).
+// - **How large** — on a Mac only, `SetServerScaling`: the Mac renders its framebuffer smaller
+//   before encoding it (`RFBAppleDisplays.swift`). Every encoding shrinks with the pixel count.
 //
-// Scaling the image on this device saves nothing: the server sends its own pixels either way.
+// Scaling the image on this device saves nothing: the server sends its own pixels either way. Only
+// a Mac can be asked to send fewer.
 
 /// How a session trades picture for bytes. Automatic measures the link and chooses a level; the
 /// others are fixed.
@@ -27,7 +31,8 @@ public enum VNCQuality: String, Sendable, CaseIterable, Codable {
     static let ladder: [VNCQuality] = [.lowest, .dataSaver, .balanced, .best]
 }
 
-/// One level's messages: what SetPixelFormat and SetEncodings say, and how often updates are asked for.
+/// One level's messages: what SetPixelFormat and SetEncodings say, how often updates are asked for,
+/// and, of a Mac, at what scale it renders.
 public struct VNCStreamProfile: Sendable, Equatable {
     public let level: VNCQuality
     public let colourDepth: RFBColourDepth
@@ -37,6 +42,16 @@ public struct VNCStreamProfile: Sendable, Equatable {
     public let compressionLevel: Int?
     /// Nil asks for the next update as soon as one arrives.
     public let maximumUpdatesPerSecond: Int?
+    /// The factor a Mac is asked to render its framebuffer at, in (0, 1]; 1 is its own size. Only
+    /// Apple's server is asked (`SetServerScaling`); every other server ignores this.
+    public let serverScale: Double
+
+    public init(level: VNCQuality, colourDepth: RFBColourDepth, jpegQuality: Int?, compressionLevel: Int?,
+                maximumUpdatesPerSecond: Int?, serverScale: Double = 1) {
+        self.level = level; self.colourDepth = colourDepth; self.jpegQuality = jpegQuality
+        self.compressionLevel = compressionLevel; self.maximumUpdatesPerSecond = maximumUpdatesPerSecond
+        self.serverScale = serverScale
+    }
 
     /// Lossless, full colour, as fast as the link allows.
     public static let best = VNCStreamProfile(level: .best, colourDepth: .full, jpegQuality: nil,
@@ -45,13 +60,15 @@ public struct VNCStreamProfile: Sendable, Equatable {
     /// session asked for before quality could be chosen.
     public static let balanced = VNCStreamProfile(level: .balanced, colourDepth: .full, jpegQuality: 8,
                                                   compressionLevel: nil, maximumUpdatesPerSecond: nil)
-    /// Thousands of colours, stronger JPEG and compression, 15 updates a second.
+    /// Thousands of colours, stronger JPEG and compression, 15 updates a second; a Mac renders at
+    /// three quarters of its size (56% of the pixels).
     public static let dataSaver = VNCStreamProfile(level: .dataSaver, colourDepth: .thousands, jpegQuality: 5,
-                                                   compressionLevel: 6, maximumUpdatesPerSecond: 15)
-    /// 256 colours, the strongest JPEG and compression, 8 updates a second. A server that sends
-    /// Tight keeps 16 bits, where its JPEG still works (`RFBStreamPlanner.wantedProfile`).
+                                                   compressionLevel: 6, maximumUpdatesPerSecond: 15, serverScale: 0.75)
+    /// 256 colours, the strongest JPEG and compression, 8 updates a second; a Mac renders at half
+    /// its size (a quarter of the pixels). A server that sends Tight keeps 16 bits, where its JPEG
+    /// still works, and so does a Mac (`RFBStreamPlanner.wantedProfile`).
     public static let lowest = VNCStreamProfile(level: .lowest, colourDepth: .colours256, jpegQuality: 2,
-                                                compressionLevel: 9, maximumUpdatesPerSecond: 8)
+                                                compressionLevel: 9, maximumUpdatesPerSecond: 8, serverScale: 0.5)
 
     /// A fixed level's profile; Automatic starts at Balanced.
     public static func profile(for level: VNCQuality) -> VNCStreamProfile {
@@ -83,13 +100,17 @@ public struct VNCLinkStatistics: Sendable, Equatable {
     /// Nothing is on screen, so no picture is asked for.
     public var paused: Bool
     public var totalBytes: Int
+    /// The scale a Mac has confirmed it renders at, from its last display layout; nil for a server
+    /// that sends no layout.
+    public var serverScale: Double?
 
     public init(bytesPerSecond: Double, updatesPerSecond: Double, profile: VNCStreamProfile, quality: VNCQuality,
                 encoding: RFBEncoding?, measuredKilobitsPerSecond: Double?, regionLimited: Bool, paused: Bool,
-                totalBytes: Int) {
+                totalBytes: Int, serverScale: Double? = nil) {
         self.bytesPerSecond = bytesPerSecond; self.updatesPerSecond = updatesPerSecond; self.profile = profile
         self.quality = quality; self.encoding = encoding; self.measuredKilobitsPerSecond = measuredKilobitsPerSecond
         self.regionLimited = regionLimited; self.paused = paused; self.totalBytes = totalBytes
+        self.serverScale = serverScale
     }
 }
 
@@ -116,6 +137,7 @@ public extension RFBEncoding {
         case .desktopSize: "DesktopSize"
         case .lastRect: "LastRect"
         case .extendedDesktopSize: "ExtendedDesktopSize"
+        case .appleDisplayInfo: "AppleDisplayInfo"
         case .appleDisplayLayout: "AppleDisplayLayout"
         }
     }
@@ -125,9 +147,11 @@ public extension RFBEncoding {
 ///
 /// What is known of Apple's server, from others' measurements (Apple documents none of it):
 /// asked for Tight it answers with Raw, and it uses ZRLE when offered; it reports its displays only
-/// through its own layout encoding, never ExtendedDesktopSize; and older macOS versions ended the
-/// session when a client asked for fewer than 15 bits of colour. So for Apple: ZRLE first, Apple's
-/// layout asked for, and colour no lower than 16 bits.
+/// through its own layout, never ExtendedDesktopSize, and only to a client listing both its layout
+/// and `DisplayInfo`; it can render its framebuffer smaller (`RFBAppleDisplays.swift`); and older
+/// macOS versions ended the session when a client asked for fewer than 15 bits of colour. So for
+/// Apple: ZRLE first, both display encodings, server-side scaling in the lower levels, and colour no
+/// lower than 16 bits.
 enum RFBServerDialect: Sendable, Equatable {
     case standard, apple
 
@@ -136,75 +160,6 @@ enum RFBServerDialect: Sendable, Equatable {
     }
 
     var minimumColourDepth: RFBColourDepth { self == .apple ? .thousands : .colours256 }
-}
-
-/// Apple's display layout pseudo-rectangle (encoding 1105). Undocumented by Apple; the form below
-/// is from published reverse engineering of macOS 26
-/// (https://github.com/andrewtheguy/remotex/blob/main/docs/apple-vnc-889.md, "AppleDisplayLayout"),
-/// and has not been checked against a Mac by this project.
-///
-/// The payload starts with a big-endian `u16` giving the length of what follows, which is a 0x14-byte
-/// header — version, desktop size in points, framebuffer size in pixels, the screen being sent, the
-/// session state, and at +0x12 a `u16` display count — then 0x38 bytes per display: two f64s
-/// (density, scale), a `u32` display id at +0x10, logical bounds at +0x14 and backing bounds at
-/// +0x1c (each `top, left, bottom, right` as `u16`s; backing bounds are framebuffer pixels), `u32`
-/// flags at +0x24 (bit 0 main, bit 1 mirror set) and a pixel format.
-///
-/// Read so that a misreading cannot take the session down: the length is honoured whatever the
-/// records say (if the length is the records' size plus two, it counted itself, and only that much
-/// more is read), and a payload that does not hold up yields no layout rather than a failure.
-enum RFBAppleDisplayLayout {
-    static let headerBytes = 0x14
-    static let recordBytes = 0x38
-    static let maximumDisplays = 25
-
-    /// The framebuffer size the layout describes, in pixels (header +0x06), when it gives one.
-    static func framebufferSize(header: [UInt8]) -> (width: Int, height: Int)? {
-        guard header.count >= 0x0a else { return nil }
-        let width = Int(header[0x06]) << 8 | Int(header[0x07]), height = Int(header[0x08]) << 8 | Int(header[0x09])
-        return width > 0 && height > 0 ? (width, height) : nil
-    }
-
-    static func read(from source: any RFBByteSource) async throws -> (screens: [VNCScreen], width: Int?, height: Int?)? {
-        let length = Int(try await source.u16())
-        guard length <= headerBytes + maximumDisplays * recordBytes + 2 else {
-            throw RFBError.resourceLimit("The server's display layout is too large.")
-        }
-        guard length >= headerBytes else {
-            _ = try await source.read(length)
-            return nil
-        }
-        let header = try await source.read(headerBytes)
-        let count = Int(header[0x12]) << 8 | Int(header[0x13])
-        let records = headerBytes + count * recordBytes
-        // Normally `length` is exactly the records' size; a length two longer counted itself.
-        let remaining = length == records + 2 ? records - headerBytes : length - headerBytes
-        let body = try await source.read(remaining)
-        guard let screens = parse(header: header, body: body, count: count) else { return nil }
-        let size = framebufferSize(header: header)
-        return (screens, size?.width, size?.height)
-    }
-
-    static func parse(header: [UInt8], body: [UInt8], count: Int) -> [VNCScreen]? {
-        guard (1...maximumDisplays).contains(count), body.count >= count * recordBytes else { return nil }
-        var screens: [VNCScreen] = []
-        for index in 0..<count {
-            var reader = ByteReader(body, offset: index * recordBytes + 0x10)
-            guard let id = try? reader.u32() else { return nil }
-            reader = ByteReader(body, offset: index * recordBytes + 0x1c)
-            guard let top = try? reader.u16(), let left = try? reader.u16(),
-                  let bottom = try? reader.u16(), let right = try? reader.u16(),
-                  let flags = try? reader.u32(), right > left, bottom > top else { return nil }
-            let screen = VNCScreen(id: id, x: Int(left), y: Int(top), width: Int(right - left), height: Int(bottom - top),
-                                   flags: flags, isMain: flags & 1 != 0)
-            // Members of a mirror set share their bounds: one window shows them.
-            if screens.contains(where: { $0.x == screen.x && $0.y == screen.y && $0.width == screen.width && $0.height == screen.height }) {
-                continue
-            }
-            screens.append(screen)
-        }
-        return screens
-    }
 }
 
 // MARK: - The link governor
@@ -308,10 +263,11 @@ extension RFBEncoding {
                                    dialect: RFBServerDialect = .standard, appleDisplayLayout: Bool = true) -> [Int32] {
         var order = advertised
         if dialect == .apple {
-            // Apple's server answers a Tight preference with Raw; ZRLE first, and its own layout.
+            // Apple's server answers a Tight preference with Raw; ZRLE first. It reports its
+            // displays only to a client listing both of its display encodings (`RFBAppleDisplays.swift`).
             order.removeAll { $0 == .zrle }
             order.insert(.zrle, at: 0)
-            if appleDisplayLayout { order.append(.appleDisplayLayout) }
+            if appleDisplayLayout { order += [.appleDisplayInfo, .appleDisplayLayout] }
         }
         var values = order.filter { copyRect || $0 != .copyRect }.map(\.rawValue)
         if let quality = profile.jpegQuality { values.append(-32 + Int32(min(9, max(0, quality)))) }
@@ -348,6 +304,14 @@ extension RFBRectangle {
         other.x >= x && other.y >= y && other.maxX <= maxX && other.maxY <= maxY
     }
 
+    /// The same area in a framebuffer rendered `factor` times as large: origin rounded down, far
+    /// edges up.
+    func scaled(by factor: Double) -> RFBRectangle {
+        let left = Int((Double(x) * factor).rounded(.down)), top = Int((Double(y) * factor).rounded(.down))
+        let right = Int((Double(maxX) * factor).rounded(.up)), bottom = Int((Double(maxY) * factor).rounded(.up))
+        return RFBRectangle(x: left, y: top, width: right - left, height: bottom - top)
+    }
+
     static func bounding(_ rectangles: [RFBRectangle]) -> RFBRectangle? {
         guard let first = rectangles.first else { return nil }
         let left = rectangles.map(\.x).min() ?? first.x, top = rectangles.map(\.y).min() ?? first.y
@@ -376,7 +340,17 @@ extension RFBRectangle {
 /// seconds with nothing arriving and the client waiting between messages, the change is sent
 /// anyway — with nothing arriving, the server is holding a request for a region that has not
 /// changed, and it will answer that in the new format.
+///
+/// **A Mac's scale.** `SetServerScaling` is sent only once a Mac has sent a display layout, since
+/// only a layout can confirm a factor and carry the framebuffer's new size (a Mac listing
+/// `DisplayInfo` sends no DesktopSize). One factor is asked for at a time. The factor in force is
+/// the last layout's, whatever was asked: pointer positions are divided by it (`VNCClient`). A
+/// request no layout confirms within ten seconds is given up, and that factor is not asked for
+/// again until the level wants another (remotex's notes, "Server-side scaling in Standard mode").
+/// Requests carry on meanwhile, as remotex's do: the layout arrives before any picture in the new
+/// size.
 final class RFBStreamPlanner: @unchecked Sendable {
+    private static let logger = Logger(subsystem: "app.glassdt.vnc", category: "planner")
     private let lock = NSLock()
 
     // The level.
@@ -403,6 +377,16 @@ final class RFBStreamPlanner: @unchecked Sendable {
     private var waitingSince: ContinuousClock.Instant?
     private var wakeAt: ContinuousClock.Instant?
 
+    // A Mac's scale.
+    private var serverScaling = true
+    /// A Mac has sent a display layout this session.
+    private var layoutSeen = false
+    private var scaleInForce = 1.0
+    private var scaleAsked: (factor: Double, at: ContinuousClock.Instant)?
+    /// A factor the Mac did not confirm in time: not asked for again until another is wanted.
+    private var scaleDeclined: Double?
+    private var scaleOverride: Double?
+
     // The readout.
     private struct Sample { let at: ContinuousClock.Instant; let changed: Bool; let encodingBytes: [Int32: Int] }
     private var samples: [Sample] = []
@@ -411,6 +395,10 @@ final class RFBStreamPlanner: @unchecked Sendable {
     static let quietBeforeForcedFormatChange: Duration = .seconds(2)
     static let pausedRequestInterval: Duration = .seconds(2)
     static let statisticsWindow: Duration = .seconds(2)
+    static let scaleAnswerTimeout: Duration = .seconds(10)
+
+    /// Two factors the Mac would treat as one.
+    static func sameScale(_ a: Double, _ b: Double) -> Bool { abs(a - b) < 0.005 }
 
     // MARK: Inputs
 
@@ -434,12 +422,51 @@ final class RFBStreamPlanner: @unchecked Sendable {
         }
     }
 
-    func start(width: Int, height: Int, dialect: RFBServerDialect = .standard, appleDisplayLayout: Bool = true) {
+    func start(width: Int, height: Int, dialect: RFBServerDialect = .standard, appleDisplayLayout: Bool = true,
+               serverScaling: Bool = true) {
         lock.withLock {
             self.width = width; self.height = height; self.dialect = dialect
             self.appleDisplayLayout = appleDisplayLayout
+            self.serverScaling = serverScaling
         }
     }
+
+    /// A factor to ask a Mac for whatever the level says, in (0, 1]; nil follows the level.
+    func setServerScaleOverride(_ value: Double?) {
+        lock.withLock {
+            scaleOverride = value.flatMap { $0.isFinite && $0 > 0 && $0 <= 1 ? $0 : nil }
+        }
+    }
+
+    /// A Mac's display layout arrived, stating the scale it renders at and the framebuffer's size
+    /// now. Its picture is asked for again in full: the layout may have changed the framebuffer, and
+    /// a Mac sends one at every login, lock and user switch.
+    func appleLayoutArrived(serverScale: Double, width: Int, height: Int) {
+        lock.withLock {
+            let previous = scaleInForce
+            layoutSeen = true
+            scaleInForce = serverScale
+            if let asked = scaleAsked, Self.sameScale(asked.factor, serverScale) {
+                Self.logger.notice("event=server-scale confirmed=\(serverScale) width=\(width) height=\(height)")
+                scaleAsked = nil
+                scaleDeclined = nil
+            }
+            // The windows' regions were in the old scale's pixels; until they say again, ask for the
+            // same parts of the picture in the new one.
+            if !Self.sameScale(previous, serverScale), let current = regions, previous > 0 {
+                regions = current.map { $0.scaled(by: serverScale / previous) }
+            }
+            self.width = width; self.height = height
+            refresh = true; urgent = true
+        }
+    }
+
+    /// The factor a Mac has confirmed it renders at: pointer positions are divided by it. 1 on
+    /// every other server, and on a Mac until a layout says otherwise.
+    var serverScaleInForce: Double { lock.withLock { scaleInForce } }
+
+    /// A factor was asked for and no layout has confirmed it yet.
+    var awaitingServerScale: Bool { lock.withLock { scaleAsked != nil } }
 
     /// The messages that open the session: SetPixelFormat and SetEncodings for the level wanted.
     /// The first request follows from `decide` once the client is streaming.
@@ -534,6 +561,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
                 advertisedEncodings = encodings
                 out += RFBEncoding.setEncodingsMessage(encodings)
             }
+            let scaleWake = planScale(at: now, into: &out)
 
             var wake: ContinuousClock.Instant?
             if urgent, !paused, let rectangle = requestRectangle() {
@@ -556,8 +584,26 @@ final class RFBStreamPlanner: @unchecked Sendable {
                 }
             }
             if urgent, paused { urgent = false }
-            return (out, wake)
+            return (out, [wake, scaleWake].compactMap { $0 }.min())
         }
+    }
+
+    /// Asks a Mac for the scale the level wants, once it has shown it sends layouts; returns when
+    /// to look again at an unanswered request.
+    private func planScale(at now: ContinuousClock.Instant, into out: inout [UInt8]) -> ContinuousClock.Instant? {
+        guard dialect == .apple, appleDisplayLayout, serverScaling, layoutSeen else { return nil }
+        if let asked = scaleAsked, now - asked.at >= Self.scaleAnswerTimeout {
+            Self.logger.error("event=server-scale unconfirmed=\(asked.factor) inForce=\(self.scaleInForce)")
+            scaleDeclined = asked.factor
+            scaleAsked = nil
+        }
+        let want = scaleOverride ?? active.serverScale
+        if scaleAsked == nil, !Self.sameScale(want, scaleInForce), !(scaleDeclined.map { Self.sameScale($0, want) } ?? false) {
+            out += RFBAppleDisplayLayout.setServerScalingMessage(want)
+            scaleAsked = (want, now)
+            Self.logger.notice("event=server-scale asked=\(want) inForce=\(self.scaleInForce)")
+        }
+        return scaleAsked.map { $0.at + Self.scaleAnswerTimeout }
     }
 
     private func sent(at now: ContinuousClock.Instant) {
@@ -577,7 +623,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
         guard depth != profile.colourDepth else { return profile }
         return VNCStreamProfile(level: profile.level, colourDepth: depth, jpegQuality: profile.jpegQuality,
                                 compressionLevel: profile.compressionLevel,
-                                maximumUpdatesPerSecond: profile.maximumUpdatesPerSecond)
+                                maximumUpdatesPerSecond: profile.maximumUpdatesPerSecond, serverScale: profile.serverScale)
     }
 
     /// The bounding rectangle of what is on screen, inside the framebuffer; the whole framebuffer
@@ -619,7 +665,8 @@ final class RFBStreamPlanner: @unchecked Sendable {
                 measuredKilobitsPerSecond: governor.lastKilobitsPerSecond,
                 regionLimited: regions != nil && !(rectangle.map { $0.width == width && $0.height == height } ?? false),
                 paused: regions?.isEmpty == true,
-                totalBytes: totalBytes)
+                totalBytes: totalBytes,
+                serverScale: dialect == .apple && layoutSeen ? scaleInForce : nil)
         }
     }
 }

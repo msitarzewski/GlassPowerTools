@@ -42,6 +42,10 @@ While a VNC computer has several displays, the app does not change its resolutio
 
 If the computer does not say where its displays are, the window shows them as one picture and **Displays** does not appear.
 
+**From a Mac:** the app asks every Mac where its displays are, and a Mac answers again whenever they change: when someone signs in, locks the screen, switches user, or adds, removes or rearranges a display. Each display's window then shows that display. A Mac sends each display at its own pixels, so beside a standard display a Retina display's picture has twice as many pixels across for the same size on the Mac. Displays that mirror each other are one display here.
+
+If a Mac ends the session in a way that suggests the app misread its displays, the message says so and **Reconnect** connects without asking: the displays are one picture again until the app is opened again.
+
 ## Quality and the network (Screen Sharing)
 
 **Quality**, in the window's controls and in **Desktop Settings** > **Connection**, chooses how much picture a VNC connection carries. It belongs to the connection, so it applies to every window of the desktop.
@@ -51,14 +55,16 @@ If the computer does not say where its displays are, the window shows them as on
 | **Automatic** (default) | Measures how fast the picture arrives and moves between the levels below as the connection changes: down quickly on a slow link, up slowly once it is fast again. |
 | **Best** | Every pixel exactly, in full color, as fast as the connection allows. |
 | **Balanced** | Full color, with photos and video compressed as JPEG where the computer offers it. |
-| **Data Saver** | Thousands of colors, stronger compression and JPEG, at most 15 updates a second. |
-| **Lowest** | The strongest compression and JPEG, at most 8 updates a second; 256 colors where the computer does not send JPEG. |
+| **Data Saver** | Thousands of colors, stronger compression and JPEG, at most 15 updates a second. A Mac sends its picture at three quarters of its size. |
+| **Lowest** | The strongest compression and JPEG, at most 8 updates a second; 256 colors where the computer does not send JPEG. A Mac sends its picture at half its size. |
 
-A Mac's Screen Sharing has not been seen to send JPEG to apps other than Apple's own, so on a Mac the levels work through colors, compression and how often the picture is asked for. They never go below thousands of colors there: older versions of macOS ended the session when asked for fewer.
+A Mac's Screen Sharing has not been seen to send JPEG to apps other than Apple's own, so on a Mac the levels work through the size of the picture, colors, compression and how often the picture is asked for. They never go below thousands of colors there: older versions of macOS ended the session when asked for fewer.
 
-On the **Connection** page, under **Quality**, the figures show what the network is carrying now, updated every second: **Receiving** (for example `1.2 Mbit/s`), **Updates** per second, the **Level** in effect (with **Automatic**, the level it chose), **Color**, the **Encoding** the computer is using, and **Fetching** (the whole desktop, only the displays on screen, or nothing). The **Quality** control in the window shows the same as one line above its choices, and on Mac, iPad and iPhone the line also appears in the bar at the bottom of the window.
+**A smaller picture from a Mac.** At **Data Saver** and **Lowest** the Mac draws its picture smaller before sending it: at three quarters of its size each update carries a little over half the pixels, and at half its size a quarter of them. The window still fills with the picture, so text is softer; a Retina display at half its size is about as sharp as a standard display. Pointing, clicking and dragging land where you point, at any size. The size changes once the Mac has confirmed it, which takes a moment, and the picture is fetched again in full. If a Mac ends the session while it is being asked for a smaller picture, the message says so and **Reconnect** connects without asking: it sends its own size until the app is opened again.
 
-Zooming or shrinking the picture in the window does not change what the network carries: the computer sends its own pixels either way. To send fewer pixels, lower the remote resolution, or show fewer displays.
+On the **Connection** page, under **Quality**, the figures show what the network is carrying now, updated every second: **Receiving** (for example `1.2 Mbit/s`), **Updates** per second, the **Level** in effect (with **Automatic**, the level it chose), **Color**, **Scale** (on a Mac: the size it is sending, `100%` at its own size), the **Encoding** the computer is using, and **Fetching** (the whole desktop, only the displays on screen, or nothing). The **Quality** control in the window shows the same as one line above its choices, ending in, for example, `75% size` while a Mac sends a smaller picture. On Mac, iPad and iPhone the line also appears in the bar at the bottom of the window.
+
+Zooming or shrinking the picture in the window does not change what the network carries: the computer sends its own pixels either way. To send fewer pixels, lower the remote resolution, show fewer displays, or, from a Mac, choose **Data Saver** or **Lowest**.
 
 ## Zoom in this window
 

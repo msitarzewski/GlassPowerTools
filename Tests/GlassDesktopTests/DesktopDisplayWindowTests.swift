@@ -263,6 +263,13 @@ struct DesktopDisplayWindowTests {
         #expect(DesktopLinkReadout.rate(bytesPerSecond: 40_000) == "320 kbit/s")
         #expect(DesktopLinkReadout.level(value) == "Automatic: Data Saver")
         #expect(DesktopLinkReadout.colour(8) == "256 colors")
+        // W36: a Mac sending a smaller picture says so; at its own size, nothing is added.
+        var scaled = value
+        scaled.serverScale = 0.75
+        #expect(DesktopLinkReadout.line(scaled) == "1.2 Mbit/s · 9.5 updates/s · 16-bit color · ZRLE · 75% size")
+        scaled.serverScale = 1
+        #expect(DesktopLinkReadout.line(scaled) == "1.2 Mbit/s · 9.5 updates/s · 16-bit color · ZRLE")
+        #expect(DesktopLinkReadout.scale(0.5) == "50%")
         await session.receive(.state(.disconnected), attempt: session.attemptID, connection: fixture.connection)
         #expect(session.linkStatistics == nil)
         session.close()

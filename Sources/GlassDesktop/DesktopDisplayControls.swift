@@ -40,12 +40,19 @@ enum DesktopLinkReadout {
         statistics.quality == .automatic ? "Automatic: \(statistics.level.title)" : statistics.level.title
     }
 
-    /// One line for a status bar or a menu: "1.2 Mbit/s · 14 updates/s · 16-bit color · ZRLE".
+    /// A Mac's picture size as a fraction of its own: "75%", "100%".
+    static func scale(_ factor: Double) -> String {
+        "\(Int((factor * 100).rounded()))%"
+    }
+
+    /// One line for a status bar or a menu: "1.2 Mbit/s · 14 updates/s · 16-bit color · ZRLE", and
+    /// "· 75% size" while a Mac sends a smaller picture.
     static func line(_ statistics: GlassDesktopLinkStatistics) -> String {
         guard !statistics.paused else { return "Paused: no display on screen" }
         var parts = [rate(bytesPerSecond: statistics.bytesPerSecond), updates(statistics.updatesPerSecond),
                      colour(statistics.colourDepth)]
         if let encoding = statistics.encoding { parts.append(encoding) }
+        if let factor = statistics.serverScale, factor < 0.995 { parts.append("\(scale(factor)) size") }
         return parts.joined(separator: " · ")
     }
 }
@@ -171,6 +178,10 @@ struct DesktopConnectionSettingsSections: View {
                     LabeledContent("Updates", value: DesktopLinkReadout.updates(statistics.updatesPerSecond))
                     LabeledContent("Level", value: DesktopLinkReadout.level(statistics))
                     LabeledContent("Color", value: DesktopLinkReadout.colour(statistics.colourDepth))
+                    if let factor = statistics.serverScale {
+                        LabeledContent("Scale", value: DesktopLinkReadout.scale(factor))
+                            .accessibilityIdentifier("desktop-window-scale")
+                    }
                     LabeledContent("Encoding", value: statistics.encoding ?? "—")
                     if let measured = statistics.measuredKilobitsPerSecond {
                         LabeledContent("Measured link", value: DesktopLinkReadout.rate(bytesPerSecond: measured * 1000 / 8))
@@ -205,7 +216,7 @@ struct DesktopConnectionSettingsSections: View {
         }
     }
 
-    static let qualityFooter = "Automatic measures the connection and moves between the levels as it changes. Best is lossless, full color. Balanced is full color, with JPEG for photos where the computer offers it. Data Saver sends thousands of colors at up to 15 updates a second; Lowest compresses hardest at up to 8, with 256 colors where the computer sends no JPEG. Quality is the connection's, so it applies to every window of this desktop. Zooming or shrinking the picture here does not change what the network carries."
+    static let qualityFooter = "Automatic measures the connection and moves between the levels as it changes. Best is lossless, full color. Balanced is full color, with JPEG for photos where the computer offers it. Data Saver sends thousands of colors at up to 15 updates a second; Lowest compresses hardest at up to 8, with 256 colors where the computer sends no JPEG. A Mac also sends a smaller picture at Data Saver (75% of its size) and Lowest (50%); Scale shows the size it is sending. Quality is the connection's, so it applies to every window of this desktop. Zooming or shrinking the picture here does not change what the network carries."
 }
 
 // MARK: - A display's own window

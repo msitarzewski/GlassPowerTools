@@ -205,45 +205,122 @@ struct VNCStreamSettingsTests {
         for quality in GlassDesktopStreamQuality.allCases {
             #expect(GlassVNCSession.level(GlassVNCSession.quality(quality)) == quality)
         }
+        // A Mac's confirmed scale reaches the readout; other servers have none.
+        var scaled = statistics
+        scaled.serverScale = 0.75
+        #expect(GlassVNCSession.statistics(scaled).serverScale == 0.75)
+        #expect(translated.serverScale == nil)
+        #expect(GlassVNCSession.remoteScreens([VNCScreen(id: 4, x: 0, y: 0, width: 3200, height: 1800, flags: 1, isMain: true),
+                                               VNCScreen(id: 1, x: 3200, y: 0, width: 1280, height: 800, flags: 0, isMain: false)])
+                == [GlassRemoteScreen(id: 4, x: 0, y: 0, width: 3200, height: 1800, isPrimary: true),
+                    GlassRemoteScreen(id: 1, x: 3200, y: 0, width: 1280, height: 800, isPrimary: false)])
     }
 }
 
-/// W30: a Mac's display layout is read from a form known only from reverse engineering. If a Mac
-/// breaks the protocol once asked for it, the next connection does not ask, so Reconnect works.
-@Suite("Apple display layout fallback")
+/// A Mac's greeting (RFB 003.889, no authentication) for a framebuffer of this size.
+private func macGreeting(width: UInt16, height: UInt16) -> [UInt8] {
+    var bytes: [UInt8] = Array("RFB 003.889\n".utf8)
+    bytes += [1, 1] + UInt32(0).bigEndianBytes
+    bytes += width.bigEndianBytes + height.bigEndianBytes + RFBPixelFormat.client.wireBytes + UInt32(0).bigEndianBytes
+    return bytes
+}
+
+/// A framebuffer update holding one display layout in the form of remotex's notes
+/// (https://github.com/andrewtheguy/remotex/blob/main/docs/apple-vnc-889.md, "The display layout"):
+/// one main display covering the framebuffer, at this scale.
+private func macLayoutUpdate(width: UInt16, height: UInt16, scale: Double = 1) -> [UInt8] {
+    func f64(_ value: Double) -> [UInt8] { withUnsafeBytes(of: value.bitPattern.bigEndian, Array.init) }
+    let edges = UInt16(0).bigEndianBytes + UInt16(0).bigEndianBytes + height.bigEndianBytes + width.bigEndianBytes
+    var payload = UInt16(5).bigEndianBytes + width.bigEndianBytes + height.bigEndianBytes + width.bigEndianBytes + height.bigEndianBytes
+    payload += UInt32.max.bigEndianBytes + UInt32(4).bigEndianBytes + UInt16(1).bigEndianBytes
+    payload += f64(1) + f64(scale) + UInt32(1).bigEndianBytes + edges + edges + UInt32(1).bigEndianBytes
+    payload += RFBPixelFormat.client.wireBytes
+    return [0, 0, 0, 1] + [UInt8](repeating: 0, count: 8) + RFBEncoding.appleDisplayLayout.rawValue.bigEndianBytes
+        + UInt16(payload.count).bigEndianBytes + payload
+}
+
+/// An update with a rectangle outside a 2 × 2 framebuffer: a protocol violation.
+private let rectangleOutside: [UInt8] = [0, 0, 0, 1] + UInt16(1).bigEndianBytes + UInt16(0).bigEndianBytes
+    + UInt16(2).bigEndianBytes + UInt16(1).bigEndianBytes + Int32(0).bigEndianBytes
+
+private final class Asked: @unchecked Sendable {
+    private let lock = NSLock()
+    private var list: [VNCConfiguration] = []
+    var configurations: [VNCConfiguration] { lock.withLock { list } }
+    func note(_ value: VNCConfiguration) { lock.withLock { list.append(value) } }
+}
+
+/// The failure a session ended with; nil when it ended normally.
+private func ending(_ session: GlassVNCSession) async -> String? {
+    for await event in session.events {
+        if case .state(.failed(let message)) = event { return message }
+        if event == .state(.disconnected) { return nil }
+    }
+    return nil
+}
+
+/// W30, W36: a Mac's displays and scale are read from forms known only from others' measurements.
+/// If a Mac breaks the protocol once it has sent its displays, or ends the session while a scale is
+/// unanswered, the next connection does not ask it again, so Reconnect works.
+@Suite("Apple displays and scaling fallback")
 struct AppleLayoutFallbackTests {
-    @Test func aMacThatBreaksTheProtocolIsNotAskedForItsLayoutAgain() async throws {
-        var mac: [UInt8] = Array("RFB 003.889\n".utf8)
-        mac += [1, 1]
-        mac += UInt32(0).bigEndianBytes
-        mac += UInt16(2).bigEndianBytes + UInt16(2).bigEndianBytes + RFBPixelFormat.client.wireBytes + UInt32(0).bigEndianBytes
-        let greeting = mac
-        // An update with a rectangle outside the framebuffer: a protocol violation.
-        let broken = mac + [0, 0, 0, 1] + UInt16(1).bigEndianBytes + UInt16(0).bigEndianBytes
-            + UInt16(2).bigEndianBytes + UInt16(1).bigEndianBytes + Int32(0).bigEndianBytes
-        final class Asked: @unchecked Sendable { var values: [Bool] = [] }
+    private func session(_ mac: [UInt8], asked: Asked, sink: MemoryByteSink = MemoryByteSink()) -> GlassVNCSession {
+        GlassVNCSession { configuration, callbacks in
+            asked.note(configuration)
+            return VNCClient(configuration: configuration, callbacks: callbacks, source: MemoryByteSource(mac), sink: sink)
+        }
+    }
+
+    @Test func aMacThatBreaksTheProtocolAfterSendingItsDisplaysIsNotAskedForThemAgain() async throws {
         let asked = Asked()
         let host = "mac-\(UUID().uuidString.prefix(8)).example"
-
-        let first = GlassVNCSession { configuration, callbacks in
-            asked.values.append(configuration.requestsAppleDisplayLayout)
-            return VNCClient(configuration: configuration, callbacks: callbacks, source: MemoryByteSource(broken), sink: MemoryByteSink())
-        }
+        let first = session(macGreeting(width: 2, height: 2) + macLayoutUpdate(width: 2, height: 2) + rectangleOutside, asked: asked)
         try await first.connect(GlassVNCConfiguration(host: host, password: "pw"))
-        var failure: String?
-        for await event in first.events {
-            if case .state(.failed(let message)) = event { failure = message; break }
-            if event == .state(.disconnected) { break }
-        }
+        let failure = await ending(first)
         #expect(failure?.hasSuffix("Reconnect connects without asking this Mac where its displays are.") == true)
 
-        let second = GlassVNCSession { configuration, callbacks in
-            asked.values.append(configuration.requestsAppleDisplayLayout)
-            return VNCClient(configuration: configuration, callbacks: callbacks, source: MemoryByteSource(greeting), sink: MemoryByteSink())
-        }
+        let second = session(macGreeting(width: 2, height: 2), asked: asked)
         try await second.connect(GlassVNCConfiguration(host: host, password: "pw"))
         for await event in second.events where event == .state(.connected) { break }
         await second.disconnect()
-        #expect(asked.values == [true, false])
+        #expect(asked.configurations.map(\.requestsAppleDisplayLayout) == [true, false])
+    }
+
+    @Test func aViolationBeforeAnyDisplayMetadataDoesNotStopAskingForThem() async throws {
+        let asked = Asked()
+        let host = "mac-\(UUID().uuidString.prefix(8)).example"
+        let first = session(macGreeting(width: 2, height: 2) + rectangleOutside, asked: asked)
+        try await first.connect(GlassVNCConfiguration(host: host, password: "pw"))
+        let failure = await ending(first)
+        #expect(failure != nil)
+        #expect(failure?.contains("Reconnect connects without") == false, "nothing the Mac said about its displays was misread")
+
+        let second = session(macGreeting(width: 2, height: 2), asked: asked)
+        try await second.connect(GlassVNCConfiguration(host: host, password: "pw"))
+        for await event in second.events where event == .state(.connected) { break }
+        await second.disconnect()
+        #expect(asked.configurations.map(\.requestsAppleDisplayLayout) == [true, true])
+    }
+
+    @Test func aMacThatEndsTheSessionWhileAScaleIsUnansweredIsNotAskedToScaleAgain() async throws {
+        let asked = Asked()
+        let host = "mac-\(UUID().uuidString.prefix(8)).example"
+        let sink = MemoryByteSink()
+        let first = session(macGreeting(width: 64, height: 64) + macLayoutUpdate(width: 64, height: 64), asked: asked, sink: sink)
+        await first.setStreamQuality(.dataSaver)
+        try await first.connect(GlassVNCConfiguration(host: host, password: "pw"))
+        let failure = await ending(first)
+        #expect(failure?.hasSuffix("Reconnect connects without asking this Mac to send a smaller picture.") == true)
+        let scaling: [UInt8] = [8, 0, 0x3F, 0xE8, 0, 0, 0, 0, 0, 0]
+        let written = await sink.written
+        #expect((0...(written.count - scaling.count)).contains { Array(written[$0..<($0 + scaling.count)]) == scaling },
+                "Data Saver asked the Mac for three quarters of its size")
+
+        let second = session(macGreeting(width: 64, height: 64), asked: asked)
+        try await second.connect(GlassVNCConfiguration(host: host, password: "pw"))
+        for await event in second.events where event == .state(.connected) { break }
+        await second.disconnect()
+        #expect(asked.configurations.map(\.allowsServerScaling) == [true, false])
+        #expect(asked.configurations.map(\.requestsAppleDisplayLayout) == [true, true], "its displays are still asked for")
     }
 }

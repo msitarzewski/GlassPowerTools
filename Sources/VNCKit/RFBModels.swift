@@ -72,9 +72,14 @@ public enum RFBEncoding: Int32, Sendable {
     case desktopSize = -223
     case lastRect = -224
     case extendedDesktopSize = -308
+    /// Apple's older display list (0x44d), asked for only from Apple's server, and always beside the
+    /// layout: a Mac reports its displays only to a client listing both (`RFBAppleDisplays.swift`).
+    /// Stepped over: it arrives only from a Mac that does not send the layout.
+    case appleDisplayInfo = 1101
     /// Apple's own display layout (0x451), asked for only from Apple's server (`RFBServerDialect`).
-    /// Apple does not document it; its form here is from published reverse engineering (see
-    /// `RFBAppleDisplayLayout`). It is how a Mac tells a client where each display sits.
+    /// Apple does not document it; its form is from remotex's measurements (`RFBAppleDisplayLayout`).
+    /// It is how a Mac tells a client where each display sits, how large the framebuffer is, and at
+    /// what server-side scale.
     case appleDisplayLayout = 1105
 
     static let advertised: [RFBEncoding] = [.tight, .zrle, .hextile, .zlib, .copyRect, .rre, .raw,
@@ -154,6 +159,9 @@ public struct VNCServerInfo: Equatable, Sendable {
     public let negotiatedVersion: RFBProtocolVersion
     public let securityType: RFBSecurityType
     public let serverPixelFormat: RFBPixelFormat
+    /// How long this device took to compute Apple Remote Desktop's Diffie-Hellman exchange (security
+    /// type 30); nil for other security types. For the log and the live probe.
+    public let keyExchangeDuration: Duration?
 
     /// Apple's Screen Sharing, which announces RFB 003.889 (`RFBServerDialect`).
     public var isAppleScreenSharing: Bool { RFBServerDialect(version: serverVersion) == .apple }

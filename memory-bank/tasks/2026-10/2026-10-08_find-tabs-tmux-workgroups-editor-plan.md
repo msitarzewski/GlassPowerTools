@@ -1058,3 +1058,19 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   since the menu was added; its tests never chose an item. Fixed: `MacTerminalMenuAction.choose(_:)`; Copy writes the
   text captured when the menu opened (`copyPasteboard`, injectable); tests now choose Copy (with the selection cleared in
   between) and Select All. Terminal 726 pass.
+- **Owner ran the VNC probe on this Mac (03:28):** RFB 3.889, security 30, framebuffer 6032×2707, ZRLE 24-bit ~24 Mbit/s
+  loopback, **no display layout published**, 29 s from connect to connected (Debug probe). remotex's notes
+  (github.com/andrewtheguy/remotex docs/apple-vnc-889.md, copy in `$SP/apple-vnc-889.md`): the Mac reports its layout
+  only when SetEncodings lists BOTH AppleDisplayLayout (1105) and DisplayInfo (1101); ours lists only 1105. Also
+  `SetServerScaling` (type 0x08, f64 factor) = real server-side scaling for bandwidth; pointer in unscaled pixels.
+  → **W36**: both encodings, DisplayInfo stepping, layout parse per the notes, scaling in Quality, sign-in speed,
+  probe updates (owner reruns). Mac **0.4.347** (7f75c83, right-click Copy fix) installed after the probe.
+- **Owner (~03:45):** the app's real sign-in is fast (the probe's 29 s was its Debug build) → W36 told to skip optimising.
+  "we need to make new local terminals pwd to the pwd in use in the current terminal" → **W37** (Mac: ⌘T and ⌘N from a
+  local terminal start in its current directory — OSC 7, or tmux `pane_current_path` via `workingDirectory(reported:)`;
+  passed as `-c` / PTY cwd, validated, home fallback; one place to make windows start at home if he prefers).
+- **W36 merged:** 1101 + 1105 listed for a Mac; layout parser per remotex (RFBAppleDisplays.swift); framebuffer resized
+  from layouts; SetServerScaling in Quality (Data Saver 0.75, Lowest 0.5) with pointer division; Scale row on the
+  Connection page; probe prints raw/decoded layouts, `--scale`, `--quality`, sign-in time. Release sign-in 0.37–0.46 s
+  vs Debug 42.7 s (fake Mac, 4096-bit group). VNCKit 69, VNC transport 10, desktop 195, connection UI 49; TigerVNC 5/5 +
+  6/6. Risk: we negotiate RFB 3.8, the notes measured 3.889 with Apple's record layer.

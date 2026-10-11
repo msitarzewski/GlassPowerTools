@@ -8,15 +8,20 @@ public struct VNCConfiguration: Sendable {
     public var password: String
     public var sharedSession: Bool
     public var clipboardEnabled: Bool
-    /// Ask Apple's server for its display layout (encoding 1105, `RFBAppleDisplayLayout`). Off
-    /// after a Mac ended a session in a protocol error once asked for it (`GlassVNCSession`).
+    /// Ask Apple's server for its displays (encodings 1101 and 1105, `RFBAppleDisplays.swift`). Off
+    /// after a Mac ended a session in a protocol error once it had sent them (`GlassVNCSession`).
     public var requestsAppleDisplayLayout: Bool
+    /// Ask Apple's server to render smaller at the lower quality levels (`SetServerScaling`). Off
+    /// after a Mac ended a session while a factor was unanswered (`GlassVNCSession`).
+    public var allowsServerScaling: Bool
 
     public init(host: String, port: UInt16 = 5900, username: String = "", password: String,
-                sharedSession: Bool = true, clipboardEnabled: Bool = false, requestsAppleDisplayLayout: Bool = true) {
+                sharedSession: Bool = true, clipboardEnabled: Bool = false, requestsAppleDisplayLayout: Bool = true,
+                allowsServerScaling: Bool = true) {
         self.host = host; self.port = port; self.username = username; self.password = password
         self.sharedSession = sharedSession; self.clipboardEnabled = clipboardEnabled
         self.requestsAppleDisplayLayout = requestsAppleDisplayLayout
+        self.allowsServerScaling = allowsServerScaling
     }
 }
 
@@ -34,6 +39,8 @@ public struct VNCClientCallbacks: Sendable {
     public var statistics: @Sendable (VNCLinkStatistics) -> Void = { _ in }
     /// Every framebuffer update as it arrived: its rectangles, encodings and bytes.
     public var update: @Sendable (VNCUpdateSummary) -> Void = { _ in }
+    /// What a Mac said about its displays, as it said it: for diagnostics and the live probe.
+    public var appleDisplayMetadata: @Sendable (RFBAppleDisplayMetadata) -> Void = { _ in }
     public init() {}
 }
 
@@ -91,6 +98,24 @@ public final class VNCClient: Sendable {
         pump()
     }
 
+    /// Asks a Mac to render at this factor, in (0, 1], whatever the quality level says; nil goes back
+    /// to the level's. Sent once the Mac has sent a display layout, and in force once a layout says
+    /// so (`RFBStreamPlanner`). Other servers ignore it.
+    public func setServerScaling(_ factor: Double?) {
+        planner.setServerScaleOverride(factor)
+        pump()
+    }
+
+    /// The factor a Mac has confirmed it renders at; 1 on every other server.
+    public var serverScale: Double { planner.serverScaleInForce }
+
+    /// A factor was asked of a Mac and no layout has confirmed it yet.
+    public var awaitingServerScaling: Bool { planner.awaitingServerScale }
+
+    /// A Mac sent display metadata this session (its layout or `DisplayInfo`): a later protocol
+    /// error may be a misreading of it.
+    public var receivedAppleDisplayMetadata: Bool { state.appleDisplayMetadata }
+
     /// What the link is doing now.
     public var statistics: VNCLinkStatistics {
         planner.statistics(totalBytes: source.totalBytes, at: .now)
@@ -124,7 +149,8 @@ public final class VNCClient: Sendable {
             try checkCancelled()
             let info = try await handshake()
             planner.start(width: info.width, height: info.height, dialect: RFBServerDialect(version: info.serverVersion),
-                          appleDisplayLayout: configuration.requestsAppleDisplayLayout)
+                          appleDisplayLayout: configuration.requestsAppleDisplayLayout,
+                          serverScaling: configuration.allowsServerScaling)
             let opening = planner.openingMessages()
             try await sink.write(opening.pixelFormat)
             try await sink.write(opening.encodings)
@@ -193,7 +219,7 @@ public final class VNCClient: Sendable {
             securityType = try choose(offered)
             try await sink.write([securityType.rawValue])
         }
-        try await authenticate(securityType, version: version)
+        let keyExchange = try await authenticate(securityType, version: version)
         try await sink.write([configuration.sharedSession ? 1 : 0])
         let initBytes = try await source.read(24)
         var reader = ByteReader(initBytes)
@@ -203,9 +229,15 @@ public final class VNCClient: Sendable {
         guard nameLength <= RFBLimits.maximumNameBytes else { throw RFBError.resourceLimit("The server name is too long.") }
         try RFBFramebuffer.validate(width: width, height: height)
         let name = String(decoding: try await source.read(nameLength), as: UTF8.self)
-        Self.logger.notice("event=connected version=\(serverVersion.major).\(serverVersion.minor) security=\(securityType.rawValue) width=\(width) height=\(height)")
+        let keyExchangeMilliseconds = keyExchange.map { Int(Self.seconds($0) * 1000) } ?? -1
+        Self.logger.notice("event=connected version=\(serverVersion.major).\(serverVersion.minor) security=\(securityType.rawValue) width=\(width) height=\(height) keyExchangeMs=\(keyExchangeMilliseconds)")
         return VNCServerInfo(name: name, width: width, height: height, serverVersion: serverVersion,
-                             negotiatedVersion: version, securityType: securityType, serverPixelFormat: pixelFormat)
+                             negotiatedVersion: version, securityType: securityType, serverPixelFormat: pixelFormat,
+                             keyExchangeDuration: keyExchange)
+    }
+
+    static func seconds(_ duration: Duration) -> Double {
+        Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1e18
     }
 
     private func choose(_ offered: [UInt8]) throws -> RFBSecurityType {
@@ -224,7 +256,8 @@ public final class VNCClient: Sendable {
         throw RFBError.unsupported("The server only offers unsupported security types (\(list)). Enable VNC password or user-account access on the host.")
     }
 
-    private func authenticate(_ type: RFBSecurityType, version: RFBProtocolVersion) async throws {
+    /// Returns how long type 30's key exchange took to compute on this device, nil for other types.
+    private func authenticate(_ type: RFBSecurityType, version: RFBProtocolVersion) async throws -> Duration? {
         switch type {
         case .none:
             if version.minor >= 8 { try await readSecurityResult() }
@@ -239,13 +272,17 @@ public final class VNCClient: Sendable {
             }
             let body = try await source.read(Int(keyLength) * 2)
             let challenge = try RFBSecurity.AppleRemoteDesktopChallenge.parse(generator: generator, keyLength: keyLength, body: body)
+            let started = ContinuousClock.now
             let response = try RFBSecurity.appleRemoteDesktopResponse(challenge, username: configuration.username,
                                                                       password: configuration.password)
+            let keyExchange = ContinuousClock.now - started
             try await sink.write(response.wireBytes)
             try await readSecurityResult()
+            return keyExchange
         case .invalid:
             throw RFBError.protocolViolation("The server selected an invalid security type.")
         }
+        return nil
     }
 
     private func readSecurityResult() async throws {
@@ -271,11 +308,22 @@ public final class VNCClient: Sendable {
         try await sink.write([4, down ? 1 : 0, 0, 0] + keysym.bigEndianBytes)
     }
 
+    /// A position in the framebuffer as it arrives. A Mac rendering at a server-side scale still
+    /// reads pointer positions in its unscaled framebuffer's pixels, so they are divided by the
+    /// factor its last layout confirmed (remotex's notes, "Server-side scaling in Standard mode").
     public func sendPointer(buttonMask: UInt8, x: Int, y: Int) async throws {
         try requireReady()
         let size = state.framebufferSize
         let clampedX = min(max(0, x), max(0, size.width - 1)), clampedY = min(max(0, y), max(0, size.height - 1))
-        try await sink.write([5, buttonMask] + UInt16(clampedX).bigEndianBytes + UInt16(clampedY).bigEndianBytes)
+        let wire = Self.unscaled(x: clampedX, y: clampedY, scale: planner.serverScaleInForce)
+        try await sink.write([5, buttonMask] + UInt16(wire.x).bigEndianBytes + UInt16(wire.y).bigEndianBytes)
+    }
+
+    /// A scaled framebuffer position in the unscaled framebuffer's pixels.
+    static func unscaled(x: Int, y: Int, scale: Double) -> (x: Int, y: Int) {
+        guard scale.isFinite, scale > 0, scale < 1 else { return (x, y) }
+        let limit = Double(UInt16.max)
+        return (Int(min(limit, (Double(x) / scale).rounded())), Int(min(limit, (Double(y) / scale).rounded())))
     }
 
     /// RFC 6143 §7.5.6: ClientCutText carries ISO 8859-1 text; characters outside it are dropped.
@@ -409,19 +457,43 @@ public final class VNCClient: Sendable {
                             Self.logger.notice("event=resize-refused status=\(rect.y)")
                         }
                     case .appleDisplayLayout:
-                        // A Mac's displays (W30): where each sits inside the one framebuffer.
-                        if let layout = try await RFBAppleDisplayLayout.read(from: source) {
-                            let boundsWidth = max(framebuffer.width, layout.width ?? 0)
-                            let boundsHeight = max(framebuffer.height, layout.height ?? 0)
-                            let screens = layout.screens.compactMap { $0.validated(inFramebufferWidth: boundsWidth, height: boundsHeight) }
-                            Self.logger.notice("event=apple-display-layout displays=\(screens.count)")
-                            callbacks.screens(screens)
-                        } else {
-                            Self.logger.notice("event=apple-display-layout unreadable")
+                        // A Mac's displays, the framebuffer's size and the scale in force
+                        // (`RFBAppleDisplays.swift`). A Mac listing DisplayInfo sends no
+                        // DesktopSize, so a size change — a display added, a scale applied —
+                        // arrives only here.
+                        state.noteAppleDisplayMetadata()
+                        let payload = try await RFBAppleDisplayLayout.readPayload(from: source)
+                        guard let layout = RFBAppleDisplayLayout(payload: payload) else {
+                            Self.logger.error("event=apple-display-layout unreadable bytes=\(payload.count)")
+                            callbacks.appleDisplayMetadata(.unreadableLayout(payload))
+                            planner.framebufferResized(width: framebuffer.width, height: framebuffer.height)
+                            pump()
+                            continue rectangles
                         }
-                        // After a layout the whole framebuffer is asked for again.
-                        planner.framebufferResized(width: framebuffer.width, height: framebuffer.height)
+                        if let size = layout.framebufferSize, size.width != framebuffer.width || size.height != framebuffer.height {
+                            if (try? RFBFramebuffer.validate(width: size.width, height: size.height)) != nil {
+                                try framebuffer.resize(width: size.width, height: size.height)
+                                state.setFramebufferSize(width: size.width, height: size.height)
+                                changed = true
+                            } else {
+                                Self.logger.error("event=apple-display-layout framebuffer=\(size.width)x\(size.height) unsupported")
+                            }
+                        }
+                        let screens = layout.screens(inFramebufferWidth: framebuffer.width, height: framebuffer.height)
+                        planner.appleLayoutArrived(serverScale: layout.serverScale, width: framebuffer.width, height: framebuffer.height)
+                        let current = layout.currentDisplay.map(String.init) ?? "all"
+                        Self.logger.notice("event=apple-display-layout version=\(layout.version) records=\(layout.records.count) displays=\(screens.count) framebuffer=\(layout.framebufferWidth)x\(layout.framebufferHeight) current=\(current, privacy: .public) scale=\(layout.serverScale) state=\(layout.sessionState)")
+                        callbacks.appleDisplayMetadata(.layout(layout))
+                        // A layout none of whose displays holds up leaves the last list in place.
+                        if !screens.isEmpty { callbacks.screens(screens) }
                         pump()
+                    case .appleDisplayInfo:
+                        // The older list, which a Mac sends instead of the layout only if it has
+                        // none: stepped over, and reported.
+                        state.noteAppleDisplayMetadata()
+                        let info = try await RFBAppleDisplayInfo.read(from: source)
+                        Self.logger.notice("event=apple-display-info width=\(info.width) height=\(info.height) flags=\(info.flags) displays=\(info.records.count)")
+                        callbacks.appleDisplayMetadata(.displayInfo(info))
                     default:
                         let validated = try rect.validated(in: framebuffer.width, framebuffer.height)
                         try await decoder.decode(validated, encoding: encoding, from: source, into: framebuffer, pixels: pixels)
@@ -473,10 +545,13 @@ private final class ClientState: @unchecked Sendable {
     private var resizeSupported = false
     private var width = 0, height = 0
     private var openAction: (@Sendable () async throws -> Void)?
+    private var displayMetadata = false
 
     var isCancelled: Bool { lock.withLock { cancelled } }
     var ready: Bool { lock.withLock { isReady } }
     var desktopResizeSupported: Bool { lock.withLock { resizeSupported } }
+    var appleDisplayMetadata: Bool { lock.withLock { displayMetadata } }
+    func noteAppleDisplayMetadata() { lock.withLock { displayMetadata = true } }
     var framebufferSize: (width: Int, height: Int) { lock.withLock { (width, height) } }
     func cancel() { lock.withLock { cancelled = true; isReady = false } }
     func setReady(_ value: Bool) { lock.withLock { isReady = value } }

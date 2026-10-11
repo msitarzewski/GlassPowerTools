@@ -10,9 +10,12 @@ let package = Package(
     targets: [
         .executableTarget(name: "GlassWindowsRDPProbe",
                           dependencies: [.product(name: "GlassRDPTransport", package: "GlassPowerTools")]),
+        // Drives VNCKit's client as GlassVNCSession configures it, so it can print a Mac's display
+        // metadata as it arrived and ask for a server-side scale (W36).
         .executableTarget(name: "GlassVNCProbe",
                           dependencies: [.product(name: "GlassRDPTransport", package: "GlassPowerTools"),
-                                         .product(name: "GlassVNCTransport", package: "GlassPowerTools")]),
+                                         .product(name: "GlassVNCTransport", package: "GlassPowerTools"),
+                                         .product(name: "VNCKit", package: "GlassPowerTools")]),
         // Functional probes run by Docker/xrdp/run.sh and Docker/tigervnc/run.sh against disposable
         // local fixtures: they assert side effects (input, resize, clipboard, reconnect), not just a frame.
         .executableTarget(name: "GlassRDPFunctionalProbe",

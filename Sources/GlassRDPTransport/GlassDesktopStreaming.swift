@@ -9,9 +9,11 @@ public enum GlassDesktopStreamQuality: String, Codable, CaseIterable, Sendable {
     case best
     /// Full colour, JPEG for photographic areas where the server offers it.
     case balanced
-    /// Thousands of colours, stronger compression, 15 updates a second.
+    /// Thousands of colours, stronger compression, 15 updates a second; a Mac renders at three
+    /// quarters of its size.
     case dataSaver
-    /// The strongest compression, 8 updates a second; 256 colours where the server sends no JPEG.
+    /// The strongest compression, 8 updates a second; 256 colours where the server sends no JPEG; a
+    /// Mac renders at half its size.
     case lowest
 
     public var title: String {
@@ -57,13 +59,16 @@ public struct GlassDesktopLinkStatistics: Sendable, Equatable {
     public var regionLimited: Bool
     /// Nothing is on screen, so no picture is being asked for.
     public var paused: Bool
+    /// The size a Mac renders its picture at, as a fraction of its own (1 is its own size), as the
+    /// Mac last confirmed it; nil for a server that cannot be asked.
+    public var serverScale: Double?
 
     public init(bytesPerSecond: Double, updatesPerSecond: Double, quality: GlassDesktopStreamQuality,
                 level: GlassDesktopStreamQuality, colourDepth: Int, encoding: String?,
-                measuredKilobitsPerSecond: Double?, regionLimited: Bool, paused: Bool) {
+                measuredKilobitsPerSecond: Double?, regionLimited: Bool, paused: Bool, serverScale: Double? = nil) {
         self.bytesPerSecond = bytesPerSecond; self.updatesPerSecond = updatesPerSecond
         self.quality = quality; self.level = level; self.colourDepth = colourDepth; self.encoding = encoding
         self.measuredKilobitsPerSecond = measuredKilobitsPerSecond
-        self.regionLimited = regionLimited; self.paused = paused
+        self.regionLimited = regionLimited; self.paused = paused; self.serverScale = serverScale
     }
 }

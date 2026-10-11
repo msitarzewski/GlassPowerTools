@@ -1333,3 +1333,12 @@ UIKit label and text-field text to black while glass, ornaments and SwiftUI prim
 legible state. **Proposal:** never derive a visionOS light look from colorScheme; if the owner wants light/dark on the
 headset, make it a terminal (and editor) theme pair chosen per window or by Focus Mode, with Opacity/Glass unchanged
 (D62). Hide or caption controls that do nothing on visionOS (terminal Canvas Material). Awaiting the owner.
+
+**D61 update (2026-10-11, W36):** a Mac publishes its displays only when SetEncodings lists both AppleDisplayLayout
+(1105) and DisplayInfo (1101) (remotex notes); the owner's probe showed none with 1105 alone. Now both are listed on the
+Apple dialect, DisplayInfo is stepped over, the layout is parsed per the notes (length counts what follows it; 0x14-byte
+header; 0x38-byte records with backing bounds in framebuffer pixels; mirror sets offer their first), the framebuffer is
+resized from each layout, and SetServerScaling (0x08, f64) carries Data Saver 0.75 / Lowest 0.5 on a Mac, confirmed by
+the next layout, pointer positions divided by the factor in force. The "don't ask this host again" refusal now needs
+display metadata to have arrived. **Unverified on a real Mac;** our client negotiates RFB 3.8, not 3.889 with Apple's
+record layer, which is what the notes measured.

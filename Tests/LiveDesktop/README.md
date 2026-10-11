@@ -12,16 +12,32 @@ swift build --disable-keychain
 | Probe | Against | Proves |
 |---|---|---|
 | `GlassWindowsRDPProbe` | a real RDP host you name | negotiation and a first real frame |
-| `GlassVNCProbe` | a real VNC host you name | negotiation and a first real frame |
+| `GlassVNCProbe` | a real VNC host you name | negotiation, sign-in time, a first real frame, a Mac's displays and server-side scale |
 | `GlassRDPFunctionalProbe` | the disposable xrdp fixture (`Docker/xrdp`) | the functional checks below |
 | `GlassVNCFunctionalProbe` | the disposable TigerVNC fixture (`Docker/tigervnc`) | the functional checks below |
 | `GlassVNCDisplaysProbe` | the same fixture with a picture workload (`Docker/tigervnc-displays`) | two displays, region requests, quality levels (below) |
 
 The first two take the password from a file (`<host> <port> <username> <password-file>`), or
 with `-` in its place ask for it at the terminal with echo off, so it never appears on a command line
-or in a file. `GlassVNCProbe` also reports the display layout the server publishes and what the link
-carries (encoding, colour depth, rate). The functional harnesses were moved from glassDT's
-`Tests/Integration` and `Tests/IntegrationVNC`.
+or in a file. The functional harnesses were moved from glassDT's `Tests/Integration` and
+`Tests/IntegrationVNC`.
+
+`GlassVNCProbe` also reports how long signing in took (and Apple Remote Desktop's key exchange
+within it), everything a Mac says about its displays — each layout's header and records, raw and
+decoded — the displays the app would be given, and what the link carries. Two options:
+
+- `--scale <factor>` asks a Mac to render at that factor, in (0, 1], once it has sent a layout, and
+  reports whether a layout confirmed it, the framebuffer's new size and the link at that scale.
+- `--quality <level>` starts at `automatic`, `best`, `balanced` (the default), `dataSaver` or `lowest`.
+
+Build it in Release, as the app ships, so the sign-in time is the app's (a Debug build's key
+exchange is far slower):
+
+```sh
+cd Tests/LiveDesktop
+swift build -c release --disable-keychain --product GlassVNCProbe
+.build/release/GlassVNCProbe 127.0.0.1 5900 <user> - --scale 0.5
+```
 
 ## Functional harnesses (Docker)
 

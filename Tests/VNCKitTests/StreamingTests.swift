@@ -315,97 +315,13 @@ struct StreamPlannerTests {
         #expect(opening.pixelFormat == RFBPixelFormat.rgb565.setPixelFormatMessage)
         let values = RFBEncoding.setEncodingsValues(profile: .lowest, copyRect: true, dialect: .apple)
         #expect(values.first == RFBEncoding.zrle.rawValue)
-        #expect(values.contains(RFBEncoding.appleDisplayLayout.rawValue))
-        #expect(!RFBEncoding.setEncodingsValues(profile: .lowest, copyRect: true).contains(1105))
+        // A Mac reports its displays only to a client listing both its display encodings.
+        #expect(values.contains(1101) && values.contains(1105))
+        let standard = RFBEncoding.setEncodingsValues(profile: .lowest, copyRect: true)
+        #expect(!standard.contains(1105) && !standard.contains(1101), "only Apple's server is asked")
+        let notAsked = RFBEncoding.setEncodingsValues(profile: .lowest, copyRect: true, dialect: .apple, appleDisplayLayout: false)
+        #expect(!notAsked.contains(1105) && !notAsked.contains(1101), "a Mac not to be asked is asked for neither")
         #expect(RFBServerDialect(version: RFBProtocolVersion(major: 3, minor: 8)) == .standard)
-    }
-}
-
-// MARK: - Apple's display layout
-
-@Suite("Apple display layout")
-struct AppleDisplayLayoutTests {
-    /// A layout as published reverse engineering describes it: a u16 length, a 0x14-byte header,
-    /// 0x38 bytes a display.
-    static func layout(_ displays: [(id: UInt32, left: UInt16, top: UInt16, right: UInt16, bottom: UInt16, main: Bool)],
-                       framebuffer: (UInt16, UInt16), lengthCountsItself: Bool = false) -> [UInt8] {
-        var header = UInt16(5).bigEndianBytes + UInt16(0).bigEndianBytes + UInt16(0).bigEndianBytes
-        header += framebuffer.0.bigEndianBytes + framebuffer.1.bigEndianBytes
-        header += UInt32.max.bigEndianBytes + UInt32(0).bigEndianBytes + UInt16(displays.count).bigEndianBytes
-        var body: [UInt8] = []
-        for display in displays {
-            var record = [UInt8](repeating: 0, count: 0x10)
-            record += display.id.bigEndianBytes
-            record += display.top.bigEndianBytes + display.left.bigEndianBytes + display.bottom.bigEndianBytes + display.right.bigEndianBytes
-            record += display.top.bigEndianBytes + display.left.bigEndianBytes + display.bottom.bigEndianBytes + display.right.bigEndianBytes
-            record += UInt32(display.main ? 1 : 0).bigEndianBytes
-            record += RFBPixelFormat.client.wireBytes
-            body += record
-        }
-        let length = header.count + body.count + (lengthCountsItself ? 2 : 0)
-        return UInt16(length).bigEndianBytes + header + body
-    }
-
-    @Test("a Mac's two displays are read from its layout, main display marked")
-    func twoDisplays() async throws {
-        let bytes = Self.layout([(1, 0, 0, 3840, 2160, true), (2, 3840, 98, 6864, 2062, false)], framebuffer: (6864, 2160))
-        let source = MemoryByteSource(bytes + [0xEE])
-        let layout = try #require(try await RFBAppleDisplayLayout.read(from: source))
-        #expect(layout.screens == [VNCScreen(id: 1, x: 0, y: 0, width: 3840, height: 2160, flags: 1, isMain: true),
-                                   VNCScreen(id: 2, x: 3840, y: 98, width: 3024, height: 1964, flags: 0, isMain: false)])
-        #expect(layout.width == 6864 && layout.height == 2160)
-        #expect(await source.remaining == 1, "exactly the layout is read")
-    }
-
-    @Test("a length that counts itself, and a layout that does not hold up, never desynchronise the stream")
-    func readSafely() async throws {
-        let counted = MemoryByteSource(Self.layout([(1, 0, 0, 100, 100, true)], framebuffer: (100, 100), lengthCountsItself: true) + [0xEE])
-        #expect(try await RFBAppleDisplayLayout.read(from: counted)?.screens.count == 1)
-        #expect(await counted.remaining == 1)
-
-        // Bounds that are not a rectangle: no layout, and the stream is still where it should be.
-        let broken = MemoryByteSource(Self.layout([(1, 100, 0, 50, 100, true)], framebuffer: (100, 100)) + [0xEE])
-        #expect(try await RFBAppleDisplayLayout.read(from: broken) == nil)
-        #expect(await broken.remaining == 1)
-
-        // A length past any layout is refused rather than read.
-        await #expect(throws: RFBError.self) {
-            _ = try await RFBAppleDisplayLayout.read(from: MemoryByteSource(UInt16(60_000).bigEndianBytes))
-        }
-    }
-
-    @Test("a mirror set's members share one window")
-    func mirrorSet() {
-        let bytes = Self.layout([(1, 0, 0, 100, 100, true), (2, 0, 0, 100, 100, false)], framebuffer: (100, 100))
-        let header = Array(bytes[2..<22]), body = Array(bytes[22...])
-        #expect(RFBAppleDisplayLayout.parse(header: header, body: body, count: 2)?.map(\.id) == [1])
-    }
-
-    @Test("the client publishes a Mac's displays from its layout")
-    func clientPublishes() async throws {
-        var server: [UInt8] = Array("RFB 003.889\n".utf8)
-        server += [1, 1]
-        server += UInt32(0).bigEndianBytes
-        server += UInt16(300).bigEndianBytes + UInt16(100).bigEndianBytes + RFBPixelFormat.client.wireBytes + UInt32(0).bigEndianBytes
-        server += [0, 0, 0, 1]
-        server += UInt16(0).bigEndianBytes + UInt16(0).bigEndianBytes + UInt16(0).bigEndianBytes + UInt16(0).bigEndianBytes
-        server += RFBEncoding.appleDisplayLayout.rawValue.bigEndianBytes
-        server += Self.layout([(7, 0, 0, 200, 100, true), (9, 200, 20, 300, 80, false)], framebuffer: (300, 100))
-        final class Box: @unchecked Sendable { var screens: [[VNCScreen]] = [] }
-        let box = Box()
-        var callbacks = VNCClientCallbacks()
-        callbacks.screens = { box.screens.append($0) }
-        let sink = MemoryByteSink()
-        let client = VNCClient(configuration: VNCConfiguration(host: "mac.example", password: ""), callbacks: callbacks,
-                               source: MemoryByteSource(server), sink: sink)
-        await #expect(throws: RFBError.connectionClosed) { try await client.run() }
-        #expect(box.screens.last?.map(\.id) == [7, 9])
-        #expect(box.screens.last?.first?.isMain == true)
-        let written = await sink.written
-        // The SetEncodings list after the 20-byte SetPixelFormat: ZRLE first.
-        let encodingsStart = 13 + 1 + 20
-        #expect(written[encodingsStart] == 2)
-        #expect(Array(written[(encodingsStart + 4)..<(encodingsStart + 8)]) == RFBEncoding.zrle.rawValue.bigEndianBytes)
     }
 }
 

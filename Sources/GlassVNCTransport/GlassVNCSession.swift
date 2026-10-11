@@ -24,6 +24,8 @@ public actor GlassVNCSession: GlassDesktopTransport {
     private static let logger = Logger(subsystem: "app.glassdt.vnc", category: "session")
     /// For this run of the app (W30): Macs not to ask for their display layout again.
     static let layoutRefusals = HostSet()
+    /// For this run of the app (W36): Macs not to ask to scale their picture again.
+    static let scalingRefusals = HostSet()
     public nonisolated let frames: AsyncStream<GlassRDPFrame>
     public nonisolated let events: AsyncStream<GlassRDPEvent>
     private let frameContinuation: AsyncStream<GlassRDPFrame>.Continuation
@@ -72,6 +74,7 @@ public actor GlassVNCSession: GlassDesktopTransport {
         var callbacks = VNCClientCallbacks()
         let layoutKey = "\(host.lowercased()):\(configuration.port)"
         let asksForLayout = !Self.layoutRefusals.contains(layoutKey)
+        let asksToScale = !Self.scalingRefusals.contains(layoutKey)
         let apple = FrameDelivery()
         callbacks.connected = { info in
             if info.isAppleScreenSharing { apple.note() }
@@ -96,19 +99,13 @@ public actor GlassVNCSession: GlassDesktopTransport {
             if let converted = Self.cursorImage(image) { eventSink.yield(.cursor(.image(converted))) }
         }
         callbacks.cutText = { eventSink.yield(.clipboard(GlassClipboardContent(text: $0))) }
-        callbacks.screens = { screens in
-            eventSink.yield(.screens(screens.map {
-                // ExtendedDesktopSize does not mark a primary screen, so the one at the framebuffer
-                // origin is treated as it; Apple's layout marks its main display.
-                GlassRemoteScreen(id: $0.id, x: $0.x, y: $0.y, width: $0.width, height: $0.height,
-                                  isPrimary: $0.isMain ?? ($0.x == 0 && $0.y == 0))
-            }))
-        }
+        callbacks.screens = { eventSink.yield(.screens(Self.remoteScreens($0))) }
         callbacks.statistics = { eventSink.yield(.linkStatistics(Self.statistics($0))) }
         let client = try makeClient(VNCConfiguration(host: host, port: configuration.port, username: configuration.username,
                                                      password: configuration.password, sharedSession: true,
                                                      clipboardEnabled: configuration.clipboardEnabled,
-                                                     requestsAppleDisplayLayout: asksForLayout), callbacks)
+                                                     requestsAppleDisplayLayout: asksForLayout,
+                                                     allowsServerScaling: asksToScale), callbacks)
         client.setQuality(Self.quality(quality))
         client.setRequestedRegions(Self.rectangles(regions))
         self.client = client
@@ -123,10 +120,20 @@ public actor GlassVNCSession: GlassDesktopTransport {
                 // shown, that is a normal ending rather than a failure to report.
                 let normalEnd = error == .cancelled || (error == .connectionClosed && delivered.any)
                 failure = normalEnd ? nil : error.localizedDescription
-                // A Mac that broke the protocol after being asked for its display layout — a form
-                // known only from reverse engineering — is not asked again while the app runs, so
-                // Reconnect works, with its displays as one picture (W30).
-                if case .protocolViolation = error, asksForLayout, apple.any {
+                // A Mac that ended the session while a scale it was asked for was unanswered is
+                // not asked again while the app runs; Reconnect shows its picture at its own size (W36).
+                if error != .cancelled, asksToScale, client.awaitingServerScaling {
+                    Self.scalingRefusals.insert(layoutKey)
+                    Self.logger.error("event=server-scale-refused")
+                    if let message = failure {
+                        failure = message + " Reconnect connects without asking this Mac to send a smaller picture."
+                    }
+                }
+                // A Mac that broke the protocol after sending its displays — a form known only from
+                // others' measurements — is not asked for them again while the app runs, so
+                // Reconnect works, with its displays as one picture (W30). A violation before any
+                // display metadata arrived cannot be a misreading of it, and changes nothing.
+                else if case .protocolViolation = error, asksForLayout, apple.any, client.receivedAppleDisplayMetadata {
                     Self.layoutRefusals.insert(layoutKey)
                     Self.logger.error("event=apple-display-layout-refused")
                     failure = (failure ?? "") + " Reconnect connects without asking this Mac where its displays are."
@@ -313,7 +320,18 @@ public actor GlassVNCSession: GlassDesktopTransport {
                                    quality: level(value.quality), level: level(value.profile.level),
                                    colourDepth: value.profile.colourDepth.rawValue, encoding: value.encoding?.name,
                                    measuredKilobitsPerSecond: value.measuredKilobitsPerSecond,
-                                   regionLimited: value.regionLimited, paused: value.paused)
+                                   regionLimited: value.regionLimited, paused: value.paused,
+                                   serverScale: value.serverScale)
+    }
+
+    /// The displays a server publishes, as the desktop shows them. ExtendedDesktopSize does not mark
+    /// a primary screen, so the one at the framebuffer origin is treated as it; Apple's layout marks
+    /// its main display. Public for the live probe, which prints what the app would be given.
+    public static func remoteScreens(_ screens: [VNCScreen]) -> [GlassRemoteScreen] {
+        screens.map {
+            GlassRemoteScreen(id: $0.id, x: $0.x, y: $0.y, width: $0.width, height: $0.height,
+                              isPrimary: $0.isMain ?? ($0.x == 0 && $0.y == 0))
+        }
     }
 
     // MARK: Cursor conversion
