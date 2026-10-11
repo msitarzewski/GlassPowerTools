@@ -31,8 +31,8 @@ enum MacLocalTmux {
         /// Scrolls a session's history `lines` toward earlier output, or back when negative.
         var scroll: @Sendable (_ name: String, _ lines: Int, _ tmux: String) -> Void
         /// Makes a session under the first free name of `candidates`, as the pane would have:
-        /// `TerminalTmux.claimScript`'s answer, as printed; nil when it could not be run. Stand-ins
-        /// that leave it out could not run it.
+        /// the answer `TerminalTmux.parseClaim` reads, as `TerminalTmux.claimScript` prints it;
+        /// nil when no session was made. Stand-ins that leave it out could not run it.
         var claim: @Sendable (_ candidates: [String], _ launch: Launch, _ tmux: String) -> String? = { _, _, _ in nil }
         /// Gives a session the name its tab was given, or takes it away with nil (W6).
         var setGivenName: @Sendable (_ session: String, _ name: String?, _ tmux: String) -> Void = { _, _, _ in }
@@ -55,11 +55,7 @@ enum MacLocalTmux {
                 // One queue, so a quick up-then-down arrives in that order.
                 MacLocalTmux.scrollQueue.async { _ = MacLocalTmux.run(tmux, arguments) }
             },
-            claim: { candidates, launch, tmux in
-                let script = TerminalTmux.claimScript(candidates: candidates, directory: launch.directory,
-                                                      command: launch.command, tmux: TerminalTmux.quoted(tmux))
-                return MacLocalTmux.run("/bin/sh", ["-c", script], environment: launch.environmentVariables)
-            },
+            claim: { candidates, launch, tmux in MacLocalTmux.claim(candidates, launch: launch, tmux: tmux) },
             setGivenName: { session, name, tmux in
                 guard let arguments = TerminalTmux.givenNameArguments(session: session, name: name) else { return }
                 // Argv, never a shell: the name is whatever someone typed.
@@ -83,7 +79,7 @@ enum MacLocalTmux {
     /// login shell otherwise) and the pane's environment (`MacLocalTerminalConfiguration`). The
     /// claim that makes the session needs all three: the pane's own `new-session -A` ignores them
     /// for a session that exists, and a claim that starts the tmux server gives it its environment.
-    struct Launch: Equatable, Sendable {
+    nonisolated struct Launch: Equatable, Sendable {
         var directory: String
         var command: [String]
         /// `NAME=value`, as a process is given them.
@@ -152,6 +148,35 @@ enum MacLocalTmux {
         }
         reserved.insert(name)
         return name
+    }
+
+    /// A claim on this Mac (`TerminalTmux.claimScript`'s, which a host runs through `sh`), as
+    /// argv: no shell stands between Glass and this Mac's tmux, so the pane's folder — whatever
+    /// folder a terminal was in, by whatever name (W37) — reaches `new-session -c` exactly as it
+    /// is, as one argument. `new-session -d` refuses a name already running; `has-session` then
+    /// tells a taken name (try the next) from tmux failing (stop). Answers as the script prints:
+    /// `created NAME`, or `exists NAME` for one candidate already running; nil when no session
+    /// was made.
+    /// - Parameters:
+    ///   - serverArguments: tests only — a private server (`-S socket`), never a real one.
+    ///   - run: tests only — what runs tmux, and with which environment.
+    nonisolated static func claim(
+        _ candidates: [String], launch: Launch, tmux: String, serverArguments: [String] = [],
+        run: (_ executable: String, _ arguments: [String], _ environment: [String: String]) -> String?
+            = { MacLocalTmux.run($0, $1, environment: $2) }
+    ) -> String? {
+        let tmuxArguments = ["-u"] + serverArguments
+        let environment = launch.environmentVariables
+        for name in candidates.prefix(TerminalTmux.claimLimit) {
+            let create = tmuxArguments + ["new-session", "-d", "-s", name, "-c", launch.directory] + launch.command
+            if run(tmux, create, environment) != nil { return "created \(name)\n" }
+            guard run(tmux, tmuxArguments + ["has-session", "-t", "=" + name], environment) != nil else {
+                logger.error("This Mac's tmux would not make session \(name, privacy: .public), and has none by that name")
+                return nil
+            }
+            if candidates.count == 1 { return "exists \(name)\n" }
+        }
+        return nil
     }
 
     /// The Mac's tmux sessions, in the form D44 reads from a host; none when no server runs, and

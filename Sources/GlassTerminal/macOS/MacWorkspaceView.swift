@@ -378,7 +378,7 @@ struct MacWorkspaceView: View {
         // ⌘N, while a terminal workspace is focused, means a new terminal window. The shell owns
         // the one File ▸ New item and each window says what it makes (`GlassShellFileCommands`).
         .focusedSceneValue(\.glassNewItem, GlassNewItemAction(title: "New Terminal Window") {
-            openWindow(id: "workspace", value: MacWorkspaceLaunchRequest())
+            openNewWindow()
         })
         .focusedSceneValue(
             \.macNewWorkspaceTabAction,
@@ -386,7 +386,8 @@ struct MacWorkspaceView: View {
                 isEnabled: windowController.canAddTab,
                 currentConnectionName: repeatableConnectionName,
                 addTab,
-                repeatingCurrentConnection: addTabRepeatingCurrentConnection
+                repeatingCurrentConnection: addTabRepeatingCurrentConnection,
+                newWindow: openNewWindow
             )
         )
         .focusedSceneValue(\.macCommandCenterEntries, [
@@ -553,7 +554,8 @@ struct MacWorkspaceView: View {
 
             ToolbarItemGroup(placement: .primaryAction) {
                 Button("New Local Pane", systemImage: "rectangle.split.2x1") {
-                    selected.addPane(intent: .local, axis: .horizontal)
+                    // In the focused local terminal's folder (W37).
+                    Task { await selected.addLocalPane(axis: .horizontal) }
                 }
                 .disabled(!selected.canAddPane)
                 .accessibilityIdentifier("mac-workspace-new-local-pane")
@@ -638,9 +640,20 @@ struct MacWorkspaceView: View {
         windowController.renameTab(id, to: renameText)
     }
 
-    /// "+" and ⌘T: a tab with a shell on this Mac, started at once (2026-10-08).
+    /// "+" and ⌘T: a tab with a shell on this Mac, started at once (2026-10-08), in the folder
+    /// of the local terminal in front (W37, `MacLocalTerminalStart`).
     private func addTab() {
-        if let tab = windowController.addTab() { startLocalPanes(of: tab) }
+        Task {
+            if let tab = await windowController.addTabStartingWhereFocusedIs() { startLocalPanes(of: tab) }
+        }
+    }
+
+    /// ⌘N and New Terminal Window from this window: one local tab, in the folder of the local
+    /// terminal in front (W37). From an SSH tab or an empty one, at the default, as before.
+    private func openNewWindow() {
+        Task {
+            openWindow(id: "workspace", value: await windowController.newWindowRequest())
+        }
     }
 
     /// Starts a tab's local shells now, not when its view first draws: a pane started only by
@@ -684,10 +697,11 @@ struct MacWorkspaceView: View {
         // And the tmux session belongs to the pane that made it: the new tab gets its own.
         intent.localTmuxSession = nil
         intent.sshTmuxSession = nil
-        if let tab = windowController.addTab(
-            MacWorkspaceTabRequest(startsEmpty: false, initialPaneIntent: intent)
-        ) {
-            startLocalPanes(of: tab)
+        // A local one starts in the folder its terminal is in now, not the one it opened in (W37).
+        Task {
+            if let tab = await windowController.addTabStartingWhereFocusedIs(repeating: intent) {
+                startLocalPanes(of: tab)
+            }
         }
     }
 
@@ -1122,7 +1136,8 @@ private struct MacWorkspaceTabContent: View {
             canAddPane: controller.canAddPane,
             hasFocusedPane: controller.focusedPaneID != nil,
             secureKeyboardEntryEnabled: secureKeyboardEntry.isEnabled(for: controller.workspaceID),
-            addLocalPane: { controller.addPane(intent: .local, axis: $0) },
+            // Split Right and Split Down: in the focused local terminal's folder (W37).
+            addLocalPane: { axis in Task { await controller.addLocalPane(axis: axis) } },
             requestSSHPane: { controller.requestSSHPane(axis: $0) },
             closeFocusedPane: {
                 if settingsManager.confirmBeforeClosing && controller.focusedPaneCloseStopsWork {

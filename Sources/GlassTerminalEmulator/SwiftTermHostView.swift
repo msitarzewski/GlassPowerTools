@@ -9,6 +9,7 @@ import MetalKit
 #elseif canImport(AppKit)
 import AppKit
 import Darwin
+import os
 #endif
 
 public enum SwiftTermRendererBackend: String, Equatable, Sendable {
@@ -3191,19 +3192,41 @@ public struct SwiftTermLocalProcessConfiguration: Equatable, Sendable {
     public var environment: [String]?
     public var executableName: String?
     public var currentDirectory: String?
+    /// Where the process starts instead when `currentDirectory` is not a folder by the time it
+    /// starts: deleted since it was chosen, or on a volume since unmounted. Nil fails the launch,
+    /// saying so.
+    public var fallbackDirectory: String?
 
     public init(
         executable: String = "/bin/zsh",
         arguments: [String] = ["-l"],
         environment: [String]? = nil,
         executableName: String? = nil,
-        currentDirectory: String? = nil
+        currentDirectory: String? = nil,
+        fallbackDirectory: String? = nil
     ) {
         self.executable = executable
         self.arguments = arguments
         self.environment = environment
         self.executableName = executableName
         self.currentDirectory = currentDirectory
+        self.fallbackDirectory = fallbackDirectory
+    }
+
+    /// This launch with `fallbackDirectory` in place of a `currentDirectory` that is not a folder
+    /// now; unchanged otherwise. Asked as the process starts, so a folder that went between
+    /// choosing it and starting there is still caught.
+    public func startingInAFolderThatExists(isFolder: (String) -> Bool = Self.isFolder) -> Self {
+        guard let currentDirectory, let fallbackDirectory, currentDirectory != fallbackDirectory,
+              !isFolder(currentDirectory) else { return self }
+        var resolved = self
+        resolved.currentDirectory = fallbackDirectory
+        return resolved
+    }
+
+    public static func isFolder(_ path: String) -> Bool {
+        var isDirectory = ObjCBool(false)
+        return FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) && isDirectory.boolValue
     }
 
     fileprivate var validationFailure: String? {
@@ -3213,7 +3236,8 @@ public struct SwiftTermLocalProcessConfiguration: Equatable, Sendable {
         guard !Self.containsNullByte(executable),
               !arguments.contains(where: Self.containsNullByte),
               executableName.map({ !$0.isEmpty && !Self.containsNullByte($0) }) ?? true,
-              currentDirectory.map({ $0.hasPrefix("/") && !Self.containsNullByte($0) }) ?? true else {
+              currentDirectory.map({ $0.hasPrefix("/") && !Self.containsNullByte($0) }) ?? true,
+              fallbackDirectory.map({ $0.hasPrefix("/") && !Self.containsNullByte($0) }) ?? true else {
             return "The local terminal launch configuration contains an invalid path or argument."
         }
         if let environmentFailure = Self.environmentValidationFailure(environment) {
@@ -3551,6 +3575,8 @@ private final class MacAlternateScreenScrollWatcher {
     }
 }
 
+private let localProcessLogger = Logger(subsystem: "sh.glas", category: "terminal")
+
 @MainActor
 private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcessControlling {
     var isBracketedPasteMode: Bool { terminalView.getTerminal().bracketedPasteMode }
@@ -3697,9 +3723,13 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
         updatePTYSize()
     }
 
-    func start(_ configuration: SwiftTermLocalProcessConfiguration) {
+    func start(_ requested: SwiftTermLocalProcessConfiguration) {
         guard let processState else { return }
         hasStarted = true
+        let configuration = requested.startingInAFolderThatExists()
+        if configuration.currentDirectory != requested.currentDirectory, let gone = requested.currentDirectory {
+            localProcessLogger.notice("A local terminal starts in its fallback folder: its own is gone, \(gone, privacy: .private)")
+        }
         if let failure = configuration.validationFailure {
             processState.failedToLaunch(failure)
             return

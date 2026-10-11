@@ -430,7 +430,7 @@ struct MacLocalTerminalPaneView: View {
             Divider()
 
             Button("New Local Terminal Window", systemImage: "macwindow.badge.plus") {
-                openWindow(id: "workspace", value: MacWorkspaceLaunchRequest())
+                openWindowInThisFolder()
             }
 
             if !processState.isRunning {
@@ -524,6 +524,20 @@ struct MacLocalTerminalPaneView: View {
             shellIsRunning: processState.isRunning,
             processDirectory: { runtime.currentWorkingDirectory }
         )
+    }
+
+    /// New Local Terminal Window: a window whose terminal starts in the folder this shell is in
+    /// (W37), asked as `resolveShellFolder` asks it.
+    private func openWindowInThisFolder() {
+        let shell = MacLocalTerminalStart.Source(
+            tmuxSession: tmuxSession,
+            shellIsRunning: processState.isRunning,
+            processDirectory: { [runtime] in runtime.currentWorkingDirectory }
+        )
+        Task {
+            let folder = await MacLocalTerminalStart.folder(for: .window, from: shell)
+            openWindow(id: "workspace", value: MacLocalTerminalStart.windowRequest(in: folder))
+        }
     }
 
     private var canOpenFolder: Bool {
@@ -695,23 +709,29 @@ enum MacLocalTerminalConfiguration {
         let fallbackShell = expandedPath(loginShell)
             ?? expandedPath(ProcessInfo.processInfo.environment["SHELL"])
             ?? "/bin/zsh"
-        let currentDirectory = expandedPath(directory)
-            ?? FileManager.default.homeDirectoryForCurrentUser.path
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let currentDirectory = expandedPath(directory) ?? home
         let processEnvironment = environment(from: ProcessInfo.processInfo.environment)
+        // A folder gone by the time the process starts — deleted since this pane opened there
+        // (W37: a new terminal opens where the one in front was), or on a volume since unmounted —
+        // starts it at Home rather than leaving a pane that cannot start, or a tmux session it
+        // cannot reattach to. tmux does the same for a session's `-c`.
         if let tmuxSession, let tmux = tmux ?? MacLocalTmux.executablePath() {
             let launch = tmuxLaunch(shell: shell, directory: directory)
             return SwiftTermLocalProcessConfiguration(
                 executable: tmux,
                 arguments: MacLocalTmux.arguments(session: tmuxSession, directory: launch.directory) + launch.command,
                 environment: launch.environment,
-                currentDirectory: launch.directory
+                currentDirectory: launch.directory,
+                fallbackDirectory: home
             )
         }
         return SwiftTermLocalProcessConfiguration(
             executable: requestedShell ?? fallbackShell,
             arguments: ["-l"],
             environment: processEnvironment,
-            currentDirectory: currentDirectory
+            currentDirectory: currentDirectory,
+            fallbackDirectory: home
         )
     }
 
@@ -761,10 +781,17 @@ enum MacLocalTerminalConfiguration {
         "ITERM_", "KITTY_", "WEZTERM_", "GHOSTTY_", "ALACRITTY_", "VSCODE_", "ZELLIJ",
     ]
 
-    private static func expandedPath(_ value: String?) -> String? {
+    /// A path as given: a typed setting's stray spaces trimmed and a leading `~` expanded. A
+    /// folder whose name begins or ends with a space is still that folder, as a terminal reports
+    /// it (W37), so an absolute path that names a folder as written is kept exactly; only one that
+    /// names nothing as written is trimmed, which costs a look at the disk only then.
+    static func expandedPath(_ value: String?,
+                             isFolder: (String) -> Bool = MacLocalShellFolder.Lookups.live.isFolder) -> String? {
         guard let value else { return nil }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : (trimmed as NSString).expandingTildeInPath
+        guard !trimmed.isEmpty else { return nil }
+        if trimmed != value, value.hasPrefix("/"), isFolder(value) { return value }
+        return trimmed.hasPrefix("~") ? (trimmed as NSString).expandingTildeInPath : trimmed
     }
 }
 

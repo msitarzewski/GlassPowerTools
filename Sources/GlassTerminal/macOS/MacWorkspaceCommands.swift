@@ -26,14 +26,19 @@ struct MacNewWorkspaceTabAction {
     let currentConnectionName: String?
     private let action: () -> Void
     private let repeatAction: () -> Void
+    /// File ▸ New Terminal Window from this window: its terminal starts in the folder of the local
+    /// terminal in front (W37), as ⌘N's does through `\.glassNewItem`. Nil opens one at the default.
+    let newWindow: (() -> Void)?
 
     init(isEnabled: Bool, currentConnectionName: String? = nil,
          _ action: @escaping () -> Void,
-         repeatingCurrentConnection repeatAction: @escaping () -> Void = {}) {
+         repeatingCurrentConnection repeatAction: @escaping () -> Void = {},
+         newWindow: (() -> Void)? = nil) {
         self.isEnabled = isEnabled
         self.currentConnectionName = currentConnectionName
         self.action = action
         self.repeatAction = repeatAction
+        self.newWindow = newWindow
     }
 
     var canRepeatCurrentConnection: Bool { isEnabled && currentConnectionName != nil }
@@ -203,7 +208,12 @@ struct MacWorkspaceCommands: Commands {
             // (`MacWorkspaceView.swift`). Keeping it in the menu unbound leaves it discoverable
             // from any window, including the library.
             Button("New Terminal Window") {
-                openWindow(id: "workspace", value: MacWorkspaceLaunchRequest())
+                // From a terminal window, as ⌘N there: in the local terminal in front's folder (W37).
+                if let newWindow = newWorkspaceTabAction?.newWindow {
+                    newWindow()
+                } else {
+                    openWindow(id: "workspace", value: MacWorkspaceLaunchRequest())
+                }
             }
 
             Button("New Terminal Tab") {

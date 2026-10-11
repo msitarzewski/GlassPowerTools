@@ -472,9 +472,10 @@ struct MacLocalTmuxTests {
         #expect((TerminalTmux.glassNumber(name) ?? 0) >= 100, "the pane's own new-session -A makes it: \(name)")
     }
 
-    /// The claim as the app runs it — `/bin/sh`, the pane's environment — against a private tmux
-    /// server, named by its socket in every call and started with no configuration.
-    @Test("a claim through sh makes the session in the pane's folder, and gives a new server the pane's environment",
+    /// The claim as the app runs it — tmux's own argv, no shell, the pane's environment (W37) —
+    /// against a private tmux server, named by its socket in every call and started with no
+    /// configuration.
+    @Test("a claim makes the session in the pane's folder, and gives a new server the pane's environment",
           .enabled(if: TerminalTmuxTests.tmux != nil))
     func claimLive() throws {
         let tmux = try #require(TerminalTmuxTests.tmux)
@@ -482,15 +483,14 @@ struct MacLocalTmuxTests {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         let socket = folder.appendingPathComponent("s").path
-        let launch = MacLocalTerminalConfiguration.tmuxLaunch(shell: nil, directory: folder.path)
-        var environment = launch.environmentVariables
-        environment["TMUX_TMPDIR"] = folder.path
-        defer { _ = MacLocalTmux.run(tmux, ["-S", socket, "kill-server"], environment: environment) }
+        var launch = MacLocalTerminalConfiguration.tmuxLaunch(shell: nil, directory: folder.path)
         // `sleep` in place of the login shell, so no dotfiles run.
+        launch.command = ["/bin/sleep", "600"]
+        launch.environment.append("TMUX_TMPDIR=\(folder.path)")
+        let environment = launch.environmentVariables
+        defer { _ = MacLocalTmux.run(tmux, ["-S", socket, "kill-server"], environment: environment) }
         func claim(_ candidates: [String]) -> TerminalTmux.Claim {
-            let script = TerminalTmux.claimScript(candidates: candidates, directory: launch.directory, command: ["/bin/sleep", "600"],
-                                                  tmux: TerminalTmux.quoted(tmux), serverArguments: ["-S", socket, "-f", "/dev/null"])
-            return MacLocalTmux.run("/bin/sh", ["-c", script], environment: environment)
+            MacLocalTmux.claim(candidates, launch: launch, tmux: tmux, serverArguments: ["-S", socket, "-f", "/dev/null"])
                 .map { TerminalTmux.parseClaim($0, candidates: candidates) } ?? .failed
         }
 

@@ -1074,3 +1074,10 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   Connection page; probe prints raw/decoded layouts, `--scale`, `--quality`, sign-in time. Release sign-in 0.37–0.46 s
   vs Debug 42.7 s (fake Mac, 4096-bit group). VNCKit 69, VNC transport 10, desktop 195, connection UI 49; TigerVNC 5/5 +
   6/6. Risk: we negotiate RFB 3.8, the notes measured 3.889 with Apple's record layer.
+- **W37 merged:** ⌘T/"+", ⇧⌘T (same shell/label), ⌘N / File ▸ New Terminal Window, the pane's New Local Terminal Window,
+  splits and New Local Pane start in the focused local terminal's folder (`MacLocalShellFolder.resolve`: tmux
+  `pane_current_path`, else the shell's cwd, else OSC 7; validated, else the old default). One switch:
+  `MacLocalTerminalStart.followsTerminalInFront(_:)`. The local tmux claim now runs tmux by argv (`new-session -d -s NAME
+  -c <dir>`), not `/bin/sh -c`. A missing start folder starts at Home (logged) instead of "Local Shell Failed"; a saved
+  tab whose tmux session is gone is re-made in its folder. SSH unchanged (needs a remote cd/claim). Terminal 737, shell
+  254; live on a private tmux 3.7c socket.

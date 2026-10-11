@@ -3,9 +3,11 @@
 //  Glass Power Tools — GlassTerminal
 //
 //  Open Folder Here on a local pane (2026-10-08): the folder the shell is in, or a plain "not
-//  known". The button used to fall back to the tmux client's folder and then Home, so a pane in
-//  tmux opened Home whenever tmux did not answer, and a deleted folder did nothing at all. No
-//  answer is unknown, never a stale value (967749f's rule), and every failure says what to do.
+//  known". A new local terminal opened from this one asks the same, to start there (W37,
+//  `MacLocalTerminalStart`). The button used to fall back to the tmux client's folder and then
+//  Home, so a pane in tmux opened Home whenever tmux did not answer, and a deleted folder did
+//  nothing at all. No answer is unknown, never a stale value (967749f's rule), and every failure
+//  says what to do.
 //
 
 #if os(macOS)
@@ -91,13 +93,13 @@ nonisolated enum MacLocalShellFolder: Equatable, Sendable {
         switch source {
         case .tmux(let session):
             path = lookups.tmuxDirectory(session)
-            if path == nil { logger.error("Open Folder Here: tmux gave no folder for \(session, privacy: .public)") }
+            if path == nil { logger.error("The shell's folder: tmux gave none for \(session, privacy: .public)") }
         case .path(let reported):
             path = reported
         }
         guard let path, path.hasPrefix("/") else { return .unknown }
         guard lookups.isFolder(path) else {
-            logger.notice("Open Folder Here: the shell's folder is gone: \(path, privacy: .private)")
+            logger.notice("The shell's folder is gone: \(path, privacy: .private)")
             return .missing(path)
         }
         return .folder(path)
