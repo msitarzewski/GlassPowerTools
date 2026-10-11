@@ -22,4 +22,5 @@ _site/
 
 # Live desktop probe output and device log archives: real machines' details, never tracked (rule 61).
 Tests/LiveDesktop/*.txt
+Tests/LiveDesktop/*.bin
 *.logarchive

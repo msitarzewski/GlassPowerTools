@@ -54,6 +54,8 @@ public struct VNCClientCallbacks: Sendable {
     public var cursorPosition: @Sendable (_ x: Int, _ y: Int) -> Void = { _, _ in }
     /// Everything that arrived about the pointer, as it arrived: for diagnostics and the live probe.
     public var cursorMessage: @Sendable (VNCCursorMessage) -> Void = { _ in }
+    /// A ZRLE rectangle had bytes left over and the session went on (`RFBZRLETrailingData`).
+    public var zrleTrailingData: @Sendable (RFBZRLETrailingData) -> Void = { _ in }
     public init() {}
 }
 
@@ -148,9 +150,13 @@ public final class VNCClient: Sendable {
     /// error may be a misreading of them (W38).
     public var receivedAppleCursor: Bool { state.appleCursor }
 
-    /// The last of a Mac's own encodings (display metadata or the pointer's) read before now: the
-    /// likeliest misreading behind a protocol error that follows it.
+    /// The last of a Mac's own encodings (display metadata or the pointer's) read since a pixel
+    /// rectangle was last read in step: the likeliest misreading behind a protocol error that follows
+    /// it. Nil once a pixel rectangle has been read after it, which shows it was read right.
     public var lastAppleEncoding: RFBEncoding? { state.lastAppleEncoding }
+
+    /// ZRLE rectangles read with bytes left over this connection (`RFBZRLETrailingData`).
+    public var zrleTrailingDataCount: Int { state.zrleTrailingDataCount }
 
     /// A factor was asked of a Mac and no layout has confirmed it yet.
     public var awaitingServerScaling: Bool { planner.awaitingServerScale }
@@ -608,7 +614,26 @@ public final class VNCClient: Sendable {
                         callbacks.appleDisplayMetadata(.displayInfo(info))
                     default:
                         let validated = try rect.validated(in: framebuffer.width, framebuffer.height)
-                        try await decoder.decode(validated, encoding: encoding, from: source, into: framebuffer, pixels: pixels)
+                        do {
+                            try await decoder.decode(validated, encoding: encoding, from: source, into: framebuffer, pixels: pixels)
+                        } catch let anomaly as RFBZRLETrailingData {
+                            // Its length was read in full and the deflate stream inflated all of it, so
+                            // the connection and the stream are still in step: only this rectangle is
+                            // suspect. Keep the session, say so, and ask for the picture again
+                            // (2026-10-11: ending here dropped a two-display session on a headset).
+                            let count = state.noteZRLETrailingData()
+                            if count <= 10 || count % 50 == 0 {
+                                let area = planner.requestedArea.map { "\($0.x),\($0.y),\($0.width)x\($0.height)" } ?? "none"
+                                VNCDiagnostics.note(Self.logger, .error, category: "client", "event=zrle-trailing count=\(count) \(anomaly.summary) "
+                                    + "framebuffer=\(framebuffer.width)x\(framebuffer.height) scale=\(planner.serverScaleInForce) requested=\(area)")
+                            }
+                            callbacks.zrleTrailingData(anomaly)
+                            planner.framebufferResized(width: framebuffer.width, height: framebuffer.height)
+                            pump()
+                        }
+                        // A pixel rectangle read in step: whatever a Mac's own encoding said before it
+                        // was read right, and is not what a later protocol error misread.
+                        state.notePixelRectangle()
                         changed = true
                     }
                 }
@@ -679,6 +704,10 @@ private final class ClientState: @unchecked Sendable {
             if encoding == .appleCursorImage || encoding == .appleCursorPosition { cursorSeen = true }
         }
     }
+    func notePixelRectangle() { lock.withLock { lastApple = nil } }
+    private var trailing = 0
+    var zrleTrailingDataCount: Int { lock.withLock { trailing } }
+    func noteZRLETrailingData() -> Int { lock.withLock { trailing += 1; return trailing } }
     func pointerSent(picture: (x: Int, y: Int), wire: (x: Int, y: Int), at now: ContinuousClock.Instant) {
         lock.withLock { cursorSpace.pointerSent(picture: picture, wire: wire, at: now) }
     }

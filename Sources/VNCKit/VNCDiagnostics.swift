@@ -27,6 +27,11 @@ public enum VNCDiagnostics {
     /// Starts keeping the file. The app calls it once, at launch.
     public static func enable() { enabled.withLock { $0 = true } }
 
+    /// Where a tool run outside the app — the live probe — sees each line instead: no file is kept
+    /// for it, so it never writes into a Caches folder of an app's name.
+    private static let echo = OSAllocatedUnfairLock<(@Sendable (String) -> Void)?>(initialState: nil)
+    public static func echo(to handler: @escaping @Sendable (String) -> Void) { echo.withLock { $0 = handler } }
+
     /// Where the log is kept: Caches, so the system may clear it and it is never backed up, in a
     /// folder named for the app — on the Mac, which runs outside the sandbox, Caches is the
     /// person's whole `~/Library/Caches`.
@@ -51,9 +56,12 @@ public enum VNCDiagnostics {
 
     /// Appends a line to the file, off the caller's thread.
     public static func record(category: String, _ message: String) {
-        guard enabled.withLock({ $0 }) else { return }
-        let line = "\(timestamp.format(Date())) \(category) \(message)\n"
-        queue.async { append(Data(line.utf8)) }
+        let handler = echo.withLock { $0 }
+        let keeping = enabled.withLock { $0 }
+        guard handler != nil || keeping else { return }
+        let line = "\(timestamp.format(Date())) \(category) \(message)"
+        handler?(line)
+        if keeping { queue.async { append(Data((line + "\n").utf8)) } }
     }
 
     private static func append(_ data: Data) {

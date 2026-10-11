@@ -367,6 +367,15 @@ struct AppleDisplaysClientTests {
         var metadata: [RFBAppleDisplayMetadata] { lock.withLock { metadataList } }
         var frames: [String] { lock.withLock { frameSizes } }
 
+        /// A value a callback sets from the client's task.
+        final class Box<Value>: @unchecked Sendable {
+            private let lock = NSLock()
+            private var stored: Value
+            init(_ value: Value) { stored = value }
+            var value: Value { lock.withLock { stored } }
+            func update(_ change: (inout Value) -> Void) { lock.withLock { change(&stored) } }
+        }
+
         func callbacks() -> VNCClientCallbacks {
             var callbacks = VNCClientCallbacks()
             callbacks.screens = { value in self.lock.withLock { self.screenLists.append(value) } }
@@ -411,6 +420,28 @@ struct AppleDisplaysClientTests {
         let scaleIndex = try #require(messages.firstIndex { $0.type == 8 })
         let encodingsIndex = try #require(messages.firstIndex { $0.type == 2 })
         #expect(encodingsIndex < scaleIndex)
+    }
+
+    @Test("a ZRLE rectangle with bytes left over is reported and the session goes on")
+    func zrleTrailingDataKeepsTheSession() async throws {
+        // One solid tile and a byte after it, deflated with a sync flush as a Mac sends each rectangle.
+        let deflated: [UInt8] = [0x78, 0x9c, 0x62, 0x14, 0x50, 0x30, 0xe0, 0x04, 0x00, 0x00, 0x00, 0xff, 0xff]
+        var mac = MacLayout.greeting(width: 4480, height: 1800)
+        mac += MacLayout.update(MacLayout.mixedPayload)
+        mac += [0, 0, 0, 2] + MacLayout.rectangleHeader(0, 0, 2, 2, .zrle) + UInt32(deflated.count).bigEndianBytes + deflated
+        mac += MacLayout.rectangleHeader(3, 3, 1, 1, .raw) + [7, 8, 9, 0]
+        let seen = Seen()
+        let reported = Seen.Box<[RFBZRLETrailingData]>([])
+        var callbacks = seen.callbacks()
+        callbacks.zrleTrailingData = { value in reported.update { $0.append(value) } }
+        let client = VNCClient(configuration: VNCConfiguration(host: "mac.example", password: ""), callbacks: callbacks,
+                               source: MemoryByteSource(mac), sink: MemoryByteSink())
+        await #expect(throws: RFBError.connectionClosed) { try await client.run() }
+
+        #expect(reported.value.map(\.consumed) == [4] && reported.value.map(\.inflated.count) == [5])
+        #expect(client.zrleTrailingDataCount == 1)
+        #expect(seen.frames.last == "4480x1800", "the update was drawn, the rectangle after it included")
+        #expect(client.lastAppleEncoding == nil, "pixel rectangles were read in step after the layout")
     }
 
     @Test("a pointer position in the scaled picture reaches the Mac in its own pixels")

@@ -326,7 +326,8 @@ struct ApplePointerTests {
                                            compressedBytes: shape.deflated.count, decoded: true),
                               .appleSelected(id: 7, known: true)])
         #expect(seen.pictures == 1, "the pixel after them decoded")
-        #expect(client.receivedAppleCursor && client.lastAppleEncoding == .appleCursorImage)
+        #expect(client.receivedAppleCursor)
+        #expect(client.lastAppleEncoding == nil, "the pixel after them shows they were read in step")
         let encodings = try #require(clientMessages(Array(await sink.written.dropFirst(13 + 1))).first { $0.type == 2 }).bytes
         let listed = stride(from: 4, to: encodings.count, by: 4).map { Int32(bitPattern: UInt32(encodings[$0]) << 24
             | UInt32(encodings[$0 + 1]) << 16 | UInt32(encodings[$0 + 2]) << 8 | UInt32(encodings[$0 + 3])) }

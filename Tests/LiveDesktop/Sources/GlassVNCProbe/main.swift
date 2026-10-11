@@ -15,6 +15,12 @@ import VNCKit
 // one), `--cursor` (every pointer message, as it arrives) and `--pointer-check` (which space the
 // Mac's CursorPos is in).
 //
+// `--as-app` (2026-10-11) does what the app did when a headset lost its second display: a second
+// connection for the display that is not the main one, the first narrowed to the rest, Retina at
+// 1x. It prints the client's own diagnostic lines as they happen, and keeps the inflated bytes of
+// any ZRLE rectangle read with bytes left over in `zrle-anomaly-<session>-<n>.bin` in the current
+// folder (ignored by git: they hold a little of the Mac's picture).
+//
 // It drives `VNCClient` with the configuration and callbacks `GlassVNCSession` gives it, so what it
 // prints is what the app reads; the displays are mapped by the session's own `remoteScreens`.
 // The password never appears in a command line or a process list: it is read from a file, or with
@@ -40,6 +46,9 @@ usage: GlassVNCProbe <host> <port> <username-or-empty> <password-file | -> [opti
                            last), and report both
   --cursor <seconds>       print every pointer message for this long: move the Mac's mouse meanwhile
   --pointer-check          move the Mac's pointer (no clicks) and report where the Mac says it went
+  --as-app [<seconds>]     as the app with a display window per display: a second connection for the
+                           display that is not the main one, the first narrowed to the rest, Retina at
+                           1x; run this long (default 30) printing the client's own log lines
 
 """
 
@@ -57,6 +66,7 @@ final class Recorder: @unchecked Sendable {
     private var _statistics: VNCLinkStatistics?
     private var _cursor: [(at: Date, value: VNCCursorMessage)] = []
     private var _positions: [(at: Date, x: Int, y: Int)] = []
+    private var _anomalies: [RFBZRLETrailingData] = []
     /// Called as each pointer message arrives, for `--cursor`'s live log.
     var onCursor: (@Sendable (Date, VNCCursorMessage) -> Void)?
 
@@ -71,6 +81,7 @@ final class Recorder: @unchecked Sendable {
     var statistics: VNCLinkStatistics? { lock.withLock { _statistics } }
     var cursor: [(at: Date, value: VNCCursorMessage)] { lock.withLock { _cursor } }
     var positions: [(at: Date, x: Int, y: Int)] { lock.withLock { _positions } }
+    var anomalies: [RFBZRLETrailingData] { lock.withLock { _anomalies } }
 
     func callbacks() -> VNCClientCallbacks {
         var callbacks = VNCClientCallbacks()
@@ -95,6 +106,7 @@ final class Recorder: @unchecked Sendable {
             live?(now, value)
         }
         callbacks.cursorPosition = { x, y in self.lock.withLock { self._positions.append((Date(), x, y)) } }
+        callbacks.zrleTrailingData = { value in self.lock.withLock { self._anomalies.append(value) } }
         return callbacks
     }
 }
@@ -236,6 +248,7 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
         var secondDisplay: UInt32?
         var cursorSeconds: Double?
         var pointerCheck = false
+        var asAppSeconds: Double?
         func bad() -> Never { FileHandle.standardError.write(Data(usage.utf8)); exit(2) }
         while let index = arguments.firstIndex(where: { $0.hasPrefix("--") }) {
             let option = arguments[index]
@@ -261,6 +274,13 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
                 cursorSeconds = length; consumed = 2
             case "--pointer-check":
                 pointerCheck = true
+            case "--as-app":
+                asAppSeconds = 30
+                if let value, let length = Double(value) {
+                    guard length > 0, length <= 600 else { bad() }
+                    asAppSeconds = length; consumed = 2
+                }
+                retina = true
             default:
                 bad()
             }
@@ -287,6 +307,10 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
         }
 
         // MARK: The run
+        if asAppSeconds != nil {
+            let launched = Date()
+            VNCDiagnostics.echo { line in print("  log \(String(format: "%6.2f", Date().timeIntervalSince(launched))) s  \(line.split(separator: " ", maxSplits: 1).last ?? "")") }
+        }
         let recorder = Recorder()
         let outcome = Outcome()
         /// As `GlassVNCSession` configures it for a host it has not been refused by.
@@ -493,6 +517,71 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
             if let size = recorder.frameSize {
                 print("cursor         : the picture is \(size.width) x \(size.height) at scale \(client.serverScale); "
                       + "positions the app would use: \(recorder.positions.count), last \(recorder.positions.last.map { "(\($0.x), \($0.y))" } ?? "none")")
+            }
+        }
+
+        // MARK: As the app does it, with a display window per display
+        if let length = asAppSeconds {
+            print("")
+            let layout = lastLayout(recorder.metadata)
+            let main = layout?.records.first { $0.isMain }?.id
+            if let layout, layout.records.count >= 2, let target = layout.records.map(\.id).first(where: { $0 != main }) {
+                let second = Recorder()
+                let secondOutcome = Outcome()
+                let secondClient: VNCClient
+                do { secondClient = try makeClient(second, display: target) } catch {
+                    print("as the app     : the second connection did not start: \(error.localizedDescription)")
+                    exit(1)
+                }
+                let begun = Date()
+                print("as the app     : a second connection for display \(target) alone, as its window's")
+                Task.detached {
+                    do { try await secondClient.run(); secondOutcome.end(nil) } catch { secondOutcome.end(error) }
+                }
+                let pictured = await wait(upTo: 60, for: secondOutcome, until: { second.firstFrameAt != nil })
+                print("as the app     : " + (pictured ? "its first picture after \(seconds(begun, Date()))" : "NO picture from it within 60 s"))
+                // The first is narrowed to the displays the second does not send, in the first's own
+                // pixels, and again whenever its displays move (a scale changes every rectangle).
+                var narrowedTo: [VNCScreen]?
+                func narrow() {
+                    guard let screens = recorder.screens else { return }
+                    let rest = screens.filter { $0.id != target }
+                    guard rest != narrowedTo, !rest.isEmpty else { return }
+                    narrowedTo = rest
+                    let regions = rest.map { RFBRectangle(x: $0.x, y: $0.y, width: $0.width, height: $0.height) }
+                    client.setRequestedRegions(regions)
+                    print("as the app     : the first asks for " + regions.map { "\($0.x),\($0.y) \($0.width)x\($0.height)" }.joined(separator: " and "))
+                }
+                let until = Date().addingTimeInterval(length)
+                let updatesBefore = recorder.updates
+                while Date() < until {
+                    narrow()
+                    if case .some = outcome.ended { break }
+                    if case .some = secondOutcome.ended { break }
+                    try? await Task.sleep(for: .milliseconds(100))
+                }
+                let firstAlive: Bool = if case .some = outcome.ended { false } else { true }
+                let secondAlive: Bool = if case .some = secondOutcome.ended { false } else { true }
+                print("as the app     : the first " + (firstAlive ? "still connected" : "ENDED")
+                      + ", \(recorder.updates - updatesBefore) updates, scale \(client.serverScale), "
+                      + "sending \(client.currentDisplay.map { "display \($0)" } ?? "all displays")")
+                if case .some(.some(let error)) = outcome.ended { print("                 it ended: \(error.localizedDescription)") }
+                print("as the app     : the second " + (secondAlive ? "still connected" : "ENDED")
+                      + ", \(second.updates) updates, scale \(secondClient.serverScale), "
+                      + "sending \(secondClient.currentDisplay.map { "display \($0)" } ?? "all displays")")
+                if case .some(.some(let error)) = secondOutcome.ended { print("                 it ended: \(error.localizedDescription)") }
+                for (label, found) in [("first", recorder.anomalies), ("second", second.anomalies)] {
+                    for (index, anomaly) in found.enumerated() {
+                        let name = "zrle-anomaly-\(label)-\(index + 1).bin"
+                        let kept = FileManager.default.createFile(atPath: name, contents: Data(anomaly.inflated))
+                        print("ZRLE anomaly   : \(label) #\(index + 1) \(anomaly.summary)" + (kept ? " — kept in \(name)" : ""))
+                    }
+                }
+                if !firstAlive || !secondAlive || !recorder.anomalies.isEmpty || !second.anomalies.isEmpty { passed = false }
+                secondClient.cancel()
+            } else {
+                print("as the app     : nothing to do — the Mac reported \(layout?.records.count ?? 0) display(s); this needs two")
+                passed = false
             }
         }
 

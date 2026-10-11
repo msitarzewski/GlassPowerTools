@@ -112,10 +112,20 @@ struct EncodingTests {
     @Test func zrleRejectsMalformedTiles() throws {
         let framebuffer = try RFBFramebuffer(width: 4, height: 4)
         let rect = RFBRectangle(x: 0, y: 0, width: 4, height: 4)
-        #expect(throws: RFBError.self) { try RFBRectangleDecoder.decodeZRLETiles([2, 1, 1, 1, 2, 2, 2, 0x80, 0, 0, 0, 0x80], rect: rect, into: framebuffer) }
+        #expect(throws: RFBZRLETrailingData.self) { try RFBRectangleDecoder.decodeZRLETiles([2, 1, 1, 1, 2, 2, 2, 0x80, 0, 0, 0, 0x80], rect: rect, into: framebuffer) }
         #expect(throws: RFBError.self) { try RFBRectangleDecoder.decodeZRLETiles([128, 1, 2, 3, 200], rect: rect, into: framebuffer) }
         #expect(throws: RFBError.self) { try RFBRectangleDecoder.decodeZRLETiles([130, 1, 1, 1, 2, 2, 2, 0x82, 0], rect: rect, into: framebuffer) }
-        #expect(throws: RFBError.self) { try RFBRectangleDecoder.decodeZRLETiles([1, 1, 2, 3, 9], rect: rect, into: framebuffer) }
+        // Bytes left over after the last tile: reported with the figures, after the tiles are drawn.
+        do {
+            try RFBRectangleDecoder.decodeZRLETiles([1, 1, 2, 3, 9], rect: rect, into: framebuffer)
+            Issue.record("trailing data was not reported")
+        } catch let anomaly as RFBZRLETrailingData {
+            #expect(anomaly.consumed == 4 && anomaly.inflated.count == 5)
+            #expect(anomaly.census.solid == 1 && anomaly.census.tiles == 1)
+            #expect(anomaly.summary.contains("rect=0,0,4x4 inflated=5 consumed=4 tiles=1") && anomaly.summary.hasSuffix("next=9"))
+            #expect(anomaly.localizedDescription == "The ZRLE rectangle has trailing data.")
+            #expect(Array(framebuffer.pixels[0..<3]) == [1, 2, 3], "the tile was drawn")
+        }
         #expect(throws: RFBError.self) { try RFBRectangleDecoder.decodeZRLETiles([17], rect: rect, into: framebuffer) }
         try RFBRectangleDecoder.decodeZRLETiles([130, 1, 1, 1, 2, 2, 2, 0x81, 15], rect: rect, into: framebuffer)
         #expect(Array(framebuffer.pixels[60..<63]) == [2, 2, 2])

@@ -286,6 +286,26 @@ struct AppleLayoutFallbackTests {
         #expect(asked.configurations.map(\.requestsAppleDisplayLayout) == [true, false])
     }
 
+    @Test func aViolationAfterAPictureWasReadInStepDoesNotStopAskingForThem() async throws {
+        // 2026-10-11: a picture error 0.9 s after a layout cost a headset its two displays.
+        let asked = Asked()
+        let host = "mac-\(UUID().uuidString.prefix(8)).example"
+        let pixel: [UInt8] = [0, 0, 0, 1] + UInt16(0).bigEndianBytes + UInt16(0).bigEndianBytes + UInt16(1).bigEndianBytes
+            + UInt16(1).bigEndianBytes + Int32(0).bigEndianBytes + [1, 2, 3, 0]
+        let first = session(macGreeting(width: 2, height: 2) + macLayoutUpdate(width: 2, height: 2) + pixel + rectangleOutside,
+                            asked: asked)
+        try await first.connect(GlassVNCConfiguration(host: host, password: "pw"))
+        let failure = await ending(first)
+        #expect(failure != nil)
+        #expect(failure?.contains("Reconnect connects without") == false, "the layout was read right: a picture followed it in step")
+
+        let second = session(macGreeting(width: 2, height: 2), asked: asked)
+        try await second.connect(GlassVNCConfiguration(host: host, password: "pw"))
+        for await event in second.events where event == .state(.connected) { break }
+        await second.disconnect()
+        #expect(asked.configurations.map(\.requestsAppleDisplayLayout) == [true, true])
+    }
+
     @Test func aViolationBeforeAnyDisplayMetadataDoesNotStopAskingForThem() async throws {
         let asked = Asked()
         let host = "mac-\(UUID().uuidString.prefix(8)).example"

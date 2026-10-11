@@ -556,6 +556,9 @@ final class RFBStreamPlanner: @unchecked Sendable {
     /// every other server, and on a Mac until a layout says otherwise.
     var serverScaleInForce: Double { lock.withLock { scaleInForce } }
 
+    /// The area requests ask for now, for the log.
+    var requestedArea: RFBRectangle? { lock.withLock { requestRectangle() } }
+
     /// A factor was asked for and no layout has confirmed it yet.
     var awaitingServerScale: Bool { lock.withLock { scaleAsked != nil } }
 

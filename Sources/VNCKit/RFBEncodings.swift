@@ -141,9 +141,11 @@ final class RFBRectangleDecoder {
 
     /// Pixels are CPIXELs (RFC 6143 §7.7.6): three bytes (B, G, R) in the 32-bit client format,
     /// whose colour bits are all in its least significant three bytes; two at 16 bits; one at 8.
+    /// Bytes left over once every tile is read throw `RFBZRLETrailingData`, after the tiles are drawn.
     static func decodeZRLETiles(_ bytes: [UInt8], rect: RFBRectangle, into framebuffer: RFBFramebuffer,
                                 pixels: RFBPixelDecoder = .native) throws {
         var reader = ByteReader(bytes)
+        var census = RFBZRLETrailingData.Census()
         var tileY = rect.y
         while tileY < rect.maxY {
             let tileHeight = min(64, rect.maxY - tileY)
@@ -151,12 +153,15 @@ final class RFBRectangleDecoder {
             while tileX < rect.maxX {
                 let tileWidth = min(64, rect.maxX - tileX)
                 let tile = RFBRectangle(x: tileX, y: tileY, width: tileWidth, height: tileHeight)
+                if reader.offset < bytes.count { census.count(bytes[reader.offset]) }
                 try decodeZRLETile(&reader, tile: tile, into: framebuffer, pixels: pixels)
                 tileX += 64
             }
             tileY += 64
         }
-        guard reader.isAtEnd else { throw RFBError.protocolViolation("The ZRLE rectangle has trailing data.") }
+        guard reader.isAtEnd else {
+            throw RFBZRLETrailingData(rectangle: rect, inflated: bytes, consumed: reader.offset, census: census)
+        }
     }
 
     private static func decodeZRLETile(_ reader: inout ByteReader, tile: RFBRectangle, into framebuffer: RFBFramebuffer,
@@ -280,4 +285,47 @@ final class RFBRectangleDecoder {
         return VNCCursorImage(width: rect.width, height: rect.height, hotSpotX: rect.x, hotSpotY: rect.y, bgra: bgra, mask: mask,
                               isPointSized: pointSized)
     }
+}
+
+/// A ZRLE rectangle whose tiles were all read with inflated bytes left over (2026-10-11: a Mac sent
+/// one 0.9 s after it began rendering at half size, on the connection fetching one display of two
+/// while a second connection held the other). Its compressed length was read in full and the
+/// deflate stream inflated all of it, so the connection and the stream are still in step: the
+/// client keeps the session, logs this and asks for the picture again (`VNCClient`). It carries
+/// the inflated bytes for the live probe to keep; the app logs only the figures.
+public struct RFBZRLETrailingData: Error, Sendable {
+    /// How many tiles began with each kind of subencoding (RFC 6143 §7.7.6).
+    public struct Census: Sendable, Equatable, CustomStringConvertible {
+        public var raw = 0, solid = 0, packed = 0, runs = 0, paletteRuns = 0, other = 0
+        mutating func count(_ subencoding: UInt8) {
+            switch subencoding {
+            case 0: raw += 1
+            case 1: solid += 1
+            case 2...16: packed += 1
+            case 128: runs += 1
+            case 130...255: paletteRuns += 1
+            default: other += 1
+            }
+        }
+        public var tiles: Int { raw + solid + packed + runs + paletteRuns + other }
+        public var description: String {
+            "raw:\(raw),solid:\(solid),packed:\(packed),runs:\(runs),paletteRuns:\(paletteRuns),other:\(other)"
+        }
+    }
+
+    public let rectangle: RFBRectangle
+    /// The rectangle's tiles, inflated.
+    public let inflated: [UInt8]
+    /// How many of them the tiles took.
+    public let consumed: Int
+    public let census: Census
+
+    public var summary: String {
+        "rect=\(rectangle.x),\(rectangle.y),\(rectangle.width)x\(rectangle.height) inflated=\(inflated.count) "
+            + "consumed=\(consumed) tiles=\(census.tiles) census=\(census) next=\(consumed < inflated.count ? String(inflated[consumed]) : "none")"
+    }
+}
+
+extension RFBZRLETrailingData: LocalizedError {
+    public var errorDescription: String? { "The ZRLE rectangle has trailing data." }
 }

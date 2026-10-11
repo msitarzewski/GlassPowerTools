@@ -161,11 +161,14 @@ public actor GlassVNCSession: GlassDesktopTransport {
                     VNCDiagnostics.note(Self.logger, .error, category: "session", "event=apple-cursor-refused")
                     failure = (failure ?? "") + " Reconnect connects without asking this Mac where its pointer is."
                 }
-                // A Mac that broke the protocol after sending its displays — a form known only from
-                // others' measurements — is not asked for them again while the app runs, so
+                // A Mac that broke the protocol right after sending its displays — a form known only
+                // from others' measurements — is not asked for them again while the app runs, so
                 // Reconnect works, with its displays as one picture (W30). A violation before any
-                // display metadata arrived cannot be a misreading of it, and changes nothing.
-                else if case .protocolViolation = error, asksForLayout, apple.any, client.receivedAppleDisplayMetadata {
+                // display metadata arrived cannot be a misreading of it, and changes nothing; nor can
+                // one after a pixel rectangle was read in step since, which shows the layout was read
+                // right (2026-10-11: a picture error cost a headset its two displays).
+                else if case .protocolViolation = error, asksForLayout, apple.any, client.receivedAppleDisplayMetadata,
+                        client.lastAppleEncoding == .appleDisplayLayout || client.lastAppleEncoding == .appleDisplayInfo {
                     Self.layoutRefusals.insert(layoutKey)
                     VNCDiagnostics.note(Self.logger, .error, category: "session", "event=apple-display-layout-refused")
                     failure = (failure ?? "") + " Reconnect connects without asking this Mac where its displays are."
