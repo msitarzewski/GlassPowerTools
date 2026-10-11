@@ -48,3 +48,11 @@ SetDisplayConfiguration virtual displays, media stream (SRTP, HEVC via VideoTool
   Mac through a real type-30 exchange to a picture in records). Probe `--apple` (and `--no-arm`, `--cursor N`).
   **Next:** owner runs `GlassVNCProbe 127.0.0.1 5900 <user> - --apple --cursor 20`; if it signs in encrypted with a
   picture, turn `appleProtocol` on in GlassVNCSession for Macs (keep 3.8 fallback if the Mac refuses), install.
+- **Probe `--apple` on the owner's Mac (13:33 local):** answered 3.889, record layer up, 418 frames, 167 Mbit/s at
+  17 updates/s full size; the Mac accepts 0x09 0x0a 0x12 0x17 0x1c 0x1d 0x21 (High Performance possible); armed, it
+  sent CursorImage (23×22, cache id 1000) and CursorPos once at sign-in, then nothing while the owner moved the
+  Mac's own mouse — its log: the agent reads the pointer when the viewer moves it. Clipboard: macOS never bridges
+  its pasteboard through Client/ServerCutText (remotex `vnc_apple_clipboard.rs`); needs AutoPasteboard + archive.
+- **e7463ce / 0.4.355 on all three:** GlassVNCSession asks for 003.889 on account connections (password-only stays
+  3.8); a Mac failing before the record layer → `appleProtocolRefusals`, 3.8 on Reconnect. Next: owner tries the
+  headset; then Apple's scroll message (0x17), Apple's pasteboard, then High Performance.
