@@ -424,6 +424,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
 
     // A Mac's pushes.
     private var arming = true
+    private var armingInterval = RFBStreamPlanner.pushInterval
     /// The interval and size the Mac was last armed with; nil once a layout dropped the arming.
     private var armed: (interval: UInt32, width: Int, height: Int)?
 
@@ -757,14 +758,16 @@ final class RFBStreamPlanner: @unchecked Sendable {
     private func planArming(paused: Bool, into out: inout [[UInt8]]) {
         guard dialect == .apple, arming, appleDisplayLayout, layoutSeen, width > 0, height > 0,
               scaleAsked == nil, displayAsked == nil, !holding else { return }
-        let interval = paused ? Self.pushesOff : Self.pushInterval
+        let interval = paused ? Self.pushesOff : armingInterval
         if let armed, armed.interval == interval, armed.width == width, armed.height == height { return }
         out.append(RFBAppleDisplayLayout.autoFramebufferUpdateMessage(interval: interval, width: width, height: height))
         armed = (interval, width, height)
     }
 
     /// Whether a Mac is armed to push (`AutoFrameBufferUpdate`). On unless a probe compares.
-    func setArming(_ on: Bool) { lock.withLock { arming = on; armed = nil } }
+    func setArming(_ on: Bool, interval: UInt32 = RFBStreamPlanner.pushInterval) {
+        lock.withLock { arming = on; armingInterval = interval; armed = nil }
+    }
 
     /// Asks a Mac for the display wanted, once it has shown it sends layouts; returns when to look
     /// again at an unanswered request.

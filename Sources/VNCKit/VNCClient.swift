@@ -145,10 +145,14 @@ public final class VNCClient: Sendable {
 
     /// Whether a Mac is armed to push its changes, its pointer's among them (`AutoFrameBufferUpdate`).
     /// On; the live probe turns it off to compare.
-    public func setAppleUpdateArming(_ on: Bool) {
-        planner.setArming(on)
+    public func setAppleUpdateArming(_ on: Bool, interval: UInt32 = 33_333) {
+        planner.setArming(on, interval: interval)
         pump()
     }
+
+    /// Whether Apple's revision's prelude identifies this client (`ViewerInfo`). On; the live probe
+    /// turns it off to compare. Set before `run`.
+    public func setAppleViewerInfo(_ on: Bool) { state.setSendsViewerInfo(on) }
 
     /// Asks a Mac to send one display, its own pixels the whole framebuffer, or every display
     /// (`SetDisplay`, W38). Sent once the Mac has sent a layout; a layout naming it confirms it.
@@ -382,7 +386,7 @@ public final class VNCClient: Sendable {
     /// back in the clear, then the rekey, read in the clear too. The Mac switches both its ciphers the
     /// moment it sends the rekey, so the layer goes up before this client writes another byte.
     private func applePrelude(wrapKey: [UInt8]) async throws {
-        try await sink.write(RFBAppleMessages.viewerInfo)
+        if state.sendsViewerInfo { try await sink.write(RFBAppleMessages.viewerInfo) }
         try await sink.write(RFBAppleMessages.setModeControl)
         try await sink.write(RFBAppleMessages.setEncryptionStart)
         try await sink.write(RFBAppleMessages.enableInboundDecryption)
@@ -883,6 +887,9 @@ private final class ClientState: @unchecked Sendable {
         lock.withLock { for id in displays { painted[id, default: 0] += 1; paintedAll[id, default: 0] += 1 } }
     }
     func takePainted() -> [UInt32: Int] { lock.withLock { defer { painted = [:] }; return painted } }
+    private var viewerInfo = true
+    var sendsViewerInfo: Bool { lock.withLock { viewerInfo } }
+    func setSendsViewerInfo(_ on: Bool) { lock.withLock { viewerInfo = on } }
     private var apple889 = false
     var appleProtocol: Bool { lock.withLock { apple889 } }
     func setAppleProtocol() { lock.withLock { apple889 = true } }

@@ -53,6 +53,8 @@ usage: GlassVNCProbe <host> <port> <username-or-empty> <password-file | -> [opti
   --compare                with something moving on every display (a video, a clock with seconds), connect
                            four times — Apple's revision armed and not, plain 3.8 armed and not — and
                            report how often each display was repainted (2026-10-11)
+  --compare2               the same, four other ways: Apple's revision armed at 33 ms and at 0 (as Apple's
+                           viewer arms), without ViewerInfo, and plain 3.8 armed — with pointer messages
   --as-app [<seconds>]     as the app with a display window per display: a second connection for the
                            display that is not the main one, the first narrowed to the rest, Retina at
                            1x; run this long (default 30) printing the client's own log lines
@@ -259,6 +261,7 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
         var arms = true
         var appleProtocol = false
         var compare = false
+        var compareSecond = false
         func bad() -> Never { FileHandle.standardError.write(Data(usage.utf8)); exit(2) }
         while let index = arguments.firstIndex(where: { $0.hasPrefix("--") }) {
             let option = arguments[index]
@@ -286,6 +289,8 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
                 pointerCheck = true
             case "--compare":
                 compare = true
+            case "--compare2":
+                compare = true; compareSecond = true
             case "--apple":
                 appleProtocol = true
             case "--no-arm":
@@ -325,9 +330,13 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
         // MARK: Four connections compared
         if compare {
             print("compare        : four connections, 20 s each; keep something moving on every display")
-            let setups: [(name: String, apple: Bool, arms: Bool)] = [
-                ("Apple's revision, armed    ", true, true), ("Apple's revision, not armed", true, false),
-                ("plain 3.8, armed           ", false, true), ("plain 3.8, not armed       ", false, false)]
+            let setups: [(name: String, apple: Bool, arms: Bool, interval: UInt32, viewerInfo: Bool)] = compareSecond
+                ? [("Apple's revision, armed at 33 ms   ", true, true, 33_333, true),
+                   ("Apple's revision, armed at 0       ", true, true, 0, true),
+                   ("Apple's revision, no ViewerInfo    ", true, true, 33_333, false),
+                   ("plain 3.8, armed at 33 ms          ", false, true, 33_333, true)]
+                : [("Apple's revision, armed    ", true, true, 33_333, true), ("Apple's revision, not armed", true, false, 33_333, true),
+                   ("plain 3.8, armed           ", false, true, 33_333, true), ("plain 3.8, not armed       ", false, false, 33_333, true)]
             for setup in setups {
                 let recorder = Recorder(), outcome = Outcome()
                 let client: VNCClient
@@ -338,7 +347,8 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
                                            callbacks: recorder.callbacks())
                 } catch { print("\(setup.name): FAILED to start: \(error.localizedDescription)"); continue }
                 client.setQuality(quality)
-                client.setAppleUpdateArming(setup.arms)
+                client.setAppleUpdateArming(setup.arms, interval: setup.interval)
+                client.setAppleViewerInfo(setup.viewerInfo)
                 Task.detached { do { try await client.run(); outcome.end(nil) } catch { outcome.end(error) } }
                 let deadline = Date().addingTimeInterval(30)
                 while Date() < deadline, recorder.firstFrameAt == nil { if case .some = outcome.ended { break }; try? await Task.sleep(for: .milliseconds(50)) }
@@ -349,8 +359,11 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
                 let painted = ids.map { "display \($0): \((after[$0] ?? 0) - (before[$0] ?? 0))" }.joined(separator: ", ")
                 var ending = ""
                 if case .some(.some(let error)) = outcome.ended { ending = " — ENDED: \(error.localizedDescription)" }
+                let shapes = recorder.cursor.filter { if case .appleStored = $0.value { return true }; if case .appleSelected = $0.value { return true }; return false }.count
+                let positions = recorder.cursor.filter { if case .applePosition = $0.value { return true }; return false }.count
                 print("\(setup.name): \(recorder.updates - updatesBefore) updates in 20 s; rectangles \(painted.isEmpty ? "none" : painted); "
-                      + "picture \(client.displayContent ?? "unknown")\(client.isEncrypted ? ", encrypted" : "")\(ending)")
+                      + "picture \(client.displayContent ?? "unknown"); pointer shapes \(shapes), positions \(positions)"
+                      + "\(client.isEncrypted ? ", encrypted" : "")\(ending)")
                 client.cancel()
                 try? await Task.sleep(for: .seconds(2))
             }
