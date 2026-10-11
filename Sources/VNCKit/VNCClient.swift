@@ -269,7 +269,7 @@ public final class VNCClient: Sendable {
                             + "rects=\(counts.rectangles - last.rectangles) bytes=\(bytes - last.bytes) "
                             + "outstanding=\(flow.outstanding) sinceRequest=\(seconds(flow.sinceRequest)) waiting=\(seconds(flow.waiting)) "
                             + "requested=\(area) scale=\(self.planner.serverScaleInForce) sending=\(self.planner.currentDisplay.map(String.init) ?? "all") "
-                            + "painted=\(painted.isEmpty ? "none" : painted)")
+                            + "painted=\(painted.isEmpty ? "none" : painted) lit=\(self.state.content ?? "unknown")")
                         last = (counts.updates, counts.frames, counts.rectangles, bytes)
                     }
                     // A Mac that does not answer may send nothing at all: looked at here, not only
@@ -777,6 +777,14 @@ public final class VNCClient: Sendable {
                     callbacks.frame(framebuffer.width, framebuffer.height, framebuffer.snapshot())
                 }
                 state.noteUpdate(rectangles: rectangles.count, delivered: delivers)
+                // What each display's part of the picture holds, now and then, for the flow line.
+                if state.contentSampleDue(at: .now) {
+                    let content = planner.currentDisplays.compactMap { display -> String? in
+                        let rect = RFBRectangle(x: display.x, y: display.y, width: display.width, height: display.height)
+                        return framebuffer.litPercent(in: rect).map { "\(display.id):\($0)%" }
+                    }.joined(separator: ",")
+                    state.noteContent(content)
+                }
                 // The link's speed, from every byte this update took to arrive whatever its
                 // encoding, is what Automatic chooses its level by.
                 let elapsed = ContinuousClock.now - started
@@ -852,6 +860,17 @@ private final class ClientState: @unchecked Sendable {
     }
     func notePixelRectangle() { lock.withLock { lastApple = nil } }
     private var painted: [UInt32: Int] = [:]
+    private var contentSampledAt: ContinuousClock.Instant?
+    private var contentSummary: String?
+    var content: String? { lock.withLock { contentSummary } }
+    func noteContent(_ value: String) { lock.withLock { contentSummary = value } }
+    func contentSampleDue(at now: ContinuousClock.Instant) -> Bool {
+        lock.withLock {
+            if let last = contentSampledAt, now - last < .seconds(4) { return false }
+            contentSampledAt = now
+            return true
+        }
+    }
     func notePainted(_ displays: [UInt32]) { lock.withLock { for id in displays { painted[id, default: 0] += 1 } } }
     func takePainted() -> [UInt32: Int] { lock.withLock { defer { painted = [:] }; return painted } }
     private var apple889 = false

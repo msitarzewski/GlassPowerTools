@@ -23,6 +23,23 @@ public final class RFBFramebuffer {
 
     public var bytesPerRow: Int { width * 4 }
 
+    /// The share of `rect` that is not black, on a grid of samples, in whole percent: whether a
+    /// display's part of the picture holds anything (the log's flow line, 2026-10-11).
+    func litPercent(in rect: RFBRectangle, samples: Int = 24) -> Int? {
+        guard let area = rect.clipped(width: width, height: height), area.width > 0, area.height > 0 else { return nil }
+        var lit = 0, total = 0
+        for row in 0..<samples {
+            let y = area.y + (area.height * (2 * row + 1)) / (2 * samples)
+            for column in 0..<samples {
+                let x = area.x + (area.width * (2 * column + 1)) / (2 * samples)
+                let offset = (y * width + x) * 4
+                total += 1
+                if pixels[offset] > 24 || pixels[offset + 1] > 24 || pixels[offset + 2] > 24 { lit += 1 }
+            }
+        }
+        return total == 0 ? nil : lit * 100 / total
+    }
+
     /// Contents after a resize are undefined until the next full update, as RFC 6143 §7.8.2 permits.
     public func resize(width: Int, height: Int) throws {
         try Self.validate(width: width, height: height)
