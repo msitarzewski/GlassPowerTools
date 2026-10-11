@@ -75,3 +75,10 @@ SetDisplayConfiguration virtual displays, media stream (SRTP, HEVC via VideoTool
   `RFBCursorPositionSpace.map` returns nil within 1 s of a local move (still learns the space). Clicks themselves
   can still land late while the Mac pushes back to back (remotex's caveat at interval 0) — next lever if it shows:
   per-display connections at one shared scale, or adaptive arming.
+- **Settled: a Mac never reports its own mouse to a controlling viewer.** Owner asked to verify against other
+  developers: codevisor PRs #28/#70 (Apple's server sends a standard viewer no shape and draws no pointer; "the
+  pointer is local by construction while controlling"), Jump Desktop ("Ask to share screen", host software),
+  Splashtop ("show remote cursor", agent), noVNC #1430. Untried avenue tested: the standard PointerPos (−232,
+  libvncserver/TigerVNC/KasmVNC) — e8a8f70 reads it, probe `--pointerpos`; owner's run (003.889, armed): **no
+  PointerPos, no CursorPos or shape at all in 20 s of the Mac's own mouse moving**, only once at sign-in. Not pursued
+  further; Observe mode (SetMode 0) remains untested for a future "watch" feature.
