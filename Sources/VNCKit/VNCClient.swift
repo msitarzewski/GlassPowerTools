@@ -395,6 +395,8 @@ public final class VNCClient: Sendable {
     private func applePrelude(wrapKey: [UInt8]) async throws {
         if state.sendsViewerInfo { try await sink.write(RFBAppleMessages.viewerInfo) }
         try await sink.write(RFBAppleMessages.setModeControl)
+        // The Mac's pasteboard, watched: in the clear, after ViewerInfo and SetMode, or it does nothing.
+        if configuration.clipboardEnabled { try await sink.write(RFBApplePasteboard.autoPasteboard(true)) }
         try await sink.write(RFBAppleMessages.setEncryptionStart)
         try await sink.write(RFBAppleMessages.enableInboundDecryption)
         let keys = try await awaitRekey(wrapKey: wrapKey)
@@ -556,6 +558,12 @@ public final class VNCClient: Sendable {
     /// RFC 6143 §7.5.6: ClientCutText carries ISO 8859-1 text; characters outside it are dropped.
     public func sendCutText(_ text: String) async throws {
         try requireReady()
+        // A Mac never takes ClientCutText: on its own revision, its pasteboard message, as UTF-8.
+        if state.appleProtocol {
+            let session = state.notePasteboardSent(text)
+            try await sink.write(try RFBApplePasteboard.send(text, session: session))
+            return
+        }
         let latin1 = text.unicodeScalars.compactMap { $0.value <= 0xFF ? UInt8($0.value) : nil }
         guard latin1.count <= RFBLimits.maximumCutTextBytes else { throw RFBError.resourceLimit("The clipboard text is too large to send.") }
         try await sink.write([6, 0, 0, 0] + UInt32(latin1.count).bigEndianBytes + latin1)
@@ -864,8 +872,45 @@ public final class VNCClient: Sendable {
                 guard length <= 64 else { throw RFBError.protocolViolation("The Mac sent a status message of \(length) bytes.") }
                 var body = ByteReader(try await source.read(length))
                 _ = try? body.u16()
-                let command = (try? body.u16()).map(String.init) ?? "none"
-                VNCDiagnostics.note(Self.logger, .default, category: "client", "event=apple-status command=\(command)")
+                let command = try? body.u16()
+                VNCDiagnostics.note(Self.logger, .default, category: "client", "event=apple-status command=\(command.map(String.init) ?? "none")")
+                if configuration.clipboardEnabled, command == 2, let session = state.beginPasteboardFetch() {
+                    // Its pasteboard changed: fetch it, one fetch at a time.
+                    try await sink.write(RFBApplePasteboard.fetch(session: session))
+                } else if configuration.clipboardEnabled, command == 3, let local = state.localPasteboard {
+                    // It wants this client's pasteboard again.
+                    try await sink.write(try RFBApplePasteboard.send(local.text, session: local.session))
+                }
+            case 0x1f where apple:
+                // The Mac's pasteboard: a pad, the fetch's promises bit, a pad, the echoed session,
+                // the archive's size and its compressed size, then the compressed archive.
+                var header = ByteReader(try await source.read(15))
+                _ = try header.bytes(3)
+                let session = try header.u32()
+                let inflatedSize = Int(try header.u32()), compressedSize = Int(try header.u32())
+                var text: String?
+                if compressedSize <= RFBApplePasteboard.maximumArchiveBytes, inflatedSize <= RFBApplePasteboard.maximumArchiveBytes {
+                    let compressed = try await source.read(compressedSize)
+                    do {
+                        let archive = try ZlibInflater().inflateAll(compressed)
+                        text = try RFBApplePasteboard.text(in: archive)
+                    } catch {
+                        VNCDiagnostics.note(Self.logger, .error, category: "client", "event=apple-pasteboard unreadable error=\(error.localizedDescription)")
+                    }
+                } else {
+                    // Past what this client inflates: stepped over in pieces, the stream in step.
+                    var left = compressedSize
+                    while left > 0 {
+                        let piece = min(left, 1 << 20)
+                        _ = try await source.read(piece)
+                        left -= piece
+                    }
+                    VNCDiagnostics.note(Self.logger, .default, category: "client", "event=apple-pasteboard skipped bytes=\(compressedSize)")
+                }
+                if let again = state.finishPasteboardFetch(session: session) {
+                    try await sink.write(RFBApplePasteboard.fetch(session: again))
+                }
+                if configuration.clipboardEnabled, let text { callbacks.cutText(text) }
             default:
                 throw RFBError.protocolViolation("The server sent an unknown message type \(type).")
             }
@@ -920,6 +965,29 @@ private final class ClientState: @unchecked Sendable {
     private var viewerInfo = true
     var sendsViewerInfo: Bool { lock.withLock { viewerInfo } }
     func setSendsViewerInfo(_ on: Bool) { lock.withLock { viewerInfo = on } }
+    // A Mac's pasteboard: the session its replies echo, one fetch at a time, and what this client
+    // last put on it, for a Mac that asks again (command 3).
+    private var pasteboardSession: UInt32 = 0
+    private var pasteboardFetching = false, pasteboardFetchAgain = false
+    private var pasteboardLocal: String?
+    func beginPasteboardFetch() -> UInt32? {
+        lock.withLock {
+            if pasteboardFetching { pasteboardFetchAgain = true; return nil }
+            pasteboardFetching = true
+            return pasteboardSession
+        }
+    }
+    /// A reply arrived; returns the session to fetch again with, when the pasteboard changed meanwhile.
+    func finishPasteboardFetch(session: UInt32) -> UInt32? {
+        lock.withLock {
+            pasteboardSession = session
+            if pasteboardFetchAgain { pasteboardFetchAgain = false; return session }
+            pasteboardFetching = false
+            return nil
+        }
+    }
+    func notePasteboardSent(_ text: String) -> UInt32 { lock.withLock { pasteboardLocal = text; return pasteboardSession } }
+    var localPasteboard: (text: String, session: UInt32)? { lock.withLock { pasteboardLocal.map { ($0, pasteboardSession) } } }
     private var appleScroll = false
     var acceptsAppleScroll: Bool { lock.withLock { appleScroll } }
     func setAcceptsAppleScroll() { lock.withLock { appleScroll = true } }

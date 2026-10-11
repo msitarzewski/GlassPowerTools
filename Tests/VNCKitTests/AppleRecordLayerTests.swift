@@ -115,6 +115,19 @@ struct AppleRecordLayerTests {
         #expect(Array(message[54..<58]) == UInt16(300).bigEndianBytes + UInt16(200).bigEndianBytes)
     }
 
+    @Test("a pasteboard archive: one text flavor going out, an empty item clearing, the first text flavor read back")
+    func pasteboardArchive() throws {
+        let archive = RFBApplePasteboard.archive(Array("hé".utf8))
+        #expect(try RFBApplePasteboard.text(in: archive) == "hé")
+        #expect(RFBApplePasteboard.archive([]) == [0, 0, 0, 0], "an item with no flavors clears the Mac's pasteboard")
+        #expect(try RFBApplePasteboard.text(in: RFBApplePasteboard.archive([])) == nil)
+        let message = try RFBApplePasteboard.send("hé", session: 9)
+        #expect(Array(message[0..<12]) == [0x1f, 0, 0, 0, 0, 0, 0, 9] + UInt32(archive.count).bigEndianBytes)
+        #expect(Int(UInt32(message[12]) << 24 | UInt32(message[13]) << 16 | UInt32(message[14]) << 8 | UInt32(message[15])) == message.count - 16)
+        #expect(try ZlibInflater().inflateAll(Array(message[16...])) == archive)
+        #expect(throws: RFBError.self) { try RFBApplePasteboard.text(in: UInt32(1).bigEndianBytes + UInt32(5000).bigEndianBytes) }
+    }
+
     @Test("on 003.889 a Mac reads the mask as left, right, middle: RFB's middle and right swap")
     func pointerMask() {
         #expect(VNCClient.applePointerMask(0x01) == 0x01)
@@ -135,12 +148,13 @@ struct AppleRecordLayerTests {
         var greeting: [UInt8] = Array("RFB 003.889\n".utf8) + [1, 30]
         greeting += UInt16(2).bigEndianBytes + UInt16(128).bigEndianBytes + prime + serverPublic
         let source = MemoryByteSource(greeting, holdsOpen: true), sink = MemoryByteSink()
-        final class Frames: @unchecked Sendable { let lock = NSLock(); var count = 0 }
+        final class Frames: @unchecked Sendable { let lock = NSLock(); var count = 0; var texts: [String] = [] }
         let frames = Frames()
         var callbacks = VNCClientCallbacks()
         callbacks.frame = { _, _, _ in frames.lock.withLock { frames.count += 1 } }
+        callbacks.cutText = { text in frames.lock.withLock { frames.texts.append(text) } }
         let client = VNCClient(configuration: VNCConfiguration(host: "mac.example", username: "alice", password: "secret",
-                                                               appleProtocol: true),
+                                                               clipboardEnabled: true, appleProtocol: true),
                                callbacks: callbacks, source: source, sink: sink)
         let run = Task { try await client.run() }
 
@@ -159,11 +173,12 @@ struct AppleRecordLayerTests {
         after += UInt16(4).bigEndianBytes + UInt16(4).bigEndianBytes + RFBPixelFormat.client.wireBytes
         after += UInt32(name.count).bigEndianBytes + name
         await source.append(after)
-        for _ in 0..<200 where await sink.written.count < 13 + 256 + 1 + 66 + 4 + 12 + 8 { try await Task.sleep(for: .milliseconds(5)) }
+        for _ in 0..<200 where await sink.written.count < 13 + 256 + 1 + 66 + 4 + 8 + 12 + 8 { try await Task.sleep(for: .milliseconds(5)) }
         let prelude = Array((await sink.written)[(13 + 256)...])
         #expect(prelude.first == 0x81, "shared, and the enhanced ServerInit asked for")
         #expect(Array(prelude.dropFirst()) == RFBAppleMessages.viewerInfo + RFBAppleMessages.setModeControl
-                + RFBAppleMessages.setEncryptionStart + RFBAppleMessages.enableInboundDecryption)
+                + RFBApplePasteboard.autoPasteboard(true) + RFBAppleMessages.setEncryptionStart + RFBAppleMessages.enableInboundDecryption,
+                "the pasteboard watched, in the clear, after ViewerInfo and SetMode")
         var rekey: [UInt8] = [0, 0, 0, 1] + [UInt8](repeating: 0, count: 8) + RFBAppleMessages.rekeyEncoding.bigEndianBytes
         rekey += UInt32(1).bigEndianBytes
         rekey += try RFBSecurity.encryptECB(algorithm: CCAlgorithm(kCCAlgorithmAES128), key: wrap, plaintext: Self.keys.key)
@@ -182,11 +197,27 @@ struct AppleRecordLayerTests {
         // Its ServerInit lists the second event message: a scroll goes as a distance, in its own record.
         #expect(client.acceptsAppleScroll)
         try await client.sendAppleScroll(horizontalPoints: 0, verticalPoints: 30, x: 1, y: 2)
+        // Its pasteboard changed; fetched; answered with rich text before the plain text.
+        await source.append(try RFBAppleRecords.frame([0x14, 0, 0, 4, 0, 1, 0, 2], with: toClient))
+        let rich = Array("{\\rtf1 copied}".utf8), plain = Array("copied on the Mac ✓".utf8)
+        var archive = UInt32(2).bigEndianBytes
+        archive += UInt32(15).bigEndianBytes + Array("public.rtf-data".utf8) + UInt32(0).bigEndianBytes
+        archive += UInt32(1).bigEndianBytes + UInt32(3).bigEndianBytes + Array("key".utf8) + UInt32(5).bigEndianBytes + Array("value".utf8)
+        archive += UInt32(rich.count).bigEndianBytes + rich
+        archive += UInt32(RFBApplePasteboard.textFlavor.count).bigEndianBytes + RFBApplePasteboard.textFlavor + UInt32(0).bigEndianBytes
+        archive += UInt32(0).bigEndianBytes + UInt32(plain.count).bigEndianBytes + plain
+        let compressed = try ZlibDeflater.syncFlushed(archive)
+        let reply: [UInt8] = [0x1f, 0, 0, 0] + UInt32(7).bigEndianBytes + UInt32(archive.count).bigEndianBytes
+            + UInt32(compressed.count).bigEndianBytes + compressed
+        await source.append(try RFBAppleRecords.frame(reply, with: toClient))
+        for _ in 0..<200 where frames.lock.withLock({ frames.texts.isEmpty }) { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(frames.lock.withLock { frames.texts } == ["copied on the Mac ✓"], "the text flavor, as UTF-8")
+        try await client.sendCutText("pasted on the headset é")
         for _ in 0..<100 { try await Task.sleep(for: .milliseconds(5)) }
 
         // What the viewer sent after the prelude: records, one message each, SetPixelFormat first.
         let written = await sink.written
-        var offset = 13 + 256 + 1 + 66 + 4 + 12 + 8
+        var offset = 13 + 256 + 1 + 66 + 4 + 8 + 12 + 8
         let fromClient = try RFBAppleRecordCipher(Self.keys, encrypting: false)
         var messages: [[UInt8]] = []
         while offset + 2 <= written.count {
@@ -200,6 +231,12 @@ struct AppleRecordLayerTests {
         #expect(messages.contains { $0.first == 3 && $0.count == 10 }, "an update request, alone in its record")
         #expect(messages.contains { $0 == RFBAppleMessages.scrollWheel(horizontalPoints: 0, verticalPoints: 30, x: 1, y: 2) },
                 "the scroll, alone in its record")
+        #expect(messages.contains { $0 == RFBApplePasteboard.fetch(session: 0) }, "the fetch, in its own record")
+        let sent = try #require(messages.first { $0.first == 0x1f }, "this client's pasteboard, as the Mac's message")
+        #expect(Array(sent[4..<8]) == UInt32(7).bigEndianBytes, "the session the Mac's reply named")
+        let outbound = try ZlibInflater().inflateAll(Array(sent[16...]))
+        #expect(try RFBApplePasteboard.text(in: outbound) == "pasted on the headset é")
+        #expect(!messages.contains { $0.first == 6 }, "never ClientCutText to a Mac")
         client.cancel()
         await source.close()
         _ = try? await run.value
