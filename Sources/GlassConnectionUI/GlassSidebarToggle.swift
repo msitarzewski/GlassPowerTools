@@ -11,6 +11,10 @@
 //  placed its own since glassdb, at the leading edge of the detail column's bar, and on an iPad.
 //  This is that button, shared, so both windows have the same one in the same place.
 //
+//  **On Vision Pro since W33** the four windows of columns have no split view at all: the toggle
+//  leads the content column's header (`GlassSpatialColumnHeader`), with ⌃⌘S, and the sidebar
+//  slides out and back (`GlassSpatialSplitView`). The iPad's database keeps it in its bar.
+//
 //  **Not on a Mac.** There the system's own item is the family standard (D24): a placed button
 //  drops into the overflow menu with its title and leaves with a collapsed column.
 //

@@ -331,6 +331,12 @@ struct GlassPowerToolsApp: App {
         } defaultValue: {
             GlassConnectionsWindow()
         }
+        // **Plain, so Glass can clear it** (W33; the owner, 2026-10-10: "Yes, all four"). The
+        // system's window keeps its glass behind a focused window whatever the app draws, as the
+        // terminal found (D59). The library draws Apple's glass itself at Glass, in Apple's
+        // corner, with Opacity's paint over it (`GlassShellLibraryView`), and lays its columns
+        // out itself (`GlassSpatialSplitView`).
+        .windowStyle(.plain)
         // **Smaller than the system's 1280 × 720** (W29; the owner, on the headset, 2026-10-10:
         // "The connections window on vision pro is pretty large"). The list column keeps its
         // 360 and the detail its grouped forms; what goes is empty space. It is the size a new

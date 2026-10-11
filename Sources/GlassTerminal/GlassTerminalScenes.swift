@@ -153,13 +153,13 @@ public struct GlassTerminalScenes: Scene {
         // and the same setting read nearly black in the simulator. The plain window's missing
         // shape is `GlassLayeredWindow`'s to supply (`GlassWindowShape`).
         //
-        // **Opacity tints the window from behind, edge to edge** (W32, 2026-10-10), in the window's
-        // shape: W28's canvas, set in from the window's edges, read as a dark panel, and the owner
-        // asked for it gone while keeping Opacity ("Opacity is essential transparency is
-        // essential"). The stack's own glass is still the window's: a `NavigationStack` draws
-        // system glass behind its content in a plain window, and nothing public turns it off
-        // (`GlassSpatialWindowGlass`), so Glass can't clear this window the way it clears a
-        // terminal.
+        // **Opacity paints the window edge to edge** (W32, 2026-10-10), in the window's shape:
+        // W28's canvas, set in from the window's edges, read as a dark panel, and the owner asked
+        // for it gone while keeping Opacity ("Opacity is essential transparency is essential").
+        // **The window draws its own glass** (W33), as strong as Glass and none at 0, behind that
+        // paint: the browser is our own column rather than a `NavigationStack`, whose system
+        // glass nothing could clear (`SFTPBrowserView.spatialBrowser`). Glass 0 and Opacity 0
+        // leave only the text and controls, as a terminal's window does.
         WindowGroup(id: "sftp", for: SFTPBrowserContext.self) { $context in
             GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsTheme(SFTPBrowserView.navigationOpacity)) {
                 if let context, sessionManager.session(for: context.sessionID) != nil {
@@ -176,6 +176,7 @@ public struct GlassTerminalScenes: Scene {
                         .trackWindowPresence(key: "sftp-missing", recovery: windowRecoveryManager)
                 }
             }
+            .glassSpatialWindowGlass()
             .glassLayers(runtime.layers)
         }
         .windowStyle(.plain)

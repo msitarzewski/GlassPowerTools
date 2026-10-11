@@ -34,9 +34,12 @@ public struct GlassShellLibraryView: View {
     static let navigationOpacity: GlassNavigationWindowOpacity = .behindColumns
 
     public var body: some View {
-        // On the headset Opacity tints the whole window, edge to edge behind the columns (owner,
-        // 2026-10-10: "The whole point of Glass Power Tools is Glass. Opacity is essential"); at 0
-        // it is Apple's glass. No inset card behind Your Library (174fa35): its column paints nothing.
+        // On the headset the window draws Apple's glass itself, at Glass, and Opacity paints the
+        // theme colour over it edge to edge in the window's shape (owner, 2026-10-10: "The whole
+        // point of Glass Power Tools is Glass. Opacity is essential"); with both at 0 only the
+        // text and controls are left. Its columns are our own (`GlassSpatialSplitView`), because
+        // the system split view drew glass of its own that nothing could clear (W33). No inset
+        // card behind Your Library (174fa35): its column paints nothing.
         GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsTheme(Self.navigationOpacity)) {
             GlassConnectionLibrary(items: model.items, selection: $selection, scope: $scope, searchText: $search,
                                    order: .source,
@@ -49,7 +52,8 @@ public struct GlassShellLibraryView: View {
                     if let id, let host = model.host(id) {
                         detail(host)
                     } else if model.hosts.isEmpty {
-                        emptyDetail
+                        // A header on the headset all the same: it carries the sidebar's toggle.
+                        emptyDetail.glassSpatialColumn("Your Library")
                     } else {
                         // D41: the library at a glance, and how this device has used it.
                         GlassLibraryOverview(statistics: .make(hosts: model.hosts, isFavorite: { model.isFavorite($0) },
@@ -98,6 +102,11 @@ public struct GlassShellLibraryView: View {
             .sidebarActions { addHostButton }
             #endif
         }
+        #if os(visionOS)
+        // Behind the paint and everything else, out to the window's edges: as much of Apple's
+        // glass as Glass asks for, and none at 0 (`GlassSpatialWindowGlass`).
+        .glassSpatialWindowGlass()
+        #endif
         // A capability asking to be sent back to the machine it belongs to. Selecting the host
         // is all it takes: on a compact width the library pushes the detail for a selection
         // change on its own, and on a Mac the detail column is already showing.

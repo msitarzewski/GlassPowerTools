@@ -78,10 +78,15 @@ public extension View {
     /// and `glassSpatialListRow()`; rows in a list never add `glassGazeHighlight` or
     /// `glassSpatialRowMetrics`, which made "a nested CSS cluster that eye tracking reveals layer by
     /// layer". A no-op off visionOS.
+    ///
+    /// **In one of our own columns** (`GlassSpatialColumn`, W33) a sidebar-style list is drawn as
+    /// an inset group — a grey platter with separators — because only the system split view's
+    /// sidebar draws it bare. There the list is plain, without separators, which is what the
+    /// split view's sidebar looked like.
     @ViewBuilder
     func glassSpatialList() -> some View {
         #if os(visionOS)
-        self.listStyle(.sidebar)
+        modifier(GlassSpatialListStyle())
         #else
         self
         #endif
@@ -147,3 +152,29 @@ public extension View {
         self
     }
 }
+
+#if os(visionOS)
+/// `glassSpatialList()` on the headset: the system's sidebar list, or a plain one without
+/// separators inside our own columns, where a sidebar list draws a grouped platter (W33).
+private struct GlassSpatialListStyle: ViewModifier {
+    @Environment(\.glassSpatialInColumn) private var inColumn
+
+    func body(content: Content) -> some View {
+        if inColumn {
+            content
+                .listStyle(.plain)
+                .listRowSeparator(.hidden)
+                .listSectionSeparator(.hidden)
+                // The window's glass is the list's surface, or nothing at Glass 0.
+                .scrollContentBackground(.hidden)
+                // The system sidebar's row height, 56 points, rather than a plain list's taller
+                // rows (rows take `glassSpatialListRow()`'s insets too): the schema's tables and
+                // the editor's files stood a fifth further apart (W33, measured against the split
+                // view's sidebar in the visionOS 27 simulator).
+                .environment(\.defaultMinListRowHeight, 56)
+        } else {
+            content.listStyle(.sidebar)
+        }
+    }
+}
+#endif

@@ -16,6 +16,8 @@ Choose **Done** to close the browser. This also closes its SFTP connection.
 
 The title shows the folder's name with its path beneath it. **Parent Directory** at the top of the list goes up one level.
 
+**On Vision Pro:** **Back** (‹), beside **Done**, returns to the folder you opened this one from (⌘[ with a keyboard). Choose the folder's name for a menu of the folders above it. The window's glass follows **Glass** in **Appearance**; with **Glass** and **Opacity** at 0% it is completely clear apart from its text and controls.
+
 - **On Vision Pro, iPad and iPhone:** tap a folder to open it. Use the disclosure arrow to show its contents in place.
 - **On Mac:** the list is a table with **Name**, **Size**, **Modified**, **Permissions** and **Actions**. Double-click a folder to open it. Select a folder and press → to expand it or ← to collapse it. Click a column header to sort.
 

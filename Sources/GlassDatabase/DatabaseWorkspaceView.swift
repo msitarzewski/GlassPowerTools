@@ -203,9 +203,9 @@ enum DatabaseWorkspaceConnectionsRoute: Equatable {
 
 struct DatabaseWorkspaceView: View {
     /// **The switch** for how a database window shows Opacity on Vision Pro (W32): the theme colour
-    /// edge to edge behind the split view's columns, and every surface in the window (the SQL
-    /// editor's ground, the grid's) at the same Opacity (`DatabaseWindowProfile`). Elsewhere the
-    /// window paints as it always has.
+    /// edge to edge over the window's own glass (W33) and behind its columns, and every surface in
+    /// the window (the SQL editor's ground, the grid's) at the same Opacity
+    /// (`DatabaseWindowProfile`). Elsewhere the window paints as it always has.
     nonisolated static let navigationOpacity: GlassNavigationWindowOpacity = .behindColumns
 
     let sessionID: UUID
@@ -756,106 +756,61 @@ struct DatabaseWorkspaceView: View {
         #if os(iOS)
         if horizontalSizeClass == .compact { compactLayout } else { splitLayout }
         #elseif os(visionOS)
-        if DatabaseSpatialLayout.drawsItsOwnGlass {
-            spatialGlassLayout
-        } else {
-            // **Opacity behind the columns, edge to edge in the window's shape** (W32, 2026-10-10):
-            // the split view's own glass over each column is tinted by it, as Files' and the
-            // editor's are. The workspace was a canvas set 34 points in from the window's edges
-            // (W28), which read as a dark panel; the owner: "Database server needs the dark
-            // background treatment like connections", and "Opacity is essential".
-            GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsTheme(Self.navigationOpacity)) {
-                splitLayout
-            }
+        // **Our own columns, on the window's own glass** (W33; the owner, 2026-10-10: "Yes, all
+        // four"). The split view drew system glass behind both columns that no setting could clear
+        // (D60); W28's prototype, behind a switch that is gone now, showed the window without it,
+        // and this is that, in the shared container. The window draws Apple's glass at its Glass and
+        // Opacity's theme colour over it edge to edge in its shape, so Glass 0 and Opacity 0 leave
+        // only the text and controls.
+        GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsTheme(Self.navigationOpacity)) {
+            spatialLayout
         }
+        .glassSpatialWindowGlass(strength: GlassWindowGlass.strength(settingsManager.layers.state, window: windowSettings,
+                                                                     reduceTransparency: reduceTransparency))
         #else
         splitLayout
         #endif
     }
 
     #if os(visionOS)
-    /// **The window without the split view, on its own glass** (W28, `DatabaseSpatialLayout`):
-    /// the schema list and the workspace side by side an even 34 points inside the window's edge,
-    /// the workspace as the canvas Opacity paints in the corner nested in Apple's, and the window's
-    /// way back, sidebar button, title and ⚡ in a title ornament, as a terminal's are. The bottom
-    /// toolbar is the same one the split view's detail column has.
-    private var spatialGlassLayout: some View {
-        GlassNativeWindowFrame(showTitle: true, showControls: false) {
-            HStack(spacing: 12) {
-                if columnVisibility != .detailOnly {
-                    schemaBrowser
-                        .environment(\.databaseSchemaInlineChrome, true)
-                        .listStyle(.sidebar)
-                        .frame(width: DatabaseSpatialLayout.sidebarWidth)
-                        .transition(.move(edge: .leading).combined(with: .opacity))
+    /// **The schema beside the workspace**, in `GlassSpatialSplitView`. The schema browser draws
+    /// its own header (title, Refresh, ⋯ and the filter); the workspace's header carries the
+    /// sidebar toggle, the way back to Connections, what is open, and the ⚡ — what the split
+    /// view's two navigation bars held. Run and the assistant are in the bottom toolbar with the
+    /// rest (`databaseExecutionToolbarPlacement`).
+    private var spatialLayout: some View {
+        GlassSpatialSplitView(visibility: $columnVisibility) {
+            schemaBrowser
+        } content: {
+            detailSurface
+                .glassSpatialColumn(detailTitle)
+                .glassSpatialColumnChrome {
+                    connectionsBackButton
+                } trailing: {
+                    if let show = runtime?.showActiveConnections {
+                        GlassActiveConnectionsButton { show() }
+                    }
                 }
-                detailSurface
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            .padding(GlassWindowShape.spatialNestedCanvasPadding(showsTitle: true, showsControls: false))
-        } title: {
-            spatialTitle
-        } controls: {
-            EmptyView()
+                .toolbar { workspaceToolbar }
         }
-        .toolbar { workspaceToolbar }
-        .glassSpatialWindowGlass(strength: GlassWindowGlass.strength(settingsManager.layers.state, window: windowSettings,
-                                                                     reduceTransparency: reduceTransparency))
-    }
-
-    /// The window's title ornament: what the split view's navigation bars held.
-    private var spatialTitle: some View {
-        HStack(spacing: 14) {
-            Button {
-                showConnections()
-            } label: {
-                Label("Connections", systemImage: "chevron.backward")
-            }
-            .help("Back to Connections")
-            .accessibilityIdentifier("database-workspace-connections")
-
-            Button {
-                withAnimation {
-                    columnVisibility = columnVisibility == .detailOnly ? .automatic : .detailOnly
-                }
-            } label: {
-                Label("Toggle Sidebar", systemImage: columnVisibility == .detailOnly ? "sidebar.left" : "sidebar.leading")
-            }
-            .help(columnVisibility == .detailOnly ? "Show the databases" : "Hide the databases")
-
-            VStack(alignment: .leading, spacing: 0) {
-                Text(detailTitle)
-                    .font(.headline)
-                    .lineLimit(1)
-                if !detailSubtitle.isEmpty {
-                    Text(detailSubtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-            .accessibilityElement(children: .combine)
-
-            if let show = runtime?.showActiveConnections {
-                GlassActiveConnectionsButton { show() }
-            }
-        }
-        .labelStyle(.iconOnly)
-        .padding(.horizontal, 18)
-        .padding(.vertical, 10)
     }
     #endif
 
-    /// Whether the way back and the sidebar button are in the window's title ornament rather than
-    /// in a navigation bar, which a database window without the split view does not have.
-    private var titleOrnamentHoldsNavigation: Bool {
-        #if os(visionOS)
-        DatabaseSpatialLayout.drawsItsOwnGlass
-        #else
-        false
-        #endif
+    /// The way back to Connections: in the bar's leading edge on a Mac, an iPad and a phone, and
+    /// in the workspace column's header on the headset.
+    private var connectionsBackButton: some View {
+        Button {
+            showConnections()
+        } label: {
+            Label("Connections", systemImage: "chevron.backward")
+        }
+        .help("Back to Connections")
+        .accessibilityIdentifier("database-workspace-connections")
     }
 
+    #if !os(visionOS)
+    /// The system split view, on a Mac and an iPad. The headset draws its own columns
+    /// (`spatialLayout`).
     private var splitLayout: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             schemaBrowser
@@ -864,19 +819,6 @@ struct DatabaseWorkspaceView: View {
         } detail: {
             detailSurface
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                #if os(visionOS)
-                // On the headset a split view's own toolbar is not drawn; a column's is. Attached
-                // here, the way back and the ⚡ appear beside the detail's own controls
-                // (2026-09-28: "there's no active connections icon in the database manager").
-                .toolbar { workspaceToolbar }
-                .glassActiveConnectionsToolbar(show: runtime?.showActiveConnections, dismissCurrent: { showConnections() })
-                // **The column's own title** (W32): the window's, on the split view, was drawn
-                // nowhere on the headset, so the detail's bar held only its buttons while the
-                // sidebar said "Databases". As a column's title visionOS sets it level with the
-                // sidebar's, as Connections' are (the owner: "the headers across all of these
-                // should do a better job of matching").
-                .navigationTitle(detailTitle)
-                #endif
         }
         #if os(macOS)
         .toolbar { workspaceToolbar }
@@ -884,11 +826,12 @@ struct DatabaseWorkspaceView: View {
         // added here it landed before their flexible spacer, on the left beside Back.
         .environment(\.glassActiveConnectionsRoute,
                      runtime?.showActiveConnections.map { GlassActiveConnectionsRoute(show: $0, dismissCurrent: { showConnections() }) })
-        #elseif !os(visionOS)
+        #else
         .toolbar { workspaceToolbar }
         .glassActiveConnectionsToolbar(show: runtime?.showActiveConnections, dismissCurrent: { showConnections() })
         #endif
     }
+    #endif
 
     #if os(iOS)
     /// One thing at a time: the schema, and what you chose from it. The same shape the editor
@@ -940,19 +883,15 @@ struct DatabaseWorkspaceView: View {
         // On a phone this is the first screen's control only: a pushed detail has the
         // stack's own back button, and two back controls pointing at different places is a
         // puzzle rather than a convenience.
-        if !isPushed && !titleOrnamentHoldsNavigation {
+        // On the headset it leads the workspace column's header instead (`spatialLayout`): there
+        // is no bar there for it.
+        #if !os(visionOS)
+        if !isPushed {
             // `.topBarLeading` on iOS, not `.navigation`: in a collapsed split view the item
             // simply did not appear, which is what "no back button" was (photographed 2026-09-19).
-            ToolbarItem(placement: backPlacement) {
-                Button {
-                    showConnections()
-                } label: {
-                    Label("Connections", systemImage: "chevron.backward")
-                }
-                .help("Back to Connections")
-                .accessibilityIdentifier("database-workspace-connections")
-            }
+            ToolbarItem(placement: backPlacement) { connectionsBackButton }
         }
+        #endif
         #if os(iOS)
         // **Disconnect, where there is no window to close.** A phone's workspace is a route in
         // the primary scene; everywhere else it is a window whose close button ends the session.
@@ -968,13 +907,14 @@ struct DatabaseWorkspaceView: View {
             }
         }
         #endif
-        #if !os(macOS)
+        #if os(iOS)
         // **No sidebar toggle where there is no sidebar.** On a compact width the schema is
         // the screen and the detail is a push; a control that reveals a column neither of
-        // them has is a control for nothing.
-        if !isCompact && !titleOrnamentHoldsNavigation {
+        // them has is a control for nothing. On the headset the workspace column's header has
+        // it (`GlassSpatialSplitView`).
+        if !isCompact {
             ToolbarItem(placement: databaseSidebarToolbarPlacement) {
-                // The same button the editor has on the headset, in the same place (W32).
+                // The same button the editor has, in the same place (W32).
                 GlassSidebarToggle(columnVisibility: $columnVisibility)
             }
         }
@@ -1129,11 +1069,11 @@ struct DatabaseWorkspaceView: View {
         // tab strip belongs to the live database canvas and follows the same
         // user-controlled opacity and blur as its editor and results grid —
         // this window's own, when it keeps them (W24).
-        #if os(visionOS)
-        .modifier(DatabaseSpatialCanvas(opacity: GlassWindowGlass.canvasOpacity(settingsManager.layers.state,
-                                                                               window: windowSettings,
-                                                                               reduceTransparency: reduceTransparency)))
-        #else
+        //
+        // Nothing of its own on the headset: the window draws its glass and paints Opacity
+        // behind both columns, edge to edge (`layout`, W33). W28's inset canvas read as a dark
+        // panel ("Database server needs the dark background treatment like connections").
+        #if !os(visionOS)
         .modifier(DatabaseWorkspaceBackground(
             material: .ultraThinMaterial,
             fillOpacity: windowProfile.glass.opacity,
@@ -1659,31 +1599,6 @@ struct DatabaseWorkspaceBackground: ViewModifier {
     }
 }
 
-
-#if os(visionOS)
-/// **The workspace on the headset.** In the split view (`DatabaseSpatialLayout.ownGlass` off) it
-/// paints nothing of its own: the window paints Opacity behind the columns, edge to edge, and the
-/// column is the split view's glass over that (W32, 2026-10-10). W28 had made it a canvas set 34
-/// points in from the window's edges, with a material behind it at the window's Glass, which the
-/// owner saw as a dark panel ("Database server needs the dark background treatment like
-/// connections").
-///
-/// Without the split view the window draws its glass itself and the workspace is its canvas:
-/// Opacity paints it, as a terminal's canvas is painted, in the continuous corner nested in
-/// Apple's at the terminal's 34-point inset, and what is drawn in it keeps to that shape.
-struct DatabaseSpatialCanvas: ViewModifier {
-    let opacity: Double
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if DatabaseSpatialLayout.drawsItsOwnGlass {
-            content.glassSpatialCanvas(opacity: opacity)
-        } else {
-            content
-        }
-    }
-}
-#endif
 
 /// One step of the workspace's location trail. Ancestors carry the
 /// destination that reopens them; the final crumb is where you already are.

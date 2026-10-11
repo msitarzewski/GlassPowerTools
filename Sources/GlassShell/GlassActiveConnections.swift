@@ -361,21 +361,44 @@ struct GlassActiveConnectionsList: View {
         .task { await model.refreshRunningSessions() }
         .refreshable { await model.refreshRunningSessions() }
         .toolbar { selectionToolbar(machines: machines, chosen: chosen) }
+        #if !os(visionOS)
         .toolbar {
-            ToolbarItem {
-                if model.isCheckingRunningSessions {
-                    ProgressView().controlSize(.small)
-                        .accessibilityLabel("Checking machines for running sessions")
-                } else {
-                    Button("Check Machines", systemImage: "arrow.clockwise") {
-                        Task { await model.refreshRunningSessions() }
-                    }
-                    .help("Look for sessions running on your machines")
-                }
-            }
+            ToolbarItem { checkMachinesControl }
+        }
+        #endif
+        // On the headset the column's header holds what the bar did: Select and Check Machines
+        // (W33). The bar's items have no bar to appear in there.
+        .glassSpatialColumn("Active") {
+            #if os(visionOS)
+            selectButton(machines)
+            checkMachinesControl
+            #endif
         }
         .modifier(GlassActiveSelectionPrompts(model: model, selection: selection, chosen: chosen))
     }
+
+    @ViewBuilder private var checkMachinesControl: some View {
+        if model.isCheckingRunningSessions {
+            ProgressView().controlSize(.small)
+                .accessibilityLabel("Checking machines for running sessions")
+        } else {
+            Button("Check Machines", systemImage: "arrow.clockwise") {
+                Task { await model.refreshRunningSessions() }
+            }
+            .help("Look for sessions running on your machines")
+        }
+    }
+
+    #if !os(macOS)
+    /// Selection mode in and out (W13).
+    private func selectButton(_ machines: [GlassActiveMachine]) -> some View {
+        Button(selection.isSelecting ? "Done" : "Select") {
+            withAnimation { selection.isSelecting.toggle() }
+        }
+        .disabled(!selection.isSelecting && machines.allSatisfy(\.running.isEmpty))
+        .accessibilityIdentifier("active-select")
+    }
+    #endif
 
     /// One machine: a disclosure over its live sessions.
     @ViewBuilder
@@ -507,13 +530,10 @@ struct GlassActiveConnectionsList: View {
             }
         }
         #else
-        ToolbarItem {
-            Button(selection.isSelecting ? "Done" : "Select") {
-                withAnimation { selection.isSelecting.toggle() }
-            }
-            .disabled(!selection.isSelecting && machines.allSatisfy(\.running.isEmpty))
-            .accessibilityIdentifier("active-select")
-        }
+        // In the column's header on the headset (`glassSpatialColumn`).
+        #if !os(visionOS)
+        ToolbarItem { selectButton(machines) }
+        #endif
         if selection.isSelecting {
             ToolbarItemGroup(placement: .glassActiveSelectionActions) {
                 Button(GlassActiveSelection.openTitle(count: plan.opening.count), systemImage: "macwindow.badge.plus") {
@@ -758,6 +778,8 @@ struct GlassActiveConnectionsDetail: View {
             description: Text(count == 0
                               ? "Connect to a machine and it appears under Active while the session is live."
                               : Self.closeHint))
+            // On the headset a header with nothing to name, for the window's sidebar toggle (W33).
+            .glassSpatialColumn("")
     }
 }
 

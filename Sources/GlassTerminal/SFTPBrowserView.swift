@@ -462,7 +462,8 @@ private final class SFTPBrowserSessionLifetime {
 
 struct SFTPBrowserView: View {
     /// **The switch** for how a Files window shows Opacity on Vision Pro (W32): the theme colour
-    /// edge to edge behind the browser's own glass. Elsewhere the window paints as it always has.
+    /// edge to edge over the window's own glass (W33), behind the files. Elsewhere the window
+    /// paints as it always has.
     static let navigationOpacity: GlassNavigationWindowOpacity = .behindColumns
 
     let sessionID: UUID
@@ -578,38 +579,92 @@ struct SFTPBrowserView: View {
         )
     }
 
-    var body: some View {
+    /// The browser and its navigation: a `NavigationStack` on a Mac, an iPad and a phone, and on
+    /// the headset our own column (`spatialBrowser`).
+    @ViewBuilder
+    private var browser: some View {
+        #if os(visionOS)
+        spatialBrowser
+        #else
         NavigationStack {
-            // On the headset the list sits on the stack's own glass, which the window's Opacity
-            // tints from behind, edge to edge (`navigationOpacity`, in the scene). W28 had made the
-            // list a canvas painted at Opacity 34 points in from the window's edges, which read as
-            // a dark panel (W32; the owner, 2026-10-10: "Database server needs the dark background
-            // treatment like connections. same with the database view and ultimately the editor").
             content
                 // **The folder's name, with the path beneath it.** The title used to be
                 // `currentPath` — the whole path as a title, which reads as a string of text
                 // rather than a place (reported 2026-09-18). The editor's file list shows the
                 // same header, because both are browsers over the same kind of thing.
-                // On the headset the title's menu goes up a level or more, as the breadcrumb does
-                // in the Mac's toolbar (W16).
                 .glassPathHeader(currentPath, openAncestor: { path in Task { await navigateTo(path) } })
                 .searchable(text: $filterText, prompt: "Filter files...")
                 .terminalTextInputDefaults()
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     sftpBottomShelf
                 }
-                .onSubmit(of: .search) {
-                    if !filterText.isEmpty {
-                        Task { await remoteFind(filterText) }
-                    }
-                }
-                .onChange(of: filterText) { _, newValue in
-                    if newValue.isEmpty {
-                        showingSearchResults = false
-                        searchResults = []
-                    }
-                }
+                .onSubmit(of: .search) { findRemotely() }
                 .toolbar { toolbarContent }
+        }
+        #endif
+    }
+
+    /// Searches the server for the filter's text, as Return in the field asks.
+    private func findRemotely() {
+        if !filterText.isEmpty {
+            Task { await remoteFind(filterText) }
+        }
+    }
+
+    #if os(visionOS)
+    /// **Files on the headset: one column of our own** (W33; the owner, 2026-10-10: "Yes, all
+    /// four"). A `NavigationStack` drew system glass behind the files that no setting could clear;
+    /// the window now draws its own (`GlassTerminalScenes`). The header is what the stack's bar
+    /// held — Done, the folder's name with the path beneath it and the folders above it in its
+    /// menu (W16), the ⋯ menu — and a way back up the folders this window has walked, with the
+    /// stack's push and pop. The filter field sits under it, and Return in it searches the server.
+    private var spatialBrowser: some View {
+        let location = GlassPathLocation(path: currentPath)
+        return content
+            // A folder opened slides in from the trailing edge; Back slides its parent in from
+            // the leading one, as a navigation stack moves.
+            .glassSpatialPush(currentPath, depth: navigationStack.count)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                sftpBottomShelf
+            }
+            .glassSpatialColumn(location.name,
+                                subtitle: location.parent,
+                                back: parentBack,
+                                search: GlassSpatialSearch(text: $filterText, prompt: "Filter files...",
+                                                           accessibilityIdentifier: "sftp-filter",
+                                                           onSubmit: { findRemotely() }),
+                                titleMenu: location.ancestors.map { ancestor in
+                                    GlassSpatialMenuItem(id: ancestor.path, title: ancestor.name,
+                                                         systemImage: "folder") {
+                                        Task { await navigateTo(ancestor.path) }
+                                    }
+                                }) {
+                actionsMenu
+            }
+            // Done leads, where the stack's bar put it.
+            .glassSpatialColumnChrome {
+                doneButton
+            } trailing: {
+                EmptyView()
+            }
+            .terminalTextInputDefaults()
+    }
+
+    /// Back to the folder this one was opened from, once there is one.
+    private var parentBack: GlassSpatialBack? {
+        guard navigationStack.count > 1 else { return nil }
+        let parent = GlassPathLocation(path: navigationStack[navigationStack.count - 2]).name
+        return GlassSpatialBack(parent) { navigateUp() }
+    }
+    #endif
+
+    var body: some View {
+        browser
+        .onChange(of: filterText) { _, newValue in
+            if newValue.isEmpty {
+                showingSearchResults = false
+                searchResults = []
+            }
         }
         .task {
             if sessionLifetime == nil, let session, session.purpose == .sftp {
@@ -2399,17 +2454,33 @@ struct SFTPBrowserView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .cancellationAction) {
-            Button("Done") {
-                Task {
-                    if await shutdownTransferAndConnection() {
-                        dismiss()
-                    }
+        ToolbarItem(placement: .cancellationAction) { doneButton }
+
+        ToolbarItem(placement: .primaryAction) { actionsMenu }
+
+        // Not on the headset: there the bar's middle is the title's, and a breadcrumb in it left
+        // the window with no title at all. The folder is the title there and the title's menu
+        // holds the folders above it (`glassPathHeader`, W16).
+        #if !os(visionOS)
+        ToolbarItem(placement: .principal) {
+            pathBreadcrumb
+        }
+        #endif
+    }
+
+    /// Ends the transfers and the connection, then closes the window.
+    private var doneButton: some View {
+        Button("Done") {
+            Task {
+                if await shutdownTransferAndConnection() {
+                    dismiss()
                 }
             }
         }
+    }
 
-        ToolbarItem(placement: .primaryAction) {
+    /// Selection, new folders and files, upload, hidden files and refresh: the ⋯ menu.
+    private var actionsMenu: some View {
             Menu {
                 #if os(iOS) || os(visionOS)
                 Button {
@@ -2478,18 +2549,14 @@ struct SFTPBrowserView: View {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
             } label: {
+                #if os(visionOS)
+                // Named, so the header's circle says what it is to VoiceOver, as the ⋯ the
+                // system's bar drew did.
+                Label("More", systemImage: "ellipsis")
+                #else
                 Image(systemName: "ellipsis.circle")
+                #endif
             }
-        }
-
-        // Not on the headset: there the bar's middle is the title's, and a breadcrumb in it left
-        // the window with no title at all. The folder is the title there and the title's menu
-        // holds the folders above it (`glassPathHeader`, W16).
-        #if !os(visionOS)
-        ToolbarItem(placement: .principal) {
-            pathBreadcrumb
-        }
-        #endif
     }
 
     private var pathBreadcrumb: some View {

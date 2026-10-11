@@ -20,7 +20,7 @@ Choose **Appearance**. The **Windows** section has:
 
 The sliders settle on 0%, 50% and 100% when you drag near them. Text and controls stay fully visible at every setting. For a completely clear window, set **Opacity** and **Glass** to 0%.
 
-**On Vision Pro:** there is no **Material** to choose. **Glass** is a window's own glass: at 100% it looks like any visionOS window, and at 0% there is none. In a terminal or remote desktop window, **Opacity** paints only the area its content sits in (the terminal's text, the desktop's screen), and both windows are completely clear with both settings at 0%. Connections, Files, the editor and the database keep visionOS's own glass in their columns, so **Glass** doesn't make them clearer; there **Opacity** paints the theme color behind the whole window, which tints that glass, and under the editor's text. At 0% they are visionOS's own glass.
+**On Vision Pro:** there is no **Material** to choose. **Glass** is a window's own glass: at 100% it looks like any visionOS window, and at 0% there is none. In a terminal or remote desktop window, **Opacity** paints only the area its content sits in (the terminal's text, the desktop's screen). In Connections, Files, the editor and the database, **Opacity** paints the theme color across the whole window, and under the editor's text. Every window is completely clear at 0% **Glass** and 0% **Opacity**, apart from its text and controls.
 
 These settings also apply to terminal windows. They are kept on each device.
 
@@ -29,8 +29,8 @@ These settings also apply to terminal windows. They are kept on each device.
 A window can keep its own **Opacity**, **Glass** and **Material** in place of these: terminal, editor and database windows. (A remote desktop window has its own glass settings instead; see its This Window.)
 
 - In a terminal, open its tools menu, choose **Settings**, then **This Window**, which has **Opacity** and **Glass**, and **Material** on iPad; see [Give a terminal window its own settings](terminal-settings.md#give-a-terminal-window-its-own-settings).
-- In an editor window, choose **Settings** (gear) in its toolbar, then **This Window**, which has **Opacity**, and **Glass** and **Material** on Mac and iPad; see [Give an editor window its own settings](editor-settings.md#give-an-editor-window-its-own-settings).
-- In a database window, choose **Settings** (gear) in its toolbar, then **This Window**, which has **Opacity**, and **Glass** on Mac and iPad; see [Give a database window its own settings](database-workspace.md#give-a-database-window-its-own-settings).
+- In an editor window, choose **Settings** (gear) in its toolbar, then **This Window**, which has **Opacity** and **Glass**, and **Material** on Mac and iPad; see [Give an editor window its own settings](editor-settings.md#give-an-editor-window-its-own-settings).
+- In a database window, choose **Settings** (gear) in its toolbar, then **This Window**, which has **Opacity** and **Glass**; see [Give a database window its own settings](database-workspace.md#give-a-database-window-its-own-settings).
 
 Each follows **Appearance** until you change it there, and only that window changes. A setting the window has changed shows a small ↺ beside its name, which returns it to **Appearance**. Whatever a window hasn't set follows **Appearance**.
 

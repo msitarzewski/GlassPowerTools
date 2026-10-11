@@ -307,5 +307,7 @@ public struct GlassLibraryDetail<Content: View, Actions: View>: View {
                 .glassActionBarSurface()
         }
         .navigationTitle(title)
+        // On the headset the column's own header, where the navigation bar's title was (W33).
+        .glassSpatialColumn(title)
     }
 }

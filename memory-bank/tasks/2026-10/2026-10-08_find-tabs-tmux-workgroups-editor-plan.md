@@ -997,3 +997,15 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   visionOS (W33 restores it). All suites green. **0.4.343** building/installing (Vision Pro + iPhone). **W33** running.
   Open for the owner: title ornament sizes differ (terminal ≈29 pt caption, desktop ≈37 pt headline); editor text at
   Opacity 0 is lightened/semibold with a shade (legibility), losing most syntax colour.
+- **0.4.343 on Vision Pro + iPhone (~19:00).** The headset relaunch hung (devicectl `process launch` waiting, headset likely
+  asleep or off-head) and was stopped; the install itself succeeded (headset reports 0.4.343).
+- **W33 merged (D62): own glass for Connections, database, editor, Files on visionOS.** `GlassSpatialSplitView` +
+  `.glassSpatialColumn(title:…)` headers (92 pt, large-title bold, level), `.glassSpatialColumnChrome`, `.glassSpatialPush`
+  transitions, `GlassSpatialSearchField`, `glassSpatialList()`; Connections scene `.plain`; windows draw
+  `glassSpatialWindowGlass()` under whole-window Opacity; Glass row back in database/editor This Window; database
+  prototype (`DatabaseSpatialLayout`, `DatabaseSpatialCanvas`, `offersGlass`) deleted; Files Back = header + ⌘[;
+  Connections' Collections tab pushes. Lost: system sidebar collapse animation, resizing, split-view rotor landmarks
+  (VoiceOver gets Sidebar/Content containers). Suites on main: connection UI 49, layers 48, shell 254, terminal 724,
+  desktop 195, database 317, editor 151, editor UI 117. visionOS UI bundle: new 3/3 + ornament 3/3 pass; 15 failures
+  identical on unchanged HEAD (iPhone-only Projects row, orb pinch, library sheet Save, TagField, 3 terminal) — pre-existing,
+  not fixed. Simulator only; not yet judged on the headset.

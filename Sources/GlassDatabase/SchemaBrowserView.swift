@@ -9,6 +9,7 @@
 import SwiftUI
 import GlassDBKit
 import GlassLayers
+import GlassConnectionUI
 import os
 
 private struct SchemaMutationTarget: Identifiable {
@@ -56,8 +57,6 @@ struct SchemaBrowserView: View {
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     #endif
-    /// No navigation bar to hold the title, controls and filter (W28, `DatabaseSpatialLayout`).
-    @Environment(\.databaseSchemaInlineChrome) private var inlineChrome
 
     @State private var databases: [String] = []
     @State private var expandedDatabases: Set<String> = []
@@ -101,9 +100,6 @@ struct SchemaBrowserView: View {
         Group {
             if session != nil {
                 VStack(spacing: 0) {
-                    if inlineChrome {
-                        inlineHeader
-                    }
                     if isLoading && databases.isEmpty {
                         ProgressView("Loading schema...")
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -125,26 +121,29 @@ struct SchemaBrowserView: View {
                 )
             }
         }
+        #if os(visionOS)
+        // **The sidebar's own header on the headset** (W33): the title, Refresh, Mutation Log in
+        // the ⋯ menu where the bar put its secondary items, and the filter field, which the bar
+        // held. The window has no navigation container to draw them (`GlassSpatialSplitView`).
+        .glassSpatialColumn(title,
+                            search: GlassSpatialSearch(text: $filterText, prompt: "Filter",
+                                                       accessibilityIdentifier: "db-schema-filter")) {
+            refreshButton
+            Menu {
+                mutationLogButton
+            } label: {
+                Label("More", systemImage: "ellipsis")
+            }
+            .menuIndicator(.hidden)
+        }
+        #else
         .navigationTitle(title)
         .schemaSearchable(text: $filterText)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    Task { await refreshExpandedSchema() }
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
-                }
-                .help("Reload databases and tables")
-            }
-            ToolbarItem(placement: .secondaryAction) {
-                Button {
-                    showingMutationAudit = true
-                } label: {
-                    Label("Mutation Log", systemImage: "list.bullet.rectangle.portrait")
-                }
-                .help("Review every row and schema change this app has made")
-            }
+            ToolbarItem(placement: .primaryAction) { refreshButton }
+            ToolbarItem(placement: .secondaryAction) { mutationLogButton }
         }
+        #endif
         .sheet(isPresented: $showingMutationAudit) {
             MutationAuditView(connectionID: session?.connectionConfig.id,
                               connectionName: session?.connectionConfig.name)
@@ -354,51 +353,22 @@ struct SchemaBrowserView: View {
     }
     #endif
 
-    /// **The list's own title, controls and filter**, where there is no navigation bar to hold
-    /// them: a Vision Pro database window without the split view (W28, `DatabaseSpatialLayout`).
-    /// The same title, Refresh, Mutation Log and filter the bar shows, in the bar's order.
-    private var inlineHeader: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                Text(title)
-                    .font(.title.weight(.bold))
-                    .lineLimit(1)
-                    .accessibilityAddTraits(.isHeader)
-                Spacer(minLength: 0)
-                Button {
-                    Task { await refreshExpandedSchema() }
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
-                }
-                .help("Reload databases and tables")
-                Menu {
-                    Button {
-                        showingMutationAudit = true
-                    } label: {
-                        Label("Mutation Log", systemImage: "list.bullet.rectangle.portrait")
-                    }
-                    .help("Review every row and schema change this app has made")
-                } label: {
-                    Label("More", systemImage: "ellipsis")
-                }
-            }
-            .labelStyle(.iconOnly)
-            .buttonBorderShape(.circle)
-
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                    .accessibilityHidden(true)
-                TextField("Filter", text: $filterText)
-                    .autocorrectionDisabled()
-                    .databaseNoAutocapitalization()
-                    .accessibilityIdentifier("db-schema-filter")
-            }
-            .textFieldStyle(.roundedBorder)
+    private var refreshButton: some View {
+        Button {
+            Task { await refreshExpandedSchema() }
+        } label: {
+            Label("Refresh", systemImage: "arrow.clockwise")
         }
-        .padding(.horizontal, 12)
-        .padding(.top, 8)
-        .padding(.bottom, 12)
+        .help("Reload databases and tables")
+    }
+
+    private var mutationLogButton: some View {
+        Button {
+            showingMutationAudit = true
+        } label: {
+            Label("Mutation Log", systemImage: "list.bullet.rectangle.portrait")
+        }
+        .help("Review every row and schema change this app has made")
     }
 
     private var schemaTree: some View {
@@ -458,8 +428,12 @@ struct SchemaBrowserView: View {
                     }
                 }
                 .tag(WorkspaceSelection.database(database))
+                .glassSpatialListRow()
             }
         }
+        // Bare rows in the headset's own sidebar column, as the system's sidebar drew them (W33);
+        // nothing elsewhere.
+        .glassSpatialList()
         .databaseScrollBehavior()
         // **The sidebar follows the tab.** A table shown any other way — from the diagram, a
         // Follow Reference, a new window — is disclosed and scrolled to, as if navigated to here
@@ -502,6 +476,8 @@ struct SchemaBrowserView: View {
         .contextMenu {
             tableActionMenu(table, database: database)
         }
+        // The sidebar's row spacing in the headset's own column (W33); nothing elsewhere.
+        .glassSpatialListRow()
     }
 
     @ViewBuilder

@@ -258,14 +258,23 @@ struct TerminalWorkgroupsView: View {
             }
         }
         .accessibilityIdentifier("connection-library-results-workgroups")
-        .navigationTitle("Workgroups")
-        .searchable(text: $model.searchQuery, prompt: "Search workgroups...")
-        .searchFocused($searchIsFocused)
         .onChange(of: visibleSelections) { _, visibleSelections in
             if let current = model.selection, !visibleSelections.contains(current) {
                 model.selection = nil
             }
         }
+        #if os(visionOS)
+        // The column's header on the headset, with the search field the bar's search button
+        // used to reveal, and the bar's two actions (W33): there is no bar there.
+        .glassSpatialColumn("Workgroups",
+                            search: GlassSpatialSearch(text: $model.searchQuery, prompt: "Search workgroups...",
+                                                       accessibilityIdentifier: "connection-library-search")) {
+            workgroupActions
+        }
+        #else
+        .navigationTitle("Workgroups")
+        .searchable(text: $model.searchQuery, prompt: "Search workgroups...")
+        .searchFocused($searchIsFocused)
         .toolbar {
             #if !os(macOS)
             ToolbarItemGroup(placement: .primaryAction) {
@@ -278,28 +287,33 @@ struct TerminalWorkgroupsView: View {
                     .accessibilityLabel("Search")
                     .accessibilityIdentifier("connection-library-search")
                 }
-
-                #if !os(macOS)
-                Button {
-                    editCurrentSessionsAsWorkgroup()
-                } label: {
-                    Image(systemName: "rectangle.stack.badge.plus")
-                }
-                .disabled(currentSavedSessionIntents.isEmpty)
-                .accessibilityLabel("Save current SSH sessions as workgroup")
-                .accessibilityIdentifier("connection-library-save-current-workgroup")
-                #endif
-
-                Button {
-                    model.editorContext = .new()
-                } label: {
-                    Image(systemName: "plus")
-                }
-                .accessibilityLabel("New workgroup")
-                .accessibilityIdentifier("connection-library-add-workgroup")
+                workgroupActions
             }
             #endif
         }
+        #endif
+    }
+
+    /// Save the open sessions as a workgroup, and a new one: the bar's actions off the Mac.
+    @ViewBuilder private var workgroupActions: some View {
+        #if !os(macOS)
+        Button {
+            editCurrentSessionsAsWorkgroup()
+        } label: {
+            Image(systemName: "rectangle.stack.badge.plus")
+        }
+        .disabled(currentSavedSessionIntents.isEmpty)
+        .accessibilityLabel("Save current SSH sessions as workgroup")
+        .accessibilityIdentifier("connection-library-save-current-workgroup")
+
+        Button {
+            model.editorContext = .new()
+        } label: {
+            Image(systemName: "plus")
+        }
+        .accessibilityLabel("New workgroup")
+        .accessibilityIdentifier("connection-library-add-workgroup")
+        #endif
     }
 
     @ViewBuilder
@@ -356,6 +370,8 @@ struct TerminalWorkgroupsView: View {
             .accessibilityIdentifier(
                 "connection-library-detail-live-workgroup-\(workgroup.id.uuidString.lowercased())"
             )
+            // The column's header on the headset, where the bar's title was (W33).
+            .glassSpatialColumn(workgroup.name)
         } else if let preset = selectedWorkgroup(in: connectionLibrary) {
             Form {
                 Section {
@@ -446,6 +462,7 @@ struct TerminalWorkgroupsView: View {
             .accessibilityIdentifier(
                 "connection-library-detail-workgroup-\(preset.id.uuidString.lowercased())"
             )
+            .glassSpatialColumn(preset.name)
         } else {
             ContentUnavailableView {
                 Label("Select a Workgroup", systemImage: "rectangle.stack")
@@ -458,6 +475,8 @@ struct TerminalWorkgroupsView: View {
                 .accessibilityIdentifier("connection-library-add-workgroup-empty-detail")
             }
             .accessibilityIdentifier("connection-library-detail-empty-workgroup")
+            // A header with nothing to name, for the window's sidebar toggle (W33).
+            .glassSpatialColumn("")
         }
     }
 

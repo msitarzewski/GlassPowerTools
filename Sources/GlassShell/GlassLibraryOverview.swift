@@ -121,13 +121,12 @@ struct GlassLibraryOverview: View {
             .frame(maxWidth: 760, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
-        #if os(visionOS)
-        // The column's own title, so visionOS sets it level with the sidebar's "All Connections"
-        // (owner: "let's keep all tiles and shapes aligned"). It was text inside the scroll view,
-        // which sat higher than the sidebar's title.
-        .navigationTitle("Your Library")
-        #endif
         .accessibilityIdentifier("library-overview")
+        // The column's own title, level with the sidebar's "All Connections" (owner: "let's keep
+        // all tiles and shapes aligned"). It was text inside the scroll view, which sat higher
+        // than the sidebar's title; then the column's navigation title (6d132e9); now our own
+        // column's header, at the same height (W33).
+        .glassSpatialColumn("Your Library")
     }
 
     #if os(visionOS)

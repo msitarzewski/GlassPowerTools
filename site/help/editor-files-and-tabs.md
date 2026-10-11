@@ -4,7 +4,7 @@ This page covers the file list of an open project, how files open into tabs, and
 
 ## Browse a project's files
 
-On Apple Vision Pro, iPad and Mac, the project's files are a list on the left of the editor window. **On Apple Vision Pro**, the list is titled **Files**; to hide or show it, choose the sidebar button at the left of the window's top bar. Folders come first, then files, each sorted by name. Choose the disclosure triangle beside a folder to open it. A folder on a server is read when you first open it, and shows a progress indicator while it is read. A folder that cannot be read shows a warning symbol; hold the pointer over it to see why. On iPhone the folder's screen says why instead.
+On Apple Vision Pro, iPad and Mac, the project's files are a list on the left of the editor window. **On Apple Vision Pro**, the list is titled **Files**; to hide or show it, choose the sidebar button beside the document's name at the top of the window (⌃⌘S with a keyboard). Folders come first, then files, each sorted by name. Choose the disclosure triangle beside a folder to open it. A folder on a server is read when you first open it, and shows a progress indicator while it is read. A folder that cannot be read shows a warning symbol; hold the pointer over it to see why. On iPhone the folder's screen says why instead.
 
 Type in **Filter** above the list to show only the entries whose names contain what you typed.
 

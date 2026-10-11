@@ -91,7 +91,8 @@ public enum GlassLayeredPanelRole: Sendable {
     /// every platform, because nothing else paints that surface.
     case presented
     /// A column or region inside a `GlassLayeredWindow`, which already paints edge to edge (on
-    /// Vision Pro, behind the columns' own glass): it paints nothing of its own anywhere.
+    /// Vision Pro, over the window's own glass and behind its columns): it paints nothing of its
+    /// own anywhere.
     case embedded
 }
 
@@ -102,8 +103,8 @@ public enum GlassLayeredPanelRole: Sendable {
 /// second rounded card inside an already layered window doubled the theme paint, clipped the
 /// detail's bottom action bar into a lighter band and let the window corner show through
 /// (observed on the Mac, 2026-09-10). On Vision Pro the window paints Opacity behind its columns
-/// (`GlassNavigationWindowOpacity`) and the column is Apple's glass over that paint (W32,
-/// 2026-10-10). W28 had made an embedded panel a canvas there, set 34 points in from the window's
+/// (`GlassNavigationWindowOpacity`, W32) over the glass it draws itself (`glassSpatialWindowGlass`,
+/// W33). W28 had made an embedded panel a canvas there, set 34 points in from the window's
 /// edges, which the owner saw as a dark panel: "remove the black background".
 public struct GlassLayeredPanel<Content: View>: View {
     @Environment(\.glassLayers) private var layers

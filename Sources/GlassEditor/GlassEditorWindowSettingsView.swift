@@ -87,8 +87,6 @@ struct GlassEditorSettingsSheet: View {
 /// its project on this device (`GlassEditorWindowSettings`).
 struct GlassEditorWindowSettingsView: View {
     let workspace: GlassEditorWorkspace
-    @Environment(\.glassLayers) private var layers
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     /// Where each setting lives for every window, as This Window names it.
     enum Source {
@@ -159,31 +157,11 @@ struct GlassEditorWindowSettingsView: View {
         .accessibilityIdentifier("editor-window-settings")
     }
 
-    /// The window's glass. **On Vision Pro, Opacity only:** there the window's glass is the
-    /// system's own and the layer paints no frost over it (`GlassLayerBackground`, since 7478a39),
-    /// so Glass and Material would be controls that change nothing in an editor window.
-    @ViewBuilder
+    /// The window's glass: Opacity and Glass, and Material off the headset
+    /// (`GlassWindowLayerControls`). **Glass is offered on Vision Pro again** (W33): the window
+    /// draws Apple's glass itself there, as strong as Glass, where W32 had only the split view's
+    /// system glass, which Glass could not change.
     private func glass(_ settings: Binding<GlassWindowOverrides>) -> some View {
-        #if os(visionOS)
-        Section {
-            GlassWindowSettingRow(GlassLayerSettings.opacity, overrides: settings, global: layers.state.opacity,
-                                  inheritsFrom: Source.appearance) { value in
-                GlassSettingSlider(title: GlassLayerSettings.opacity.title, value: value, detents: [0, 0.5, 1],
-                                   leadingAccessibilityLabel: "Transparent", trailingAccessibilityLabel: "Opaque",
-                                   accessibilityIdentifier: "window-layers-opacity")
-            }
-        } header: {
-            Text("Appearance")
-        } footer: {
-            if reduceTransparency {
-                Text(GlassWindowGlassFooter.reduceTransparency)
-            } else {
-                Text("Opacity paints the theme color behind the window's glass and under the text. At 0% the window is visionOS's own glass.")
-            }
-        }
-        .disabled(reduceTransparency)
-        #else
         GlassWindowLayerControls(overrides: settings, inheritsFrom: Source.appearance)
-        #endif
     }
 }

@@ -93,7 +93,12 @@ public struct GlassLibraryResults<ID: Hashable & Sendable, Row: View>: View {
         #if os(macOS)
         .contentMargins(.top, 10, for: .scrollContent)
         #endif
+        // On the headset the column's header holds the title and the search field instead
+        // (`GlassConnectionLibrary.visionSidebar`, W33): there is no navigation bar there for
+        // either to appear in.
+        #if !os(visionOS)
         .navigationTitle(title)
+        #endif
         // The list does not paint a surface of its own: the window's layered glass is the surface,
         // and the list sits on it. This is what makes the results column match the sidebar instead
         // of being an opaque white panel beside it — and it is why the opacity and frost settings
@@ -101,8 +106,10 @@ public struct GlassLibraryResults<ID: Hashable & Sendable, Row: View>: View {
         // divider, since an opaque child over a translucent window leaves every pixel it misses
         // showing the desktop.
         .scrollContentBackground(.hidden)
+        #if !os(visionOS)
         .searchable(text: $searchText, prompt: "Search connections...")
         .searchFocused($searchFocused)
+        #endif
         .onKeyPress(.return, phases: .down) { press in
             guard press.modifiers.isEmpty, !searchFocused, let selection,
                   items.contains(where: { $0.id == selection }) else { return .ignored }

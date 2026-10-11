@@ -25,6 +25,8 @@ Tabs appear once more than one is open, and a trail above the content shows wher
 
 **Connections**, at the leading edge of the toolbar, returns to the host in the library.
 
+**On Vision Pro:** **Connections** is at the top left of the workspace, beside the sidebar button, which hides and shows the schema browser (⌃⌘S with a keyboard). ⚡ is at the top right. Running a table's SQL and the on-device assistant are in the bar below the window, with the other commands.
+
 ## Read the overview
 
 The first tab, **Overview**, shows:
@@ -86,7 +88,7 @@ A database window can keep settings of its own, so one window can have larger te
 
 **This Window** has:
 
-- **Appearance**: **Opacity** and **Glass**, which otherwise follow **Appearance** in Settings. They change the canvas behind the window's tabs, editor and results; the schema sidebar keeps the system's material. **On Vision Pro**, **Appearance** has **Opacity** only: it paints the theme color behind the whole window, which tints visionOS's own glass, and under the SQL editor and the results. At 0% the window is visionOS's own glass.
+- **Appearance**: **Opacity** and **Glass**, which otherwise follow **Appearance** in Settings. They change the canvas behind the window's tabs, editor and results; the schema sidebar keeps the system's material. **On Vision Pro**, **Glass** is the window's own glass, and **Opacity** paints the theme color across the whole window and under the SQL editor and the results. With both at 0% the window is completely clear apart from its text and controls.
 - **Query**: **Result row limit**.
 - **Editor**: **SQL editor text**, **Results grid text**, **Show line numbers** and **Format JSON automatically while editing**.
 

@@ -55,15 +55,27 @@ struct GlassWindowShapeTests {
     /// W32 (2026-10-10): a navigation window has no canvas any more — its `GlassLayeredWindow`
     /// paints Opacity behind the columns, edge to edge in the window's own shape, as its kind's
     /// `GlassNavigationWindowOpacity` says, and the columns' glass is tinted by it.
+    /// W33 (2026-10-10, the owner: "Yes, all four"): Connections, Files, the editor and the
+    /// database have no navigation container on the headset any more — their columns are our own
+    /// (`GlassSpatialSplitView`, `GlassSpatialColumn`) — so each draws Apple's glass itself, as
+    /// strong as its Glass and none at 0, with Opacity's paint over it edge to edge in the
+    /// window's shape. Connections became plain to be able to: the system's window keeps its
+    /// glass behind a focused window whatever the app draws (D59).
     static let plainWindows: [String: (frame: (file: String, uses: [String])?, why: String)] = [
         "\"terminal\"": (("VisionTerminalWorkgroupView.swift", [".glassSpatialWindowGlass(strength:"]),
                          "it draws Apple's glass itself, in Apple's corner, as strong as its Blur, so it can be clear"),
+        "\"main\"": (("GlassShellLibraryView.swift",
+                      ["GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsTheme(Self.navigationOpacity)) {",
+                       ".glassSpatialWindowGlass()"]),
+                     "Connections draws Apple's glass itself, at Glass, with Opacity's paint over it in the window's shape; its columns are our own"),
         "\"sftp\"": (("GlassTerminalScenes.swift",
-                      ["GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsTheme(SFTPBrowserView.navigationOpacity)) {"]),
-                     "the browser's NavigationStack draws the window's glass; Opacity paints the window behind it, in the window's shape"),
+                      ["GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsTheme(SFTPBrowserView.navigationOpacity)) {",
+                       ".glassSpatialWindowGlass()"]),
+                     "Files draws Apple's glass itself, at Glass, with Opacity's paint over it in the window's shape; the browser is our own column"),
         "GlassEditorRuntime.windowID": (("GlassEditorWorkspaceView.swift",
-                                         ["GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsTheme(GlassEditorWorkspace.navigationOpacity)) {"]),
-                                        "the split view draws the window's glass; Opacity paints the window behind it, in the window's shape"),
+                                         ["GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsTheme(GlassEditorWorkspace.navigationOpacity)) {",
+                                          ".glassSpatialWindowGlass()"]),
+                                        "the editor draws Apple's glass itself, at Glass, with Opacity's paint over it in the window's shape; its columns are our own"),
         "\"desktop-session\"": (("DesktopSessionView.swift",
                                  [".glassSpatialWindowGlass(strength:", "GlassWindowShape.spatialNestedCanvasCornerRadius"]),
                                 "it draws Apple's glass itself; the remote screen is its canvas, nested in Apple's corner"),
@@ -74,7 +86,7 @@ struct GlassWindowShapeTests {
         "\"database-workspace\"": (("DatabaseWorkspaceView.swift",
                                     ["GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsTheme(Self.navigationOpacity)) {",
                                      ".glassSpatialWindowGlass(strength:"]),
-                                   "the split view draws the window's glass and Opacity paints the window behind it, in the window's shape; without the split view (DatabaseSpatialLayout) it draws Apple's glass itself"),
+                                   "the database draws Apple's glass itself, at the window's Glass, with Opacity's paint over it in the window's shape; its columns are our own"),
         "\"minimized\"": (nil, "an icon in a circle; there is no window surface to shape"),
     ]
 

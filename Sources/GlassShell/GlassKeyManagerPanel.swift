@@ -157,23 +157,34 @@ public struct GlassKeyManagerPanel: View {
         }
         .glassSpatialList()
         .scrollContentBackground(.hidden)
+        #if os(visionOS)
+        // The column's header holds the search field and Add Key on the headset, where there is
+        // no navigation bar for either (W33).
+        .glassSpatialColumn("SSH Keys",
+                            search: GlassSpatialSearch(text: $panel.searchQuery, prompt: "Search Keys")) {
+            addKeyMenu
+        }
+        #else
         .searchable(text: $panel.searchQuery, prompt: "Search Keys")
         .toolbar {
-            ToolbarItem {
-                Menu {
-                    Button("Import a Key…", systemImage: "square.and.arrow.down") { panel.showingImport = true }
-                    // Only where there is one: offered everywhere, it then failed on the devices
-                    // without a Secure Enclave.
-                    if SecureEnclave.isAvailable {
-                        Button("Generate in the Secure Enclave…", systemImage: "lock.shield") { panel.showingGenerate = true }
-                    }
-                } label: {
-                    Label("Add Key", systemImage: "plus")
-                }
-                .disabled(keyStore == nil)
-                .accessibilityIdentifier("key-manager-add")
-            }
+            ToolbarItem { addKeyMenu }
         }
+        #endif
+    }
+
+    private var addKeyMenu: some View {
+        Menu {
+            Button("Import a Key…", systemImage: "square.and.arrow.down") { panel.showingImport = true }
+            // Only where there is one: offered everywhere, it then failed on the devices
+            // without a Secure Enclave.
+            if SecureEnclave.isAvailable {
+                Button("Generate in the Secure Enclave…", systemImage: "lock.shield") { panel.showingGenerate = true }
+            }
+        } label: {
+            Label("Add Key", systemImage: "plus")
+        }
+        .disabled(keyStore == nil)
+        .accessibilityIdentifier("key-manager-add")
     }
 
     private func row(_ key: StoredSSHKey) -> some View {
@@ -264,6 +275,8 @@ public struct GlassKeyManagerPanel: View {
             .font(.title3)
             .frame(maxWidth: 560)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // A header with nothing to name, for the window's sidebar toggle (W33).
+            .glassSpatialColumn("")
             #endif
         }
     }

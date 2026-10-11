@@ -223,8 +223,9 @@ extension View {
 
     /// Keeps the schema browser in Apple-provided material while the database
     /// canvas independently follows the user's opacity and blur settings. On
-    /// Vision Pro the sidebar column is the split view's own glass already, as
-    /// Connections' is: a material over it was a second, darker panel (W32).
+    /// Vision Pro the sidebar stands on the window's own glass, as Connections'
+    /// does: a material over it was a second, darker panel (W32), and at Glass 0
+    /// it would be the one thing left in the room (W33).
     @ViewBuilder
     func databaseWorkspaceSidebarMaterial() -> some View {
         #if os(visionOS)
@@ -682,13 +683,11 @@ struct DatabaseCommands: Commands {
 @MainActor let databaseSidebarToolbarPlacement: ToolbarItemPlacement = .topBarLeading
 #else
 @MainActor let databaseToolbarPlacement: ToolbarItemPlacement = .bottomOrnament
-/// Run and the assistant: the detail's navigation bar, or with no split view (`DatabaseSpatialLayout`)
-/// and so no navigation bar, the bottom toolbar beside everything else.
-@MainActor let databaseExecutionToolbarPlacement: ToolbarItemPlacement =
-    DatabaseSpatialLayout.drawsItsOwnGlass ? .bottomOrnament : .primaryAction
+/// Run and the assistant: the bottom toolbar beside everything else. The window has no navigation
+/// bar on the headset (`GlassSpatialSplitView`, W33), and an item placed for one vanishes there.
+@MainActor let databaseExecutionToolbarPlacement: ToolbarItemPlacement = .bottomOrnament
 @MainActor let databaseTransferToolbarPlacement: ToolbarItemPlacement = .bottomOrnament
 @MainActor let databaseContextToolbarPlacement: ToolbarItemPlacement = .bottomOrnament
-@MainActor let databaseSidebarToolbarPlacement: ToolbarItemPlacement = .topBarLeading
 #endif
 
 #if os(macOS)

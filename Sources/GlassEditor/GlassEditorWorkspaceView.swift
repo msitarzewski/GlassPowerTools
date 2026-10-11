@@ -94,10 +94,11 @@ public struct GlassEditorWorkspaceView: View {
     }
 
     public var body: some View {
-        // On the headset Opacity paints the window behind its columns, edge to edge in its shape,
-        // and the split view's glass over each column is tinted by it (W32,
-        // `GlassEditorWorkspace.navigationOpacity`). W28 had painted the text's column as a canvas
-        // set in from the window's edges, which read as a dark panel.
+        // On the headset the window draws Apple's glass itself, at Glass, and Opacity paints the
+        // theme colour over it edge to edge in its shape (`GlassEditorWorkspace.navigationOpacity`);
+        // its columns are our own (`spatialLayout`), because the split view's system glass could
+        // not be cleared (W33). W28 had painted the text's column as a canvas set in from the
+        // window's edges, which read as a dark panel.
         GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsTheme(GlassEditorWorkspace.navigationOpacity)) {
             #if os(iOS)
             // **A phone is not a narrow Mac.** `NavigationSplitView` collapses on a compact width
@@ -107,10 +108,17 @@ public struct GlassEditorWorkspaceView: View {
             // (reported 2026-09-17). The library has always branched here
             // (`GlassConnectionLibrary.body`); the editor never did.
             if horizontalSizeClass == .compact { compactLayout } else { splitLayout }
+            #elseif os(visionOS)
+            spatialLayout
             #else
             splitLayout
             #endif
         }
+        #if os(visionOS)
+        // Behind the paint, out to the window's edges: as much of Apple's glass as the window's
+        // Glass asks for, none at 0 (`GlassSpatialWindowGlass`).
+        .glassSpatialWindowGlass()
+        #endif
         // **The text follows the system's appearance.** `GlassEditorModel` defaults to the dark
         // theme and nothing ever changed it, so in Light mode the window's chrome went light and the
         // text sat in a dark rectangle in the middle of it. The engine is right not to read the
@@ -214,7 +222,8 @@ public struct GlassEditorWorkspaceView: View {
     }
     #endif
 
-    /// Two columns, for a Mac, an iPad and a headset.
+    #if !os(visionOS)
+    /// Two columns, for a Mac and an iPad. The headset draws its own (`spatialLayout`).
     @ViewBuilder
     private var splitLayout: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -222,39 +231,12 @@ public struct GlassEditorWorkspaceView: View {
                 .navigationSplitViewColumnWidth(min: GlassLibraryColumnLayout.navigationMinimum,
                                                 ideal: GlassLibraryColumnLayout.navigationIdeal,
                                                 max: GlassLibraryColumnLayout.navigationMaximum)
-                #if os(visionOS)
-                // **A title, where the column's bar was empty** (the owner, 2026-10-10: "just a big
-                // blank space at the top of the sidebar"). The column's own title, so visionOS sets
-                // it level with the detail's, as Connections' "All Connections" and the database's
-                // "Databases" are: what the list is, while the detail's names what is open (W32).
-                .navigationTitle("Files")
-                #endif
         } detail: {
             GlassLayeredPanel(cornerRadius: 0, role: .embedded) { detail }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                #if os(visionOS)
-                // **On the headset a split view's own toolbar is not drawn; a column's is** — the
-                // database found it first (`DatabaseWorkspaceView.splitLayout`). Given to the split
-                // view, the editor's whole toolbar — Preview, Save, Open, Find, Close, the ⚡ — was
-                // missing from Vision Pro, and so was every way to see a Markdown file's preview
-                // (2026-10-09). Attached to the detail column it is the window's toolbar ornament.
-                .toolbar { toolbarContent(includingDismissal: true) }
-                .toolbar {
-                    // **Hide the sidebar**, as the database's window can: visionOS draws no control
-                    // for it here (W32). Only with a project — the sidebar is its file tree.
-                    if !workspace.projects.isEmpty {
-                        ToolbarItem(placement: .topBarLeading) {
-                            GlassSidebarToggle(columnVisibility: $columnVisibility)
-                        }
-                    }
-                }
-                .glassActiveConnectionsToolbar(show: runtime?.showActiveConnections, dismissCurrent: dismissal?.action)
-                #endif
         }
-        #if !os(visionOS)
         .toolbar { toolbarContent(includingDismissal: true) }
         .glassActiveConnectionsToolbar(show: runtime?.showActiveConnections, dismissCurrent: dismissal?.action)
-        #endif
         // **No sidebar without a project.** The sidebar is the project's file tree and holds
         // nothing else — open documents are tabs. With no project open, the control offered to
         // reveal a column that could only ever be blank, so the control goes too: a toggle whose
@@ -263,15 +245,44 @@ public struct GlassEditorWorkspaceView: View {
         // Nobody is stranded by it. Opening a project is Open… — File ▸ Open… (⌘O) on a Mac, the
         // toolbar elsewhere, and a button on the empty document view — none of which is in the
         // sidebar.
-        //
-        // On the headset the system's item is removed either way: visionOS drew none here, and the
-        // window's own (`GlassSidebarToggle`) is the one control, as in the database's window.
-        #if os(visionOS)
-        .toolbar(removing: .sidebarToggle)
-        #else
         .toolbar(removing: workspace.projects.isEmpty ? .sidebarToggle : nil)
-        #endif
     }
+    #endif
+
+    #if os(visionOS)
+    /// **The file list beside the text, in our own columns** (W33; the owner, 2026-10-10: "Yes,
+    /// all four"). The split view drew system glass that no setting could clear; here the window
+    /// draws its own (`body`). The file list is titled "Files" with its filter field in its header
+    /// (W32 gave it that title); the text's column names what is open and carries the sidebar
+    /// toggle — only with a project, because the list is its tree — and the ⚡. The window's other
+    /// actions stay in the bottom toolbar ornament (`editorLeading`, `editorTrailing`).
+    private var spatialLayout: some View {
+        GlassSpatialSplitView(visibility: $columnVisibility, showsToggle: !workspace.projects.isEmpty) {
+            sidebar
+        } content: {
+            GlassLayeredPanel(cornerRadius: 0, role: .embedded) { detail }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .glassSpatialColumn(detailTitle)
+                // Nothing before the title but the toggle: on the headset an editor is always a
+                // window, never a presentation with a way out (`dismissal` is a phone's).
+                .glassSpatialColumnChrome {
+                    if let show = runtime?.showActiveConnections {
+                        GlassActiveConnectionsButton { show() }
+                    }
+                }
+                // The window's actions: Apple's toolbar ornament below the window, as before.
+                .toolbar { toolbarContent(includingDismissal: false) }
+        }
+    }
+
+    /// What the text's column is titled: the document in front, else the project, else the
+    /// window — the navigation titles the split view's detail had.
+    private var detailTitle: String {
+        if let document = workspace.selectedDocument { return document.displayName }
+        if let project = workspace.projects.first { return project.displayName }
+        return "Editor"
+    }
+    #endif
 
     #if os(iOS)
     /// One thing at a time, for a phone: the folder you are in, and what you choose from it.
@@ -399,6 +410,8 @@ public struct GlassEditorWorkspaceView: View {
                 // that can also change it.
             }
         }
+        // Bare rows in the headset's own sidebar column, as the system's sidebar drew them (W33).
+        .glassSpatialList()
         .scrollContentBackground(.hidden)
         .safeAreaInset(edge: .bottom, spacing: 0) { projectFooter }
         // A field, not a button. The connections list and the schema browser both filter their
@@ -408,7 +421,10 @@ public struct GlassEditorWorkspaceView: View {
         // `.sidebar` placement, so it is a field standing in the list — the "Filter" field the
         // connections window shows. Left to itself the modifier collapses into a magnifying glass
         // in the toolbar at this window width, which is the button this was meant to replace.
+        // On the headset the field is in the column's header (`glassSpatialColumn`, below).
+        #if !os(visionOS)
         .searchable(text: $filter, placement: .sidebar, prompt: "Filter")
+        #endif
         // **The keyboard reaches the tree.**
         //
         // ↑ and ↓ move the selection because the rows are tagged and selectable — which they were
@@ -427,6 +443,11 @@ public struct GlassEditorWorkspaceView: View {
             guard press.modifiers.contains(.command) else { return .ignored }
             return activateSelection()
         }
+        // **"Files", with its filter, on the headset** (W32 titled the column; W33 draws the
+        // header itself, where there is no navigation bar): what the list is, while the text's
+        // column names what is open.
+        .glassSpatialColumn("Files", search: GlassSpatialSearch(text: $filter, prompt: "Filter",
+                                                                 accessibilityIdentifier: "editor-files-filter"))
     }
 
     /// **The project's own controls, at the foot of its own list.** Refresh was buried in a "…"
@@ -1496,9 +1517,12 @@ private struct GlassEditorTreeRows: View {
                     row(node, symbol: "folder")
                 }
                 .tag(GlassEditorSidebarSelection.node(node.id))
+                // The sidebar's row spacing in the headset's own column (W33); nothing elsewhere.
+                .glassSpatialListRow()
             } else {
                 row(node, symbol: "doc")
                     .tag(GlassEditorSidebarSelection.node(node.id))
+                    .glassSpatialListRow()
             }
         }
     }

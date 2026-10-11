@@ -390,49 +390,90 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
     }
 
     #if os(visionOS)
+    /// **The headset's library: the tab ornament, and our own columns in each tab** (W33). Each
+    /// tab was a `NavigationSplitView`, whose system glass no setting could clear; the owner chose
+    /// to give that up for a window that is completely clear at Glass 0 and Opacity 0 ("Yes, all
+    /// four"). The tab bar stays the system's ornament beside the window. In each tab the list is
+    /// the sidebar and the detail the content (`GlassSpatialSplitView`); the window draws its
+    /// glass (`GlassShellLibraryView`). Selection, search, the scopes and the panels are the same
+    /// state as before, and every row and identifier is the same view.
     private var visionNavigation: some View {
         TabView(selection: visionTabSelection) {
             ForEach(VisionCategory.allCases) { category in
-                Group {
-                    if category == .collections {
-                        NavigationSplitView {
-                            List(projection.collections) { collection in
-                                Button(collection.name) { scope = .collection(collection.id) }
-                                    .buttonStyle(.plain)
-                            }
-                            .navigationTitle("Collections")
-                            .safeAreaInset(edge: .bottom, spacing: 0) { sidebarFooter() }
-                        } content: {
-                            results.navigationSplitViewColumnWidth(min: 320, ideal: 360, max: 460)
-                        } detail: { withLibraryToolbar(detail(selection), active: activeTab == .category(category)) }
-                    } else {
-                        NavigationSplitView {
-                            // Wide enough to carry a full-size row. The sidebar was previously left
-                            // at the system default and the row's contents were shrunk to fit it,
-                            // which is backwards: on a platform aimed with the eyes the column
-                            // gives way, not the target.
-                            results
-                                .safeAreaInset(edge: .bottom, spacing: 0) { sidebarFooter() }
-                                .navigationSplitViewColumnWidth(min: 320, ideal: 360, max: 460)
-                        } detail: { withLibraryToolbar(detail(selection), active: activeTab == .category(category)) }
-                    }
+                GlassSpatialSplitView(visibility: $columnVisibility) {
+                    visionSidebar(for: category)
+                } content: {
+                    withLibraryToolbar(detail(selection), active: activeTab == .category(category))
                 }
                 .tabItem { Label(category.title, systemImage: category.symbol) }
                 .tag(VisionTab.category(category))
             }
             // A contributed panel is a tab here rather than a sidebar section: visionOS already
             // draws the tab bar as an ornament beside the window, which is the platform's own
-            // answer to the same question glas.sh answered with a sidebar section on the Mac.
+            // answer to the same question glas.sh answered with a sidebar section on the Mac. The
+            // panel's own views draw their columns' headers (`glassSpatialColumn`).
             ForEach(panels) { panel in
-                NavigationSplitView {
-                    panel.results().navigationSplitViewColumnWidth(min: 320, ideal: 360, max: 460)
-                } detail: {
+                GlassSpatialSplitView(visibility: $columnVisibility) {
+                    panel.results()
+                } content: {
                     withLibraryToolbar(panel.detail(), active: activeTab == .panel(panel.id))
                 }
                 .tabItem { Label(panel.title, systemImage: panel.symbolName) }
                 .tag(VisionTab.panel(panel.id))
             }
         }
+    }
+
+    /// The collection the Collections tab has open, or nil while it lists them.
+    private var openCollection: String? {
+        if case .collection(let id) = scope, !id.isEmpty { return id }
+        return nil
+    }
+
+    /// **A tab's sidebar**: the scope's machines, with the search field the column's bar used to
+    /// hold, and the iCloud footer. In Collections it is a stack — the collections, then one
+    /// collection's machines pushed over them with the way back — where the split view had a third
+    /// column for the list of collections.
+    @ViewBuilder
+    private func visionSidebar(for category: VisionCategory) -> some View {
+        Group {
+            if category == .collections, openCollection == nil {
+                List(projection.collections) { collection in
+                    Button(collection.name) {
+                        withAnimation { scope = .collection(collection.id) }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("glass-library-collection-\(collection.name)")
+                }
+                .glassSpatialList()
+                .scrollContentBackground(.hidden)
+                .overlay {
+                    if projection.collections.isEmpty {
+                        ContentUnavailableView("No Collections", systemImage: "folder",
+                                               description: Text("Add a machine to a collection in its details."))
+                    }
+                }
+                .glassSpatialColumn("Collections")
+            } else {
+                // Wide enough to carry a full-size row. The sidebar was previously left at the
+                // system default and the row's contents were shrunk to fit it, which is backwards:
+                // on a platform aimed with the eyes the column gives way, not the target.
+                results
+                    .glassSpatialColumn(projection.title(for: scope),
+                                        back: category == .collections
+                                            ? GlassSpatialBack("Collections") {
+                                                withAnimation { scope = .collection("") }
+                                            }
+                                            : nil,
+                                        search: GlassSpatialSearch(text: $searchText,
+                                                                   prompt: "Search connections...",
+                                                                   accessibilityIdentifier: "glass-library-search"))
+            }
+        }
+        // Into a collection slides in from the trailing edge, and back from the leading one.
+        .glassSpatialPush(category == .collections ? (openCollection ?? "") : "results",
+                          depth: category == .collections && openCollection != nil ? 1 : 0)
+        .safeAreaInset(edge: .bottom, spacing: 0) { sidebarFooter() }
     }
 
     private var activeTab: VisionTab {

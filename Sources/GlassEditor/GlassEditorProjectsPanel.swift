@@ -132,27 +132,38 @@ public struct GlassEditorProjectsPanel: View {
         }
         .glassSpatialList()
         .scrollContentBackground(.hidden)
+        #if os(visionOS)
+        // The column's header holds the search field and New or Open on the headset, where there
+        // is no navigation bar for either (W33).
+        .glassSpatialColumn("Projects",
+                            search: GlassSpatialSearch(text: $panel.searchQuery, prompt: "Search Projects")) {
+            newOrOpenMenu
+        }
+        #else
         .searchable(text: $panel.searchQuery, prompt: "Search Projects")
         .toolbar {
-            ToolbarItem {
-                // **New Document and the one Open…, as well as a project.** Off the Mac this panel
-                // is the editor's only door, and it opened folders and nothing else: a blank
-                // document, or one file without its folder, could be had only from inside an editor
-                // window, which only a project could open (2026-10-09, Vision Pro). The Mac's File
-                // menu has both (⇧⌘E, ⌘O); this is the same pair, and Open… is the same rule.
-                Menu {
-                    Button("New Document", systemImage: "doc.badge.plus") {
-                        runtime.show([runtime.prepareNewEditorWindow()], with: openWindow)
-                    }
-                    .accessibilityIdentifier("projects-new-document")
-                    Button("Open…", systemImage: "folder") { panel.showingOpenPanel = true }
-                        .accessibilityIdentifier("projects-open")
-                } label: {
-                    Label("New or Open", systemImage: "plus")
-                }
-                .accessibilityIdentifier("projects-add")
-            }
+            ToolbarItem { newOrOpenMenu }
         }
+        #endif
+    }
+
+    /// **New Document and the one Open…, as well as a project.** Off the Mac this panel is the
+    /// editor's only door, and it opened folders and nothing else: a blank document, or one file
+    /// without its folder, could be had only from inside an editor window, which only a project
+    /// could open (2026-10-09, Vision Pro). The Mac's File menu has both (⇧⌘E, ⌘O); this is the
+    /// same pair, and Open… is the same rule.
+    private var newOrOpenMenu: some View {
+        Menu {
+            Button("New Document", systemImage: "doc.badge.plus") {
+                runtime.show([runtime.prepareNewEditorWindow()], with: openWindow)
+            }
+            .accessibilityIdentifier("projects-new-document")
+            Button("Open…", systemImage: "folder") { panel.showingOpenPanel = true }
+                .accessibilityIdentifier("projects-open")
+        } label: {
+            Label("New or Open", systemImage: "plus")
+        }
+        .accessibilityIdentifier("projects-add")
     }
 
     private func row(_ project: GlassEditorProject) -> some View {
@@ -243,6 +254,8 @@ public struct GlassEditorProjectsPanel: View {
             .font(.title3)
             .frame(maxWidth: 560)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // A header with nothing to name, for the window's sidebar toggle (W33).
+            .glassSpatialColumn("")
             #endif
         }
     }

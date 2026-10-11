@@ -19,12 +19,12 @@
 //  visionOS 27 (W28, traced in the simulator: `glassBackgroundEffect(displayMode: .never)` on the
 //  container or its columns, toolbar backgrounds, toolbar visibility, every split view style and a
 //  `TabView` around it all leave it; `containerBackground(_:for: .navigation)` is unavailable on
-//  visionOS). A window with one of those keeps that glass and draws none of its own under it,
-//  which would only double it. Since W32 (2026-10-10) such a window paints Opacity behind its
-//  columns, edge to edge in the window's own shape, as windows did before W28's inset canvas, and
-//  Apple's glass over each column is tinted by it (`GlassNavigationWindowOpacity`). The owner:
-//  "Database server needs the dark background treatment like connections", and then "Opacity is
-//  essential transparency is essential."
+//  visionOS). So no Glass window uses one on the headset: since W33 (2026-10-10; the owner, of
+//  Connections, the database, the editor and Files: "Yes, all four") they lay out their own columns
+//  (`GlassSpatialSplitView`, `GlassSpatialColumn` in GlassConnectionUI) and draw this glass, and a
+//  `TabView` alone draws none. Opacity paints the theme colour over it, edge to edge in the
+//  window's own shape (`GlassNavigationWindowOpacity`, W32: "Opacity is essential transparency is
+//  essential"), so Glass 0 and Opacity 0 leave only the text and controls.
 //
 
 import SwiftUI
@@ -35,8 +35,8 @@ import GlassConnectionUI
 public enum GlassWindowGlass {
     /// Whether a window whose content has a canvas also paints the theme behind the whole window
     /// (`GlassLayeredWindow(paintsTheme:)`). Everywhere but the headset: there Opacity paints the
-    /// canvas alone, as a terminal's does, rather than tinting every column's glass (W28). A window
-    /// built on a navigation container names its own instead (`GlassNavigationWindowOpacity`, W32).
+    /// canvas alone, as a terminal's does (W28). A window of columns names its own instead
+    /// (`GlassNavigationWindowOpacity`, W32).
     public static var paintsWholeWindow: Bool {
         #if os(visionOS)
         false
@@ -70,25 +70,25 @@ public enum GlassWindowGlass {
     }
 }
 
-/// **How a window built on a navigation container shows Opacity on Vision Pro** (W32, 2026-10-10).
-/// Such a window — Connections, the editor, Files, the database — keeps the system glass its
-/// `NavigationSplitView` or `NavigationStack` draws behind every column, which nothing public
-/// removes (see the top of this file). Each kind of window names its own value in one place, so
-/// one kind can change without the others. Off the headset every window paints edge to edge as it
-/// always has, whatever this says.
+/// **How a window of columns shows Opacity on Vision Pro** (W32, 2026-10-10): Connections, the
+/// editor, Files, the database. Each kind of window names its own value in one place, so one kind
+/// can change without the others. Off the headset every window paints edge to edge as it always
+/// has, whatever this says. Since W33 these windows draw their own glass at Glass
+/// (`glassSpatialWindowGlass()`) and their own columns, where they had a navigation container's
+/// system glass that nothing could clear.
 public enum GlassNavigationWindowOpacity: Sendable, Equatable {
-    /// The theme colour at Opacity, edge to edge in the window's own shape, **behind** the columns,
-    /// so Apple's glass over each column is tinted by it; and a window's text (the editor's, the
-    /// SQL editor's) on a ground at the same Opacity. Nothing is painted at 0, so the window is
-    /// Apple's glass exactly. No inset card: W28's canvas, set 34 points in from the window's
-    /// edges, read as a dark panel (the owner: "remove the black background").
+    /// The theme colour at Opacity, edge to edge in the window's own shape, over the window's own
+    /// glass and behind its columns; and a window's text (the editor's, the SQL editor's) on a
+    /// ground at the same Opacity. Nothing is painted at 0, so the window is its Glass exactly. No
+    /// inset card: W28's canvas, set 34 points in from the window's edges, read as a dark panel
+    /// (the owner: "remove the black background").
     case behindColumns
-    /// Nothing at any Opacity: Apple's glass alone.
+    /// Nothing at any Opacity: the window's glass alone.
     case none
 }
 
 public extension GlassWindowGlass {
-    /// `GlassLayeredWindow(paintsTheme:)` for a window built on a navigation container.
+    /// `GlassLayeredWindow(paintsTheme:)` for a window of columns.
     static func paintsTheme(_ opacity: GlassNavigationWindowOpacity) -> Bool {
         #if os(visionOS)
         opacity == .behindColumns
@@ -97,7 +97,7 @@ public extension GlassWindowGlass {
         #endif
     }
 
-    /// The Opacity a navigation window's own surfaces paint at (the editor's text ground, the
+    /// The Opacity a window of columns' own surfaces paint at (the editor's text ground, the
     /// database's surfaces), given the window's resolved Opacity (`canvasOpacity`): the same, or
     /// none in a window that paints none.
     static func surfaceOpacity(_ resolved: Double, _ opacity: GlassNavigationWindowOpacity) -> Double {
@@ -161,25 +161,7 @@ private struct GlassSpatialAppearanceGlass: ViewModifier {
     }
 }
 
-// MARK: - The canvas Opacity paints
-
-public extension View {
-    /// **This view as a plain window's canvas**: Opacity paints it — the theme colour, as a
-    /// terminal's canvas is painted — in a continuous corner, and what is drawn in it is kept to
-    /// that shape. The corner defaults to the one nested in Apple's at the terminal's 34-point
-    /// inset (`GlassWindowShape.spatialNestedCanvasCornerRadius`). Nothing is painted at 0.
-    func glassSpatialCanvas(opacity: Double,
-                            cornerRadius: CGFloat = GlassWindowShape.spatialNestedCanvasCornerRadius) -> some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        return background {
-            if opacity > 0 {
-                shape.fill(Color.glassThemeBackground)
-                    .opacity(opacity)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-            }
-        }
-        .clipShape(shape)
-    }
-}
+// The inset canvas Opacity once painted in a window of columns (`glassSpatialCanvas`, W28) went
+// with the database's prototype (W33): those windows paint Opacity edge to edge (W32), and the
+// terminal and the remote desktop draw their canvases themselves.
 #endif

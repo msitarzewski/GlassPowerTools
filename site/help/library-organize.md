@@ -31,7 +31,7 @@ To take a host out of a collection, choose the × on its chip, or press Delete i
 
 Each collection appears in the sidebar under **Collections**, with the number of hosts in it.
 
-- **On Vision Pro:** choose the **Collections** tab, then choose a collection from the list.
+- **On Vision Pro:** choose the **Collections** tab, then choose a collection from the list. **Back** (‹) returns to the list of collections.
 - **On Mac, iPad and iPhone:** choose the collection in the sidebar's **Collections** section. The section appears once any host belongs to a collection.
 
 Collection names ignore case, so `Staging` and `staging` are one collection. A collection disappears when no host belongs to it. Collections are saved with the host, so they appear on all your devices.
