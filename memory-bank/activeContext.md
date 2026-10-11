@@ -27,6 +27,31 @@ anything touching real servers (SSH and database tests use the disposable test V
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
+## 2026-10-11 (evening) — where things stand
+
+**HEAD = this notes commit (after 7fc7be3). Installed: 0.4.362 on the Mac; 0.4.361 on Vision Pro and iPhone** (they were
+off-network for 0.4.362 — install it when reachable). Full story: `tasks/2026-10/2026-10-11_apple-screen-sharing-protocol.md`.
+- **Screen sharing speaks Apple's revision (003.889)** on account connections to a Mac: record layer (encrypted after
+  sign-in — 3.8 never was), arming `AutoFrameBufferUpdate` at 0 after each layout (pictures come only by pushes on 889;
+  33,333 starved/blackened display 2), ViewerInfo required (without it the Mac hangs), Apple pointer shapes, pointer
+  echoes ignored within 1 s of a local move, scroll by distance (0x17), clipboard via Apple pasteboard (0x15/0x0b/0x1f),
+  3.8 fallback if the prelude fails. Per-display connections off (a Mac serves one scale at a time); a scaled Mac is
+  asked for the whole framebuffer (region requests broke its scaled readback). Fast native ZRLE path; renderer uploads
+  only its window's region on new frames. A Mac never reports its own mouse to a controlling viewer (PointerPos −232
+  tried; matches codevisor/Jump/Splashtop).
+- **Orb (W39, c23a6b6):** the Connections window becomes its orb in place (pushWindow broke after force-quit). UI 9/9 on
+  simulator; NOT yet on the headset. If the orb jumps when it comes forward, drop the openWindow in `becomeOrb`.
+- **Hotspot test (owner in his car, 380/52):** Balanced at full Retina = 64–74 Mbit/s from the Mac, seconds of lag
+  (cellular queueing + the Mac reads input only between pushes). Data Saver (16-bit) "much more responsive"; Lowest
+  "somewhat useful". No SetServerScaling was sent all session — probably `scalingRefusals` from a test session.
+- **Next:** (1) install 0.4.362, verify orb; pull the headset log (server-scale-refused? flow on the hotspot);
+  (2) latency-aware Automatic quality; make the W36 scale refusal less blunt; (3) Service Availability probe: skip hosts
+  with a live session, lighter check for a Mac's 5900 (each connect starts screensharingd + agent, once a minute all day);
+  (4) High Performance mode (HEVC media stream, virtual displays, AAC-ELD) from remotex `vnc_apple_media.rs` (clone in
+  the scratchpad `ext/remotex`), behind a switch, probe first; (5) owner to verify scroll and clipboard with the Mac.
+  Older open items: drag-select past the screen in tmux (Select All takes history, ec226f9); light/dark theme pair;
+  title capsule sizes; SSH new tabs in the remote folder (scratch only).
+
 ## 2026-10-11 (midday) — where things stand
 
 **HEAD = latest notes commit after 5651ae3. Installed: 0.4.350 on Mac, Vision Pro and iPhone.** Two-display screen sharing
