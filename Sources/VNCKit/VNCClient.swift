@@ -175,6 +175,9 @@ public final class VNCClient: Sendable {
     /// The session travels in a Mac's record layer, encrypted (003.889).
     public var isEncrypted: Bool { records.isEncrypted }
 
+    /// This client answered a Mac in its own revision, 003.889.
+    public var answeredAppleProtocol: Bool { state.appleProtocol }
+
     /// ZRLE rectangles read with bytes left over this connection (`RFBZRLETrailingData`).
     public var zrleTrailingDataCount: Int { state.zrleTrailingDataCount }
 
@@ -221,7 +224,6 @@ public final class VNCClient: Sendable {
             if info.negotiatedVersion == .apple {
                 try await applePrelude(wrapKey: wrapKey)
                 info.encrypted = true
-                state.setAppleProtocol()
             }
             wrapKey = []
             planner.start(width: info.width, height: info.height, dialect: RFBServerDialect(version: info.serverVersion),
@@ -316,8 +318,12 @@ public final class VNCClient: Sendable {
 
     private func handshake() async throws -> (VNCServerInfo, wrapKey: [UInt8]) {
         let serverVersion = try RFBProtocolVersion.parse(try await source.read(12))
-        let version = configuration.appleProtocol && serverVersion == .apple ? .apple : serverVersion.negotiated
+        // Only with the Mac's own sign-in: its record layer's key comes from type 30's exchange, so a
+        // password-only connection is answered in 3.8 as before.
+        let account = !configuration.username.isEmpty && !configuration.password.isEmpty
+        let version = configuration.appleProtocol && account && serverVersion == .apple ? .apple : serverVersion.negotiated
         let apple = version == .apple
+        if apple { state.setAppleProtocol() }
         try await sink.write(version.wireBytes)
         let securityType: RFBSecurityType
         if version.minor == 3 {

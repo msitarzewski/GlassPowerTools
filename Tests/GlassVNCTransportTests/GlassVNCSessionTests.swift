@@ -306,6 +306,31 @@ struct AppleLayoutFallbackTests {
         #expect(asked.configurations.map(\.requestsAppleDisplayLayout) == [true, true])
     }
 
+    /// 2026-10-11: a Mac is answered in its own revision, encrypted; one that fails before its record
+    /// layer is up is answered in 3.8 on Reconnect.
+    @Test func aMacThatFailsBeforeItsRecordLayerIsAnsweredInTheStandardProtocolNext() async throws {
+        let asked = Asked()
+        let host = "mac-\(UUID().uuidString.prefix(8)).example"
+        // Type 30 with a toy group, accepted; the enhanced ServerInit; then the Mac goes away before
+        // sending its encryption key.
+        var mac: [UInt8] = Array("RFB 003.889\n".utf8) + [1, 30]
+        mac += UInt16(2).bigEndianBytes + UInt16(16).bigEndianBytes
+        mac += [UInt8](repeating: 0xff, count: 15) + [0xfb] + [UInt8](repeating: 0x07, count: 16)
+        mac += UInt32(0).bigEndianBytes
+        mac += UInt16(2).bigEndianBytes + UInt16(2).bigEndianBytes + RFBPixelFormat.client.wireBytes
+        let name: [UInt8] = [0, 0] + UInt32(0x12).bigEndianBytes + [UInt8](repeating: 0xff, count: 16)
+        mac += UInt32(name.count).bigEndianBytes + name
+        let first = session(mac, asked: asked)
+        try await first.connect(GlassVNCConfiguration(host: host, username: "ann", password: "pw"))
+        let failure = await ending(first)
+        #expect(failure?.hasSuffix("Reconnect connects in the standard protocol, which this Mac does not encrypt.") == true)
+
+        let second = session(macGreeting(width: 2, height: 2), asked: asked)
+        try await second.connect(GlassVNCConfiguration(host: host, username: "ann", password: "pw"))
+        _ = await ending(second)
+        #expect(asked.configurations.map(\.appleProtocol) == [true, false])
+    }
+
     @Test func aViolationBeforeAnyDisplayMetadataDoesNotStopAskingForThem() async throws {
         let asked = Asked()
         let host = "mac-\(UUID().uuidString.prefix(8)).example"

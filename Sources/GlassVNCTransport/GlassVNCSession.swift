@@ -32,6 +32,9 @@ public actor GlassVNCSession: GlassDesktopTransport {
     static let scalingRefusals = HostSet()
     /// For this run of the app (W38): Macs not to ask for their pointer's position and shapes again.
     static let cursorRefusals = HostSet()
+    /// For this run of the app (2026-10-11): Macs not to answer in their own revision again, having
+    /// failed before its record layer was up.
+    static let appleProtocolRefusals = HostSet()
     public nonisolated let frames: AsyncStream<GlassRDPFrame>
     public nonisolated let events: AsyncStream<GlassRDPEvent>
     private let frameContinuation: AsyncStream<GlassRDPFrame>.Continuation
@@ -85,6 +88,7 @@ public actor GlassVNCSession: GlassDesktopTransport {
         let asksForLayout = !Self.layoutRefusals.contains(layoutKey)
         let asksToScale = !Self.scalingRefusals.contains(layoutKey)
         let asksForCursor = !Self.cursorRefusals.contains(layoutKey)
+        let speaksApple = !Self.appleProtocolRefusals.contains(layoutKey)
         let apple = FrameDelivery()
         let pointer = pointer
         pointer.reset()
@@ -127,7 +131,8 @@ public actor GlassVNCSession: GlassDesktopTransport {
                                                      requestsAppleDisplayLayout: asksForLayout,
                                                      allowsServerScaling: asksToScale,
                                                      requestsAppleCursor: asksForCursor,
-                                                     display: configuration.display), callbacks)
+                                                     display: configuration.display,
+                                                     appleProtocol: speaksApple), callbacks)
         client.setQuality(Self.quality(quality))
         client.setDensityScaling(retina == .oneX)
         client.setRequestedRegions(Self.rectangles(regions))
@@ -143,6 +148,16 @@ public actor GlassVNCSession: GlassDesktopTransport {
                 // shown, that is a normal ending rather than a failure to report.
                 let normalEnd = error == .cancelled || (error == .connectionClosed && delivered.any)
                 failure = normalEnd ? nil : error.localizedDescription
+                // A Mac answered in its own revision that failed before its record layer was up —
+                // an older macOS, say — is answered in 3.8 while the app runs, so Reconnect works,
+                // unencrypted as before 2026-10-11. A refused sign-in is not that.
+                if error != .cancelled, speaksApple, client.answeredAppleProtocol, !client.isEncrypted {
+                    if case .authenticationFailed = error {} else {
+                        Self.appleProtocolRefusals.insert(layoutKey)
+                        VNCDiagnostics.note(Self.logger, .error, category: "session", "event=apple-protocol-refused")
+                        failure = (failure ?? "") + " Reconnect connects in the standard protocol, which this Mac does not encrypt."
+                    }
+                }
                 // A Mac that ended the session while a scale it was asked for was unanswered is
                 // not asked again while the app runs; Reconnect shows its picture at its own size (W36).
                 if error != .cancelled, asksToScale, client.awaitingServerScaling {
