@@ -209,6 +209,18 @@ public struct RFBAppleDisplayLayout: Sendable, Equatable {
         return [8, 0] + value.bitPattern.bigEndianBytes
     }
 
+    // MARK: Pushes
+
+    /// `AutoFrameBufferUpdate`: type 0x09, a pad byte, version 1, the interval in microseconds
+    /// between pushes, then the area to push, as x, y, width and height (remotex's
+    /// `auto_framebuffer_update`). A Mac sends its pointer's position and shapes only to a viewer
+    /// that has armed it, and a layout drops the arming (remotex's notes, "The display layout").
+    public static func autoFramebufferUpdateMessage(interval: UInt32, width: Int, height: Int) -> [UInt8] {
+        let w = UInt16(clamping: width), h = UInt16(clamping: height)
+        return [0x09, 0] + UInt16(1).bigEndianBytes + interval.bigEndianBytes
+            + UInt16(0).bigEndianBytes + UInt16(0).bigEndianBytes + w.bigEndianBytes + h.bigEndianBytes
+    }
+
     // MARK: Choosing a display
 
     /// `SetDisplay`: type 0x0d, a byte that is 1 to combine every display and 0 to send one, a

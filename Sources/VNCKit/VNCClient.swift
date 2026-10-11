@@ -133,6 +133,13 @@ public final class VNCClient: Sendable {
         pump()
     }
 
+    /// Whether a Mac is armed to push its changes, its pointer's among them (`AutoFrameBufferUpdate`).
+    /// On; the live probe turns it off to compare.
+    public func setAppleUpdateArming(_ on: Bool) {
+        planner.setArming(on)
+        pump()
+    }
+
     /// Asks a Mac to send one display, its own pixels the whole framebuffer, or every display
     /// (`SetDisplay`, W38). Sent once the Mac has sent a layout; a layout naming it confirms it.
     public func setDisplay(_ selection: RFBDisplaySelection?) {
@@ -693,6 +700,17 @@ public final class VNCClient: Sendable {
                         callbacks.cutText(String(bytes.map { Character(Unicode.Scalar($0)) }))
                     }
                 }
+            case 0x14 where apple:
+                // A Mac's `MiscStatus`: a pad byte, a `u16` length, then that many bytes — a `u16`
+                // 1 and the command. Most are sent only to a viewer that says it handles them; the
+                // user session changing (17) is sent to every viewer (remotex's notes, "MiscStatus").
+                _ = try await source.u8()
+                let length = Int(try await source.u16())
+                guard length <= 64 else { throw RFBError.protocolViolation("The Mac sent a status message of \(length) bytes.") }
+                var body = ByteReader(try await source.read(length))
+                _ = try? body.u16()
+                let command = (try? body.u16()).map(String.init) ?? "none"
+                VNCDiagnostics.note(Self.logger, .default, category: "client", "event=apple-status command=\(command)")
             default:
                 throw RFBError.protocolViolation("The server sent an unknown message type \(type).")
             }

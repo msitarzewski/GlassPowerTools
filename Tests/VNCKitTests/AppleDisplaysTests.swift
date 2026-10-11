@@ -81,7 +81,7 @@ enum MacLayout {
 }
 
 /// The client messages in a write, by type: SetPixelFormat, SetEncodings, FramebufferUpdateRequest,
-/// SetServerScaling, PointerEvent and SetDisplay.
+/// SetServerScaling, AutoFrameBufferUpdate, PointerEvent and SetDisplay.
 func clientMessages(_ bytes: [UInt8]) -> [(type: UInt8, bytes: [UInt8])] {
     var found: [(type: UInt8, bytes: [UInt8])] = []
     var index = 0
@@ -92,6 +92,7 @@ func clientMessages(_ bytes: [UInt8]) -> [(type: UInt8, bytes: [UInt8])] {
         case 2: length = 4 + (Int(bytes[index + 2]) << 8 | Int(bytes[index + 3])) * 4
         case 3, 8: length = 10
         case 5: length = 6
+        case 9: length = 16
         case 13: length = 8
         default: return found
         }
@@ -421,6 +422,19 @@ struct AppleDisplaysClientTests {
         let scaleIndex = try #require(messages.firstIndex { $0.type == 8 })
         let encodingsIndex = try #require(messages.firstIndex { $0.type == 2 })
         #expect(encodingsIndex < scaleIndex)
+    }
+
+    @Test("a Mac's status message is read and the session goes on (the user session changing, sent to every viewer)")
+    func appleStatus() async throws {
+        var mac = MacLayout.greeting(width: 4480, height: 1800)
+        mac += MacLayout.update(MacLayout.mixedPayload)
+        mac += [0x14, 0, 0, 4, 0, 1, 0, 17]
+        mac += [0, 0, 0, 1] + MacLayout.rectangleHeader(3, 3, 1, 1, .raw) + [7, 8, 9, 0]
+        let seen = Seen()
+        let client = VNCClient(configuration: VNCConfiguration(host: "mac.example", password: ""), callbacks: seen.callbacks(),
+                               source: MemoryByteSource(mac), sink: MemoryByteSink())
+        await #expect(throws: RFBError.connectionClosed) { try await client.run() }
+        #expect(seen.frames.last == "4480x1800", "the picture after it arrived")
     }
 
     @Test("a ZRLE rectangle with bytes left over is reported and the session goes on")

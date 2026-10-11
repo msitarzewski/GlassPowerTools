@@ -179,6 +179,49 @@ struct RetinaScaleTests {
         #expect(serverScales(out).isEmpty)
     }
 
+    /// remotex's notes: a Mac sends its pointer only to a viewer that armed `AutoFrameBufferUpdate`,
+    /// and every layout drops the arming. The owner (2026-10-11): the pointer moved on the headset
+    /// only when moved from there.
+    @Test("a Mac is armed for the whole picture after each layout, never while a scale waits, and off with nothing on screen")
+    func arming() {
+        func armings(_ bytes: [UInt8]) -> [[UInt8]] { clientMessages(bytes).filter { $0.type == 9 }.map(\.bytes) }
+        let start = ContinuousClock.now
+        let planner = mac(.best, retina: false, width: 3024, height: 1964)
+        var out: [UInt8] = []
+        _ = planner.decide(at: start) { out += $0 }
+        #expect(armings(out).isEmpty, "not before a layout")
+        planner.appleLayoutArrived(serverScale: 1, width: 3024, height: 1964)
+        out = []
+        _ = planner.decide(at: start + .milliseconds(10)) { out += $0 }
+        #expect(armings(out) == [[0x09, 0, 0, 1, 0, 0, 0x82, 0x35, 0, 0, 0, 0, 0x0b, 0xd0, 0x07, 0xac]],
+                "version 1, 33,333 µs, the whole 3024 × 1964 picture")
+        out = []
+        _ = planner.decide(at: start + .milliseconds(20)) { out += $0 }
+        #expect(armings(out).isEmpty, "armed once")
+
+        // A scale is asked: not armed again until the layout says the new size.
+        planner.setServerScaleOverride(0.5)
+        planner.appleLayoutArrived(serverScale: 1, width: 3024, height: 1964)
+        out = []
+        _ = planner.decide(at: start + .milliseconds(30)) { out += $0 }
+        #expect(serverScales(out) == [0.5] && armings(out).isEmpty, "never armed for a picture about to shrink")
+        planner.appleLayoutArrived(serverScale: 0.5, width: 1512, height: 982)
+        out = []
+        _ = planner.decide(at: start + .milliseconds(40)) { out += $0 }
+        #expect(armings(out) == [RFBAppleDisplayLayout.autoFramebufferUpdateMessage(interval: 33_333, width: 1512, height: 982)])
+
+        // Nothing on screen: pushes off.
+        planner.setRegions([])
+        out = []
+        _ = planner.decide(at: start + .milliseconds(50)) { out += $0 }
+        #expect(armings(out) == [RFBAppleDisplayLayout.autoFramebufferUpdateMessage(interval: .max, width: 1512, height: 982)])
+
+        // Another server is never sent it.
+        let standard = RFBStreamPlanner()
+        standard.start(width: 640, height: 480)
+        #expect(armings(decide(standard)).isEmpty)
+    }
+
     @Test("turning Retina at 1x on or off is asked for at once")
     func choiceIsImmediate() {
         let planner = mac(.best, retina: false, width: 3024, height: 1964)

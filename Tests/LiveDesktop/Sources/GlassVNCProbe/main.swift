@@ -46,6 +46,8 @@ usage: GlassVNCProbe <host> <port> <username-or-empty> <password-file | -> [opti
                            last), and report both
   --cursor <seconds>       print every pointer message for this long: move the Mac's mouse meanwhile
   --pointer-check          move the Mac's pointer (no clicks) and report where the Mac says it went
+  --no-arm                 do not arm the Mac's pushes (AutoFrameBufferUpdate), as before 2026-10-11, to
+                           compare: armed, a Mac should send its pointer's position and shapes
   --as-app [<seconds>]     as the app with a display window per display: a second connection for the
                            display that is not the main one, the first narrowed to the rest, Retina at
                            1x; run this long (default 30) printing the client's own log lines
@@ -249,6 +251,7 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
         var cursorSeconds: Double?
         var pointerCheck = false
         var asAppSeconds: Double?
+        var arms = true
         func bad() -> Never { FileHandle.standardError.write(Data(usage.utf8)); exit(2) }
         while let index = arguments.firstIndex(where: { $0.hasPrefix("--") }) {
             let option = arguments[index]
@@ -274,6 +277,8 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
                 cursorSeconds = length; consumed = 2
             case "--pointer-check":
                 pointerCheck = true
+            case "--no-arm":
+                arms = false
             case "--as-app":
                 asAppSeconds = 30
                 if let value, let length = Double(value) {
@@ -320,6 +325,7 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
                                        callbacks: recorder.callbacks())
             client.setQuality(quality)
             client.setDensityScaling(retina)
+            client.setAppleUpdateArming(arms)
             return client
         }
         let client: VNCClient
@@ -332,6 +338,7 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
         #else
         print("build          : Release")
         #endif
+        print("pushes         : " + (arms ? "armed after each layout (AutoFrameBufferUpdate, 33,333 µs)" : "not armed (--no-arm)"))
         print("asking for     : \(display.map { "display \($0) alone (SetDisplay)" } ?? "every display, as the Mac sends them")"
               + ", quality \(quality.rawValue)" + (retina ? ", Retina displays at 1x" : ", displays at their own pixels"))
         let started = Date()

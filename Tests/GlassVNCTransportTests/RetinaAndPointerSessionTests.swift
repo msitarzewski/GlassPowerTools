@@ -46,6 +46,7 @@ private func scales(_ written: [UInt8]) -> [Double] {
         case 3, 8: length = 10
         case 4, 13: length = 8
         case 5: length = 6
+        case 9: length = 16
         default: return found
         }
         guard index + length <= bytes.count else { return found }

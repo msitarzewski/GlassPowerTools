@@ -422,6 +422,11 @@ final class RFBStreamPlanner: @unchecked Sendable {
     private var scaleDeclined: Double?
     private var scaleOverride: Double?
 
+    // A Mac's pushes.
+    private var arming = true
+    /// The interval and size the Mac was last armed with; nil once a layout dropped the arming.
+    private var armed: (interval: UInt32, width: Int, height: Int)?
+
     // A Mac's displays (W38).
     private var densityScaling = false
     /// The displays in the framebuffer now, with their densities, in its current pixels.
@@ -452,6 +457,11 @@ final class RFBStreamPlanner: @unchecked Sendable {
     static let scaleAnswerTimeout: Duration = .seconds(10)
     static let displayAnswerTimeout: Duration = .seconds(10)
     static let densitySettle: Duration = .seconds(1)
+    /// One push per video frame at most: remotex's `PUSH_INTERVAL_US`. At 0 a Mac pushes as fast as
+    /// it captures and reads nothing meanwhile, input included (remotex's notes, "Other messages").
+    static let pushInterval: UInt32 = 33_333
+    /// The all-ones interval: a Mac pushes nothing while it is armed with it.
+    static let pushesOff: UInt32 = .max
 
     /// Two factors the Mac would treat as one.
     static func sameScale(_ a: Double, _ b: Double) -> Bool { abs(a - b) < 0.005 }
@@ -549,6 +559,8 @@ final class RFBStreamPlanner: @unchecked Sendable {
             }
             self.width = width; self.height = height
             refresh = true; urgent = true
+            // A layout drops the Mac's arming: armed again, at the size the layout states.
+            armed = nil
         }
     }
 
@@ -690,6 +702,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
             // The display before the scale it wants, and the request after both.
             let displayWake = planDisplay(at: now, into: &out)
             let scaleWake = planScale(at: now, into: &out)
+            planArming(paused: paused, into: &out)
 
             var wake: ContinuousClock.Instant?
             if let bounds = displaySwitchRequest {
@@ -730,6 +743,24 @@ final class RFBStreamPlanner: @unchecked Sendable {
             return (out, [wake, scaleWake, displayWake].compactMap { $0 }.min())
         }
     }
+
+    /// Arms a Mac's pushes (`AutoFrameBufferUpdate`) once it has sent a layout, and again after each
+    /// one, for the whole framebuffer: without them it sends no pointer position or shape, and a
+    /// physical display's changes come late (remotex's notes, "Other messages"). Never while a
+    /// display or a scale is waiting for its layout: arming is a read of the picture, and one sized
+    /// for a picture that is about to shrink is what crashes the Mac's capture agent (the notes,
+    /// "Resizing"). Nothing on screen arms them off.
+    private func planArming(paused: Bool, into out: inout [UInt8]) {
+        guard dialect == .apple, arming, appleDisplayLayout, layoutSeen, width > 0, height > 0,
+              scaleAsked == nil, displayAsked == nil, !holding else { return }
+        let interval = paused ? Self.pushesOff : Self.pushInterval
+        if let armed, armed.interval == interval, armed.width == width, armed.height == height { return }
+        out += RFBAppleDisplayLayout.autoFramebufferUpdateMessage(interval: interval, width: width, height: height)
+        armed = (interval, width, height)
+    }
+
+    /// Whether a Mac is armed to push (`AutoFrameBufferUpdate`). On unless a probe compares.
+    func setArming(_ on: Bool) { lock.withLock { arming = on; armed = nil } }
 
     /// Asks a Mac for the display wanted, once it has shown it sends layouts; returns when to look
     /// again at an unanswered request.
