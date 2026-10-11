@@ -17,8 +17,10 @@ swift build --disable-keychain
 | `GlassVNCFunctionalProbe` | the disposable TigerVNC fixture (`Docker/tigervnc`) | the functional checks below |
 | `GlassVNCDisplaysProbe` | the same fixture with a picture workload (`Docker/tigervnc-displays`) | two displays, region requests, quality levels (below) |
 
-The first two read the password from a file (`<host> <port> <username> <password-file>`) so it
-never appears on a command line. The functional harnesses were moved from glassDT's
+The first two take the password from a file (`<host> <port> <username> <password-file>`), or
+with `-` in its place ask for it at the terminal with echo off, so it never appears on a command line
+or in a file. `GlassVNCProbe` also reports the display layout the server publishes and what the link
+carries (encoding, colour depth, rate). The functional harnesses were moved from glassDT's
 `Tests/Integration` and `Tests/IntegrationVNC`.
 
 ## Functional harnesses (Docker)

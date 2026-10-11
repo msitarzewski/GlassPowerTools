@@ -1048,3 +1048,7 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   credential migration marker), the desktop (window settings store, notices, all 12 @AppStorage), the shell's
   @AppStorage (availability, idle shrink, settings pane), the editor's default stores. Left on `.standard` on purpose:
   `ApplePersistenceIgnoreState` registration (AppKit reads it) and the legacy-domain migration. All 8 suites pass.
+- **Mac 0.4.346 (4df6d2a) installed 02:53** (running, no new crash report). **GlassVNCProbe** now takes `-` for a no-echo
+  terminal prompt (no password file) and prints the published displays and link figures (encoding, colour, rate);
+  built at `Tests/LiveDesktop/.build/debug/GlassVNCProbe`. Offered the owner: run it himself in Terminal against this
+  Mac (127.0.0.1 5900), paste the output; nothing stored.
