@@ -147,6 +147,18 @@ struct DatabaseWindowSettingsView: View {
         #endif
     }
 
+    /// Whether Glass changes anything in this window. **Not on Vision Pro**, as in an editor
+    /// window: there the split view's glass is the system's own, and the material the workspace's
+    /// canvas used to put behind itself went with the canvas (W32). Opacity stays. Without the
+    /// split view (`DatabaseSpatialLayout`) the window draws its glass itself, as strong as Glass.
+    static var offersGlass: Bool {
+        #if os(visionOS)
+        DatabaseSpatialLayout.drawsItsOwnGlass
+        #else
+        true
+        #endif
+    }
+
     var body: some View {
         let global = settingsManager
         let sizes = DatabaseWindowSettings.textSizes
@@ -159,16 +171,22 @@ struct DatabaseWindowSettingsView: View {
                                        leadingAccessibilityLabel: "Transparent", trailingAccessibilityLabel: "Opaque",
                                        accessibilityIdentifier: "database-window-opacity")
                 }
-                GlassWindowSettingRow(GlassLayerSettings.frost, overrides: $settings,
-                                      global: global.blurBackground, inheritsFrom: Source.appearance) { value in
-                    GlassSettingSlider(title: GlassLayerSettings.frost.title, value: value, detents: [0, 0.5, 1],
-                                       leadingAccessibilityLabel: "No glass", trailingAccessibilityLabel: "Full glass",
-                                       accessibilityIdentifier: "database-window-frost")
+                if Self.offersGlass {
+                    GlassWindowSettingRow(GlassLayerSettings.frost, overrides: $settings,
+                                          global: global.blurBackground, inheritsFrom: Source.appearance) { value in
+                        GlassSettingSlider(title: GlassLayerSettings.frost.title, value: value, detents: [0, 0.5, 1],
+                                           leadingAccessibilityLabel: "No glass", trailingAccessibilityLabel: "Full glass",
+                                           accessibilityIdentifier: "database-window-frost")
+                    }
                 }
             } header: {
                 Text("Appearance")
             } footer: {
-                Text(GlassWindowGlassFooter.text(opacity: "paints the background behind the tabs, editor and results"))
+                if Self.offersGlass {
+                    Text(GlassWindowGlassFooter.text(opacity: "paints the background behind the tabs, editor and results"))
+                } else {
+                    Text("Opacity paints the theme color behind the window's glass and under the editor and results. At 0% the window is visionOS's own glass.")
+                }
             }
 
             Section {

@@ -137,6 +137,20 @@ enum GlassDemoMode {
             // Put there by Tools/Screenshots/shoot.sh, from make-demo-db.py.
             database.requestDemoDatabase(file: URL.documentsDirectory.appending(path: "demo-shop.sqlite"), name: "shop",
                                          showsDiagram: surface == "diagram")
+        case "database-server", "database-main":
+            // W32: the server's overview, or the `main` database's, for their titles and tiles.
+            database.requestDemoDatabase(file: URL.documentsDirectory.appending(path: "demo-shop.sqlite"), name: "shop",
+                                         start: surface == "database-server" ? .server : .database)
+        case "editor-project":
+            // W32: the shop's repository open with no file in front, for its overview page.
+            let root = URL.documentsDirectory.appending(path: "shop", directoryHint: .isDirectory)
+            for (path, text) in projectFiles {
+                let url = root.appending(path: path)
+                try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
+                                                         withIntermediateDirectories: true)
+                try? Data(text.utf8).write(to: url)
+            }
+            if let window = editor.openProject(root) { editor.present(window) }
         case "database-window", "database-settings":
             // A database window with settings of its own (W24), and This Window open over it.
             database.requestDemoDatabase(file: URL.documentsDirectory.appending(path: "demo-shop.sqlite"), name: "shop",

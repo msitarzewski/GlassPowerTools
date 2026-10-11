@@ -222,9 +222,16 @@ extension View {
     }
 
     /// Keeps the schema browser in Apple-provided material while the database
-    /// canvas independently follows the user's opacity and blur settings.
+    /// canvas independently follows the user's opacity and blur settings. On
+    /// Vision Pro the sidebar column is the split view's own glass already, as
+    /// Connections' is: a material over it was a second, darker panel (W32).
+    @ViewBuilder
     func databaseWorkspaceSidebarMaterial() -> some View {
+        #if os(visionOS)
+        self
+        #else
         background(.regularMaterial)
+        #endif
     }
 
     @ViewBuilder

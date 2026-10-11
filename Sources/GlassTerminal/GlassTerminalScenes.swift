@@ -153,13 +153,15 @@ public struct GlassTerminalScenes: Scene {
         // and the same setting read nearly black in the simulator. The plain window's missing
         // shape is `GlassLayeredWindow`'s to supply (`GlassWindowShape`).
         //
-        // **Opacity paints the files, not the window** (W28): the window paints no theme, and the
-        // browser's list is its canvas, in the corner nested in Apple's. The stack's own glass is
-        // still the window's: a `NavigationStack` draws system glass behind its content in a plain
-        // window, and nothing public turns it off (`GlassSpatialWindowGlass`), so Glass can't
-        // clear this window the way it clears a terminal.
+        // **Opacity tints the window from behind, edge to edge** (W32, 2026-10-10), in the window's
+        // shape: W28's canvas, set in from the window's edges, read as a dark panel, and the owner
+        // asked for it gone while keeping Opacity ("Opacity is essential transparency is
+        // essential"). The stack's own glass is still the window's: a `NavigationStack` draws
+        // system glass behind its content in a plain window, and nothing public turns it off
+        // (`GlassSpatialWindowGlass`), so Glass can't clear this window the way it clears a
+        // terminal.
         WindowGroup(id: "sftp", for: SFTPBrowserContext.self) { $context in
-            GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsWholeWindow) {
+            GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsTheme(SFTPBrowserView.navigationOpacity)) {
                 if let context, sessionManager.session(for: context.sessionID) != nil {
                     SFTPBrowserView(sessionID: context.sessionID, initialPath: context.initialPath)
                         .environment(sessionManager)

@@ -20,7 +20,11 @@
 //  container or its columns, toolbar backgrounds, toolbar visibility, every split view style and a
 //  `TabView` around it all leave it; `containerBackground(_:for: .navigation)` is unavailable on
 //  visionOS). A window with one of those keeps that glass and draws none of its own under it,
-//  which would only double it.
+//  which would only double it. Since W32 (2026-10-10) such a window paints Opacity behind its
+//  columns, edge to edge in the window's own shape, as windows did before W28's inset canvas, and
+//  Apple's glass over each column is tinted by it (`GlassNavigationWindowOpacity`). The owner:
+//  "Database server needs the dark background treatment like connections", and then "Opacity is
+//  essential transparency is essential."
 //
 
 import SwiftUI
@@ -31,7 +35,8 @@ import GlassConnectionUI
 public enum GlassWindowGlass {
     /// Whether a window whose content has a canvas also paints the theme behind the whole window
     /// (`GlassLayeredWindow(paintsTheme:)`). Everywhere but the headset: there Opacity paints the
-    /// canvas alone, as a terminal's does, rather than tinting every column's glass (W28).
+    /// canvas alone, as a terminal's does, rather than tinting every column's glass (W28). A window
+    /// built on a navigation container names its own instead (`GlassNavigationWindowOpacity`, W32).
     public static var paintsWholeWindow: Bool {
         #if os(visionOS)
         false
@@ -62,6 +67,45 @@ public enum GlassWindowGlass {
     public static func canvasOpacity(_ state: GlassLayerState, window: GlassWindowOverrides,
                                      reduceTransparency: Bool) -> Double {
         GlassLayerResolution.resolve(state, window: window, reduceTransparency: reduceTransparency).effectiveOpacity
+    }
+}
+
+/// **How a window built on a navigation container shows Opacity on Vision Pro** (W32, 2026-10-10).
+/// Such a window — Connections, the editor, Files, the database — keeps the system glass its
+/// `NavigationSplitView` or `NavigationStack` draws behind every column, which nothing public
+/// removes (see the top of this file). Each kind of window names its own value in one place, so
+/// one kind can change without the others. Off the headset every window paints edge to edge as it
+/// always has, whatever this says.
+public enum GlassNavigationWindowOpacity: Sendable, Equatable {
+    /// The theme colour at Opacity, edge to edge in the window's own shape, **behind** the columns,
+    /// so Apple's glass over each column is tinted by it; and a window's text (the editor's, the
+    /// SQL editor's) on a ground at the same Opacity. Nothing is painted at 0, so the window is
+    /// Apple's glass exactly. No inset card: W28's canvas, set 34 points in from the window's
+    /// edges, read as a dark panel (the owner: "remove the black background").
+    case behindColumns
+    /// Nothing at any Opacity: Apple's glass alone.
+    case none
+}
+
+public extension GlassWindowGlass {
+    /// `GlassLayeredWindow(paintsTheme:)` for a window built on a navigation container.
+    static func paintsTheme(_ opacity: GlassNavigationWindowOpacity) -> Bool {
+        #if os(visionOS)
+        opacity == .behindColumns
+        #else
+        true
+        #endif
+    }
+
+    /// The Opacity a navigation window's own surfaces paint at (the editor's text ground, the
+    /// database's surfaces), given the window's resolved Opacity (`canvasOpacity`): the same, or
+    /// none in a window that paints none.
+    static func surfaceOpacity(_ resolved: Double, _ opacity: GlassNavigationWindowOpacity) -> Double {
+        #if os(visionOS)
+        opacity == .behindColumns ? resolved : 0
+        #else
+        resolved
+        #endif
     }
 }
 
@@ -136,25 +180,6 @@ public extension View {
             }
         }
         .clipShape(shape)
-    }
-
-    /// The canvas at the window's Appearance (`GlassWindowGlass.canvasOpacity`): apply it inside
-    /// `glassWindowOverrides(_:)`.
-    func glassSpatialCanvas(cornerRadius: CGFloat = GlassWindowShape.spatialNestedCanvasCornerRadius) -> some View {
-        modifier(GlassSpatialAppearanceCanvas(cornerRadius: cornerRadius))
-    }
-}
-
-private struct GlassSpatialAppearanceCanvas: ViewModifier {
-    let cornerRadius: CGFloat
-    @Environment(\.glassLayers) private var layers
-    @Environment(\.glassWindowOverrides) private var windowOverrides
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
-    func body(content: Content) -> some View {
-        content.glassSpatialCanvas(opacity: GlassWindowGlass.canvasOpacity(layers.state, window: windowOverrides,
-                                                                            reduceTransparency: reduceTransparency),
-                                   cornerRadius: cornerRadius)
     }
 }
 #endif

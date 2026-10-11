@@ -202,6 +202,12 @@ enum DatabaseWorkspaceConnectionsRoute: Equatable {
 // MARK: - Workspace View
 
 struct DatabaseWorkspaceView: View {
+    /// **The switch** for how a database window shows Opacity on Vision Pro (W32): the theme colour
+    /// edge to edge behind the split view's columns, and every surface in the window (the SQL
+    /// editor's ground, the grid's) at the same Opacity (`DatabaseWindowProfile`). Elsewhere the
+    /// window paints as it always has.
+    nonisolated static let navigationOpacity: GlassNavigationWindowOpacity = .behindColumns
+
     let sessionID: UUID
 
     /// Optional: the scenes inject it, and a preview or a test may not.
@@ -750,7 +756,18 @@ struct DatabaseWorkspaceView: View {
         #if os(iOS)
         if horizontalSizeClass == .compact { compactLayout } else { splitLayout }
         #elseif os(visionOS)
-        if DatabaseSpatialLayout.drawsItsOwnGlass { spatialGlassLayout } else { splitLayout }
+        if DatabaseSpatialLayout.drawsItsOwnGlass {
+            spatialGlassLayout
+        } else {
+            // **Opacity behind the columns, edge to edge in the window's shape** (W32, 2026-10-10):
+            // the split view's own glass over each column is tinted by it, as Files' and the
+            // editor's are. The workspace was a canvas set 34 points in from the window's edges
+            // (W28), which read as a dark panel; the owner: "Database server needs the dark
+            // background treatment like connections", and "Opacity is essential".
+            GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsTheme(Self.navigationOpacity)) {
+                splitLayout
+            }
+        }
         #else
         splitLayout
         #endif
@@ -853,6 +870,12 @@ struct DatabaseWorkspaceView: View {
                 // (2026-09-28: "there's no active connections icon in the database manager").
                 .toolbar { workspaceToolbar }
                 .glassActiveConnectionsToolbar(show: runtime?.showActiveConnections, dismissCurrent: { showConnections() })
+                // **The column's own title** (W32): the window's, on the split view, was drawn
+                // nowhere on the headset, so the detail's bar held only its buttons while the
+                // sidebar said "Databases". As a column's title visionOS sets it level with the
+                // sidebar's, as Connections' are (the owner: "the headers across all of these
+                // should do a better job of matching").
+                .navigationTitle(detailTitle)
                 #endif
         }
         #if os(macOS)
@@ -951,16 +974,8 @@ struct DatabaseWorkspaceView: View {
         // them has is a control for nothing.
         if !isCompact && !titleOrnamentHoldsNavigation {
             ToolbarItem(placement: databaseSidebarToolbarPlacement) {
-                Button {
-                    withAnimation {
-                        columnVisibility = columnVisibility == .detailOnly
-                            ? .automatic : .detailOnly
-                    }
-                } label: {
-                    Label("Toggle Sidebar",
-                          systemImage: columnVisibility == .detailOnly
-                              ? "sidebar.left" : "sidebar.leading")
-                }
+                // The same button the editor has on the headset, in the same place (W32).
+                GlassSidebarToggle(columnVisibility: $columnVisibility)
             }
         }
         #endif
@@ -1117,9 +1132,7 @@ struct DatabaseWorkspaceView: View {
         #if os(visionOS)
         .modifier(DatabaseSpatialCanvas(opacity: GlassWindowGlass.canvasOpacity(settingsManager.layers.state,
                                                                                window: windowSettings,
-                                                                               reduceTransparency: reduceTransparency),
-                                        frost: DatabaseSpatialLayout.drawsItsOwnGlass ? 0 : windowProfile.glass.blur,
-                                        insetsForWindowCorner: !DatabaseSpatialLayout.drawsItsOwnGlass))
+                                                                               reduceTransparency: reduceTransparency)))
         #else
         .modifier(DatabaseWorkspaceBackground(
             material: .ultraThinMaterial,
@@ -1648,36 +1661,26 @@ struct DatabaseWorkspaceBackground: ViewModifier {
 
 
 #if os(visionOS)
-/// **The workspace as the window's canvas, on the headset** (W28; owner, 2026-10-10: "rebuild all
-/// window appearances to match the new terminal"). Opacity paints it — the terminal's dark paint,
-/// not a material — in the continuous corner nested in Apple's at the terminal's 34-point inset,
-/// and what is drawn in it keeps to that shape.
+/// **The workspace on the headset.** In the split view (`DatabaseSpatialLayout.ownGlass` off) it
+/// paints nothing of its own: the window paints Opacity behind the columns, edge to edge, and the
+/// column is the split view's glass over that (W32, 2026-10-10). W28 had made it a canvas set 34
+/// points in from the window's edges, with a material behind it at the window's Glass, which the
+/// owner saw as a dark panel ("Database server needs the dark background treatment like
+/// connections").
 ///
-/// In the split view (`DatabaseSpatialLayout.ownGlass` off) the column runs to the window's edge, so
-/// the canvas stands 34 points in from the window's trailing and bottom edges, where its corner
-/// meets Apple's. The split view's own glass is the window's there; the window's frost, when set,
-/// stays a material behind the paint, in the canvas's shape. Without the split view the window
-/// draws its glass itself and places the canvas, and there is no material at all.
+/// Without the split view the window draws its glass itself and the workspace is its canvas:
+/// Opacity paints it, as a terminal's canvas is painted, in the continuous corner nested in
+/// Apple's at the terminal's 34-point inset, and what is drawn in it keeps to that shape.
 struct DatabaseSpatialCanvas: ViewModifier {
     let opacity: Double
-    let frost: Double
-    let insetsForWindowCorner: Bool
 
+    @ViewBuilder
     func body(content: Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: GlassWindowShape.spatialNestedCanvasCornerRadius, style: .continuous)
-        content
-            .glassSpatialCanvas(opacity: opacity)
-            .background {
-                if frost > 0 {
-                    shape.fill(.ultraThinMaterial)
-                        .opacity(frost)
-                        .allowsHitTesting(false)
-                        .accessibilityHidden(true)
-                }
-            }
-            // The detail column's insets in the split view: the window's 34 at its trailing and
-            // bottom edges, a little room beside the sidebar, none under the navigation bar.
-            .padding(insetsForWindowCorner ? GlassWindowShape.spatialColumnCanvasInsets(besideSidebar: true) : EdgeInsets())
+        if DatabaseSpatialLayout.drawsItsOwnGlass {
+            content.glassSpatialCanvas(opacity: opacity)
+        } else {
+            content
+        }
     }
 }
 #endif

@@ -461,6 +461,10 @@ private final class SFTPBrowserSessionLifetime {
 }
 
 struct SFTPBrowserView: View {
+    /// **The switch** for how a Files window shows Opacity on Vision Pro (W32): the theme colour
+    /// edge to edge behind the browser's own glass. Elsewhere the window paints as it always has.
+    static let navigationOpacity: GlassNavigationWindowOpacity = .behindColumns
+
     let sessionID: UUID
     /// The directory to open at, if the caller knows one. Applied once, before the first listing,
     /// so the user does not watch the root load and then jump.
@@ -576,17 +580,12 @@ struct SFTPBrowserView: View {
 
     var body: some View {
         NavigationStack {
+            // On the headset the list sits on the stack's own glass, which the window's Opacity
+            // tints from behind, edge to edge (`navigationOpacity`, in the scene). W28 had made the
+            // list a canvas painted at Opacity 34 points in from the window's edges, which read as
+            // a dark panel (W32; the owner, 2026-10-10: "Database server needs the dark background
+            // treatment like connections. same with the database view and ultimately the editor").
             content
-                #if os(visionOS)
-                // **The files are the window's canvas** (W28, the owner: "rebuild all window
-                // appearances to match the new terminal"): Opacity paints them as a terminal's
-                // canvas is painted, in the corner nested in Apple's, 34 points in from the window's
-                // edges, rather than tinting the stack's glass across the whole window. The whole
-                // column, whatever it shows: a message or a progress view is not the canvas's size.
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .glassSpatialCanvas()
-                .padding(GlassWindowShape.spatialColumnCanvasInsets(besideSidebar: false))
-                #endif
                 // **The folder's name, with the path beneath it.** The title used to be
                 // `currentPath` — the whole path as a title, which reads as a string of text
                 // rather than a place (reported 2026-09-18). The editor's file list shows the

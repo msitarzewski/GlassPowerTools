@@ -52,15 +52,18 @@ struct GlassWindowShapeTests {
     /// either draws Apple's glass itself (`glassSpatialWindowGlass`, as strong as its Glass, none at
     /// 0) or holds a navigation container whose own system glass is the window's, and then paints
     /// its content as a canvas in the corner nested in Apple's and draws no glass under it.
+    /// W32 (2026-10-10): a navigation window has no canvas any more — its `GlassLayeredWindow`
+    /// paints Opacity behind the columns, edge to edge in the window's own shape, as its kind's
+    /// `GlassNavigationWindowOpacity` says, and the columns' glass is tinted by it.
     static let plainWindows: [String: (frame: (file: String, uses: [String])?, why: String)] = [
         "\"terminal\"": (("VisionTerminalWorkgroupView.swift", [".glassSpatialWindowGlass(strength:"]),
                          "it draws Apple's glass itself, in Apple's corner, as strong as its Blur, so it can be clear"),
-        "\"sftp\"": (("GlassTerminalScenes.swift", ["GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsWholeWindow) {"]),
-                     "the browser's NavigationStack draws the window's glass; Opacity paints the list, its canvas"),
+        "\"sftp\"": (("GlassTerminalScenes.swift",
+                      ["GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsTheme(SFTPBrowserView.navigationOpacity)) {"]),
+                     "the browser's NavigationStack draws the window's glass; Opacity paints the window behind it, in the window's shape"),
         "GlassEditorRuntime.windowID": (("GlassEditorWorkspaceView.swift",
-                                         ["GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsWholeWindow) {",
-                                          "GlassLayeredPanel(cornerRadius: 0, role: .embedded,"]),
-                                        "the split view draws the window's glass; Opacity paints the text's column, its canvas"),
+                                         ["GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsTheme(GlassEditorWorkspace.navigationOpacity)) {"]),
+                                        "the split view draws the window's glass; Opacity paints the window behind it, in the window's shape"),
         "\"desktop-session\"": (("DesktopSessionView.swift",
                                  [".glassSpatialWindowGlass(strength:", "GlassWindowShape.spatialNestedCanvasCornerRadius"]),
                                 "it draws Apple's glass itself; the remote screen is its canvas, nested in Apple's corner"),
@@ -69,8 +72,9 @@ struct GlassWindowShapeTests {
                                                 [".glassSpatialWindowGlass(strength:", "GlassWindowShape.spatialNestedCanvasCornerRadius"]),
                                                "a display's window is the desktop's session view: the same glass and canvas"),
         "\"database-workspace\"": (("DatabaseWorkspaceView.swift",
-                                    ["DatabaseSpatialCanvas(", ".glassSpatialWindowGlass(strength:"]),
-                                   "the split view draws the window's glass and the workspace is its canvas; without the split view (DatabaseSpatialLayout) it draws Apple's glass itself"),
+                                    ["GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsTheme(Self.navigationOpacity)) {",
+                                     ".glassSpatialWindowGlass(strength:"]),
+                                   "the split view draws the window's glass and Opacity paints the window behind it, in the window's shape; without the split view (DatabaseSpatialLayout) it draws Apple's glass itself"),
         "\"minimized\"": (nil, "an icon in a circle; there is no window surface to shape"),
     ]
 
@@ -188,14 +192,15 @@ struct GlassNestedCanvasTests {
         }
     }
 
-    @Test func aColumnCanvasMeetsTheWindowsCornerWhereItReachesTheWindowsEdge() {
-        let alone = GlassWindowShape.spatialColumnCanvasInsets(besideSidebar: false)
-        #expect(alone.leading == 34 && alone.trailing == 34 && alone.bottom == 34)
-        #expect(alone.top == 0, "the column's navigation bar is above it, not the window's edge")
-        let beside = GlassWindowShape.spatialColumnCanvasInsets(besideSidebar: true)
-        #expect(beside.leading == GlassWindowShape.spatialCanvasGap && beside.leading < 34,
-                "beside a sidebar the leading edge is not the window's")
-        #expect(beside.trailing == 34 && beside.bottom == 34)
+    /// W32: a column's content lines up with the column's title and keeps the terminal's margin
+    /// from the window's edges — Your Library's numbers (6d132e9), shared by the database's and the
+    /// editor's pages so every window's content starts in the same place.
+    @Test func aColumnsContentStartsAtItsTitleAndKeepsTheTerminalsMarginFromTheWindowsEdges() {
+        let insets = GlassWindowShape.spatialColumnContentInsets
+        #expect(insets.leading == GlassWindowShape.spatialColumnTitleInset && insets.leading == 24,
+                "where visionOS sets a column's navigation title, measured in the visionOS 27 simulator")
+        #expect(insets.trailing == GlassWindowShape.spatialNestedCanvasInset && insets.bottom == 34)
+        #expect(insets.top == 0, "the column's navigation bar is above it, not the window's edge")
     }
 }
 

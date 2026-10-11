@@ -85,7 +85,10 @@ struct DatabaseWindowProfile: Equatable {
     init(window: GlassWindowOverrides, appearance: GlassLayerState, resultRowLimit: Int,
          editorFontSize: Double, dataGridFontSize: Double, showLineNumbers: Bool, formatsJSON: Bool) {
         let layers = appearance.overlaid(by: window)
-        glass = DatabaseGlassAppearance(opacity: layers.effectiveOpacity, blur: layers.frost)
+        // On Vision Pro as the database window's switch says (`DatabaseWorkspaceView.navigationOpacity`).
+        glass = DatabaseGlassAppearance(opacity: GlassWindowGlass.surfaceOpacity(layers.effectiveOpacity,
+                                                                                 DatabaseWorkspaceView.navigationOpacity),
+                                        blur: layers.frost)
         self.resultRowLimit = window.value(of: DatabaseWindowSettings.resultRowLimit, over: resultRowLimit)
         self.editorFontSize = window.value(of: DatabaseWindowSettings.editorFontSize, over: editorFontSize)
         self.dataGridFontSize = window.value(of: DatabaseWindowSettings.dataGridFontSize, over: dataGridFontSize)

@@ -102,6 +102,28 @@ public final class GlassEditorWorkspace {
             project: projectOverrides(for: document),
             file: document.textOverrides)
         document.model.theme = preferences.theme
+        // Only when it differs: the engine redraws every run when its surface is set.
+        if document.model.surfaceCondition != textSurface { document.model.updateSurface(textSurface) }
+    }
+
+    // MARK: What the text is drawn on
+
+    /// **The switch** for how an editor window shows Opacity on Vision Pro (W32): the theme colour
+    /// edge to edge behind the window's columns, and the text on a ground at the same Opacity.
+    static let navigationOpacity: GlassNavigationWindowOpacity = .behindColumns
+
+    /// What this window's text is drawn on. On a Mac, an iPad and a phone the theme's own ground,
+    /// as it always was (`.opaque`). On Vision Pro Apple's glass, with the theme colour at the
+    /// window's Opacity under the text and nothing at 0, described as the SQL editor's is (W32):
+    /// the owner, 2026-10-10, "Opacity is essential transparency is essential". The window says
+    /// which, because only it knows its Appearance.
+    public private(set) var textSurface: SurfaceCondition = .opaque
+
+    /// Every document in this window is drawn on `surface` from now on.
+    public func setTextSurface(_ surface: SurfaceCondition) {
+        guard surface != textSurface else { return }
+        textSurface = surface
+        applyAppearance()
     }
 
     // MARK: This window's own settings

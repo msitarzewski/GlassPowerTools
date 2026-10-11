@@ -90,19 +90,21 @@ public enum GlassLayeredPanelRole: Sendable {
     /// Its own presentation: a sheet, popover or secondary window. It paints theme and frost on
     /// every platform, because nothing else paints that surface.
     case presented
-    /// A column or region inside a `GlassLayeredWindow`, which already paints edge to edge.
+    /// A column or region inside a `GlassLayeredWindow`, which already paints edge to edge (on
+    /// Vision Pro, behind the columns' own glass): it paints nothing of its own anywhere.
     case embedded
 }
 
 /// A panel or detail surface drawing from the same state.
 ///
-/// visionOS leads: a panel is a floating surface with the family's rounded frost, so there it
-/// always paints its own theme inside `cornerRadius` — and an `.embedded` one is the window's
-/// canvas, in the corner nested in Apple's (W28). On the Mac, iPad and iPhone a
-/// `.presented` panel paints the same way, while an `.embedded` panel is the content itself:
-/// painting a second rounded card inside an already layered window doubled the theme paint,
-/// clipped the detail's bottom action bar into a lighter band and let the window corner show
-/// through (observed on the Mac, 2026-09-10).
+/// A `.presented` panel paints its own theme inside `cornerRadius` on every platform. An
+/// `.embedded` panel is the content itself, everywhere. On the Mac, iPad and iPhone painting a
+/// second rounded card inside an already layered window doubled the theme paint, clipped the
+/// detail's bottom action bar into a lighter band and let the window corner show through
+/// (observed on the Mac, 2026-09-10). On Vision Pro the window paints Opacity behind its columns
+/// (`GlassNavigationWindowOpacity`) and the column is Apple's glass over that paint (W32,
+/// 2026-10-10). W28 had made an embedded panel a canvas there, set 34 points in from the window's
+/// edges, which the owner saw as a dark panel: "remove the black background".
 public struct GlassLayeredPanel<Content: View>: View {
     @Environment(\.glassLayers) private var layers
     /// The overrides of the window the panel is in (W22), so a sheet looks like its window.
@@ -111,51 +113,21 @@ public struct GlassLayeredPanel<Content: View>: View {
 
     private let cornerRadius: CGFloat
     private let role: GlassLayeredPanelRole
-    private let besideSidebar: Bool
     private let content: Content
 
-    /// - Parameter besideSidebar: an `.embedded` panel on the headset, where it is the window's
-    ///   canvas: whether a sidebar stands at its leading edge, or the window's edge does.
-    public init(cornerRadius: CGFloat = 24, role: GlassLayeredPanelRole = .presented, besideSidebar: Bool = true,
+    public init(cornerRadius: CGFloat = 24, role: GlassLayeredPanelRole = .presented,
                 @ViewBuilder content: () -> Content) {
         self.cornerRadius = cornerRadius
         self.role = role
-        self.besideSidebar = besideSidebar
         self.content = content()
     }
 
-    private var paintsOwnSurface: Bool {
-        #if os(visionOS)
-        true
-        #else
-        role == .presented
-        #endif
-    }
-
     public var body: some View {
-        if paintsOwnSurface {
-            let state = GlassLayerResolution.resolve(layers.state, window: windowOverrides,
-                                                     reduceTransparency: reduceTransparency)
-            #if os(visionOS)
-            if role == .embedded {
-                // **A detail column on the headset is the window's canvas** (W28, the owner: "rebuild
-                // all window appearances to match the new terminal"): Opacity paints it as a
-                // terminal's canvas is painted, in the corner nested in Apple's, 34 points in from the
-                // window edges the column reaches and a little apart from the sidebar. The column's
-                // window paints nothing of its own (`GlassLayeredWindow(paintsTheme: false)`), so
-                // the paint is the content's, not a tint over the whole window's glass.
-                content
-                    // The whole column, whatever it shows: an empty state is not the canvas's size.
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .glassSpatialCanvas(opacity: state.effectiveOpacity)
-                    .padding(GlassWindowShape.spatialColumnCanvasInsets(besideSidebar: besideSidebar))
-            } else {
-                presentedSurface(state)
-            }
-            #else
-            presentedSurface(state)
-            #endif
-        } else {
+        switch role {
+        case .presented:
+            presentedSurface(GlassLayerResolution.resolve(layers.state, window: windowOverrides,
+                                                          reduceTransparency: reduceTransparency))
+        case .embedded:
             content
         }
     }

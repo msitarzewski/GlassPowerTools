@@ -92,20 +92,22 @@ public enum GlassWindowShape {
         continuousConcentricCornerRadius(outer: spatialWindowCornerRadius, inset: spatialNestedCanvasInset)
     }
 
-    /// A canvas in a navigation container's column, which runs to the window's edges: 34 points
-    /// in from each window edge it reaches, so its corner meets Apple's as the terminal's does, and
-    /// none under the column's navigation bar. Beside a sidebar the leading edge is not the
-    /// window's, and the canvas only stands a little apart from it.
-    public static func spatialColumnCanvasInsets(besideSidebar: Bool) -> EdgeInsets {
-        EdgeInsets(top: 0,
-                   leading: besideSidebar ? spatialCanvasGap : spatialNestedCanvasInset,
-                   bottom: spatialNestedCanvasInset,
-                   trailing: spatialNestedCanvasInset)
-    }
+    // MARK: - Content in a navigation window's column (Your Library's, then every one's)
 
-    /// The room between a canvas and what stands beside it in the window, such as a sidebar: the
-    /// distance a terminal's rows keep inside its canvas.
-    public static let spatialCanvasGap: CGFloat = 12
+    /// Where visionOS sets a column's navigation title from the column's leading edge, measured in
+    /// the visionOS 27 simulator (6d132e9). Content that starts here lines up with the title.
+    public static let spatialColumnTitleInset: CGFloat = 24
+
+    /// Content in a column of a navigation window on the headset, as Your Library's overview has it
+    /// (6d132e9; the owner, 2026-10-10: "I like the minimum space that terminal provides as a
+    /// margin ... let's keep all tiles and shapes aligned"): its leading edge level with the
+    /// column's title, and the terminal's 34 points from the window's own trailing and bottom
+    /// edges, which the detail column reaches. None at the top, where the column's bar is.
+    /// Replaces W28's column canvas insets (W32): there is no canvas in the column any more.
+    public static var spatialColumnContentInsets: EdgeInsets {
+        EdgeInsets(top: 0, leading: spatialColumnTitleInset,
+                   bottom: spatialNestedCanvasInset, trailing: spatialNestedCanvasInset)
+    }
 
     /// The padding inside `GlassNativeWindowFrame` that puts a canvas `spatialNestedCanvasInset`
     /// from the window's edge: the frame insets for the ornaments it shows, this makes up the rest.

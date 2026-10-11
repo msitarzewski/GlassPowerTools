@@ -94,9 +94,11 @@ public struct GlassEditorWorkspaceView: View {
     }
 
     public var body: some View {
-        // On the headset the window paints no theme of its own: Opacity paints the text's column,
-        // the window's canvas (`GlassLayeredPanel`, W28), not a tint over the split view's glass.
-        GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsWholeWindow) {
+        // On the headset Opacity paints the window behind its columns, edge to edge in its shape,
+        // and the split view's glass over each column is tinted by it (W32,
+        // `GlassEditorWorkspace.navigationOpacity`). W28 had painted the text's column as a canvas
+        // set in from the window's edges, which read as a dark panel.
+        GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsTheme(GlassEditorWorkspace.navigationOpacity)) {
             #if os(iOS)
             // **A phone is not a narrow Mac.** `NavigationSplitView` collapses on a compact width
             // into a single stack showing its *sidebar* first — so an editor opened on a file
@@ -220,9 +222,15 @@ public struct GlassEditorWorkspaceView: View {
                 .navigationSplitViewColumnWidth(min: GlassLibraryColumnLayout.navigationMinimum,
                                                 ideal: GlassLibraryColumnLayout.navigationIdeal,
                                                 max: GlassLibraryColumnLayout.navigationMaximum)
+                #if os(visionOS)
+                // **A title, where the column's bar was empty** (the owner, 2026-10-10: "just a big
+                // blank space at the top of the sidebar"). The column's own title, so visionOS sets
+                // it level with the detail's, as Connections' "All Connections" and the database's
+                // "Databases" are: what the list is, while the detail's names what is open (W32).
+                .navigationTitle("Files")
+                #endif
         } detail: {
-            GlassLayeredPanel(cornerRadius: 0, role: .embedded,
-                              besideSidebar: columnVisibility != .detailOnly) { detail }
+            GlassLayeredPanel(cornerRadius: 0, role: .embedded) { detail }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 #if os(visionOS)
                 // **On the headset a split view's own toolbar is not drawn; a column's is** — the
@@ -231,6 +239,15 @@ public struct GlassEditorWorkspaceView: View {
                 // missing from Vision Pro, and so was every way to see a Markdown file's preview
                 // (2026-10-09). Attached to the detail column it is the window's toolbar ornament.
                 .toolbar { toolbarContent(includingDismissal: true) }
+                .toolbar {
+                    // **Hide the sidebar**, as the database's window can: visionOS draws no control
+                    // for it here (W32). Only with a project — the sidebar is its file tree.
+                    if !workspace.projects.isEmpty {
+                        ToolbarItem(placement: .topBarLeading) {
+                            GlassSidebarToggle(columnVisibility: $columnVisibility)
+                        }
+                    }
+                }
                 .glassActiveConnectionsToolbar(show: runtime?.showActiveConnections, dismissCurrent: dismissal?.action)
                 #endif
         }
@@ -246,7 +263,14 @@ public struct GlassEditorWorkspaceView: View {
         // Nobody is stranded by it. Opening a project is Open… — File ▸ Open… (⌘O) on a Mac, the
         // toolbar elsewhere, and a button on the empty document view — none of which is in the
         // sidebar.
+        //
+        // On the headset the system's item is removed either way: visionOS drew none here, and the
+        // window's own (`GlassSidebarToggle`) is the one control, as in the database's window.
+        #if os(visionOS)
+        .toolbar(removing: .sidebarToggle)
+        #else
         .toolbar(removing: workspace.projects.isEmpty ? .sidebarToggle : nil)
+        #endif
     }
 
     #if os(iOS)
@@ -1123,9 +1147,30 @@ private struct GlassEditorWindowLifecycle: ViewModifier {
     #if os(macOS)
     @Environment(\.controlActiveState) private var activeState
     #endif
+    #if os(visionOS)
+    @Environment(\.glassLayers) private var layers
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    /// The text on Apple's glass, with the theme under it at this window's Opacity (Appearance's,
+    /// the window's own over it, whole under Reduce Transparency): the surface the SQL editor's
+    /// text has in a database window (`SQLEditorSurface.applyEnvironment`), so the engine keeps
+    /// the text readable over glass it can't see through, as it does there (W32). Never the opaque
+    /// slab it was at every Opacity.
+    private var textSurface: SurfaceCondition {
+        let state = GlassLayerResolution.resolve(layers.state, window: workspace.windowSettings,
+                                                 reduceTransparency: reduceTransparency)
+        return SurfaceCondition(
+            windowOpacity: GlassWindowGlass.surfaceOpacity(state.effectiveOpacity, GlassEditorWorkspace.navigationOpacity),
+            backing: .blur(strength: state.frost),
+            ambient: .unknown)
+    }
+    #endif
 
     func body(content: Content) -> some View {
         content
+            #if os(visionOS)
+            .onChange(of: textSurface, initial: true) { _, surface in workspace.setTextSurface(surface) }
+            #endif
             // Which window a file opened from the menu bar lands in: the one in front.
             .onAppear { runtime?.noteFrontmost(windowID) }
             #if os(macOS)

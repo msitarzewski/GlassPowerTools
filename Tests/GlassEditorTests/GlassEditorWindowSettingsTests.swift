@@ -351,6 +351,29 @@ struct GlassEditorWindowSettingsTests {
         #expect(GlassEditorInheritedName.forFile(document, in: workspace) == "shop's settings")
     }
 
+    /// W32 (owner, 2026-10-10: "Opacity is essential transparency is essential"): on Vision Pro an
+    /// editor window's text is drawn on Apple's glass with the theme under it at the window's
+    /// Opacity, which the window tells the workspace. Every document follows — those open and those
+    /// opened later — and a workspace no window has told stays on the theme's own ground.
+    @Test("Every document in a window is drawn on the surface its window says, including later ones")
+    func documentsFollowTheWindowsTextSurface() {
+        let runtime = GlassEditorRuntime(defaults: defaults())
+        let workspace = runtime.workspace(for: UUID())
+        let open = workspace.newDocument()
+        #expect(workspace.textSurface == .opaque, "off the headset the theme's own ground, as always")
+        #expect(open.model.surfaceCondition == .opaque)
+
+        let half = SurfaceCondition(windowOpacity: 0.5, backing: .blur(strength: 1))
+        workspace.setTextSurface(half)
+        #expect(open.model.surfaceCondition == half, "the open document follows at once")
+        let later = workspace.newDocument()
+        #expect(later.model.surfaceCondition == half, "a document opened later starts on it")
+
+        workspace.setTextSurface(SurfaceCondition(windowOpacity: 0, backing: .blur(strength: 1)))
+        #expect(open.model.surfaceCondition.windowOpacity == 0 && later.model.surfaceCondition.windowOpacity == 0,
+                "Opacity 0 paints nothing under the text")
+    }
+
     @Test("Editor Settings opens on This Window where there are windows; a phone has none")
     func sections() {
         #expect(GlassEditorSettingsSection.offered(hasWindows: true) == [.thisWindow, .thisFile, .allEditors])

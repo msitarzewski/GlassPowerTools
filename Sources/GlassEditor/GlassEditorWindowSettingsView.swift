@@ -178,7 +178,7 @@ struct GlassEditorWindowSettingsView: View {
             if reduceTransparency {
                 Text(GlassWindowGlassFooter.reduceTransparency)
             } else {
-                Text("Opacity paints the theme color behind the text.")
+                Text("Opacity paints the theme color behind the window's glass and under the text. At 0% the window is visionOS's own glass.")
             }
         }
         .disabled(reduceTransparency)

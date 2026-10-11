@@ -10,6 +10,7 @@ import SwiftUI
 import GlassDBKit
 import Charts
 import GlassShell
+import GlassConnectionUI
 
 struct ConnectionOverviewView: View {
     let sessionID: UUID
@@ -64,7 +65,7 @@ struct ConnectionOverviewView: View {
                     databasesSection
                 }
             }
-            .padding(28)
+            .databaseOverviewPadding()
         }
         .databaseScrollBehavior()
         #if os(macOS)
@@ -109,11 +110,14 @@ struct ConnectionOverviewView: View {
                 .font(.system(size: 34))
                 .foregroundStyle(.tint)
                 .frame(width: 54, height: 54)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+                .databaseOverviewCard(cornerRadius: 14)
 
             VStack(alignment: .leading, spacing: 4) {
+                // Not on the headset, where it is the column's own title just above (W32).
+                #if !os(visionOS)
                 Text(config?.name ?? "Connection")
                     .font(.title.bold())
+                #endif
                 HStack(spacing: 8) {
                     Text(config?.engine.displayName ?? session?.connection?.engineName ?? "Database")
                         .foregroundStyle(.secondary)
@@ -166,7 +170,7 @@ struct ConnectionOverviewView: View {
     }
 
     private var metricsSection: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 12)], spacing: 12) {
+        OverviewMetrics {
             OverviewMetricCard(
                 value: serverVersion ?? (isLoading ? "Loading…" : "Unavailable"),
                 label: "Server version",
@@ -228,7 +232,11 @@ struct ConnectionOverviewView: View {
             }
         }
         .padding(18)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+        #if os(visionOS)
+        // The tiles' full width, so their edges and the card's are one line.
+        .frame(maxWidth: .infinity, alignment: .leading)
+        #endif
+        .databaseOverviewCard(cornerRadius: 18)
     }
 
     private func connectionDetailRow(
@@ -274,7 +282,7 @@ struct ConnectionOverviewView: View {
         }.sorted { $0.value > $1.value }.prefix(8))
 
         if !rowLeaders.isEmpty || !storageLeaders.isEmpty {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 360), spacing: 16)], spacing: 16) {
+            OverviewCharts {
                 if !rowLeaders.isEmpty {
                     OverviewChartCard(
                         title: "Largest by Rows",
@@ -344,7 +352,7 @@ struct ConnectionOverviewView: View {
                     }
                 }
                 .padding(10)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .databaseOverviewCard(cornerRadius: 16)
             }
         }
     }
@@ -631,7 +639,7 @@ struct DatabaseDetailView: View {
                     )
                 }
             }
-            .padding(28)
+            .databaseOverviewPadding()
         }
         .databaseScrollBehavior()
         #if os(macOS)
@@ -687,10 +695,13 @@ struct DatabaseDetailView: View {
                 .font(.system(size: 34))
                 .foregroundStyle(.tint)
                 .frame(width: 54, height: 54)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+                .databaseOverviewCard(cornerRadius: 14)
             VStack(alignment: .leading, spacing: 4) {
+                // Not on the headset, where it is the column's own title just above (W32).
+                #if !os(visionOS)
                 Text(database)
                     .font(.title.bold())
+                #endif
                 HStack(spacing: 8) {
                     Text(session?.connection?.engineName ?? "Database")
                         .foregroundStyle(.secondary)
@@ -736,7 +747,7 @@ struct DatabaseDetailView: View {
     }
 
     private var overviewSection: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 12)], spacing: 12) {
+        OverviewMetrics {
             OverviewMetricCard(value: tableStatuses.count.formatted(), label: "Tables", systemImage: "tablecells")
             OverviewMetricCard(value: totalRows, label: "Estimated rows", systemImage: "number")
             OverviewMetricCard(value: totalSize, label: "Table storage", systemImage: "internaldrive")
@@ -784,7 +795,7 @@ struct DatabaseDetailView: View {
         let storageLeaders = Array(tableStatuses.filter { $0.dataLength > 0 }.sorted { $0.dataLength > $1.dataLength }.prefix(8))
 
         if !rowLeaders.isEmpty || !storageLeaders.isEmpty {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 360), spacing: 16)], spacing: 16) {
+            OverviewCharts {
                 if !rowLeaders.isEmpty {
                     OverviewChartCard(title: "Largest by Rows", subtitle: "Top tables by server-reported row estimate") {
                         OverviewBarChart(kind: .rows, entries: rowLeaders.map { .init(name: $0.name, value: $0.rowCount) })
@@ -849,7 +860,7 @@ struct DatabaseDetailView: View {
                 }
             }
             .padding(10)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .databaseOverviewCard(cornerRadius: 16)
         }
     }
 
@@ -961,7 +972,7 @@ struct TableStatisticsPreviewView: View {
                     freshnessSection(status)
                 }
             }
-            .padding(28)
+            .databaseOverviewPadding()
         }
         .databaseScrollBehavior()
         #if os(macOS)
@@ -1004,10 +1015,13 @@ struct TableStatisticsPreviewView: View {
                 .font(.system(size: 34))
                 .foregroundStyle(.tint)
                 .frame(width: 54, height: 54)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+                .databaseOverviewCard(cornerRadius: 14)
             VStack(alignment: .leading, spacing: 4) {
+                // Not on the headset, where it is the column's own title just above (W32).
+                #if !os(visionOS)
                 Text(table)
                     .font(.title.bold())
+                #endif
                 Text(database)
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -1037,7 +1051,7 @@ struct TableStatisticsPreviewView: View {
     }
 
     private func statisticsSection(_ status: TableStatus) -> some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 12)], spacing: 12) {
+        OverviewMetrics {
             OverviewMetricCard(
                 value: rowCountDescription(status),
                 label: status.rowCountAccuracy == .estimated ? "Estimated rows" : "Rows",
@@ -1167,8 +1181,13 @@ private struct OverviewMetricCard: View {
             Spacer(minLength: 0)
         }
         .padding(16)
+        #if os(visionOS)
+        // The row's height too, so every tile in it is the same shape (`OverviewMetrics`).
+        .frame(maxWidth: .infinity, minHeight: 82, maxHeight: .infinity, alignment: .leading)
+        #else
         .frame(maxWidth: .infinity, minHeight: 82, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        #endif
+        .databaseOverviewCard(cornerRadius: 16)
     }
 }
 
@@ -1325,6 +1344,82 @@ private struct OverviewChartCard<Content: View>: View {
                 .frame(minHeight: 220)
         }
         .padding(18)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+        #if os(visionOS)
+        // The share of the row it is given, so cards side by side are the same shape (`OverviewCharts`).
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        #endif
+        .databaseOverviewCard(cornerRadius: 18)
+    }
+}
+
+/// An overview's figures. **On the headset as Your Library has them** (W32, after 6d132e9; the
+/// owner: "let's keep all tiles and shapes aligned"): one even row, or two even rows of two where
+/// the column is too narrow for every tile whole, each tile the same width and height. An adaptive
+/// grid left three in a row and one under it. Elsewhere the adaptive grid, as before.
+private struct OverviewMetrics<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        #if os(visionOS)
+        ViewThatFits(in: .horizontal) {
+            GlassEqualWidthRow(spacing: 12) { content }
+            // Two rows of two: the same tiles, paired in order.
+            Group(subviews: content) { tiles in
+                VStack(spacing: 12) {
+                    ForEach(Array(stride(from: 0, to: tiles.count, by: 2)), id: \.self) { start in
+                        GlassEqualWidthRow(spacing: 12) {
+                            ForEach(tiles[start..<min(start + 2, tiles.count)]) { $0 }
+                        }
+                    }
+                }
+            }
+        }
+        #else
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 12)], spacing: 12) { content }
+        #endif
+    }
+}
+
+/// An overview's charts. **On the headset in one even row, or one above the other** (W32), so a
+/// single chart takes the whole width and two share it, their edges on the tiles' edges above.
+/// The adaptive grid left a lone chart in half the width. Elsewhere the adaptive grid, as before.
+private struct OverviewCharts<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        #if os(visionOS)
+        ViewThatFits(in: .horizontal) {
+            GlassEqualWidthRow(spacing: 16) { content }
+            VStack(spacing: 16) { content }
+        }
+        #else
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 360), spacing: 16)], spacing: 16) { content }
+        #endif
+    }
+}
+
+extension View {
+    /// An overview's card. **On the headset, Your Library's tile** — a light fill on the window's
+    /// glass in a 12-point corner — so every window's cards are one shape and none is a darker
+    /// panel of material over the glass (W32). Elsewhere the material card it always was.
+    @ViewBuilder
+    func databaseOverviewCard(cornerRadius: CGFloat) -> some View {
+        #if os(visionOS)
+        background(.quaternary.opacity(0.5), in: .rect(cornerRadius: 12))
+        #else
+        background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius))
+        #endif
+    }
+
+    /// An overview page's margins. On the headset under the column's title and the terminal's
+    /// margin from the window's edges, as Your Library has them
+    /// (`GlassWindowShape.spatialColumnContentInsets`, W32); 28 points elsewhere, as before.
+    @ViewBuilder
+    func databaseOverviewPadding() -> some View {
+        #if os(visionOS)
+        padding(GlassWindowShape.spatialColumnContentInsets)
+        #else
+        padding(28)
+        #endif
     }
 }

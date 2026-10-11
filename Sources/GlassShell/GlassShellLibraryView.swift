@@ -29,12 +29,15 @@ public struct GlassShellLibraryView: View {
 
     public init(model: GlassShellModel) { self.model = model }
 
+    /// How Opacity paints this window on the headset, as Files, the editor and the database say
+    /// it for theirs (`GlassNavigationWindowOpacity`).
+    static let navigationOpacity: GlassNavigationWindowOpacity = .behindColumns
+
     public var body: some View {
-        // On the headset the window paints no theme of its own, and its detail paints none either:
-        // Connections is Apple's window, with Apple's glass and margins (owner, 2026-10-10, on the
-        // Vision Pro: "the your library screen can remove the black background now ... Fix the
-        // margins to Apple default"). W28 had made the detail a dark canvas inset from the edges.
-        GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsWholeWindow) {
+        // On the headset Opacity tints the whole window, edge to edge behind the columns (owner,
+        // 2026-10-10: "The whole point of Glass Power Tools is Glass. Opacity is essential"); at 0
+        // it is Apple's glass. No inset card behind Your Library (174fa35): its column paints nothing.
+        GlassLayeredWindow(paintsTheme: GlassWindowGlass.paintsTheme(Self.navigationOpacity)) {
             GlassConnectionLibrary(items: model.items, selection: $selection, scope: $scope, searchText: $search,
                                    order: .source,
                                    onActivate: { model.connect(hostID: $0) }) { item in

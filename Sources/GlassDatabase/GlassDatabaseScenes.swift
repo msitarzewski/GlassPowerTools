@@ -178,7 +178,7 @@ public struct GlassDatabaseBootstrap<Content: View>: View {
         case .showFailure(let message):
             failureMessage = message
         #if DEBUG
-        case .demoConnect(let config, let showsDiagram, let windowSettings, let opensSettings):
+        case .demoConnect(let config, let showsDiagram, let windowSettings, let opensSettings, let start):
             runtime.demoOpensSettings = opensSettings
             Task {
                 do {
@@ -188,10 +188,15 @@ public struct GlassDatabaseBootstrap<Content: View>: View {
                         openWindow(id: "database-diagram", value: runtime.sessionManager.registerDiagram(request))
                         return
                     }
-                    // Straight to a table: the grid is the shot, and the overview would show the
-                    // simulator's file path.
+                    // Straight to a table by default: the grid is the shot, and the overview would
+                    // show the simulator's file path.
+                    let selection: WorkspaceSelection = switch start {
+                    case .table: .table(database: "main", table: "orders")
+                    case .server: .connection
+                    case .database: .database("main")
+                    }
                     present(DatabaseWorkspaceWindowRequest.additional(
-                        sessionID: sessionID, initialSelection: .table(database: "main", table: "orders"), id: sessionID,
+                        sessionID: sessionID, initialSelection: selection, id: sessionID,
                         windowSettings: windowSettings))
                 } catch {
                     failureMessage = DatabaseConnectionFailure.message(for: error, config: config)

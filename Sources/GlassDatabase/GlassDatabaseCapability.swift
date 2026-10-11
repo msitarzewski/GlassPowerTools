@@ -52,7 +52,7 @@ public final class GlassDatabaseRuntime {
         /// Screenshots (App/GlassDemoMode.swift): connect to this configuration without saving it,
         /// in a window with these settings of its own (W24), and This Window open over it.
         case demoConnect(DatabaseConnectionConfig, showsDiagram: Bool, windowSettings: GlassWindowOverrides?,
-                         opensSettings: Bool)
+                         opensSettings: Bool, start: DemoStart)
         #endif
     }
     private(set) var requestSerial = 0
@@ -92,14 +92,15 @@ public final class GlassDatabaseRuntime {
     /// Screenshots only: the real SQLite engine on a demo file, in a workspace, with nothing saved
     /// to the library. The file is imported the way a person's own would be. With
     /// `windowSettings`, the window keeps them as its own (W24); with `opensSettings`, Settings ▸
-    /// This Window opens over it.
+    /// This Window opens over it. `start` is what the window shows first.
     public func requestDemoDatabase(file: URL, name: String, showsDiagram: Bool = false,
-                                    windowSettings: GlassWindowOverrides? = nil, opensSettings: Bool = false) {
+                                    windowSettings: GlassWindowOverrides? = nil, opensSettings: Bool = false,
+                                    start: DemoStart = .table) {
         do {
             let imported = try SQLiteFileImporter.importFile(at: file)
             enqueue(.demoConnect(DatabaseConnectionConfig(name: name, engine: .sqlite, host: imported.path,
                                                           port: 0, username: ""), showsDiagram: showsDiagram,
-                                 windowSettings: windowSettings, opensSettings: opensSettings))
+                                 windowSettings: windowSettings, opensSettings: opensSettings, start: start))
         } catch {
             enqueue(.showFailure("The demo database could not be opened: \(error.localizedDescription)"))
         }
@@ -114,6 +115,13 @@ public final class GlassDatabaseRuntime {
         window[DatabaseWindowSettings.editorFontSize] = 16
         window[DatabaseWindowSettings.resultRowLimit] = 500
         return window
+    }
+
+    /// Screenshots only: what a demo database window shows first — the orders table's data, the
+    /// server's overview (which shows the demo file's path on this device), or the `main`
+    /// database's overview (W32).
+    public enum DemoStart: Sendable {
+        case table, server, database
     }
 
     /// Screenshots only: This Window opens over the next workspace window, once.

@@ -3,8 +3,9 @@
 #   APP=<path to the built .app> Tools/Screenshots/shoot.sh <simulator-udid> <surface> <out.png> [seconds]
 # The app is reinstalled first: visionOS restores a previous launch's windows, which would stand in
 # front of the one being captured.
-# Surfaces: library, editor, editor-window, editor-settings, preview, terminal, terminal-window,
-# terminal-settings, terminal-move, terminal-tabs, terminal-grid, files, database, database-window, database-settings, diagram,
+# Surfaces: library, library-history, editor, editor-window, editor-settings, editor-project, preview,
+# terminal, terminal-window, terminal-settings, terminal-move, terminal-tabs, terminal-grid, files, database,
+# database-window, database-settings, database-server, database-main, diagram,
 # desktop, desktop-window, desktop-settings, desktop-displays, desktop-quality, connections-host, orb,
 # orb-looked-at, orb-later, orb-later-desktop
 # (see App/GlassDemoMode.swift). The orb surfaces need DEMO_ARGS="--demo-idle-seconds 5".

@@ -82,6 +82,19 @@ struct GlassEditorProjectOverview: View {
     }
 
     var body: some View {
+        #if os(visionOS)
+        // **Under its title, on the headset** (W32, the owner, 2026-10-10: "the headers across all
+        // of these should do a better job of matching"). The project's name is the column's own
+        // title there, which visionOS sets level with the sidebar's, so the page starts where that
+        // title does — as Your Library does under its own — and keeps the terminal's margin from
+        // the window's edges. Centred, it floated away from the title it belongs to.
+        ScrollView {
+            overview
+                .padding(GlassWindowShape.spatialColumnContentInsets)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityIdentifier("editor-project-overview")
+        #else
         // **Centred in the pane, both ways**, like the empty state it replaced — a short list of
         // files pinned to the top of a tall empty window reads as content that failed to load.
         // The block itself stays left-aligned: a column of filenames is a list, not a poster.
@@ -96,6 +109,7 @@ struct GlassEditorProjectOverview: View {
             }
         }
         .accessibilityIdentifier("editor-project-overview")
+        #endif
     }
 
     private var overview: some View {
@@ -125,9 +139,13 @@ struct GlassEditorProjectOverview: View {
 
     private var heading: some View {
         VStack(alignment: .leading, spacing: 6) {
+            // Not on the headset: there the name is the column's title already, and the page
+            // said it a second time, larger, just under it (W32).
+            #if !os(visionOS)
             Text(project.displayName)
                 .font(GlassSpatialMetrics.isSpatial ? .largeTitle : .title)
                 .fontWeight(.semibold)
+            #endif
             HStack(spacing: 10) {
                 if let reach = workspace.projectReach[project.id] {
                     Label(reach.badge, systemImage: reach.symbolName)
@@ -184,6 +202,11 @@ struct GlassEditorProjectOverview: View {
         }
         .buttonStyle(.plain)
         .glassGazeHighlight()
+        #if os(visionOS)
+        // The highlight reaches past the file's name and symbol, and they line up with the
+        // section's own symbol and the column's title above (W32).
+        .padding(.horizontal, -8)
+        #endif
         .accessibilityIdentifier("editor-overview-\(name)")
     }
 }

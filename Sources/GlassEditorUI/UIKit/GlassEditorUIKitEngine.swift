@@ -218,9 +218,17 @@ public final class GlassEditorUIKitEngine: GlassEditorEngine {
     }
 
     private func applyThemeToCanvas() {
-        textView.canvasColor = AttributedAssembly.canvasColor(
+        let canvas = AttributedAssembly.canvasColor(
             theme: model.theme, surface: model.surfaceCondition
         )
+        textView.canvasColor = canvas
+        #if os(visionOS)
+        // On Vision Pro the text's ground is painted at the window's Opacity over Apple's glass
+        // (W32), and the line numbers stand on the same ground: a clear gutter beside it read as a
+        // stripe of a different surface. Off the headset the gutter stays clear over whatever the
+        // window paints, as it always has.
+        gutter?.backgroundColor = canvas
+        #endif
         gutter?.refresh()
     }
 
