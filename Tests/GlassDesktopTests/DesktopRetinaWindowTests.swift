@@ -56,12 +56,16 @@ struct DesktopRetinaWindowTests {
         static let uniform = [GlassRemoteScreen(id: 4, x: 0, y: 0, width: 3200, height: 1800, isPrimary: true, density: 2),
                               GlassRemoteScreen(id: 5, x: 3200, y: 0, width: 2560, height: 1440, isPrimary: false, density: 2)]
 
+        /// The mechanism's tests turn it on; the app leaves it off (`opensDisplayConnections`).
+        var opensDisplayConnections = true
+
         func connected(app: DesktopAppModel, screens: [GlassRemoteScreen] = Fixture.mixed,
                        framebuffer: (Int, Int) = (4480, 1800)) async throws -> DesktopSessionModel {
             let session = DesktopSessionModel(connection: connection, app: app, operations: operations,
                                               wallpaperRoot: root.appendingPathComponent("wallpapers"))
             session.canOpenDisplayWindows = true
             session.displayWindows = .oneWindow
+            session.opensDisplayConnections = opensDisplayConnections
             session.attach(session.primaryViewport)
             try await session.connect(username: "", domain: nil, password: "test secret")
             await session.receive(.state(.connected), attempt: session.attemptID, connection: connection)
@@ -126,6 +130,28 @@ struct DesktopRetinaWindowTests {
         await fixture.settle { fixture.disconnects.contains(ObjectIdentifier(connection.transport)) }
         #expect(fixture.disconnects.contains(ObjectIdentifier(connection.transport)))
         #expect(session.isConnected && !session.shouldClosePresentation)
+        session.close()
+    }
+
+    /// The owner (2026-10-11, Vision Pro): "The second display doesn't reflect any changes." A Mac
+    /// serves one scale at a time: the 1x display's own connection got nothing once the desktop's
+    /// was at half size.
+    @Test("as the app runs: a Retina display and a 1x display both come from the desktop's connection, at their own pixels")
+    func noSecondConnectionInTheApp() async throws {
+        let fixture = try Fixture()
+        defer { fixture.clean() }
+        fixture.opensDisplayConnections = false
+        let session = try await fixture.connected(app: await fixture.launch())
+        #expect(!DesktopSessionModel(connection: fixture.connection, app: await fixture.launch(), operations: fixture.operations,
+                                     wallpaperRoot: fixture.root).opensDisplayConnections, "off unless a test turns it on")
+        let second = session.displayViewport(for: 1)
+        session.attach(second)
+        await fixture.settle { fixture.connects.count > 1 }
+        #expect(session.displayConnections.isEmpty && fixture.connects.count == 1, "one connection")
+        #expect(session.currentRequestedRegions == [GlassRemoteRegion(x: 0, y: 0, width: 3200, height: 1800),
+                                                    GlassRemoteRegion(x: 3200, y: 0, width: 1280, height: 800)],
+                "both displays from the desktop's connection: mixed densities, so their own pixels")
+        #expect(session.inputTransport(for: second) === session.transport)
         session.close()
     }
 

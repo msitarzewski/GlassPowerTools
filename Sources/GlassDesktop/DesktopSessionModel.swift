@@ -363,10 +363,21 @@ public final class DesktopSessionModel {
         return oneX > 0 && oneX < densities.count
     }
 
+    /// Whether a display window may open a connection of its own (W38). Off: a Mac serves every
+    /// viewer at one scale at a time. With the desktop's connection at half size for its Retina
+    /// display, the 1x display's own connection got no picture after its first few — the Mac's
+    /// counters showed every update going through its scaling path, none unscaled — while its
+    /// pointer still moved (2026-10-11, the owner on a Vision Pro: "the second display doesn't
+    /// reflect any changes"). So, as Apple's viewer does over mixed densities, both displays come
+    /// from the desktop's connection at their own pixels; Retina at 1x applies where only Retina
+    /// displays are on screen. The mechanism stays, tested, for a Mac that can do otherwise.
+    var opensDisplayConnections = false
+
     /// The display a window would take a connection of its own for, if any: a display window showing
     /// one display of a Mac whose displays are of mixed density, with Retina Displays at 1x.
     func ownConnectionDisplay(for viewport: DesktopViewport) -> UInt32? {
-        guard !closed, isConnected, connection.protocol == .vnc, retinaDisplays == .oneX, !viewport.isPrimary,
+        guard opensDisplayConnections,
+              !closed, isConnected, connection.protocol == .vnc, retinaDisplays == .oneX, !viewport.isPrimary,
               displayConnectionFailure == nil, attemptCredential != nil, hasMixedDensities,
               let display = viewport.selectedScreenID, screens.contains(where: { $0.id == display }) else { return nil }
         return display

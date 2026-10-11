@@ -225,7 +225,7 @@ struct DesktopConnectionSettingsSections: View {
             } header: {
                 Text("Windows")
             } footer: {
-                Text("Each window's picture as it arrives: its size in pixels, and at what scale of the Mac's own points. A display window marked Own Connection fetches its display on a connection of its own.")
+                Text("Each window's picture as it arrives: its size in pixels, and at what scale of the Mac's own points.")
             }
         }
         if session.screens.count > 1 {
@@ -260,7 +260,7 @@ struct DesktopConnectionSettingsSections: View {
         return line
     }
 
-    static let retinaFooter = "Retina Displays is for a Mac. At 1x a Retina display arrives at one pixel per point, a quarter of its own pixels, and Quality's own reduction comes on top. A Retina display and a 1x display cannot share one scale, so when a Mac has both and a display has a window of its own, that window opens a connection of its own to the Mac with the same sign-in, and each arrives at 1x. Native 2x sends a Retina display's own pixels."
+    static let retinaFooter = "Retina Displays is for a Mac. At 1x a Retina display arrives at one pixel per point, a quarter of its own pixels, and Quality's own reduction comes on top. A Mac sends one scale at a time, so while a Retina display and a 1x display are both on screen, each arrives at its own pixels, as Apple's Screen Sharing shows them. Native 2x always sends a Retina display's own pixels."
 
     static let qualityFooter = "Automatic measures the connection and moves between the levels as it changes. Best is lossless, full color. Balanced is full color, with JPEG for photos where the computer offers it. Data Saver sends thousands of colors at up to 15 updates a second; Lowest compresses hardest at up to 8, with 256 colors where the computer sends no JPEG. A Mac also sends a smaller picture at Data Saver (75% of its size) and Lowest (50%); Scale shows the size it is sending. Quality is the connection's, so it applies to every window of this desktop. Zooming or shrinking the picture here does not change what the network carries."
 }
