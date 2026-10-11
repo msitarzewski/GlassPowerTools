@@ -135,6 +135,62 @@ struct EncodingTests {
         #expect(Array(framebuffer.pixels[60..<63]) == [2, 2, 2])
     }
 
+    /// The native fast path (2026-10-11) against the per-pixel reference, tile kind by tile kind,
+    /// edges included: a rectangle off the grid, partial tiles at its right and bottom.
+    @Test func zrleNativePathMatchesTheReference() throws {
+        var random = SystemRandomNumberGenerator()
+        let rect = RFBRectangle(x: 3, y: 5, width: 150, height: 70)
+        var tiles: [UInt8] = []
+        var y = rect.y
+        var kind = 0
+        while y < rect.maxY {
+            let height = min(64, rect.maxY - y)
+            var x = rect.x
+            while x < rect.maxX {
+                let width = min(64, rect.maxX - x), count = width * height
+                func colour() -> [UInt8] { [UInt8.random(in: 0...255, using: &random), UInt8.random(in: 0...255, using: &random), UInt8.random(in: 0...255, using: &random)] }
+                switch kind % 5 {
+                case 0: tiles.append(0); for _ in 0..<count { tiles += colour() }
+                case 1: tiles.append(1); tiles += colour()
+                case 2:
+                    tiles.append(5); for _ in 0..<5 { tiles += colour() }
+                    for _ in 0..<(((width * 4 + 7) / 8) * height) { tiles.append(UInt8.random(in: 0...255, using: &random) & 0x44) }
+                case 3:
+                    tiles.append(128)
+                    var left = count
+                    while left > 0 {
+                        let length = min(left, Int.random(in: 1...300, using: &random))
+                        tiles += colour()
+                        var rest = length - 1
+                        while rest >= 255 { tiles.append(255); rest -= 255 }
+                        tiles.append(UInt8(rest))
+                        left -= length
+                    }
+                default:
+                    tiles.append(128 + 3); for _ in 0..<3 { tiles += colour() }
+                    var left = count
+                    while left > 0 {
+                        let length = min(left, Int.random(in: 1...40, using: &random))
+                        let index = UInt8.random(in: 0...2, using: &random)
+                        if length == 1 { tiles.append(index) } else { tiles += [index | 0x80, UInt8(length - 1)] }
+                        left -= length
+                    }
+                }
+                kind += 1
+                x += 64
+            }
+            y += 64
+        }
+        let fast = try RFBFramebuffer(width: 160, height: 80), reference = try RFBFramebuffer(width: 160, height: 80)
+        try RFBRectangleDecoder.decodeZRLETiles(tiles, rect: rect, into: fast)
+        try RFBRectangleDecoder.decodeZRLETilesGenerally(tiles, rect: rect, into: reference, pixels: .native)
+        #expect(fast.pixels == reference.pixels)
+        #expect(fast.pixels[((rect.y * 160) + rect.x) * 4 + 3] == 255)
+        #expect(throws: RFBError.self, "a rectangle past the framebuffer is refused") {
+            try RFBRectangleDecoder.decodeZRLETiles([1, 1, 2, 3], rect: RFBRectangle(x: 159, y: 0, width: 2, height: 1), into: fast)
+        }
+    }
+
     @Test func cursorDecoding() async throws {
         var bytes: [UInt8] = []
         for index in 0..<6 { bytes += [UInt8(index), 0, 0, 0] }

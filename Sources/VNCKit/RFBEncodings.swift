@@ -149,6 +149,15 @@ final class RFBRectangleDecoder {
         // one byte per 64 rows: an empty raw tile each (2026-10-11, on a headset: "rect=2056,23,0x517
         // inflated=9"). Its bytes were inflated in step, so skipping them keeps the stream in step.
         if rect.isEmpty { return }
+        if pixels.isNative, pixels.compactBytes == 3 {
+            return try decodeNativeZRLETiles(bytes, rect: rect, into: framebuffer)
+        }
+        try decodeZRLETilesGenerally(bytes, rect: rect, into: framebuffer, pixels: pixels)
+    }
+
+    /// Any pixel format, a pixel at a time: the reference the native path is tested against.
+    static func decodeZRLETilesGenerally(_ bytes: [UInt8], rect: RFBRectangle, into framebuffer: RFBFramebuffer,
+                                         pixels: RFBPixelDecoder) throws {
         var reader = ByteReader(bytes)
         var census = RFBZRLETrailingData.Census()
         var tileY = rect.y
@@ -166,6 +175,135 @@ final class RFBRectangleDecoder {
         }
         guard reader.isAtEnd else {
             throw RFBZRLETrailingData(rectangle: rect, inflated: bytes, consumed: reader.offset, census: census)
+        }
+    }
+
+    /// The format this client asks for, three-byte CPIXELs (B, G, R), written as whole 32-bit pixels
+    /// straight into the framebuffer, with lengths checked per tile rather than per pixel. A whole
+    /// 6032 × 2707 desktop took 53 ms a pixel at a time on a Mac; a Vision Pro on a Mac's two displays
+    /// fell behind its pushes and lagged (2026-10-11).
+    static func decodeNativeZRLETiles(_ bytes: [UInt8], rect: RFBRectangle, into framebuffer: RFBFramebuffer) throws {
+        guard rect.x >= 0, rect.y >= 0, rect.maxX <= framebuffer.width, rect.maxY <= framebuffer.height else {
+            throw RFBError.protocolViolation("The server sent a rectangle outside the framebuffer.")
+        }
+        var census = RFBZRLETrailingData.Census()
+        let stride = framebuffer.width
+        let consumed: Int = try bytes.withUnsafeBufferPointer { input in
+            try framebuffer.withPixels32 { out in
+                var at = 0
+                let count = input.count
+                var palette = [UInt32](repeating: 0, count: 128)
+                func need(_ length: Int) throws {
+                    guard at + length <= count else { throw RFBError.protocolViolation("The server message ended early.") }
+                }
+                func pixel() -> UInt32 {
+                    defer { at += 3 }
+                    return UInt32(input[at]) | UInt32(input[at + 1]) << 8 | UInt32(input[at + 2]) << 16 | 0xFF00_0000
+                }
+                func runLength() throws -> Int {
+                    var length = 1
+                    while true {
+                        try need(1)
+                        let byte = input[at]
+                        at += 1
+                        length += Int(byte)
+                        guard length <= 64 * 64 + 1 else { throw RFBError.protocolViolation("ZRLE run length is too long.") }
+                        if byte != 255 { return length }
+                    }
+                }
+                var tileY = rect.y
+                while tileY < rect.maxY {
+                    let tileHeight = min(64, rect.maxY - tileY)
+                    var tileX = rect.x
+                    while tileX < rect.maxX {
+                        let tileWidth = min(64, rect.maxX - tileX)
+                        let pixelCount = tileWidth * tileHeight
+                        /// A run of one colour from a tile's `start`th pixel, row by row.
+                        func run(from start: Int, length: Int, colour: UInt32) {
+                            var position = start, remaining = length
+                            while remaining > 0 {
+                                let row = position / tileWidth, column = position % tileWidth
+                                let span = min(remaining, tileWidth - column)
+                                (out + (tileY + row) * stride + tileX + column).update(repeating: colour, count: span)
+                                position += span; remaining -= span
+                            }
+                        }
+                        try need(1)
+                        let subencoding = input[at]
+                        at += 1
+                        census.count(subencoding)
+                        switch subencoding {
+                        case 0:
+                            try need(pixelCount * 3)
+                            for row in 0..<tileHeight {
+                                let line = out + (tileY + row) * stride + tileX
+                                for column in 0..<tileWidth { line[column] = pixel() }
+                            }
+                        case 1:
+                            try need(3)
+                            let colour = pixel()
+                            for row in 0..<tileHeight {
+                                (out + (tileY + row) * stride + tileX).update(repeating: colour, count: tileWidth)
+                            }
+                        case 2...16:
+                            let size = Int(subencoding)
+                            try need(size * 3)
+                            for index in 0..<size { palette[index] = pixel() }
+                            let bits = size == 2 ? 1 : (size <= 4 ? 2 : 4)
+                            let rowBytes = (tileWidth * bits + 7) / 8
+                            try need(rowBytes * tileHeight)
+                            let mask = (1 << bits) - 1
+                            for row in 0..<tileHeight {
+                                let line = out + (tileY + row) * stride + tileX
+                                let start = at + row * rowBytes
+                                var bitOffset = 0
+                                for column in 0..<tileWidth {
+                                    let byte = Int(input[start + bitOffset >> 3])
+                                    let index = (byte >> (8 - bits - (bitOffset & 7))) & mask
+                                    guard index < size else { throw RFBError.protocolViolation("ZRLE palette index out of range.") }
+                                    line[column] = palette[index]
+                                    bitOffset += bits
+                                }
+                            }
+                            at += rowBytes * tileHeight
+                        case 128:
+                            var written = 0
+                            while written < pixelCount {
+                                try need(3)
+                                let colour = pixel()
+                                let length = try runLength()
+                                guard written + length <= pixelCount else { throw RFBError.protocolViolation("ZRLE run overflows its tile.") }
+                                run(from: written, length: length, colour: colour)
+                                written += length
+                            }
+                        case 130...255:
+                            let size = Int(subencoding) - 128
+                            try need(size * 3)
+                            for index in 0..<size { palette[index] = pixel() }
+                            var written = 0
+                            while written < pixelCount {
+                                try need(1)
+                                let entry = input[at]
+                                at += 1
+                                let index = Int(entry & 0x7F)
+                                guard index < size else { throw RFBError.protocolViolation("ZRLE palette index out of range.") }
+                                let length = entry & 0x80 != 0 ? try runLength() : 1
+                                guard written + length <= pixelCount else { throw RFBError.protocolViolation("ZRLE run overflows its tile.") }
+                                run(from: written, length: length, colour: palette[index])
+                                written += length
+                            }
+                        default:
+                            throw RFBError.protocolViolation("Unsupported ZRLE subencoding \(subencoding).")
+                        }
+                        tileX += 64
+                    }
+                    tileY += 64
+                }
+                return at
+            }
+        }
+        guard consumed == bytes.count else {
+            throw RFBZRLETrailingData(rectangle: rect, inflated: bytes, consumed: consumed, census: census)
         }
     }
 

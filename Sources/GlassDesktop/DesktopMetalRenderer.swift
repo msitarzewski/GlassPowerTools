@@ -36,8 +36,14 @@ final class DesktopMetalRenderer: NSObject, MTKViewDelegate {
     private let fallback: any MTLTexture
     private let onError: @MainActor @Sendable (String) -> Void
     var frame: GlassRDPFrame? {
-        didSet { if frame == nil { textures = Array(repeating: nil, count: 3) } }
+        didSet { if frame == nil { textures = Array(repeating: nil, count: 3); uploaded = nil } }
     }
+    /// The picture a texture holds now: which frame, and which part of it. A draw for anything else —
+    /// the pointer moving, a setting — draws that texture again rather than uploading the frame.
+    private struct Upload: Equatable { let sequence: UInt64; let x: Int, y: Int, width: Int, height: Int }
+    private var uploaded: (key: Upload, slot: Int)?
+    /// Pictures sent to the GPU, for tests.
+    private(set) var uploads = 0
     var settings = PresentationSettings()
 
     init(device: any MTLDevice, pixelFormat: MTLPixelFormat, onError: @escaping @MainActor @Sendable (String) -> Void) throws {
@@ -135,26 +141,46 @@ final class DesktopMetalRenderer: NSObject, MTKViewDelegate {
     private func encodeFrame(_ encoder: any MTLRenderCommandEncoder, size: CGSize) throws {
             if let frame {
             guard frame.width <= DesktopSize.maximumPixels / frame.height else { throw RendererError.frameTooLarge }
-            if textures[slot]?.width != frame.width || textures[slot]?.height != frame.height {
-                let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm,
-                    width: frame.width, height: frame.height, mipmapped: false)
-                descriptor.usage = .shaderRead
-                descriptor.storageMode = .shared
-                textures[slot] = device.makeTexture(descriptor: descriptor)
-            }
-            guard let texture = textures[slot] else { throw RendererError.unavailable }
-            frame.pixels.withUnsafeBytes { bytes in
-                if let address = bytes.baseAddress {
-                    texture.replace(region: MTLRegionMake2D(0, 0, frame.width, frame.height), mipmapLevel: 0,
-                                    withBytes: address, bytesPerRow: frame.bytesPerRow)
+            let visible = region ?? .whole(width: frame.width, height: frame.height)
+            // Only the window's part of the picture goes to the GPU, and only when it is a new
+            // picture. Every draw used to upload the whole framebuffer, on the main thread: a Mac's
+            // two displays at their own pixels are 65 MB, uploaded by each display's window, and
+            // again for every move of the pointer — the lag the owner felt on a Vision Pro
+            // (2026-10-11). Remove Wallpaper samples the wallpaper at the whole picture's
+            // coordinates, so it keeps the whole picture.
+            let crops = settings.mode != .removeWallpaper && visible.normalized(inWidth: frame.width, height: frame.height) != nil
+            let key = crops ? Upload(sequence: frame.sequence, x: visible.origin.x, y: visible.origin.y,
+                                     width: visible.size.width, height: visible.size.height)
+                            : Upload(sequence: frame.sequence, x: 0, y: 0, width: frame.width, height: frame.height)
+            let texture: any MTLTexture
+            if let uploaded, uploaded.key == key, let shown = textures[uploaded.slot] {
+                texture = shown
+            } else {
+                // Never the texture last shown: draws still in flight may be reading it.
+                let target = uploaded.map { ($0.slot + 1) % textures.count } ?? 0
+                if textures[target]?.width != key.width || textures[target]?.height != key.height {
+                    let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm,
+                        width: key.width, height: key.height, mipmapped: false)
+                    descriptor.usage = .shaderRead
+                    descriptor.storageMode = .shared
+                    textures[target] = device.makeTexture(descriptor: descriptor)
                 }
+                guard let fresh = textures[target] else { throw RendererError.unavailable }
+                frame.pixels.withUnsafeBytes { bytes in
+                    if let address = bytes.baseAddress {
+                        fresh.replace(region: MTLRegionMake2D(0, 0, key.width, key.height), mipmapLevel: 0,
+                                      withBytes: address + key.y * frame.bytesPerRow + key.x * 4, bytesPerRow: frame.bytesPerRow)
+                    }
+                }
+                uploaded = (key, target)
+                uploads += 1
+                texture = fresh
             }
             let width = Float(size.width), height = Float(size.height)
-            let visible = region ?? .whole(width: frame.width, height: frame.height)
-            let source = visible.normalized(inWidth: frame.width, height: frame.height)
-                ?? (originX: 0, originY: 0, extentX: 1, extentY: 1)
-            let sourceWidth = Float(source.extentX) * Float(frame.width)
-            let sourceHeight = Float(source.extentY) * Float(frame.height)
+            let source = crops ? (originX: 0.0, originY: 0.0, extentX: 1.0, extentY: 1.0)
+                : visible.normalized(inWidth: frame.width, height: frame.height) ?? (originX: 0, originY: 0, extentX: 1, extentY: 1)
+            let sourceWidth = Float(source.extentX) * Float(texture.width)
+            let sourceHeight = Float(source.extentY) * Float(texture.height)
             let scale = min(width / sourceWidth, height / sourceHeight)
             let mode: UInt32
             switch settings.mode {

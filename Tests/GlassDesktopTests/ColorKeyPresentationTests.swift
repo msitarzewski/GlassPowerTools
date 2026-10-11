@@ -148,6 +148,28 @@ struct ColorKeyPresentationTests {
             mode: .removeWallpaper, threshold: 1, feather: 0) == 1)
     }
 
+    /// 2026-10-11: every draw uploaded the whole framebuffer, on the main thread, for every window
+    /// and every move of the pointer. A window uploads its own part, once per picture.
+    @Test("a window uploads only its part of the picture, and only when the picture or the part changes")
+    func uploadsOnlyItsPartOnce() throws {
+        let device = try #require(MTLCreateSystemDefaultDevice(), "A real Metal device is required for shader readback")
+        let renderer = try DesktopMetalRenderer(device: device, pixelFormat: .bgra8Unorm) { Issue.record("\($0)") }
+        // Two "displays" side by side: red on the left 2 × 2, green on the right 2 × 2 (B, G, R, A).
+        let red: [UInt8] = [0, 0, 255, 255], green: [UInt8] = [0, 255, 0, 255]
+        let row = red + red + green + green
+        renderer.frame = try GlassRDPFrame(width: 4, height: 2, bytesPerRow: 16, pixels: Data(row + row), sequence: 7)
+        renderer.region = DesktopRegion(origin: .init(x: 2, y: 0), size: DesktopSize(width: 2, height: 2))
+        #expect(try read(renderer, device: device) == Array((green).repeated(4)))
+        #expect(try read(renderer, device: device) == Array((green).repeated(4)), "drawn again")
+        #expect(renderer.uploads == 1, "the same picture is not uploaded again")
+        renderer.region = DesktopRegion(origin: .init(x: 0, y: 0), size: DesktopSize(width: 2, height: 2))
+        #expect(try read(renderer, device: device) == Array((red).repeated(4)))
+        #expect(renderer.uploads == 2, "another part is")
+        renderer.frame = try GlassRDPFrame(width: 4, height: 2, bytesPerRow: 16, pixels: Data(row + row), sequence: 8)
+        _ = try read(renderer, device: device)
+        #expect(renderer.uploads == 3, "and a new picture is")
+    }
+
     private func renderer(pixels: [UInt8]? = nil) throws -> (any MTLDevice, DesktopMetalRenderer) {
         let device = try #require(MTLCreateSystemDefaultDevice(), "A real Metal device is required for shader readback")
         let renderer = try DesktopMetalRenderer(device: device, pixelFormat: .bgra8Unorm) { Issue.record("\($0)") }
@@ -187,4 +209,8 @@ struct ColorKeyPresentationTests {
         CGImageDestinationAddImage(destination, image, nil)
         #expect(CGImageDestinationFinalize(destination))
     }
+}
+
+private extension Array {
+    func repeated(_ count: Int) -> [Element] { (0..<count).flatMap { _ in self } }
 }

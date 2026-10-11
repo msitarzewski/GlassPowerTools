@@ -51,6 +51,13 @@ public final class RFBFramebuffer {
 
     public func snapshot() -> Data { Data(pixels) }
 
+    /// The pixels as 32-bit B, G, R, A words, for a decoder that writes whole pixels.
+    func withPixels32<R>(_ body: (UnsafeMutablePointer<UInt32>) throws -> R) rethrows -> R {
+        try pixels.withUnsafeMutableBufferPointer { buffer in
+            try buffer.baseAddress!.withMemoryRebound(to: UInt32.self, capacity: buffer.count / 4) { try body($0) }
+        }
+    }
+
     @inline(__always)
     func store(x: Int, y: Int, blue: UInt8, green: UInt8, red: UInt8) {
         let offset = (y * width + x) * 4
