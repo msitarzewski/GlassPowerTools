@@ -62,7 +62,9 @@ struct SchemaDiagramVolume: View {
             }
         }
         .overlay { statusOverlay }
-        .ornament(attachmentAnchor: .scene(.bottom), contentAlignment: .top) { controls }
+        // Apple's toolbar ornament, as every window's bottom bar is (W31): the system sizes and
+        // spaces the controls and draws the capsule.
+        .toolbar { ToolbarItemGroup(placement: .bottomOrnament) { controls } }
         .task { await reload() }
     }
 
@@ -110,34 +112,31 @@ struct SchemaDiagramVolume: View {
         }
     }
 
-    private var controls: some View {
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(request.database).font(.headline)
-                Text(document.selection ?? document.summary)
-                    .font(.caption).foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            .frame(minWidth: 180, alignment: .leading)
-            Divider().frame(height: 32)
-            Button { yaw -= .pi / 6 } label: { Label("Turn Left", systemImage: "rotate.left") }
-            Button { yaw += .pi / 6 } label: { Label("Turn Right", systemImage: "rotate.right") }
-            Button { yaw = 0; pitch = 0 } label: {
-                Label("Face Front", systemImage: "arrow.counterclockwise")
-            }
-            Toggle(isOn: $document.keysOnly) { Label("Keys Only", systemImage: "key") }
-                .toggleStyle(.button)
-            Button {
-                if let selection = document.selection { openTable(selection) }
-            } label: { Label("Open Table", systemImage: "tablecells") }
-                .disabled(document.selection == nil)
-            Button { Task { await reload() } } label: {
-                Label("Refresh", systemImage: "arrow.clockwise")
-            }
+    /// Separate items, not a stack: each is one of the toolbar's own, and it draws a label as its
+    /// icon.
+    @ViewBuilder private var controls: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(request.database).font(.headline)
+            Text(document.selection ?? document.summary)
+                .font(.caption).foregroundStyle(.secondary)
+                .lineLimit(1)
         }
-        .labelStyle(.iconOnly)
-        .padding(.horizontal, 20).padding(.vertical, 12)
-        .glassBackgroundEffect()
+        .frame(minWidth: 180, alignment: .leading)
+        Divider().frame(height: 32)
+        Button { yaw -= .pi / 6 } label: { Label("Turn Left", systemImage: "rotate.left") }
+        Button { yaw += .pi / 6 } label: { Label("Turn Right", systemImage: "rotate.right") }
+        Button { yaw = 0; pitch = 0 } label: {
+            Label("Face Front", systemImage: "arrow.counterclockwise")
+        }
+        Toggle(isOn: $document.keysOnly) { Label("Keys Only", systemImage: "key") }
+            .toggleStyle(.button)
+        Button {
+            if let selection = document.selection { openTable(selection) }
+        } label: { Label("Open Table", systemImage: "tablecells") }
+            .disabled(document.selection == nil)
+        Button { Task { await reload() } } label: {
+            Label("Refresh", systemImage: "arrow.clockwise")
+        }
     }
 
     private func reload() async {

@@ -322,6 +322,29 @@ struct TerminalConnectFlow: ViewModifier {
             session.demoOpensSettings = opensSettings
             session.feedTerminalData(output)
             presentTerminalWindow(for: session, windowSettings: windowSettings)
+        case .demoTabs(let names, let output, let grid):
+            // The same connectionless sessions, as the tabs of one window.
+            let sessions = names.map { name in
+                let session = TerminalSession(server: ServerConfiguration(name: name, host: "192.0.2.10", username: "ann"),
+                                              terminalWriteSink: { _ in },
+                                              terminalResizeSink: { _, _ in })
+                sessionManager.registerSession(session)
+                session.state = .connected
+                session.feedTerminalData(output)
+                return session
+            }
+            guard let first = sessions.first else { return }
+            #if os(visionOS)
+            let workgroupID = sessionManager.createWorkgroup(name: first.server.name, colorTag: first.server.colorTag,
+                                                             windowSettings: GlassWindowOverrides())
+            for session in sessions { _ = sessionManager.appendSession(session, toWorkgroup: workgroupID) }
+            sessionManager.selectSession(first.id, inWorkgroup: workgroupID)
+            if grid { VisionTerminalWorkgroupView.demoOpensGrid.insert(workgroupID) }
+            openWindow(id: "terminal", value: workgroupID)
+            #else
+            _ = grid
+            presentTerminalWindow(for: first)
+            #endif
         case .demoFiles(let name, let path):
             // The same connectionless session: the browser cannot open SFTP over it and says so,
             // which leaves its window, title and toolbar to look at.

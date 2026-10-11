@@ -898,7 +898,10 @@ struct TerminalWindowView: View {
         } label: {
             Image(systemName: "textformat.size")
         }
+        // A toolbar item on Vision Pro, styled by the toolbar (W31).
+        #if os(iOS)
         .buttonStyle(.borderless)
+        #endif
         .disabled(!isTerminalActive)
         .accessibilityLabel("Terminal Font Size")
         .accessibilityValue("\(Int(swiftTermTheme.fontSize)) points")
@@ -1409,11 +1412,10 @@ struct TerminalWindowView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
         #else
-        HStack(spacing: 12) {
-            bottomStatusBarContents(compact: false)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        // Vision Pro: the items themselves, with no stack, spacing or padding of their own. They
+        // are Apple's toolbar ornament (`GlassNativeWindowFrame`), which sizes and spaces them and
+        // draws the capsule, so the bar is the size of every other window's (W31).
+        bottomStatusBarContents(compact: false)
         #endif
     }
 
@@ -1464,7 +1466,9 @@ struct TerminalWindowView: View {
                 } label: {
                     Image(systemName: "server.rack")
                 }
-#if !os(macOS)
+                // iPhone and iPad only: on Vision Pro these are toolbar items, and the toolbar
+                // styles its own buttons (W31).
+#if os(iOS)
                 .buttonStyle(.borderless)
 #endif
                 .accessibilityLabel("Connections")
@@ -1480,7 +1484,7 @@ struct TerminalWindowView: View {
                 } label: {
                     toolLabel("AI Assistant", image: "sparkles", inMenu: inMenu)
                 }
-#if !os(macOS)
+#if os(iOS)
                 .buttonStyle(.borderless)
 #endif
                 .accessibilityLabel("AI Assistant")
@@ -1506,9 +1510,6 @@ struct TerminalWindowView: View {
                 }
                 // Pinch and hold (right-click on a Mac): the same folder in the editor instead.
                 .contextMenu { workingFolderActions }
-                #if os(visionOS)
-                .buttonStyle(.borderless)
-                #endif
                 .accessibilityLabel("Open Folder Here")
                 .accessibilityIdentifier("terminal-open-folder-here")
                 .help(session.survivesClose ? "Open this shell's folder over SFTP" : "Open \(reportedFolder ?? "") over SFTP")
@@ -1529,7 +1530,6 @@ struct TerminalWindowView: View {
             } label: {
                 Image(systemName: isImmersiveFocusActive ? "moon.fill" : "moon")
             }
-            .buttonStyle(.borderless)
             .accessibilityLabel(isImmersiveFocusActive ? "Exit Focus Mode" : "Focus Mode")
             .help(isImmersiveFocusActive ? "Exit Focus Mode" : "Focus Mode")
             #elseif os(macOS)
@@ -1566,7 +1566,7 @@ struct TerminalWindowView: View {
                 } label: {
                     Image(systemName: "plus")
                 }
-#if !os(macOS)
+#if os(iOS)
                 .buttonStyle(.borderless)
 #endif
                 .accessibilityIdentifier("terminal-footer-new-tab")
@@ -1711,7 +1711,7 @@ struct TerminalWindowView: View {
                 toolLabel("Session", image: "gearshape", inMenu: inMenu)
             }
             .menuOrder(.fixed)
-#if !os(macOS)
+#if os(iOS)
             .menuStyle(.button)
             .buttonStyle(.borderless)
 #endif

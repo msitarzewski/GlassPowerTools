@@ -887,7 +887,12 @@ public struct GlassActiveConnectionsButton: View {
         } label: {
             Label("Active Connections", systemImage: "bolt.fill")
         }
+        // Not on Vision Pro, where every ⚡ is a toolbar item or in an icon-only ornament, and the
+        // toolbar draws a label as its icon itself. Set here, the style made the bolt a narrower
+        // item than its neighbours in Apple's bottom ornament (W31).
+        #if !os(visionOS)
         .labelStyle(.iconOnly)
+        #endif
         .help("Active connections")
         .accessibilityIdentifier("active-connections-bolt")
     }

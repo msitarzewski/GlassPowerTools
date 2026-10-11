@@ -217,21 +217,20 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
     /// same controls just below the window at a comfortable size, which is Apple's pattern and what
     /// a visionOS user reaches for. The actions are identical on every platform; only where they
     /// live differs, so a Mac user still recognises the app.
+    ///
+    /// **The ornament is Apple's toolbar ornament** (W31; the owner, 2026-10-10: "Why are these
+    /// different sizes? Let's make them all the smaller apple defaults"). It was drawn by hand — a
+    /// stack of large borderless buttons in a padded glass capsule — and so had a size of its own
+    /// beside every other window's. The system sizes and spaces the buttons and draws the capsule,
+    /// as for the database's, the editor's, a terminal's and a desktop's; `toolbarActions` hands
+    /// them over as separate items, and only the shown tab's column contributes any.
     private func withLibraryToolbar<Content: View>(_ content: Content, active: Bool = true) -> some View {
         #if os(visionOS)
         content
-            .ornament(visibility: active ? .visible : .hidden,
-                      attachmentAnchor: .scene(.bottom),
-                      contentAlignment: .center) {
-                HStack(spacing: GlassSpatialMetrics.ornamentSpacing) {
-                    toolbarActions()
+            .toolbar {
+                if active {
+                    ToolbarItemGroup(placement: .bottomOrnament) { toolbarActions() }
                 }
-                .labelStyle(.iconOnly)
-                .buttonStyle(.borderless)
-                .controlSize(.large)
-                .padding(.horizontal, GlassSpatialMetrics.ornamentPadding)
-                .padding(.vertical, GlassSpatialMetrics.ornamentPadding * 0.6)
-                .glassBackgroundEffect(in: .capsule)
             }
             .background { if active { presentationAnchor() } }
         #else

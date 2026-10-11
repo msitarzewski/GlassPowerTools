@@ -95,6 +95,13 @@ enum GlassDemoMode {
                 if day % 5 == 0 { connections.append(("build", day, .ssh)) }
             }
             shell.demoRecordConnections(connections)
+        case "terminal-tabs", "terminal-grid":
+            // W31: one window with two terminals as its tabs, shown in tabs and in the grid, for
+            // checking that one bottom bar shows. The shell reports its folder (OSC 7), so Open
+            // Folder Here is in the bar as it is on a real shell.
+            terminal.requestDemoTabs(names: ["alpha", "bravo"],
+                                     output: Data(("\u{1B}]7;/home/ann/shop\u{07}" + terminalTranscript).utf8),
+                                     grid: surface == "terminal-grid")
         case "connections-host":
             // The Connections window at its first size with a machine's details showing (W29).
             while !shell.isLoaded { try? await Task.sleep(for: .milliseconds(100)) }

@@ -147,6 +147,12 @@ struct VisionTerminalWorkgroupView: View {
     private var presentationBinding: Binding<VisionTerminalPresentation> {
         Binding(get: { spatialPresentation.mode }, set: { spatialPresentation.mode = $0 })
     }
+
+    #if DEBUG
+    /// Screenshots only (`GlassTerminalRuntime.requestDemoTabs`): workgroups whose window opens in
+    /// the grid.
+    static var demoOpensGrid: Set<UUID> = []
+    #endif
     #endif
 
     var body: some View {
@@ -181,6 +187,9 @@ struct VisionTerminalWorkgroupView: View {
             sessionManager.serverManager.loadServersIfNeeded()
             synchronizeSelection()
             connectShownSlot()
+            #if DEBUG && os(visionOS)
+            if Self.demoOpensGrid.remove(workgroupID) != nil { presentation = .grid }
+            #endif
         }
         .onChange(of: liveSelectedSessionID) { _, newSelection in
             if selectedSessionID != newSelection {
@@ -547,24 +556,26 @@ struct VisionTerminalWorkgroupView: View {
                 // and compound their per-terminal transparency settings.
                 .allowsHitTesting(presentation != .tabs)
                 .accessibilityHidden(presentation == .tabs)
-                .ornament(visibility: presentation == .tabs || sessions.count < 2 ? .hidden : .visible,
-                          attachmentAnchor: .scene(.bottom)) {
-                    HStack(spacing: 16) {
-                        VisionTerminalPresentationPicker(selection: presentationBinding)
-                        Button("Previous", systemImage: "chevron.left") {
-                            moveOverviewSelection(-1, sessions: sessions)
-                        }
-                        .labelStyle(.iconOnly)
-                        Button("Next", systemImage: "chevron.right") {
-                            moveOverviewSelection(1, sessions: sessions)
-                        }
-                        .labelStyle(.iconOnly)
-                        Button("Open Terminal", systemImage: "arrow.up.forward") {
-                            presentation = .tabs
+                // The grid's and the carousel's controls: Apple's toolbar ornament, as a terminal's
+                // are (W31), and in the same place. Never both: in the grid and the carousel no
+                // terminal is in front, so none contributes its own.
+                .toolbar {
+                    if presentation != .tabs && sessions.count > 1 {
+                        ToolbarItemGroup(placement: .bottomOrnament) {
+                            VisionTerminalPresentationPicker(selection: presentationBinding)
+                            // Icons only, as the toolbar draws a label by default.
+                            Button("Previous", systemImage: "chevron.left") {
+                                moveOverviewSelection(-1, sessions: sessions)
+                            }
+                            Button("Next", systemImage: "chevron.right") {
+                                moveOverviewSelection(1, sessions: sessions)
+                            }
+                            Button("Open Terminal", systemImage: "arrow.up.forward") {
+                                presentation = .tabs
+                            }
+                            .labelStyle(.titleAndIcon)
                         }
                     }
-                    .padding(12)
-                    .glassBackgroundEffect(in: .capsule)
                 }
         }
         .onChange(of: sessions.count, initial: true) { _, count in

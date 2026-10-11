@@ -62,30 +62,13 @@ public struct GlassShellLibraryView: View {
                 // surface and nothing to seam.
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } toolbarActions: {
-                HStack {
-                    // The ⚡, here too: every top toolbar in the app has it, and in the library it
-                    // simply opens Active.
-                    GlassActiveConnectionsButton { model.showActiveConnections() }
-                    ForEach(model.registry.registered, id: \.kind) { capability in
-                        capability.libraryToolbarItems()
-                    }
-                    // On the Mac "Add Host" belongs to the sidebar column (left of the sidebar
-                    // toggle); compact stacks and the visionOS tab bar have no sidebar region.
-                    #if !os(macOS)
-                    addHostButton
-                    Button("Settings", systemImage: "gearshape") {
-                        // The headset's Settings is its own window, where its icon tabs are the
-                        // leading ornament; in a sheet that ornament was lost (2026-09-11). The
-                        // database workspace already opened this window.
-                        #if os(visionOS)
-                        openSettingsWindow(id: "settings")
-                        #else
-                        showSettings = true
-                        #endif
-                    }
-                        .accessibilityIdentifier("connection-library-settings")
-                    #endif
-                }
+                // One row where they share one toolbar item (Mac, iPad, iPhone); separate items on
+                // Vision Pro, where Apple's toolbar ornament lays them out and sizes them (W31).
+                #if os(visionOS)
+                libraryToolbarActions
+                #else
+                HStack { libraryToolbarActions }
+                #endif
             } presentationAnchor: {
                 alertAnchor
             }
@@ -180,6 +163,32 @@ public struct GlassShellLibraryView: View {
         .frame(minWidth: 900, minHeight: 560)
         // So Window ▸ Workgroups can bring this window forward rather than open another.
         .background { GlassLibraryWindowRegistration() }
+        #endif
+    }
+
+    /// The library's actions: the ⚡, each capability's, and Add Host and Settings.
+    @ViewBuilder private var libraryToolbarActions: some View {
+        // The ⚡, here too: every top toolbar in the app has it, and in the library it
+        // simply opens Active.
+        GlassActiveConnectionsButton { model.showActiveConnections() }
+        ForEach(model.registry.registered, id: \.kind) { capability in
+            capability.libraryToolbarItems()
+        }
+        // On the Mac "Add Host" belongs to the sidebar column (left of the sidebar
+        // toggle); compact stacks and the visionOS tab bar have no sidebar region.
+        #if !os(macOS)
+        addHostButton
+        Button("Settings", systemImage: "gearshape") {
+            // The headset's Settings is its own window, where its icon tabs are the
+            // leading ornament; in a sheet that ornament was lost (2026-09-11). The
+            // database workspace already opened this window.
+            #if os(visionOS)
+            openSettingsWindow(id: "settings")
+            #else
+            showSettings = true
+            #endif
+        }
+            .accessibilityIdentifier("connection-library-settings")
         #endif
     }
 

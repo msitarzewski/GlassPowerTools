@@ -77,6 +77,9 @@ public final class GlassTerminalRuntime {
         /// recorded transcript in the real terminal window. Typing goes nowhere.
         /// `windowSettings` for its window (W22), and This Window opened over it when asked.
         case demoReplay(name: String, output: Data, windowSettings: GlassWindowOverrides, opensSettings: Bool)
+        /// Screenshots: one window holding a demo terminal on each of `names`, the first in front;
+        /// on Vision Pro, shown in the grid when `grid` (W31: one bottom bar in tabs and in grid).
+        case demoTabs(names: [String], output: Data, grid: Bool)
         /// Screenshots: the Files window over a session that connects to nothing, opened at
         /// `path`. It shows the window's frame and header, and the browser's own "not connected"
         /// state where a listing would be.
@@ -237,6 +240,11 @@ public final class GlassTerminalRuntime {
                                   windowSettings: GlassWindowOverrides = GlassWindowOverrides(),
                                   opensSettings: Bool = false) {
         enqueue(.demoReplay(name: name, output: output, windowSettings: windowSettings, opensSettings: opensSettings))
+    }
+    /// Screenshots only: one window with a demo terminal on each of `names` as its tabs, each
+    /// showing `output`; on Vision Pro in the grid when `grid`.
+    public func requestDemoTabs(names: [String], output: Data, grid: Bool = false) {
+        enqueue(.demoTabs(names: names, output: output, grid: grid))
     }
     /// Screenshots only: a terminal window's own settings (W22) — lighter glass with a tint, a
     /// larger font and a bar cursor — over the demo's Appearance.

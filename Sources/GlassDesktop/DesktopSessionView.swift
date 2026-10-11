@@ -388,8 +388,11 @@ public struct DesktopSessionView: View {
     }
 
     #if os(visionOS)
-    private var nativeControls: some View {
-        HStack(spacing: 16) {
+    /// The window's controls as separate items of Apple's toolbar ornament (`GlassNativeWindowFrame`),
+    /// which sizes and spaces them and draws the capsule, so the bar is the size of every other
+    /// window's (W31). No stack, spacing or padding of their own: a stack would be one item.
+    @ViewBuilder private var nativeControls: some View {
+        Group {
             sessionActions
             Divider().frame(height: 24)
             Button("Escape", systemImage: "escape") { session.sendKey(0x01) }
@@ -404,11 +407,6 @@ public struct DesktopSessionView: View {
                 GlassActiveConnectionsButton { session.releaseInput(); showActiveConnections() }
             }
         }
-        .labelStyle(.iconOnly)
-        .padding(.horizontal, 18).padding(.vertical, 10)
-        .fixedSize(horizontal: true, vertical: false)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("session.controls")
     }
     #endif
 
@@ -447,7 +445,11 @@ public struct DesktopSessionView: View {
                     if !showDisplayOptions { settingsSection = .thisWindow }
                     showDisplayOptions.toggle()
                 }
+                    // On Vision Pro the toolbar draws it as an icon itself; set there, the style
+                    // made it a narrower item than its neighbours (W31).
+                    #if !os(visionOS)
                     .labelStyle(.iconOnly)
+                    #endif
                     .help("Settings")
                     .accessibilityIdentifier("session.display")
                     .accessibilityValue(showDisplayOptions ? "Open" : "Closed")

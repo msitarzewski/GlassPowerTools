@@ -35,9 +35,8 @@ public enum GlassSpatialMetrics {
     public static var rowVerticalPadding: CGFloat { isSpatial ? 8 : 0 }
     public static var rowHorizontalPadding: CGFloat { isSpatial ? 8 : 0 }
 
-    /// Gap between an ornament's controls, and the ornament's own inset.
-    public static let ornamentSpacing: CGFloat = 20
-    public static let ornamentPadding: CGFloat = 22
+    // No ornament spacing or padding of our own: every bottom bar is Apple's toolbar ornament,
+    // which sizes and spaces its items itself (W31, 2026-10-10).
 
     /// The type a library row is set in.
     ///
