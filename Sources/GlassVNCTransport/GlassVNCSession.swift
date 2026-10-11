@@ -77,7 +77,7 @@ public actor GlassVNCSession: GlassDesktopTransport {
         let host = configuration.host.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !host.isEmpty, configuration.port > 0 else { throw GlassRDPError.invalidConfiguration }
         let id = UUID()
-        Self.logger.notice("event=connect attempt=\(id.uuidString, privacy: .public) account=\(configuration.username.isEmpty ? "password-only" : "user", privacy: .public)")
+        VNCDiagnostics.note(Self.logger, .default, category: "session", "event=connect attempt=\(id.uuidString) account=\(configuration.username.isEmpty ? "password-only" : "user")")
         let eventSink = eventContinuation, frameSink = frameContinuation, sequence = sequence, delivered = delivered
         delivered.reset()
         var callbacks = VNCClientCallbacks()
@@ -147,7 +147,7 @@ public actor GlassVNCSession: GlassDesktopTransport {
                 // not asked again while the app runs; Reconnect shows its picture at its own size (W36).
                 if error != .cancelled, asksToScale, client.awaitingServerScaling {
                     Self.scalingRefusals.insert(layoutKey)
-                    Self.logger.error("event=server-scale-refused")
+                    VNCDiagnostics.note(Self.logger, .error, category: "session", "event=server-scale-refused")
                     if let message = failure {
                         failure = message + " Reconnect connects without asking this Mac to send a smaller picture."
                     }
@@ -158,7 +158,7 @@ public actor GlassVNCSession: GlassDesktopTransport {
                 else if case .protocolViolation = error, asksForCursor, apple.any, client.receivedAppleCursor,
                         client.lastAppleEncoding == .appleCursorImage || client.lastAppleEncoding == .appleCursorPosition {
                     Self.cursorRefusals.insert(layoutKey)
-                    Self.logger.error("event=apple-cursor-refused")
+                    VNCDiagnostics.note(Self.logger, .error, category: "session", "event=apple-cursor-refused")
                     failure = (failure ?? "") + " Reconnect connects without asking this Mac where its pointer is."
                 }
                 // A Mac that broke the protocol after sending its displays — a form known only from
@@ -167,7 +167,7 @@ public actor GlassVNCSession: GlassDesktopTransport {
                 // display metadata arrived cannot be a misreading of it, and changes nothing.
                 else if case .protocolViolation = error, asksForLayout, apple.any, client.receivedAppleDisplayMetadata {
                     Self.layoutRefusals.insert(layoutKey)
-                    Self.logger.error("event=apple-display-layout-refused")
+                    VNCDiagnostics.note(Self.logger, .error, category: "session", "event=apple-display-layout-refused")
                     failure = (failure ?? "") + " Reconnect connects without asking this Mac where its displays are."
                 }
             } catch { failure = error.localizedDescription }
@@ -176,7 +176,7 @@ public actor GlassVNCSession: GlassDesktopTransport {
     }
 
     public func disconnect() async {
-        Self.logger.notice("event=disconnect-requested")
+        VNCDiagnostics.note(Self.logger, .default, category: "session", "event=disconnect-requested")
         stopRequested = true
         await releaseInputs()
         client?.cancel()
@@ -186,7 +186,7 @@ public actor GlassVNCSession: GlassDesktopTransport {
     private func finished(id: UUID, error: String?) {
         guard activeID == id else { return }
         let cancelled = stopRequested
-        Self.logger.notice("event=finished attempt=\(id.uuidString, privacy: .public) cancelled=\(cancelled) failed=\(error != nil)")
+        VNCDiagnostics.note(Self.logger, .default, category: "session", "event=finished attempt=\(id.uuidString) cancelled=\(cancelled) failed=\(error != nil)\(error.map { " error=\($0)" } ?? "")")
         worker = nil; client = nil; activeID = nil
         resetInputState()
         if !cancelled, let error { eventContinuation.yield(.state(.failed(error))) }
@@ -323,7 +323,7 @@ public actor GlassVNCSession: GlassDesktopTransport {
     public func setStreamQuality(_ quality: GlassDesktopStreamQuality) async {
         guard quality != self.quality else { return }
         self.quality = quality
-        Self.logger.notice("event=quality requested=\(quality.rawValue, privacy: .public)")
+        VNCDiagnostics.note(Self.logger, .default, category: "session", "event=quality requested=\(quality.rawValue)")
         client?.setQuality(Self.quality(quality))
     }
 
@@ -332,7 +332,7 @@ public actor GlassVNCSession: GlassDesktopTransport {
     public func setRetinaDisplays(_ value: GlassDesktopRetinaDisplays) async {
         guard value != retina else { return }
         retina = value
-        Self.logger.notice("event=retina requested=\(value.rawValue, privacy: .public)")
+        VNCDiagnostics.note(Self.logger, .default, category: "session", "event=retina requested=\(value.rawValue)")
         client?.setDensityScaling(value == .oneX)
     }
 

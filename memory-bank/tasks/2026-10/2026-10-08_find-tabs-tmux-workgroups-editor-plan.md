@@ -1116,3 +1116,9 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   after 1.9 s (likely a mistyped password; rerun). The app's drop on the headset is not explained by the probe yet;
   suspicion: the main connection's region request racing the scaled layout (an out-of-bounds request after the
   framebuffer shrinks). Need the headset's app log (`sudo log collect --device-udid … --last 1h`).
+- **`log collect --device-udid` → "Device not configured"** (headset over the network). Added **VNCDiagnostics**: the
+  screen-sharing `event=` lines (planner, client, session; finished now carries the error; display connections'
+  open/state/close) also go to `Library/Caches/com.glasspowertools/Diagnostics/screen-sharing.log` (512 KB, one rotated),
+  enabled by the app at launch (not in tests or UI tests). Fetch from the headset with
+  `xcrun devicectl device copy from --device <id> --domain-type appDataContainer --domain-identifier com.glasspowertools
+  --source Library/Caches/com.glasspowertools/Diagnostics/screen-sharing.log --destination <file>`.

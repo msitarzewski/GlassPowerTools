@@ -367,7 +367,7 @@ let package = Package(
         .target(
             name: "GlassDesktop",
             dependencies: [
-                "GlassRDPTransport", "GlassVNCTransport", "GlasSecretStore", "GlassShell", "GlassLayers",
+                "GlassRDPTransport", "GlassVNCTransport", "VNCKit", "GlasSecretStore", "GlassShell", "GlassLayers",
                 "GlassConnectionKit",
                 "GlassConnectionUI",
                 "GlassHostCatalog",

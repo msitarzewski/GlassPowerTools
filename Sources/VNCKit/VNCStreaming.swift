@@ -530,7 +530,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
             layoutSeen = true
             scaleInForce = serverScale
             if let asked = scaleAsked, Self.sameScale(asked.factor, serverScale) {
-                Self.logger.notice("event=server-scale confirmed=\(serverScale) width=\(width) height=\(height)")
+                VNCDiagnostics.note(Self.logger, .default, category: "planner", "event=server-scale confirmed=\(serverScale) width=\(width) height=\(height)")
                 scaleAsked = nil
                 scaleDeclined = nil
             }
@@ -538,7 +538,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
             if !densities.isEmpty { self.densities = densities }
             displayInForce = current
             if let asked = displayAsked, asked.selection.matches(current) {
-                Self.logger.notice("event=display confirmed=\(current.map(String.init) ?? "all", privacy: .public)")
+                VNCDiagnostics.note(Self.logger, .default, category: "planner", "event=display confirmed=\(current.map(String.init) ?? "all")")
                 displayAsked = nil
                 displayDeclined = nil
             }
@@ -727,7 +727,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
     private func planDisplay(at now: ContinuousClock.Instant, into out: inout [UInt8]) -> ContinuousClock.Instant? {
         guard dialect == .apple, appleDisplayLayout, layoutSeen, let wanted = displayWanted else { return nil }
         if let asked = displayAsked, now - asked.at >= Self.displayAnswerTimeout {
-            Self.logger.error("event=display unconfirmed=\(asked.selection.id.map(String.init) ?? "all", privacy: .public)")
+            VNCDiagnostics.note(Self.logger, .error, category: "planner", "event=display unconfirmed=\(asked.selection.id.map(String.init) ?? "all")")
             displayDeclined = asked.selection
             displayAsked = nil
         }
@@ -737,7 +737,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
             // The whole picture after it: the Mac answers it for the display it switches to.
             displaySwitchRequest = RFBRectangle(x: 0, y: 0, width: width, height: height)
             refresh = true
-            Self.logger.notice("event=display asked=\(wanted.id.map(String.init) ?? "all", privacy: .public)")
+            VNCDiagnostics.note(Self.logger, .default, category: "planner", "event=display asked=\(wanted.id.map(String.init) ?? "all")")
         }
         return displayAsked.map { $0.at + Self.displayAnswerTimeout }
     }
@@ -748,7 +748,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
     private func planScale(at now: ContinuousClock.Instant, into out: inout [UInt8]) -> ContinuousClock.Instant? {
         guard dialect == .apple, appleDisplayLayout, serverScaling, layoutSeen else { return nil }
         if let asked = scaleAsked, now - asked.at >= Self.scaleAnswerTimeout {
-            Self.logger.error("event=server-scale unconfirmed=\(asked.factor) inForce=\(self.scaleInForce)")
+            VNCDiagnostics.note(Self.logger, .error, category: "planner", "event=server-scale unconfirmed=\(asked.factor) inForce=\(self.scaleInForce)")
             scaleDeclined = asked.factor
             scaleAsked = nil
         }
@@ -757,7 +757,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
         if scaleAsked == nil, !Self.sameScale(want, scaleInForce), !(scaleDeclined.map { Self.sameScale($0, want) } ?? false) {
             out += RFBAppleDisplayLayout.setServerScalingMessage(want)
             scaleAsked = (want, now)
-            Self.logger.notice("event=server-scale asked=\(want) inForce=\(self.scaleInForce) density=\(self.densityFactorInUse)")
+            VNCDiagnostics.note(Self.logger, .default, category: "planner", "event=server-scale asked=\(want) inForce=\(self.scaleInForce) density=\(self.densityFactorInUse)")
         }
         return [scaleAsked.map { $0.at + Self.scaleAnswerTimeout }, settleWake].compactMap { $0 }.min()
     }

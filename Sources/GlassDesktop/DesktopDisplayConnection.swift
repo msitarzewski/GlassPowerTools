@@ -32,6 +32,7 @@
 //
 
 import Foundation
+import VNCKit
 import Observation
 import CoreGraphics
 import GlassRDPTransport
@@ -75,6 +76,7 @@ public final class DesktopDisplayConnection: Identifiable {
                connect: @escaping @MainActor (any GlassDesktopTransport, DesktopTransportConfiguration) async throws -> Void) {
         let target = transport
         observe()
+        VNCDiagnostics.record(category: "display-connection", "event=open display=\(display) quality=\(quality.rawValue) retina=\(retina.rawValue) onScreen=\(onScreen)")
         Task { [weak self] in
             await target.setStreamQuality(quality)
             await target.setRetinaDisplays(retina)
@@ -106,6 +108,7 @@ public final class DesktopDisplayConnection: Identifiable {
     func close() {
         guard !isClosed else { return }
         isClosed = true
+        VNCDiagnostics.record(category: "display-connection", "event=close display=\(display)")
         eventTask?.cancel(); frameTask?.cancel()
         eventTask = nil; frameTask = nil
         frame = nil
@@ -136,6 +139,7 @@ public final class DesktopDisplayConnection: Identifiable {
         switch event {
         case .state(let value):
             state = value
+            VNCDiagnostics.record(category: "display-connection", "event=state display=\(display) state=\(value)")
             session?.displayConnectionChanged(self)
         case .cursor(let value):
             session?.receive(value, from: self)

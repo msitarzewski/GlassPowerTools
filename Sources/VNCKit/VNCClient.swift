@@ -292,7 +292,7 @@ public final class VNCClient: Sendable {
         try RFBFramebuffer.validate(width: width, height: height)
         let name = String(decoding: try await source.read(nameLength), as: UTF8.self)
         let keyExchangeMilliseconds = keyExchange.map { Int(Self.seconds($0) * 1000) } ?? -1
-        Self.logger.notice("event=connected version=\(serverVersion.major).\(serverVersion.minor) security=\(securityType.rawValue) width=\(width) height=\(height) keyExchangeMs=\(keyExchangeMilliseconds)")
+        VNCDiagnostics.note(Self.logger, .default, category: "client", "event=connected version=\(serverVersion.major).\(serverVersion.minor) security=\(securityType.rawValue) width=\(width) height=\(height) keyExchangeMs=\(keyExchangeMilliseconds)")
         return VNCServerInfo(name: name, width: width, height: height, serverVersion: serverVersion,
                              negotiatedVersion: version, securityType: securityType, serverPixelFormat: pixelFormat,
                              keyExchangeDuration: keyExchange)
@@ -511,7 +511,7 @@ public final class VNCClient: Sendable {
                             var decoded = false
                             if case .shape = outcome { decoded = true }
                             if case .unreadable(let reason) = outcome {
-                                Self.logger.error("event=apple-cursor unreadable id=\(body.id) reason=\(reason, privacy: .public)")
+                                VNCDiagnostics.note(Self.logger, .error, category: "client", "event=apple-cursor unreadable id=\(body.id) reason=\(reason)")
                             }
                             callbacks.cursorMessage(.appleStored(id: body.id, width: rect.width, height: rect.height,
                                                                  hotSpotX: rect.x, hotSpotY: rect.y,
@@ -563,7 +563,7 @@ public final class VNCClient: Sendable {
                             pump()
                             changed = true
                         } else if rect.y != 0, rect.x == 1 {
-                            Self.logger.notice("event=resize-refused status=\(rect.y)")
+                            VNCDiagnostics.note(Self.logger, .default, category: "client", "event=resize-refused status=\(rect.y)")
                         }
                     case .appleDisplayLayout:
                         // A Mac's displays, the framebuffer's size and the scale in force
@@ -574,7 +574,7 @@ public final class VNCClient: Sendable {
                         state.noteApple(.appleDisplayLayout)
                         let payload = try await RFBAppleDisplayLayout.readPayload(from: source)
                         guard let layout = RFBAppleDisplayLayout(payload: payload) else {
-                            Self.logger.error("event=apple-display-layout unreadable bytes=\(payload.count)")
+                            VNCDiagnostics.note(Self.logger, .error, category: "client", "event=apple-display-layout unreadable bytes=\(payload.count)")
                             callbacks.appleDisplayMetadata(.unreadableLayout(payload))
                             planner.framebufferResized(width: framebuffer.width, height: framebuffer.height)
                             pump()
@@ -586,14 +586,14 @@ public final class VNCClient: Sendable {
                                 state.setFramebufferSize(width: size.width, height: size.height)
                                 changed = true
                             } else {
-                                Self.logger.error("event=apple-display-layout framebuffer=\(size.width)x\(size.height) unsupported")
+                                VNCDiagnostics.note(Self.logger, .error, category: "client", "event=apple-display-layout framebuffer=\(size.width)x\(size.height) unsupported")
                             }
                         }
                         let screens = layout.screens(inFramebufferWidth: framebuffer.width, height: framebuffer.height)
                         planner.appleLayoutArrived(serverScale: layout.serverScale, width: framebuffer.width, height: framebuffer.height,
                                                    displays: screens, densities: layout.densities, current: layout.currentDisplay)
                         let current = layout.currentDisplay.map(String.init) ?? "all"
-                        Self.logger.notice("event=apple-display-layout version=\(layout.version) records=\(layout.records.count) displays=\(screens.count) framebuffer=\(layout.framebufferWidth)x\(layout.framebufferHeight) current=\(current, privacy: .public) scale=\(layout.serverScale) state=\(layout.sessionState)")
+                        VNCDiagnostics.note(Self.logger, .default, category: "client", "event=apple-display-layout version=\(layout.version) records=\(layout.records.count) displays=\(screens.count) framebuffer=\(layout.framebufferWidth)x\(layout.framebufferHeight) current=\(current) scale=\(layout.serverScale) state=\(layout.sessionState)")
                         callbacks.appleDisplayMetadata(.layout(layout))
                         // A layout none of whose displays holds up leaves the last list in place.
                         if !screens.isEmpty { callbacks.screens(screens) }
@@ -604,7 +604,7 @@ public final class VNCClient: Sendable {
                         state.noteAppleDisplayMetadata()
                         state.noteApple(.appleDisplayInfo)
                         let info = try await RFBAppleDisplayInfo.read(from: source)
-                        Self.logger.notice("event=apple-display-info width=\(info.width) height=\(info.height) flags=\(info.flags) displays=\(info.records.count)")
+                        VNCDiagnostics.note(Self.logger, .default, category: "client", "event=apple-display-info width=\(info.width) height=\(info.height) flags=\(info.flags) displays=\(info.records.count)")
                         callbacks.appleDisplayMetadata(.displayInfo(info))
                     default:
                         let validated = try rect.validated(in: framebuffer.width, framebuffer.height)

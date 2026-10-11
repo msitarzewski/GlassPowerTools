@@ -15,6 +15,7 @@ import GlassConnectionUI
 import GlassTerminal
 import GlassDatabase
 import GlassDesktop
+import VNCKit
 import GlassEditor
 import GlassEditorCore
 
@@ -40,6 +41,9 @@ struct GlassPowerToolsApp: App {
         // Appearance in the run's own suite while a UI test drives the app, as every other store
         // is, with nothing migrated into it from the person's legacy suites (W35, 2026-10-11).
         let layers = GlassUITestRun.defaults.map { GlassLayerStore(defaults: $0, legacyDefaults: []) } ?? GlassLayerStore()
+        // Screen sharing's events also go to a small file in the app's storage, which can be copied
+        // off a headset with devicectl when a session goes wrong (VNCDiagnostics). Not in UI tests.
+        if GlassUITestRun.defaults == nil { VNCDiagnostics.enable() }
         var isolatedDirectory: URL?
         #if DEBUG || GLASS_STRESS_HARNESS
         // `--ui-testing <uuid>` isolates storage and the catalog under a per-run directory so UI
