@@ -240,6 +240,7 @@ public final class VNCClient: Sendable {
             if info.negotiatedVersion == .apple {
                 try await applePrelude(wrapKey: wrapKey)
                 info.encrypted = true
+                if info.appleAccepts(0x17) { state.setAcceptsAppleScroll() }
             }
             wrapKey = []
             planner.start(width: info.width, height: info.height, dialect: RFBServerDialect(version: info.serverVersion),
@@ -519,6 +520,22 @@ public final class VNCClient: Sendable {
         state.pointerSent(picture: (clampedX, clampedY), wire: wire, at: .now)
         let mask = state.appleProtocol ? Self.applePointerMask(buttonMask) : buttonMask
         try await sink.write([5, mask] + UInt16(wire.x).bigEndianBytes + UInt16(wire.y).bigEndianBytes)
+    }
+
+    /// Whether a scroll can go to this Mac as a distance (`sendAppleScroll`): it was answered in its
+    /// own revision and its ServerInit lists the second event message (0x17).
+    public var acceptsAppleScroll: Bool { state.appleProtocol && state.acceptsAppleScroll }
+
+    /// A scroll by a distance in the picture's points, up and left positive, at a position in the
+    /// picture: as Apple's viewer scrolls a Mac, smoothly, where the wheel bits move it a couple of
+    /// pixels a notch (remotex's notes, "A Mac scrolls by a distance").
+    public func sendAppleScroll(horizontalPoints: Int, verticalPoints: Int, x: Int, y: Int) async throws {
+        try requireReady()
+        let size = state.framebufferSize
+        let clampedX = min(max(0, x), max(0, size.width - 1)), clampedY = min(max(0, y), max(0, size.height - 1))
+        let wire = Self.unscaled(x: clampedX, y: clampedY, scale: planner.serverScaleInForce)
+        try await sink.write(RFBAppleMessages.scrollWheel(horizontalPoints: horizontalPoints, verticalPoints: verticalPoints,
+                                                          x: wire.x, y: wire.y))
     }
 
     /// RFB's mask with its middle (0x02) and right (0x04) buttons swapped: a Mac reads a 003.889
@@ -903,6 +920,9 @@ private final class ClientState: @unchecked Sendable {
     private var viewerInfo = true
     var sendsViewerInfo: Bool { lock.withLock { viewerInfo } }
     func setSendsViewerInfo(_ on: Bool) { lock.withLock { viewerInfo = on } }
+    private var appleScroll = false
+    var acceptsAppleScroll: Bool { lock.withLock { appleScroll } }
+    func setAcceptsAppleScroll() { lock.withLock { appleScroll = true } }
     private var apple889 = false
     var appleProtocol: Bool { lock.withLock { apple889 } }
     func setAppleProtocol() { lock.withLock { apple889 = true } }

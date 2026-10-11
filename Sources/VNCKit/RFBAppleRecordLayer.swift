@@ -277,6 +277,25 @@ enum RFBAppleMessages {
         return message
     }()
 
+    /// The second event message (0x17), kind 11, a scroll by a distance (remotex's `scroll_wheel`;
+    /// the notes, "A Mac scrolls by a distance"): 58 bytes, `u16` size 54, version 1, then line
+    /// deltas as three `i16`, the same in 16.16 fixed point as three `i32`, point deltas as three
+    /// `i32`, scroll phase, momentum phase and scroll count (0: no gesture around it), flags (2,
+    /// continuous: the point delta is the one that counts), and the pointer's position. Each three is
+    /// horizontal, vertical and an axis no device has; up and left are positive, as macOS counts them.
+    static func scrollWheel(horizontalPoints: Int, verticalPoints: Int, x: Int, y: Int) -> [UInt8] {
+        let pointsPerLine = 10
+        let axes = [Int32(clamping: horizontalPoints), Int32(clamping: verticalPoints), 0]
+        var message: [UInt8] = [0x17, 0] + UInt16(54).bigEndianBytes + UInt16(1).bigEndianBytes + UInt16(11).bigEndianBytes
+        for points in axes { message += UInt16(bitPattern: Int16(clamping: Int(points) / pointsPerLine)).bigEndianBytes }
+        for points in axes { message += UInt32(bitPattern: Int32(clamping: Int64(points) * 65_536 / Int64(pointsPerLine))).bigEndianBytes }
+        for points in axes { message += UInt32(bitPattern: points).bigEndianBytes }
+        message += [UInt8](repeating: 0, count: 12)
+        message += UInt32(2).bigEndianBytes
+        message += UInt16(clamping: max(0, x)).bigEndianBytes + UInt16(clamping: max(0, y)).bigEndianBytes
+        return message
+    }
+
     /// `SetMode` (0x0a): control.
     static let setModeControl: [UInt8] = [0x0a, 0, 0, 1]
     /// `SetEncryption` (0x12) command 1, AES-128 the one method: the Mac answers with the rekey. The

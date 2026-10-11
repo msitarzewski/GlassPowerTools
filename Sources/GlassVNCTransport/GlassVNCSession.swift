@@ -271,9 +271,21 @@ public actor GlassVNCSession: GlassDesktopTransport {
 
     /// Wheel rotation arrives in RDP units (120 per notch); each notch becomes one press/release of
     /// buttons 4/5 (vertical) or 7/6 (horizontal). Fractional precise-scrolling remainders accumulate.
+    /// A Mac that takes it gets the distance instead, in points (2026-10-11): a trackpad's precise
+    /// scroll arrives at 10 units a point and a wheel's notch at 120, twelve points, a line and a bit.
     public func scroll(vertical: Int, horizontal: Int, x: Int, y: Int) async throws {
         let client = try readyClient()
         pointerAt = (x, y)
+        if client.acceptsAppleScroll {
+            scrollRemainder.vertical += vertical
+            scrollRemainder.horizontal += horizontal
+            let verticalPoints = scrollRemainder.vertical / 10, horizontalPoints = scrollRemainder.horizontal / 10
+            scrollRemainder.vertical -= verticalPoints * 10
+            scrollRemainder.horizontal -= horizontalPoints * 10
+            guard verticalPoints != 0 || horizontalPoints != 0 else { return }
+            try await client.sendAppleScroll(horizontalPoints: horizontalPoints, verticalPoints: verticalPoints, x: x, y: y)
+            return
+        }
         scrollRemainder.vertical += vertical
         scrollRemainder.horizontal += horizontal
         let verticalNotches = scrollRemainder.vertical / 120, horizontalNotches = scrollRemainder.horizontal / 120

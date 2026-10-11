@@ -100,6 +100,21 @@ struct AppleRecordLayerTests {
         #expect(try await layer.read(1) == [5])
     }
 
+    /// remotex's notes, "A Mac scrolls by a distance": 40 points right and 25 up arrive as exactly that.
+    @Test("a scroll by a distance is 58 bytes: lines, lines in 16.16, points, no phase, continuous, the position")
+    func scrollWheel() {
+        let message = RFBAppleMessages.scrollWheel(horizontalPoints: -40, verticalPoints: 25, x: 300, y: 200)
+        #expect(message.count == 58)
+        #expect(Array(message[0..<8]) == [0x17, 0, 0, 54, 0, 1, 0, 11])
+        #expect(Array(message[8..<14]) == UInt16(bitPattern: -4).bigEndianBytes + UInt16(2).bigEndianBytes + [0, 0], "lines: a tenth")
+        #expect(Array(message[14..<26]) == UInt32(bitPattern: Int32(-262_144)).bigEndianBytes + UInt32(163_840).bigEndianBytes + [0, 0, 0, 0],
+                "the same lines in 16.16: −4.0 and 2.5")
+        #expect(Array(message[26..<38]) == UInt32(bitPattern: -40).bigEndianBytes + UInt32(25).bigEndianBytes + [0, 0, 0, 0], "points")
+        #expect(Array(message[38..<50]) == [UInt8](repeating: 0, count: 12), "no phase, no momentum, no count")
+        #expect(Array(message[50..<54]) == [0, 0, 0, 2], "continuous")
+        #expect(Array(message[54..<58]) == UInt16(300).bigEndianBytes + UInt16(200).bigEndianBytes)
+    }
+
     @Test("on 003.889 a Mac reads the mask as left, right, middle: RFB's middle and right swap")
     func pointerMask() {
         #expect(VNCClient.applePointerMask(0x01) == 0x01)
@@ -164,6 +179,10 @@ struct AppleRecordLayerTests {
         for _ in 0..<200 where frames.lock.withLock({ frames.count }) == 0 { try await Task.sleep(for: .milliseconds(5)) }
         #expect(frames.lock.withLock { frames.count } >= 1, "the picture arrived through the record layer")
         #expect(client.isEncrypted)
+        // Its ServerInit lists the second event message: a scroll goes as a distance, in its own record.
+        #expect(client.acceptsAppleScroll)
+        try await client.sendAppleScroll(horizontalPoints: 0, verticalPoints: 30, x: 1, y: 2)
+        for _ in 0..<100 { try await Task.sleep(for: .milliseconds(5)) }
 
         // What the viewer sent after the prelude: records, one message each, SetPixelFormat first.
         let written = await sink.written
@@ -179,6 +198,8 @@ struct AppleRecordLayerTests {
         #expect(messages.first?.first == 0 && messages.first?.count == 20, "SetPixelFormat, alone in its record")
         #expect(messages.dropFirst().first?.first == 2, "then SetEncodings")
         #expect(messages.contains { $0.first == 3 && $0.count == 10 }, "an update request, alone in its record")
+        #expect(messages.contains { $0 == RFBAppleMessages.scrollWheel(horizontalPoints: 0, verticalPoints: 30, x: 1, y: 2) },
+                "the scroll, alone in its record")
         client.cancel()
         await source.close()
         _ = try? await run.value
