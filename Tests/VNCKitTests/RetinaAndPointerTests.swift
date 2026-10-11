@@ -193,8 +193,8 @@ struct RetinaScaleTests {
         planner.appleLayoutArrived(serverScale: 1, width: 3024, height: 1964)
         out = []
         _ = planner.decide(at: start + .milliseconds(10)) { out += $0 }
-        #expect(armings(out) == [[0x09, 0, 0, 1, 0, 0, 0x82, 0x35, 0, 0, 0, 0, 0x0b, 0xd0, 0x07, 0xac]],
-                "version 1, 33,333 µs, the whole 3024 × 1964 picture")
+        #expect(armings(out) == [[0x09, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0x0b, 0xd0, 0x07, 0xac]],
+                "version 1, as fast as the Mac captures (0, as Apple's viewer arms), the whole 3024 × 1964 picture")
         out = []
         _ = planner.decide(at: start + .milliseconds(20)) { out += $0 }
         #expect(armings(out).isEmpty, "armed once")
@@ -208,7 +208,7 @@ struct RetinaScaleTests {
         planner.appleLayoutArrived(serverScale: 0.5, width: 1512, height: 982)
         out = []
         _ = planner.decide(at: start + .milliseconds(40)) { out += $0 }
-        #expect(armings(out) == [RFBAppleDisplayLayout.autoFramebufferUpdateMessage(interval: 33_333, width: 1512, height: 982)])
+        #expect(armings(out) == [RFBAppleDisplayLayout.autoFramebufferUpdateMessage(interval: 0, width: 1512, height: 982)])
 
         // Nothing on screen: pushes off.
         planner.setRegions([])

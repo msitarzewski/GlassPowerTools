@@ -398,7 +398,7 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
         #else
         print("build          : Release")
         #endif
-        print("pushes         : " + (arms ? "armed after each layout (AutoFrameBufferUpdate, 33,333 µs)" : "not armed (--no-arm)"))
+        print("pushes         : " + (arms ? "armed after each layout (AutoFrameBufferUpdate, as fast as the Mac captures)" : "not armed (--no-arm)"))
         print("asking for     : \(display.map { "display \($0) alone (SetDisplay)" } ?? "every display, as the Mac sends them")"
               + ", quality \(quality.rawValue)" + (retina ? ", Retina displays at 1x" : ", displays at their own pixels"))
         let started = Date()

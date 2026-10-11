@@ -145,7 +145,7 @@ public final class VNCClient: Sendable {
 
     /// Whether a Mac is armed to push its changes, its pointer's among them (`AutoFrameBufferUpdate`).
     /// On; the live probe turns it off to compare.
-    public func setAppleUpdateArming(_ on: Bool, interval: UInt32 = 33_333) {
+    public func setAppleUpdateArming(_ on: Bool, interval: UInt32 = 0) {
         planner.setArming(on, interval: interval)
         pump()
     }

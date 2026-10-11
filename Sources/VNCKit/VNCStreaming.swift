@@ -458,9 +458,15 @@ final class RFBStreamPlanner: @unchecked Sendable {
     static let scaleAnswerTimeout: Duration = .seconds(10)
     static let displayAnswerTimeout: Duration = .seconds(10)
     static let densitySettle: Duration = .seconds(1)
-    /// One push per video frame at most: remotex's `PUSH_INTERVAL_US`. At 0 a Mac pushes as fast as
-    /// it captures and reads nothing meanwhile, input included (remotex's notes, "Other messages").
-    static let pushInterval: UInt32 = 33_333
+    /// As fast as the Mac captures: 0, as Apple's viewer arms a running session. On 003.889 a Mac
+    /// sends pictures only by its pushes, and on the owner's Mac (a Retina display beside a 1x one,
+    /// both changing) remotex's one push per video frame (33,333) starved or blackened the second
+    /// display — 1,032 repaints to 32 one run, 130 to 131 with it black the next — where 0 repainted
+    /// both evenly with their pictures (probe `--compare`, `--compare2`, 2026-10-11). remotex's cost
+    /// of 0: a Mac reads nothing while it pushes, so a viewer that drains slowly has its input left
+    /// unread; it measured that with a gateway held to 15% of a core. A Mac also throttles itself by
+    /// what the connection drains (the notes, "Other messages").
+    static let pushInterval: UInt32 = 0
     /// The all-ones interval: a Mac pushes nothing while it is armed with it.
     static let pushesOff: UInt32 = .max
 
