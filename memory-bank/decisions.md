@@ -1342,3 +1342,6 @@ resized from each layout, and SetServerScaling (0x08, f64) carries Data Saver 0.
 the next layout, pointer positions divided by the factor in force. The "don't ask this host again" refusal now needs
 display metadata to have arrived. **Unverified on a real Mac;** our client negotiates RFB 3.8, not 3.889 with Apple's
 record layer, which is what the notes measured.
+
+**D61 verified (2026-10-11):** on the owner's two-display Mac (one 2x Retina, one 1x external), build 0.4.348 opens each
+display in its own window on the Vision Pro — "Dual screen works!!!". The RFB 3.8 risk noted above did not bite.

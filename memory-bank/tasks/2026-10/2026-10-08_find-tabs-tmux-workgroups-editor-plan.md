@@ -1082,3 +1082,8 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   tab whose tmux session is gone is re-made in its folder. SSH unchanged (needs a remote cd/claim). Terminal 737, shell
   254; live on a private tmux 3.7c socket.
 - **0.4.348 (6617a0e) installed on Mac (04:23), Vision Pro and iPhone (~04:35).**
+- **Owner (~04:45): "Dual screen works!!!"** (D61 verified on his Mac). New: "lock the dimensions to the actual screen
+  ratio" and "can we have the Mac chill on the 2x retina resolution when screen sharing?" → **W38**: aspect-ratio lock
+  for desktop/display windows (visionOS API research), Retina at 1x — one factor when densities match; with mixed
+  densities a connection per display window (SetDisplay + SetServerScaling 1/density × quality), credentials reused;
+  fallback a single-factor setting; probe options for his verification.
