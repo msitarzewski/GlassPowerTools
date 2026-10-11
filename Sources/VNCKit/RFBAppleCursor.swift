@@ -125,6 +125,8 @@ struct RFBCursorPositionSpace: Sendable {
     private var misses = 0
 
     static let window: Duration = .milliseconds(1500)
+    /// How long after this client moves the pointer it stays where this client put it.
+    static let localAuthority: Duration = .seconds(1)
     static let tolerance = 2
     static let missesBeforeDistrust = 8
 
@@ -140,6 +142,12 @@ struct RFBCursorPositionSpace: Sendable {
     mutating func map(x: Int, y: Int, scale: Double, width: Int, height: Int,
                       at now: ContinuousClock.Instant) -> (x: Int, y: Int)? {
         learn(x: x, y: y, scale: scale, at: now)
+        // While this client moves the pointer, it is drawn where this client put it. A Mac busy
+        // pushing pictures reads the moves late and reports them late, and each late report dragged
+        // the drawn pointer back along its path: real time one moment, far behind the next (the
+        // owner on a Vision Pro, 2026-10-11). A report still teaches the space; a position this
+        // client did not send — the Mac moving its own pointer — moves it once the client is still.
+        if let last = sent.last, now - last.at < Self.localAuthority { return nil }
         let factor = scale.isFinite && scale > 0 && scale < 1 ? scale : 1
         let picture: (x: Int, y: Int)
         switch space {

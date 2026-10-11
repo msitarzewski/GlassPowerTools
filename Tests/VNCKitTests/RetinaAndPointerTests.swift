@@ -316,18 +316,26 @@ struct ApplePointerTests {
         #expect(space.map(x: 2000, y: 600, scale: 0.5, width: 2240, height: 900, at: start)! == (1000, 300))
         #expect(space.map(x: 5000, y: 600, scale: 0.5, width: 2240, height: 900, at: start) == nil, "not in this picture")
         // The Mac answers a move to picture (100, 100) — Mac (200, 200) — with (100, 100): the picture's.
+        // An answer to this client's own move is an echo: the pointer is drawn there already, and a
+        // late one would drag it back (2026-10-11); it teaches the space all the same.
         space.pointerSent(picture: (100, 100), wire: (200, 200), at: start)
-        #expect(space.map(x: 100, y: 100, scale: 0.5, width: 2240, height: 900, at: start + .milliseconds(100))! == (100, 100))
+        #expect(space.map(x: 100, y: 100, scale: 0.5, width: 2240, height: 900, at: start + .milliseconds(100)) == nil)
         #expect(space.space == .scaled)
+        #expect(space.map(x: 160, y: 120, scale: 0.5, width: 2240, height: 900, at: start + .milliseconds(800)) == nil,
+                "while this client moves the pointer, nothing the Mac reports moves it")
+        // Once the client is still, the Mac moving its own pointer moves it, in the space it learned.
+        #expect(space.map(x: 400, y: 200, scale: 0.5, width: 2240, height: 900, at: start + .seconds(2))! == (400, 200))
         // Answers at the Mac's own pixels put it back.
         space.pointerSent(picture: (300, 300), wire: (600, 600), at: start + .seconds(5))
-        #expect(space.map(x: 600, y: 600, scale: 0.5, width: 2240, height: 900, at: start + .seconds(5))! == (300, 300))
+        #expect(space.map(x: 600, y: 600, scale: 0.5, width: 2240, height: 900, at: start + .seconds(5)) == nil)
         #expect(space.space == .unscaled)
+        #expect(space.map(x: 600, y: 600, scale: 0.5, width: 2240, height: 900, at: start + .seconds(7))! == (300, 300))
         // At a scale of 1 both agree, and the space is not told apart.
         var plain = RFBCursorPositionSpace()
         plain.pointerSent(picture: (40, 40), wire: (40, 40), at: start)
-        #expect(plain.map(x: 40, y: 40, scale: 1, width: 100, height: 100, at: start)! == (40, 40))
+        #expect(plain.map(x: 40, y: 40, scale: 1, width: 100, height: 100, at: start) == nil)
         #expect(plain.space == .unknown)
+        #expect(plain.map(x: 50, y: 40, scale: 1, width: 100, height: 100, at: start + .seconds(3))! == (50, 40))
         // Reports that match no move, again and again — another space — stop being used.
         var other = RFBCursorPositionSpace()
         for step in 0..<RFBCursorPositionSpace.missesBeforeDistrust {
