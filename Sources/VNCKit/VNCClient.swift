@@ -175,6 +175,12 @@ public final class VNCClient: Sendable {
     /// The session travels in a Mac's record layer, encrypted (003.889).
     public var isEncrypted: Bool { records.isEncrypted }
 
+    /// How many picture rectangles each of a Mac's displays has received this connection, by display id.
+    public var rectanglesPainted: [UInt32: Int] { state.paintedTotal }
+
+    /// What each display's part of the picture holds, as the flow line samples it ("1:73%,4:97%").
+    public var displayContent: String? { state.content }
+
     /// This client answered a Mac in its own revision, 003.889.
     public var answeredAppleProtocol: Bool { state.appleProtocol }
 
@@ -871,7 +877,11 @@ private final class ClientState: @unchecked Sendable {
             return true
         }
     }
-    func notePainted(_ displays: [UInt32]) { lock.withLock { for id in displays { painted[id, default: 0] += 1 } } }
+    private var paintedAll: [UInt32: Int] = [:]
+    var paintedTotal: [UInt32: Int] { lock.withLock { paintedAll } }
+    func notePainted(_ displays: [UInt32]) {
+        lock.withLock { for id in displays { painted[id, default: 0] += 1; paintedAll[id, default: 0] += 1 } }
+    }
     func takePainted() -> [UInt32: Int] { lock.withLock { defer { painted = [:] }; return painted } }
     private var apple889 = false
     var appleProtocol: Bool { lock.withLock { apple889 } }

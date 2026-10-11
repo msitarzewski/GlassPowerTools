@@ -50,6 +50,9 @@ usage: GlassVNCProbe <host> <port> <username-or-empty> <password-file | -> [opti
                            session encrypted after sign-in (2026-10-11)
   --no-arm                 do not arm the Mac's pushes (AutoFrameBufferUpdate), as before 2026-10-11, to
                            compare: armed, a Mac should send its pointer's position and shapes
+  --compare                with something moving on every display (a video, a clock with seconds), connect
+                           four times — Apple's revision armed and not, plain 3.8 armed and not — and
+                           report how often each display was repainted (2026-10-11)
   --as-app [<seconds>]     as the app with a display window per display: a second connection for the
                            display that is not the main one, the first narrowed to the rest, Retina at
                            1x; run this long (default 30) printing the client's own log lines
@@ -255,6 +258,7 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
         var asAppSeconds: Double?
         var arms = true
         var appleProtocol = false
+        var compare = false
         func bad() -> Never { FileHandle.standardError.write(Data(usage.utf8)); exit(2) }
         while let index = arguments.firstIndex(where: { $0.hasPrefix("--") }) {
             let option = arguments[index]
@@ -280,6 +284,8 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
                 cursorSeconds = length; consumed = 2
             case "--pointer-check":
                 pointerCheck = true
+            case "--compare":
+                compare = true
             case "--apple":
                 appleProtocol = true
             case "--no-arm":
@@ -314,6 +320,41 @@ func expectedScale(layout: RFBAppleDisplayLayout?, display: UInt32?, quality: VN
                 exit(2)
             }
             password = stored.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        // MARK: Four connections compared
+        if compare {
+            print("compare        : four connections, 20 s each; keep something moving on every display")
+            let setups: [(name: String, apple: Bool, arms: Bool)] = [
+                ("Apple's revision, armed    ", true, true), ("Apple's revision, not armed", true, false),
+                ("plain 3.8, armed           ", false, true), ("plain 3.8, not armed       ", false, false)]
+            for setup in setups {
+                let recorder = Recorder(), outcome = Outcome()
+                let client: VNCClient
+                do {
+                    client = try VNCClient(configuration: VNCConfiguration(host: host, port: port, username: username, password: password,
+                                                                           sharedSession: true, clipboardEnabled: false,
+                                                                           appleProtocol: setup.apple),
+                                           callbacks: recorder.callbacks())
+                } catch { print("\(setup.name): FAILED to start: \(error.localizedDescription)"); continue }
+                client.setQuality(quality)
+                client.setAppleUpdateArming(setup.arms)
+                Task.detached { do { try await client.run(); outcome.end(nil) } catch { outcome.end(error) } }
+                let deadline = Date().addingTimeInterval(30)
+                while Date() < deadline, recorder.firstFrameAt == nil { if case .some = outcome.ended { break }; try? await Task.sleep(for: .milliseconds(50)) }
+                let before = client.rectanglesPainted, updatesBefore = recorder.updates
+                try? await Task.sleep(for: .seconds(20))
+                let after = client.rectanglesPainted
+                let ids = Set(before.keys).union(after.keys).sorted()
+                let painted = ids.map { "display \($0): \((after[$0] ?? 0) - (before[$0] ?? 0))" }.joined(separator: ", ")
+                var ending = ""
+                if case .some(.some(let error)) = outcome.ended { ending = " — ENDED: \(error.localizedDescription)" }
+                print("\(setup.name): \(recorder.updates - updatesBefore) updates in 20 s; rectangles \(painted.isEmpty ? "none" : painted); "
+                      + "picture \(client.displayContent ?? "unknown")\(client.isEncrypted ? ", encrypted" : "")\(ending)")
+                client.cancel()
+                try? await Task.sleep(for: .seconds(2))
+            }
+            exit(0)
         }
 
         // MARK: The run
