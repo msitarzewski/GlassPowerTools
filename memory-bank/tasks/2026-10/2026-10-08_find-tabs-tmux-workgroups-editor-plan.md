@@ -1134,3 +1134,12 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   reproduce with a probe mode (regions = display 1, scale 0.5, second session on display 4), fix the decoder, keep the
   layout. Log copy: `$SP/probe-runs/headset-screen-sharing-1710.log`. Also pending: drag-select into tmux history;
   pointer (Mac sends no cursor messages to our 3.8 client).
+- **98d8f60 (after compacting):** ZRLE trailing data is now `RFBZRLETrailingData` (rect, inflated bytes, consumed,
+  tile census). `VNCClient` keeps the session (length read in full, deflate stream inflated all of it → still in
+  step), logs `event=zrle-trailing … framebuffer= scale= requested=` (first 10, then every 50th), asks for the whole
+  picture again. `lastAppleEncoding` clears once a pixel rectangle is read in step; the session's layout refusal now
+  needs the layout/DisplayInfo to be that last encoding (a picture error no longer costs a Mac its displays). Probe
+  `--as-app [s]` repeats the app's two-connection setup with Retina at 1x, echoes the client's log lines
+  (`VNCDiagnostics.echo`, no file) and keeps anomalies' inflated bytes as `zrle-anomaly-*.bin` (git-ignored). Tests:
+  VNCKit 85, GlassVNCTransport 18, GlassDesktop 202 passed. Root cause still unknown: waiting on the owner's
+  `--as-app` run; 0.4.351 building for all three.
