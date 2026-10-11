@@ -568,6 +568,9 @@ final class RFBStreamPlanner: @unchecked Sendable {
     /// every other server, and on a Mac until a layout says otherwise.
     var serverScaleInForce: Double { lock.withLock { scaleInForce } }
 
+    /// The displays in the framebuffer now, for the log.
+    var currentDisplays: [VNCScreen] { lock.withLock { displays } }
+
     /// The area requests ask for now, for the log.
     var requestedArea: RFBRectangle? { lock.withLock { requestRectangle() } }
 

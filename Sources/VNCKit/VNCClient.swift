@@ -263,11 +263,13 @@ public final class VNCClient: Sendable {
                             value.map { String(format: "%.1f", Double($0.components.seconds) + Double($0.components.attoseconds) / 1e18) } ?? "-"
                         }
                         let area = self.planner.requestedArea.map { "\($0.x),\($0.y),\($0.width)x\($0.height)" } ?? "none"
+                        let painted = self.state.takePainted().sorted { $0.key < $1.key }.map { "\($0.key):\($0.value)" }.joined(separator: ",")
                         VNCDiagnostics.record(category: "client", "event=flow connection=\(self.configuration.display.map { "display-\($0)" } ?? "desktop") "
                             + "updates=\(counts.updates - last.updates) frames=\(counts.frames - last.frames) "
                             + "rects=\(counts.rectangles - last.rectangles) bytes=\(bytes - last.bytes) "
                             + "outstanding=\(flow.outstanding) sinceRequest=\(seconds(flow.sinceRequest)) waiting=\(seconds(flow.waiting)) "
-                            + "requested=\(area) scale=\(self.planner.serverScaleInForce) sending=\(self.planner.currentDisplay.map(String.init) ?? "all")")
+                            + "requested=\(area) scale=\(self.planner.serverScaleInForce) sending=\(self.planner.currentDisplay.map(String.init) ?? "all") "
+                            + "painted=\(painted.isEmpty ? "none" : painted)")
                         last = (counts.updates, counts.frames, counts.rectangles, bytes)
                     }
                     // A Mac that does not answer may send nothing at all: looked at here, not only
@@ -757,6 +759,14 @@ public final class VNCClient: Sendable {
                         // A pixel rectangle read in step: whatever a Mac's own encoding said before it
                         // was read right, and is not what a later protocol error misread.
                         state.notePixelRectangle()
+                        // Which displays it painted, for the flow line (2026-10-11: a display that
+                        // never repainted on 003.889).
+                        if !validated.isEmpty {
+                            let hit = planner.currentDisplays.filter {
+                                validated.intersects(RFBRectangle(x: $0.x, y: $0.y, width: $0.width, height: $0.height))
+                            }.map(\.id)
+                            state.notePainted(hit)
+                        }
                         changed = true
                     }
                 }
@@ -841,6 +851,9 @@ private final class ClientState: @unchecked Sendable {
         }
     }
     func notePixelRectangle() { lock.withLock { lastApple = nil } }
+    private var painted: [UInt32: Int] = [:]
+    func notePainted(_ displays: [UInt32]) { lock.withLock { for id in displays { painted[id, default: 0] += 1 } } }
+    func takePainted() -> [UInt32: Int] { lock.withLock { defer { painted = [:] }; return painted } }
     private var apple889 = false
     var appleProtocol: Bool { lock.withLock { apple889 } }
     func setAppleProtocol() { lock.withLock { apple889 = true } }
