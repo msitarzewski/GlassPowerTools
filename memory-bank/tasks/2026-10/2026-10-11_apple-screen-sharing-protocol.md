@@ -63,3 +63,10 @@ SetDisplayConfiguration virtual displays, media stream (SRTP, HEVC via VideoTool
   889 without ViewerInfo → nothing, and it wedged the next connection (3.8 armed then got nothing). **65eb2fc /
   0.4.358:** arm at 0 as Apple's viewer does (remotex's caveat: input unread while a slow viewer drains).
   "display index not found 1/4" in the Mac agent's log appears on every 889 session; cause unknown.
+- **0.4.358: both displays paint, "enormous lag".** Flow: client never waiting, 10–18 MB/s, late updates 3.4 MB each
+  (the Mac's one rectangle per push spans both displays when both change). Bench (release, this Mac): per-pixel ZRLE
+  53 ms per 6032×2707 frame; snapshot 2.3 ms. Renderer uploaded the whole 65 MB framebuffer per draw on the main
+  thread, per window, per pointer move. **eba5bf7 / 0.4.359:** native ZRLE fast path (5.2 ms, tested against the
+  per-pixel reference) and the renderer uploads only its window's region, only on a new frame (`uploads` counter test).
+  Remaining levers if still slow: per-display connections at one shared scale (pushes per display, no
+  both-display rectangles), scale 0.5 for mixed displays (blurry 1x display), High Performance (HEVC).
