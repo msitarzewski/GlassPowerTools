@@ -34,7 +34,14 @@ enum MacTerminalContextMenu {
             })
             menu.addItem(.separator())
         }
-        menu.addItem(item("Copy", enabled: selected != nil) { view.copy(view) })
+        // What was selected when the menu opened, not whatever is selected when Copy is chosen:
+        // output arriving while the menu is open (tmux redraws its status line every second) can
+        // clear or move the view's selection first, and `view.copy` then copies nothing (owner,
+        // 2026-10-11: "Looks like we broke copy", right-click). Terminal.app copies what it showed.
+        menu.addItem(item("Copy", enabled: selected != nil) {
+            guard let selected else { return }
+            copy(selected, to: copyPasteboard)
+        })
         menu.addItem(item("Paste", enabled: pasteboardHasText()) { view.paste(view) })
         menu.addItem(item("Select All") { view.selectAll(nil) })
         return menu
@@ -105,6 +112,15 @@ enum MacTerminalContextMenu {
 
     // MARK: Items
 
+    /// Where Copy writes: the general pasteboard; a test's own, so a test never replaces what the
+    /// person copied.
+    static var copyPasteboard: NSPasteboard = .general
+
+    static func copy(_ text: String, to pasteboard: NSPasteboard) {
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+    }
+
     /// Whether Paste has text to paste. Asks only which types are there: reading the text itself
     /// would show the system's paste-permission prompt before anyone chose Paste.
     private static func pasteboardHasText() -> Bool {
@@ -113,8 +129,8 @@ enum MacTerminalContextMenu {
 
     private static func item(_ title: String, symbol: String? = nil, enabled: Bool = true,
                              _ run: @escaping @MainActor () -> Void) -> NSMenuItem {
-        let action = MenuAction(run)
-        let item = NSMenuItem(title: title, action: #selector(MenuAction.perform(_:)), keyEquivalent: "")
+        let action = MacTerminalMenuAction(run)
+        let item = NSMenuItem(title: title, action: #selector(MacTerminalMenuAction.choose(_:)), keyEquivalent: "")
         item.target = action
         // A menu item holds its target weakly; this keeps the action alive as long as the item.
         item.representedObject = action
@@ -123,11 +139,19 @@ enum MacTerminalContextMenu {
         return item
     }
 
-    // AppKit calls a menu item's action on the main thread.
-    @MainActor private final class MenuAction: NSObject {
-        let run: @MainActor () -> Void
-        init(_ run: @escaping @MainActor () -> Void) { self.run = run }
-        @objc func perform(_ sender: Any?) { run() }
-    }
+}
+
+/// A menu item's action, run when the item is chosen. AppKit calls it on the main thread.
+///
+/// **Not `perform(_:)`.** It was, and `#selector(MenuAction.perform(_:))` named NSObject's own
+/// `performSelector:`, so choosing an item asked the action to perform the menu item as if it were
+/// a selector: an unrecognized one, which AppKit swallowed. Copy, Paste, Select All and Look Up
+/// did nothing from the day the menu was added; ⌘C, which never goes through it, worked (owner,
+/// 2026-10-11: "Looks like we broke copy" — right-click). The menu's tests checked only that the
+/// items were there and enabled; they now choose them.
+@MainActor final class MacTerminalMenuAction: NSObject {
+    let run: @MainActor () -> Void
+    init(_ run: @escaping @MainActor () -> Void) { self.run = run }
+    @objc func choose(_ sender: Any?) { run() }
 }
 #endif

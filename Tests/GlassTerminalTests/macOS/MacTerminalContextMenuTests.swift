@@ -58,6 +58,42 @@ struct MacTerminalContextMenuTests {
         #expect(try item(menu, "Look Up “hello”").isEnabled)
     }
 
+    /// The owner (2026-10-11): "Looks like we broke copy" — right-click ▸ Copy. Output arriving
+    /// while the menu is open can clear the view's selection before Copy is chosen.
+    @Test("Copy copies what was selected when the menu opened, even if the selection is gone by the time it is chosen")
+    func copyUsesTheSelectionTheMenuShowed() async throws {
+        let host = await HostedTerminal()
+        defer { host.close() }
+        await host.feed("hello world\r\n")
+        let view = try terminalView(host)
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name("MacTerminalContextMenuTests.copy.\(UUID())"))
+        defer { pasteboard.releaseGlobally() }
+        let general = MacTerminalContextMenu.copyPasteboard
+        MacTerminalContextMenu.copyPasteboard = pasteboard
+        defer { MacTerminalContextMenu.copyPasteboard = general }
+
+        let menu = try #require(view.menu(for: try rightClick(view)))
+        // A redraw while the menu is open takes the selection away.
+        view.selection.selectNone()
+        let copy = try #require(menu.items.firstIndex { $0.title == "Copy" })
+        menu.performActionForItem(at: copy)
+        #expect(pasteboard.string(forType: .string) == "hello")
+    }
+
+    @Test("choosing Select All selects the terminal's text")
+    func selectAllIsChosen() async throws {
+        let host = await HostedTerminal()
+        defer { host.close() }
+        await host.feed("hello world\r\n")
+        let view = try terminalView(host)
+
+        let menu = try #require(view.menu(for: try rightClick(view, row: 5)))
+        let selectAll = try #require(menu.items.firstIndex { $0.title == "Select All" })
+        menu.performActionForItem(at: selectAll)
+        #expect(view.selection.active)
+        #expect(view.selection.getSelectedText().contains("hello world"))
+    }
+
     @Test("a right-click inside the selection keeps it")
     func rightClickInsideSelection() async throws {
         let host = await HostedTerminal()

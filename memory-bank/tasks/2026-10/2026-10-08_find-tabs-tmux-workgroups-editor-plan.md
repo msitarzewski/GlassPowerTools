@@ -1052,3 +1052,9 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   terminal prompt (no password file) and prints the published displays and link figures (encoding, colour, rate);
   built at `Tests/LiveDesktop/.build/debug/GlassVNCProbe`. Offered the owner: run it himself in Terminal against this
   Mac (127.0.0.1 5900), paste the output; nothing stored.
+- **Owner (~03:10): "Looks like we broke copy" — right-click; ⌘C works.** Cause: the Mac terminal context menu's
+  `MenuAction.perform(_:)` collided with NSObject's `perform(_:)`, so `#selector(...perform(_:))` was `performSelector:`
+  and choosing any item (Copy, Paste, Select All, Look Up) sent an unrecognized selector, swallowed by AppKit — broken
+  since the menu was added; its tests never chose an item. Fixed: `MacTerminalMenuAction.choose(_:)`; Copy writes the
+  text captured when the menu opened (`copyPasteboard`, injectable); tests now choose Copy (with the selection cleared in
+  between) and Select All. Terminal 726 pass.
