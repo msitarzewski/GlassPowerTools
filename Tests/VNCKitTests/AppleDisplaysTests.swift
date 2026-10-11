@@ -340,7 +340,7 @@ struct ServerScalingPlannerTests {
         #expect(serverScales(decide(planner)).isEmpty, "a factor outside (0, 1] is no override")
     }
 
-    @Test("the displays on screen are asked for in the new scale's pixels until the windows say again")
+    @Test("the displays on screen are asked for at their own size; at a scale, the whole picture")
     func regionsFollowTheScale() {
         let planner = mac(.dataSaver)
         planner.setRegions([RFBRectangle(x: 3200, y: 0, width: 1280, height: 800)])
@@ -350,7 +350,8 @@ struct ServerScalingPlannerTests {
         _ = planner.updateBegan()
         planner.appleLayoutArrived(serverScale: 0.75, width: 3360, height: 1350)
         let after = clientMessages(decide(planner)).filter { $0.type == 3 }.map(\.bytes)
-        #expect(after.last == RFBRectangle(x: 2400, y: 0, width: 960, height: 600).updateRequest(incremental: false))
+        // A Mac asked for part of a scaled picture failed to read it back and stopped sending (2026-10-11).
+        #expect(after.last == RFBRectangle(x: 0, y: 0, width: 3360, height: 1350).updateRequest(incremental: false))
     }
 }
 

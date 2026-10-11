@@ -858,6 +858,13 @@ final class RFBStreamPlanner: @unchecked Sendable {
         if holding { return RFBRectangle(x: 0, y: 0, width: 1, height: 1) }
         let whole = RFBRectangle(x: 0, y: 0, width: width, height: height)
         guard let regions else { return whole }
+        // A Mac rendering at a scale other than 1 is asked for the whole picture, never part of it.
+        // Asked for one display beside another at half size, it trimmed the area at the seam
+        // ("adjust right 2057 2056"), its agent failed to read the scaled part back
+        // ("ReadBackResizedScreenData err -30", once a request) and it sent nothing more to any
+        // viewer, while input still worked (2026-10-11, the Mac's own log). The whole picture at
+        // half size streamed for 606 frames. The scale is still the windows' displays' to decide.
+        if dialect == .apple, !Self.sameScale(scaleInForce, 1), !regions.isEmpty { return whole }
         return RFBRectangle.bounding(regions.compactMap { $0.clipped(width: width, height: height) })
     }
 

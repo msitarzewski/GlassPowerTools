@@ -156,6 +156,12 @@ struct RetinaScaleTests {
         planner.appleLayoutArrived(serverScale: 0.5, width: 2240, height: 900,
                                    displays: mixedScreens.map { $0.scaled(by: 0.5) }, densities: mixedDensities)
         #expect(planner.serverScaleInForce == 0.5)
+        // At a scale, the whole picture is asked for: a Mac asked for the 2x display alone, its edge
+        // on the seam, failed to read the scaled part back and sent nothing more (2026-10-11).
+        out = []
+        _ = planner.decide(at: start + .milliseconds(1200)) { out += $0 }
+        #expect(requests(out) == [RFBRectangle(x: 0, y: 0, width: 2240, height: 900).updateRequest(incremental: false)])
+        #expect(serverScales(out).isEmpty, "the factor stays the 2x display's")
 
         // Only the 1x display: its own pixels.
         planner.setRegions([RFBRectangle(x: 1600, y: 0, width: 640, height: 400)])
