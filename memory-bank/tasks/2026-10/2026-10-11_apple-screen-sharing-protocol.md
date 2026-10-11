@@ -56,3 +56,10 @@ SetDisplayConfiguration virtual displays, media stream (SRTP, HEVC via VideoTool
 - **e7463ce / 0.4.355 on all three:** GlassVNCSession asks for 003.889 on account connections (password-only stays
   3.8); a Mac failing before the record layer → `appleProtocolRefusals`, 3.8 on Reconnect. Next: owner tries the
   headset; then Apple's scroll message (0x17), Apple's pasteboard, then High Performance.
+- **Display 2 froze on 003.889 (0.4.355–0.4.357).** Flow lines: display 4's rectangles rare (painted=1:130,4:0–2),
+  its picture present (lit 97%). Probe `--compare` (each 20 s, something moving on both displays): 889 armed 1032/32;
+  889 unarmed 0/0 (no picture at all — 889 pictures come only by pushes); 3.8 armed 439/181; 3.8 unarmed 249/177.
+  `--compare2`: 889 armed 33,333 → 130/131 but display 4 black; **889 armed 0 → 149/150, both pictures right**;
+  889 without ViewerInfo → nothing, and it wedged the next connection (3.8 armed then got nothing). **65eb2fc /
+  0.4.358:** arm at 0 as Apple's viewer does (remotex's caveat: input unread while a slow viewer drains).
+  "display index not found 1/4" in the Mac agent's log appears on every 889 session; cause unknown.
