@@ -70,3 +70,8 @@ SetDisplayConfiguration virtual displays, media stream (SRTP, HEVC via VideoTool
   per-pixel reference) and the renderer uploads only its window's region, only on a new frame (`uploads` counter test).
   Remaining levers if still slow: per-display connections at one shared scale (pushes per display, no
   both-display rectangles), scale 0.5 for mixed displays (blurry 1x display), High Performance (HEVC).
+- **0.4.359: "much faster", but the pointer swung between real time and long delay.** Cause: the app drew the pointer
+  at every CursorPos, and a Mac busy pushing (armed at 0) reads moves late and echoes them late. **057e5fe / 0.4.360:**
+  `RFBCursorPositionSpace.map` returns nil within 1 s of a local move (still learns the space). Clicks themselves
+  can still land late while the Mac pushes back to back (remotex's caveat at interval 0) — next lever if it shows:
+  per-display connections at one shared scale, or adaptive arming.
