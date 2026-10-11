@@ -1325,3 +1325,11 @@ sidebar collapse, column resizing and VoiceOver column landmarks. **Implemented 
 the columns (`GlassNavigationWindowOpacity.behindColumns`, 6f2cb23; Connections switched with it). **In progress:** W33,
 one shared own-glass sidebar/content container for the four windows; supersedes D60's "split-view windows keep system
 glass" and its prototype switch. Never remove or hide an Opacity or Glass control to make a look work.
+
+## D63 — No Light/Dark mode on Vision Pro built on colorScheme — Proposed 2026-10-11
+**Evidence (W35):** visionOS has no system Light/Dark for native apps (HIG Dark Mode and Materials; WWDC23 10076);
+Compatible Apps Appearance applies to iPhone/iPad apps only. Forcing `.preferredColorScheme(.light)` on visionOS changes
+UIKit label and text-field text to black while glass, ornaments and SwiftUI primary text stay unchanged — a mixed, less
+legible state. **Proposal:** never derive a visionOS light look from colorScheme; if the owner wants light/dark on the
+headset, make it a terminal (and editor) theme pair chosen per window or by Focus Mode, with Opacity/Glass unchanged
+(D62). Hide or caption controls that do nothing on visionOS (terminal Canvas Material). Awaiting the owner.

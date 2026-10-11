@@ -1026,3 +1026,17 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   the runner's tap onto the invisible name and broke the restore UI test only). DEBUG `connections-scene-phase` marker;
   hidden check = phases exactly ["background"]; new test for the display ⚡. UI 15/15 on visionOS 27.0 and 27.2; shell 254,
   connection UI 49, desktop 195. Not confirmed that the owner took the display-⚡ path (headset log collection needs root).
+- **0.4.345 (b55377b) installed on Vision Pro (relaunched) and iPhone (~02:10).**
+- **W35 (read-only appearance audit), 2026-10-11.** visionOS has no Light/Dark for native apps (HIG Dark Mode: "isn't
+  supported in visionOS"; "Avoid offering an app-specific appearance setting"; Materials: glass adapts to luminance).
+  Compatible Apps Appearance (Settings ▸ Appearance) affects iPhone/iPad apps only. Probe: native windows always report
+  .dark; `.preferredColorScheme(.light)` leaves glass/ornaments/primary text identical but turns UIKit label and field text
+  black (mixed, less legible) → don't build one on colorScheme. Mac/iPad/iPhone follow the system (no in-app override).
+  Findings: Opacity paint is hard-coded black on visionOS (GlassLayerEnvironment.swift:24-31); terminal theme "Canvas
+  Material" is dead on visionOS (SettingsView.swift:968-975); legibility at O0 depends on the room (terminal 2.5:1 at
+  O0/G100, 1.8:1 at G0 in the sim's bright room; light theme 3-4:1). Ranked plan: (1) owner's call: a theme pair
+  (light/dark) — system-chosen elsewhere, a bright-room/dark-room toggle on Vision Pro (dark under Focus Mode);
+  (2) hide/caption Canvas Material on visionOS; (3) Appearance footer line explaining Vision Pro has no Light/Dark;
+  (4) record a decision not to build light mode on colorScheme; (5) database pinned-header ground. Also found: in
+  `--ui-testing` runs terminal settings/themes use `UserDefaults.standard` (SettingsManager.swift:226-227), so Mac UI runs
+  write into the real store. Composites in `$SP/w35/composites/`. Asked the owner what he saw first.
