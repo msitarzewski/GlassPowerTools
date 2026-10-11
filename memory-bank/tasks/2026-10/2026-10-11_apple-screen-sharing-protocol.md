@@ -82,3 +82,8 @@ SetDisplayConfiguration virtual displays, media stream (SRTP, HEVC via VideoTool
   libvncserver/TigerVNC/KasmVNC) — e8a8f70 reads it, probe `--pointerpos`; owner's run (003.889, armed): **no
   PointerPos, no CursorPos or shape at all in 20 s of the Mac's own mouse moving**, only once at sign-in. Not pursued
   further; Observe mode (SetMode 0) remains untested for a future "watch" feature.
+- **2a75e49 scroll** (0x17 by distance when the Mac lists it; 10 units/point, 120/notch) and **69d619e clipboard**
+  (AutoPasteboard in the prelude when clipboard shared; MiscStatus 2 → fetch 0x0b; Mac 0x1f archive → first
+  utf8 text flavor; sendCutText → Mac 0x1f; MiscStatus 3 resends) → **0.4.361 on all three**. Not yet checked on the
+  owner's Mac. Orb: W39 agent (worktree) making the Connections window become the orb in place (no pushWindow —
+  known visionOS bug after force-quit/pinning leaves the parent visible); patch to `$SP/w39-orb.patch`.
