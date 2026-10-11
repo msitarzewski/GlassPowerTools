@@ -1081,3 +1081,4 @@ The owner, using 0.4.319: W14 works on the iPhone (a screenshot dropped from Pho
   -c <dir>`), not `/bin/sh -c`. A missing start folder starts at Home (logged) instead of "Local Shell Failed"; a saved
   tab whose tmux session is gone is re-made in its folder. SSH unchanged (needs a remote cd/claim). Terminal 737, shell
   254; live on a private tmux 3.7c socket.
+- **0.4.348 (6617a0e) installed on Mac (04:23), Vision Pro and iPhone (~04:35).**
