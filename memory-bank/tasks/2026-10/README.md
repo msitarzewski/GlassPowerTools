@@ -23,3 +23,6 @@
   only tmux's visible screen), "+" opens an empty chooser tab, a twin window controller behind the
   drag "copy", `-A` joining a session by name, workgroups without tmux names, `modifiedAt` never
   saved (D51 defect), editor projects piling into the front window. Five workstreams; awaiting go.
+- 2026-10-12: [This Mac's tmux server under launchd (D66)](2026-10-12_tmux-under-launchd.md) — a Force Quit of an app
+  run from a pane ended every local terminal; the resource coalition, reproduced with a probe; launchd's server survives
+  the same Force Quit. Installed 0.4.373 (Mac).

@@ -27,6 +27,17 @@ anything touching real servers (SSH and database tests use the disposable test V
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
+## 2026-10-12 (early) — tmux server under launchd (D66); desktop keys
+
+**Installed: 0.4.373 on the Mac** (01:29; macOS-only changes; Vision Pro and iPhone stay at 0.4.372). Since 0.4.367: arrow
+keys as priority commands (2be5122), the desktop Keys menu, arrow pad and keyboard bar (15d25b8), the thinned desktop
+toolbar (e514e74), push pacing (8770d27), and D66 (86815ed, 1e89b18, 0619569): a Force Quit of an app run from a tmux pane
+ended every local terminal; the cause is the resource coalition, reproduced and fixed with a probe
+(`tasks/2026-10/2026-10-12_tmux-under-launchd.md`). **The owner's current server (00:44) predates D66** and is in the quit
+app's coalition; launchd takes over when it ends (reboot, or the owner's choice: ending it ends every session). Until then,
+run test apps with `open`, never from a pane. **Open:** D46 pinch gestures (asked, no answer); High Performance trial with
+the Mac at hand; W39 orb check on the headset; Bonjour availability (owner's call).
+
 ## 2026-10-11 (late night) — High Performance built; quality-switch crash fixed
 
 **Installed: 0.4.367 on Mac, Vision Pro and iPhone** (19:58–20:05; headset and iPhone were locked, not launched).

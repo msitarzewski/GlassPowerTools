@@ -1375,3 +1375,13 @@ once crashed WindowServer and logged the user out), so it is tested in the app o
 (4) A colour-depth change on a pushing Mac waits for a SetEncodings layout marker (1f2a01c): the hotspot log showed three
 sessions killed by misread in-flight pictures, and the first one tripped W36 (why no scale was ever asked); W36 now
 counts only the Mac closing the connection, for 10 minutes.
+
+## D66 — This Mac's tmux server runs under launchd — Implemented 2026-10-12 (verified on the owner's Mac)
+**Owner:** a Force Quit of a scratch app run from a tmux pane ended every local terminal; asked for "both" the cleanup and
+the launchd server. **Cause, measured:** the app, the tmux server it starts and every pane share the app's resource
+coalition; once that app has quit (every install), each answers for itself, and the Dock's Force Quit of an app run from a
+pane ends the whole coalition (reproduced with a probe and two bystander panes). **Decision:** when no server answers, the
+app has launchd run `tmux -u -D` from a job file in Application Support (no login item; starts when a local terminal needs
+it; Interactive; pane environment less SSH_AUTH_SOCK/TMPDIR); a running server is left alone; launchd refusing leaves the
+claim to start tmux as before (1e89b18, 0619569). Under it, the same probe's Force Quit ended the probe alone. Takes over
+only when the current server ends; evidence in `tasks/2026-10/2026-10-12_tmux-under-launchd.md`.
