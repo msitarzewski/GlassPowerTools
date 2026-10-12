@@ -404,10 +404,8 @@ public struct DesktopSessionView: View {
             Divider().frame(height: 24)
             // The terminal's keys and cursor pad, for a desktop (2026-10-11); Escape and Tab are the
             // Keys menu's first two, so they have no buttons of their own.
-            DesktopKeysMenu(session: session)
+            DesktopKeysMenu(session: session, typeText: { session.releaseInput(); showTextInput = true })
             DesktopArrowPad(session: session)
-            Button("Input", systemImage: "keyboard") { session.releaseInput(); showTextInput = true }
-                .help("Send Text").disabled(!session.isConnected)
             // Last, as the ⚡ is on the trailing edge of every toolbar (2026-10-05).
             if let showActiveConnections {
                 Divider().frame(height: 24)
@@ -431,8 +429,12 @@ public struct DesktopSessionView: View {
                         .accessibilityIdentifier("session.readout")
                 }
                 Spacer()
-                // Escape and Tab are the Keys menu's first two.
+                // Escape and Tab are the Keys menu's first two, and on the Mac so is Type Text.
+                #if os(iOS)
                 DesktopKeysMenu(session: session)
+                #else
+                DesktopKeysMenu(session: session, typeText: { session.releaseInput(); showTextInput = true })
+                #endif
                 #if os(iOS)
                 DesktopArrowPad(session: session)
                 Button(session.wantsKeyboard ? "Hide Keyboard" : "Keyboard", systemImage: "keyboard") {
@@ -440,8 +442,6 @@ public struct DesktopSessionView: View {
                 }
                 .disabled(!session.isConnected)
                 .accessibilityIdentifier("session.keyboard")
-                #else
-                Button("Input", systemImage: "keyboard") { session.releaseInput(); showTextInput = true }.disabled(!session.isConnected)
                 #endif
             }
             .font(.caption).padding(10)
@@ -482,10 +482,8 @@ public struct DesktopSessionView: View {
                     Button("Copy Remote Clipboard") { copyRemoteClipboard() }.disabled(!session.isConnected || session.remoteClipboard == nil)
                     Button("Control–Alt–Delete") { session.sendSecureAttention() }.disabled(!session.isConnected)
                 }.help("Clipboard")
-
-                // W30: a host's displays, each in a window of its own; and what the connection carries.
-                DesktopDisplaysMenu(session: session, viewport: viewport)
-                DesktopQualityMenu(session: session)
+                // Displays and Quality were menus of their own here; both are in Settings ▸ This
+                // Window, and the toolbar was getting busy (the owner, 2026-10-11).
     }
 
     @ViewBuilder private var connectionStatus: some View {

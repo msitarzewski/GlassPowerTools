@@ -85,75 +85,6 @@ enum DesktopLinkReadout {
 }
 
 
-// MARK: - Controls in the window's bar
-
-/// Displays (W30): which display this window shows, and opening another in a window of its own.
-/// Offered when the host publishes more than one display.
-struct DesktopDisplaysMenu: View {
-    let session: DesktopSessionModel
-    @Bindable var viewport: DesktopViewport
-    @Environment(\.openWindow) private var openWindow
-
-    var body: some View {
-        if session.screens.count > 1 {
-            Menu("Displays", systemImage: "rectangle.on.rectangle") {
-                Picker("Show", selection: $viewport.selectedScreenID) {
-                    Text("All Displays").tag(UInt32?.none)
-                    ForEach(session.screens) { screen in
-                        Text(DesktopDisplayLayout.name(of: screen.id, in: session.screens)).tag(UInt32?.some(screen.id))
-                    }
-                }
-                .pickerStyle(.inline)
-                if GlassWindowPresentation.canOpenWindows {
-                    Section("Open in a New Window") {
-                        ForEach(session.screens) { screen in
-                            Button(DesktopDisplayLayout.name(of: screen.id, in: session.screens)) {
-                                openWindow(id: DesktopDisplayWindowValue.windowID,
-                                           value: DesktopDisplayWindowValue(endpoint: session.connection.id.rawValue,
-                                                                            display: screen.id))
-                            }
-                        }
-                    }
-                }
-            }
-            .help("Displays")
-            .accessibilityIdentifier("session.displays")
-        }
-    }
-}
-
-/// Quality (W30), with what the link is doing as the menu's heading. VNC only: RDP negotiates its
-/// own codecs with the server.
-struct DesktopQualityMenu: View {
-    let session: DesktopSessionModel
-    private var allDesktops = DesktopAllDesktopsStorage()
-
-    init(session: DesktopSessionModel) { self.session = session }
-
-    var body: some View {
-        if session.connection.protocol == .vnc {
-            Menu("Quality", systemImage: "gauge.with.dots.needle.67percent") {
-                Section(session.linkStatistics.map(DesktopLinkReadout.line) ?? "Measuring the connection…") {
-                    Picker("Quality", selection: quality) {
-                        ForEach(GlassDesktopStreamQuality.allCases, id: \.self) { Text($0.title).tag($0) }
-                    }
-                    .pickerStyle(.inline)
-                }
-            }
-            .help("Quality")
-            .accessibilityIdentifier("session.quality")
-        }
-    }
-
-    /// The desktop's own window's Quality: one connection carries every window of the desktop.
-    private var quality: Binding<GlassDesktopStreamQuality> {
-        GlassWindowSettingBinding.value(DesktopWindowSettings.quality,
-                                        in: Binding(get: { session.primaryViewport.windowSettings },
-                                                    set: { session.primaryViewport.windowSettings = $0 }),
-                                        over: allDesktops.defaults.quality)
-    }
-}
-
 // MARK: - Desktop Settings ▸ Connection
 
 /// Desktop Settings ▸ **Connection** (W30): what belongs to the desktop's connection rather than to
@@ -276,7 +207,7 @@ struct DesktopConnectionSettingsSections: View {
             } header: {
                 Text("Display Windows")
             } footer: {
-                Text("With a window for each display, connecting to this computer opens one window per display, and each moves, sizes and zooms on its own. Open or close a display's window at any time from Displays in the window's controls; closing one leaves the others connected.")
+                Text("With a window for each display, connecting to this computer opens one window per display, and each moves, sizes and zooms on its own. Open a display's window at any time from This Window ▸ Displays, and close it as any window; closing one leaves the others connected.")
             }
         }
     }

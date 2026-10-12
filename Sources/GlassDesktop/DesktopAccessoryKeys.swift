@@ -78,9 +78,17 @@ public enum DesktopStickyModifier: String, CaseIterable, Sendable, Identifiable 
 /// Escape, Tab, the modifiers for the next key, navigation and function keys.
 struct DesktopKeysMenu: View {
     let session: DesktopSessionModel
+    /// Opens the sheet that types text, where the window has no software keyboard of its own to
+    /// type with (Vision Pro and the Mac).
+    var typeText: (() -> Void)?
 
     var body: some View {
         Menu {
+            if let typeText {
+                Button("Type Text…", systemImage: "character.cursor.ibeam") { typeText() }
+                    .accessibilityIdentifier("session.type-text")
+                Divider()
+            }
             Button("Escape", systemImage: "escape") { session.sendAccessoryKey(DesktopAccessoryKeys.escape) }
             Button("Tab", systemImage: "arrow.right.to.line") { session.sendAccessoryKey(DesktopAccessoryKeys.tab) }
             Section("For the Next Key") {
@@ -114,7 +122,7 @@ struct DesktopKeysMenu: View {
         .disabled(!session.isConnected)
         .help("Keys")
         .accessibilityIdentifier("session.keys")
-        .accessibilityHint("Escape, Tab, modifiers for the next key, navigation and function keys.")
+        .accessibilityHint("Type text, Escape, Tab, modifiers for the next key, navigation and function keys.")
     }
 
     private var armedTitle: String {

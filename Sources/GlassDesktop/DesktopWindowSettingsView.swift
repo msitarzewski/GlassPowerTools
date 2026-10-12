@@ -15,6 +15,7 @@ import SwiftUI
 import GlassLayers
 import GlassConnectionUI
 import GlassRDPTransport
+import GlassShell
 
 /// This Window: the desktop window's own settings over All Desktops', and its session's controls.
 struct DesktopWindowSettingsView: View {
@@ -27,6 +28,7 @@ struct DesktopWindowSettingsView: View {
     /// Closes Desktop Settings and asks for the wallpaper image: the file importer is the window's.
     let chooseWallpaper: () -> Void
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.openWindow) private var openWindow
 
     /// Where every row's setting lives, as This Window names it: Settings ▸ Desktops, which is
     /// also Desktop Settings' second page.
@@ -186,11 +188,22 @@ struct DesktopWindowSettingsView: View {
                         Text("\(screenName(screen)) (\(screen.width) × \(screen.height))").tag(UInt32?.some(screen.id))
                     }
                 }.accessibilityIdentifier("display.screen")
+                // Opening a display in a window of its own was the toolbar's Displays menu until the
+                // toolbar was thinned (2026-10-11); it lives here with the choice of what to show.
+                if GlassWindowPresentation.canOpenWindows {
+                    ForEach(session.screens) { screen in
+                        Button("Open \(screenName(screen)) in a New Window", systemImage: "macwindow.badge.plus") {
+                            openWindow(id: DesktopDisplayWindowValue.windowID,
+                                       value: DesktopDisplayWindowValue(endpoint: session.connection.id.rawValue, display: screen.id))
+                        }
+                        .accessibilityIdentifier("display.open-window-\(screen.id)")
+                    }
+                }
             } header: {
                 Text("Displays")
             } footer: {
                 Text(session.connection.protocol == .vnc
-                     ? "Showing one display fills this window with it, and the computer sends only the displays that have a window on screen: a display whose window is closed or in the background costs nothing. Open another display in a window of its own from Displays in the window's controls."
+                     ? "Showing one display fills this window with it, and the computer sends only the displays that have a window on screen: a display whose window is closed or in the background costs nothing. Open another display in a window of its own here."
                      : "Showing one display fills this window with it. The computer still sends every display.")
             }
         }
