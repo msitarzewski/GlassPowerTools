@@ -402,11 +402,8 @@ public struct DesktopSessionView: View {
         Group {
             sessionActions
             Divider().frame(height: 24)
-            Button("Escape", systemImage: "escape") { session.sendKey(0x01) }
-                .help("Send Escape").disabled(!session.isConnected)
-            Button("Tab", systemImage: "arrow.right.to.line") { session.sendKey(0x0f) }
-                .help("Send Tab").disabled(!session.isConnected)
-            // The terminal's keys and cursor pad, for a desktop (2026-10-11).
+            // The terminal's keys and cursor pad, for a desktop (2026-10-11); Escape and Tab are the
+            // Keys menu's first two, so they have no buttons of their own.
             DesktopKeysMenu(session: session)
             DesktopArrowPad(session: session)
             Button("Input", systemImage: "keyboard") { session.releaseInput(); showTextInput = true }
@@ -434,8 +431,7 @@ public struct DesktopSessionView: View {
                         .accessibilityIdentifier("session.readout")
                 }
                 Spacer()
-                Button("Esc") { session.sendKey(0x01) }.disabled(!session.isConnected)
-                Button("Tab") { session.sendKey(0x0f) }.disabled(!session.isConnected)
+                // Escape and Tab are the Keys menu's first two.
                 DesktopKeysMenu(session: session)
                 #if os(iOS)
                 DesktopArrowPad(session: session)
