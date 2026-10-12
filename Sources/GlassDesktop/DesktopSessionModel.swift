@@ -984,6 +984,64 @@ public final class DesktopSessionModel {
             else if let text = content.text { try await target.sendText(text) }
         }
     }
+    // MARK: Accessory keys
+
+    /// Control, Option, Command or Shift for the next key: from the Keys menu, since a headset's or a
+    /// phone's software keyboard has none of them (`DesktopAccessoryKeys`).
+    public private(set) var armedModifiers: Set<DesktopStickyModifier> = []
+    /// The accessory keys' own queue, in order, to the desktop's connection.
+    private var accessoryInput: DesktopInput?
+    private weak var accessoryTransport: (any GlassDesktopTransport)?
+    /// Modifiers held down through an arrow pad drag.
+    private var heldForDrag: [DesktopKey] = []
+
+    public func toggleArmed(_ modifier: DesktopStickyModifier) {
+        if armedModifiers.contains(modifier) { armedModifiers.remove(modifier) } else { armedModifiers.insert(modifier) }
+    }
+
+    /// The armed modifiers' keys, disarmed: for a key typed on the software keyboard, which presses
+    /// them before it and releases them after.
+    func takeArmedModifiers() -> [DesktopKey] {
+        defer { armedModifiers = [] }
+        return DesktopStickyModifier.allCases.filter(armedModifiers.contains).map(\.key)
+    }
+
+    /// One key from the Keys menu, with the modifiers armed for it.
+    func sendAccessoryKey(_ key: DesktopKey) {
+        guard let input = accessoryQueue() else { return }
+        for event in DesktopAccessoryKeys.tap(key, holding: takeArmedModifiers()) { input.send(event) }
+    }
+
+    /// An arrow pad drag began: the armed modifiers go down for the whole of it.
+    func beginArrowDrag() {
+        guard let input = accessoryQueue() else { return }
+        heldForDrag = takeArmedModifiers()
+        for modifier in heldForDrag { input.send(.key(modifier.scancode, modifier.extended, true, false)) }
+    }
+
+    func sendArrowStep(_ key: DesktopKey) {
+        guard let input = accessoryQueue() else { return }
+        input.send(.key(key.scancode, key.extended, true, false))
+        input.send(.key(key.scancode, key.extended, false, false))
+    }
+
+    func endArrowDrag() {
+        guard let input = accessoryQueue() else { heldForDrag = []; return }
+        for modifier in heldForDrag.reversed() { input.send(.key(modifier.scancode, modifier.extended, false, false)) }
+        heldForDrag = []
+    }
+
+    /// The queue to the connection now, made again when the connection changes.
+    private func accessoryQueue() -> DesktopInput? {
+        guard isConnected else { return nil }
+        if accessoryInput == nil || accessoryTransport !== transport {
+            accessoryInput?.stop()
+            accessoryInput = DesktopInput(session: transport) { [weak self] in self?.errorMessage = $0 }
+            accessoryTransport = transport
+        }
+        return accessoryInput
+    }
+
     public func sendKey(_ code: UInt16, extended: Bool = false) {
         sendInput { target in
             try await target.keyboard(scancode: code, extended: extended, isDown: true)
@@ -1028,6 +1086,8 @@ public final class DesktopSessionModel {
         screens = []; selectedScreenID = nil
         linkStatistics = nil; displayWindowRequests = []; appliedDisplayWindows = false
         highPerformanceStatus = nil
+        armedModifiers = []; heldForDrag = []
+        accessoryInput?.stop(); accessoryInput = nil; accessoryTransport = nil
         cursor = .systemDefault; cursorBitmap = nil; cursorImage = nil
         pointerPosition = nil; cursorVisible = true
         lastRequestedSize = nil

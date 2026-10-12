@@ -7,6 +7,17 @@ public struct DesktopKey: Hashable, Sendable {
 }
 
 public enum DesktopKeyboard {
+    /// A single lowercase or uppercase letter or a digit as its key on a US keyboard; nil otherwise.
+    public static func key(character text: String) -> DesktopKey? {
+        guard text.count == 1, let scalar = text.lowercased().unicodeScalars.first, scalar.isASCII else { return nil }
+        switch scalar {
+        case "a"..."z": return key(hidUsage: 4 + Int(scalar.value - 97))
+        case "1"..."9": return key(hidUsage: 30 + Int(scalar.value - 49))
+        case "0": return key(hidUsage: 39)
+        default: return nil
+        }
+    }
+
     /// USB HID usages supplied by UIKit hardware keyboard events, mapped to RDP set-1 scancodes.
     public static func key(hidUsage: Int) -> DesktopKey? {
         let letters: [UInt16] = [0x1e,0x30,0x2e,0x20,0x12,0x21,0x22,0x23,0x17,0x24,0x25,0x26,0x32,

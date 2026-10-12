@@ -11,6 +11,8 @@ struct DesktopMetalSurface: NSViewRepresentable {
     /// The window this surface is in (W30); nil is the desktop's own.
     var viewport: DesktopViewport?
     var inputEnabled = true
+    /// A Mac has its own keyboard: no bar above one.
+    var keyboardTools: AnyView?
     func makeNSView(context: Context) -> DesktopMTKView { DesktopMTKView(session: session, inputEnabled: inputEnabled) }
     func updateNSView(_ view: DesktopMTKView, context: Context) { view.update(session, viewport: viewport, inputEnabled: inputEnabled) }
     static func dismantleNSView(_ view: DesktopMTKView, coordinator: ()) { view.shutdown() }
@@ -22,8 +24,13 @@ struct DesktopMetalSurface: UIViewRepresentable {
     /// The window this surface is in (W30); nil is the desktop's own.
     var viewport: DesktopViewport?
     var inputEnabled = true
+    /// The window's tools, for the bar above the software keyboard (`DesktopKeyboardAccessory`).
+    var keyboardTools: AnyView?
     func makeUIView(context: Context) -> DesktopMTKView { DesktopMTKView(session: session, inputEnabled: inputEnabled) }
-    func updateUIView(_ view: DesktopMTKView, context: Context) { view.update(session, viewport: viewport, inputEnabled: inputEnabled) }
+    func updateUIView(_ view: DesktopMTKView, context: Context) {
+        view.keyboardTools = keyboardTools
+        view.update(session, viewport: viewport, inputEnabled: inputEnabled)
+    }
     static func dismantleUIView(_ view: DesktopMTKView, coordinator: ()) { view.shutdown() }
 }
 #endif
@@ -68,6 +75,18 @@ final class DesktopMTKView: MTKView {
     var wantsSoftwareKeyboard = false {
         didSet { if wantsSoftwareKeyboard != oldValue { reloadInputViews() } }
     }
+    #endif
+    /// The window's tools, for the bar above the software keyboard (iPhone and iPad).
+    var keyboardTools: AnyView? {
+        didSet { updateKeyboardTools() }
+    }
+    private func updateKeyboardTools() {
+        #if os(iOS)
+        keyboardAccessory?.update(tools: keyboardTools)
+        #endif
+    }
+    #if os(iOS)
+    private var keyboardAccessory: DesktopKeyboardAccessory?
     #endif
     var autocorrectionType: UITextAutocorrectionType = .no
     var autocapitalizationType: UITextAutocapitalizationType = .none
@@ -433,6 +452,33 @@ final class DesktopMTKView: MTKView {
     }
 
     #if os(iOS)
+    /// The bar above the software keyboard: its keys, the arrow pad and the window's tools, only with
+    /// the software keyboard, so it never covers the picture otherwise. visionOS has no accessory
+    /// view; its toolbar carries the keys and the pad.
+    override var inputAccessoryView: UIView? {
+        guard wantsSoftwareKeyboard, let session else { return nil }
+        if keyboardAccessory == nil {
+            keyboardAccessory = DesktopKeyboardAccessory(session: session, tools: keyboardTools) { [weak session] in
+                session?.wantsKeyboard = false
+            }
+        }
+        return keyboardAccessory
+    }
+    #endif
+
+    /// The modifiers armed in the Keys menu go down before a key typed on the software keyboard and
+    /// up after it.
+    fileprivate func typed(_ send: (DesktopInput) -> Void) {
+        guard let input else { return }
+        let held = session?.takeArmedModifiers() ?? []
+        for modifier in held { input.send(.key(modifier.scancode, modifier.extended, true, false)) }
+        send(input)
+        for modifier in held.reversed() { input.send(.key(modifier.scancode, modifier.extended, false, false)) }
+    }
+
+    fileprivate var hasArmedModifiers: Bool { session?.armedModifiers.isEmpty == false }
+
+    #if os(iOS)
     override var inputView: UIView? { wantsSoftwareKeyboard ? nil : suppressedKeyboard }
 
     /// Drops the pointing finger and releases anything it was dragging.
@@ -665,12 +711,22 @@ extension DesktopMTKView: UIKeyInput {
     var hasText: Bool { true } // Backspace remains available even though the remote document is not locally inspectable.
     func insertText(_ text: String) {
         guard inputEnabled, session?.isConnected == true else { return }
-        if text == "\n" || text == "\t" {
-            let code: UInt16 = text == "\n" ? 0x1c : 0x0f
-            input?.send(.key(code, false, true, false)); input?.send(.key(code, false, false, false))
-        } else { input?.send(.text(text)) }
+        let named: DesktopKey? = text == "\n" ? DesktopKey(0x1c) : text == "\t" ? DesktopKey(0x0f) : nil
+        // With a modifier armed, a letter or digit goes as its key, so Command-C is a shortcut and not
+        // a C typed with Command held, which a Windows server would not take as one.
+        let key = named ?? (hasArmedModifiers ? DesktopKeyboard.key(character: text) : nil)
+        typed { input in
+            if let key {
+                input.send(.key(key.scancode, key.extended, true, false)); input.send(.key(key.scancode, key.extended, false, false))
+            } else {
+                input.send(.text(text))
+            }
+        }
     }
-    func deleteBackward() { guard inputEnabled, session?.isConnected == true else { return }; input?.send(.key(0x0e, false, true, false)); input?.send(.key(0x0e, false, false, false)) }
+    func deleteBackward() {
+        guard inputEnabled, session?.isConnected == true else { return }
+        typed { input in input.send(.key(0x0e, false, true, false)); input.send(.key(0x0e, false, false, false)) }
+    }
 }
 #endif
 

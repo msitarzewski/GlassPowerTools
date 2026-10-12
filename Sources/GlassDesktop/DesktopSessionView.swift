@@ -194,7 +194,8 @@ public struct DesktopSessionView: View {
             GeometryReader { geometry in
                 ZStack {
                     ZStack {
-                        DesktopMetalSurface(session: session, viewport: viewport, inputEnabled: remoteInputEnabled)
+                        DesktopMetalSurface(session: session, viewport: viewport, inputEnabled: remoteInputEnabled,
+                                            keyboardTools: keyboardTools)
                         cursor(in: geometry.size)
                     }
                     #if os(visionOS)
@@ -405,6 +406,9 @@ public struct DesktopSessionView: View {
                 .help("Send Escape").disabled(!session.isConnected)
             Button("Tab", systemImage: "arrow.right.to.line") { session.sendKey(0x0f) }
                 .help("Send Tab").disabled(!session.isConnected)
+            // The terminal's keys and cursor pad, for a desktop (2026-10-11).
+            DesktopKeysMenu(session: session)
+            DesktopArrowPad(session: session)
             Button("Input", systemImage: "keyboard") { session.releaseInput(); showTextInput = true }
                 .help("Send Text").disabled(!session.isConnected)
             // Last, as the ⚡ is on the trailing edge of every toolbar (2026-10-05).
@@ -432,7 +436,9 @@ public struct DesktopSessionView: View {
                 Spacer()
                 Button("Esc") { session.sendKey(0x01) }.disabled(!session.isConnected)
                 Button("Tab") { session.sendKey(0x0f) }.disabled(!session.isConnected)
+                DesktopKeysMenu(session: session)
                 #if os(iOS)
+                DesktopArrowPad(session: session)
                 Button(session.wantsKeyboard ? "Hide Keyboard" : "Keyboard", systemImage: "keyboard") {
                     session.wantsKeyboard.toggle()
                 }
@@ -445,6 +451,16 @@ public struct DesktopSessionView: View {
             .font(.caption).padding(10)
         #if !os(visionOS)
         .background(.regularMaterial)
+        #endif
+    }
+
+    /// The window's tools in the bar above the software keyboard, which covers the status bar on an
+    /// iPhone and an iPad, as a terminal's Tools menu does there. A Vision Pro keeps its toolbar.
+    private var keyboardTools: AnyView? {
+        #if os(iOS)
+        AnyView(sessionActions)
+        #else
+        nil
         #endif
     }
 

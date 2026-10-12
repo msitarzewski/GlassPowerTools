@@ -263,9 +263,10 @@ public actor GlassVNCSession: GlassDesktopTransport {
 
     public func keyboard(scancode: UInt16, extended: Bool, isDown: Bool, isRepeat: Bool) async throws {
         let client = try readyClient()
-        guard let keysym = RFBKeysym.keysym(scancode: scancode, extended: extended) else {
+        guard let standard = RFBKeysym.keysym(scancode: scancode, extended: extended) else {
             throw GlassRDPError.unsupported("This key has no VNC equivalent.")
         }
+        let keysym = pointer.isApple ? RFBKeysym.forMac(standard) : standard
         if isDown { pressedKeysyms.insert(keysym) } else { pressedKeysyms.remove(keysym) }
         try await client.sendKey(keysym: keysym, down: isDown)
     }
@@ -526,6 +527,8 @@ final class PointerMemory: @unchecked Sendable {
 
     func reset() { lock.withLock { shape = nil; hidden = false; apple = false; position = nil } }
     func noteApple() { lock.withLock { apple = true } }
+    /// The server is a Mac's Screen Sharing.
+    var isApple: Bool { lock.withLock { apple } }
     func hide() { lock.withLock { hidden = true } }
     func show(_ value: GlassRDPCursorImage) { lock.withLock { shape = value; hidden = false } }
 

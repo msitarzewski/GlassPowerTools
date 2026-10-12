@@ -32,6 +32,19 @@ public enum RFBKeysym {
         0x5B: superLeft, 0x5C: superRight, 0x5D: menu
     ]
 
+    public static let metaLeft: UInt32 = 0xFFE7, metaRight: UInt32 = 0xFFE8
+
+    /// A key as a Mac reads it: its agent takes Alt, Super and Hyper all as Command and Meta as
+    /// Option, so a keyboard's Alt goes to a Mac as Meta (remotex's notes, "Keys", MIT; Apple's
+    /// viewer sends Option so).
+    public static func forMac(_ keysym: UInt32) -> UInt32 {
+        switch keysym {
+        case altLeft: metaLeft
+        case altRight: metaRight
+        default: keysym
+        }
+    }
+
     public static func keysym(scancode: UInt16, extended isExtended: Bool) -> UInt32? {
         isExtended ? extended[scancode] : base[scancode]
     }

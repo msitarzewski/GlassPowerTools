@@ -330,6 +330,23 @@ struct DesktopRetinaWindowTests {
         session.close()
     }
 
+    @Test("modifiers armed for the next key are taken once, in a fixed order, and cleared with the session")
+    func armedModifiers() async throws {
+        let fixture = try Fixture()
+        defer { fixture.clean() }
+        let session = try await fixture.connected(app: await fixture.launch())
+        session.toggleArmed(.shift)
+        session.toggleArmed(.command)
+        session.toggleArmed(.option)
+        session.toggleArmed(.option)
+        #expect(session.armedModifiers == [.shift, .command])
+        #expect(session.takeArmedModifiers() == [DesktopKey(0x5b, extended: true), DesktopKey(0x2a)], "Command before Shift")
+        #expect(session.armedModifiers.isEmpty && session.takeArmedModifiers().isEmpty, "for one key only")
+        session.toggleArmed(.control)
+        session.close()
+        #expect(session.armedModifiers.isEmpty)
+    }
+
     @Test("High Performance is the connection's, from the desktop's window, and asks for the window's size at its density")
     func highPerformance() async throws {
         let fixture = try Fixture()
