@@ -13,6 +13,7 @@ import GlassTerminalEmulator
 ///
 /// tmux here is `MacLocalTmuxTests.FakeServer`, or a private server named by its socket on every
 /// call (rule 63). The only other processes started are `/bin/sh` and `/bin/sleep`.
+extension LocalTmuxServerSuites {
 @MainActor
 @Suite("New local terminals start in the folder of the one in front", .serialized)
 struct MacLocalTerminalStartTests {
@@ -442,5 +443,6 @@ struct MacLocalTerminalStartTests {
         }
         return condition()
     }
+}
 }
 #endif

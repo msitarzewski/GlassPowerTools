@@ -11,6 +11,7 @@ import Testing
 ///
 /// Nothing here starts tmux: names come from `MacLocalTmuxTests.FakeServer`, and tests that swap
 /// `MacLocalTmux.server` never suspend while it is in place.
+extension LocalTmuxServerSuites {
 @MainActor
 @Suite("Terminal layouts that survive a crash", .serialized)
 struct MacWorkspaceRestorationTests {
@@ -399,5 +400,6 @@ private nonisolated final class AskCount: @unchecked Sendable {
     private var count = 0
     var value: Int { lock.withLock { count } }
     func add() { lock.withLock { count += 1 } }
+}
 }
 #endif

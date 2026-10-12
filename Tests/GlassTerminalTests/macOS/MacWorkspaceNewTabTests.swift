@@ -14,6 +14,7 @@ import GlassTerminalEmulator
 /// Nothing here starts tmux: names come from `MacLocalTmuxTests.FakeServer`, and the one process
 /// started is `/bin/sh`. Tests that swap `MacLocalTmux.server` never suspend, so no other test
 /// runs while the fake is in place, and they put back whatever was there.
+extension LocalTmuxServerSuites {
 @MainActor
 @Suite("New terminal tabs and one controller per window", .serialized)
 struct MacWorkspaceNewTabTests {
@@ -313,5 +314,6 @@ private struct SceneHost: View {
         renders.value += 1
         return MacWorkspaceSceneRoot(request: request)
     }
+}
 }
 #endif

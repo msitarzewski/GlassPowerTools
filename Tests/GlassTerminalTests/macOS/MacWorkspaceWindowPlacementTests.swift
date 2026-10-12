@@ -12,6 +12,7 @@ import Testing
 ///
 /// No tmux runs: the windows' terminals are SSH panes that name tmux sessions, which nothing
 /// connects, and no test swaps `MacLocalTmux.server`.
+extension LocalTmuxServerSuites {
 @MainActor
 @Suite("Terminal windows come back where they were", .serialized)
 struct MacWorkspaceWindowPlacementTests {
@@ -362,5 +363,6 @@ struct MacWorkspaceWindowPlacementTests {
         #expect(!window.isRestorable,
                 "forced on, AppKit brought terminal windows back empty after a crash, and Connections never appeared")
     }
+}
 }
 #endif

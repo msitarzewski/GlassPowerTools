@@ -11,6 +11,7 @@ import Testing
 ///
 /// No real tmux runs: names come from `MacLocalTmuxTests.FakeServer`, terminals are made without
 /// starting, and no test suspends while the fake is in place.
+extension LocalTmuxServerSuites {
 @MainActor
 @Suite("Selecting several terminal tabs", .serialized)
 struct MacWorkspaceTabSelectionTests {
@@ -311,5 +312,6 @@ struct MacWorkspaceTabSelectionTests {
         }
         return condition()
     }
+}
 }
 #endif

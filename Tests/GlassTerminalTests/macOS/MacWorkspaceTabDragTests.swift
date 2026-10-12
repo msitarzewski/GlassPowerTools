@@ -6,6 +6,7 @@ import Testing
 
 /// Terminal tabs dragged between windows (2026-10-08): a tab moves with its terminals running, a
 /// window whose last tab leaves closes, and the same drag within a window reorders.
+extension LocalTmuxServerSuites {
 @MainActor
 @Suite("Dragging terminal tabs between windows")
 struct MacWorkspaceTabDragTests {
@@ -198,5 +199,6 @@ struct MacWorkspaceTabDragTests {
             withExtendedLifetime(shown) {}
         }
     }
+}
 }
 #endif

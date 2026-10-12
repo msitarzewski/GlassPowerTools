@@ -11,6 +11,7 @@ import Testing
 /// Nothing here starts tmux or connects: local names come from `MacLocalTmuxTests.FakeServer`,
 /// hosts answer from memory. Tests that swap `MacLocalTmux.server` never suspend while it is in
 /// place, so no other test runs against the fake.
+extension LocalTmuxServerSuites {
 @MainActor
 @Suite("Mac workgroups keep their tmux sessions", .serialized)
 struct MacWorkgroupTmuxTests {
@@ -328,5 +329,6 @@ struct MacWorkgroupTmuxTests {
             withExtendedLifetime(held) {}
         }
     }
+}
 }
 #endif

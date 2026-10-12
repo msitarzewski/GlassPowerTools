@@ -7,6 +7,7 @@ import Testing
 /// Show All Terminals (W9, 2026-10-08): every terminal window as a group of live tiles, one per
 /// tab, packed onto the screen; arrows, typing, choosing and dragging; the tmux sessions no tab
 /// shows; and the pinch that opens it.
+extension LocalTmuxServerSuites {
 @MainActor
 @Suite("Show All Terminals")
 struct MacTerminalExposeTests {
@@ -403,5 +404,6 @@ struct MacTerminalExposeTests {
         #expect(otherKey.keyEquivalent == "t", "only ⇧⌘\\ is taken")
         #expect(MacTerminalExposeShortcut.release(in: main) == 0)
     }
+}
 }
 #endif

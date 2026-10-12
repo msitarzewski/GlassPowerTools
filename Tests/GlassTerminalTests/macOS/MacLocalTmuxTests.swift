@@ -11,6 +11,7 @@ import GlassTerminalEmulator
 /// D47: local terminals kept in this Mac's tmux. A tab gets its own `glass-N` session and keeps it
 /// across a relaunch. Closing the tab or quitting detaches: the session keeps running, and Active
 /// lists it under This Mac to open again, take over or end.
+extension LocalTmuxServerSuites {
 @MainActor
 @Suite("Local terminals in tmux", .serialized)
 struct MacLocalTmuxTests {
@@ -1333,5 +1334,6 @@ struct MacLocalTmuxTests {
             runtime.sessionManager.closeSession(toBravo)
         }
     }
+}
 }
 #endif
