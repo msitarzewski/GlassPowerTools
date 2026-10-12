@@ -716,8 +716,15 @@ enum MacLocalTerminalConfiguration {
         // (W37: a new terminal opens where the one in front was), or on a volume since unmounted —
         // starts it at Home rather than leaving a pane that cannot start, or a tmux session it
         // cannot reattach to. tmux does the same for a session's `-c`.
+        let requestedTmux = tmux
         if let tmuxSession, let tmux = tmux ?? MacLocalTmux.executablePath() {
             let launch = tmuxLaunch(shell: shell, directory: directory)
+            // A pane reattaching after a restart would start the server itself, in the app's
+            // group: launchd starts it first (`MacTmuxService`). Only for the app's own panes,
+            // which name no tmux; a test names one and never reaches the real server.
+            if requestedTmux == nil {
+                MacTmuxService.ensureDefaultServer(tmux: tmux, environment: launch.environmentVariables)
+            }
             return SwiftTermLocalProcessConfiguration(
                 executable: tmux,
                 arguments: MacLocalTmux.arguments(session: tmuxSession, directory: launch.directory) + launch.command,

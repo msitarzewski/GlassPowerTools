@@ -59,7 +59,11 @@ enum MacLocalTmux {
                 MacLocalTmux.scrollQueue.async { _ = MacLocalTmux.run(tmux, arguments) }
             },
             history: { name, tmux in MacLocalTmux.run(tmux, TerminalTmux.historyArguments(session: name)) },
-            claim: { candidates, launch, tmux in MacLocalTmux.claim(candidates, launch: launch, tmux: tmux) },
+            claim: { candidates, launch, tmux in
+                // The server under launchd, so no app's Force Quit can end it (`MacTmuxService`).
+                MacTmuxService.ensureDefaultServer(tmux: tmux, environment: launch.environmentVariables)
+                return MacLocalTmux.claim(candidates, launch: launch, tmux: tmux)
+            },
             setGivenName: { session, name, tmux in
                 guard let arguments = TerminalTmux.givenNameArguments(session: session, name: name) else { return }
                 // Argv, never a shell: the name is whatever someone typed.
