@@ -45,6 +45,32 @@ public enum GlassDesktopRetinaDisplays: String, Codable, CaseIterable, Sendable 
     }
 }
 
+/// How a Mac shares its screen: its own displays over RFB, or High Performance — a virtual display
+/// of the window's size, its picture as HEVC and its sound over the media stream, as Apple's own
+/// Screen Sharing offers it (`VNCHighPerformance`). A VNC session to a Mac acts on it when it
+/// connects; every other session ignores it.
+public enum GlassDesktopMacScreenSharing: String, Codable, CaseIterable, Sendable {
+    case standard
+    case highPerformance
+
+    public var title: String {
+        switch self {
+        case .standard: "Standard"
+        case .highPerformance: "High Performance (Experimental)"
+        }
+    }
+}
+
+/// What a High Performance session is doing.
+public enum GlassDesktopHighPerformanceStatus: Sendable, Equatable {
+    /// The Mac cannot, or this connection cannot ask; its own displays are shown instead.
+    case unavailable(String)
+    case starting
+    case streaming
+    /// The display changed and the stream is starting again.
+    case restarting
+}
+
 /// A rectangle of the remote framebuffer, in its pixels.
 public struct GlassRemoteRegion: Sendable, Hashable {
     public let x: Int

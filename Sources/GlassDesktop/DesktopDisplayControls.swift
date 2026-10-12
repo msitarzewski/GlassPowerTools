@@ -50,6 +50,16 @@ enum DesktopLinkReadout {
         return "\(duration(seconds)), \(duration(queued)) of it waiting in the network"
     }
 
+    /// What a High Performance session is doing, in a word or the Mac's reason.
+    static func highPerformance(_ status: GlassDesktopHighPerformanceStatus) -> String {
+        switch status {
+        case .unavailable(let reason): "Not available: \(reason)"
+        case .starting: "Starting…"
+        case .streaming: "Streaming"
+        case .restarting: "Restarting after a display change…"
+        }
+    }
+
     /// A Mac's picture size as a fraction of its own: "75%", "100%".
     static func scale(_ factor: Double) -> String {
         "\(Int((factor * 100).rounded()))%"
@@ -198,6 +208,17 @@ struct DesktopConnectionSettingsSections: View {
                     }
                     .accessibilityIdentifier("desktop-window-retina")
                 }
+                GlassWindowSettingRow(DesktopWindowSettings.macScreenSharing, overrides: $primary.windowSettings,
+                                      global: defaults.macScreenSharing, inheritsFrom: DesktopWindowSettingsView.allDesktops) { value in
+                    Picker(DesktopWindowSettings.macScreenSharing.title, selection: value) {
+                        ForEach(GlassDesktopMacScreenSharing.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                    .accessibilityIdentifier("desktop-window-mac-screen-sharing")
+                }
+                if let status = session.highPerformanceStatus {
+                    LabeledContent("High Performance", value: DesktopLinkReadout.highPerformance(status))
+                        .accessibilityIdentifier("desktop-window-high-performance")
+                }
                 if let statistics = session.linkStatistics {
                     LabeledContent("Receiving", value: DesktopLinkReadout.rate(bytesPerSecond: statistics.bytesPerSecond))
                     LabeledContent("Updates", value: DesktopLinkReadout.updates(statistics.updatesPerSecond))
@@ -223,7 +244,7 @@ struct DesktopConnectionSettingsSections: View {
             } header: {
                 Text("Quality")
             } footer: {
-                Text("The figures are what the network carries now, updated every second. \(Self.qualityFooter) \(Self.retinaFooter)")
+                Text("The figures are what the network carries now, updated every second. \(Self.qualityFooter) \(Self.retinaFooter) \(Self.macScreenSharingFooter)")
             }
             .accessibilityIdentifier("desktop-window-readout")
             // W38: what each window of this desktop is being sent, and over which connection.
@@ -274,6 +295,7 @@ struct DesktopConnectionSettingsSections: View {
         return line
     }
 
+    static let macScreenSharingFooter = "High Performance is a Mac's own fast mode, as Apple's Screen Sharing offers it: the Mac moves its windows to a virtual display the size of this window and sends it as video with its sound, and stops playing sound itself meanwhile. It needs macOS 14 or later on Apple silicon, the Mac's own account, and UDP between this device and the Mac (ports 5900 and 5901). The Mac adapts the video between 20 and 60 Mbit/s; Data Saver holds it to 8 and Lowest to 3. It applies when the desktop next connects."
     static let retinaFooter = "Retina Displays is for a Mac. At 1x a Retina display arrives at one pixel per point, a quarter of its own pixels, and Quality's own reduction comes on top. A Mac sends one scale at a time, so while a Retina display and a 1x display are both on screen, each arrives at its own pixels, as Apple's Screen Sharing shows them. Native 2x always sends a Retina display's own pixels."
 
     static let qualityFooter = "Automatic measures the connection and moves between the levels as it changes: down when the link is slow, or when the picture arrives late — data waiting in the network, as on a phone's hotspot. Best is lossless, full color. Balanced is full color, with JPEG for photos where the computer offers it. Data Saver sends thousands of colors at up to 15 updates a second; Lowest compresses hardest at up to 8, with 256 colors where the computer sends no JPEG. A Mac sends its changes as they happen at every level, in thousands of colors at the least, and a smaller picture at Data Saver (75% of its size) and Lowest (50%); Scale shows the size it is sending. On a Mac, Best and Balanced are the same. Quality is the connection's, so it applies to every window of this desktop. Zooming or shrinking the picture here does not change what the network carries."

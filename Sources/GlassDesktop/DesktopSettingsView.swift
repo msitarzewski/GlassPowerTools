@@ -50,13 +50,18 @@ struct DesktopAllDesktopsStorage: DynamicProperty {
     @AppStorage(DesktopPreferenceKey.displays, store: GlassUITestRun.settingsDefaults) var displays = ""
     @AppStorage(DesktopPreferenceKey.retina, store: GlassUITestRun.settingsDefaults) var retina = ""
     @AppStorage(DesktopPreferenceKey.keepProportions, store: GlassUITestRun.settingsDefaults) var keepProportions = true
+    @AppStorage(DesktopPreferenceKey.macScreenSharing, store: GlassUITestRun.settingsDefaults) var macScreenSharing = ""
 
     /// What is stored, kept in range.
     var defaults: DesktopDefaults {
         DesktopDefaults(storedOpacity: opacity, frost: frost, backgroundRemoval: backgroundRemoval,
                         red: red, green: green, blue: blue, tolerance: tolerance, edgeSoftness: edgeSoftness,
                         detail: detail, pointer: pointer, quality: quality, displays: displays,
-                        retina: retina, keepProportions: keepProportions)
+                        retina: retina, keepProportions: keepProportions, macScreenSharing: macScreenSharing)
+    }
+
+    var macScreenSharingMode: Binding<GlassDesktopMacScreenSharing> {
+        Binding(get: { defaults.macScreenSharing }, set: { macScreenSharing = $0.rawValue })
     }
 
     var retinaDisplays: Binding<GlassDesktopRetinaDisplays> {
@@ -162,10 +167,14 @@ public struct DesktopSettingsView: View {
                     ForEach(GlassDesktopRetinaDisplays.allCases, id: \.self) { Text($0.title).tag($0) }
                 }
                 .accessibilityIdentifier("display.retina")
+                Picker(DesktopWindowSettings.macScreenSharing.title, selection: allDesktops.macScreenSharingMode) {
+                    ForEach(GlassDesktopMacScreenSharing.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                .accessibilityIdentifier("display.mac-screen-sharing")
             } header: {
                 Text("Screen Sharing (VNC)")
             } footer: {
-                Text("\(DesktopConnectionSettingsSections.qualityFooter) Display Windows is for a computer with several displays: one window showing them, or a window for each, opened when it connects. \(DesktopConnectionSettingsSections.retinaFooter)")
+                Text("\(DesktopConnectionSettingsSections.qualityFooter) Display Windows is for a computer with several displays: one window showing them, or a window for each, opened when it connects. \(DesktopConnectionSettingsSections.retinaFooter) \(DesktopConnectionSettingsSections.macScreenSharingFooter)")
             }
             if DesktopWindowSettings.offersTouchPointer {
                 Section {

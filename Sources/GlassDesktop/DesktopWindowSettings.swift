@@ -58,6 +58,7 @@ extension DesktopPointerMode: GlassWindowSettingValue {}
 extension GlassDesktopStreamQuality: GlassWindowSettingValue {}
 extension DesktopDisplayWindows: GlassWindowSettingValue {}
 extension GlassDesktopRetinaDisplays: GlassWindowSettingValue {}
+extension GlassDesktopMacScreenSharing: GlassWindowSettingValue {}
 
 // MARK: - The settings a desktop window can keep
 
@@ -97,13 +98,17 @@ nonisolated enum DesktopWindowSettings {
     /// A Mac's Retina displays at 1x or at their own pixels (W38). The connection's, like Quality, so
     /// the desktop's own window's.
     static let retina = GlassWindowSetting<GlassDesktopRetinaDisplays>.choice("desktop.retina", title: "Retina Displays")
+    /// A Mac's own displays, or High Performance's virtual display (2026-10-11). The connection's,
+    /// taken when it opens, so the desktop's own window's.
+    static let macScreenSharing = GlassWindowSetting<GlassDesktopMacScreenSharing>.choice("desktop.macScreenSharing",
+                                                                                          title: "Mac Screen Sharing")
     /// The window resizes only in the shape of the remote display it shows (W38; the owner,
     /// 2026-10-11: "we need a way to lock the dimensions to the actual screen ratio"). Each window's.
     static let keepProportions = GlassWindowSetting<Bool>("desktop.keepProportions", title: "Keep Display Proportions")
 
     static var keys: Set<String> {
         [opacity.key, frost.key, backgroundRemoval.key, keyColor.key, tolerance.key, edgeSoftness.key,
-         detail.key, pointer.key, quality.key, displays.key, retina.key, keepProportions.key]
+         detail.key, pointer.key, quality.key, displays.key, retina.key, keepProportions.key, macScreenSharing.key]
     }
 
     /// Where Opacity and Glass apply: a see-through window, on the Mac and the headset.
@@ -175,6 +180,8 @@ enum DesktopPreferenceKey {
     static let displays = "display.screens.windows"
     /// W38: what a Mac's Retina displays are sent at; empty for 1x.
     static let retina = "display.stream.retina"
+    /// A Mac's own displays or High Performance; empty for Standard.
+    static let macScreenSharing = "display.stream.macScreenSharing"
     /// W38: whether a desktop window keeps its display's shape.
     static let keepProportions = "display.window.proportions"
 }
@@ -202,6 +209,8 @@ struct DesktopDefaults: Equatable, Sendable {
     var displays: DesktopDisplayWindows?
     /// A Mac's Retina displays at 1x unless chosen otherwise (W38).
     var retina: GlassDesktopRetinaDisplays = .oneX
+    /// A Mac's own displays unless chosen otherwise.
+    var macScreenSharing: GlassDesktopMacScreenSharing = .standard
     /// Windows keep their display's shape unless turned off (W38).
     var keepProportions = true
 
@@ -211,8 +220,9 @@ struct DesktopDefaults: Equatable, Sendable {
     /// out of range, and an unknown choice is the standard one.
     init(storedOpacity: Double, frost: Double, backgroundRemoval: String, red: Double, green: Double, blue: Double,
          tolerance: Double, edgeSoftness: Double, detail: String, pointer: String, quality: String = "",
-         displays: String = "", retina: String = "", keepProportions: Bool = true) {
+         displays: String = "", retina: String = "", keepProportions: Bool = true, macScreenSharing: String = "") {
         self.quality = GlassDesktopStreamQuality(rawValue: quality) ?? .automatic
+        self.macScreenSharing = GlassDesktopMacScreenSharing(rawValue: macScreenSharing) ?? .standard
         self.displays = DesktopDisplayWindows(rawValue: displays)
         self.retina = GlassDesktopRetinaDisplays(rawValue: retina) ?? .oneX
         self.keepProportions = keepProportions
@@ -259,6 +269,8 @@ struct DesktopWindowProfile: Equatable {
     let displays: DesktopDisplayWindows
     /// The connection's, from the desktop's own window (W38).
     let retina: GlassDesktopRetinaDisplays
+    /// The connection's, from the desktop's own window, taken when it opens.
+    let macScreenSharing: GlassDesktopMacScreenSharing
     /// This window's (W38).
     let keepProportions: Bool
 
@@ -291,6 +303,7 @@ struct DesktopWindowProfile: Equatable {
         self.quality = window.value(of: DesktopWindowSettings.quality, over: defaults.quality)
         self.displays = window.value(of: DesktopWindowSettings.displays, over: defaults.resolvedDisplays)
         self.retina = window.value(of: DesktopWindowSettings.retina, over: defaults.retina)
+        self.macScreenSharing = window.value(of: DesktopWindowSettings.macScreenSharing, over: defaults.macScreenSharing)
         self.keepProportions = window.value(of: DesktopWindowSettings.keepProportions, over: defaults.keepProportions)
     }
 
@@ -323,6 +336,7 @@ extension DesktopSessionModel {
         if streamQuality != profile.quality { streamQuality = profile.quality }
         if displayWindows != profile.displays { displayWindows = profile.displays }
         if retinaDisplays != profile.retina { retinaDisplays = profile.retina }
+        if macScreenSharing != profile.macScreenSharing { macScreenSharing = profile.macScreenSharing }
     }
 }
 

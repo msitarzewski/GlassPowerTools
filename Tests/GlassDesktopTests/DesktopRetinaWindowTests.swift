@@ -329,4 +329,43 @@ struct DesktopRetinaWindowTests {
         #expect(DesktopWindowSettings.keys.contains("desktop.retina") && DesktopWindowSettings.keys.contains("desktop.keepProportions"))
         session.close()
     }
+
+    @Test("High Performance is the connection's, from the desktop's window, and asks for the window's size at its density")
+    func highPerformance() async throws {
+        let fixture = try Fixture()
+        defer { fixture.clean() }
+        let session = try await fixture.connected(app: await fixture.launch())
+        #expect(session.highPerformanceRequest() == nil, "Standard unless chosen")
+        var window = GlassWindowOverrides()
+        window[DesktopWindowSettings.macScreenSharing] = .highPerformance
+        let profile = DesktopWindowProfile(window: window, defaults: .standard, reduceTransparency: false)
+        let second = session.displayViewport(for: 1)
+        session.attach(second)
+        session.apply(profile, to: second)
+        #expect(session.macScreenSharing == .standard, "a display window cannot change the connection")
+        session.apply(profile, to: session.primaryViewport)
+        #expect(session.macScreenSharing == .highPerformance)
+        #expect(session.highPerformanceRequest() == GlassVNCHighPerformance(width: 1920, height: 1080, density: 1),
+                "no window size yet: 1920 × 1080")
+        session.resize(width: 1366.4, height: 800, displayScale: 2)
+        #expect(session.highPerformanceRequest() == GlassVNCHighPerformance(width: 1366, height: 800, density: 2))
+        session.resize(width: 300, height: 200, displayScale: 1)
+        #expect(session.highPerformanceRequest() == GlassVNCHighPerformance(width: 640, height: 480, density: 1), "at least 640 × 480")
+        session.streamQuality = .dataSaver
+        #expect(session.highPerformanceRequest()?.bitrateCap == 8_000_000)
+        session.streamQuality = .lowest
+        #expect(session.highPerformanceRequest()?.bitrateCap == 3_000_000)
+        session.streamQuality = .best
+        #expect(session.highPerformanceRequest()?.bitrateCap == nil, "the Mac's own rate controller")
+        let stored = DesktopDefaults(storedOpacity: 1, frost: 0, backgroundRemoval: "", red: 1, green: 0, blue: 1, tolerance: 0,
+                                     edgeSoftness: 0, detail: "", pointer: "", macScreenSharing: "highPerformance")
+        #expect(stored.macScreenSharing == .highPerformance && DesktopDefaults.standard.macScreenSharing == .standard)
+        #expect(DesktopWindowSettings.keys.contains("desktop.macScreenSharing"))
+        // Its status reaches the window while the session runs, and goes with it.
+        await session.receive(.highPerformance(.streaming), attempt: session.attemptID, connection: fixture.connection)
+        #expect(session.highPerformanceStatus == .streaming)
+        #expect(DesktopLinkReadout.highPerformance(.unavailable("No.")) == "Not available: No.")
+        session.close()
+        #expect(session.highPerformanceStatus == nil)
+    }
 }

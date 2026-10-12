@@ -121,6 +121,11 @@ public final class DesktopSessionModel {
             updateDisplayConnections()
         }
     }
+    /// How a Mac shares its screen, from the desktop's own window's settings: taken when the
+    /// connection opens, since High Performance makes the Mac a virtual display of the window's size.
+    public var macScreenSharing = GlassDesktopMacScreenSharing.standard
+    /// What a High Performance session is doing; nil in Standard mode.
+    public private(set) var highPerformanceStatus: GlassDesktopHighPerformanceStatus?
     /// Display windows' own connections (W38), by window (`DesktopViewport.id`): where a Mac's
     /// displays are of mixed density, each display window that shows one display fetches it on a
     /// connection of its own, at that display's 1x (`DesktopDisplayConnection`).
@@ -672,7 +677,8 @@ public final class DesktopSessionModel {
         case .vnc:
             guard !password.isEmpty else { throw RDPCredentialValidationError.missingUsernameOrPassword }
             configuration = .vnc(GlassVNCConfiguration(host: value.host, port: value.port, username: account,
-                                                       password: password, clipboardEnabled: value.clipboardEnabled))
+                                                       password: password, clipboardEnabled: value.clipboardEnabled,
+                                                       highPerformance: highPerformanceRequest()))
         }
         attemptCredential = AttemptCredential(attemptID: attempt.id, connection: value,
             credential: RDPCredential(username: account.isEmpty ? DesktopConnection.passwordOnlyAccount : account,
@@ -851,6 +857,21 @@ public final class DesktopSessionModel {
         scheduleResize(size, matchingWindow: true, delay: .milliseconds(250))
     }
 
+    /// What a High Performance connection asks the Mac for: a virtual display the window's size in
+    /// points, at this screen's density, its encoder capped at Data Saver and Lowest — the Mac's own
+    /// rate controller otherwise moves between 20 and 60 Mbit/s.
+    func highPerformanceRequest() -> GlassVNCHighPerformance? {
+        guard macScreenSharing == .highPerformance else { return nil }
+        let points = windowPoints ?? (1920, 1080)
+        let cap: UInt64? = switch streamQuality {
+        case .dataSaver: 8_000_000
+        case .lowest: 3_000_000
+        case .automatic, .best, .balanced: nil
+        }
+        return GlassVNCHighPerformance(width: max(640, Int(points.width.rounded())), height: max(480, Int(points.height.rounded())),
+                                       density: displayScale >= 1.5 ? 2 : 1, bitrateCap: cap)
+    }
+
     /// The remote size for this window at the chosen scale. Falls back to the window's own size when
     /// the scaled request would exceed the supported bounds.
     private func scaledWindowSize(width: Double, height: Double) -> DesktopSize {
@@ -1006,6 +1027,7 @@ public final class DesktopSessionModel {
         closeDisplayConnections()
         screens = []; selectedScreenID = nil
         linkStatistics = nil; displayWindowRequests = []; appliedDisplayWindows = false
+        highPerformanceStatus = nil
         cursor = .systemDefault; cursorBitmap = nil; cursorImage = nil
         pointerPosition = nil; cursorVisible = true
         lastRequestedSize = nil
@@ -1083,8 +1105,12 @@ public final class DesktopSessionModel {
         case .linkStatistics(let value):
             if isConnected { linkStatistics = value }
         case .clipboard(let value): if isConnected, snapshot.clipboardEnabled { remoteClipboard = value }
+        case .highPerformance(let value):
+            if isConnected || state == .connecting { highPerformanceStatus = value }
         case .audio(let sample):
-            guard isConnected, snapshot.audioEnabled else { return }
+            // A Mac in High Performance mutes its own output and sends its sound here, as Apple's
+            // Screen Sharing plays it: VNC sends sound only then.
+            guard isConnected, snapshot.audioEnabled || connection.protocol == .vnc else { return }
             do { try audio.play(sample) } catch { errorMessage = error.localizedDescription }
         }
     }

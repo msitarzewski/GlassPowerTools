@@ -14,11 +14,33 @@ public struct GlassVNCConfiguration: Sendable, Equatable {
     /// A Mac's display this connection shows alone, its own pixels the whole framebuffer
     /// (`SetDisplay`): a display window's own connection (W38). Nil shows them all, as a Mac sends them.
     public var display: UInt32?
+    /// A Mac's High Performance mode: a virtual display of this size, its picture and sound over the
+    /// media stream. Nil, or a Mac that cannot, shows the Mac's own displays.
+    public var highPerformance: GlassVNCHighPerformance?
 
     public init(host: String, port: UInt16 = 5900, username: String = "", password: String, clipboardEnabled: Bool = false,
-                display: UInt32? = nil) {
+                display: UInt32? = nil, highPerformance: GlassVNCHighPerformance? = nil) {
         self.host = host; self.port = port; self.username = username; self.password = password
-        self.clipboardEnabled = clipboardEnabled; self.display = display
+        self.clipboardEnabled = clipboardEnabled; self.display = display; self.highPerformance = highPerformance
+    }
+}
+
+/// What a High Performance connection asks a Mac for (`VNCHighPerformance`).
+public struct GlassVNCHighPerformance: Sendable, Equatable {
+    /// The virtual display, in points.
+    public var width: Int
+    public var height: Int
+    /// 2 for a Retina display, else 1.
+    public var density: Double
+    /// Caps the Mac's encoder, in bits a second; nil leaves Apple's rate controller its 20–60 Mbit/s.
+    public var bitrateCap: UInt64?
+
+    public init(width: Int, height: Int, density: Double, bitrateCap: UInt64? = nil) {
+        self.width = width; self.height = height; self.density = density; self.bitrateCap = bitrateCap
+    }
+
+    var request: VNCHighPerformance {
+        VNCHighPerformance(width: width, height: height, density: density, bitrates: bitrateCap.map(VNCHighPerformance.capped(at:)))
     }
 }
 
@@ -126,6 +148,13 @@ public actor GlassVNCSession: GlassDesktopTransport {
         callbacks.cutText = { eventSink.yield(.clipboard(GlassClipboardContent(text: $0))) }
         callbacks.screens = { eventSink.yield(.screens(Self.remoteScreens($0))) }
         callbacks.statistics = { eventSink.yield(.linkStatistics(Self.statistics($0))) }
+        callbacks.highPerformance = { eventSink.yield(.highPerformance(Self.status($0))) }
+        let sound = RFBAppleSoundDecoder.make()
+        callbacks.mediaSound = { unit in
+            guard let sound, let pcm = sound.decode(unit) else { return }
+            eventSink.yield(.audio(GlassRDPAudioSample(sampleRate: RFBAppleSoundDecoder.sampleRate,
+                                                       channels: RFBAppleSoundDecoder.channels, data: pcm)))
+        }
         let client = try makeClient(VNCConfiguration(host: host, port: configuration.port, username: configuration.username,
                                                      password: configuration.password, sharedSession: true,
                                                      clipboardEnabled: configuration.clipboardEnabled,
@@ -133,7 +162,8 @@ public actor GlassVNCSession: GlassDesktopTransport {
                                                      allowsServerScaling: asksToScale,
                                                      requestsAppleCursor: asksForCursor,
                                                      display: configuration.display,
-                                                     appleProtocol: speaksApple), callbacks)
+                                                     appleProtocol: speaksApple,
+                                                     highPerformance: configuration.highPerformance?.request), callbacks)
         client.setQuality(Self.quality(quality))
         client.setDensityScaling(retina == .oneX)
         client.setRequestedRegions(Self.rectangles(regions))
@@ -405,6 +435,15 @@ public actor GlassVNCSession: GlassDesktopTransport {
                   $0.x <= RFBLimits.maximumDimension, $0.y <= RFBLimits.maximumDimension else { return nil }
             return RFBRectangle(x: $0.x, y: $0.y, width: min($0.width, RFBLimits.maximumDimension),
                                 height: min($0.height, RFBLimits.maximumDimension))
+        }
+    }
+
+    static func status(_ value: VNCHighPerformanceStatus) -> GlassDesktopHighPerformanceStatus {
+        switch value {
+        case .unavailable(let reason): .unavailable(reason)
+        case .starting: .starting
+        case .streaming: .streaming
+        case .restarting: .restarting
         }
     }
 

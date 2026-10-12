@@ -391,6 +391,19 @@ struct AppleLayoutFallbackTests {
         #expect(asked.configurations.map(\.allowsServerScaling) == [true, true])
     }
 
+    @Test func highPerformanceReachesTheClientAndItsStatusTheApp() async throws {
+        let asked = Asked()
+        let first = session(macGreeting(width: 2, height: 2), asked: asked)
+        let wanted = GlassVNCHighPerformance(width: 1280, height: 800, density: 2, bitrateCap: 8_000_000)
+        try await first.connect(GlassVNCConfiguration(host: "mac.example", password: "pw", highPerformance: wanted))
+        for await event in first.events where event == .state(.connected) { break }
+        await first.disconnect()
+        #expect(asked.configurations.first?.highPerformance
+                == VNCHighPerformance(width: 1280, height: 800, density: 2, bitrates: VNCHighPerformance.capped(at: 8_000_000)))
+        #expect(GlassVNCSession.status(.unavailable("No.")) == .unavailable("No."))
+        #expect(GlassVNCSession.status(.streaming) == .streaming && GlassVNCSession.status(.restarting) == .restarting)
+    }
+
     @Test func aRefusalForAWhileEnds() {
         final class Clock: @unchecked Sendable { var now = ContinuousClock.now }
         let clock = Clock()

@@ -130,7 +130,12 @@ public enum GlassRDPCursor: Sendable, Equatable {
 public struct GlassRDPAudioSample: Sendable, Equatable {
     public let sampleRate: Double
     public let channels: Int
+    /// Interleaved 16-bit little-endian PCM.
     public let data: Data
+
+    public init(sampleRate: Double, channels: Int, data: Data) {
+        self.sampleRate = sampleRate; self.channels = channels; self.data = data
+    }
 }
 
 /// One copy, in every form the source had (D42a): text, and where present HTML, RTF and an image as
@@ -161,6 +166,8 @@ public enum GlassRDPEvent: Sendable, Equatable {
     case screens([GlassRemoteScreen])
     /// What the link is doing, about once a second (VNC).
     case linkStatistics(GlassDesktopLinkStatistics)
+    /// What a Mac's High Performance session is doing (VNC).
+    case highPerformance(GlassDesktopHighPerformanceStatus)
 }
 
 public enum GlassRDPError: Error, Sendable, Equatable, LocalizedError {
