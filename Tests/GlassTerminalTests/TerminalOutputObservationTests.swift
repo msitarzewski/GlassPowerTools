@@ -46,9 +46,10 @@ struct TerminalOutputObservationTests {
     func settledOncePerBurst() async throws {
         let session = makeSession()
         session.outputSettleDelay = .milliseconds(400)
+        // One burst, fed without a pause: 10 ms sleeps between lines stretched past the settle
+        // delay when a full run kept the main actor busy, and the burst was announced twice.
         for index in 0..<10 {
             session.feedTerminalData(Data("line \(index)\r\n".utf8))
-            try await Task.sleep(for: .milliseconds(10))
         }
         #expect(session.outputSettledNonce == 0)
         for _ in 0..<200 where session.outputSettledNonce == 0 { try await Task.sleep(for: .milliseconds(10)) }
