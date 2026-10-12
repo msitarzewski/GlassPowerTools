@@ -77,6 +77,9 @@ public final class VNCClient: Sendable {
     /// Under `source` and `sink`: the bytes as they come until a Mac's rekey, then its record layer.
     private let records: RFBAppleRecordLayer
     private let closeAction: @Sendable () async -> Void
+    /// The transport's round trip, read every couple of seconds for Automatic; nil for a source
+    /// that has none.
+    private let roundTrip: (@Sendable () async -> RFBTransportRoundTrip?)?
     private let state = ClientState()
     /// What to ask the server for, and when (`VNCStreaming.swift`).
     private let planner = RFBStreamPlanner()
@@ -89,14 +92,17 @@ public final class VNCClient: Sendable {
     public convenience init(configuration: VNCConfiguration, callbacks: VNCClientCallbacks) throws {
         let channel = try RFBNetworkChannel(host: configuration.host, port: configuration.port)
         self.init(configuration: configuration, callbacks: callbacks, source: channel, sink: channel,
-                  open: { try await channel.open() }, close: { await channel.close() })
+                  open: { try await channel.open() }, close: { await channel.close() },
+                  roundTrip: { await channel.roundTrip() })
     }
 
     public init(configuration: VNCConfiguration, callbacks: VNCClientCallbacks, source: any RFBByteSource,
                 sink: any RFBByteSink, open: @escaping @Sendable () async throws -> Void = {},
-                close: @escaping @Sendable () async -> Void = {}) {
+                close: @escaping @Sendable () async -> Void = {},
+                roundTrip: (@Sendable () async -> RFBTransportRoundTrip?)? = nil) {
         self.configuration = configuration
         self.callbacks = callbacks
+        self.roundTrip = roundTrip
         let records = RFBAppleRecordLayer(source: source, sink: sink)
         self.records = records
         self.source = RFBCountingByteSource(records)
@@ -280,13 +286,16 @@ public final class VNCClient: Sendable {
                             value.map { String(format: "%.1f", Double($0.components.seconds) + Double($0.components.attoseconds) / 1e18) } ?? "-"
                         }
                         let area = self.planner.requestedArea.map { "\($0.x),\($0.y),\($0.width)x\($0.height)" } ?? "none"
+                        let late = self.planner.lateness
+                        func milliseconds(_ value: Double?) -> String { value.map { String(Int(($0 * 1000).rounded())) } ?? "-" }
                         let painted = self.state.takePainted().sorted { $0.key < $1.key }.map { "\($0.key):\($0.value)" }.joined(separator: ",")
                         VNCDiagnostics.record(category: "client", "event=flow connection=\(self.configuration.display.map { "display-\($0)" } ?? "desktop") "
                             + "updates=\(counts.updates - last.updates) frames=\(counts.frames - last.frames) "
                             + "rects=\(counts.rectangles - last.rectangles) bytes=\(bytes - last.bytes) "
                             + "outstanding=\(flow.outstanding) sinceRequest=\(seconds(flow.sinceRequest)) waiting=\(seconds(flow.waiting)) "
                             + "requested=\(area) scale=\(self.planner.serverScaleInForce) sending=\(self.planner.currentDisplay.map(String.init) ?? "all") "
-                            + "painted=\(painted.isEmpty ? "none" : painted) lit=\(self.state.content ?? "unknown")")
+                            + "painted=\(painted.isEmpty ? "none" : painted) lit=\(self.state.content ?? "unknown") "
+                            + "level=\(late.level.rawValue) roundTripMs=\(milliseconds(late.roundTrip)) queuedMs=\(milliseconds(late.queued))")
                         last = (counts.updates, counts.frames, counts.rectangles, bytes)
                     }
                     // A Mac that does not answer may send nothing at all: looked at here, not only
@@ -297,6 +306,19 @@ public final class VNCClient: Sendable {
                     }
                 }
             })
+            // A loop of its own, so a report that never comes back stops only this.
+            if let roundTrip {
+                streaming.append(Task { [weak self] in
+                    while !Task.isCancelled {
+                        try? await Task.sleep(for: Self.roundTripInterval)
+                        guard !Task.isCancelled else { return }
+                        guard let reading = await roundTrip() else { continue }
+                        guard let self else { return }
+                        self.planner.roundTripMeasured(reading, at: .now)
+                        self.pump()
+                    }
+                })
+            }
             state.setReady(true)
             callbacks.connected(info)
             try await updateLoop(framebuffer: framebuffer)
@@ -308,6 +330,8 @@ public final class VNCClient: Sendable {
         }
         await finish()
     }
+
+    static let roundTripInterval: Duration = .seconds(2)
 
     static func displayRefusal(_ display: UInt32) -> RFBError {
         .unsupported("The Mac did not send display \(display) on a connection of its own within ten seconds.")

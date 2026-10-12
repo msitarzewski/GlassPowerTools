@@ -40,6 +40,16 @@ enum DesktopLinkReadout {
         statistics.quality == .automatic ? "Automatic: \(statistics.level.title)" : statistics.level.title
     }
 
+    /// The round trip, and the part of it spent waiting in the network when that is noticeable:
+    /// "42 ms", "1.3 s, 1.2 s of it waiting in the network".
+    static func roundTrip(_ seconds: Double, queued: Double?) -> String {
+        func duration(_ value: Double) -> String {
+            value < 1 ? "\(Int((value * 1000).rounded())) ms" : String(format: "%.1f s", value)
+        }
+        guard let queued, queued >= 0.05 else { return duration(seconds) }
+        return "\(duration(seconds)), \(duration(queued)) of it waiting in the network"
+    }
+
     /// A Mac's picture size as a fraction of its own: "75%", "100%".
     static func scale(_ factor: Double) -> String {
         "\(Int((factor * 100).rounded()))%"
@@ -201,6 +211,10 @@ struct DesktopConnectionSettingsSections: View {
                     if let measured = statistics.measuredKilobitsPerSecond {
                         LabeledContent("Measured link", value: DesktopLinkReadout.rate(bytesPerSecond: measured * 1000 / 8))
                     }
+                    if let roundTrip = statistics.roundTrip {
+                        LabeledContent("Round trip", value: DesktopLinkReadout.roundTrip(roundTrip, queued: statistics.queued))
+                            .accessibilityIdentifier("desktop-window-round-trip")
+                    }
                     LabeledContent("Fetching", value: statistics.paused ? "Nothing: no window on screen"
                                    : statistics.regionLimited ? "Only the displays on screen" : "The whole desktop")
                 } else {
@@ -262,7 +276,7 @@ struct DesktopConnectionSettingsSections: View {
 
     static let retinaFooter = "Retina Displays is for a Mac. At 1x a Retina display arrives at one pixel per point, a quarter of its own pixels, and Quality's own reduction comes on top. A Mac sends one scale at a time, so while a Retina display and a 1x display are both on screen, each arrives at its own pixels, as Apple's Screen Sharing shows them. Native 2x always sends a Retina display's own pixels."
 
-    static let qualityFooter = "Automatic measures the connection and moves between the levels as it changes. Best is lossless, full color. Balanced is full color, with JPEG for photos where the computer offers it. Data Saver sends thousands of colors at up to 15 updates a second; Lowest compresses hardest at up to 8, with 256 colors where the computer sends no JPEG. A Mac also sends a smaller picture at Data Saver (75% of its size) and Lowest (50%); Scale shows the size it is sending. Quality is the connection's, so it applies to every window of this desktop. Zooming or shrinking the picture here does not change what the network carries."
+    static let qualityFooter = "Automatic measures the connection and moves between the levels as it changes: down when the link is slow, or when the picture arrives late — data waiting in the network, as on a phone's hotspot. Best is lossless, full color. Balanced is full color, with JPEG for photos where the computer offers it. Data Saver sends thousands of colors at up to 15 updates a second; Lowest compresses hardest at up to 8, with 256 colors where the computer sends no JPEG. A Mac sends its changes as they happen at every level, in thousands of colors at the least, and a smaller picture at Data Saver (75% of its size) and Lowest (50%); Scale shows the size it is sending. On a Mac, Best and Balanced are the same. Quality is the connection's, so it applies to every window of this desktop. Zooming or shrinking the picture here does not change what the network carries."
 }
 
 // MARK: - A display's own window

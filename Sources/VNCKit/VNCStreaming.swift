@@ -107,12 +107,18 @@ public struct VNCLinkStatistics: Sendable, Equatable {
     /// The scale a Mac has confirmed it renders at, from its last display layout; nil for a server
     /// that sends no layout.
     public var serverScale: Double?
+    /// The connection's round trip as its transport last measured it, in seconds; nil before a
+    /// reading, and for a connection that has none.
+    public var roundTrip: Double?
+    /// How much of the round trip is data waiting in the network, in seconds (`RFBRoundTrips`).
+    public var queued: Double?
 
     public init(bytesPerSecond: Double, updatesPerSecond: Double, profile: VNCStreamProfile, quality: VNCQuality,
-                encoding: RFBEncoding?, measuredKilobitsPerSecond: Double?, regionLimited: Bool, paused: Bool,
-                totalBytes: Int, serverScale: Double? = nil) {
+                encoding: RFBEncoding?, measuredKilobitsPerSecond: Double?, roundTrip: Double? = nil, queued: Double? = nil,
+                regionLimited: Bool, paused: Bool, totalBytes: Int, serverScale: Double? = nil) {
         self.bytesPerSecond = bytesPerSecond; self.updatesPerSecond = updatesPerSecond; self.profile = profile
         self.quality = quality; self.encoding = encoding; self.measuredKilobitsPerSecond = measuredKilobitsPerSecond
+        self.roundTrip = roundTrip; self.queued = queued
         self.regionLimited = regionLimited; self.paused = paused; self.totalBytes = totalBytes
         self.serverScale = serverScale
     }
@@ -172,26 +178,64 @@ enum RFBServerDialect: Sendable, Equatable {
 
 // MARK: - The link governor
 
-/// Chooses Automatic's level from how fast update data actually arrives, measured at the connection
-/// for every encoding — so a server that never sends Tight still has its colour depth and update
-/// rate stepped down on a slow link, not only a JPEG quality it ignores.
+/// Chooses Automatic's level from how fast update data arrives and how late it arrives, measured
+/// at the connection for every encoding — so a server that never sends Tight still has its colour
+/// depth and update rate stepped down on a slow link, not only a JPEG quality it ignores.
 ///
-/// A measurement is one update of at least 16 KB: its bytes over the time they took to arrive.
-/// Smaller updates say more about latency than speed and are ignored. Going down takes three
+/// **Speed.** A measurement is one update of at least 16 KB: its bytes over the time they took to
+/// arrive. Smaller updates say more about latency than speed and are ignored. Going down takes three
 /// measurements in a row below the current level; going up takes five in a row at least 25% above
 /// the next level's floor, one level at a time, so a burst does not flip the picture back and forth
-/// and a level that only just fits is not chosen.
+/// and a level that only just fits is not chosen. The floors are TigerVNC's viewer's (16 Mbit/s for
+/// full colour).
+///
+/// **Lateness (2026-10-11).** Speed alone chose the wrong level on a phone's hotspot: a Mac sent
+/// 64–74 Mbit/s, which reads as Best, and the picture ran seconds behind the hand. Two measures
+/// of lateness now count as well:
+/// - An update that takes a quarter of a second or more to arrive is a measurement one level down,
+///   however fast its bytes came: the picture waited that long, and a Mac reads no input while it
+///   sends one (remotex's notes, "Other messages"). Going up also needs the update to have arrived
+///   in time at the next level's size, about two and a half times its bytes.
+/// - Data waiting in the network (`observeQueueing`): the connection's smoothed round trip over
+///   the shortest lately, as TCP Vegas and TigerVNC's server judge congestion by delay over the
+///   base round trip (TigerVNC `common/rfb/Congestion.cxx`). Two readings in a row with 200 ms or
+///   more waiting step down a level; the next reading counts once the queue has had four seconds
+///   to drain; and nothing steps up for thirty seconds after, or while more than 100 ms waits.
 struct RFBLinkQualityGovernor: Sendable {
     /// Never `.automatic`.
     private(set) var level: VNCQuality = .balanced
     private(set) var lastKilobitsPerSecond: Double?
+    /// The highest level worth choosing. Balanced on a Mac, which sends no Tight and so the same
+    /// bytes at Best.
+    var highest: VNCQuality = .best {
+        didSet { if Self.rank(level) > Self.rank(highest) { level = highest } }
+    }
     private var downward: [VNCQuality] = []
     private var upward = 0
+    /// How long data waited in the network at the last reading; nil before one.
+    private var queued: Double?
+    private var lateReadings = 0
+    /// Late readings are not counted before this: the queue a step down left is still draining.
+    private var drainingUntil: ContinuousClock.Instant?
+    /// Nothing steps up before this.
+    private var holdingUntil: ContinuousClock.Instant?
 
     static let minimumBytes = 16 * 1024
     static let measurementsToStepDown = 3
     static let measurementsToStepUp = 5
     static let upwardMargin = 1.25
+    /// An update this late, in seconds, held the picture back.
+    static let slowUpdate = 0.25
+    /// About how many times the bytes the next level up sends for the same picture: a Mac's 16-bit
+    /// colour against its 24 (in ZRLE's three-byte pixels), and three quarters of the size against
+    /// all of it, is 2.7; half against three quarters is 2.25.
+    static let levelCost = 2.5
+    /// Seconds waiting in the network that make a reading late, and that let a level step up.
+    static let congestedQueue = 0.2
+    static let calmQueue = 0.1
+    static let lateReadingsToStepDown = 2
+    static let drainAfterStep: Duration = .seconds(4)
+    static let holdAfterLateStep: Duration = .seconds(30)
 
     /// Tight's JPEG quality at the current level.
     var jpegQuality: Int? { VNCStreamProfile.profile(for: level).jpegQuality }
@@ -212,12 +256,16 @@ struct RFBLinkQualityGovernor: Sendable {
 
     private static func rank(_ level: VNCQuality) -> Int { VNCQuality.ladder.firstIndex(of: level) ?? 2 }
 
+    private static func lower(_ a: VNCQuality, _ b: VNCQuality) -> VNCQuality { rank(a) <= rank(b) ? a : b }
+
     /// One update: its bytes and how long they took to arrive. Returns the new level when it changes.
-    mutating func observe(bytes: Int, seconds: Double) -> VNCQuality? {
+    mutating func observe(bytes: Int, seconds: Double, at now: ContinuousClock.Instant = .now) -> VNCQuality? {
         guard bytes >= Self.minimumBytes, seconds > 0.001, seconds.isFinite else { return nil }
         let rate = Double(bytes) * 8 / 1000 / seconds
         lastKilobitsPerSecond = rate
-        let measured = Self.level(forKilobitsPerSecond: rate), current = Self.rank(level)
+        let current = Self.rank(level)
+        var measured = Self.lower(Self.level(forKilobitsPerSecond: rate), highest)
+        if seconds >= Self.slowUpdate { measured = Self.lower(measured, VNCQuality.ladder[max(0, current - 1)]) }
         if Self.rank(measured) < current {
             upward = 0
             downward.append(measured)
@@ -229,14 +277,61 @@ struct RFBLinkQualityGovernor: Sendable {
             return chosen
         }
         downward = []
-        guard current + 1 < VNCQuality.ladder.count else { upward = 0; return nil }
+        guard current < Self.rank(highest) else { upward = 0; return nil }
         let next = VNCQuality.ladder[current + 1]
-        guard rate >= Self.floor(of: next) * Self.upwardMargin else { upward = 0; return nil }
+        let inTime = seconds * Self.levelCost < Self.slowUpdate
+        let calm = queued.map { $0 < Self.calmQueue } ?? true
+        let held = holdingUntil.map { now < $0 } ?? false
+        guard rate >= Self.floor(of: next) * Self.upwardMargin, inTime, calm, !held else { upward = 0; return nil }
         upward += 1
         guard upward >= Self.measurementsToStepUp else { return nil }
         upward = 0
         level = next
         return next
+    }
+
+    /// How long data waits in the network now, in seconds (`RFBRoundTrips`), every couple of
+    /// seconds. Returns the new level when it changes.
+    mutating func observeQueueing(_ seconds: Double, at now: ContinuousClock.Instant) -> VNCQuality? {
+        guard seconds.isFinite, seconds >= 0 else { return nil }
+        queued = seconds
+        if seconds >= Self.calmQueue { upward = 0 }
+        if let draining = drainingUntil, now < draining { return nil }
+        guard seconds >= Self.congestedQueue else { lateReadings = 0; return nil }
+        lateReadings += 1
+        let current = Self.rank(level)
+        guard lateReadings >= Self.lateReadingsToStepDown, current > 0 else { return nil }
+        lateReadings = 0; downward = []
+        level = VNCQuality.ladder[current - 1]
+        drainingUntil = now + Self.drainAfterStep
+        holdingUntil = now + Self.holdAfterLateStep
+        return level
+    }
+}
+
+/// The connection's round trip as the transport measures it, and how much of it is data waiting in
+/// the network: the smoothed round trip over the shortest of the last two minutes. The shortest
+/// takes the transport's own minimum too, which includes the handshake's, measured before any
+/// picture queued. Two minutes lets a longer route (a hotspot after Wi-Fi, a relay) become the
+/// new base.
+struct RFBRoundTrips: Sendable {
+    private var shortest: [(at: ContinuousClock.Instant, seconds: Double)] = []
+    private(set) var smoothed: Double?
+    private(set) var queued: Double?
+
+    static let baseWindow: Duration = .seconds(120)
+
+    /// Returns how long data waits in the network now, in seconds; nil for a reading with no
+    /// round trip in it.
+    mutating func observe(_ reading: RFBTransportRoundTrip, at now: ContinuousClock.Instant) -> Double? {
+        guard reading.smoothed.isFinite, reading.smoothed > 0 else { return nil }
+        let least = reading.shortest.isFinite && reading.shortest > 0 ? min(reading.shortest, reading.smoothed) : reading.smoothed
+        shortest.append((now, least))
+        shortest.removeAll { now - $0.at > Self.baseWindow }
+        let base = shortest.map(\.seconds).min() ?? least
+        smoothed = reading.smoothed
+        queued = max(0, reading.smoothed - base)
+        return queued
     }
 }
 
@@ -391,6 +486,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
     // The level.
     private var quality: VNCQuality = .automatic
     private var governor = RFBLinkQualityGovernor()
+    private var roundTrips = RFBRoundTrips()
     private var active = VNCStreamProfile.balanced
     private var decoder = RFBPixelDecoder.native
     private var advertisedEncodings: [Int32] = []
@@ -505,6 +601,8 @@ final class RFBStreamPlanner: @unchecked Sendable {
             self.appleDisplayLayout = appleDisplayLayout
             self.serverScaling = serverScaling
             self.appleCursor = appleCursor
+            // A Mac sends no Tight: Best would send it the same bytes as Balanced.
+            governor.highest = dialect == .apple ? .balanced : .best
             startedAt = .now
         }
     }
@@ -663,8 +761,26 @@ final class RFBStreamPlanner: @unchecked Sendable {
             if encodingBytes[RFBEncoding.tight.rawValue] != nil { serverSendsTight = true }
             samples.append(Sample(at: now, changed: changed, encodingBytes: encodingBytes))
             samples.removeAll { now - $0.at > Self.statisticsWindow }
-            if quality == .automatic { _ = governor.observe(bytes: bytes, seconds: seconds) }
+            if quality == .automatic, let level = governor.observe(bytes: bytes, seconds: seconds, at: now) {
+                VNCDiagnostics.note(Self.logger, .default, category: "planner", "event=automatic level=\(level.rawValue) bytes=\(bytes) seconds=\(String(format: "%.3f", seconds))")
+            }
         }
+    }
+
+    /// A reading of the connection's round trip, every couple of seconds: for Automatic and the
+    /// readout.
+    func roundTripMeasured(_ reading: RFBTransportRoundTrip, at now: ContinuousClock.Instant) {
+        lock.withLock {
+            guard let queued = roundTrips.observe(reading, at: now), quality == .automatic,
+                  let level = governor.observeQueueing(queued, at: now) else { return }
+            VNCDiagnostics.note(Self.logger, .default, category: "planner", "event=automatic level=\(level.rawValue) queued=\(String(format: "%.3f", queued)) roundTrip=\(String(format: "%.3f", reading.smoothed))")
+        }
+    }
+
+    /// The round trip and the part of it waiting in the network, in seconds, and the level in
+    /// effect: for the log's flow line.
+    var lateness: (roundTrip: Double?, queued: Double?, level: VNCQuality) {
+        lock.withLock { (roundTrips.smoothed, roundTrips.queued, active.level) }
     }
 
     func currentDecoder() -> RFBPixelDecoder { lock.withLock { decoder } }
@@ -948,6 +1064,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
                 updatesPerSecond: Double(samples.filter(\.changed).count) / window,
                 profile: active, quality: quality, encoding: dominant,
                 measuredKilobitsPerSecond: governor.lastKilobitsPerSecond,
+                roundTrip: roundTrips.smoothed, queued: roundTrips.queued,
                 regionLimited: regions != nil && !(rectangle.map { $0.width == width && $0.height == height } ?? false),
                 paused: regions?.isEmpty == true,
                 totalBytes: totalBytes,

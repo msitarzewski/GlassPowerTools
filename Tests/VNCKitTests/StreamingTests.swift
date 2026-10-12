@@ -346,22 +346,114 @@ struct AutomaticQualityTests {
     func hysteresis() {
         var governor = RFBLinkQualityGovernor()
         #expect(governor.level == .balanced && governor.jpegQuality == 8)
-        // 100 KB in a second: 800 kbit/s, Data Saver.
-        #expect(governor.observe(bytes: 100_000, seconds: 1) == nil)
-        #expect(governor.observe(bytes: 100_000, seconds: 1) == nil)
-        #expect(governor.observe(bytes: 100_000, seconds: 1) == .dataSaver)
+        // 20 KB in a fifth of a second: 800 kbit/s, Data Saver.
+        #expect(governor.observe(bytes: 20_000, seconds: 0.2) == nil)
+        #expect(governor.observe(bytes: 20_000, seconds: 0.2) == nil)
+        #expect(governor.observe(bytes: 20_000, seconds: 0.2) == .dataSaver)
         // One fast burst does not flip it back, and an interrupted run starts again.
-        #expect(governor.observe(bytes: 1_000_000, seconds: 1) == nil)
-        #expect(governor.observe(bytes: 300_000, seconds: 1) == nil)
+        #expect(governor.observe(bytes: 100_000, seconds: 0.1) == nil)
+        #expect(governor.observe(bytes: 30_000, seconds: 0.1) == nil)
         #expect(governor.level == .dataSaver)
         // 4 Mbit/s is Balanced's floor, but not 25% above it: no step.
-        for _ in 0..<6 { #expect(governor.observe(bytes: 500_000, seconds: 1) == nil) }
+        for _ in 0..<6 { #expect(governor.observe(bytes: 40_000, seconds: 0.08) == nil) }
         // 6 Mbit/s, five times: one level up, not two.
-        for _ in 0..<4 { #expect(governor.observe(bytes: 750_000, seconds: 1) == nil) }
-        #expect(governor.observe(bytes: 750_000, seconds: 1) == .balanced)
+        for _ in 0..<4 { #expect(governor.observe(bytes: 60_000, seconds: 0.08) == nil) }
+        #expect(governor.observe(bytes: 60_000, seconds: 0.08) == .balanced)
         // A very slow link drops straight to Lowest.
         for _ in 0..<2 { _ = governor.observe(bytes: 20_000, seconds: 1) }
         #expect(governor.observe(bytes: 20_000, seconds: 1) == .lowest)
+    }
+
+    @Test("an update that arrives late steps down however fast its bytes came")
+    func lateUpdates() {
+        var governor = RFBLinkQualityGovernor()
+        // 3 MB in 0.3 s is 80 Mbit/s, Best's by speed; the picture still waited 0.3 s for it, as a
+        // Mac's two displays at full colour did on a phone's hotspot (2026-10-11).
+        #expect(governor.observe(bytes: 3_000_000, seconds: 0.3) == nil)
+        #expect(governor.observe(bytes: 3_000_000, seconds: 0.3) == nil)
+        #expect(governor.observe(bytes: 3_000_000, seconds: 0.3) == .dataSaver)
+        // Up again only once an update would arrive in time at Balanced's size, about 2.5 times
+        // the bytes: 0.12 s would be 0.3 s there.
+        for _ in 0..<10 { #expect(governor.observe(bytes: 1_200_000, seconds: 0.12) == nil) }
+        for _ in 0..<4 { #expect(governor.observe(bytes: 800_000, seconds: 0.08) == nil) }
+        #expect(governor.observe(bytes: 800_000, seconds: 0.08) == .balanced)
+    }
+
+    @Test("data waiting in the network steps down a level at a time, lets the queue drain, and holds")
+    func queueing() {
+        var governor = RFBLinkQualityGovernor()
+        let start = ContinuousClock.now
+        func at(_ seconds: Int) -> ContinuousClock.Instant { start + .seconds(seconds) }
+        #expect(governor.observeQueueing(0.25, at: at(0)) == nil)
+        #expect(governor.observeQueueing(0.05, at: at(2)) == nil, "one late reading, then a calm one: no step")
+        #expect(governor.observeQueueing(0.25, at: at(4)) == nil)
+        #expect(governor.observeQueueing(1.2, at: at(6)) == .dataSaver, "two late readings in a row")
+        #expect(governor.observeQueueing(1.0, at: at(8)) == nil, "the queue is still draining")
+        #expect(governor.observeQueueing(0.8, at: at(10)) == nil)
+        #expect(governor.observeQueueing(0.6, at: at(12)) == .lowest)
+        #expect(governor.observeQueueing(0.6, at: at(16)) == nil)
+        #expect(governor.observeQueueing(0.6, at: at(18)) == nil, "nothing below Lowest")
+        // Fast updates on a calm link do not step up within thirty seconds of a step for lateness.
+        #expect(governor.observeQueueing(0.02, at: at(20)) == nil)
+        for second in 21..<41 { #expect(governor.observe(bytes: 100_000, seconds: 0.02, at: at(second)) == nil) }
+        // Nor while data still waits, though not enough to step down.
+        #expect(governor.observeQueueing(0.15, at: at(43)) == nil)
+        for second in 44..<54 { #expect(governor.observe(bytes: 100_000, seconds: 0.02, at: at(second)) == nil) }
+        #expect(governor.observeQueueing(0.03, at: at(55)) == nil)
+        for second in 56..<60 { #expect(governor.observe(bytes: 100_000, seconds: 0.02, at: at(second)) == nil) }
+        #expect(governor.observe(bytes: 100_000, seconds: 0.02, at: at(60)) == .dataSaver)
+    }
+
+    @Test("on a Mac, Automatic goes no higher than Balanced, which sends it the same bytes as Best")
+    func macCeiling() {
+        var governor = RFBLinkQualityGovernor()
+        governor.highest = .balanced
+        for _ in 0..<10 { #expect(governor.observe(bytes: 500_000, seconds: 0.02) == nil) }
+        #expect(governor.level == .balanced)
+
+        let planner = RFBStreamPlanner()
+        planner.start(width: 100, height: 100, dialect: .apple)
+        _ = planner.openingMessages()
+        for _ in 0..<10 { planner.updateEnded(bytes: 500_000, seconds: 0.02, changed: true, encodingBytes: [:], at: .now) }
+        _ = planner.decide(at: .now) { _ in }
+        #expect(planner.statistics(totalBytes: 0, at: .now).profile.level == .balanced)
+    }
+
+    @Test("the round trip's queue is measured over the shortest of the last two minutes")
+    func roundTrips() {
+        var trips = RFBRoundTrips()
+        let start = ContinuousClock.now
+        #expect(trips.observe(RFBTransportRoundTrip(smoothed: 0, shortest: 0), at: start) == nil, "no sample yet")
+        // The handshake's 40 ms is the base, though every smoothed reading since was queued.
+        #expect(trips.observe(RFBTransportRoundTrip(smoothed: 0.9, shortest: 0.04), at: start) == 0.86)
+        #expect(trips.observe(RFBTransportRoundTrip(smoothed: 1.24, shortest: 0), at: start + .seconds(2)) == 1.2)
+        #expect(trips.smoothed == 1.24)
+        // Two minutes later on a longer route, the old base has gone.
+        #expect(trips.observe(RFBTransportRoundTrip(smoothed: 0.3, shortest: 0.3), at: start + .seconds(130)) == 0)
+    }
+
+    @Test("a planner on Automatic steps down for a queue, and only on Automatic")
+    func plannerQueueing() {
+        let start = ContinuousClock.now
+        for quality in [VNCQuality.automatic, .balanced] {
+            let planner = RFBStreamPlanner()
+            planner.setQuality(quality)
+            planner.start(width: 100, height: 100, dialect: .apple)
+            _ = planner.openingMessages()
+            planner.roundTripMeasured(RFBTransportRoundTrip(smoothed: 0.05, shortest: 0.04), at: start)
+            planner.roundTripMeasured(RFBTransportRoundTrip(smoothed: 0.6, shortest: 0.04), at: start + .seconds(2))
+            planner.roundTripMeasured(RFBTransportRoundTrip(smoothed: 0.8, shortest: 0.04), at: start + .seconds(4))
+            planner.waitingForMessage(at: start + .seconds(4))
+            var out: [UInt8] = []
+            _ = planner.decide(at: start + .seconds(4)) { out += $0 }
+            let statistics = planner.statistics(totalBytes: 0, at: start + .seconds(4))
+            #expect(statistics.roundTrip == 0.8 && statistics.queued.map { abs($0 - 0.76) < 0.0001 } == true)
+            if quality == .automatic {
+                #expect(statistics.profile.level == .dataSaver)
+            } else {
+                #expect(statistics.profile.level == .balanced, "a fixed level stays as chosen")
+            }
+        }
     }
 
     @Test("small updates say nothing about the link")

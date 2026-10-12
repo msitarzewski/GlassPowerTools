@@ -80,13 +80,19 @@ public struct GlassDesktopLinkStatistics: Sendable, Equatable {
     /// The size a Mac renders its picture at, as a fraction of its own (1 is its own size), as the
     /// Mac last confirmed it; nil for a server that cannot be asked.
     public var serverScale: Double?
+    /// The connection's round trip, in seconds, and how much of it is data waiting in the network;
+    /// nil where the transport does not say.
+    public var roundTrip: Double?
+    public var queued: Double?
 
     public init(bytesPerSecond: Double, updatesPerSecond: Double, quality: GlassDesktopStreamQuality,
                 level: GlassDesktopStreamQuality, colourDepth: Int, encoding: String?,
-                measuredKilobitsPerSecond: Double?, regionLimited: Bool, paused: Bool, serverScale: Double? = nil) {
+                measuredKilobitsPerSecond: Double?, regionLimited: Bool, paused: Bool, serverScale: Double? = nil,
+                roundTrip: Double? = nil, queued: Double? = nil) {
         self.bytesPerSecond = bytesPerSecond; self.updatesPerSecond = updatesPerSecond
         self.quality = quality; self.level = level; self.colourDepth = colourDepth; self.encoding = encoding
         self.measuredKilobitsPerSecond = measuredKilobitsPerSecond
         self.regionLimited = regionLimited; self.paused = paused; self.serverScale = serverScale
+        self.roundTrip = roundTrip; self.queued = queued
     }
 }

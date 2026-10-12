@@ -270,6 +270,10 @@ struct DesktopDisplayWindowTests {
         scaled.serverScale = 1
         #expect(DesktopLinkReadout.line(scaled) == "1.2 Mbit/s · 9.5 updates/s · 16-bit color · ZRLE")
         #expect(DesktopLinkReadout.scale(0.5) == "50%")
+        #expect(DesktopLinkReadout.roundTrip(0.042, queued: 0.002) == "42 ms")
+        #expect(DesktopLinkReadout.roundTrip(1.25, queued: 1.21) == "1.2 s, 1.2 s of it waiting in the network")
+        #expect(DesktopLinkReadout.roundTrip(0.3, queued: 0.26) == "300 ms, 260 ms of it waiting in the network")
+        #expect(DesktopLinkReadout.roundTrip(0.08, queued: nil) == "80 ms")
         await session.receive(.state(.disconnected), attempt: session.attemptID, connection: fixture.connection)
         #expect(session.linkStatistics == nil)
         session.close()

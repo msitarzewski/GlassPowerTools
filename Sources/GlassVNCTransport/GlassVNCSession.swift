@@ -28,8 +28,9 @@ public actor GlassVNCSession: GlassDesktopTransport {
     private static let logger = Logger(subsystem: "app.glassdt.vnc", category: "session")
     /// For this run of the app (W30): Macs not to ask for their display layout again.
     static let layoutRefusals = HostSet()
-    /// For this run of the app (W36): Macs not to ask to scale their picture again.
+    /// For ten minutes (W36, loosened 2026-10-11): Macs not to ask to scale their picture again.
     static let scalingRefusals = HostSet()
+    static let scalingRefusalLasts: Duration = .seconds(600)
     /// For this run of the app (W38): Macs not to ask for their pointer's position and shapes again.
     static let cursorRefusals = HostSet()
     /// For this run of the app (2026-10-11): Macs not to answer in their own revision again, having
@@ -159,9 +160,13 @@ public actor GlassVNCSession: GlassDesktopTransport {
                     }
                 }
                 // A Mac that ended the session while a scale it was asked for was unanswered is
-                // not asked again while the app runs; Reconnect shows its picture at its own size (W36).
-                if error != .cancelled, asksToScale, client.awaitingServerScaling {
-                    Self.scalingRefusals.insert(layoutKey)
+                // not asked again for ten minutes; Reconnect shows its picture at its own size (W36).
+                // Only the Mac's ending counts — it closed the connection, or sent what could not be
+                // read — not a network that dropped: Automatic asks for a smaller picture just when
+                // a link is failing, and a hotspot that then dropped cost a Mac its scaling for
+                // the rest of the app's run (2026-10-11).
+                if Self.macEnded(error), asksToScale, client.awaitingServerScaling {
+                    Self.scalingRefusals.insert(layoutKey, for: Self.scalingRefusalLasts)
                     VNCDiagnostics.note(Self.logger, .error, category: "session", "event=server-scale-refused")
                     if let message = failure {
                         failure = message + " Reconnect connects without asking this Mac to send a smaller picture."
@@ -190,6 +195,14 @@ public actor GlassVNCSession: GlassDesktopTransport {
                 }
             } catch { failure = error.localizedDescription }
             await self?.finished(id: id, error: failure)
+        }
+    }
+
+    /// The Mac ended the session: it closed the connection, or sent what could not be read.
+    static func macEnded(_ error: RFBError) -> Bool {
+        switch error {
+        case .connectionClosed, .protocolViolation: true
+        default: false
         }
     }
 
@@ -401,7 +414,7 @@ public actor GlassVNCSession: GlassDesktopTransport {
                                    colourDepth: value.profile.colourDepth.rawValue, encoding: value.encoding?.name,
                                    measuredKilobitsPerSecond: value.measuredKilobitsPerSecond,
                                    regionLimited: value.regionLimited, paused: value.paused,
-                                   serverScale: value.serverScale)
+                                   serverScale: value.serverScale, roundTrip: value.roundTrip, queued: value.queued)
     }
 
     /// The displays a server publishes, as the desktop shows them. ExtendedDesktopSize does not mark
@@ -447,9 +460,24 @@ public actor GlassVNCSession: GlassDesktopTransport {
 /// Hosts whose Mac ended a session in a protocol error once asked for its display layout.
 final class HostSet: @unchecked Sendable {
     private let lock = NSLock()
-    private var values: Set<String> = []
-    func contains(_ value: String) -> Bool { lock.withLock { values.contains(value) } }
-    func insert(_ value: String) { lock.withLock { _ = values.insert(value) } }
+    /// Each host, and when it leaves the set; nil keeps it while the app runs.
+    private var values: [String: ContinuousClock.Instant?] = [:]
+    private let now: @Sendable () -> ContinuousClock.Instant
+
+    init(now: @escaping @Sendable () -> ContinuousClock.Instant = { .now }) { self.now = now }
+
+    func contains(_ value: String) -> Bool {
+        lock.withLock {
+            guard let entry = values[value] else { return false }
+            guard let until = entry, now() >= until else { return true }
+            values[value] = nil
+            return false
+        }
+    }
+
+    func insert(_ value: String) { lock.withLock { values[value] = .some(nil) } }
+
+    func insert(_ value: String, for duration: Duration) { lock.withLock { values[value] = .some(now() + duration) } }
 }
 
 /// The pointer's last shape and whether the host hid it (W38), shared by the client's task, which

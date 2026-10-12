@@ -9,6 +9,8 @@ public actor RFBNetworkChannel: RFBByteSource, RFBByteSink {
     private var buffer: [UInt8] = []
     private var bufferOffset = 0
     private var closed = false
+    /// The transport's report since the last round-trip reading.
+    private var report: NWConnection.PendingDataTransferReport?
 
     public init(host: String, port: UInt16) throws {
         guard let endpointPort = NWEndpoint.Port(rawValue: port), !host.isEmpty else {
@@ -38,6 +40,20 @@ public actor RFBNetworkChannel: RFBByteSource, RFBByteSink {
             connection.start(queue: queue)
         }
         connection.stateUpdateHandler = nil
+        report = connection.startDataTransferReport()
+    }
+
+    /// The connection's round trip as TCP measures it now: smoothed, and the shortest it has seen.
+    /// Nil before the connection is up, after it closes, or before TCP has a sample. Each call
+    /// starts the next report.
+    public func roundTrip() async -> RFBTransportRoundTrip? {
+        guard !closed, let pending = report else { return nil }
+        report = connection.startDataTransferReport()
+        let path = await withCheckedContinuation { (continuation: CheckedContinuation<NWConnection.DataTransferReport.PathReport, Never>) in
+            pending.collect(queue: queue) { continuation.resume(returning: $0.aggregatePathReport) }
+        }
+        guard path.transportSmoothedRTT > 0 else { return nil }
+        return RFBTransportRoundTrip(smoothed: path.transportSmoothedRTT, shortest: path.transportMinimumRTT)
     }
 
     public func close() {
@@ -103,6 +119,15 @@ public actor RFBNetworkChannel: RFBByteSource, RFBByteSink {
         default: return "The connection failed."
         }
     }
+}
+
+/// A connection's round trip, in seconds, as its transport measures it.
+public struct RFBTransportRoundTrip: Sendable, Equatable {
+    public var smoothed: Double
+    /// The shortest the transport has seen; 0 when it has none.
+    public var shortest: Double
+
+    public init(smoothed: Double, shortest: Double) { self.smoothed = smoothed; self.shortest = shortest }
 }
 
 private final class ResumeOnce<T: Sendable>: @unchecked Sendable {

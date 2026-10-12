@@ -368,4 +368,52 @@ struct AppleLayoutFallbackTests {
         #expect(asked.configurations.map(\.allowsServerScaling) == [true, false])
         #expect(asked.configurations.map(\.requestsAppleDisplayLayout) == [true, true], "its displays are still asked for")
     }
+
+    /// 2026-10-11: Automatic asks for a smaller picture just when a link is failing; a hotspot that
+    /// then dropped is not the Mac refusing the scale.
+    @Test func aNetworkThatDropsWhileAScaleIsUnansweredStillAsksToScaleNextTime() async throws {
+        let asked = Asked()
+        let host = "mac-\(UUID().uuidString.prefix(8)).example"
+        let mac = macGreeting(width: 64, height: 64) + macLayoutUpdate(width: 64, height: 64)
+        let first = GlassVNCSession { configuration, callbacks in
+            asked.note(configuration)
+            return VNCClient(configuration: configuration, callbacks: callbacks, source: DroppingSource(mac), sink: MemoryByteSink())
+        }
+        await first.setStreamQuality(.dataSaver)
+        try await first.connect(GlassVNCConfiguration(host: host, password: "pw"))
+        let failure = await ending(first)
+        #expect(failure == "The connection timed out.")
+
+        let second = session(macGreeting(width: 64, height: 64), asked: asked)
+        try await second.connect(GlassVNCConfiguration(host: host, password: "pw"))
+        for await event in second.events where event == .state(.connected) { break }
+        await second.disconnect()
+        #expect(asked.configurations.map(\.allowsServerScaling) == [true, true])
+    }
+
+    @Test func aRefusalForAWhileEnds() {
+        final class Clock: @unchecked Sendable { var now = ContinuousClock.now }
+        let clock = Clock()
+        let set = HostSet(now: { clock.now })
+        set.insert("mac.example:5900", for: .seconds(600))
+        set.insert("other.example:5900")
+        #expect(set.contains("mac.example:5900") && set.contains("other.example:5900"))
+        clock.now += .seconds(599)
+        #expect(set.contains("mac.example:5900"))
+        clock.now += .seconds(1)
+        #expect(!set.contains("mac.example:5900"), "ten minutes on, the Mac is asked to scale again")
+        #expect(set.contains("other.example:5900"), "one kept while the app runs stays")
+        #expect(GlassVNCSession.macEnded(.connectionClosed) && GlassVNCSession.macEnded(.protocolViolation("x")))
+        #expect(!GlassVNCSession.macEnded(.connectionFailed("The connection timed out.")) && !GlassVNCSession.macEnded(.cancelled))
+    }
+}
+
+/// The Mac's bytes, then a network that stops answering.
+private actor DroppingSource: RFBByteSource {
+    private let base: MemoryByteSource
+    init(_ bytes: [UInt8]) { base = MemoryByteSource(bytes) }
+    func read(_ count: Int) async throws -> [UInt8] {
+        guard await base.remaining >= count else { throw RFBError.connectionFailed("The connection timed out.") }
+        return try await base.read(count)
+    }
 }
