@@ -109,7 +109,8 @@ profile, notarization, deploying the site), the behaviour findings listed in `ac
 - Desktops are listed in Active (`GlassDesktopCapability.openSessions`); the D31 line saying they
   contribute none is superseded.
 - `configurations(ofKind:)` skips undecodable records without logging.
-- VNC sessions are unencrypted after sign-in (no VeNCrypt, no tunnel); the setup form says so.
+- VNC is encrypted after sign-in only to a Mac signed in with a Mac account (its own revision, e7463ce);
+  a password alone or a non-Mac server is not (no VeNCrypt, no tunnel). The setup form says which (262ba7a).
 - tree-sitter 0.27 and swift-crypto 5 wait on upstream releases (`techContext.md`).
 - The legacy `SFTPRemoteEditorView` sheet remains as a fallback; the owner has been asked whether to
   delete it.

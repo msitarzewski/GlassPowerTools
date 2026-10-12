@@ -44,8 +44,11 @@ this repository's `PATCHES.md` files record what is changed locally.
   unless you turn that off.
 - **RDP** checks the server's certificate before any credential is sent: against system trust,
   or against a certificate you have pinned for that host and port.
-- **VNC** is not encrypted after sign-in. The security types this client supports (none, VNC
-  password, Apple Remote Desktop account) protect the password, not the session. Use VNC on a
+- **VNC** to a Mac signed in with a Mac account is encrypted after sign-in: the app speaks the Mac's
+  own Screen Sharing revision, whose session runs inside a record layer keyed by that sign-in. Any
+  other VNC — a password alone, or a server that isn't a Mac — is not: those security types (none,
+  VNC password) protect the password, not the session. If a Mac can't be reached in its own
+  revision, the app says so and Reconnect connects unencrypted. Use VNC without a Mac account on a
   network you trust.
 
 ## The Mac app is not sandboxed
