@@ -175,7 +175,7 @@ struct MacWorkspaceView: View {
             // While a terminal in the tab is printing, a wave moves under the row.
             .background {
                 if controller.isProducingOutput {
-                    MacTerminalActivityWave(color: windowTint ?? controller.workgroupColor?.color ?? .accentColor)
+                    MacTerminalActivityShimmer(color: windowTint ?? controller.workgroupColor?.color ?? .accentColor)
                         .padding(.horizontal, -6)
                         .transition(.opacity)
                 }

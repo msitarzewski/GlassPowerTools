@@ -247,7 +247,7 @@ private struct MacTerminalExposeTabTile: View {
         MacWorkspacePreview(controller: tab, alwaysVisible: alwaysVisible)
             .overlay(alignment: .bottom) {
                 if tile.isBusy {
-                    MacTerminalActivityWave(color: tab.workgroupColor?.color ?? .accentColor)
+                    MacTerminalActivityShimmer(color: tab.workgroupColor?.color ?? .accentColor)
                         .frame(height: 22)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                         .transition(.opacity)
