@@ -41,6 +41,24 @@ struct WorkgroupsInLibraryTests {
         #expect(panel.title == "Workgroups")
     }
 
+    /// The owner's iPhone, 2026-10-12: "tapping a workgroup in iphone is a dead end". On a
+    /// phone the library pushes a panel's detail when the panel reports a selection, and pops
+    /// back by clearing it; Workgroups reported none.
+    @Test("a tapped workgroup is the panel's selection, so a phone shows its detail; going back clears it")
+    func selectionReachesTheLibrary() throws {
+        let (model, runtime, root) = try makeShell()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let panel = try #require(model.registry.libraryPanels.first { $0.id == GlassTerminalRuntime.workgroupsPanelID })
+        #expect(panel.selectedItem == nil)
+        let id = UUID()
+        runtime.workgroupsModel.selection = .preset(id)
+        #expect(panel.selectedItem == AnyHashable(ConnectionWorkgroupSelection.preset(id)))
+        runtime.workgroupsModel.selection = .live(id)
+        #expect(panel.selectedItem == AnyHashable(ConnectionWorkgroupSelection.live(id)), "another row is another push")
+        panel.clearSelection()
+        #expect(runtime.workgroupsModel.selection == nil && panel.selectedItem == nil)
+    }
+
     @Test("Asking twice opens it twice")
     func askingAgainIsAChange() throws {
         let (model, runtime, root) = try makeShell()

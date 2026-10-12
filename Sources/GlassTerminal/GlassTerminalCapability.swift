@@ -675,6 +675,11 @@ public final class GlassTerminalCapability: GlassCapability {
                 title: "Workgroups",
                 symbolName: "rectangle.stack",
                 count: runtime.settingsManager.layoutPresets.count,
+                // On a phone the library pushes a panel's detail when the panel says something is
+                // selected; without these a tapped workgroup went nowhere (the owner's iPhone,
+                // 2026-10-12: "tapping a workgroup in iphone is a dead end").
+                selection: { runtime.workgroupsModel.selection },
+                clearSelection: { runtime.workgroupsModel.selection = nil },
                 results: {
                     TerminalWorkgroupsView(presentation: .results, model: runtime.workgroupsModel)
                         .environment(runtime)
