@@ -45,11 +45,11 @@ struct TerminalWithoutTmuxTests {
         #expect(marked.withoutTmux && marked.tmuxSession == nil)
     }
 
-    @Test("a menu that says \"Terminal on\" names the machine: never \"Terminal on Terminal on oscar\"")
+    @Test("a menu that says \"Terminal on\" names the machine: never \"Terminal on Terminal on alpha\"")
     func machineTitles() {
-        #expect(GlassTerminalRuntime.machineTitle(serverName: "Terminal on oscar", hostName: "oscar") == "oscar")
-        #expect(GlassTerminalRuntime.machineTitle(serverName: "oscar", hostName: "oscar") == "oscar")
-        #expect(GlassTerminalRuntime.machineTitle(serverName: "Admin shell", hostName: "oscar") == "oscar — Admin shell",
+        #expect(GlassTerminalRuntime.machineTitle(serverName: "Terminal on alpha", hostName: "alpha") == "alpha")
+        #expect(GlassTerminalRuntime.machineTitle(serverName: "alpha", hostName: "alpha") == "alpha")
+        #expect(GlassTerminalRuntime.machineTitle(serverName: "Admin shell", hostName: "alpha") == "alpha — Admin shell",
                 "a terminal named something else: both, so two on one machine are told apart")
         #expect(GlassTerminalRuntime.machineTitle(serverName: "Terminal on alpha", hostName: nil) == "alpha",
                 "no catalog: the default prefix a host sheet gives it comes off")

@@ -100,7 +100,7 @@ enum GlassTerminalCommandCenter {
             entries.append(MacCommandCenterEntry(id: "library.tailscale", title: "Tailscale Devices",
                                                  detail: "Library") { runtime.requestShowTailscale() })
         }
-        // By machine: "Connect to oscar", not "Connect to Terminal on oscar" (2026-10-12).
+        // By machine: "Connect to alpha", not "Connect to Terminal on alpha" (2026-10-12).
         let titled = GlassTerminalRuntime.distinguished(runtime.sessionManager.serverManager.servers.map { ($0, runtime.machineTitle(of: $0)) })
         for (server, machine) in titled {
             entries.append(MacCommandCenterEntry(id: "connection.connect.\(server.id)",

@@ -116,14 +116,14 @@ public final class GlassTerminalRuntime {
     public var openSessions: (@MainActor () -> [GlassOpenSession])?
 
     /// The name of the machine a saved server is a terminal on, from the shell's catalog, for
-    /// menus that already say "Terminal on" (2026-10-12: "New Terminal on ▸ Terminal on oscar").
+    /// menus that already say "Terminal on" (2026-10-12: "New Terminal on ▸ Terminal on alpha").
     /// Supplied by the composition root, by the same seam; nil leaves them the server's own name.
     public var hostName: (@MainActor (UUID) -> String?)?
 
     /// What a menu that says "Terminal on" calls a saved server: its machine's name; for a
     /// terminal named something else, both. A "Terminal on …" name is the default a host sheet
-    /// gives (`serviceDisplayName`), kept when the machine is renamed since ("Staging — Terminal on
-    /// Tandem Net Staging", 2026-10-12): the machine's name now is the one. Without the machine,
+    /// gives (`serviceDisplayName`), kept when the machine is renamed since ("bravo — Terminal on
+    /// old-bravo", 2026-10-12): the machine's name now is the one. Without the machine,
     /// the name less that default prefix.
     static func machineTitle(serverName: String, hostName: String?) -> String {
         let defaultPrefix = "Terminal on "
@@ -134,7 +134,7 @@ public final class GlassTerminalRuntime {
     }
 
     /// Titles two terminals on one machine would share get their user names, so a menu tells
-    /// them apart ("oscar (ann)", "oscar (root)").
+    /// them apart ("alpha (ann)", "alpha (root)").
     static func distinguished(_ titled: [(ServerConfiguration, String)]) -> [(server: ServerConfiguration, title: String)] {
         let counts = Dictionary(titled.map { ($0.1, 1) }, uniquingKeysWith: +)
         return titled.map { server, title in

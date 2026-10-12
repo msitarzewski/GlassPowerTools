@@ -738,7 +738,7 @@ struct MacWorkspaceView: View {
             guard let serverID = intent.serverID,
                   let server = sessionManager.serverManager.servers.first(where: { $0.id == serverID })
             else { return nil }
-            // "New Tab on oscar", not "New Tab on Terminal on oscar".
+            // "New Tab on alpha", not "New Tab on Terminal on alpha".
             return intent.label ?? machineTitle(of: server)
         }
     }

@@ -48,7 +48,7 @@ struct GlassTerminalReconnectingListerTests {
     }
 
     private func reconnecting(_ first: FakeLister, _ opener: Opener) -> GlassTerminalReconnectingLister {
-        GlassTerminalReconnectingLister(machine: "juliet", first: first) { try await opener.open() }
+        GlassTerminalReconnectingLister(machine: "alpha", first: first) { try await opener.open() }
     }
 
     @Test("a closed connection is opened again and the call made once more; the old one is closed")
@@ -95,7 +95,7 @@ struct GlassTerminalReconnectingListerTests {
             _ = try await again.read("/a")
             Issue.record("expected an error")
         } catch {
-            #expect(error.localizedDescription.hasPrefix("The connection to juliet was lost"), "\(error.localizedDescription)")
+            #expect(error.localizedDescription.hasPrefix("The connection to alpha was lost"), "\(error.localizedDescription)")
         }
     }
 
