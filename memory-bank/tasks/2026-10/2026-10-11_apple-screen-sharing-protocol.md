@@ -87,3 +87,21 @@ SetDisplayConfiguration virtual displays, media stream (SRTP, HEVC via VideoTool
   utf8 text flavor; sendCutText → Mac 0x1f; MiscStatus 3 resends) → **0.4.361 on all three**. Not yet checked on the
   owner's Mac. Orb: W39 agent (worktree) making the Connections window become the orb in place (no pushWindow —
   known visionOS bug after force-quit/pinning leaves the parent visible); patch to `$SP/w39-orb.patch`.
+- **Hotspot test (owner, 380/52 cellular hotspot, Tailscale):** Balanced = 64–74 Mbit/s from the Mac (nettop), seconds of
+  picture lag; Data Saver "much more responsive", Lowest "somewhat useful". Automatic judged by speed alone, and 70
+  Mbit/s reads as Best. No SetServerScaling all session (cause unproven — headset log not yet pulled).
+- **8b9f39d / 0.4.363 (Mac only; devices off-network): Automatic watches lateness.** (1) An update ≥ 16 KB taking ≥ 0.25 s
+  is a vote one level down however fast its bytes came; stepping up also needs updates in time at ~2.5× the bytes.
+  (2) TCP's smoothed RTT over the shortest of the last 2 min (`NWConnection` data-transfer report, read every 2 s;
+  `RFBRoundTrips`): two readings ≥ 200 ms queued step down one level, 4 s drain before the next counts, no step up for
+  30 s after or while ≥ 100 ms waits (Vegas / TigerVNC `Congestion.cxx` style delay-over-base). (3) A Mac's Automatic
+  stops at Balanced (Best is the same bytes there). Readout "Round trip: 1.3 s, 1.2 s of it waiting in the network";
+  flow line `level= roundTripMs= queuedMs=`; each level change logged `event=automatic`. W36 scale refusal now only for
+  the Mac ending the session (closed / unreadable), not a network drop, and lasts 10 min (`HostSet` expiry). Each new
+  rule broken on purpose failed its test. VNCKit 101, transport 21, desktop 204. **Unverified on a real hotspot.**
+- **Availability probe cost, measured on this Mac:** one TCP connect to 5900 launched screensharingd +
+  ScreensharingAgent (RSA key setup, "try to launch all agents"); both exit 15 s after the last viewer closes ("No
+  viewers so time to exit"). Once a minute = a quarter of the day per device. The Mac advertises `_rfb._tcp` over
+  Bonjour (LAN only; would need NSBonjourServices + local-network permission — owner's call). **e5912f5 / 0.4.364:**
+  services probed on their capability's interval (VNC 10 min, others 1 min); a service with a session open is not
+  probed and reads as answering. Shell 273, desktop capability 12.

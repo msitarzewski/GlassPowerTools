@@ -27,6 +27,16 @@ anything touching real servers (SSH and database tests use the disposable test V
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
+## 2026-10-11 (night) — after the compaction
+
+**Installed: Mac 0.4.364; Vision Pro + iPhone still 0.4.361** (off-network all evening; install 0.4.364 when `devicectl`
+shows them, then verify the W39 orb). Since d495e42: **8b9f39d** Automatic quality watches lateness (slow updates, TCP
+queueing over base RTT; a Mac's Automatic stops at Balanced; W36 scale refusal only for the Mac's own ending, 10 min);
+**e5912f5** availability dots skip connected services and probe VNC every 10 min (a probe launches the Mac's
+screensharingd + agent for 15 s). Details in the screen-sharing task note. Next: devices → install + orb + headset log
+(look for `event=automatic`, `roundTripMs`, `queuedMs`, `server-scale`); then High Performance mode behind a switch
+(probe first); owner to try Automatic on the hotspot and scroll/clipboard on the Mac.
+
 ## 2026-10-11 (evening) — where things stand
 
 **HEAD = this notes commit (after 7fc7be3). Installed: 0.4.362 on the Mac; 0.4.361 on Vision Pro and iPhone** (they were
