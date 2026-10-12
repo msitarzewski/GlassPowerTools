@@ -296,6 +296,47 @@ struct ServerScalingPlannerTests {
         #expect(serverScales(decide(planner)) == [0.75])
     }
 
+    /// The owner's headset on a phone's hotspot (2026-10-11): a Quality change read pictures still on
+    /// the way in the new format and ended the session. A Mac that pushes is stopped first, and the
+    /// layout answering a SetEncodings sent after the stop marks the last picture in the old format.
+    @Test("a colour change on a Mac that pushes stops the pushes and waits for the layout marking the last old picture")
+    func formatChangeWaitsForItsMarker() {
+        let planner = mac(.balanced)
+        let start = ContinuousClock.now
+        func messages(at now: ContinuousClock.Instant) -> [[UInt8]] {
+            var out: [[UInt8]] = []
+            _ = planner.decide(at: now) { out.append($0) }
+            return out
+        }
+        func arming(_ message: [UInt8]) -> UInt32? {
+            guard message.first == 9, message.count == 16 else { return nil }
+            return UInt32(message[4]) << 24 | UInt32(message[5]) << 16 | UInt32(message[6]) << 8 | UInt32(message[7])
+        }
+        planner.appleLayoutArrived(serverScale: 1, width: 4480, height: 1800)
+        #expect(messages(at: start).compactMap(arming) == [0], "armed at 0")
+        planner.setQuality(.dataSaver)
+        let stopping = messages(at: start)
+        #expect(stopping.compactMap(arming) == [RFBStreamPlanner.pushesOff], "the pushes stop first")
+        #expect(stopping.count == 2 && stopping[1].first == 2, "then a SetEncodings, whose layout is the marker")
+        #expect(planner.currentDecoder().colourDepth == .full, "pictures still on the way are read in the old format")
+        let waiting = messages(at: start + .seconds(1))
+        #expect(!waiting.contains { $0.first == 0 } && waiting.compactMap(arming).isEmpty && !waiting.contains { $0.first == 8 },
+                "no format, no arming and no scale before the marker")
+        planner.appleLayoutArrived(serverScale: 1, width: 4480, height: 1800)
+        let switched = messages(at: start + .seconds(1))
+        #expect(switched.first == RFBPixelFormat.rgb565.setPixelFormatMessage, "the new format once the marker is in")
+        #expect(planner.currentDecoder().colourDepth == .thousands)
+        #expect(switched.contains { $0.first == 8 }, "then Data Saver's scale")
+        planner.appleLayoutArrived(serverScale: 0.75, width: 3360, height: 1350)
+        #expect(messages(at: start + .seconds(2)).compactMap(arming) == [0], "armed again, after SetPixelFormat")
+
+        // A marker that never comes: the change goes after five seconds.
+        planner.setQuality(.best)
+        _ = messages(at: start + .seconds(3))
+        #expect(!messages(at: start + .seconds(7)).contains { $0.first == 0 })
+        #expect(messages(at: start + .seconds(8)).first == RFBPixelFormat.client.setPixelFormatMessage)
+    }
+
     @Test("a factor no layout confirms within ten seconds is given up, and asked for again only when another is wanted")
     func unconfirmed() {
         let planner = mac(.dataSaver)

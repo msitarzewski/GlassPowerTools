@@ -416,7 +416,8 @@ struct AppleLayoutFallbackTests {
         clock.now += .seconds(1)
         #expect(!set.contains("mac.example:5900"), "ten minutes on, the Mac is asked to scale again")
         #expect(set.contains("other.example:5900"), "one kept while the app runs stays")
-        #expect(GlassVNCSession.macEnded(.connectionClosed) && GlassVNCSession.macEnded(.protocolViolation("x")))
+        #expect(GlassVNCSession.macEnded(.connectionClosed))
+        #expect(!GlassVNCSession.macEnded(.protocolViolation("ZRLE palette index out of range.")), "a picture this client misread")
         #expect(!GlassVNCSession.macEnded(.connectionFailed("The connection timed out.")) && !GlassVNCSession.macEnded(.cancelled))
     }
 }

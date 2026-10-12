@@ -191,10 +191,11 @@ public actor GlassVNCSession: GlassDesktopTransport {
                 }
                 // A Mac that ended the session while a scale it was asked for was unanswered is
                 // not asked again for ten minutes; Reconnect shows its picture at its own size (W36).
-                // Only the Mac's ending counts — it closed the connection, or sent what could not be
-                // read — not a network that dropped: Automatic asks for a smaller picture just when
-                // a link is failing, and a hotspot that then dropped cost a Mac its scaling for
-                // the rest of the app's run (2026-10-11).
+                // Only the Mac's ending counts — it closed the connection — not a network that
+                // dropped, nor a picture this client misread: on a phone's hotspot a Quality change
+                // misread pictures still on the way ("ZRLE palette index out of range") just as Data
+                // Saver asked for 0.75, and that cost the Mac its scaling for the rest of the run
+                // (the owner's headset, 2026-10-11).
                 if Self.macEnded(error), asksToScale, client.awaitingServerScaling {
                     Self.scalingRefusals.insert(layoutKey, for: Self.scalingRefusalLasts)
                     VNCDiagnostics.note(Self.logger, .error, category: "session", "event=server-scale-refused")
@@ -228,13 +229,8 @@ public actor GlassVNCSession: GlassDesktopTransport {
         }
     }
 
-    /// The Mac ended the session: it closed the connection, or sent what could not be read.
-    static func macEnded(_ error: RFBError) -> Bool {
-        switch error {
-        case .connectionClosed, .protocolViolation: true
-        default: false
-        }
-    }
+    /// The Mac ended the session: it closed the connection.
+    static func macEnded(_ error: RFBError) -> Bool { error == .connectionClosed }
 
     public func disconnect() async {
         VNCDiagnostics.note(Self.logger, .default, category: "session", "event=disconnect-requested")

@@ -520,6 +520,12 @@ final class RFBStreamPlanner: @unchecked Sendable {
     private var scaleDeclined: Double?
     private var scaleOverride: Double?
 
+    // A colour depth change on a Mac that pushes (2026-10-11): pushes stopped and a SetEncodings sent,
+    // whose layout marks the last picture in the old format.
+    private var formatMarkerSentAt: ContinuousClock.Instant?
+    /// SetEncodings sent to a Mac listing its display layout whose layout has not come back.
+    private var layoutsOwed = 0
+
     // High Performance: the picture comes over the media stream.
     private var highPerformance = false
     /// SetEncodings lists the media stream first, for the rest of the session.
@@ -558,6 +564,8 @@ final class RFBStreamPlanner: @unchecked Sendable {
     private var readings: [(at: ContinuousClock.Instant, total: Int)] = []
 
     static let quietBeforeForcedFormatChange: Duration = .seconds(2)
+    /// How long a format change on a Mac that pushes waits for its marker's layout before it goes anyway.
+    static let formatMarkerTimeout: Duration = .seconds(5)
     static let pausedRequestInterval: Duration = .seconds(2)
     static let statisticsWindow: Duration = .seconds(2)
     static let scaleAnswerTimeout: Duration = .seconds(10)
@@ -676,6 +684,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
         lock.withLock {
             let previous = scaleInForce
             layoutSeen = true
+            layoutsOwed = max(0, layoutsOwed - 1)
             scaleInForce = serverScale
             if let asked = scaleAsked, Self.sameScale(asked.factor, serverScale) {
                 VNCDiagnostics.note(Self.logger, .default, category: "planner", "event=server-scale confirmed=\(serverScale) width=\(width) height=\(height)")
@@ -757,6 +766,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
                                                              appleDisplayLayout: appleDisplayLayout, appleCursor: appleCursor)
             started = true
             refresh = true; urgent = true
+            if dialect == .apple, appleDisplayLayout { layoutsOwed += 1 }
             return (active.colourDepth.pixelFormat.setPixelFormatMessage, RFBEncoding.setEncodingsMessage(advertisedEncodings))
         }
     }
@@ -837,10 +847,38 @@ final class RFBStreamPlanner: @unchecked Sendable {
             var out: [[UInt8]] = []
             let wanted = wantedProfile()
             if wanted.colourDepth != active.colourDepth {
-                let quiet = waitingSince.map { now - $0 >= Self.quietBeforeForcedFormatChange } ?? false
-                guard waitingSince != nil, outstanding == 0 || quiet else {
-                    // Stop asking until the held request is answered; look again for a quiet line.
-                    return ([], now + .milliseconds(500))
+                if pushesInPlay {
+                    // **A Mac that pushes is not quiet between requests.** On 003.889 it sends its
+                    // pictures unasked, and over a phone's hotspot seconds of them were still on the
+                    // way when SetPixelFormat went: read in the new format, they ended three sessions
+                    // ("ZRLE palette index out of range", "Unsupported ZRLE subencoding 57", the
+                    // owner's headset, 2026-10-11). So the pushes stop first, with a SetEncodings
+                    // after them, which the Mac answers with a layout once it has read both: every
+                    // picture before that layout is in the old format, and none follows it until the
+                    // Mac is armed again, after SetPixelFormat.
+                    if formatMarkerSentAt == nil {
+                        guard scaleAsked == nil, displayAsked == nil else { return ([], now + .milliseconds(500)) }
+                        out.append(RFBAppleDisplayLayout.autoFramebufferUpdateMessage(interval: Self.pushesOff, width: width, height: height))
+                        armed = (Self.pushesOff, width, height)
+                        out.append(RFBEncoding.setEncodingsMessage(advertisedEncodings))
+                        layoutsOwed += 1
+                        formatMarkerSentAt = now
+                        VNCDiagnostics.note(Self.logger, .default, category: "planner", "event=format-change marker depth=\(wanted.colourDepth.rawValue)")
+                        return (out, now + .milliseconds(500))
+                    }
+                    guard layoutsOwed == 0 || formatMarkerSentAt.map({ now - $0 >= Self.formatMarkerTimeout }) == true else {
+                        return ([], now + .milliseconds(500))
+                    }
+                    formatMarkerSentAt = nil
+                    layoutsOwed = 0
+                    // Armed again after SetPixelFormat, below: its pushes are in the new format.
+                    armed = nil
+                } else {
+                    let quiet = waitingSince.map { now - $0 >= Self.quietBeforeForcedFormatChange } ?? false
+                    guard waitingSince != nil, outstanding == 0 || quiet else {
+                        // Stop asking until the held request is answered; look again for a quiet line.
+                        return ([], now + .milliseconds(500))
+                    }
                 }
                 out.append(wanted.colourDepth.pixelFormat.setPixelFormatMessage)
                 decoder = (try? RFBPixelDecoder(format: wanted.colourDepth.pixelFormat)) ?? .native
@@ -860,6 +898,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
             if encodings != advertisedEncodings {
                 advertisedEncodings = encodings
                 out.append(RFBEncoding.setEncodingsMessage(encodings))
+                if dialect == .apple, appleDisplayLayout { layoutsOwed += 1 }
             }
             // The display before the scale it wants, and the request after both.
             let displayWake = planDisplay(at: now, into: &out)
@@ -906,6 +945,11 @@ final class RFBStreamPlanner: @unchecked Sendable {
         }
     }
 
+    /// A Mac armed to push its pictures: no request is what holds them back.
+    private var pushesInPlay: Bool {
+        dialect == .apple && arming && appleDisplayLayout && layoutSeen && !highPerformance
+    }
+
     /// Arms a Mac's pushes (`AutoFrameBufferUpdate`) once it has sent a layout, and again after each
     /// one, for the whole framebuffer: without them it sends no pointer position or shape, and a
     /// physical display's changes come late (remotex's notes, "Other messages"). Never while a
@@ -914,7 +958,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
     /// "Resizing"). Nothing on screen arms them off.
     private func planArming(paused: Bool, into out: inout [[UInt8]]) {
         guard dialect == .apple, arming, appleDisplayLayout, layoutSeen, width > 0, height > 0,
-              scaleAsked == nil, displayAsked == nil, !holding else { return }
+              scaleAsked == nil, displayAsked == nil, !holding, formatMarkerSentAt == nil else { return }
         let interval = paused ? Self.pushesOff : armingInterval
         let (armWidth, armHeight) = highPerformance ? (1, 1) : (width, height)
         if let armed, armed.interval == interval, armed.width == armWidth, armed.height == armHeight { return }
@@ -951,7 +995,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
     /// layouts; returns when to look again at an unanswered request, or at a density change waiting
     /// to settle.
     private func planScale(at now: ContinuousClock.Instant, into out: inout [[UInt8]]) -> ContinuousClock.Instant? {
-        guard dialect == .apple, appleDisplayLayout, serverScaling, layoutSeen else { return nil }
+        guard dialect == .apple, appleDisplayLayout, serverScaling, layoutSeen, formatMarkerSentAt == nil else { return nil }
         if let asked = scaleAsked, now - asked.at >= Self.scaleAnswerTimeout {
             VNCDiagnostics.note(Self.logger, .error, category: "planner", "event=server-scale unconfirmed=\(asked.factor) inForce=\(self.scaleInForce)")
             scaleDeclined = asked.factor
