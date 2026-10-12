@@ -14,9 +14,9 @@
 #   Tools/Release/release-mac.sh 1.0.0 100 [notes.html]
 #
 # Flow: archive (Release, push environment production) → export with Developer ID (app and widget,
-# Sparkle's helpers, hardened runtime) → verify signatures, hardened runtime, entitlements and the
-# update key → notarize the app → staple → Sparkle zip, signed with the EdDSA key → feed entry →
-# disk image with an Applications link → sign → notarize → staple → checksums.
+# Sparkle's helpers, hardened runtime) → verify signatures, hardened runtime and entitlements (the app's
+# and the widget's) and the update key → notarize the app → staple → Sparkle zip, signed with the EdDSA
+# key → feed entry → disk image with an Applications link → sign → notarize → staple → checksums.
 # Afterwards: publish the GitHub release v<version> with the .dmg and .zip, THEN publish the site
 # (the feed points at the zip on the release).
 set -euo pipefail
@@ -97,7 +97,28 @@ grep -q "Authority=Developer ID Application" <<<"$info" || { echo "app: not Deve
 grep -q "flags=.*runtime" <<<"$info" || { echo "app: hardened runtime missing"; exit 1; }
 entitlements="$(codesign -d --entitlements - --xml "$APP" 2>/dev/null)"
 grep -q "production" <<<"$entitlements" || { echo "app: push environment is not production"; exit 1; }
-# Not sandboxed on purpose (SECURITY.md): a terminal must start the user's shell.
+# Not sandboxed on purpose (SECURITY.md): a terminal must start the user's shell. Its widget extension is.
+# The widget extension (D68) is nested code the checks above do not name; `--deep` proves only that its
+# signature is valid. Check it as the app is checked, here rather than by notarization's refusal, and
+# check what notarization cannot: the app and the extension name one App Group (GlassWidgetGroup, from
+# GPT_WIDGET_GROUP) and are both signed with it, or the widgets read no snapshot and show nothing
+# (2026-10-12).
+WIDGET="$APP/Contents/PlugIns/GlassPowerToolsWidgets.appex"
+[ -d "$WIDGET" ] || { echo "widget: GlassPowerToolsWidgets.appex missing from the app"; exit 1; }
+info="$(codesign -dvv "$WIDGET" 2>&1)"
+grep -q "Authority=Developer ID Application" <<<"$info" || { echo "widget: not Developer ID signed"; exit 1; }
+grep -q "flags=.*runtime" <<<"$info" || { echo "widget: hardened runtime missing"; exit 1; }
+codesign -d --entitlements - --xml "$WIDGET" > "$WORK/widget-entitlements.plist" 2>/dev/null \
+  || { echo "widget: its entitlements could not be read"; exit 1; }
+[ "$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.app-sandbox' "$WORK/widget-entitlements.plist" 2>/dev/null)" = true ] \
+  || { echo "widget: not sandboxed (a Mac app extension must be)"; exit 1; }
+WIDGET_GROUP="$(/usr/libexec/PlistBuddy -c 'Print :GlassWidgetGroup' "$WIDGET/Contents/Info.plist" 2>/dev/null || true)"
+[ -n "$WIDGET_GROUP" ] \
+  && [ "$(/usr/libexec/PlistBuddy -c 'Print :GlassWidgetGroup' "$APP/Contents/Info.plist" 2>/dev/null)" = "$WIDGET_GROUP" ] \
+  || { echo "widget: GlassWidgetGroup missing, or not the same in the app and the extension"; exit 1; }
+grep -qF "<string>$WIDGET_GROUP</string>" "$WORK/widget-entitlements.plist" \
+  && grep -qF "<string>$WIDGET_GROUP</string>" <<<"$entitlements" \
+  || { echo "widget: the app and the extension are not both signed with App Group $WIDGET_GROUP"; exit 1; }
 [ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")" = "$VERSION" ] \
   || { echo "version mismatch"; exit 1; }
 [ -n "$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$APP/Contents/Info.plist" 2>/dev/null)" ] \

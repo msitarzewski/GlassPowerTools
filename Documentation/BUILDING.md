@@ -21,7 +21,7 @@ package at the repository root (`Package.swift`), whose modules the app target l
 | `Sources/` | The package's modules: the shell, each capability, their engines, the editor |
 | `Packages/` | Third-party code carried in the repository, each with its licence and a record of local changes (`PATCHES.md`, `GLASSDT-PATCHES.md`) |
 | `Tests/`, `UITests/` | Package tests (Swift Testing and XCTest) and XCUITest suites |
-| `Widgets/` | The widget extension |
+| `Widgets/` | The widget extension, for every platform; what it shares with the app is the `GlassWidgetData` module |
 | `Config/Identity.xcconfig` | Signing team, bundle identifier, iCloud container, App Group and keychain group |
 | `Tools/` | Build and maintenance scripts |
 | `memory-bank/` | The project's working notes: decisions, rules, progress and task records |
@@ -42,7 +42,11 @@ GPT_KVSTORE_SUFFIX = com.example.glasspowertools
 ```
 
 The entitlements files, the Info.plists and the code (`GlassAppIdentity`) all read these, so nothing
-else needs to change. Your team needs the iCloud container and App Group registered for the app ID.
+else needs to change. Your team needs the iCloud container and App Group registered for the app ID,
+and the App Group for the widget extension's (`$(GPT_BUNDLE_ID).widgets`) too. On a Mac the widgets
+use a group of their own instead, `GPT_WIDGET_GROUP`, made from your team and bundle identifier: Xcode
+signs the Mac extension with the team's wildcard profile, which cannot grant a `group.` App Group, and
+a team-prefixed group needs no profile. Nothing to set.
 
 ## Building
 
@@ -66,7 +70,7 @@ takes a new version only when every package inside it carries a licence already 
 the build continues with the copy it has.
 
 The macOS app is not sandboxed: a terminal needs to start local shells and reach the user's files and
-tools. Release builds use the hardened runtime.
+tools. Its widget extension is, as a Mac app extension must be. Release builds use the hardened runtime.
 
 **If a build stops at "Downloading binary artifact … Sparkle":** SwiftPM looks for GitHub credentials
 in the Keychain before downloading Sparkle's prebuilt framework, and with more than one saved entry it
@@ -75,8 +79,9 @@ waits on a Keychain prompt. The download is public; skip the lookup with `swift 
 
 ## Releasing the Mac app
 
-`Tools/Release/release-mac.sh <version> <build>` archives, signs with Developer ID, notarizes,
-staples, signs the Sparkle update and adds it to `site/static/appcast.xml`, then makes the disk image.
+`Tools/Release/release-mac.sh <version> <build>` archives, signs with Developer ID, checks the app
+and its widget extension (signatures, hardened runtime, entitlements), notarizes, staples, signs the
+Sparkle update and adds it to `site/static/appcast.xml`, then makes the disk image.
 It needs the Developer ID certificate, Apple notarization credentials in the environment, and
 Sparkle's EdDSA key: create it once with Sparkle's `generate_keys --account GlassPowerTools`, keep
 the private half in the login Keychain, and put the public half in `GPT_SPARKLE_PUBLIC_KEY` in
@@ -101,6 +106,10 @@ swift test
 **Unlock the screen first.** Several stores write files with complete data protection, which are
 unreadable while the Mac is locked; a locked screen shows up as permission and `mktemp` failures.
 
+The terminal tests that need tmux run only when it is installed, on private servers of their own; they
+never touch your tmux sessions (`memory-bank/projectRules.md`, rule 63). `tmux list-sessions` before
+and after a run should show the same sessions.
+
 UI tests run through Xcode or `xcodebuild test` against a simulator, for example:
 
 ```sh
@@ -112,6 +121,42 @@ xcodebuild test -project GlassPowerTools.xcodeproj -scheme GlassPowerTools \
 UI tests launch the app with `--ui-testing <uuid>`, which gives the run its own storage and settings
 and keeps it away from iCloud; nothing a test does reaches your own library.
 
+### The UIKit editor on the iOS simulator
+
+`Tests/GlassEditorUIKitTests` tests the editor's UIKit text view. Built for the Mac it is empty, so
+`swift test` does not exercise it. The package's own scheme, `GlassPowerTools-Package`, cannot test on
+iOS because other test targets do not compile there; run this one through a scheme holding only it.
+Save this as `.swiftpm/xcode/xcshareddata/xcschemes/EditorUITests.xcscheme` (`.swiftpm/` is
+git-ignored):
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<Scheme LastUpgradeVersion="1600" version="1.7">
+   <BuildAction parallelizeBuildables="YES" buildImplicitDependencies="YES">
+   </BuildAction>
+   <TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.DebuggerFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="YES">
+      <Testables>
+         <TestableReference skipped="NO">
+            <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="GlassEditorUIKitTests" BuildableName="GlassEditorUIKitTests" BlueprintName="GlassEditorUIKitTests" ReferencedContainer="container:">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
+   </TestAction>
+</Scheme>
+```
+
+If `.swiftpm/xcode/package.xcworkspace` does not exist yet, open `Package.swift` in Xcode once to make
+it. Then:
+
+```sh
+xcodebuild test -workspace .swiftpm/xcode/package.xcworkspace -scheme EditorUITests \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -packageAuthorizationProvider netrc -skipPackagePluginValidation \
+  -onlyUsePackageVersionsFromResolvedFile
+```
+
+`-clonedSourcePackagesDirPath <folder>` reuses the packages an earlier build already fetched.
+
 ### Live tests against real servers
 
 Some suites talk to a real SSH server and real MySQL and PostgreSQL servers. They are skipped unless
@@ -120,7 +165,7 @@ virtual machine: the tests create and drop tables and files.
 
 | Suite | Variables |
 |---|---|
-| SSH transport, remote editing | `GPT_SSH_TEST_HOST`, `GPT_SSH_TEST_PORT`, `GPT_SSH_TEST_USER`, and `GPT_SSH_TEST_KEY_PATH` or `GPT_SSH_TEST_PASSWORD` |
+| SSH transport, remote editing, remote tmux | `GPT_SSH_TEST_HOST`, `GPT_SSH_TEST_PORT`, `GPT_SSH_TEST_USER`, and `GPT_SSH_TEST_KEY_PATH` or `GPT_SSH_TEST_PASSWORD` |
 | Databases | `GPT_DB_TEST_HOST`, `GPT_DB_TEST_MYSQL_*` and `GPT_DB_TEST_PG_*` (user, password, port, database, scratch database; `GPT_DB_TEST_MYSQL_CA_PATH` and `GPT_DB_TEST_MYSQL_TLS_SERVER_NAME` for the TLS tests) |
 
 Keep the values in a file outside the repository and load it into the shell before running:
@@ -131,6 +176,15 @@ swift test --filter LiveDatabaseIntegration
 ```
 
 Give the database tests a least-privilege user that owns only the test databases.
+
+**If the SSH tests fail with "No route to host"** against a VM on a local or virtual network, macOS's
+Local Network permission is blocking the test runner. Tunnel through loopback and point the tests at
+the tunnel, keeping the other SSH variables as they were:
+
+```sh
+ssh -N -L 2222:localhost:22 user@<test VM>     # in another terminal
+GPT_SSH_TEST_HOST=127.0.0.1 GPT_SSH_TEST_PORT=2222 swift test --filter LiveRemoteEditing
+```
 
 ### Vendored packages
 

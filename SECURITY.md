@@ -53,7 +53,9 @@ this repository's `PATCHES.md` files record what is changed locally.
 A terminal has to start your shell and reach your files, tools and SSH agent, which App Sandbox
 does not allow. The Mac app therefore runs outside the sandbox, with the hardened runtime and no
 runtime exceptions. It is to be distributed outside the Mac App Store, signed with a Developer ID
-and notarized by Apple. The iPhone, iPad and Vision Pro apps run in their platforms' sandboxes.
+and notarized by Apple. Its widget extension runs sandboxed: it reads only the summary the app writes
+for the widgets (machine names, service kinds, times and counts) from an App Group of its own. The
+iPhone, iPad and Vision Pro apps run in their platforms' sandboxes.
 
 ## Third-party code
 
