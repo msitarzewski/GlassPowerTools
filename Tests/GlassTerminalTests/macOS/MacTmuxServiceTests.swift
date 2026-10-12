@@ -75,9 +75,24 @@ struct MacTmuxServiceTests {
 
     nonisolated static var tmux: String? { MacLocalTmux.executablePath() }
 
+    /// A process's resource coalition: macOS counts everything an app starts, and everything those
+    /// start, as the app's, and a server tmux daemonizes stays in it (its parent and process group
+    /// are its own either way). `PROC_PIDCOALITIONINFO` is flavor 20 of `proc_pidinfo`; the resource
+    /// coalition's id comes first.
+    static func coalition(_ pid: pid_t) -> UInt64? {
+        var info = [UInt64](repeating: 0, count: 5)
+        let size = Int32(info.count * MemoryLayout<UInt64>.size)
+        let read = info.withUnsafeMutableBytes { proc_pidinfo(pid, 20, 0, $0.baseAddress, size) }
+        return read == size && info[0] != 0 ? info[0] : nil
+    }
+
+    static func serverPID(socket: String) -> pid_t? {
+        (MacLocalTmux.run("/usr/bin/pgrep", ["-f", "\(socket) -f /dev/null"]) ?? "").split(separator: "\n").compactMap { pid_t($0) }.first
+    }
+
     /// The real thing on a private server: a socket of its own, no configuration, a label of its own,
     /// and the job file in a temporary folder — neither the owner's server nor his job is touched.
-    @Test("launchd runs a private tmux server, not this process: its parent is launchd, and it outlives its sessions' clients",
+    @Test("launchd runs a private tmux server in a coalition of its own, where one this process starts shares its coalition",
           .enabled(if: MacTmuxServiceTests.tmux != nil))
     func live() throws {
         let tmux = try #require(Self.tmux)
@@ -85,25 +100,32 @@ struct MacTmuxServiceTests {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let socket = folder.appendingPathComponent("s").path
         let server = ["-S", socket, "-f", "/dev/null"]
+        let ownSocket = folder.appendingPathComponent("o").path
+        let ownServer = ["-S", ownSocket, "-f", "/dev/null"]
         let label = "com.glasspowertools.tmux.test.\(UUID().uuidString.prefix(8))"
         let jobURL = folder.appendingPathComponent("job.plist")
         defer {
             MacTmuxService.remove(label: label, jobURL: jobURL)
             _ = MacLocalTmux.run(tmux, server + ["kill-server"])
+            _ = MacLocalTmux.run(tmux, ownServer + ["kill-server"])
             try? FileManager.default.removeItem(at: folder)
         }
+        let mine = try #require(Self.coalition(getpid()))
+        // The contrast: a server this process starts is this process's, as the app's was.
+        #expect(MacLocalTmux.run(tmux, ownServer + ["new-session", "-d", "-s", "own", "/bin/sleep", "600"]) != nil)
+        #expect(Self.serverPID(socket: ownSocket).flatMap(Self.coalition) == mine, "a server started the old way shares the coalition")
+
         #expect(!MacTmuxService.serverRunning(tmux: tmux, serverArguments: server))
         let outcome = MacTmuxService.ensureServer(tmux: tmux, environment: ["PATH": "/usr/bin:/bin", "TMUX_TMPDIR": folder.path],
                                                   label: label, serverArguments: server, jobURL: jobURL)
         #expect(outcome == .started)
-        // The server's parent is launchd, and its process group is its own, not this test's.
-        let pids = (MacLocalTmux.run("/usr/bin/pgrep", ["-f", socket]) ?? "").split(separator: "\n").compactMap { Int32($0) }
-        let serverPID = try #require(pids.first)
-        let info = (MacLocalTmux.run("/bin/ps", ["-o", "ppid=,pgid=", "-p", String(serverPID)]) ?? "")
-            .split(separator: " ").compactMap { Int32($0) }
-        #expect(info.first == 1, "launchd's: \(info)")
-        #expect(info.last != getpgrp())
+        let serverPID = try #require(Self.serverPID(socket: socket))
+        let theirs = try #require(Self.coalition(serverPID))
+        #expect(theirs != mine, "launchd's server is in a coalition of its own")
         #expect(MacLocalTmux.run(tmux, server + ["new-session", "-d", "-s", "probe", "/bin/sleep", "600"]) != nil)
+        let pane = try #require((MacLocalTmux.run("/usr/bin/pgrep", ["-P", String(serverPID)]) ?? "")
+            .split(separator: "\n").compactMap { pid_t($0) }.first)
+        #expect(Self.coalition(pane) == theirs, "and so are its panes")
         #expect(MacTmuxService.ensureServer(tmux: tmux, environment: [:], label: label, serverArguments: server, jobURL: jobURL) == .alreadyRunning)
         // Taken away, the job's server ends with it.
         MacTmuxService.remove(label: label, jobURL: jobURL)

@@ -4,11 +4,16 @@
 //
 //  This Mac's tmux server, started by launchd rather than by the app (2026-10-12). The owner force
 //  quit a scratch app an agent had left running, and every local terminal ended with it: the app
-//  had been launched from inside one of the tmux sessions, so macOS counted it, the tmux server and
-//  every pane as one group, and Force Quit ends a group (the Dock logged "force quit (caller
-//  responsible for termination)", and a dozen of the panes' processes exited in the same
-//  milliseconds). A server the app starts is in the app's group the same way, so a Force Quit of
-//  Glass Power Tools would end every session too — the reverse of what D47 keeps them for.
+//  had been launched from inside one of the tmux sessions. macOS counts everything an app starts,
+//  and everything those start, in the app's resource coalition — the tmux server (daemonized, so
+//  its parent and process group are its own regardless) and every pane. Once the app that started
+//  the server has quit, as an update quits it, each of them answers for itself, and the Dock's
+//  Force Quit of an app launched from a pane ends the whole coalition: on this Mac, a probe app
+//  force quit that way took its server and two bystander panes with it in the same second.
+//
+//  A server launchd runs is a coalition of its own, alive while it runs, and an app started from a
+//  pane is the server's to answer for: the same Force Quit, the same probe, under such a server,
+//  ended the probe alone.
 //
 //  So when no server runs, the app asks launchd to run one: `tmux -u -D` (in the foreground, which
 //  is how launchd runs a job), from a job file in the app's Application Support folder, not
