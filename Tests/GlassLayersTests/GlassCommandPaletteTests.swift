@@ -16,9 +16,9 @@ import Testing
 @Suite("Command palette")
 struct GlassCommandPaletteTests {
     @Test @MainActor func commandCenterSearchAndMenuSnapshotPreserveAvailability() {
-        #expect(MacCommandCenterEntry.matches("beam error", title: "Errors", detail: "Open table · beam"))
+        #expect(MacCommandCenterEntry.matches("bravo error", title: "Errors", detail: "Open table · bravo"))
         #expect(MacCommandCenterEntry.matches("cafe", title: "Café", detail: "Connection"))
-        #expect(!MacCommandCenterEntry.matches("drop", title: "Open table", detail: "beam"))
+        #expect(!MacCommandCenterEntry.matches("drop", title: "Open table", detail: "bravo"))
         let menu = NSMenu(title: "Test")
         menu.autoenablesItems = false
         let enabled = NSMenuItem(title: "Show Test", action: #selector(NSApplication.hide(_:)), keyEquivalent: "s")
