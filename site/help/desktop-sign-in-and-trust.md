@@ -25,7 +25,7 @@ A VNC service picks the sign-in method from what the server offers and what you 
 When the server wants something you did not enter, the connection fails with "This server needs a Mac user name and password (Apple Remote Desktop authentication)." or "This server needs a VNC password." If the server offers only methods the app does not support, the message asks you to enable VNC password or user-account access on the host.
 
 > [!WARNING]
-> VNC protects the password at sign-in, not what follows. The screen and your typing cross the network readable. Use VNC on a network you trust.
+> With a **Mac user name** and password, a Mac is reached in Apple's own Screen Sharing revision, and the session is encrypted after sign-in. Other VNC — a password alone, or a server that isn't a Mac — protects the password at sign-in, not what follows: the screen and your typing cross the network readable. If a Mac can't be reached in its own revision, the message says so, and Reconnect connects unencrypted. Use VNC without a Mac account on a network you trust.
 
 ## Verify an RDP server's certificate
 

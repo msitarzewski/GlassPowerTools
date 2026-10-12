@@ -66,6 +66,7 @@ When a terminal's machine keeps sessions running with tmux, the Workgroup rememb
 - **A terminal without a session yet** gets a new one the first time the Workgroup opens, and the Workgroup keeps it from then on, on all your devices.
 - **On another device**, the Workgroup joins the same sessions, as a second screen on the same work.
 - New terminals you open on a machine never take a session a Workgroup keeps there.
+- **A basic terminal**, one opened outside tmux, is saved as one, and opens outside tmux again on every device (see [Open a terminal without tmux](terminal-tmux.md#open-a-terminal-without-tmux)).
 
 In **Edit Tab**, **tmux session** shows the session a tab opens on. **Start a New One** gives the tab a new session next time; the old one keeps running, and **Active** lists it.
 

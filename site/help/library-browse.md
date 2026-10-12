@@ -23,7 +23,7 @@ The list shows hosts whose name, other names (**Also known as**), collection nam
 
 Select a host to see two sections.
 
-**Services** lists each service on the host with its kind: **Terminal**, **Database** or **Desktop**. Each row has a **Connect** button (play symbol) and an **Edit** button (pencil). When the row is too narrow, extra actions move into a **More** menu. Rows for tools that a service provides, such as a file browser, appear under the services with an **Open** button. **Add a service…** is at the end of the section.
+**Services** lists each service on the host with its kind: **Terminal**, **Database** or **Desktop**. Each row has a **Connect** button (play symbol) and an **Edit** button (pencil). When the row is too narrow, extra actions move into a **More** menu. Rows for tools that a service provides appear under the services with an **Open** button: **Files** for a Terminal service, and **Basic Terminal**, a shell outside tmux, for one that keeps its terminals in tmux (see [Open a terminal without tmux](terminal-tmux.md#open-a-terminal-without-tmux)). **Add a service…** is at the end of the section.
 
 > [!NOTE]
 > A service marked **Not set up** in orange has no saved settings behind it. Connecting cannot work. Right-click it, or touch and hold it, choose **Remove Service**, then add it again.

@@ -21,7 +21,7 @@ Each level stores only what you change. Anything left on **Default**, or that a 
 2. Under **Text**, turn **Show Line Numbers** and **Wrap Long Lines** on or off.
 3. Under **Size**, use **Smaller** and **Larger** to change **Text Size**, or **Actual Size** to return to 13 pt.
 
-These apply to every open document and to documents opened later, in every editor window that doesn't keep its own. Text size ranges from 8 pt to 32 pt. The same controls are under **All Editors** in an editor window's **Settings**.
+These apply to every open document and to documents opened later, in every editor window that doesn't keep its own. Text size ranges from 8 pt to 32 pt. With **Wrap Long Lines** off, a long line stays on one line and you scroll sideways to read the rest of it, on iPhone, iPad and Vision Pro as on Mac. The same controls are under **All Editors** in an editor window's **Settings**.
 
 **On Mac:** you can also open Settings with ⌘, and change the default text size from the Text menu: **Increase Text Size** (⌘+), **Decrease Text Size** (⌘−) and **Actual Size** (⌘0). In a window that keeps its own **Text Size**, these change that window's size instead.
 

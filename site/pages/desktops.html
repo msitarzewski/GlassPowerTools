@@ -6,7 +6,7 @@ description: RDP and VNC desktops that follow your window's size and adapt to th
 
 <section class="hero">
   <h1>Remote desktops</h1>
-  <p class="lede">RDP for Windows and Linux, tested against Windows 11 and GNOME Remote Desktop, and VNC, including the Apple Remote Desktop sign-in a Mac's Screen Sharing uses (not yet tested against a Mac). Each desktop opens in its own window.</p>
+  <p class="lede">RDP for Windows and Linux, tested against Windows 11 and GNOME Remote Desktop, and VNC, including a Mac's Screen Sharing, signed in with a Mac account and encrypted. Each desktop opens in its own window.</p>
   <div class="cta">
     <a class="button primary" href="help/desktop-add-service.html">Add a remote desktop</a>
     <a class="button" href="index.html">Back to the overview</a>
@@ -35,7 +35,7 @@ description: RDP and VNC desktops that follow your window's size and adapt to th
     </div>
     <div class="card">
       <h3>Adapts to the link</h3>
-      <p>RDP tells the server how fast the connection really is, during the session too. VNC uses Tight with JPEG and chooses its quality from the measured speed: lossless on a fast link, lighter as it slows.</p>
+      <p>RDP tells the server how fast the connection really is, during the session too. VNC's Quality measures the link and moves between levels: lossless on a fast link, lighter as it slows or as the picture starts to arrive late.</p>
     </div>
     <div class="card">
       <h3>Import an .rdp file</h3>
@@ -54,14 +54,14 @@ description: RDP and VNC desktops that follow your window's size and adapt to th
   <div class="two">
     <div>
       <h3>Vision Pro</h3>
-      <p>A desktop is a window you place, resize and see through. Look and pinch to click. A connected keyboard, trackpad or mouse works too. Opacity and frost change how the window sits in the room.</p>
+      <p>A desktop is a window you place, resize and see through. Look and pinch to click. A connected keyboard, trackpad or mouse works too. A Keys menu and an arrow pad send the keys a headset has no keyboard for. Opacity and glass change how the window sits in the room.</p>
       <p>Background removal can make black, a chosen color, or the remote wallpaper transparent, so a remote window floats over your space.</p>
     </div>
     <div>
       <h3>Mac</h3>
-      <p>Mouse or trackpad, with left, right and middle buttons, back and forward, and scrolling. Opacity and frost let the desktop window show what is behind it, as on Vision Pro.</p>
+      <p>Mouse or trackpad, with left, right and middle buttons, back and forward, and scrolling. Opacity and glass let the desktop window show what is behind it, as on Vision Pro.</p>
       <h3>iPad and iPhone</h3>
-      <p>Choose Trackpad or Direct Touch for the pointer. Pinch to zoom the image. Keys that are hard to type have buttons, including Control–Alt–Delete.</p>
+      <p>Choose Trackpad or Direct Touch for the pointer. Pinch to zoom the image. A Keys menu and an arrow pad, also on a bar above the on-screen keyboard, send Escape, Tab, arrows, F1–F12, and Control, Option, Command or Shift with the next key. Control–Alt–Delete is in the Clipboard menu.</p>
     </div>
   </div>
 </section>
@@ -76,10 +76,10 @@ description: RDP and VNC desktops that follow your window's size and adapt to th
     <li>RemoteApp, single remote programs.</li>
     <li>Drive, printer, smart-card and USB redirection. Microphone and camera.</li>
     <li>More than one remote monitor over RDP. UDP transport; connections use TCP.</li>
-    <li>Files through the clipboard. Over VNC, only text, and only Latin-1 characters.</li>
+    <li>Files through the clipboard. Over VNC, only text: any text with a Mac signed in with a Mac account, Latin-1 characters with other servers.</li>
     <li>On Vision Pro and Mac, desktop windows are not restored when you reopen the app.</li>
   </ul>
-  <p><strong>VNC is not encrypted after sign-in.</strong> It protects your password, not the screen or your typing. The setup sheet says so. Use VNC on a network you trust, or use RDP.</p>
+  <p><strong>VNC is not encrypted after sign-in, except to a Mac signed in with a Mac account.</strong> Otherwise it protects your password, not the screen or your typing. Use VNC without a Mac account on a network you trust, or use RDP.</p>
 </section>
 
 <section class="band">
@@ -89,7 +89,7 @@ description: RDP and VNC desktops that follow your window's size and adapt to th
     <a class="card" href="help/desktop-sign-in-and-trust.html"><h3>Sign in and trust</h3><p>NLA, certificates, VNC sign-in, and what is not supported.</p></a>
     <a class="card" href="help/desktop-sessions.html"><h3>Connect and leave</h3><p>Status messages, reconnecting and closing.</p></a>
     <a class="card" href="help/desktop-display-and-scaling.html"><h3>Resolution and zoom</h3><p>Match Window Size, Detail and fixed resolutions.</p></a>
-    <a class="card" href="help/desktop-input.html"><h3>Keyboard, pointer, clipboard, audio</h3><p>Input on each device.</p></a>
+    <a class="card" href="help/desktop-input.html"><h3>Keyboard, pointer, clipboard, audio</h3><p>Input on each device, the Keys menu and the arrow pad.</p></a>
     <a class="card" href="help/desktop-vision-pro.html"><h3>On Apple Vision Pro</h3><p>Window controls, glass and background removal.</p></a>
     <a class="card" href="help/desktop-import-rdp-file.html"><h3>Import an RDP file</h3><p>What the import keeps, and what it refuses.</p></a>
   </div>

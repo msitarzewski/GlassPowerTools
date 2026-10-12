@@ -13,6 +13,7 @@ To move a terminal to another window, touch and hold its tab, or its card in **G
 | Action | Where | Shortcut |
 |---|---|---|
 | New tab with a shell on this Mac, in tmux when that's on | **New Terminal Tab** (the plus button) | ⌘T |
+| New tab with a shell on this Mac outside tmux | **New Basic Terminal Tab** | ⌃⌘T |
 | New tab on the same machine | **New Tab with Same Connection** | ⇧⌘T |
 | New window | **New Terminal Window** | ⌘N in a terminal window |
 | Split with a local shell | **Split Right**, **Split Down** | ⌘D, ⇧⌘D |
@@ -25,6 +26,8 @@ To move a terminal to another window, touch and hold its tab, or its card in **G
 | All tabs as a grid or carousel | **Terminal Grid**, **Terminal Carousel** | ⌥⌘G, ⌥⇧⌘G |
 | Every terminal window and its tabs at once | **Window ▸ Show All Terminals** | ⇧⌘\ |
 | Find in the focused pane | **Edit ▸ Find ▸ Find…**, **Find Next**, **Find Previous** | ⌘F, ⌘G, ⇧⌘G |
+
+The plus button opens a new tab as ⌘T does. Its menu has **New Terminal**; **New Basic Terminal**, a shell on this Mac outside tmux (see [Open a terminal without tmux](terminal-tmux.md#open-a-terminal-without-tmux)); and **New Terminal on**, which lists every saved host with a Terminal service by its machine's name and opens a tab there, in tmux when that host keeps its terminals in tmux. A Terminal service you gave a name of its own shows it after the machine's, for example **alpha — Admin shell**, and two that would still read the same show their user names, for example **alpha (root)** and **alpha (ann)**. **Connect Saved Host…** and the command palette name them the same way.
 
 A new local tab, window or split opened while a local terminal is in front starts in the folder that terminal is in, as Terminal.app's Same Working Directory does; opened from anywhere else, or when that folder no longer exists, it starts in your home folder, or in the working directory set in Settings.
 
@@ -45,7 +48,7 @@ To work with several tabs at once, ⌘-click them in the sidebar, or ⇧-click t
 
 ## Show All Terminals
 
-**On Mac:** see every terminal window and all of its tabs at once, the way Mission Control shows windows. The screen dims, and each terminal window becomes a group, named like its window, with a live picture of each tab. Busy tabs show the same moving wave as in the sidebar.
+**On Mac:** see every terminal window and all of its tabs at once, the way Mission Control shows windows. The screen dims, and each terminal window becomes a group, named like its window, with a live picture of each tab. Busy tabs show the same sweep of light as in the sidebar.
 
 To open it, do any of these:
 
@@ -133,7 +136,7 @@ While input is recorded, the terminal shows **INPUT REC**. Choose **Stop Recordi
 
 ## The Mac's local shell
 
-**On Mac:** choose **Local Terminal** in the library toolbar, or **Connect** on this Mac's **Local Shell** service. A local pane's tools menu adds **New Local Terminal Window** and, after the shell exits, **Restart**. Its **Settings** opens the same Terminal Settings as an SSH terminal's, without port forwarding. **Open Folder Here** opens the shell's directory in Finder. A local terminal starts with your Mac's environment, as Terminal.app's do (so `ssh` finds your agent), and tells programs it is Glass Power Tools through `TERM_PROGRAM`.
+**On Mac:** choose **Local Terminal** in the library toolbar, or **Connect** on this Mac's **Local Shell** service. While local terminals are kept in tmux, **File** ▸ **New Basic Terminal Tab** (⌃⌘T) opens one outside it; see [Open a terminal without tmux](terminal-tmux.md#open-a-terminal-without-tmux). A local pane's tools menu adds **New Local Terminal Window** and, after the shell exits, **Restart**. Its **Settings** opens the same Terminal Settings as an SSH terminal's, without port forwarding. **Open Folder Here** opens the shell's directory in Finder. A local terminal starts with your Mac's environment, as Terminal.app's do (so `ssh` finds your agent), and tells programs it is Glass Power Tools through `TERM_PROGRAM`.
 
 **Secure Keyboard Entry**, in the toolbar and the **Terminal** menu, stops other apps from reading what you type in the focused terminal.
 

@@ -30,6 +30,16 @@ The switch can only be turned on once a connection has found tmux on the machine
 
 If the machine doesn't have tmux, the terminal says so and opens an ordinary shell instead.
 
+## Open a terminal without tmux
+
+For a quick shell that ends when you close it, open a **basic terminal**: one outside tmux, even where terminals are kept in tmux.
+
+- **On a machine that keeps its terminals in tmux, on every device:** select the host in the library and, in its details, choose **Open** (play symbol) on the **Basic Terminal** row below **Files**. On a machine that doesn't, **Connect** already opens a shell outside tmux.
+- **On Mac, over SSH:** in **Connect Saved Host…** (⌥⌘T), turn on **Open without tmux** before you choose the host, or, in the command palette (⇧⌘P), choose **Connect to alpha without tmux**, with the machine's name in place of alpha.
+- **On Mac, a local terminal:** choose **File** ▸ **New Basic Terminal Tab** (⌃⌘T), or **New Basic Terminal** in the plus button's menu. It starts in the folder of the local terminal in front, as ⌘T's tab does. An empty tab offers **Basic Local Terminal** while local terminals are kept in tmux, and the command palette has **Open Basic Local Terminal**.
+
+A basic terminal is never given a tmux session, and never asks whether to use tmux. Closing it, or quitting the app, ends what is running in it. It stays basic: when its window comes back after a relaunch it comes back as a new basic terminal, and a Workgroup saved with it opens it outside tmux again, on every device.
+
 ## Scroll back
 
 tmux keeps its own history, so scrolling over a terminal in tmux scrolls tmux's history: two fingers on a trackpad, a mouse wheel, a finger on iPad and iPhone, or pinch and drag on Vision Pro. Scroll back to the bottom, or press **q**, to return to typing. While you are scrolled back, keys go to tmux's history view rather than to the program.
@@ -78,16 +88,24 @@ To end several, choose them as you would to open them together (above), then rig
 
 ## Local terminals on a Mac
 
-A Mac's own terminals can be kept in tmux too, so quitting or updating Glass Power Tools doesn't stop what's running in them: a build, a server, a long command.
+A Mac's own terminals can be kept in tmux too, so quitting, updating or force quitting Glass Power Tools doesn't stop what's running in them: a build, a server, a long command.
 
 1. Install tmux, for example `brew install tmux`.
-2. Open Settings, choose **Terminal**, and under **Local Terminal** turn on **Keep local terminals running with tmux**. Until the Mac has tmux, the switch is off and says how to install it.
+2. Open Settings, choose **Terminal**, and under **tmux** turn on **Keep local terminals running with tmux**. Until the Mac has tmux, the switch is off and says how to install it.
 
-Each local terminal you open afterwards runs in its own tmux session on the Mac.
+Each local terminal you open afterwards runs in its own tmux session on the Mac. To open one outside tmux, see [Open a terminal without tmux](#open-a-terminal-without-tmux).
 
 - **Quit** the app and the sessions keep running. When it opens again, each tab picks up where it was. Windows of SSH terminals in tmux come back too, each terminal on its own session.
 - **Close** a tab, a pane or a window and its session keeps running, as for a terminal in tmux on any other machine. Its tools menu says **Detach** rather than **Disconnect**.
 - **Active** lists the Mac's sessions under **This Mac**. Those a tab shows say **Open here**, and choosing one brings its tab forward. Open the others again, take one over from another terminal, or end one (swipe left and choose **End**, or right-click and choose **End Session…**). Typing `exit` in the session ends it too.
 - The tab's name follows the program's title, the repository and the folder you `cd` into, as it does without tmux. A Mac's SSH tabs in tmux do the same, from the session on the other machine.
+
+### Running in the background
+
+The Mac's local terminals in tmux run in a background Glass Power Tools process, not in the app itself. Quitting, updating or force quitting the app leaves them running, and so does force quitting another app you started from one of them. The background process has no Dock icon and isn't listed in **Force Quit Applications**. It stops by itself when the last of these terminals ends.
+
+Under **tmux** in Settings ▸ **Terminal**, **Running in the background** shows **Running, 7 terminals** (with however many there are), or **Not running**. **End All Local Terminals…** asks first, then ends tmux on the Mac and every session in it, with whatever they are running, and their tabs close. That includes any tmux sessions you started yourself in another terminal app, because they share the Mac's tmux.
+
+If tmux was already running when you turned the setting on or updated the app, for example one you started in another terminal app, Glass Power Tools uses it as it is. The background process starts with the next tmux: after the Mac restarts, or after **End All Local Terminals…**.
 
 To reach these sessions from another device, turn on **Remote Login** on the Mac (System Settings, **General**, **Sharing**) and add the Mac to the library with a Terminal service that keeps sessions running with tmux. **Active** on your other devices then lists the Mac's sessions like any machine's. On the Mac itself, **Active** recognizes that machine as this Mac and lists its sessions once, under **This Mac**.

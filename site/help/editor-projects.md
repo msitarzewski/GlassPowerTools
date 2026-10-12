@@ -23,7 +23,7 @@ If a project is open but no longer in **Projects** (you removed it while its win
 1. Connect to the machine's Terminal service and open its Files browser.
 2. Open the context menu on a folder and choose **Open in Editor**.
 
-The folder opens as a project in an editor window, over the same SSH connection the Terminal uses, and saves go back to the server. The project is added to **Projects**, tied to that machine, so you can open it again from the list on any of your devices that has the machine in its library.
+The folder opens as a project in an editor window, over the same SSH connection the Terminal uses, and saves go back to the server. If that connection is lost, the project makes a new one the next time it reads a folder or a file, or saves. If it can't, it says so, for example **The connection to alpha was lost and could not be made again. Check that alpha is on and reachable, then try again.** The project is added to **Projects**, tied to that machine, so you can open it again from the list on any of your devices that has the machine in its library.
 
 To edit one file without opening its folder, choose **Edit** on the file instead.
 

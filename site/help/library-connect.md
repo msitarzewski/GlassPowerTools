@@ -24,6 +24,10 @@ Each of these opens one service: the one you connected to last on that host, or 
 
 The host's **Last connected** time and its place in **Recent** change only when a session actually connects. A failed or cancelled attempt does not count.
 
+## Connect from a widget
+
+The **Machines** widget has a button for each service of your favorite and recent machines; choose one to connect. The **Active** widget opens **Active**. See [Widgets](library-widgets.md).
+
 ## See what is open
 
 **Active** lists every open session: terminals, databases, remote desktops and editor windows.

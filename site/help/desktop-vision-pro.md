@@ -8,21 +8,19 @@ Each desktop opens in its own window with the service's name at the top and a ro
 
 | Control | What it does |
 |---|---|
-| **Settings** (gear) | Opens **Desktop Settings**. |
+| **Settings** (gear) | Opens **Desktop Settings**, which also holds the display this window shows and, for Screen Sharing (VNC), **Quality**. See [Give a desktop window its own settings](desktop-sessions.md#give-a-desktop-window-its-own-settings). |
 | **Clipboard** | Sends or copies clipboard text, and sends Control–Alt–Delete. See [Keyboard, pointer, clipboard and audio](desktop-input.md). |
-| **Displays** (two rectangles) | Only for a computer with more than one display: chooses the display this window shows, and opens another display in a window of its own. |
-| **Quality** (gauge) | Only for Screen Sharing (VNC): chooses how much picture the connection carries, under a line showing what it carries now. |
-| **Escape** | Sends the Escape key. |
-| **Tab** | Sends the Tab key. |
-| **Input** (keyboard) | Opens **Send Text**, where you type text and choose **Send** to type it on the remote computer. |
+| **Keys** | **Type Text…**, where you type text and choose **Send** to type it on the remote computer; **Escape** and **Tab**; **Control**, **Option**, **Command** and **Shift** for the next key; navigation keys; and F1–F12. See [Keys that are hard to type](desktop-input.md#keys-that-are-hard-to-type). |
+| **Arrows** | Drag on it to send arrow keys. |
+| ⚡ | Brings the library forward on **Active**. |
 
 The window is at least 800 × 440 points. It keeps the shape of the display it shows as you resize it, so the picture fills it with no bars (**Keep Display Proportions**, in **Desktop Settings** > **This Window**). While **Match Window Size** is changing the remote computer's resolution to match the window, the window can take any shape instead. See [Resolution, scaling and zoom](desktop-display-and-scaling.md) and [Keep a window in its display's shape](desktop-display-and-scaling.md#keep-a-window-in-its-displays-shape).
 
 ## A window for each display
 
-When a computer with several displays connects, each display opens in a window of its own, as if you had a monitor for each: the desktop's window shows the main display, and the others open beside it. Place, resize, zoom and tilt each window on its own; each keeps its display's shape. The pointer and keys go to the display of the window you are using, and the pointer is drawn in whichever window shows the display it is on, at the size the computer shows it. All of them share one connection, except that a Mac with a Retina display beside a standard one gives a display's window a connection of its own, with the same sign-in, so that each display arrives at 1x; see [Retina displays from a Mac](desktop-display-and-scaling.md#retina-displays-from-a-mac).
+When a computer with several displays connects, each display opens in a window of its own, as if you had a monitor for each: the desktop's window shows the main display, and the others open beside it. Place, resize, zoom and tilt each window on its own; each keeps its display's shape. The pointer and keys go to the display of the window you are using, and the pointer is drawn in whichever window shows the display it is on, at the size the computer shows it. All of them share one connection. A Mac sends its whole picture at one scale, so while a Retina display and a standard one are both on screen, each arrives at its own pixels; see [Retina displays from a Mac](desktop-display-and-scaling.md#retina-displays-from-a-mac).
 
-Close a display's window when you don't need it: the others stay connected, and that display stops using the network. Closing the last window ends the session. To open a display again, choose **Displays** and the display under **Open in a New Window**.
+Close a display's window when you don't need it: the others stay connected, and that display stops using the network. Closing the last window ends the session. To open a display again, choose **Settings** in one of the desktop's windows, and under **Displays** in **This Window** choose the display's **Open … in a New Window**, for example **Open Display 2 in a New Window**.
 
 To keep every display in one window instead, set **Display Windows** to **One Window** in **Desktop Settings** > **Connection**, or for every desktop in **Settings** > **Desktops**. See [Several displays](desktop-display-and-scaling.md#several-displays).
 
@@ -31,7 +29,7 @@ To keep every display in one window instead, set **Display Windows** to **One Wi
 - Look at a point on the desktop and pinch to click there. Pinch and drag to drag.
 - Pinching is how you select in visionOS, so it does not zoom the desktop. To see more detail, make the window larger, or use **Local Scale** in **Desktop Settings** > **This Window**.
 - A connected keyboard types directly into the remote computer, and a connected trackpad or mouse points and clicks. To take the keyboard back from the desktop, press ⇧⌘Esc; the desktop has the keyboard again the next time you pinch it.
-- Without a keyboard, use **Input** to send text, and **Escape** and **Tab** for those keys.
+- Without a keyboard, use **Keys** > **Type Text…** to send text, the rest of **Keys** for Escape, Tab, modifiers, navigation and function keys, and **Arrows** for the arrow keys. A connected keyboard's arrow keys go to the remote computer too, not to visionOS.
 
 ## Glass
 

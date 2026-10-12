@@ -6,7 +6,7 @@ The file browser shows a machine's files over SFTP, using the host's Terminal se
 
 - In the library, select the host, then choose **Files** in its detail.
 - In a terminal, choose **Open Folder Here** to open the folder the shell is in.
-- **On Mac:** in the command palette (⇧⌘P), choose **Open SFTP** followed by the connection's name.
+- **On Mac:** in the command palette (⇧⌘P), choose **Open SFTP** followed by the machine's name.
 
 **On Vision Pro and Mac**, the browser opens in its own window. **On iPad and iPhone**, it opens as a sheet over the library or terminal.
 
