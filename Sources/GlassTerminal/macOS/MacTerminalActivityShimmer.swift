@@ -7,8 +7,9 @@
 //  then light (2026-10-12: "Let's make this shimmer light magic style instead of a water wave
 //  look?", and of the three offered, the light sweep): a soft band of light in the tab's colour
 //  glides left to right across the row, like light catching glass, over the faintest tint of the
-//  same colour. It exists only while output is arriving, so an idle window draws nothing; with
-//  Reduce Motion it is a still tint.
+//  same colour. Then softer, narrower and a little slower ("slow to a glisten, lighten it up",
+//  lighter meaning subtler): a glint rather than a wash. It exists only while output is arriving,
+//  so an idle window draws nothing; with Reduce Motion it is a still tint.
 //
 
 import SwiftUI
@@ -19,11 +20,11 @@ struct MacTerminalActivityShimmer: View {
 
     /// Seconds from one pass's start to the next: the sweep, then a short rest, so it reads as
     /// light passing rather than a loading bar.
-    static let period: Double = 1.6
+    static let period: Double = 2.4
     /// The part of the period the band is crossing the row.
-    static let sweep: Double = 1.2
+    static let sweep: Double = 1.8
     /// The band's width, as a share of the row's.
-    static let bandShare: Double = 0.45
+    static let bandShare: Double = 0.32
 
     var body: some View {
         Group {
@@ -36,14 +37,14 @@ struct MacTerminalActivityShimmer: View {
                         let width = geometry.size.width
                         let band = width * Self.bandShare
                         ZStack(alignment: .leading) {
-                            Rectangle().fill(color.opacity(0.06))
+                            Rectangle().fill(color.opacity(0.035))
                             if let center = Self.bandCenter(at: time, width: width, band: band) {
                                 Rectangle()
                                     .fill(LinearGradient(stops: [
                                         .init(color: color.opacity(0), location: 0),
-                                        .init(color: color.opacity(0.16), location: 0.3),
-                                        .init(color: color.mix(with: .white, by: 0.55).opacity(0.42), location: 0.5),
-                                        .init(color: color.opacity(0.16), location: 0.7),
+                                        .init(color: color.opacity(0.08), location: 0.3),
+                                        .init(color: color.mix(with: .white, by: 0.6).opacity(0.26), location: 0.5),
+                                        .init(color: color.opacity(0.08), location: 0.7),
                                         .init(color: color.opacity(0), location: 1),
                                     ], startPoint: UnitPoint(x: 0, y: 0.35), endPoint: UnitPoint(x: 1, y: 0.65)))
                                     .frame(width: band)
