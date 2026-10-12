@@ -336,6 +336,52 @@ struct RFBRoundTrips: Sendable {
     }
 }
 
+// MARK: - Pacing a Mac's pushes
+
+/// The interval a Mac's pushes are armed with, following what each picture costs this client to
+/// take — read off the connection, decoded and handed on — as remotex's `PushPace` does
+/// (`src/vnc_apple.rs`, MIT, Andrew Chen).
+///
+/// A Mac reads no input while it writes a picture, and armed at 0 it writes the next as soon as the
+/// connection drains, for as long as the screen changes: the viewer's keys and clicks wait behind
+/// them. On the owner's headset over a LAN (2026-10-11, evening) a Mac pushed about 100 pictures a
+/// second at 88 Mbit/s, the client never idle, and typing and the arrow keys went unread in bursts.
+/// Keeping the gap after each picture at least as long as the picture took leaves the connection
+/// empty, and the Mac reading input, before the next starts.
+///
+/// The least interval is one push per video frame (33 ms) on a Mac sharing one display, and 0 with
+/// several: 33 ms starved a second display on the owner's Mac (probe `--compare2`), which pacing by
+/// cost still widens from as the client falls behind. The cost is smoothed over a handful of
+/// pictures; the interval is re-armed only when it moves by half either way, at most twice a second,
+/// and never past a second.
+struct RFBPushPace {
+    private(set) var armed: UInt32?
+    private var cost = 0.0
+    private var changedAt: ContinuousClock.Instant?
+
+    static let ceiling: UInt32 = 1_000_000
+    static let rearmRatio = 1.5
+    static let rearmGap: Duration = .milliseconds(500)
+
+    /// A picture took `seconds` to take; `floor` is the least interval. Returns the interval to arm
+    /// when it has moved far enough from the one armed.
+    mutating func observe(seconds: Double, floor: UInt32, at now: ContinuousClock.Instant) -> UInt32? {
+        guard seconds.isFinite, seconds >= 0 else { return nil }
+        cost += (seconds * 1_000_000 - cost) * 0.2
+        let wanted = min(Double(Self.ceiling), max(Double(floor), cost))
+        if let armed {
+            let current = Double(armed)
+            let moved = wanted >= current * Self.rearmRatio || wanted <= current / Self.rearmRatio
+                || (wanted <= Double(floor) && armed != floor)
+            guard moved, changedAt.map({ now - $0 >= Self.rearmGap }) ?? true else { return nil }
+        }
+        let interval = UInt32(wanted)
+        armed = interval
+        changedAt = now
+        return interval
+    }
+}
+
 // MARK: - Counting what arrives
 
 /// Counts every byte the client reads, whatever the encoding or message: the link's measure, and
@@ -536,6 +582,9 @@ final class RFBStreamPlanner: @unchecked Sendable {
     private var asksForPointerPosition = false
     func setAsksForPointerPosition(_ on: Bool) { lock.withLock { asksForPointerPosition = on } }
     private var armingInterval = RFBStreamPlanner.pushInterval
+    /// The interval follows what each picture costs this client (`RFBPushPace`), unless a probe fixed it.
+    private var pacing = true
+    private var pace = RFBPushPace()
     /// The interval and size the Mac was last armed with; nil once a layout dropped the arming.
     private var armed: (interval: UInt32, width: Int, height: Int)?
 
@@ -580,6 +629,9 @@ final class RFBStreamPlanner: @unchecked Sendable {
     /// unread; it measured that with a gateway held to 15% of a core. A Mac also throttles itself by
     /// what the connection drains (the notes, "Other messages").
     static let pushInterval: UInt32 = 0
+    /// One push per video frame: the least interval on a Mac sharing one display (remotex's
+    /// `PUSH_INTERVAL_US`), where 0 buys no picture and costs input (`RFBPushPace`).
+    static let pushIntervalOneDisplay: UInt32 = 33_333
     /// The all-ones interval: a Mac pushes nothing while it is armed with it.
     static let pushesOff: UInt32 = .max
     /// High Performance arms one push a second, for a single pixel: its picture is the media stream,
@@ -638,6 +690,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
             densityScaling = false
             quality = .balanced
             armingInterval = Self.highPerformancePushInterval
+            pacing = false
             armed = nil
         }
     }
@@ -804,6 +857,11 @@ final class RFBStreamPlanner: @unchecked Sendable {
             if quality == .automatic, let level = governor.observe(bytes: bytes, seconds: seconds, at: now) {
                 VNCDiagnostics.note(Self.logger, .default, category: "planner", "event=automatic level=\(level.rawValue) bytes=\(bytes) seconds=\(String(format: "%.3f", seconds))")
             }
+            if changed, pacing, dialect == .apple, !highPerformance {
+                if let interval = pace.observe(seconds: seconds, floor: pushFloor, at: now) {
+                    VNCDiagnostics.note(Self.logger, .default, category: "planner", "event=push-pace interval=\(interval) cost=\(Int(seconds * 1_000_000))")
+                }
+            }
         }
     }
 
@@ -822,6 +880,9 @@ final class RFBStreamPlanner: @unchecked Sendable {
     var lateness: (roundTrip: Double?, queued: Double?, level: VNCQuality) {
         lock.withLock { (roundTrips.smoothed, roundTrips.queued, active.level) }
     }
+
+    /// The interval a Mac's pushes are armed with now, in microseconds; nil while unarmed.
+    var armedInterval: UInt32? { lock.withLock { armed?.interval } }
 
     func currentDecoder() -> RFBPixelDecoder { lock.withLock { decoder } }
 
@@ -945,6 +1006,9 @@ final class RFBStreamPlanner: @unchecked Sendable {
         }
     }
 
+    /// The least push interval (`RFBPushPace`): one a video frame on one display, 0 over several.
+    private var pushFloor: UInt32 { displays.count > 1 ? Self.pushInterval : Self.pushIntervalOneDisplay }
+
     /// A Mac armed to push its pictures: no request is what holds them back.
     private var pushesInPlay: Bool {
         dialect == .apple && arming && appleDisplayLayout && layoutSeen && !highPerformance
@@ -959,7 +1023,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
     private func planArming(paused: Bool, into out: inout [[UInt8]]) {
         guard dialect == .apple, arming, appleDisplayLayout, layoutSeen, width > 0, height > 0,
               scaleAsked == nil, displayAsked == nil, !holding, formatMarkerSentAt == nil else { return }
-        let interval = paused ? Self.pushesOff : armingInterval
+        let interval = paused ? Self.pushesOff : pacing ? (pace.armed ?? pushFloor) : armingInterval
         let (armWidth, armHeight) = highPerformance ? (1, 1) : (width, height)
         if let armed, armed.interval == interval, armed.width == armWidth, armed.height == armHeight { return }
         out.append(RFBAppleDisplayLayout.autoFramebufferUpdateMessage(interval: interval, width: armWidth, height: armHeight))
@@ -968,7 +1032,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
 
     /// Whether a Mac is armed to push (`AutoFrameBufferUpdate`). On unless a probe compares.
     func setArming(_ on: Bool, interval: UInt32 = RFBStreamPlanner.pushInterval) {
-        lock.withLock { arming = on; armingInterval = interval; armed = nil }
+        lock.withLock { arming = on; armingInterval = interval; pacing = false; armed = nil }
     }
 
     /// Asks a Mac for the display wanted, once it has shown it sends layouts; returns when to look

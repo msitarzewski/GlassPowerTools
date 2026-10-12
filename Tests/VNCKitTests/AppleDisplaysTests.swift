@@ -313,7 +313,7 @@ struct ServerScalingPlannerTests {
             return UInt32(message[4]) << 24 | UInt32(message[5]) << 16 | UInt32(message[6]) << 8 | UInt32(message[7])
         }
         planner.appleLayoutArrived(serverScale: 1, width: 4480, height: 1800)
-        #expect(messages(at: start).compactMap(arming) == [0], "armed at 0")
+        #expect(messages(at: start).compactMap(arming) == [33_333], "armed, one push a video frame")
         planner.setQuality(.dataSaver)
         let stopping = messages(at: start)
         #expect(stopping.compactMap(arming) == [RFBStreamPlanner.pushesOff], "the pushes stop first")
@@ -328,7 +328,7 @@ struct ServerScalingPlannerTests {
         #expect(planner.currentDecoder().colourDepth == .thousands)
         #expect(switched.contains { $0.first == 8 }, "then Data Saver's scale")
         planner.appleLayoutArrived(serverScale: 0.75, width: 3360, height: 1350)
-        #expect(messages(at: start + .seconds(2)).compactMap(arming) == [0], "armed again, after SetPixelFormat")
+        #expect(messages(at: start + .seconds(2)).compactMap(arming) == [33_333], "armed again, after SetPixelFormat")
 
         // A marker that never comes: the change goes after five seconds.
         planner.setQuality(.best)

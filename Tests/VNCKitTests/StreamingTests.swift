@@ -456,6 +456,57 @@ struct AutomaticQualityTests {
         }
     }
 
+    @Test("a Mac's pushes are paced by what a picture costs: a frame at least on one display, 0 over several, never past a second")
+    func pushPace() {
+        let start = ContinuousClock.now
+        func at(_ ms: Int) -> ContinuousClock.Instant { start + .milliseconds(ms) }
+        var pace = RFBPushPace()
+        #expect(pace.observe(seconds: 0.005, floor: 33_333, at: at(0)) == 33_333, "a cheap picture: one a video frame")
+        #expect(pace.observe(seconds: 0.006, floor: 33_333, at: at(10)) == nil, "unchanged")
+        // A client falling behind: 200 ms a picture widens the gap, by half at a time, twice a second at most.
+        var armed: [UInt32] = []
+        for step in 1...40 {
+            if let interval = pace.observe(seconds: 0.2, floor: 33_333, at: at(10 + step * 100)) { armed.append(interval) }
+        }
+        // Once, half a second after the last arming, at the smoothed cost; then held, since the cost
+        // never rises by half again.
+        #expect(armed.count == 1 && (120_000...200_000).contains(armed.first ?? 0), "widened: \(armed)")
+        // Caught up: straight back down to the floor once the smoothed cost falls.
+        var last: UInt32?
+        for step in 1...40 { last = pace.observe(seconds: 0.004, floor: 33_333, at: at(5_000 + step * 600)) ?? last }
+        #expect(last == 33_333)
+        // Several displays: no floor but what a picture costs; a very slow picture is held to a second.
+        var several = RFBPushPace()
+        #expect(several.observe(seconds: 0.001, floor: 0, at: at(0)) == 200)
+        for step in 1...60 { _ = several.observe(seconds: 5, floor: 0, at: at(step * 600)) }
+        #expect(several.armed == RFBPushPace.ceiling)
+    }
+
+    @Test("a Mac's pushes are armed with the paced interval; a probe's fixed one stays")
+    func pacedArming() {
+        let planner = RFBStreamPlanner()
+        planner.setQuality(.balanced)
+        planner.start(width: 100, height: 100, dialect: .apple)
+        _ = planner.openingMessages()
+        planner.appleLayoutArrived(serverScale: 1, width: 100, height: 100,
+                                   displays: [VNCScreen(id: 1, x: 0, y: 0, width: 100, height: 100, flags: 0, isMain: true)])
+        _ = planner.decide(at: .now) { _ in }
+        #expect(planner.armedInterval == 33_333)
+        let start = ContinuousClock.now
+        for step in 0..<20 { planner.updateEnded(bytes: 50_000, seconds: 0.3, changed: true, encodingBytes: [:], at: start + .milliseconds(600 * step)) }
+        _ = planner.decide(at: .now) { _ in }
+        #expect((100_000...300_000).contains(planner.armedInterval ?? 0), "the gap follows the cost")
+        let fixed = RFBStreamPlanner()
+        fixed.setQuality(.balanced)
+        fixed.setArming(true, interval: 0)
+        fixed.start(width: 100, height: 100, dialect: .apple)
+        _ = fixed.openingMessages()
+        fixed.appleLayoutArrived(serverScale: 1, width: 100, height: 100)
+        for _ in 0..<20 { fixed.updateEnded(bytes: 50_000, seconds: 0.3, changed: true, encodingBytes: [:], at: .now) }
+        _ = fixed.decide(at: .now) { _ in }
+        #expect(fixed.armedInterval == 0, "the probe's own interval")
+    }
+
     @Test("small updates say nothing about the link")
     func smallUpdatesIgnored() {
         var governor = RFBLinkQualityGovernor()

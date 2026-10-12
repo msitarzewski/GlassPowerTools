@@ -314,7 +314,8 @@ public final class VNCClient: Sendable {
                             + "outstanding=\(flow.outstanding) sinceRequest=\(seconds(flow.sinceRequest)) waiting=\(seconds(flow.waiting)) "
                             + "requested=\(area) scale=\(self.planner.serverScaleInForce) sending=\(self.planner.currentDisplay.map(String.init) ?? "all") "
                             + "painted=\(painted.isEmpty ? "none" : painted) lit=\(self.state.content ?? "unknown") "
-                            + "level=\(late.level.rawValue) roundTripMs=\(milliseconds(late.roundTrip)) queuedMs=\(milliseconds(late.queued))")
+                            + "level=\(late.level.rawValue) roundTripMs=\(milliseconds(late.roundTrip)) queuedMs=\(milliseconds(late.queued)) "
+                            + "armedUs=\(self.planner.armedInterval.map(String.init) ?? "-")")
                         last = (counts.updates, counts.frames, counts.rectangles, bytes)
                     }
                     // A High Performance stream that owes something and is late ends the session.
