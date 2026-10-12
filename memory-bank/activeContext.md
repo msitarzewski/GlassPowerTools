@@ -27,6 +27,15 @@ anything touching real servers (SSH and database tests use the disposable test V
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
+## 2026-10-11 (late night) — High Performance built; quality-switch crash fixed
+
+**Installed: 0.4.367 on Mac, Vision Pro and iPhone** (19:58–20:05; headset and iPhone were locked, not launched).
+Since 93d5f88: High Performance mode (6211b12, f53eb38, 963d0de, 02453cc, fabb375, c2ed00c — D65), the Quality-change
+decode crash on the hotspot (1f2a01c). **Next:** owner tries High Performance on the headset (Desktop window settings ▸
+Mac Screen Sharing ▸ High Performance, then reconnect) with the Mac at hand; first pull the headset log and read
+`event=hp-decoder-check`; then the `hp-*` / `media-*` lines of a session. Then: live resize of the virtual display,
+two virtual displays, the W39 orb check on the headset, scroll/clipboard check.
+
 ## 2026-10-11 (night) — after the compaction
 
 **Installed: Mac 0.4.364; Vision Pro + iPhone still 0.4.361** (off-network all evening; install 0.4.364 when `devicectl`

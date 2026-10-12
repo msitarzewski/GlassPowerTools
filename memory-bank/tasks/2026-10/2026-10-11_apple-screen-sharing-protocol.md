@@ -105,3 +105,18 @@ SetDisplayConfiguration virtual displays, media stream (SRTP, HEVC via VideoTool
   Bonjour (LAN only; would need NSBonjourServices + local-network permission — owner's call). **e5912f5 / 0.4.364:**
   services probed on their capability's interval (VNC 10 min, others 1 min); a service with a session open is not
   probed and reads as answering. Shell 273, desktop capability 12.
+- **Headset log of the hotspot drive (pulled at 19:51):** Balanced 31–54 MB per 5 s (≈ 50–87 Mbit/s), client never waiting.
+  Three sessions ended 50 ms–1.3 s after a Quality change: "ZRLE palette index out of range" ×2, "Unsupported ZRLE
+  subencoding 57" — SetPixelFormat switched the decoder while seconds of pushed old-format pictures were in flight. The
+  first came as Data Saver asked 0.75 → `server-scale-refused` → no scale for the rest of the run. Also many "Network
+  error 53" (hotspot drops). **1f2a01c / 0.4.366:** on a pushing Mac a depth change disarms, sends a SetEncodings marker,
+  switches only on its layout (5 s fallback), re-arms after SetPixelFormat; W36 counts only `.connectionClosed`.
+- **High Performance (0.4.365–0.4.367, behind "Mac Screen Sharing: High Performance (Experimental)"):** ported from
+  remotex `vnc_apple_media.rs` + notes: offers byte-identical to Apple's captured blobs; SRTP/SRTCP against remotex's
+  vectors; RFC 7798 depacketizer (one tile, refresh/ack); VideoToolbox decode of remotex's 4:4:4 fixture to FFmpeg's
+  colours (Mac, visionOS and iOS simulators); UDP receiver loopback test (stand-in Mac → 3 pictures, sound unit,
+  authentic reports); state machine (ports first, one offer at a time, 10 s / 48 s deadlines); client order checked
+  against a scripted Mac in records; AAC-ELD: this Mac's encoder's ASC is exactly F8 E6 50 00 and a 1 kHz tone decodes.
+  The app decodes the 4:4:4 sample at launch and logs `event=hp-decoder-check` — **read the headset's and iPhone's log
+  to learn whether they decode 4:4:4.** Not yet run against a real Mac. Known gaps: no live resize of the virtual
+  display (size fixed at connect), two virtual displays not offered, H.264 fallback not built.

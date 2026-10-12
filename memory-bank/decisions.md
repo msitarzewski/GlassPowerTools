@@ -1359,3 +1359,19 @@ has none), Mac via `contentAspectRatio`; left free while Match Window Size resiz
 in points, drawn at density × server scale; CursorPos (1100) and the cursor cache (1104) advertised on Apple servers;
 a hidden pointer returns on movement. **Needs the owner's probe run:** a second session, SetDisplay under RFB 3.8,
 1100/1104 delivery, CursorPos coordinates, hand-resizing under `.uniform` on the headset.
+
+## D65 — Automatic watches lateness; High Performance mode behind a switch — Implemented 2026-10-11 (HP unverified on a Mac)
+**Owner** (hotspot drive): "bandwidth isn't the issue right?"; Data Saver "much more responsive"; agreed order: latency-aware
+Automatic, availability probe, then High Performance "behind a switch, probe first". **Decisions:** (1) Automatic steps
+down for updates ≥ 0.25 s and for TCP queueing (smoothed RTT over the 2-minute base, NWConnection transfer report) ≥ 200 ms
+twice; a Mac's Automatic stops at Balanced (8b9f39d). (2) Availability: VNC probed every 10 min (each probe starts the
+Mac's screensharingd + agent for 15 s), none while connected (e5912f5); Bonjour `_rfb._tcp` left to the owner (needs the
+local-network permission). (3) **High Performance (Experimental)** as a per-desktop "Mac Screen Sharing" setting
+(Standard / High Performance), taken at connect: a virtual display the window's points × density, HEVC 4:4:4 decoded by
+VideoToolbox, AAC-ELD by AudioToolbox, SRTP/RTCP/RCTL as remotex measured (MIT, credited), one tile a frame (refresh
+pictures after loss), Data Saver caps 8 Mbit/s, Lowest 3, else the Mac's 20–60 Mbit/s controller (6211b12…c2ed00c).
+The probe cannot test it against the owner's own Mac (the stream needs the same UDP ports at both ends; a botched offer
+once crashed WindowServer and logged the user out), so it is tested in the app on the headset with the owner present.
+(4) A colour-depth change on a pushing Mac waits for a SetEncodings layout marker (1f2a01c): the hotspot log showed three
+sessions killed by misread in-flight pictures, and the first one tripped W36 (why no scale was ever asked); W36 now
+counts only the Mac closing the connection, for 10 minutes.
