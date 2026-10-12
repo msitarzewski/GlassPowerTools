@@ -11,7 +11,7 @@ this project's `activeContext`, `progress`, `decisions` (D1–D68), all 91 task 
 and site, the private agent memory, and GitHub (no repository yet); then the three original apps (glas.sh,
 glassdb, glassDT) and the three absorbed packages (GlassEditorKit, GlassConnectionKit, GlasSecretStore),
 including their uncommitted and unpushed local branches. Spot-checked by hand: B-X1, B-X3, B-X25, B-F44,
-B-H1, B-H9, and the rule 61 find below. Items found finished are left out; IDs are for picking ("do B-X1").
+B-H1, B-H9, B-X21, and the rule 61 find below. Items found finished are left out; IDs are for picking ("do B-X1").
 
 **Fixed during the sweep** (committed): the VNC setup warning (262ba7a); SECURITY.md's VNC paragraph; a real
 database name in `GlassCommandPaletteTests.swift` (rule 61; it is still in history from 6425ac5).
@@ -20,13 +20,79 @@ database name in `GlassCommandPaletteTests.swift` (rule 61; it is still in histo
 `agent/keyboard-command-center` branches, and glas.sh's SSH-key backlog is the unpushed commit 634d97c on
 `agent/ssh-key-source-backlog`. Their content is now in section 5.
 
-## 0. Recommended first
+## 0. Order of importance
 
-1. **B-X1** — the editor reads any local file whole on the main thread (a FIFO hangs the app). A protection
-   the editor kit had, bypassed by the new editor.
-2. **B-F44** — iPhone Duo ships 2026-10-23 and the app refuses windows on a phone.
-3. **B-H9** — the first weekly dependency check's three failures, unread.
-4. **B-H1 – B-H3** — public pages that say less than the app does.
+Claude's ranking, recorded at the owner's request ("put these in memory by your order of importance"). The
+owner may reorder; the sections below keep the detail. Within a tier, earlier is more important.
+
+**Tier 1 — protect the owner's machines and data** (each small and contained)
+1. B-X1 — a FIFO or a link to `/dev/zero` in a local project hangs the app or exhausts memory.
+2. B-X9 — the editor's save path can follow a swapped parent directory.
+3. B-X21 — Citadel's `writeCompositeSSHString` advances the writer without reserving (`DH-Helpers.swift:264`);
+   reachable, since group-14 key exchange is enabled (`SSHTransport.swift:25`). Prove or rule out a crash first.
+4. B-X3 — a deleted SSH key is quietly replaced by another key, which is then offered to the host.
+5. B-X14 — an unreadable record vanishes without a log line; a stale list can delete another device's record.
+6. B-X8 — a regular expression in Find can hang the app.
+7. B-X23 — keep every device on one build (older builds strip workgroups' tmux names).
+
+**Tier 2 — dated, or gating the first release**
+8. B-F44 — iPhone Duo ships 10-23; the app refuses windows on a phone.
+9. B-H9 with B-Q28 — the dependency check's three failures; follow SwiftTerm's Ghostty-based v1.99 or not.
+10. B-X25 — nothing handles sleep and wake.
+11. B-H1–B-H4 — public pages and notes that contradict the app.
+12. B-V4 — the D26 two-device acceptance and sync checks: the product's central promise, never run end to end.
+13. B-T5 — a full package run with the screen unlocked (last 09-27).
+14. B-T8 — release QA: OS 26 at run time, Instruments, an assistive-technology pass, IME and layouts, OSV.
+15. B-R7 — RDP and H.264/HEVC licensing clearance before any distribution.
+16. B-R1 → B-R4, then B-Q27, B-R5, B-R6 — the owner's release path in order: Sparkle key, Developer ID,
+    the first release run, the site; then the scrub decision, the repository, the first push.
+17. B-R8, B-R9 — after the first push: retire the old repositories; send the upstream contributions.
+
+**Tier 3 — defects felt in daily use**
+18. B-X5 — a dropped shared SSH connection leaves terminals that do not say so.
+19. B-X4 — drag-select cannot reach tmux history on the Mac.
+20. B-X10, B-X11 — the database breadcrumb; Query commands dead on table tabs.
+21. B-X2 with B-Q11 — the editor notices an outside change only at save; then retire the legacy sheet.
+22. B-X6 with B-F32 — RDP colour distortion in motion, and the graphics-mode escape.
+23. B-X7 — RDP on Vision Pro asks for twice the pixels; whole-frame copies.
+24. B-X13 — Local Network blamed for any failure.
+25. B-X12, B-X26 — look again: grid rows over the header; the first headset terminal window small.
+26. B-X15–B-X20, B-X24, B-X22 — the rest.
+
+**Tier 4 — the owner's decisions, best taken in one sitting** (each unblocks work)
+27. B-Q1 (D46 pinch gestures), B-Q4 (D63 light/dark), B-Q2 (D50), B-Q6 (SSH tabs in the remote folder).
+28. B-Q3 (D53 spike), B-Q5 (Bonjour), B-Q7–B-Q10 (headset looks), B-Q19 (Paste Text).
+29. B-Q12–B-Q18, B-Q20–B-Q26.
+
+**Tier 5 — checks owed, done with the devices at hand**
+30. B-V3 Mac (High Performance with the real Mac first), B-V1 Vision Pro, B-V2 iPhone and iPad, B-V5 servers.
+
+**Tier 6 — features, by value to the product**
+31. B-F40 — terminal, database and desktop together in Workgroups: AGENTS.md's differentiator.
+32. B-F13 — open the same set on another device.
+33. B-F34 — VNC and RDP through SSH, with an encryption indicator in the session.
+34. B-F1, B-F2, B-F3 — SSH agent, MFA and certificates, ECDSA: what real servers ask for.
+35. B-F5 — SFTP folders.
+36. B-F45, B-F50, B-F51 — the owner's own asks: editor window size, resizable sidebars, detaching a key.
+37. B-F31 — the remote background found through SSH (the owner's glassDT requirement).
+38. B-F20, B-F28 — transactions; SQL documents run from the editor; the Cancel warning.
+39. B-F17, B-F9 — Apple Intelligence over a database and over terminal output, read-only and bounded.
+40. B-F48, B-F49 — App Intents, Shortcuts, Spotlight, Handoff; the palette on every device.
+41. B-F47 — editor accessibility (also part of B-T8).
+42. B-F8, B-F7, B-F6 — shell integration, recordings, saved forwards.
+43. B-F18, B-F19, B-F21–B-F27, B-F29, B-F30 — database depth.
+44. B-F33, B-F35–B-F39 — remote desktop depth.
+45. B-F41, B-F42, B-F43, B-F46 — editor depth.
+46. B-F56 — the cross-device credential lifecycle (before anyone else uses the product).
+47. B-F10, B-F11, B-F12 — terminal performance, conformance, engine (with B-Q28).
+48. B-F4, B-F14–B-F16, B-F52–B-F54 — smaller.
+49. B-F55, B-F57 — deferred by design: curved display, XPC engines, watchOS.
+
+**Tier 7 — infrastructure and cleanup**
+50. B-T1 (seeded configurations for UI tests), B-T4 (flaky tests), B-T2, B-T3, B-T6, B-T9.
+51. B-H5–B-H8 cleanup; B-T7 CI once the repository exists.
+
+**Tier 8 — accepted limits** (section 7): revisit when someone other than the owner uses the product.
 
 ## 1. Waiting on the owner's decision
 
@@ -81,8 +147,8 @@ database name in `GlassCommandPaletteTests.swift` (rule 61; it is still in histo
 
 - **B-X1** Local files are read whole with `Data(contentsOf:)` on the main actor
   (`Sources/GlassEditor/GlassEditorFileAccess.swift:90`): no non-regular-file refusal, no 8 MB ceiling. A FIFO
-  in a project hangs the app; a link to `/dev/zero` reads until memory runs out. Remote reads are uncapped
-  too (`SFTPSession.swift:226`). The kit's `DocumentLoader` fix (M-4) is used only by the legacy sheet.
+  in a project hangs the app; a link to `/dev/zero` reads until memory runs out. (Remote reads are capped at
+  64 MB, `GlassTerminalCapability.swift:914`.) The kit's `DocumentLoader` fix (M-4) is used only by the legacy sheet.
 - **B-X2** The new editor checks for an outside change only when saving, not when its window comes forward;
   only the legacy sheet does (deleting it, B-Q11, would lose the behaviour).
 - **B-X3** A deleted SSH key quietly becomes the library's first key when the server's form opens, and a key
@@ -111,8 +177,8 @@ database name in `GlassCommandPaletteTests.swift` (rule 61; it is still in histo
 - **B-X18** The ECDSA error text contradicts itself (`SSHTransportError.swift:44` vs `:77`).
 - **B-X19** visionOS library search unreachable through accessibility; schema sidebar rows have no button trait.
 - **B-X20** The database workspace window can shrink when its id is not found (`GlassDatabaseScenes.swift:35`).
-- **B-X21** Vendored Citadel `DH-Helpers.swift:82,117,264` keep the `moveWriterIndex` placeholder pattern patch C2
-  fixed elsewhere; C6 overloads drop options (the app does not use them). S6 (credentials not zeroed) and S7
+- **B-X21** Vendored Citadel's `writeCompositeSSHString` (`DH-Helpers.swift:264`) moves the writer index without
+  reserving, the pattern patch C2 fixed elsewhere (`:82` and `:117` reserve first); C6 overloads drop options (the app does not use them). S6 (credentials not zeroed) and S7
   (Keychain read before the host key is checked) need a Citadel change.
 - **B-X22** Remote listing never checks `hasSafeName`; project reach ignores pinned host keys (both low).
 - **B-X23** Older device builds strip workgroups' tmux names when they re-save — keep devices on one build.
@@ -240,20 +306,20 @@ Already folded into the lists above, by source, so the record of where they came
 
 ## 6. Checks owed on devices and servers
 
-- **Vision Pro:** the W39 orb; tab groups reopen and grid-card drags (W15); W26 title drop; W16 Files window;
+- **B-V1 Vision Pro:** the W39 orb; tab groups reopen and grid-card drags (W15); W26 title drop; W16 Files window;
   Keep Display Proportions under hand-resizing; High Performance's `hp-decoder-check`; the schema diagram
   volume; the results bar; the Settings ornament; Reduce Transparency; tilt and legibility; a remote project;
   SwiftTerm 1.20; tmux pan scrolling; W21 limits; arrow keys; widgets.
-- **iPhone and iPad:** widgets placed and tapped; landscape with the keyboard and the Pro Max layout; tmux pan;
+- **B-V2 iPhone and iPad:** widgets placed and tapped; landscape with the keyboard and the Pro Max layout; tmux pan;
   W11 rename menus (compile-only); W27 sheets on iPad; the schema diagram sheet; a hardware keyboard on
   desktops; a VoiceOver pass on the library and service picker; the Open File security-scope fix.
-- **Mac:** widget taps; High Performance, Apple scroll (0x17) and pasteboard with a real Mac; Automatic quality
+- **B-V3 Mac:** widget taps; High Performance, Apple scroll (0x17) and pasteboard with a real Mac; Automatic quality
   on a hotspot; the D64 probe; the database scroll edge; W9 menu bar; W8 multi-tab drag; W20/W27 settings;
   the screenshot-thumbnail drop; a Force Quit of the app while it hosts tmux; Open With from the Finder; the
   launchd host taking over from the pre-D66 server; the macOS 26.0 floor at run time (compile-only so far).
-- **Across devices:** D26 two-device acceptance; Stage 3.5 #4/#6/#7 (offline convergence, re-auth, iCloud
+- **B-V4 Across devices:** D26 two-device acceptance; Stage 3.5 #4/#6/#7 (offline convergence, re-auth, iCloud
   sign-out); favourites and workgroups syncing on real devices.
-- **Servers:** RDP with an intermediate CA; resize against Windows; RDP audio on a device; Windows autodetect
+- **B-V5 Servers:** RDP with an intermediate CA; resize against Windows; RDP audio on a device; Windows autodetect
   (the test account needs a reset); TightVNC and other VNC servers; a macOS RDP server; GNOME sign-out closing
   the window; Ubuntu Detail scale; PostgreSQL CA-only TLS and an intermediate chain; PostgreSQL arrays; SQLite
   row delete and foreign-key follow; local MySQL/PostgreSQL on This Mac; forwards (local, remote, SOCKS5),

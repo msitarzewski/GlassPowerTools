@@ -70,8 +70,10 @@ claims corrected. **Done after the compaction (the owner's first ask):** the VNC
 Mac user name it says a Mac is encrypted after sign-in and other servers protect only the password; without one it
 keeps the orange warning and names adding the Mac's user name as the fix. Help page `desktop-add-service.md` matches.
 **Then the backlog inventory** (`tasks/2026-10/2026-10-12_backlog-inventory.md`): every open item, with IDs, including
-the original apps' lists that never came forward. Recommended first: B-X1 (editor reads FIFOs and huge files whole on
-the main actor), B-F44 (iPhone Duo ships 10-23), B-H9 (weekly dependency failures), B-H1–H3 (stale site pages).
+the original apps' lists that never came forward. **Its section 0 is the order of importance** (the owner asked for
+it): tier 1 protects machines and data (B-X1 FIFO/huge local reads on the main actor, B-X9 save race, B-X21 Citadel
+writer, B-X3 key substitution, B-X14 silent record loss, B-X8 regex hang); tier 2 is dated or release-gating (B-F44
+iPhone Duo 10-23, B-H9 dependency failures, B-X25 sleep/wake, stale docs, B-V4 two-device acceptance). Work from it.
 
 ## 2026-10-11 (late night) — High Performance built; quality-switch crash fixed
 
