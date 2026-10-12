@@ -374,7 +374,7 @@ let package = Package(
             ]
         ),
         .testTarget(name: "GlassDesktopTests", dependencies: ["GlassDesktop"]),
-        .testTarget(name: "VNCKitTests", dependencies: ["VNCKit"]),
+        .testTarget(name: "VNCKitTests", dependencies: ["VNCKit"], resources: [.copy("Fixtures")]),
         .testTarget(name: "GlassRDPTransportTests", dependencies: ["GlassRDPTransport"]),
         .testTarget(name: "GlassVNCTransportTests", dependencies: ["GlassVNCTransport"]),
         .testTarget(name: "GlasSecretStoreTests", dependencies: ["GlasSecretStore"]),

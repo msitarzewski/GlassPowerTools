@@ -128,6 +128,7 @@ Small extractions rather than whole modules; each carries its attribution in the
 | `MacKeyboardMapping.swift` | RDPKit 0.3.1 `Examples/RDPClient/RemoteInputCaptureView.swift` (MIT). The example app is not carried; this mapping is. |
 | `DesktopAudioPlayer.swift` | RDPKit's AVAudioEngine example player (MIT), adapted with bounded scheduling and generation safety. |
 | `Sources/VNCKit/RFBAppleRecordLayer.swift`, the 003.889 handshake in `VNCClient.swift` | remotex (MIT, Copyright (c) 2026 Andrew Chen, https://github.com/andrewtheguy/remotex): `src/vnc_record.rs`, `src/vnc_apple.rs`, `src/vnc.rs` and `docs/apple-vnc-889.md`, ported to Swift and CommonCrypto. |
+| `Sources/VNCKit/RFBAppleMediaNegotiation.swift`, `RFBAppleSRTP.swift`, `RFBAppleHEVC.swift`, `RFBAppleVideoDecoder.swift` (High Performance) | remotex (MIT, as above): `src/vnc_apple_media.rs`, `src/vnc_apple.rs` and `docs/apple-vnc-889.md` ("The media stream", "The High Performance virtual display"), ported to Swift, CommonCrypto and VideoToolbox. The tests carry its captured offers, SRTP vectors and rate report, and `Tests/VNCKitTests/Fixtures/hevc-444-64x48.h265` is its `tests/fixtures` file, unchanged. |
 
 ## System libraries
 
