@@ -47,3 +47,19 @@ agent; findings checked in the code.
 - The release script's Developer ID export now has a Mac widget to sign (it said so before it was
   true); check on the next Mac release.
 - Workgroups and Controls widgets were offered and not chosen.
+
+## After: counts and the Mac's read (6ca8927, b554534; 0.4.385 on all three)
+
+- Active counted a Mac's local tmux tabs (Active's running rows marked open here, W6) as running:
+  "0 open · 22 running". Now open, as Active shows them.
+- The Mac widget still read nothing: logged as Cocoa 257, permission denied. Xcode signed the Mac
+  extension with the wildcard "Mac Team Provisioning Profile: *", which cannot grant a `group.` App
+  Group, so the sandbox kept it out though its signature named the group (iOS/visionOS extensions
+  have the explicit profile). On a Mac the snapshot now lives in a team-prefixed group,
+  `GPT_WIDGET_GROUP` = `7JQGQ7CRH8.com.glasspowertools.widgets` (no profile needed), elsewhere the
+  library's group; Info.plist key `GlassWidgetGroup`. Verified: the restarted extension reads it;
+  the owner sees the counts.
+- The snapshot was rewritten every minute unchanged (dates to the second vs fractions): compared
+  as written now.
+- A backboardd abort on the headset at 11:34 (RealitySimulation, xrOS 27.2 beta) was the owner
+  viewing a three.js page in the browser: unrelated.
