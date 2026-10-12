@@ -143,6 +143,19 @@ struct GlassDesktopCapabilityTests {
         #expect(draft.validate(address: "10.0.0.9").isEmpty)
     }
 
+    @Test("The sheet's Screen Sharing note follows the user name: a Mac account is encrypted, a password alone is not")
+    func vncPrivacyNoteFollowsTheUserName() async throws {
+        let (runtime, root) = try await makeRuntime()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let draft = try #require(GlassDesktopCapability(runtime: runtime).makeSetupDraft() as? DesktopServiceDraft)
+        draft.username = "alpha"
+        #expect(!draft.vncSignsInWithMacAccount, "RDP has no such note")
+        draft.desktopProtocol = .vnc
+        #expect(draft.vncSignsInWithMacAccount)
+        draft.username = "  "
+        #expect(!draft.vncSignsInWithMacAccount, "blank once trimmed, as the record saves it")
+    }
+
     @Test("A deliberate port survives a protocol change")
     func aTypedPortIsNotOverwritten() async throws {
         let (runtime, root) = try await makeRuntime()

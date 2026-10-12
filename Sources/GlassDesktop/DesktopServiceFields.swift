@@ -40,10 +40,19 @@ struct DesktopRequiredFields: View {
                 .accessibilityIdentifier("\(identifierPrefix)-protocol")
                 .onChange(of: draft.desktopProtocol) { _, _ in draft.protocolDidChange() }
             })
-            if draft.desktopProtocol == .vnc {
-                // Said where the choice is made: the RFB security types this client speaks protect
-                // the password at sign-in and nothing after it.
-                Label("VNC protects the password at sign-in, not what follows: the screen and your typing cross the network readable. Use it on a network you trust.",
+            if draft.vncSignsInWithMacAccount {
+                // Said where the choice is made: a Mac reached with its user name is encrypted
+                // after sign-in (e7463ce); any other server still is not.
+                Label("A Mac is encrypted after it signs you in with this account. A server that isn't a Mac protects the password at sign-in, not what follows.",
+                      systemImage: "lock")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("\(identifierPrefix)-vnc-encrypted")
+            } else if draft.desktopProtocol == .vnc {
+                // A password alone is answered in 3.8, whose security types protect the password
+                // at sign-in and nothing after it.
+                Label("Without a Mac user name, VNC protects the password at sign-in, not what follows: the screen and your typing cross the network readable. Add the Mac's user name, or use it on a network you trust.",
                       systemImage: "exclamationmark.triangle")
                     .font(.caption)
                     .foregroundStyle(.orange)

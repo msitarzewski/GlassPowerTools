@@ -126,6 +126,13 @@ final class DesktopServiceDraft: GlassServiceDraft {
     /// meaning in RFB, and showing dead controls is what the parity checklist warns against.
     var showsRDPOnlyFields: Bool { desktopProtocol == .rdp }
 
+    /// A Screen Sharing session with a Mac user name: a Mac is answered in its own revision and
+    /// encrypted after sign-in (e7463ce). A password alone, or a server that is not a Mac, protects
+    /// the password at sign-in and nothing after it.
+    var vncSignsInWithMacAccount: Bool {
+        desktopProtocol == .vnc && !username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     // MARK: Validation
 
     func validate(address: String) -> [GlassSetupIssue] {

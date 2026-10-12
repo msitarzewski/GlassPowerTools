@@ -16,7 +16,7 @@ A Desktop service lets you see and control another computer's screen, over Remot
 The address belongs to the host, not the service. If the host has no address yet, the sheet asks for one; every service on the host shares it.
 
 > [!WARNING]
-> When you choose **Screen Sharing (VNC)**, the sheet says: "VNC protects the password at sign-in, not what follows: the screen and your typing cross the network readable. Use it on a network you trust." Use RDP, or reach the computer over a network you trust, when that matters.
+> When you choose **Screen Sharing (VNC)** without a Mac user name, the sheet says: "Without a Mac user name, VNC protects the password at sign-in, not what follows: the screen and your typing cross the network readable. Add the Mac's user name, or use it on a network you trust." With a Mac user name, a Mac is encrypted after it signs you in, and the sheet says so; a server that isn't a Mac still protects only the password. Use a Mac account, RDP, or a network you trust when that matters.
 
 ## Advanced settings
 
