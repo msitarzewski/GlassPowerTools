@@ -1398,3 +1398,11 @@ terminal's (`withoutTmux` on the session, the Mac pane and the workgroup) and su
 terminal is never offered tmux. The local toggle moved from Settings ▸ Connections to Settings ▸ Terminal ▸ tmux, beside
 the background server's controls (130c879). Named **Basic** wherever it appears, and "+" offers New Terminal, New Basic Terminal and New
 Terminal on ▸ every saved host, in the owner's words (737fa43).
+
+## D68 — Widgets read a snapshot the app writes; taps are App Intents — Implemented 2026-10-12
+**Owner:** "update the widget suite to make all of them useful for today's platform"; chose Machines and Active on
+iPhone/iPad, Vision Pro and the Mac. **Decision:** the widgets read a snapshot written by the app into the App Group
+container for them alone (`GlassWidgetData`, metadata only, schema-numbered), never the catalog's or the old `servers`
+defaults; a tap is an App Intent run in the app (connect a service, show a machine, show Active), not a URL scheme,
+keeping D4's removal of the old schemes. The extension is now built for the Mac as well (sandboxed, App Group).
+Evidence: `tasks/2026-10/2026-10-12_widgets-machines-and-active.md` (cd6a2f1).
