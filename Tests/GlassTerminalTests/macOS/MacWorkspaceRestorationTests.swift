@@ -290,7 +290,7 @@ struct MacWorkspaceRestorationTests {
 
     /// A tmux that counts how often it is asked, and answers with `reply`.
     private func countingServer(_ reply: String?, asked: @escaping @Sendable () -> Void) -> MacLocalTmux.Server {
-        MacLocalTmux.Server(executablePath: { "/opt/homebrew/bin/tmux" },
+        MacLocalTmux.Server(executablePath: { TmuxStandIn.path },
                             listSessions: { _ in asked(); return reply },
                             kill: { _, _ in }, detachClients: { _, _ in }, scroll: { _, _, _ in })
     }

@@ -119,6 +119,9 @@ nonisolated enum MacTmuxService {
     /// before a claim makes a session and before a pane attaches, either of which would otherwise
     /// start the server in the app's group.
     static func ensureDefaultServer(tmux: String, environment: [String: String]) {
+        // This Mac's tmux and no other: a test's shim names a private server, and the job and its
+        // label are the owner's — booting them out would end every session.
+        guard tmux == MacLocalTmux.executablePath() else { return }
         let now = ContinuousClock.now
         if let last = confirmed.withLock({ $0 }), now - last < confirmationLasts { return }
         if ensureServer(tmux: tmux, environment: environment) != .couldNotStart {

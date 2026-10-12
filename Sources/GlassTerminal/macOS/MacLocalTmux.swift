@@ -47,6 +47,9 @@ enum MacLocalTmux {
         /// The repository a session's folder is in, read from the files (W11). Stand-ins that
         /// leave it out read none, so a listing's folders on the test machine change nothing.
         var readRepository: @Sendable (_ folder: String, _ home: String?) -> TerminalRepository? = { _, _ in nil }
+        /// Has the server run where no app's Force Quit can end it (`MacTmuxService`) before a pane
+        /// attaches. Stand-ins leave it out: a test never starts, stops or asks this Mac's server.
+        var ensureRunning: @Sendable (_ tmux: String, _ environment: [String: String]) -> Void = { _, _ in }
 
         nonisolated static let live = Server(
             executablePath: { MacLocalTmux.executablePath() },
@@ -79,7 +82,8 @@ enum MacLocalTmux {
                     MacLocalTmux.logger.notice("tmux would not keep the repository of session \(session, privacy: .public)")
                 }
             },
-            readRepository: { TerminalRepository.read(folder: $0, home: $1) }
+            readRepository: { TerminalRepository.read(folder: $0, home: $1) },
+            ensureRunning: { MacTmuxService.ensureDefaultServer(tmux: $0, environment: $1) }
         )
     }
 

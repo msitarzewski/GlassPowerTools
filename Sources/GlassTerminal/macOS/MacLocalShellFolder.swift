@@ -38,15 +38,21 @@ nonisolated enum MacLocalShellFolder: Equatable, Sendable {
         /// Whether a path is a folder that exists.
         var isFolder: @Sendable (_ path: String) -> Bool
 
-        static let live = Lookups(
-            tmuxDirectory: { session in
-                MacLocalTmux.executablePath().flatMap { MacLocalTmux.context(session: session, tmux: $0)?.directory }
-            },
-            isFolder: { path in
-                var isDirectory = ObjCBool(false)
-                return FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) && isDirectory.boolValue
-            }
-        )
+        /// The server's tmux, read as the lookups are made: a test's stand-in is never this Mac's.
+        @MainActor static var live: Lookups {
+            let tmux = MacLocalTmux.server.executablePath
+            return Lookups(
+                tmuxDirectory: { session in
+                    tmux().flatMap { MacLocalTmux.context(session: session, tmux: $0)?.directory }
+                },
+                isFolder: Lookups.folderExists
+            )
+        }
+
+        static let folderExists: @Sendable (_ path: String) -> Bool = { path in
+            var isDirectory = ObjCBool(false)
+            return FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) && isDirectory.boolValue
+        }
     }
 
     /// Whether there is anything to ask: a shell that has exited is in no folder, but a tmux

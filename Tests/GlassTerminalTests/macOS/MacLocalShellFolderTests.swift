@@ -81,7 +81,7 @@ struct MacLocalShellFolderTests {
         defer { try? FileManager.default.removeItem(atPath: base) }
         let path = base + "/build output"
         try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: false)
-        let onDisk = MacLocalShellFolder.Lookups(tmuxDirectory: { _ in path }, isFolder: MacLocalShellFolder.Lookups.live.isFolder)
+        let onDisk = MacLocalShellFolder.Lookups(tmuxDirectory: { _ in path }, isFolder: MacLocalShellFolder.Lookups.folderExists)
 
         let before = await MacLocalShellFolder.resolve(tmuxSession: "glass-2", shellIsRunning: true,
                                                        processDirectory: { nil }, lookups: onDisk)
@@ -162,7 +162,7 @@ struct MacLocalShellFolderTests {
             let folder = await MacLocalShellFolder.resolve(
                 tmuxSession: nil, shellIsRunning: true, processDirectory: { path },
                 lookups: MacLocalShellFolder.Lookups(tmuxDirectory: { _ in nil },
-                                                     isFolder: MacLocalShellFolder.Lookups.live.isFolder)
+                                                     isFolder: MacLocalShellFolder.Lookups.folderExists)
             )
             #expect(folder == .folder(path))
 

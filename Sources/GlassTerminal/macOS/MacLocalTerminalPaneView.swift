@@ -716,15 +716,16 @@ enum MacLocalTerminalConfiguration {
         // (W37: a new terminal opens where the one in front was), or on a volume since unmounted —
         // starts it at Home rather than leaving a pane that cannot start, or a tmux session it
         // cannot reattach to. tmux does the same for a session's `-c`.
-        let requestedTmux = tmux
-        if let tmuxSession, let tmux = tmux ?? MacLocalTmux.executablePath() {
+        // The server's tmux, as everything else asks it: a pane attaching with this Mac's own tmux
+        // under a test's stand-in joined, or made, sessions on the owner's server (2026-10-12).
+        let server = MacLocalTmux.server
+        let named = tmux != nil
+        if let tmuxSession, let tmux = tmux ?? server.executablePath() {
             let launch = tmuxLaunch(shell: shell, directory: directory)
             // A pane reattaching after a restart would start the server itself, in the app's
-            // group: launchd starts it first (`MacTmuxService`). Only for the app's own panes,
-            // which name no tmux; a test names one and never reaches the real server.
-            if requestedTmux == nil {
-                MacTmuxService.ensureDefaultServer(tmux: tmux, environment: launch.environmentVariables)
-            }
+            // coalition: launchd starts it first (`MacTmuxService`). Not for a tmux the caller
+            // names, which is not the server's.
+            if !named { server.ensureRunning(tmux, launch.environmentVariables) }
             return SwiftTermLocalProcessConfiguration(
                 executable: tmux,
                 arguments: MacLocalTmux.arguments(session: tmuxSession, directory: launch.directory) + launch.command,
@@ -793,7 +794,7 @@ enum MacLocalTerminalConfiguration {
     /// it (W37), so an absolute path that names a folder as written is kept exactly; only one that
     /// names nothing as written is trimmed, which costs a look at the disk only then.
     static func expandedPath(_ value: String?,
-                             isFolder: (String) -> Bool = MacLocalShellFolder.Lookups.live.isFolder) -> String? {
+                             isFolder: (String) -> Bool = MacLocalShellFolder.Lookups.folderExists) -> String? {
         guard let value else { return nil }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }

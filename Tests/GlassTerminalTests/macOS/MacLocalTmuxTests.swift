@@ -73,7 +73,7 @@ struct MacLocalTmuxTests {
 
         var server: MacLocalTmux.Server {
             MacLocalTmux.Server(
-                executablePath: { "/opt/homebrew/bin/tmux" },
+                executablePath: { TmuxStandIn.path },
                 listSessions: { _ in
                     self.listing ?? self.running.sorted().map { "\($0)\t0\t1\t1790000000" }.joined(separator: "\n")
                 },
@@ -369,7 +369,7 @@ struct MacLocalTmuxTests {
         let suite = "MacLocalTmuxTests.\(UUID())"
         let defaults = try #require(UserDefaults.forTest(suiteName: suite))
         MacLocalTmux.server = MacLocalTmux.Server(
-            executablePath: { "/opt/homebrew/bin/tmux" },
+            executablePath: { TmuxStandIn.path },
             listSessions: { _ in "glass-1_1_1_1790000000\n" },
             kill: { _, _ in }, detachClients: { _, _ in }, scroll: { _, _, _ in })
         defer {
@@ -462,7 +462,7 @@ struct MacLocalTmuxTests {
         let suite = "MacLocalTmuxTests.\(UUID())"
         let defaults = try #require(UserDefaults.forTest(suiteName: suite))
         MacLocalTmux.server = MacLocalTmux.Server(
-            executablePath: { "/opt/homebrew/bin/tmux" },
+            executablePath: { TmuxStandIn.path },
             listSessions: { _ in "" },
             kill: { _, _ in }, detachClients: { _, _ in }, scroll: { _, _, _ in })
         defer {

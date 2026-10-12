@@ -28,7 +28,7 @@ struct MacLocalTerminalStartTests {
         MacLocalShellFolder.Lookups(tmuxDirectory: { session in
             asked.record(session)
             return answer
-        }, isFolder: MacLocalShellFolder.Lookups.live.isFolder)
+        }, isFolder: MacLocalShellFolder.Lookups.folderExists)
     }
 
     /// Lookups that fail the test if tmux is asked at all.
@@ -37,7 +37,7 @@ struct MacLocalTerminalStartTests {
             Issue.record("tmux was asked about \(session)")
             return nil
         },
-        isFolder: MacLocalShellFolder.Lookups.live.isFolder
+        isFolder: MacLocalShellFolder.Lookups.folderExists
     )
 
     /// A folder of the test's own, by its real path (`/var` is `/private/var`), removed afterwards.
@@ -360,6 +360,24 @@ struct MacLocalTerminalStartTests {
         #expect(refused.processState.launchError?.contains("does not exist") == true)
     }
 
+    @Test("a pane attaches with its server's tmux, never this Mac's own, and only the server it names is asked to run (rule 63)")
+    func paneAttachesWithTheServersTmux() async throws {
+        try await withFakeTmux { _, _ in
+            let launch = MacLocalTerminalConfiguration.resolve(shell: nil, directory: nil, tmuxSession: "glass-1")
+            #expect(launch.executable == TmuxStandIn.path, "the stand-in's, as every other tmux call asks it")
+        }
+        let asked = Asked()
+        var server = MacLocalTmuxTests.FakeServer().server
+        server.ensureRunning = { tmux, _ in asked.record(tmux) }
+        let previous = MacLocalTmux.server
+        MacLocalTmux.server = server
+        defer { MacLocalTmux.server = previous }
+        _ = MacLocalTerminalConfiguration.resolve(shell: nil, directory: nil, tmuxSession: "glass-1")
+        _ = MacLocalTerminalConfiguration.resolve(shell: nil, directory: nil, tmuxSession: "glass-1", tmux: "/elsewhere/tmux")
+        _ = MacLocalTerminalConfiguration.resolve(shell: "/bin/sh", directory: nil)
+        #expect(asked.sessions == [TmuxStandIn.path], "once, for the server's own tmux; not for a named one, nor a bare shell")
+    }
+
     // MARK: Live, on a private tmux server
 
     /// The whole way through, on a tmux server of the test's own: a window's local pane in tmux,
@@ -393,6 +411,7 @@ struct MacLocalTerminalStartTests {
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: shim)
         var server = MacLocalTmux.Server.live
         server.executablePath = { shim }
+        server.ensureRunning = { _, _ in }
         server.claim = { candidates, launch, tmux in
             var launch = launch
             launch.command = ["/bin/sleep", "600"]
@@ -403,7 +422,7 @@ struct MacLocalTerminalStartTests {
         defer { MacLocalTmux.server = previous }
         let found = MacLocalShellFolder.Lookups(
             tmuxDirectory: { MacLocalTmux.context(session: $0, tmux: shim)?.directory },
-            isFolder: MacLocalShellFolder.Lookups.live.isFolder
+            isFolder: MacLocalShellFolder.Lookups.folderExists
         )
         func path(_ session: String) -> String {
             run(["-u", "display-message", "-p", "-t", "=\(session):", "#{pane_current_path}"]).output
