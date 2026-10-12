@@ -48,6 +48,24 @@ struct GlassDesktopCapabilityTests {
         #expect(capability.openSessions().isEmpty, "closed, it is gone")
     }
 
+    /// 2026-10-11: a Mac starts its Screen Sharing daemon and agent for every connection to 5900.
+    @Test("VNC is probed for availability every ten minutes, RDP every minute")
+    func availabilityInterval() async throws {
+        let (runtime, root) = try await makeRuntime()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let capability = GlassDesktopCapability(runtime: runtime)
+        let machine = try host()
+        let vnc = DesktopConnection(name: "alpha", host: "10.0.0.9", port: 5900, username: "casey", protocol: .vnc)
+        let rdp = DesktopConnection(name: "bravo", host: "10.0.0.9", username: "casey")
+        try await runtime.app.save(vnc, password: nil)
+        try await runtime.app.save(rdp, password: nil)
+        func link(_ connection: DesktopConnection) -> HostServiceLink {
+            HostServiceLink(endpointID: connection.id, kind: .rdp, displayName: connection.name)
+        }
+        #expect(capability.availabilityInterval(service: link(vnc), host: machine) == 600)
+        #expect(capability.availabilityInterval(service: link(rdp), host: machine) == GlassAvailabilityMonitor.interval)
+    }
+
     @Test("The capability owns .rdp and serves both protocols through the record's field")
     func servesBothProtocols() async throws {
         let (runtime, root) = try await makeRuntime()

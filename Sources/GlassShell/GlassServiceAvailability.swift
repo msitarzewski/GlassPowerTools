@@ -5,7 +5,13 @@
 //  Whether each service answers (D41, 2026-09-30): a dot beside its icon in the library, when the
 //  owner turns on Settings ▸ General ▸ Show Service Availability (off by default). A plain TCP
 //  connection to the service's port — never a sign-in, nothing sent — only while the library is on
-//  screen, at most once a minute, closed as soon as it answers.
+//  screen, each service at most as often as its capability allows (once a minute unless it says
+//  otherwise), closed as soon as it answers. A service with a session open is not probed: it
+//  answers by definition.
+//
+//  Why a capability may ask for less (2026-10-11): a Mac starts its Screen Sharing daemon and agent
+//  for every connection to 5900, a plain probe included, and they run until fifteen seconds after
+//  it closes ("No viewers so time to exit", the Mac's own log) — once a minute, a quarter of the day.
 //
 
 import Foundation
@@ -34,10 +40,11 @@ public enum GlassServiceAvailability: Sendable, Equatable {
 @MainActor @Observable
 public final class GlassAvailabilityMonitor {
     public static let settingKey = "com.glasspowertools.library.showsAvailability"
-    public static let interval: TimeInterval = 60
+    public nonisolated static let interval: TimeInterval = 60
 
     public private(set) var states: [EndpointID: GlassServiceAvailability] = [:]
-    private var lastRun: Date?
+    /// When each service was last probed.
+    private var probedAt: [EndpointID: Date] = [:]
 
     public init() {}
 
@@ -45,15 +52,34 @@ public final class GlassAvailabilityMonitor {
         public var endpointID: EndpointID
         public var host: String
         public var port: Int
+        /// The least time between two probes of this service, in seconds.
+        public var interval: TimeInterval
+
+        public init(endpointID: EndpointID, host: String, port: Int, interval: TimeInterval = GlassAvailabilityMonitor.interval) {
+            self.endpointID = endpointID; self.host = host; self.port = port; self.interval = interval
+        }
     }
 
-    /// Probes every target, unless the last pass was under a minute ago.
-    public func refresh(_ targets: [Target], now: Date = Date()) async {
-        if let lastRun, now.timeIntervalSince(lastRun) < Self.interval { return }
-        lastRun = now
+    /// Probes each target whose interval has passed since it was last probed. One with a session
+    /// open (`connected`) is not probed and reads as reachable; it is probed again once its
+    /// interval since the last probe has passed and the session has closed.
+    public func refresh(_ targets: [Target], connected: Set<EndpointID> = [], now: Date = Date()) async {
+        let listed = Set(targets.map(\.endpointID))
+        states = states.filter { listed.contains($0.key) }
+        probedAt = probedAt.filter { listed.contains($0.key) }
+        var due: [Target] = []
+        for target in targets {
+            if connected.contains(target.endpointID) {
+                states[target.endpointID] = .reachable
+            } else if probedAt[target.endpointID].map({ now.timeIntervalSince($0) >= target.interval }) ?? true {
+                due.append(target)
+                probedAt[target.endpointID] = now
+            }
+        }
+        guard !due.isEmpty else { return }
         let results = await withTaskGroup(of: (EndpointID, GlassServiceAvailability).self) { group in
             // Eight at a time: start eight, then one more as each finishes.
-            var remaining = targets.makeIterator()
+            var remaining = due.makeIterator()
             func startNext() {
                 guard let target = remaining.next() else { return }
                 group.addTask { (target.endpointID, await Self.probe(host: target.host, port: target.port)) }
@@ -66,7 +92,7 @@ public final class GlassAvailabilityMonitor {
             }
             return collected
         }
-        states = Dictionary(results, uniquingKeysWith: { _, last in last })
+        for (id, state) in results { states[id] = state }
     }
 
     /// One TCP connection attempt: ready within `slowAfter` is reachable, later is slow, and a

@@ -122,7 +122,7 @@ public struct GlassShellLibraryView: View {
         .task(id: showsAvailability) {
             guard showsAvailability else { return }
             while !Task.isCancelled {
-                await availabilityMonitor.refresh(model.availabilityTargets())
+                await availabilityMonitor.refresh(model.availabilityTargets(), connected: model.connectedEndpoints())
                 try? await Task.sleep(for: .seconds(GlassAvailabilityMonitor.interval))
             }
         }

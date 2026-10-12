@@ -306,6 +306,10 @@ public protocol GlassCapability: AnyObject {
     /// is none to probe directly (a local shell, a file, a service reached through a tunnel).
     /// Default: nil.
     func knownPort(service: HostServiceLink, host: HostProfile) -> Int?
+    /// The least time between two availability probes of `service`, in seconds: for a service
+    /// whose host does work for every connection, even one that sends nothing. Default: once a
+    /// minute (`GlassAvailabilityMonitor.interval`).
+    func availabilityInterval(service: HostServiceLink, host: HostProfile) -> TimeInterval
 
     /// A draft for a new service of this kind, composed into the shell's host sheet. A service
     /// is created complete — configuration and credentials with it — so no capability may
@@ -455,6 +459,7 @@ public extension GlassCapability {
     func setupDraft(importing configuration: Data) -> (any GlassServiceDraft)? { nil }
     func knownAddress(service: HostServiceLink, host: HostProfile) -> String? { nil }
     func knownPort(service: HostServiceLink, host: HostProfile) -> Int? { nil }
+    func availabilityInterval(service: HostServiceLink, host: HostProfile) -> TimeInterval { GlassAvailabilityMonitor.interval }
     /// A capability that has not adopted the setup contract yet: the sheet shows why and Save
     /// refuses, so no half-made service can be created through it.
     func makeSetupDraft() -> any GlassServiceDraft { GlassUnavailableServiceDraft(kind: kind, capabilityName: displayName) }

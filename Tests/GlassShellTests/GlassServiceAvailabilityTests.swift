@@ -48,19 +48,40 @@ struct GlassServiceAvailabilityTests {
         #expect(GlassServiceAvailability.worst([.slow, .unreachable, .reachable]) == .unreachable)
     }
 
-    @Test("at most one pass a minute")
-    @MainActor func oncePerMinute() async throws {
+    @Test("each service at most once a minute, or as seldom as its capability asks")
+    @MainActor func ownInterval() async throws {
         let (open, port) = try await listener()
-        defer { open.cancel() }
+        let monitor = GlassAvailabilityMonitor()
+        let ssh = EndpointID(), vnc = EndpointID()
+        let start = Date()
+        func targets() -> [GlassAvailabilityMonitor.Target] {
+            [.init(endpointID: ssh, host: "127.0.0.1", port: port), .init(endpointID: vnc, host: "127.0.0.1", port: port, interval: 600)]
+        }
+        await monitor.refresh(targets(), now: start)
+        #expect(monitor.states[ssh] == .reachable && monitor.states[vnc] == .reachable)
+        open.cancel()
+        try await Task.sleep(for: .milliseconds(200))
+        await monitor.refresh(targets(), now: start.addingTimeInterval(30))
+        #expect(monitor.states[ssh] == .reachable, "30 seconds later nothing is probed")
+        await monitor.refresh(targets(), now: start.addingTimeInterval(61))
+        #expect(monitor.states[ssh] == .unreachable, "a minute on, the port that closed is seen closed")
+        #expect(monitor.states[vnc] == .reachable, "not yet its ten minutes")
+        await monitor.refresh(targets(), now: start.addingTimeInterval(601))
+        #expect(monitor.states[vnc] == .unreachable)
+        await monitor.refresh([], now: start.addingTimeInterval(700))
+        #expect(monitor.states.isEmpty, "a service no longer listed has no dot")
+    }
+
+    @Test("a service with a session open is not probed: it answers")
+    @MainActor func connectedIsNotProbed() async throws {
         let monitor = GlassAvailabilityMonitor()
         let id = EndpointID()
+        // Nothing listens on port 1; a probe would find it unreachable.
+        let target = GlassAvailabilityMonitor.Target(endpointID: id, host: "127.0.0.1", port: 1)
         let start = Date()
-        await monitor.refresh([.init(endpointID: id, host: "127.0.0.1", port: port)], now: start)
+        await monitor.refresh([target], connected: [id], now: start)
         #expect(monitor.states[id] == .reachable)
-        let other = EndpointID()
-        await monitor.refresh([.init(endpointID: other, host: "127.0.0.1", port: port)], now: start.addingTimeInterval(30))
-        #expect(monitor.states[other] == nil, "30 seconds later nothing is probed")
-        await monitor.refresh([.init(endpointID: other, host: "127.0.0.1", port: port)], now: start.addingTimeInterval(61))
-        #expect(monitor.states[other] == .reachable)
+        await monitor.refresh([target], now: start.addingTimeInterval(1))
+        #expect(monitor.states[id] == .unreachable, "closed, and never probed before: probed at once")
     }
 }

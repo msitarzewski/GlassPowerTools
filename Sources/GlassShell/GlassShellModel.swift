@@ -996,10 +996,11 @@ public final class GlassShellModel: GlassServiceStore {
         hosts.flatMap { host -> [GlassAvailabilityMonitor.Target] in
             guard let address = host.address ?? knownAddress(for: host) else { return [] }
             return host.services.compactMap { service in
-                guard let owner = host.record(owning: service.endpointID),
-                      let port = registry.capability(for: service.kind)?.knownPort(service: service, host: owner)
+                guard let owner = host.record(owning: service.endpointID), let capability = registry.capability(for: service.kind),
+                      let port = capability.knownPort(service: service, host: owner)
                 else { return nil }
-                return .init(endpointID: service.endpointID, host: address, port: port)
+                return .init(endpointID: service.endpointID, host: address, port: port,
+                             interval: capability.availabilityInterval(service: service, host: owner))
             }
         }
     }

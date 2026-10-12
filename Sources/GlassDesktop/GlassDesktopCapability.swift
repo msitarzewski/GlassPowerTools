@@ -233,6 +233,15 @@ public final class GlassDesktopCapability: GlassCapability {
         runtime.connection(for: service.endpointID).map { Int($0.port) }
     }
 
+    /// VNC every ten minutes: a Mac starts its Screen Sharing daemon and agent for every connection,
+    /// a probe that sends nothing included, and keeps them running fifteen seconds after it closes
+    /// (the Mac's own log, 2026-10-11). RDP, once a minute.
+    public func availabilityInterval(service: HostServiceLink, host: HostProfile) -> TimeInterval {
+        runtime.connection(for: service.endpointID)?.protocol == .vnc ? Self.vncAvailabilityInterval : GlassAvailabilityMonitor.interval
+    }
+
+    static let vncAvailabilityInterval: TimeInterval = 600
+
     /// The machine's address changed in the shell: every saved desktop that is a service of that
     /// host follows it, so the machine's identity is edited once.
     public func hostAddressDidChange(host: HostProfile, address: String?) {
