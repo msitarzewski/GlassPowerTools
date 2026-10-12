@@ -37,3 +37,5 @@
 - 2026-10-12: [Widgets: Machines and Active (D68)](2026-10-12_widgets-machines-and-active.md) — the dead "Recent
   Servers" replaced; snapshot + App Intents; iPhone/iPad, Vision Pro and now the Mac. 0.4.382 on all three. Also
   iPhone workgroup tap fixed (276117e).
+- 2026-10-12 (after the compaction): the VNC setup sheet's warning follows the user name — a Mac account is encrypted
+  since e7463ce, a password alone is not (new draft test; help page matched).

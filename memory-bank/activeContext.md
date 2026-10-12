@@ -29,7 +29,7 @@ anything touching real servers (SSH and database tests use the disposable test V
 
 ## 2026-10-12 — end of the session (before a compaction)
 
-**Installed: Mac 0.4.388; iPhone and Vision Pro 0.4.385.** Nothing pushed. Leave the owner's one-space README edit and
+**Installed: Mac 0.4.389 (after the compaction); iPhone and Vision Pro 0.4.385.** Nothing pushed. Leave the owner's one-space README edit and
 the uncommitted `testArrowKeysReachTheTerminal` in `UITests/GlassTerminalUITests.swift` (it fails in the visionOS
 simulator on an accessibility scene error; not to commit). **Next: the owner brings a new list after the compaction.**
 
@@ -66,8 +66,9 @@ leave them, no history rewrite for them, rule 61 unchanged — "just keep moving
 any file or commit message (scanned 2026-10-12). **Docs (2908a18, the site commit
 after it):** release script checks the Mac widget before notarizing (never run; the Developer ID export may need a
 profile for `<bundle id>.widgets`); BUILDING.md and SECURITY.md current; site and help current, three stale desktop
-claims corrected. **Follow-up:** the app's own VNC setup warning (`DesktopServiceFields.swift:46`) still says every VNC
-session is readable after sign-in; a Mac signed in with a Mac account is encrypted since e7463ce.
+claims corrected. **Done after the compaction (the owner's first ask):** the VNC setup warning follows the user name (262ba7a): with a
+Mac user name it says a Mac is encrypted after sign-in and other servers protect only the password; without one it
+keeps the orange warning and names adding the Mac's user name as the fix. Help page `desktop-add-service.md` matches.
 
 ## 2026-10-11 (late night) — High Performance built; quality-switch crash fixed
 
