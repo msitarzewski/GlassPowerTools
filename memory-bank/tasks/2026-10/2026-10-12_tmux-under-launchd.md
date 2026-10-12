@@ -98,5 +98,15 @@ host design and asked that it end with its last session and that Settings > Term
 - Tests 752/752 twice; owner's sessions unchanged. Installed 0.4.374 07:46, no crash report; his
   20 sessions (13 his own from 07:23–07:42) reattached. The server of 00:44 still predates D66.
 
-Open: the owner asked about a per-terminal choice; proposed moving the tmux toggle from Settings >
-Connections to Settings > Terminal and adding New Plain Terminal (no tmux) — awaiting his answer.
+## Terminals without tmux (130c879, D67)
+
+Owner: "build both. we need to allow remote sessions without tmux too even if it's been selected as
+default." A terminal carries `withoutTmux` (session, Mac pane intent, workgroup intent, reopen
+record); it claims and attaches nothing and is not offered tmux. Entry points: File > New Plain
+Terminal Tab (⌃⌘T, free per the running app's menus read through accessibility), "+" menu, empty
+tab's Plain Local Terminal (only with local tmux on), Connect Saved Host's "Open without tmux",
+palette entries, and a Plain Terminal row beside Files in the host detail on every device (hosts
+that keep terminals in tmux). Settings > Terminal > tmux holds the local toggle (moved from
+Connections), the background status and End All. Tests: 13 new; 7 fail with the core changes
+undone. Terminal 763/763 twice; every module passes; owner's sessions unchanged.
+

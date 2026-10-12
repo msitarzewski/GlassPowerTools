@@ -1388,3 +1388,12 @@ only when the current server ends; evidence in `tasks/2026-10/2026-10-12_tmux-un
 (9b62ebf):** launchd runs the app's own executable as host (`--tmux-host`), which starts tmux, because panes answer for
 privacy permissions to whatever their chain started from (tmux, run directly, raised its own Desktop prompt); the host
 turns tmux's `exit-empty` back on so the server and host end with the last session; Settings ▸ Terminal can end both.
+
+## D67 — A terminal can be opened without tmux; tmux settings live in Settings ▸ Terminal — Implemented 2026-10-12
+**Owner:** "What if I just want a quick naked local terminal?"; "build both. we need to allow remote sessions without
+tmux too even if it's been selected as default." **Decision:** tmux stays the default where it is set (local: one
+setting; SSH: per host), and any terminal can be opened plain: New Plain Terminal Tab (⌃⌘T), "+"'s menu, Connect Saved
+Host's "Open without tmux", the palette, and Plain Terminal in a host's detail on every device. The choice is the
+terminal's (`withoutTmux` on the session, the Mac pane and the workgroup) and survives relaunch and workgroups; such a
+terminal is never offered tmux. The local toggle moved from Settings ▸ Connections to Settings ▸ Terminal ▸ tmux, beside
+the background server's controls (130c879).

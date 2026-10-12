@@ -32,8 +32,10 @@ anything touching real servers (SSH and database tests use the disposable test V
 **Installed: 0.4.374 on the Mac** (07:46). The launchd job runs the app as `--tmux-host`, so terminals keep the app's
 privacy permissions; tmux and the host end with the last session; Settings ▸ Terminal shows the state and can end them
 all. A test leak onto the owner's tmux server was found and fixed (8ce39c3). Measured and the owner's Force Quit probe
-passed; see the task note. **Awaiting the owner:** move the tmux toggle to Settings ▸ Terminal and add New Plain
-Terminal (proposed). His server of 00:44 still predates D66.
+passed; see the task note. Then D67 (130c879): terminals can be opened without tmux
+(⌃⌘T New Plain Terminal Tab, "+" menu, Connect Saved Host's switch, Plain Terminal on a host on every device); the local
+toggle moved to Settings ▸ Terminal ▸ tmux. Building 0.4.375 for Mac, iPhone and Vision Pro. His server of 00:44 still
+predates D66.
 
 ## 2026-10-12 (early) — tmux server under launchd (D66); desktop keys
 

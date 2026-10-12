@@ -26,3 +26,5 @@
 - 2026-10-12: [This Mac's tmux server under launchd (D66)](2026-10-12_tmux-under-launchd.md) — a Force Quit of an app
   run from a pane ended every local terminal; the resource coalition, reproduced with a probe; launchd's server survives
   the same Force Quit. Installed 0.4.373 (Mac).
+- 2026-10-12: background-mode tmux host (D66 revised, 0.4.374) and terminals without tmux (D67, 130c879): New Plain
+  Terminal Tab, Plain Terminal per host, tmux settings in Settings ▸ Terminal. Same task note.
