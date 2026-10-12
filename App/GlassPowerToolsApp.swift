@@ -19,7 +19,18 @@ import VNCKit
 import GlassEditor
 import GlassEditorCore
 
+/// The app; on a Mac, also the background process that keeps local terminals running
+/// (`MacTmuxHost`), which must start nothing of the app's, so it is chosen before SwiftUI is.
 @main
+enum GlassPowerToolsMain {
+    static func main() {
+        #if os(macOS)
+        MacTmuxHost.runIfAsked()
+        #endif
+        GlassPowerToolsApp.main()
+    }
+}
+
 struct GlassPowerToolsApp: App {
     @State private var layers: GlassLayerStore
     @State private var model: GlassShellModel

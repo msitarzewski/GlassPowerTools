@@ -50,6 +50,8 @@ enum MacLocalTmux {
         /// Has the server run where no app's Force Quit can end it (`MacTmuxService`) before a pane
         /// attaches. Stand-ins leave it out: a test never starts, stops or asks this Mac's server.
         var ensureRunning: @Sendable (_ tmux: String, _ environment: [String: String]) -> Void = { _, _ in }
+        /// Ends the server and every session in it (Settings ▸ Terminal). Stand-ins: nothing.
+        var endServer: @Sendable (_ tmux: String) -> Void = { _ in }
 
         nonisolated static let live = Server(
             executablePath: { MacLocalTmux.executablePath() },
@@ -83,7 +85,8 @@ enum MacLocalTmux {
                 }
             },
             readRepository: { TerminalRepository.read(folder: $0, home: $1) },
-            ensureRunning: { MacTmuxService.ensureDefaultServer(tmux: $0, environment: $1) }
+            ensureRunning: { MacTmuxService.ensureDefaultServer(tmux: $0, environment: $1) },
+            endServer: { MacTmuxService.stopDefaultServer(tmux: $0) }
         )
     }
 

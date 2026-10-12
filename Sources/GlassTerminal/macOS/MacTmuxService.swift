@@ -15,12 +15,14 @@
 //  pane is the server's to answer for: the same Force Quit, the same probe, under such a server,
 //  ended the probe alone.
 //
-//  So when no server runs, the app asks launchd to run one: `tmux -u -D` (in the foreground, which
-//  is how launchd runs a job), from a job file in the app's Application Support folder, not
-//  LaunchAgents — it is no login item, and starts only when a local terminal needs it. The job has
-//  the environment a pane's first claim used to give the server, so its shells start the same. A
-//  server already running is left alone, whoever started it; one that will not start leaves the
-//  claim to start it, as before.
+//  So when no server runs, the app asks launchd to run one, from a job file in the app's Application
+//  Support folder, not LaunchAgents — it is no login item, and starts only when a local terminal
+//  needs it. The job runs the app's own executable as the host (`MacTmuxHost`), which starts tmux:
+//  run by launchd directly, tmux answered for its panes, and macOS asked for the Desktop folder in
+//  tmux's name rather than the app's. The job has the environment a pane's first claim used to give
+//  the server, so its shells start the same. A server already running is left alone, whoever
+//  started it; one that will not start leaves the claim to start it, as before. Settings ▸ Terminal
+//  can end the server, and with it the host (`stopDefaultServer`).
 //
 
 #if os(macOS)
@@ -44,13 +46,13 @@ nonisolated enum MacTmuxService {
             .appendingPathComponent("\(label).plist")
     }
 
-    /// The job: tmux in the foreground under launchd, at a terminal's priority, with the pane's
-    /// environment. `serverArguments` only for a test's private server.
-    static func job(label: String = label, tmux: String, environment: [String: String],
+    /// The job: the host, which runs tmux, at a terminal's priority, with the pane's environment.
+    /// `serverArguments` only for a test's private server.
+    static func job(label: String = label, host: String, tmux: String, environment: [String: String],
                     serverArguments: [String] = []) -> [String: Any] {
         [
             "Label": label,
-            "ProgramArguments": [tmux] + serverArguments + ["-u", "-D"],
+            "ProgramArguments": [host, MacTmuxHost.flag, tmux] + serverArguments,
             "EnvironmentVariables": environment.filter { !fromLaunchd.contains($0.key) },
             "RunAtLoad": true,
             "KeepAlive": false,
@@ -72,7 +74,7 @@ nonisolated enum MacTmuxService {
 
     /// A tmux server runs, under launchd if this call started it.
     @discardableResult
-    static func ensureServer(tmux: String, environment: [String: String], label: String = label,
+    static func ensureServer(host: String, tmux: String, environment: [String: String], label: String = label,
                              serverArguments: [String] = [], jobURL: URL? = jobURL(),
                              run: (_ executable: String, _ arguments: [String]) -> String? = { MacLocalTmux.run($0, $1) },
                              wait: (Duration) -> Void = { Thread.sleep(forTimeInterval: Double($0.components.seconds) + Double($0.components.attoseconds) / 1e18) })
@@ -82,7 +84,8 @@ nonisolated enum MacTmuxService {
         do {
             try FileManager.default.createDirectory(at: jobURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             let data = try PropertyListSerialization.data(
-                fromPropertyList: job(label: label, tmux: tmux, environment: environment, serverArguments: serverArguments),
+                fromPropertyList: job(label: label, host: host, tmux: tmux, environment: environment,
+                                      serverArguments: serverArguments),
                 format: .xml, options: 0)
             try data.write(to: jobURL, options: .atomic)
         } catch {
@@ -121,12 +124,32 @@ nonisolated enum MacTmuxService {
     static func ensureDefaultServer(tmux: String, environment: [String: String]) {
         // This Mac's tmux and no other: a test's shim names a private server, and the job and its
         // label are the owner's — booting them out would end every session.
-        guard tmux == MacLocalTmux.executablePath() else { return }
+        guard tmux == MacLocalTmux.executablePath(), let host = appExecutable() else { return }
         let now = ContinuousClock.now
         if let last = confirmed.withLock({ $0 }), now - last < confirmationLasts { return }
-        if ensureServer(tmux: tmux, environment: environment) != .couldNotStart {
+        if ensureServer(host: host, tmux: tmux, environment: environment) != .couldNotStart {
             confirmed.withLock { $0 = now }
         }
+    }
+
+    /// The app's executable, to run as the host; nil in anything but the app (a test runner).
+    static func appExecutable(bundle: Bundle = .main) -> String? {
+        bundle.bundleURL.pathExtension == "app" ? bundle.executablePath : nil
+    }
+
+    /// Ends this Mac's tmux server — every local terminal in it — and with it the host, for
+    /// Settings ▸ Terminal. The job is taken out too, so nothing is left loaded.
+    static func stopDefaultServer(tmux: String) {
+        guard tmux == MacLocalTmux.executablePath() else { return }
+        stopServer(tmux: tmux)
+        confirmed.withLock { $0 = nil }
+    }
+
+    static func stopServer(tmux: String, label: String = label, serverArguments: [String] = [],
+                           run: (_ executable: String, _ arguments: [String]) -> String? = { MacLocalTmux.run($0, $1) }) {
+        _ = run(tmux, serverArguments + ["kill-server"])
+        _ = run("/bin/launchctl", ["bootout", "gui/\(getuid())/\(label)"])
+        logger.notice("This Mac's tmux server was ended from Settings")
     }
 
     /// Takes a test's job away again.

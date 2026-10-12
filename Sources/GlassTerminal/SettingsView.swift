@@ -524,6 +524,10 @@ struct TerminalSettingsView: View {
                         settings.saveSettings()
                     }
             }
+
+            #if os(macOS)
+            MacLocalTerminalServerSection()
+            #endif
         }
         .formStyle(.grouped)
         // No extra padding: a grouped form brings its own margins, and a second set made these

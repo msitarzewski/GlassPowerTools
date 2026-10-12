@@ -7,20 +7,24 @@ import Testing
 /// session ended every local terminal, since a server an app starts is that app's to end.
 @Suite("Local tmux under launchd", .serialized)
 struct MacTmuxServiceTests {
-    @Test("the job runs tmux in the foreground at a terminal's priority, with the pane's environment less launchd's own")
+    static let host = "/Applications/Glass Power Tools.app/Contents/MacOS/Glass Power Tools"
+
+    @Test("the job runs the app as the host of tmux, at a terminal's priority, with the pane's environment less launchd's own")
     func job() throws {
-        let job = MacTmuxService.job(tmux: "/opt/homebrew/bin/tmux",
+        let job = MacTmuxService.job(host: Self.host, tmux: "/opt/homebrew/bin/tmux",
                                      environment: ["PATH": "/opt/homebrew/bin:/usr/bin", "LANG": "en_US.UTF-8",
                                                    "SSH_AUTH_SOCK": "/private/tmp/stale", "TMPDIR": "/var/folders/stale"])
         #expect(job["Label"] as? String == "com.glasspowertools.tmux")
-        #expect(job["ProgramArguments"] as? [String] == ["/opt/homebrew/bin/tmux", "-u", "-D"])
+        #expect(job["ProgramArguments"] as? [String] == [Self.host, "--tmux-host", "/opt/homebrew/bin/tmux"],
+                "the app's own executable, so a terminal's programs answer to Glass Power Tools")
         #expect(job["EnvironmentVariables"] as? [String: String] == ["PATH": "/opt/homebrew/bin:/usr/bin", "LANG": "en_US.UTF-8"],
                 "the agent socket and temporary folder are launchd's, current for this login")
         #expect(job["ProcessType"] as? String == "Interactive" && job["KeepAlive"] as? Bool == false)
         #expect(job["RunAtLoad"] as? Bool == true && job["AbandonProcessGroup"] as? Bool == true)
         #expect(MacTmuxService.jobURL()?.path.contains("/Library/LaunchAgents/") == false, "no login item")
-        let test = MacTmuxService.job(label: "t", tmux: "tmux", environment: [:], serverArguments: ["-S", "/tmp/s"])
-        #expect(test["ProgramArguments"] as? [String] == ["tmux", "-S", "/tmp/s", "-u", "-D"])
+        let test = MacTmuxService.job(label: "t", host: "/h", tmux: "/t", environment: [:], serverArguments: ["-S", "/tmp/s"])
+        #expect(test["ProgramArguments"] as? [String] == ["/h", "--tmux-host", "/t", "-S", "/tmp/s"])
+        #expect(MacTmuxService.appExecutable() == nil, "a test runner is no app: it never hosts this Mac's tmux")
     }
 
     private final class Calls: @unchecked Sendable {
@@ -49,13 +53,13 @@ struct MacTmuxServiceTests {
 
         let running = Calls()
         running.serverAnswersAfter = 0
-        #expect(MacTmuxService.ensureServer(tmux: "tmux", environment: [:], jobURL: jobURL, run: running.run, wait: { _ in }) == .alreadyRunning)
+        #expect(MacTmuxService.ensureServer(host: Self.host, tmux: "tmux", environment: [:], jobURL: jobURL, run: running.run, wait: { _ in }) == .alreadyRunning)
         #expect(running.list == [["tmux", "-N", "list-sessions"]])
         #expect(!FileManager.default.fileExists(atPath: jobURL.path), "nothing written")
 
         let starting = Calls()
         starting.serverAnswersAfter = 3
-        #expect(MacTmuxService.ensureServer(tmux: "tmux", environment: ["LANG": "C"], jobURL: jobURL, run: starting.run, wait: { _ in }) == .started)
+        #expect(MacTmuxService.ensureServer(host: Self.host, tmux: "tmux", environment: ["LANG": "C"], jobURL: jobURL, run: starting.run, wait: { _ in }) == .started)
         let launchctl = starting.list.filter { $0.first == "/bin/launchctl" }.map { Array($0.dropFirst()) }
         #expect(launchctl.map(\.first) == ["bootout", "bootstrap"], "out first, so the new environment runs")
         #expect(launchctl.last?.last == jobURL.path)
@@ -64,13 +68,20 @@ struct MacTmuxServiceTests {
 
         let refused = Calls()
         refused.bootstrapFails = true
-        #expect(MacTmuxService.ensureServer(tmux: "tmux", environment: [:], jobURL: jobURL, run: refused.run, wait: { _ in }) == .couldNotStart,
+        #expect(MacTmuxService.ensureServer(host: Self.host, tmux: "tmux", environment: [:], jobURL: jobURL, run: refused.run, wait: { _ in }) == .couldNotStart,
                 "the claim then starts tmux itself, as before")
 
         let silent = Calls()
         var waited: Duration = .zero
-        #expect(MacTmuxService.ensureServer(tmux: "tmux", environment: [:], jobURL: jobURL, run: silent.run, wait: { waited += $0 }) == .couldNotStart)
+        #expect(MacTmuxService.ensureServer(host: Self.host, tmux: "tmux", environment: [:], jobURL: jobURL, run: silent.run, wait: { waited += $0 }) == .couldNotStart)
         #expect(waited >= MacTmuxService.startTimeout)
+    }
+
+    @Test("ending the server from Settings ends tmux, then takes the job out")
+    func stop() {
+        let calls = Calls()
+        MacTmuxService.stopServer(tmux: "/t", label: "l", serverArguments: ["-S", "/tmp/s"], run: calls.run)
+        #expect(calls.list == [["/t", "-S", "/tmp/s", "kill-server"], ["/bin/launchctl", "bootout", "gui/\(getuid())/l"]])
     }
 
     nonisolated static var tmux: String? { MacLocalTmux.executablePath() }
@@ -104,6 +115,11 @@ struct MacTmuxServiceTests {
         let ownServer = ["-S", ownSocket, "-f", "/dev/null"]
         let label = "com.glasspowertools.tmux.test.\(UUID().uuidString.prefix(8))"
         let jobURL = folder.appendingPathComponent("job.plist")
+        // The app as host, as far as launchd sees it: a program given the host's arguments that
+        // runs tmux in the foreground (MacTmuxHostTests runs the host's own code).
+        let host = folder.appendingPathComponent("host").path
+        try Data("#!/bin/sh\nshift\ntmux=\"$1\"\nshift\nexec \"$tmux\" \"$@\" -u -D\n".utf8).write(to: URL(fileURLWithPath: host))
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: host)
         defer {
             MacTmuxService.remove(label: label, jobURL: jobURL)
             _ = MacLocalTmux.run(tmux, server + ["kill-server"])
@@ -116,7 +132,7 @@ struct MacTmuxServiceTests {
         #expect(Self.serverPID(socket: ownSocket).flatMap(Self.coalition) == mine, "a server started the old way shares the coalition")
 
         #expect(!MacTmuxService.serverRunning(tmux: tmux, serverArguments: server))
-        let outcome = MacTmuxService.ensureServer(tmux: tmux, environment: ["PATH": "/usr/bin:/bin", "TMUX_TMPDIR": folder.path],
+        let outcome = MacTmuxService.ensureServer(host: host, tmux: tmux, environment: ["PATH": "/usr/bin:/bin", "TMUX_TMPDIR": folder.path],
                                                   label: label, serverArguments: server, jobURL: jobURL)
         #expect(outcome == .started)
         let serverPID = try #require(Self.serverPID(socket: socket))
@@ -126,7 +142,8 @@ struct MacTmuxServiceTests {
         let pane = try #require((MacLocalTmux.run("/usr/bin/pgrep", ["-P", String(serverPID)]) ?? "")
             .split(separator: "\n").compactMap { pid_t($0) }.first)
         #expect(Self.coalition(pane) == theirs, "and so are its panes")
-        #expect(MacTmuxService.ensureServer(tmux: tmux, environment: [:], label: label, serverArguments: server, jobURL: jobURL) == .alreadyRunning)
+        #expect(MacTmuxService.ensureServer(host: host, tmux: tmux, environment: [:], label: label, serverArguments: server,
+                                            jobURL: jobURL) == .alreadyRunning)
         // Taken away, the job's server ends with it.
         MacTmuxService.remove(label: label, jobURL: jobURL)
         var gone = false
