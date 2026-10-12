@@ -137,6 +137,65 @@ struct LiveRemoteEditingTests {
         }
     }
 
+    /// The owner's iPhone, 2026-10-12: an empty file (`default.profraw`) "could not be opened:
+    /// ... NIOCore.ChannelError error 5". An empty file is an empty document.
+    @Test("an empty file reads as nothing, and the session goes on working after it")
+    func readingAnEmptyFile() async throws {
+        try await withLiveServer { lister, root, transport in
+            _ = try await transport.execute(": > \(root)/empty.profraw && printf 'after\\n' > \(root)/after.txt")
+            #expect(try await lister.read("\(root)/empty.profraw") == Data())
+            #expect(try await lister.stat("\(root)/empty.profraw")?.size == 0)
+            #expect(try await lister.read("\(root)/after.txt") == Data("after\n".utf8))
+        }
+    }
+
+    /// The connection under a project ended — the phone locked, the network changed — and every
+    /// call after it failed with a closed channel. A real SSH connection is ended here, and the
+    /// project's next read makes a new one and answers.
+    @Test("a project whose connection ended reads through a new one")
+    func readingAfterTheConnectionEnded() async throws {
+        guard let first = try await connect() else { return }
+        let opened = OpenedConnections()
+        let lister = GlassTerminalReconnectingLister(machine: "scratch", first: first.lister) {
+            guard let context = try await self.connect() else { throw SFTPSessionError.closed }
+            opened.append(context)
+            return context.lister
+        }
+        // Whatever happens, nothing is left on the machine: the first connection's folder goes
+        // through whichever connection still works.
+        func cleanUp() async {
+            await lister.close()
+            for context in opened.all {
+                do { _ = try await context.transport.execute("rm -rf \(first.root)") } catch { Issue.record("cleanup: \(error)") }
+                await tearDown(context)
+            }
+            if opened.all.isEmpty { await tearDown(first) } else { await first.lister.close() }
+        }
+        do {
+            _ = try await first.transport.execute("printf 'kept\\n' > \(first.root)/kept.txt")
+            #expect(try await lister.read("\(first.root)/kept.txt") == Data("kept\n".utf8))
+            // The SSH connection ends under the open project.
+            await first.transport.release(owner: first.owner)
+            #expect(try await lister.read("\(first.root)/kept.txt") == Data("kept\n".utf8))
+            #expect(opened.all.count == 1)
+        } catch {
+            await cleanUp()
+            throw error
+        }
+        await cleanUp()
+    }
+
+    nonisolated final class OpenedConnections: @unchecked Sendable {
+        private let lock = NSLock()
+        private var contexts: [(lister: GlassTerminalDirectoryLister, root: String, transport: SSHTransport, owner: UUID)] = []
+        func append(_ context: (lister: GlassTerminalDirectoryLister, root: String, transport: SSHTransport, owner: UUID)) {
+            lock.withLock { contexts.append(context) }
+        }
+        var all: [(lister: GlassTerminalDirectoryLister, root: String, transport: SSHTransport, owner: UUID)] {
+            lock.withLock { contexts }
+        }
+    }
+
     @Test("a real file reads back byte for byte, including one larger than a single SFTP read")
     func readingARealFile() async throws {
         try await withLiveServer { lister, root, transport in

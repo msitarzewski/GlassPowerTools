@@ -997,7 +997,19 @@ extension GlassTerminalCapability {
     /// The same borrow as `openPortForward`, and the same D14 rule: an unknown or changed host key
     /// surfaces the terminal's own fingerprint prompt rather than being refused or, worse, trusted
     /// silently. Opening a project is a foreground action; the user pressed Open and is waiting.
+    ///
+    /// The connection is opened again when it has gone (`GlassTerminalReconnectingLister`): a
+    /// project stays open across a phone locking or a network changing.
     public func openDirectoryLister(host: HostProfile) async throws -> any GlassHostDirectoryLister {
+        let first = try await openConnectedLister(host: host)
+        return GlassTerminalReconnectingLister(machine: host.displayName, first: first) { [weak self] in
+            guard let self else { throw SFTPSessionError.closed }
+            return try await self.openConnectedLister(host: host)
+        }
+    }
+
+    /// One connection's lister, as `openDirectoryLister` describes.
+    private func openConnectedLister(host: HostProfile) async throws -> GlassTerminalDirectoryLister {
         guard let link = host.services.first(where: { $0.kind == .ssh }),
               let server = runtime.sessionManager.serverManager.server(for: link.endpointID.rawValue)
         else { throw GlassPortForwardError.unavailable }
