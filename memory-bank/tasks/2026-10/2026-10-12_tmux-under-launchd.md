@@ -62,3 +62,18 @@ Same Dock log lines both times. The control reproduces the incident; the first r
   the owner ending it at a time of his choosing — it ends every session, this agent's included).
 - Until then: launch a test app with `open`, never by running its binary from a pane.
 - Not tested: a Force Quit of Glass Power Tools itself while it owns the server.
+
+## Found after: test panes on the owner's tmux server (rule 63), fixed
+
+The owner's app reopened six tabs titled with a test's awkward folder name: sessions glass-7, 8, 9,
+11, 12, 13 on his default server, made during this session's terminal runs (01:08–01:11). Cause:
+`MacLocalTerminalConfiguration.resolve` took tmux from the static `MacLocalTmux.executablePath()`
+while everything else asks `MacLocalTmux.server`, so a test window's pane ran this Mac's tmux
+(`new-session -A` makes the session, or joins the owner's of that name); the stand-ins also named
+`/opt/homebrew/bin/tmux`. Fixed in `8ce39c3`: resolve and `Lookups.live` ask the server; a new
+`Server.ensureRunning` carries the launchd check (stand-ins: nothing); `ensureDefaultServer` acts
+only for this Mac's own tmux; stand-ins name `TmuxStandIn.path`, which is no tmux. A test fails both
+ways without the fix. Terminal suite 747/747 on four runs with the owner's session list identical
+before and after. `df5bfea` fixes a timing-flaky output test seen once in those runs. The six
+sessions are left for the owner (he had typed in two while looking into them). No reinstall: the
+app's behaviour is unchanged.
