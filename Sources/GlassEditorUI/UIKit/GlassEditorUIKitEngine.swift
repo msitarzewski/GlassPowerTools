@@ -34,11 +34,7 @@ public final class GlassEditorUIKitEngine: GlassEditorEngine {
         containerView.backgroundColor = .clear
         textView.delegate = coordinator
         textView.isEditable = model.configuration.isEditable
-        textView.textContainer.widthTracksTextView = model.configuration.wrapsLines
-        textView.textContainer.size = CGSize(
-            width: model.configuration.wrapsLines ? 0 : CGFloat.greatestFiniteMagnitude,
-            height: CGFloat.greatestFiniteMagnitude
-        )
+        textView.wrapsLines = model.configuration.wrapsLines
         coordinator.textView = textView
 
         installViews()
@@ -259,11 +255,7 @@ public final class GlassEditorUIKitEngine: GlassEditorEngine {
         let current = model.configuration
         textView.isEditable = current.isEditable
         if previous.wrapsLines != current.wrapsLines {
-            textView.textContainer.widthTracksTextView = current.wrapsLines
-            textView.textContainer.size = CGSize(
-                width: current.wrapsLines ? 0 : CGFloat.greatestFiniteMagnitude,
-                height: CGFloat.greatestFiniteMagnitude
-            )
+            textView.wrapsLines = current.wrapsLines
         }
         if previous.showsLineNumbers != current.showsLineNumbers {
             gutterWidthConstraint?.constant =

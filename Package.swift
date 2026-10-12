@@ -384,6 +384,8 @@ let package = Package(
         .testTarget(name: "GlassEditorCoreTests", dependencies: ["GlassEditorCore"],
                     resources: [.copy("Fixtures")]),
         .testTarget(name: "GlassEditorUITests", dependencies: ["GlassEditorUI"]),
+        // The UIKit engine, run on the iOS simulator (`xcodebuild test`); empty on a Mac.
+        .testTarget(name: "GlassEditorUIKitTests", dependencies: ["GlassEditorUI"]),
         .testTarget(name: "GlassEditorTests", dependencies: ["GlassEditor"]),
         .testTarget(name: "GlassLayersTests", dependencies: ["GlassLayers"]),
         .testTarget(

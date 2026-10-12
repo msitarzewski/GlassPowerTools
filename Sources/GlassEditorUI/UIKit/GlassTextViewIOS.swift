@@ -29,6 +29,57 @@ public final class GlassTextViewIOS: UITextView {
     /// One-shot intent for the edit a UIKit action is about to cause.
     var pendingIntent: EditIntent?
 
+    /// Wrap Long Lines. Off, the text container is unbounded and the view scrolls sideways to
+    /// the longest line laid out. Both are held here, on every layout, because `UITextView` does
+    /// neither on its own: it laid a container set unbounded before it had a size out to its own
+    /// width when it got one — the owner's iPhone wrapped every long line with the setting off
+    /// (2026-10-12) — and it keeps its content as wide as itself, so an unwrapped line was out of
+    /// reach.
+    public var wrapsLines = true {
+        didSet {
+            guard wrapsLines != oldValue else { return }
+            textContainer.widthTracksTextView = wrapsLines
+            if wrapsLines {
+                // Back to the view's width: UIKit tracks it from here.
+                textContainer.size = CGSize(width: max(bounds.width, 0), height: .greatestFiniteMagnitude)
+                super.contentSize = CGSize(width: bounds.width, height: super.contentSize.height)
+            } else {
+                holdUnboundedContainer()
+            }
+            setNeedsLayout()
+        }
+    }
+
+    /// A container this wide never wraps.
+    static let unboundedWidth = CGFloat.greatestFiniteMagnitude
+
+    private func holdUnboundedContainer() {
+        if textContainer.widthTracksTextView { textContainer.widthTracksTextView = false }
+        if textContainer.size.width != Self.unboundedWidth {
+            textContainer.size = CGSize(width: Self.unboundedWidth, height: .greatestFiniteMagnitude)
+        }
+    }
+
+    /// The content width the laid-out text needs, insets included; nil while wrapping.
+    private var unwrappedContentWidth: CGFloat? {
+        guard !wrapsLines, let layoutManager = textLayoutManager else { return nil }
+        let used = layoutManager.usageBoundsForTextContainer
+        guard used.maxX.isFinite, used.maxX < Self.unboundedWidth / 2 else { return nil }
+        return ceil(used.maxX + textContainerInset.left + textContainerInset.right
+                    + textContainer.lineFragmentPadding)
+    }
+
+    /// UIKit sets the content size from its own layout, as wide as the view; unwrapped, it is
+    /// as wide as the text.
+    public override var contentSize: CGSize {
+        get { super.contentSize }
+        set {
+            var size = newValue
+            if let width = unwrappedContentWidth { size.width = max(size.width, width) }
+            super.contentSize = size
+        }
+    }
+
     /// The canvas.
     ///
     /// A layer rather than a `backgroundColor`, because `UITextView` is a
@@ -103,7 +154,11 @@ public final class GlassTextViewIOS: UITextView {
     // MARK: - Canvas
 
     public override func layoutSubviews() {
+        if !wrapsLines { holdUnboundedContainer() }
         super.layoutSubviews()
+        if let width = unwrappedContentWidth, width > super.contentSize.width {
+            super.contentSize = CGSize(width: width, height: super.contentSize.height)
+        }
         // Pin the canvas to the viewport, not the content, and do it without an
         // implicit animation — an animated background during a scroll reads as a
         // flicker.
