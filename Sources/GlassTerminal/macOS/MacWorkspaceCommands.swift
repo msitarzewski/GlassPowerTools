@@ -238,7 +238,7 @@ struct MacWorkspaceCommands: Commands {
             // ⌃⌘T: a quick shell on this Mac outside tmux, whatever Settings ▸ Terminal says. It
             // ends with its tab, or when the app quits (the owner, 2026-10-12: "a quick naked local
             // terminal"). ⌃⌘T was free in every menu of the running app.
-            Button("New Plain Terminal Tab") {
+            Button("New Basic Terminal Tab") {
                 if let plainTab = newWorkspaceTabAction?.plainTab, newWorkspaceTabAction?.isEnabled == true {
                     plainTab()
                 } else {

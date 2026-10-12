@@ -258,10 +258,21 @@ struct MacWorkspaceView: View {
             // glassdb gives Add Connection (`ConnectionManagerView.swift:327-330`).
             .toolbar {
                 ToolbarItem(id: "new-terminal-tab", placement: .navigation) {
-                    // Click: a tab as ⌘T makes it. The menu: the same without tmux (⌃⌘T).
+                    // Click: a tab as ⌘T makes it. The menu, in the owner's words (2026-10-12): "new
+                    // terminal, new basic terminal, new terminal on..." — the last a cascading menu
+                    // of every saved host with a terminal, in tmux as that host says.
                     Menu {
-                        Button("New Terminal Tab", systemImage: "plus", action: addTab)
-                        Button("New Plain Terminal Tab", systemImage: "apple.terminal", action: addPlainTab)
+                        Button("New Terminal", systemImage: "plus", action: addTab)
+                        Button("New Basic Terminal", systemImage: "apple.terminal", action: addPlainTab)
+                        let hosts = terminalHosts
+                        if !hosts.isEmpty {
+                            Menu("New Terminal on", systemImage: "server.rack") {
+                                ForEach(hosts) { server in
+                                    Button(server.name) { addTab(onHost: server.id) }
+                                }
+                            }
+                            .accessibilityIdentifier("mac-workspace-new-tab-on-host")
+                        }
                     } label: {
                         Label("New Terminal Tab", systemImage: "plus")
                     } primaryAction: {
@@ -654,6 +665,20 @@ struct MacWorkspaceView: View {
     private func addTab() {
         Task {
             if let tab = await windowController.addTabStartingWhereFocusedIs() { startLocalPanes(of: tab) }
+        }
+    }
+
+    /// Saved hosts with a terminal, by name, for "+" ▸ New Terminal on.
+    private var terminalHosts: [ServerConfiguration] {
+        sessionManager.serverManager.servers.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    /// "+" ▸ New Terminal on: a tab on that host, in tmux as it says.
+    private func addTab(onHost serverID: UUID) {
+        Task {
+            if let tab = await windowController.addTabStartingWhereFocusedIs(repeating: .ssh(serverID: serverID)) {
+                startLocalPanes(of: tab)
+            }
         }
     }
 
@@ -1270,7 +1295,7 @@ struct MacWorkspaceEmptyTab: View {
         } actions: {
             Button("Local Terminal", systemImage: "apple.terminal", action: startLocal)
             if let startPlain {
-                Button("Plain Local Terminal", systemImage: "terminal", action: startPlain)
+                Button("Basic Local Terminal", systemImage: "terminal", action: startPlain)
                     .help("A shell on this Mac outside tmux: it ends with its tab")
             }
             Button("SSH Connection", systemImage: "network", action: startSSH)

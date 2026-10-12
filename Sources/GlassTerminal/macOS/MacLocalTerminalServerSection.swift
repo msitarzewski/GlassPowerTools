@@ -6,7 +6,7 @@
 //  2026-10-12, so everything about local tmux is in one place), the background process they run
 //  in (D66, `MacTmuxHost`), and a way to end it (the owner, 2026-10-12: "give the user a way to
 //  terminate it in the settings > terminal tab"). It stops by itself when the last terminal ends;
-//  ending it here ends them all. New Plain Terminal Tab (⌃⌘T) opens one outside tmux either way.
+//  ending it here ends them all. New Basic Terminal Tab (⌃⌘T) opens one outside tmux either way.
 //
 
 #if os(macOS)
@@ -28,7 +28,7 @@ struct MacLocalTerminalServerSection: View {
                 .accessibilityIdentifier("settings.local-tmux")
             Text(tmuxPath == nil
                  ? "tmux isn't installed on this Mac. Install it with Homebrew (brew install tmux), then come back here."
-                 : "Quitting or updating the app leaves local terminals running, and each tab picks up where it was when the app opens again. Closing a tab leaves its terminal running too: Active lists it under This Mac, to open again or end. New Plain Terminal Tab (⌃⌘T) opens one outside tmux.")
+                 : "Quitting or updating the app leaves local terminals running, and each tab picks up where it was when the app opens again. Closing a tab leaves its terminal running too: Active lists it under This Mac, to open again or end. New Basic Terminal Tab (⌃⌘T) opens one outside tmux.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -43,7 +43,7 @@ struct MacLocalTerminalServerSection: View {
                     .foregroundStyle(.secondary)
             }
 
-            Text("Each saved host has its own tmux setting, in its editor. A host that keeps its terminals in tmux also offers Plain Terminal, for a shell outside it.")
+            Text("Each saved host has its own tmux setting, in its editor. A host that keeps its terminals in tmux also offers Basic Terminal, for a shell outside it.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

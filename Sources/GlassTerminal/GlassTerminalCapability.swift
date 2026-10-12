@@ -684,7 +684,7 @@ public final class GlassTerminalCapability: GlassCapability {
         // default"). Where it does not, Connect gives one already.
         if runtime.sessionManager.serverManager.server(for: serverID)?.keepsSessionsInTmux == true {
             tools.append(GlassServiceTool(id: "plain-terminal-\(serverID.uuidString.lowercased())",
-                                          title: "Plain Terminal",
+                                          title: "Basic Terminal",
                                           symbolName: "terminal",
                                           subtitle: "A shell outside tmux: it ends when you close it") {
                 runtime.requestConnect(serverID: serverID, withoutTmux: true)

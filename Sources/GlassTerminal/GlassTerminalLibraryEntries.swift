@@ -90,7 +90,7 @@ enum GlassTerminalCommandCenter {
                                             detail: "Connections") { runtime.requestAddServer() },
                        MacCommandCenterEntry(id: "terminal.local", title: "Open Local Terminal",
                                             detail: "Terminal") { runtime.requestLocalTerminal() },
-                       MacCommandCenterEntry(id: "terminal.local.plain", title: "Open Plain Local Terminal",
+                       MacCommandCenterEntry(id: "terminal.local.plain", title: "Open Basic Local Terminal",
                                             detail: "Terminal without tmux", shortcut: "⌃⌘T") {
                            runtime.requestLocalTerminal(withoutTmux: true)
                        },
