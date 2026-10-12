@@ -258,7 +258,10 @@ struct GlassActiveConnectionsTests {
         try await store.upsert(alpha); try await store.upsert(bravo); try await store.upsert(empty)
         let terminal = StubCapability(kind: .ssh, displayName: "Terminal")
         terminal.sessions = [session("terminal:1", title: "alpha", endpoints: [alphaTerminal.endpointID])]
-        terminal.running = [running("glass-1", on: alphaTerminal.endpointID), running("glass-2", on: alphaTerminal.endpointID)]
+        terminal.running = [running("glass-1", on: alphaTerminal.endpointID), running("glass-2", on: alphaTerminal.endpointID),
+                            GlassRunningSession(id: "glass-3", title: "glass-3", symbolName: "terminal",
+                                                endpointID: alphaTerminal.endpointID, isAttachedElsewhere: true, isOpenHere: true,
+                                                open: {}, takeOver: {}, end: {})]
         let database = StubCapability(kind: .database, displayName: "Database")
         database.sessions = [session("database:1", title: "MySQL on alpha", endpoints: [alphaDatabase.endpointID])]
         model.registry.register(terminal); model.registry.register(database)
@@ -274,7 +277,8 @@ struct GlassActiveConnectionsTests {
         #expect(machines["bravo"]?.services.map(\.kind) == [.desktop] && machines["bravo"]?.isFavorite == true)
         #expect(!snapshot.machines.contains { $0.id == GlassLocalHost.id.rawValue }, "not this device's own entry")
         let active = try #require(snapshot.active.first { $0.name == "alpha" })
-        #expect(active.open == 2 && active.running == 2 && active.kinds == [.terminal, .database])
+        #expect(active.open == 3 && active.running == 2 && active.kinds == [.terminal, .database],
+                "a session a window here shows is open, as Active says, not running elsewhere: \(active.open) open, \(active.running) running")
         #expect(active.machineID == alpha.id.rawValue)
     }
 

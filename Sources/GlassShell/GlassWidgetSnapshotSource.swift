@@ -31,9 +31,13 @@ public extension GlassShellModel {
             let present = Set(endpoints.compactMap { endpoint in
                 host(owningEndpoint: endpoint)?.services.first { $0.endpointID == endpoint }.map { Self.widgetKind($0.kind) }
             })
+            // A session a window here shows is open, as Active says — a Mac's local tab in tmux is
+            // listed with the running ones (W6). Counted as running, the Mac's widget said "0 open ·
+            // 22 running" with 21 terminals open in front of the owner (2026-10-12).
+            let openHere = machine.running.filter(\.isOpenHere).count
             return GlassWidgetSnapshot.ActiveMachine(
                 machineID: UUID(uuidString: machine.id), name: machine.name,
-                open: machine.sessions.count, running: machine.running.count,
+                open: machine.sessions.count + openHere, running: machine.running.count - openHere,
                 kinds: GlassWidgetSnapshot.ServiceKind.allCases.filter(present.contains))
         }
         return GlassWidgetSnapshot(writtenAt: now, machines: machines, active: active)
