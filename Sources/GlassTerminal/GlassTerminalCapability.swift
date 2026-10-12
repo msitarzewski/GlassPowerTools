@@ -115,6 +115,26 @@ public final class GlassTerminalRuntime {
     /// means the overview shows only what it always showed.
     public var openSessions: (@MainActor () -> [GlassOpenSession])?
 
+    /// The name of the machine a saved server is a terminal on, from the shell's catalog, for
+    /// menus that already say "Terminal on" (2026-10-12: "New Terminal on ▸ Terminal on oscar").
+    /// Supplied by the composition root, by the same seam; nil leaves them the server's own name.
+    public var hostName: (@MainActor (UUID) -> String?)?
+
+    /// What a menu that says "Terminal on" calls a saved server: its machine's name; for a
+    /// terminal named something else, both. Without the machine, its name less the default
+    /// "Terminal on " a host sheet gives it (`serviceDisplayName`).
+    static func machineTitle(serverName: String, hostName: String?) -> String {
+        let defaultPrefix = "Terminal on "
+        if let hostName = hostName?.trimmingCharacters(in: .whitespacesAndNewlines), !hostName.isEmpty {
+            return serverName == defaultPrefix + hostName || serverName == hostName ? hostName : "\(hostName) — \(serverName)"
+        }
+        return serverName.hasPrefix(defaultPrefix) ? String(serverName.dropFirst(defaultPrefix.count)) : serverName
+    }
+
+    func machineTitle(of server: ServerConfiguration) -> String {
+        Self.machineTitle(serverName: server.name, hostName: hostName?(server.id))
+    }
+
     /// "Take me to the live connections" — the ⚡ in every toolbar. Supplied by the composition
     /// root, since the library is the shell's; nil means the bolt is not offered.
     public var showActiveConnections: GlassShowActiveConnections?

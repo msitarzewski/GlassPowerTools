@@ -52,6 +52,8 @@ struct MacWorkspaceView: View {
 
     @Environment(SessionManager.self) private var sessionManager
     @Environment(SettingsManager.self) private var settingsManager
+    /// For the machine names "+" ▸ New Terminal on and ⇧⌘T's title show; nil in previews.
+    @Environment(GlassTerminalRuntime.self) private var terminalRuntime: GlassTerminalRuntime?
     @Environment(\.openWindow) private var openWindow
 
     init(request: MacWorkspaceLaunchRequest) {
@@ -267,8 +269,8 @@ struct MacWorkspaceView: View {
                         let hosts = terminalHosts
                         if !hosts.isEmpty {
                             Menu("New Terminal on", systemImage: "server.rack") {
-                                ForEach(hosts) { server in
-                                    Button(server.name) { addTab(onHost: server.id) }
+                                ForEach(hosts, id: \.server.id) { host in
+                                    Button(host.title) { addTab(onHost: host.server.id) }
                                 }
                             }
                             .accessibilityIdentifier("mac-workspace-new-tab-on-host")
@@ -668,9 +670,16 @@ struct MacWorkspaceView: View {
         }
     }
 
-    /// Saved hosts with a terminal, by name, for "+" ▸ New Terminal on.
-    private var terminalHosts: [ServerConfiguration] {
-        sessionManager.serverManager.servers.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    /// Saved hosts with a terminal, by their machines' names, for "+" ▸ New Terminal on.
+    private var terminalHosts: [(server: ServerConfiguration, title: String)] {
+        sessionManager.serverManager.servers
+            .map { ($0, machineTitle(of: $0)) }
+            .sorted { $0.1.localizedStandardCompare($1.1) == .orderedAscending }
+    }
+
+    private func machineTitle(of server: ServerConfiguration) -> String {
+        terminalRuntime?.machineTitle(of: server)
+            ?? GlassTerminalRuntime.machineTitle(serverName: server.name, hostName: nil)
     }
 
     /// "+" ▸ New Terminal on: a tab on that host, in tmux as it says.
@@ -729,7 +738,8 @@ struct MacWorkspaceView: View {
             guard let serverID = intent.serverID,
                   let server = sessionManager.serverManager.servers.first(where: { $0.id == serverID })
             else { return nil }
-            return intent.label ?? server.name
+            // "New Tab on oscar", not "New Tab on Terminal on oscar".
+            return intent.label ?? machineTitle(of: server)
         }
     }
 

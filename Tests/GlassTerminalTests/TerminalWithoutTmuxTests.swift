@@ -45,6 +45,23 @@ struct TerminalWithoutTmuxTests {
         #expect(marked.withoutTmux && marked.tmuxSession == nil)
     }
 
+    @Test("a menu that says \"Terminal on\" names the machine: never \"Terminal on Terminal on oscar\"")
+    func machineTitles() {
+        #expect(GlassTerminalRuntime.machineTitle(serverName: "Terminal on oscar", hostName: "oscar") == "oscar")
+        #expect(GlassTerminalRuntime.machineTitle(serverName: "oscar", hostName: "oscar") == "oscar")
+        #expect(GlassTerminalRuntime.machineTitle(serverName: "Admin shell", hostName: "oscar") == "oscar — Admin shell",
+                "a terminal named something else: both, so two on one machine are told apart")
+        #expect(GlassTerminalRuntime.machineTitle(serverName: "Terminal on alpha", hostName: nil) == "alpha",
+                "no catalog: the default prefix a host sheet gives it comes off")
+        #expect(GlassTerminalRuntime.machineTitle(serverName: "bravo", hostName: "  ") == "bravo")
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+        var server = ServerConfiguration(name: "Terminal on alpha", host: "alpha.example.com", username: "ann")
+        runtime.hostName = { $0 == server.id ? "Alpha Lab" : nil }
+        #expect(runtime.machineTitle(of: server) == "Alpha Lab — Terminal on alpha")
+        server.name = "Terminal on Alpha Lab"
+        #expect(runtime.machineTitle(of: server) == "Alpha Lab")
+    }
+
     @Test("Connect without tmux and a plain local terminal reach the connect flow as asked")
     func requests() {
         let runtime = GlassTerminalRuntime(layers: GlassLayerStore())

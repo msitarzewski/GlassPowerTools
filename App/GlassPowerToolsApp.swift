@@ -259,6 +259,8 @@ struct GlassPowerToolsApp: App {
         // The Mac's Terminal Overview shows every open session, not only this window's tabs —
         // the user asked where the database was, standing in the overview. Read at draw time.
         terminal.openSessions = { [registry = model.registry] in registry.openSessions() }
+        // "New Terminal on ▸ oscar", not "Terminal on oscar": the machine's name, from the catalog.
+        terminal.hostName = { [weak model] serverID in model?.host(owningEndpoint: EndpointID(rawValue: serverID))?.displayName }
         // The ⚡ in every toolbar means one thing — the library's Active panel — so all four
         // runtimes get the same closure.
         let showActive: GlassShowActiveConnections = { [weak model] in model?.showActiveConnections() }
