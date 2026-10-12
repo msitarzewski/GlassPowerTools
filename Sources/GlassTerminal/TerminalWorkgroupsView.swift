@@ -665,7 +665,8 @@ struct TerminalWorkgroupsView: View {
             guard session.purpose == .terminal,
                   servers.contains(where: { $0.id == session.server.id }) else { return nil }
             return LayoutPreset.SessionIntent(serverID: session.server.id, label: session.workgroupLabel,
-                                              tmuxSession: session.usesTmux ? session.tmuxSessionName : nil)
+                                              tmuxSession: session.usesTmux ? session.tmuxSessionName : nil,
+                                              withoutTmux: session.withoutTmux)
         }
     }
 

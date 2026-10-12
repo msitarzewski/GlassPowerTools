@@ -437,6 +437,9 @@ class TerminalSession: Identifiable, Hashable {
     var tmuxTakesOver = false
     /// The host had no tmux when this terminal connected: it is an ordinary shell.
     private(set) var tmuxUnavailable = false
+    /// Started as a plain shell by choice, whatever the server's setting (2026-10-12: "allow
+    /// remote sessions without tmux too even if it's been selected as default"). No offer is made.
+    var withoutTmux = false
     /// Told what each connection found: whether the host has tmux. Installed by the session
     /// manager, which records it on the server and decides whether to offer the setting.
     var tmuxAvailabilityObserved: (@MainActor (Bool) -> Void)?
@@ -998,7 +1001,7 @@ class TerminalSession: Identifiable, Hashable {
     }
 
     var usesTmux: Bool {
-        purpose == .terminal && !tmuxUnavailable && (tmuxSessionName != nil || server.keepsSessionsInTmux)
+        purpose == .terminal && !withoutTmux && !tmuxUnavailable && (tmuxSessionName != nil || server.keepsSessionsInTmux)
     }
 
     /// Types the attach line once the shell is up, after claiming a name the first time. The
@@ -2313,6 +2316,9 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
         /// a new one. It travels with the workgroup (D51): the session lives on the host, not on
         /// the device. Nil until a terminal opened from the workgroup claims one.
         var tmuxSession: String? = nil
+        /// 2026-10-12: a plain shell by choice, whatever the settings say, so a terminal opened
+        /// without tmux opens without it again. Written only when true: older builds read the rest.
+        var withoutTmux = false
 
         init(
             schemaVersion: Int = SessionIntent.currentSchemaVersion,
@@ -2320,7 +2326,8 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
             restoration: Restoration = .freshAuthorizedSession,
             label: String? = nil,
             startupCommand: String? = nil,
-            tmuxSession: String? = nil
+            tmuxSession: String? = nil,
+            withoutTmux: Bool = false
         ) {
             self.schemaVersion = schemaVersion
             self.kind = .ssh
@@ -2328,7 +2335,8 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
             self.restoration = restoration
             self.label = Self.normalizedLabel(label)
             self.startupCommand = Self.normalizedCommand(startupCommand)
-            self.tmuxSession = Self.normalizedTmuxSession(tmuxSession)
+            self.tmuxSession = withoutTmux ? nil : Self.normalizedTmuxSession(tmuxSession)
+            self.withoutTmux = withoutTmux
         }
 
         init(
@@ -2340,7 +2348,8 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
             startupCommand: String? = nil,
             localShell: String? = nil,
             localDirectory: String? = nil,
-            tmuxSession: String? = nil
+            tmuxSession: String? = nil,
+            withoutTmux: Bool = false
         ) {
             self.schemaVersion = schemaVersion
             self.kind = kind
@@ -2350,7 +2359,8 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
             self.restoration = restoration
             self.label = Self.normalizedLabel(label)
             self.startupCommand = Self.normalizedCommand(startupCommand)
-            self.tmuxSession = Self.normalizedTmuxSession(tmuxSession)
+            self.tmuxSession = withoutTmux ? nil : Self.normalizedTmuxSession(tmuxSession)
+            self.withoutTmux = withoutTmux
         }
 
         var isSupported: Bool {
@@ -2417,6 +2427,7 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
             case startupCommand
             case localShell, localDirectory
             case tmuxSession
+            case withoutTmux
         }
 
         init(from decoder: Decoder) throws {
@@ -2435,6 +2446,8 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
             // Optional and without a schema change, so a build from before W4b still reads the
             // workgroup; it drops the name only if it saves the workgroup again.
             tmuxSession = Self.normalizedTmuxSession(try container.decodeIfPresent(String.self, forKey: .tmuxSession))
+            withoutTmux = try container.decodeIfPresent(Bool.self, forKey: .withoutTmux) ?? false
+            if withoutTmux { tmuxSession = nil }
         }
 
         func encode(to encoder: Encoder) throws {
@@ -2448,6 +2461,7 @@ struct LayoutPreset: Identifiable, Codable, Hashable {
             try container.encodeIfPresent(localShell, forKey: .localShell)
             try container.encodeIfPresent(localDirectory, forKey: .localDirectory)
             try container.encodeIfPresent(tmuxSession, forKey: .tmuxSession)
+            if withoutTmux { try container.encode(true, forKey: .withoutTmux) }
         }
     }
 

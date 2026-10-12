@@ -258,10 +258,18 @@ struct MacWorkspaceView: View {
             // glassdb gives Add Connection (`ConnectionManagerView.swift:327-330`).
             .toolbar {
                 ToolbarItem(id: "new-terminal-tab", placement: .navigation) {
-                    Button("New Terminal Tab", systemImage: "plus", action: addTab)
-                        .help("New Terminal Tab")
-                        .disabled(!windowController.canAddTab)
-                        .accessibilityIdentifier("mac-workspace-new-tab")
+                    // Click: a tab as ⌘T makes it. The menu: the same without tmux (⌃⌘T).
+                    Menu {
+                        Button("New Terminal Tab", systemImage: "plus", action: addTab)
+                        Button("New Plain Terminal Tab", systemImage: "apple.terminal", action: addPlainTab)
+                    } label: {
+                        Label("New Terminal Tab", systemImage: "plus")
+                    } primaryAction: {
+                        addTab()
+                    }
+                    .help("New Terminal Tab")
+                    .disabled(!windowController.canAddTab)
+                    .accessibilityIdentifier("mac-workspace-new-tab")
                 }
                 .glassKeepVisibleWhenCompact()
             }
@@ -387,7 +395,8 @@ struct MacWorkspaceView: View {
                 currentConnectionName: repeatableConnectionName,
                 addTab,
                 repeatingCurrentConnection: addTabRepeatingCurrentConnection,
-                newWindow: openNewWindow
+                newWindow: openNewWindow,
+                plainTab: addPlainTab
             )
         )
         .focusedSceneValue(\.macCommandCenterEntries, [
@@ -648,6 +657,16 @@ struct MacWorkspaceView: View {
         }
     }
 
+    /// ⌃⌘T and "+"'s menu: the same tab as a plain shell, never in tmux (2026-10-12).
+    private func addPlainTab() {
+        Task {
+            if let tab = await windowController.addTabStartingWhereFocusedIs(
+                repeating: MacLocalTerminalStart.intent(in: nil).startingWithoutTmux()) {
+                startLocalPanes(of: tab)
+            }
+        }
+    }
+
     /// ⌘N and New Terminal Window from this window: one local tab, in the folder of the local
     /// terminal in front (W37). From an SSH tab or an empty one, at the default, as before.
     private func openNewWindow() {
@@ -774,6 +793,8 @@ private struct MacWorkspaceTabContent: View {
     @State private var persistentStateReady = false
     @State private var showingPaneCloseConfirmation = false
     @State private var credentialPrompt: WorkspaceCredentialPrompt?
+    /// Connect Saved Host's "Open without tmux"; off each time the sheet opens.
+    @State private var sshWithoutTmux = false
 
     @Environment(SessionManager.self) private var sessionManager
     @Environment(SettingsManager.self) private var settingsManager
@@ -808,7 +829,7 @@ private struct MacWorkspaceTabContent: View {
                 findNext: { controller.requestFind(.next) },
                 findPrevious: { controller.requestFind(.previous) }
             ))
-            .sheet(isPresented: sshPickerPresented) { sshPicker }
+            .sheet(isPresented: sshPickerPresented, onDismiss: { sshWithoutTmux = false }) { sshPicker }
             .sheet(item: $credentialPrompt) { prompt in
                 ConnectionPasswordPromptSheet(server: prompt.server, savesPassword: true) { password in
                     guard let current = sessionManager.server(for: prompt.server.id),
@@ -892,6 +913,10 @@ private struct MacWorkspaceTabContent: View {
                 opacity: profile.look.opacity,
                 blur: profile.look.blur,
                 startLocal: { controller.addPane(intent: .local, axis: .horizontal) },
+                // With tmux off, Local Terminal is plain already.
+                startPlain: settingsManager.localTmux
+                    ? { controller.addPane(intent: MacWorkspacePaneIntent.local.startingWithoutTmux(), axis: .horizontal) }
+                    : nil,
                 startSSH: { controller.requestSSHPane(axis: .horizontal) }
             )
         }
@@ -1176,16 +1201,26 @@ private struct MacWorkspaceTabContent: View {
                 } else {
                     List(sessionManager.serverManager.servers) { server in
                         Button {
-                            controller.addSSHPane(serverID: server.id)
+                            controller.addSSHPane(serverID: server.id, withoutTmux: sshWithoutTmux)
                         } label: {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(server.name)
-                                Text("\(server.username)@\(server.host):\(server.port)")
+                                Text("\(server.username)@\(server.host):\(server.port)"
+                                     + (server.keepsSessionsInTmux && !sshWithoutTmux ? " · in tmux" : ""))
                                     .font(.caption.monospaced())
                                     .foregroundStyle(.secondary)
                             }
                         }
                         .buttonStyle(.plain)
+                    }
+                    .safeAreaInset(edge: .bottom) {
+                        // Hosts that keep terminals in tmux can still open a plain shell (2026-10-12).
+                        if sessionManager.serverManager.servers.contains(where: \.keepsSessionsInTmux) {
+                            Toggle("Open without tmux", isOn: $sshWithoutTmux)
+                                .help("A plain shell, even on a host that keeps its terminals in tmux")
+                                .accessibilityIdentifier("mac-workspace-ssh-without-tmux")
+                                .padding(12)
+                        }
                     }
                 }
             }
@@ -1222,6 +1257,8 @@ struct MacWorkspaceEmptyTab: View {
     var opacity: Double = 1
     var blur: Double = 0
     let startLocal: () -> Void
+    /// A local shell outside tmux; nil leaves the choice out.
+    var startPlain: (() -> Void)? = nil
     let startSSH: () -> Void
     @Environment(\.colorScheme) private var systemColorScheme
 
@@ -1232,6 +1269,10 @@ struct MacWorkspaceEmptyTab: View {
             Text("Choose how to start this terminal tab.")
         } actions: {
             Button("Local Terminal", systemImage: "apple.terminal", action: startLocal)
+            if let startPlain {
+                Button("Plain Local Terminal", systemImage: "terminal", action: startPlain)
+                    .help("A shell on this Mac outside tmux: it ends with its tab")
+            }
             Button("SSH Connection", systemImage: "network", action: startSSH)
         }
         .environment(\.colorScheme, theme.resolvedAppearance.colorScheme ?? systemColorScheme)

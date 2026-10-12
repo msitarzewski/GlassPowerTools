@@ -47,9 +47,10 @@ public final class GlassTerminalRuntime {
     /// legacy-algorithm confirmation, trust prompt and password fallback exist exactly once.
     enum Request {
         /// `report` is the shell's outcome callback (nil for the terminal's own callers).
-        /// `tmux` names a session already running on the host to attach to (D44, Active).
+        /// `tmux` names a session already running on the host to attach to (D44, Active);
+        /// `withoutTmux` opens a plain shell whatever the server's setting.
         case connect(serverID: UUID, purpose: TerminalSession.Purpose, report: GlassCapabilityReport?,
-                     tmux: TerminalTmuxAttachment? = nil)
+                     tmux: TerminalTmuxAttachment? = nil, withoutTmux: Bool = false)
         case quickConnect(ServerConfiguration, password: String)
         case openWorkgroup(LayoutPreset)
         case addServer(draft: ServerConfiguration?)
@@ -59,7 +60,8 @@ public final class GlassTerminalRuntime {
         case serverInfo(ServerConfiguration)
         case deleteServer(ServerConfiguration)
         /// `tmux` names a session on this Mac to attach to — Active's Open (D47).
-        case localTerminal(tmux: String? = nil)
+        /// `withoutTmux`: a plain shell, whatever Settings ▸ Terminal says.
+        case localTerminal(tmux: String? = nil, withoutTmux: Bool = false)
         /// Running tmux sessions, on this Mac and on saved servers, opened together in one new
         /// window in this order — Active's "Open N in New Window" (W13).
         case openTmuxSessions([TerminalTmuxTarget])
@@ -159,9 +161,11 @@ public final class GlassTerminalRuntime {
     /// Connect to the saved server whose id is the shell's endpoint id. Consumed by the bootstrap.
     /// `report`, when given, receives the attempt's terminal state (the shell stamps "last
     /// connected" only on `.connected`).
+    /// `withoutTmux`: a plain shell, though the server keeps its terminals in tmux.
     public func requestConnect(serverID: UUID, purpose: GlassTerminalOpenPurpose = .terminal,
-                               report: GlassCapabilityReport? = nil) {
-        enqueue(.connect(serverID: serverID, purpose: purpose == .sftp ? .sftp : .terminal, report: report))
+                               report: GlassCapabilityReport? = nil, withoutTmux: Bool = false) {
+        enqueue(.connect(serverID: serverID, purpose: purpose == .sftp ? .sftp : .terminal, report: report,
+                         withoutTmux: withoutTmux))
     }
     /// Open a saved workgroup preset (all of its terminals) through the launch plan.
     public func requestOpenWorkgroup(_ presetID: UUID) {
@@ -190,7 +194,7 @@ public final class GlassTerminalRuntime {
         enqueue(.deleteServer(server))
     }
     /// macOS: a new workspace window with a local shell. Elsewhere this is a no-op.
-    public func requestLocalTerminal() { enqueue(.localTerminal()) }
+    public func requestLocalTerminal(withoutTmux: Bool = false) { enqueue(.localTerminal(withoutTmux: withoutTmux)) }
 
     // MARK: The device's own shell (D8)
 
@@ -667,7 +671,7 @@ public final class GlassTerminalCapability: GlassCapability {
         let serverID = service.endpointID.rawValue
         guard runtime.hasServer(id: serverID) else { return [] }
         let runtime = self.runtime
-        return [
+        var tools = [
             GlassServiceTool(id: "files-\(serverID.uuidString.lowercased())",
                              title: "Files",
                              symbolName: "folder",
@@ -675,6 +679,18 @@ public final class GlassTerminalCapability: GlassCapability {
                 runtime.requestConnect(serverID: serverID, purpose: .sftp)
             }
         ]
+        // A host that keeps its terminals in tmux can still give a plain shell (the owner,
+        // 2026-10-12: "allow remote sessions without tmux too even if it's been selected as
+        // default"). Where it does not, Connect gives one already.
+        if runtime.sessionManager.serverManager.server(for: serverID)?.keepsSessionsInTmux == true {
+            tools.append(GlassServiceTool(id: "plain-terminal-\(serverID.uuidString.lowercased())",
+                                          title: "Plain Terminal",
+                                          symbolName: "terminal",
+                                          subtitle: "A shell outside tmux: it ends when you close it") {
+                runtime.requestConnect(serverID: serverID, withoutTmux: true)
+            })
+        }
+        return tools
     }
 }
 

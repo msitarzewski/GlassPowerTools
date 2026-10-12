@@ -82,6 +82,9 @@ enum TerminalWorkgroupOpening {
     static func prepare(_ session: TerminalSession, for target: LayoutRestorationTarget,
                         workgroupID: UUID, settingsManager: SettingsManager) {
         session.workgroupLabel = target.intent.label
+        // A plain shell by choice: no session, and none claimed to keep.
+        session.withoutTmux = target.intent.withoutTmux
+        guard !target.intent.withoutTmux else { return }
         if let name = target.intent.tmuxSession {
             session.tmuxSessionName = name
             session.tmuxClaimsGivenName = true

@@ -48,6 +48,18 @@ struct TerminalTmuxOfferTests {
         #expect(!second.tmuxOffer, "already on, and already answered")
     }
 
+    @Test("a terminal opened without tmux on purpose is not offered it; what the host has is still recorded")
+    func notOfferedWhenDeclined() async throws {
+        let (manager, server, root) = try await fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let plain = TerminalSession(server: server)
+        plain.withoutTmux = true
+        await manager.noteTmuxAvailability(true, on: plain)?.value
+        #expect(!plain.tmuxOffer)
+        #expect(manager.serverManager.server(for: server.id)?.tmuxAvailable == true)
+        #expect(manager.serverManager.server(for: server.id)?.tmuxOffered != true, "still to be asked, by a terminal that wants it")
+    }
+
     @Test("Not Now is remembered, and a host without tmux is never offered")
     func declineAndMissing() async throws {
         let (manager, server, root) = try await fixture()

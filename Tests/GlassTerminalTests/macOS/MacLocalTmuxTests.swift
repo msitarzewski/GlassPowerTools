@@ -784,7 +784,7 @@ struct MacLocalTmuxTests {
             #expect(revealed.all == ["glass-1"], "Open brings forward the tab showing it")
             #expect(runtime.takeRequests().isEmpty, "and never attaches a second client")
             local[1].open()
-            guard case .localTerminal(let opened)? = runtime.takeRequests().first else {
+            guard case .localTerminal(let opened, false)? = runtime.takeRequests().first else {
                 Issue.record("a detached session opens in a new tab")
                 return
             }

@@ -90,6 +90,10 @@ enum GlassTerminalCommandCenter {
                                             detail: "Connections") { runtime.requestAddServer() },
                        MacCommandCenterEntry(id: "terminal.local", title: "Open Local Terminal",
                                             detail: "Terminal") { runtime.requestLocalTerminal() },
+                       MacCommandCenterEntry(id: "terminal.local.plain", title: "Open Plain Local Terminal",
+                                            detail: "Terminal without tmux", shortcut: "⌃⌘T") {
+                           runtime.requestLocalTerminal(withoutTmux: true)
+                       },
                        MacCommandCenterEntry(id: "library.workgroups", title: "Workgroups",
                                             detail: "Library") { runtime.requestShowWorkgroups() }]
         if runtime.tailscaleIsConfigured {
@@ -101,6 +105,12 @@ enum GlassTerminalCommandCenter {
                 title: "Connect to \(server.name)", detail: "Open SSH terminal") {
                 runtime.requestConnect(serverID: server.id)
             })
+            if server.keepsSessionsInTmux {
+                entries.append(MacCommandCenterEntry(id: "connection.plain.\(server.id)",
+                    title: "Connect to \(server.name) without tmux", detail: "Open a plain SSH terminal") {
+                    runtime.requestConnect(serverID: server.id, withoutTmux: true)
+                })
+            }
             entries.append(MacCommandCenterEntry(id: "connection.sftp.\(server.id)",
                 title: "Open SFTP · \(server.name)", detail: "Files") {
                 runtime.requestConnect(serverID: server.id, purpose: .sftp)

@@ -29,16 +29,20 @@ struct MacNewWorkspaceTabAction {
     /// File ▸ New Terminal Window from this window: its terminal starts in the folder of the local
     /// terminal in front (W37), as ⌘N's does through `\.glassNewItem`. Nil opens one at the default.
     let newWindow: (() -> Void)?
+    /// ⌃⌘T: a tab with a plain shell on this Mac, never in tmux (2026-10-12).
+    let plainTab: (() -> Void)?
 
     init(isEnabled: Bool, currentConnectionName: String? = nil,
          _ action: @escaping () -> Void,
          repeatingCurrentConnection repeatAction: @escaping () -> Void = {},
-         newWindow: (() -> Void)? = nil) {
+         newWindow: (() -> Void)? = nil,
+         plainTab: (() -> Void)? = nil) {
         self.isEnabled = isEnabled
         self.currentConnectionName = currentConnectionName
         self.action = action
         self.repeatAction = repeatAction
         self.newWindow = newWindow
+        self.plainTab = plainTab
     }
 
     var canRepeatCurrentConnection: Bool { isEnabled && currentConnectionName != nil }
@@ -229,6 +233,22 @@ struct MacWorkspaceCommands: Commands {
                 }
             }
             .keyboardShortcut("t", modifiers: .command)
+            .disabled(newWorkspaceTabAction?.isEnabled == false)
+
+            // ⌃⌘T: a quick shell on this Mac outside tmux, whatever Settings ▸ Terminal says. It
+            // ends with its tab, or when the app quits (the owner, 2026-10-12: "a quick naked local
+            // terminal"). ⌃⌘T was free in every menu of the running app.
+            Button("New Plain Terminal Tab") {
+                if let plainTab = newWorkspaceTabAction?.plainTab, newWorkspaceTabAction?.isEnabled == true {
+                    plainTab()
+                } else {
+                    openWindow(
+                        id: "workspace",
+                        value: MacWorkspaceLaunchRequest(initialPaneIntent: MacWorkspacePaneIntent.local.startingWithoutTmux())
+                    )
+                }
+            }
+            .keyboardShortcut("t", modifiers: [.command, .control])
             .disabled(newWorkspaceTabAction?.isEnabled == false)
 
             // ⇧⌘T: another tab on the machine this one is already on, with no chooser. The whole

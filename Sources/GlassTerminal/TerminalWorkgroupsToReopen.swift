@@ -40,6 +40,8 @@ nonisolated struct TerminalWorkgroupReopenRecord: Codable, Equatable, Sendable {
         /// The name someone gave it (W11). For a terminal in tmux its session says it again once
         /// attached; until then — an iPhone's slot not yet shown — this is what it is called.
         var name: String?
+        /// Opened without tmux by choice (2026-10-12): it comes back the same; nil otherwise.
+        var withoutTmux: Bool? = nil
     }
 
     var id: UUID
@@ -220,7 +222,8 @@ final class TerminalWorkgroupsToReopen {
                     serverID: terminal.server.id,
                     tmuxSession: terminal.survivesClose ? terminal.tmuxSessionName : nil,
                     label: terminal.workgroupLabel,
-                    name: terminal.givenName)
+                    name: terminal.givenName,
+                    withoutTmux: terminal.withoutTmux ? true : nil)
             }
             guard terminals.contains(where: { $0.tmuxSession != nil }) else { return nil }
             return TerminalWorkgroupReopenRecord(
@@ -295,7 +298,8 @@ extension TerminalWorkgroupOpening {
                 result.failures.append("\(server.name) uses legacy algorithms, so \(called) didn't come back. Open it on its own to review its security settings.")
                 continue
             }
-            let intent = LayoutPreset.SessionIntent(serverID: server.id, label: terminal.label, tmuxSession: terminal.tmuxSession)
+            let intent = LayoutPreset.SessionIntent(serverID: server.id, label: terminal.label, tmuxSession: terminal.tmuxSession,
+                                                    withoutTmux: terminal.withoutTmux == true)
             let target = LayoutRestorationTarget(intent: intent, server: server, sourceIndex: nil)
             do {
                 let session = try sessionManager.createSessionWithoutConnecting(

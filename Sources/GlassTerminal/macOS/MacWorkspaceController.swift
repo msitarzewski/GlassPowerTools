@@ -846,7 +846,7 @@ final class MacWorkspaceController {
         guard let root = state.root else { return false }
         let enabled = defaults.bool(forKey: UserDefaultsKeys.localTmux)
         let panes = root.panes.filter {
-            $0.intent.kind == .local && (enabled || $0.intent.localTmuxSession != nil)
+            $0.intent.kind == .local && !$0.intent.withoutTmux && (enabled || $0.intent.localTmuxSession != nil)
         }
         guard !panes.isEmpty else { return false }
         let server = MacLocalTmux.server
@@ -910,10 +910,12 @@ final class MacWorkspaceController {
         pendingSSHAxis = axis
     }
 
-    func addSSHPane(serverID: UUID) {
+    /// `withoutTmux`: a plain shell, though the host keeps its terminals in tmux (2026-10-12).
+    func addSSHPane(serverID: UUID, withoutTmux: Bool = false) {
         let axis = pendingSSHAxis ?? .horizontal
         pendingSSHAxis = nil
-        addPane(intent: .ssh(serverID: serverID), axis: axis)
+        let intent = MacWorkspacePaneIntent.ssh(serverID: serverID)
+        addPane(intent: withoutTmux ? intent.startingWithoutTmux() : intent, axis: axis)
     }
 
     func cancelSSHPaneRequest() {
@@ -1029,15 +1031,18 @@ final class MacWorkspaceController {
         let startupCommand = startupTicket?.command
         // The pane as it is now: a retry after a session ended carries the name it claimed.
         let tmuxSession = state.root?.pane(id: pane.id)?.intent.sshTmuxSession ?? pane.intent.sshTmuxSession
+        let withoutTmux = pane.intent.withoutTmux
         do {
             let launch = try await sessionManager.createAuthorizedSessionByServerID(
                 serverID,
                 settingsManager: settingsManager,
                 startupCommand: startupCommand,
                 configure: { [weak self] session in
+                    // A plain shell by choice: no session, whatever the server's setting.
+                    session.withoutTmux = withoutTmux
                     // W4b: its saved session, claimed — joined when it runs, made again when it
                     // has ended — or, without one, the session it claims kept for next time.
-                    if let tmuxSession {
+                    if !withoutTmux, let tmuxSession {
                         session.tmuxSessionName = tmuxSession
                         session.tmuxClaimsGivenName = true
                     }
@@ -1652,7 +1657,8 @@ final class MacWorkspaceWindowController {
                                          localDirectory: intent.kind == .local
                                             ? (tab.localDirectory(for: pane.id) ?? intent.localDirectory ?? defaultLocalDirectory)
                                             : nil,
-                                         tmuxSession: tmuxSession))
+                                         tmuxSession: tmuxSession,
+                                         withoutTmux: intent.withoutTmux))
                     return .session(index)
                 case .split(let split):
                     return .split(axis: split.axis == .horizontal ? .horizontal : .vertical,

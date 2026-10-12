@@ -153,6 +153,7 @@ class SessionManager {
         purpose: TerminalSession.Purpose = .terminal,
         startupCommand: String? = nil,
         tmux: TerminalTmuxAttachment? = nil,
+        withoutTmux: Bool = false,
         initialTerminalPresentation: TerminalSession.InitialTerminalPresentationRequest? = nil
     ) async throws -> AuthorizedSessionLaunch {
         guard let currentServer = serverManager.server(for: server.id) else {
@@ -166,6 +167,7 @@ class SessionManager {
             providedPassword: nil,
             startupCommand: startupCommand,
             tmux: tmux,
+            configure: withoutTmux ? { @MainActor (session: TerminalSession) in session.withoutTmux = true } : nil,
             initialTerminalPresentation: initialTerminalPresentation
         )
     }
@@ -946,7 +948,8 @@ class SessionManager {
     @discardableResult
     func noteTmuxAvailability(_ available: Bool, on session: TerminalSession) -> Task<Void, Never>? {
         guard let server = serverManager.server(for: session.server.id) else { return nil }
-        if available, !server.keepsSessionsInTmux, server.tmuxOffered != true { session.tmuxOffer = true }
+        // A terminal started without tmux on purpose is not asked to use it.
+        if available, !session.withoutTmux, !server.keepsSessionsInTmux, server.tmuxOffered != true { session.tmuxOffer = true }
         guard server.tmuxAvailable != available else { return nil }
         let serverManager = self.serverManager
         return Task { await serverManager.updateTmux(server.id) { $0.tmuxAvailable = available } }

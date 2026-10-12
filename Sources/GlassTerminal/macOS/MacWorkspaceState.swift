@@ -60,6 +60,9 @@ struct MacWorkspacePaneIntent: Codable, Hashable, Sendable {
     /// workgroup saved, or the one it claimed or attached to — so a relaunch reattaches to it
     /// rather than starting another. Always absent for a local pane, whose is `localTmuxSession`.
     var sshTmuxSession: String? = nil
+    /// 2026-10-12: a plain shell, by choice — New Plain Terminal, or an SSH connection opened
+    /// without tmux — whatever the settings say; kept so the pane is plain again after a restart.
+    var withoutTmux = false
 
     static let local = MacWorkspacePaneIntent(kind: .local, serverID: nil)
     static func local(shell: String?, directory: String?) -> Self {
@@ -71,6 +74,15 @@ struct MacWorkspacePaneIntent: Codable, Hashable, Sendable {
 
     static func ssh(serverID: UUID) -> MacWorkspacePaneIntent {
         MacWorkspacePaneIntent(kind: .ssh, serverID: serverID)
+    }
+
+    /// The same pane as a plain shell: no tmux session, now or after a restart.
+    func startingWithoutTmux() -> Self {
+        var plain = self
+        plain.withoutTmux = true
+        plain.localTmuxSession = nil
+        plain.sshTmuxSession = nil
+        return plain
     }
 
     private init(kind: Kind, serverID: UUID?) {
@@ -106,6 +118,11 @@ struct MacWorkspacePaneIntent: Codable, Hashable, Sendable {
         // Refusing it would turn the whole tab into "Couldn't restore" (W7b).
         self.sshTmuxSession = try container.decodeIfPresent(String.self, forKey: .sshTmuxSession)
             .flatMap { kind == .ssh && TerminalTmux.isValidSessionName($0) ? $0 : nil }
+        self.withoutTmux = try container.decodeIfPresent(Bool.self, forKey: .withoutTmux) ?? false
+        if withoutTmux {
+            localTmuxSession = nil
+            sshTmuxSession = nil
+        }
     }
 
     /// The same pane to start, whatever tmux session an SSH pane has since claimed: a name
@@ -797,8 +814,9 @@ enum MacLiveSessionWorkspaceRouter {
             guard let sessionManager, let session else { return }
             sessionManager.closeSession(session)
         }
+        let intent = MacWorkspacePaneIntent.ssh(serverID: session.server.id)
         return MacWorkspaceLaunchRequest(
-            initialPaneIntent: .ssh(serverID: session.server.id),
+            initialPaneIntent: session.withoutTmux ? intent.startingWithoutTmux() : intent,
             liveSessionTicketID: ticketID
         )
     }
@@ -839,6 +857,7 @@ enum MacWorkgroupLauncher {
                     case .local: intent.localTmuxSession = item.tmuxSession
                     case .ssh: intent.sshTmuxSession = item.tmuxSession
                     }
+                    if item.withoutTmux { intent = intent.startingWithoutTmux() }
                     let pane = MacWorkspacePane(intent: intent)
                     paneIDs[index] = pane.id
                     tickets[pane.id] = broker.issue(command: item.startupCommand)

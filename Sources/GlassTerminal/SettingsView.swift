@@ -36,7 +36,6 @@ struct GeneralSettingsView: View {
     @State private var tailscaleTestResult: String?
     @State private var tailscaleTestInProgress = false
     #if os(macOS)
-    @State private var localTmuxPath: String?
     #endif
     
     var body: some View {
@@ -80,19 +79,10 @@ struct GeneralSettingsView: View {
                     .onChange(of: settings.localShell) { _, _ in settings.saveSettings() }
                 TextField("Working directory (default: home)", text: $settings.localWorkingDirectory)
                     .onChange(of: settings.localWorkingDirectory) { _, _ in settings.saveSettings() }
-                Text("Use an absolute path or ~. Changes apply to new terminals. Saved Workgroups can override these defaults.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Toggle("Keep local terminals running with tmux", isOn: $settings.localTmux)
-                    .disabled(localTmuxPath == nil && !settings.localTmux)
-                    .onChange(of: settings.localTmux) { _, _ in settings.saveSettings() }
-                Text(localTmuxPath == nil
-                     ? "tmux isn't installed on this Mac. Install it with Homebrew (brew install tmux), then come back here."
-                     : "Quitting or updating the app leaves local terminals running, and each tab picks up where it was when the app opens again. Closing a tab leaves its terminal running too: Active lists it under This Mac, to open again or end.")
+                Text("Use an absolute path or ~. Changes apply to new terminals. Saved Workgroups can override these defaults. Whether they run in tmux is under Terminal.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            .task { localTmuxPath = MacLocalTmux.executablePath() }
             #endif
 
             Section("Session Recording") {
@@ -526,7 +516,7 @@ struct TerminalSettingsView: View {
             }
 
             #if os(macOS)
-            MacLocalTerminalServerSection()
+            MacLocalTerminalServerSection(settings: settingsManager)
             #endif
         }
         .formStyle(.grouped)

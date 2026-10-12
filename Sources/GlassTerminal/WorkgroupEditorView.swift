@@ -109,6 +109,8 @@ struct WorkgroupTabDraft: Identifiable {
     /// W4b: the tmux session the tab opens on, kept through an edit — the editor rebuilds every
     /// terminal from its draft, and a name left out here was lost on save.
     var tmuxSession: String? = nil
+    /// A plain shell by choice (2026-10-12), kept through an edit for the same reason.
+    var withoutTmux = false
 
     init(
         id: UUID = UUID(),
@@ -134,6 +136,7 @@ struct WorkgroupTabDraft: Identifiable {
         localShell = intent.localShell ?? ""
         localDirectory = intent.localDirectory ?? ""
         tmuxSession = intent.tmuxSession
+        withoutTmux = intent.withoutTmux
     }
 
     var intent: LayoutPreset.SessionIntent {
@@ -144,7 +147,8 @@ struct WorkgroupTabDraft: Identifiable {
             startupCommand: startupCommand,
             localShell: kind == .local ? localShell : nil,
             localDirectory: kind == .local ? localDirectory : nil,
-            tmuxSession: tmuxSession
+            tmuxSession: tmuxSession,
+            withoutTmux: withoutTmux
         )
     }
 

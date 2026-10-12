@@ -48,6 +48,8 @@ struct TerminalConnectFlow: ViewModifier {
     /// The tmux session a pending connect was attaching to (D44), kept across the password and
     /// legacy-algorithm prompts so the retry attaches to it rather than opening a new one.
     @State private var pendingTmuxAttachment: TerminalTmuxAttachment?
+    /// And whether it was to open without tmux, kept the same way.
+    @State private var pendingWithoutTmux = false
     @State private var addServerDraft: AddServerRequest?
     @State private var editingServer: EditServerRequest?
     @State private var viewingServer: ServerConfiguration?
@@ -158,7 +160,8 @@ struct TerminalConnectFlow: ViewModifier {
         ) { server in
             Button("Connect with Legacy Algorithms", role: .destructive) {
                 pendingLegacyAlgorithmServer = nil
-                connectToServer(server, purpose: pendingConnectionPurpose, tmux: pendingTmuxAttachment, legacyAlgorithmsConfirmed: true)
+                connectToServer(server, purpose: pendingConnectionPurpose, tmux: pendingTmuxAttachment,
+                                withoutTmux: pendingWithoutTmux, legacyAlgorithmsConfirmed: true)
             }
             Button("Cancel", role: .cancel) {
                 report(.dismissed, for: server.id)
@@ -289,7 +292,7 @@ struct TerminalConnectFlow: ViewModifier {
 
     private func handle(_ request: GlassTerminalRuntime.Request) {
         switch request {
-        case .connect(let serverID, let purpose, let report, let tmux):
+        case .connect(let serverID, let purpose, let report, let tmux, let withoutTmux):
             guard let server = serverManager.server(for: serverID) else {
                 report?(.failed(SessionOpenError.savedServerNotFound.localizedDescription))
                 return
@@ -300,7 +303,7 @@ struct TerminalConnectFlow: ViewModifier {
                 if let superseded = outcomeReports[serverID] { superseded(.dismissed) }
                 outcomeReports[serverID] = report
             }
-            connectToServer(server, purpose: purpose, tmux: tmux)
+            connectToServer(server, purpose: purpose, tmux: tmux, withoutTmux: withoutTmux)
         case .quickConnect(let config, let password):
             Task { @MainActor in
                 if let failure = await connectTransient(config, password: password) {
@@ -370,9 +373,12 @@ struct TerminalConnectFlow: ViewModifier {
             viewingServer = server
         case .deleteServer(let server):
             serverPendingDeletion = server
-        case .localTerminal(let tmux):
+        case .localTerminal(let tmux, let withoutTmux):
             #if os(macOS)
-            if let tmux {
+            if withoutTmux {
+                openWindow(id: "workspace",
+                           value: MacWorkspaceLaunchRequest(initialPaneIntent: MacWorkspacePaneIntent.local.startingWithoutTmux()))
+            } else if let tmux {
                 var intent = MacWorkspacePaneIntent.local
                 intent.localTmuxSession = tmux
                 openWindow(id: "workspace", value: MacWorkspaceLaunchRequest(initialPaneIntent: intent))
@@ -732,11 +738,13 @@ struct TerminalConnectFlow: ViewModifier {
         _ server: ServerConfiguration,
         purpose: TerminalSession.Purpose = .terminal,
         tmux: TerminalTmuxAttachment? = nil,
+        withoutTmux: Bool = false,
         legacyAlgorithmsConfirmed: Bool = false
     ) {
         if server.legacyAlgorithmsEnabled && !legacyAlgorithmsConfirmed {
             pendingConnectionPurpose = purpose
             pendingTmuxAttachment = tmux
+            pendingWithoutTmux = withoutTmux
             pendingLegacyAlgorithmServer = server
             return
         }
@@ -754,6 +762,7 @@ struct TerminalConnectFlow: ViewModifier {
                     settingsManager: settingsManager,
                     purpose: purpose,
                     tmux: tmux,
+                    withoutTmux: withoutTmux,
                     initialTerminalPresentation: { pendingSession in
                         presentConnectionSurface(for: pendingSession)
                     }
@@ -765,6 +774,7 @@ struct TerminalConnectFlow: ViewModifier {
                 ) {
                     pendingConnectionPurpose = purpose
                     pendingTmuxAttachment = tmux
+                    pendingWithoutTmux = withoutTmux
                     passwordPromptServer = promptServer
                 } else {
                     let message = Self.connectionFailureMessage(
@@ -1018,7 +1028,8 @@ struct TerminalConnectFlow: ViewModifier {
             do {
                 // On trial: kept only if this sign-in succeeds.
                 try await serverManager.tryPassword(password, for: savedServer)
-                connectToServer(savedServer, purpose: pendingConnectionPurpose, tmux: pendingTmuxAttachment)
+                connectToServer(savedServer, purpose: pendingConnectionPurpose, tmux: pendingTmuxAttachment,
+                                withoutTmux: pendingWithoutTmux)
                 return nil
             } catch {
                 return "The password could not be saved in Keychain. \(error.localizedDescription)"
