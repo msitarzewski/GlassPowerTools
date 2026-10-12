@@ -39,3 +39,6 @@
   iPhone workgroup tap fixed (276117e).
 - 2026-10-12 (after the compaction): the VNC setup sheet's warning follows the user name — a Mac account is encrypted
   since e7463ce, a password alone is not (new draft test; help page matched).
+- 2026-10-12: [Backlog inventory](2026-10-12_backlog-inventory.md) — everything open across this project, glas.sh,
+  glassdb, glassDT and the absorbed packages, checked against the code; IDs B-Q/R/X/F/T/H. Found on the way and
+  fixed: SECURITY.md's VNC paragraph; a real database name in a test (rule 61).

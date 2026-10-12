@@ -69,6 +69,9 @@ profile for `<bundle id>.widgets`); BUILDING.md and SECURITY.md current; site an
 claims corrected. **Done after the compaction (the owner's first ask):** the VNC setup warning follows the user name (262ba7a): with a
 Mac user name it says a Mac is encrypted after sign-in and other servers protect only the password; without one it
 keeps the orange warning and names adding the Mac's user name as the fix. Help page `desktop-add-service.md` matches.
+**Then the backlog inventory** (`tasks/2026-10/2026-10-12_backlog-inventory.md`): every open item, with IDs, including
+the original apps' lists that never came forward. Recommended first: B-X1 (editor reads FIFOs and huge files whole on
+the main actor), B-F44 (iPhone Duo ships 10-23), B-H9 (weekly dependency failures), B-H1–H3 (stale site pages).
 
 ## 2026-10-11 (late night) — High Performance built; quality-switch crash fixed
 
