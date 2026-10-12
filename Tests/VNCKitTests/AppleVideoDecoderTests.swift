@@ -52,6 +52,14 @@ struct AppleVideoDecoderTests {
         }
     }
 
+    @Test("the sample in the app is the fixture, and this device decodes it")
+    func selfCheck() throws {
+        let url = try #require(Bundle.module.url(forResource: "hevc-444-64x48", withExtension: "h265", subdirectory: "Fixtures"))
+        #expect(RFBAppleVideoDecoder.sample444 == [UInt8](try Data(contentsOf: url)))
+        #expect(RFBAppleVideoDecoder.annexBUnits(RFBAppleVideoDecoder.sample444) == (try fixtureUnits()))
+        #expect(RFBAppleVideoDecoder.decodesHighPerformance)
+    }
+
     @Test("a picture before any parameter sets is refused")
     func needsParameterSets() throws {
         let units = try fixtureUnits()

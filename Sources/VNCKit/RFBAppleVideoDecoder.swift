@@ -15,6 +15,7 @@
 import CoreMedia
 import CoreVideo
 import Foundation
+import os
 import VideoToolbox
 
 public final class RFBAppleVideoDecoder: @unchecked Sendable {
@@ -87,6 +88,48 @@ public final class RFBAppleVideoDecoder: @unchecked Sendable {
         session = created
         format = made
         parameterSets = sets
+    }
+
+    /// Whether this device decodes a Mac's High Performance picture: three pictures of the same
+    /// format (`sample444`) decoded once, the answer kept and logged. A device that cannot is not
+    /// asked to try a Mac's stream, which would fail only after the Mac had moved its windows.
+    public static var decodesHighPerformance: Bool { sampleCheck.withLock { $0 ?? runSampleCheck(&$0) } }
+
+    private static let sampleCheck = OSAllocatedUnfairLock<Bool?>(initialState: nil)
+
+    private static func runSampleCheck(_ result: inout Bool?) -> Bool {
+        let started = ContinuousClock.now
+        let decoder = RFBAppleVideoDecoder()
+        var pictures = 0
+        var failure = ""
+        do {
+            for unit in annexBUnits(sample444) where try decoder.decode(unit) != nil { pictures += 1 }
+        } catch {
+            failure = error.localizedDescription
+        }
+        let elapsed = ContinuousClock.now - started
+        let ok = pictures == 3
+        VNCDiagnostics.record(category: "media", "event=hp-decoder-check ok=\(ok) pictures=\(pictures) ms=\(elapsed.components.attoseconds / 1_000_000_000_000_000 + elapsed.components.seconds * 1000)\(failure.isEmpty ? "" : " reason=\(failure)")")
+        result = ok
+        return ok
+    }
+
+    /// An Annex B stream's access units, one a picture: a VCL NAL unit closes one.
+    static func annexBUnits(_ stream: [UInt8]) -> [[[UInt8]]] {
+        var starts: [Int] = []
+        var index = 0
+        while index + 3 <= stream.count {
+            if stream[index] == 0, stream[index + 1] == 0, stream[index + 2] == 1 { starts.append(index + 3); index += 3 } else { index += 1 }
+        }
+        var units: [[[UInt8]]] = [[]]
+        for (number, start) in starts.enumerated() {
+            var nal = Array(stream[start..<(number + 1 < starts.count ? starts[number + 1] - 3 : stream.count)])
+            while nal.last == 0 { nal.removeLast() }
+            guard !nal.isEmpty else { continue }
+            units[units.count - 1].append(nal)
+            if RFBAppleHEVC.nalType(nal[0]) < 32 { units.append([]) }
+        }
+        return units.filter { !$0.isEmpty }
     }
 
     private static func decode(_ nals: [[UInt8]], session: VTDecompressionSession, format: CMVideoFormatDescription) throws -> CVPixelBuffer? {

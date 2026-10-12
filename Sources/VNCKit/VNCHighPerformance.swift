@@ -111,6 +111,10 @@ extension VNCClient {
             highPerformanceUnavailable("This Mac does not offer High Performance screen sharing; it needs macOS 14 or later on Apple silicon.")
             return
         }
+        guard RFBAppleVideoDecoder.decodesHighPerformance else {
+            highPerformanceUnavailable("This device cannot decode the Mac's High Performance picture (HEVC 4:4:4).")
+            return
+        }
         let session = RFBAppleMediaSession(displays: 1, bitrates: wanted.bitrates)
         mediaState.begin(wanted, session: session, at: .now)
         planner.setHighPerformance()
