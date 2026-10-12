@@ -1798,7 +1798,35 @@ private final class ReviewingTerminalView: TerminalView {
         var commands = super.keyCommands ?? []
         commands.append(correctedFunctionKeyCommand(input: UIKeyCommand.f10))
         commands.append(correctedFunctionKeyCommand(input: UIKeyCommand.f12))
+        // Not while text is being composed, nor under the Kitty keyboard protocol: SwiftTerm's own
+        // handling of the press is the right one then.
+        if markedTextRange == nil, getTerminal().keyboardEnhancementFlags.isEmpty { commands += Self.arrowCommands }
         return commands
+    }
+
+    /// **The arrow keys ahead of the system** (the owner on visionOS 27.2, 2026-10-11: no arrow
+    /// worked in a terminal or a desktop, while Mac Virtual Display took them). A press reaches
+    /// `pressesBegan` only after the system has passed on it, and visionOS uses arrows for its own
+    /// navigation; a key command with priority is offered the press first, as F10 and F12 are. The
+    /// bytes are SwiftTerm's own for each arrow (`iOSTerminalView.pressesBegan`); with marked text or
+    /// the Kitty keyboard protocol the press goes to SwiftTerm as before.
+    private static let arrowCommands: [UIKeyCommand] = {
+        let inputs = [UIKeyCommand.inputUpArrow, UIKeyCommand.inputDownArrow, UIKeyCommand.inputLeftArrow, UIKeyCommand.inputRightArrow]
+        let modifiers: [UIKeyModifierFlags] = [[], .shift, .alternate, .control]
+        return inputs.flatMap { input in
+            modifiers.map { flags in
+                let command = UIKeyCommand(input: input, modifierFlags: flags, action: #selector(sendArrow(_:)))
+                command.wantsPriorityOverSystemBehavior = true
+                return command
+            }
+        }
+    }()
+
+    @objc private func sendArrow(_ command: UIKeyCommand) {
+        guard let input = command.input,
+              let bytes = SwiftTermArrowKeys.bytes(input: input, modifiers: command.modifierFlags,
+                                                   applicationCursor: getTerminal().applicationCursor) else { return }
+        send(bytes)
     }
 
     private func correctedFunctionKeyCommand(input: String) -> UIKeyCommand {
@@ -4465,6 +4493,31 @@ public struct SwiftTermLocalProcessHostView: NSViewRepresentable {
 
         fileprivate init(terminatesOnDismantle: Bool) {
             self.terminatesOnDismantle = terminatesOnDismantle
+        }
+    }
+}
+#endif
+
+#if canImport(UIKit)
+/// What SwiftTerm sends for each arrow (`iOSTerminalView.pressesBegan`): the cursor keys in normal or
+/// application mode, and Option or Control with Left and Right as a word back or forward.
+enum SwiftTermArrowKeys {
+    static func bytes(input: String, modifiers: UIKeyModifierFlags, applicationCursor: Bool) -> [UInt8]? {
+        switch input {
+        case UIKeyCommand.inputUpArrow:
+            return applicationCursor ? EscapeSequences.moveUpApp : EscapeSequences.moveUpNormal
+        case UIKeyCommand.inputDownArrow:
+            return applicationCursor ? EscapeSequences.moveDownApp : EscapeSequences.moveDownNormal
+        case UIKeyCommand.inputLeftArrow:
+            if modifiers.contains(.alternate) { return EscapeSequences.emacsBack }
+            if modifiers.contains(.control) { return EscapeSequences.controlLeft }
+            return applicationCursor ? EscapeSequences.moveLeftApp : EscapeSequences.moveLeftNormal
+        case UIKeyCommand.inputRightArrow:
+            if modifiers.contains(.alternate) { return EscapeSequences.emacsForward }
+            if modifiers.contains(.control) { return EscapeSequences.controlRight }
+            return applicationCursor ? EscapeSequences.moveRightApp : EscapeSequences.moveRightNormal
+        default:
+            return nil
         }
     }
 }

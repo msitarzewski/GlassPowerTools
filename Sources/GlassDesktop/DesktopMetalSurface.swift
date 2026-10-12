@@ -2,6 +2,7 @@ import SwiftUI
 import MetalKit
 import GlassConnectionUI
 import GlassRDPTransport
+import VNCKit
 
 #if os(macOS)
 import AppKit
@@ -531,6 +532,52 @@ final class DesktopMTKView: MTKView {
             input?.send(.key(key.scancode, key.extended, down, false))
         }
     }
+    // MARK: Arrow keys
+
+    /// **The arrow keys as key commands that come before the system's own use of them** (the owner on
+    /// a Vision Pro running visionOS 27.2, 2026-10-11: "couldn't use arrow keys" in a terminal or a
+    /// desktop, while Mac Virtual Display took them). A press reaches `pressesBegan` only after the
+    /// system has passed on it, and visionOS uses arrows for its own navigation; a key command with
+    /// priority over system behaviour is offered the press first, as the terminal's F10 and F12 are.
+    /// Every combination of Shift, Control, Option and Command, since a key command matches its
+    /// modifiers exactly; those keys themselves still arrive through `pressesBegan`. The arrow goes
+    /// as a press and a release, again each time the key repeats.
+    override var keyCommands: [UIKeyCommand]? {
+        var commands = super.keyCommands ?? []
+        commands += Self.arrowCommands
+        return commands
+    }
+
+    private static let arrowCommands: [UIKeyCommand] = {
+        let modifiers: [UIKeyModifierFlags] = [.shift, .control, .alternate, .command]
+        let combinations = (0..<16).map { bits in
+            modifiers.enumerated().reduce(into: UIKeyModifierFlags()) { flags, entry in
+                if bits & (1 << entry.offset) != 0 { flags.insert(entry.element) }
+            }
+        }
+        return DesktopArrowKeys.inputs.flatMap { input in
+            combinations.map { flags in
+                let command = UIKeyCommand(input: input, modifierFlags: flags, action: #selector(DesktopMTKView.sendArrow(_:)))
+                command.wantsPriorityOverSystemBehavior = true
+                return command
+            }
+        }
+    }()
+
+    override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
+        if action == #selector(sendArrow(_:)) { return inputEnabled && session?.isConnected == true }
+        return super.canPerformAction(action, withSender: sender)
+    }
+
+    @objc private func sendArrow(_ command: UIKeyCommand) {
+        guard inputEnabled, session?.isConnected == true, let input = command.input,
+              let usage = DesktopArrowKeys.usage(for: input), let code = DesktopKeyboard.key(hidUsage: usage) else { return }
+        DesktopArrowKeys.note(path: "command")
+        synchronizeUIKitModifiers(command.modifierFlags, changedUsage: usage, isDown: true)
+        self.input?.send(.key(code.scancode, code.extended, true, false))
+        self.input?.send(.key(code.scancode, code.extended, false, false))
+    }
+
     override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
         guard inputEnabled else { super.pressesBegan(presses, with: event); return }
         guard session?.isConnected == true else { super.pressesBegan(presses, with: event); return }
@@ -538,6 +585,7 @@ final class DesktopMTKView: MTKView {
         for press in presses {
             guard let key = press.key else { unhandled.insert(press); continue }
             let usage = key.keyCode.rawValue
+            if DesktopArrowKeys.usages.contains(usage) { DesktopArrowKeys.note(path: "presses") }
             synchronizeUIKitModifiers(key.modifierFlags, changedUsage: usage, isDown: true)
             if (224...231).contains(usage) || usage == 57 { continue }
             let special = usage >= 58 || [40,41,42,43].contains(usage)
@@ -631,5 +679,33 @@ extension DesktopMTKView: UIGestureRecognizerDelegate {
     /// Pinch and the two-finger drag share the same touches, so both must be allowed to run.
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
                            shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+}
+#endif
+
+#if !os(macOS)
+/// The arrow keys' inputs and HID usages, and a note in the screen-sharing log of which way the first
+/// few reached a desktop: as key commands, or as presses the system passed on.
+enum DesktopArrowKeys {
+    static let inputs = [UIKeyCommand.inputUpArrow, UIKeyCommand.inputDownArrow, UIKeyCommand.inputLeftArrow, UIKeyCommand.inputRightArrow]
+    /// Right, left, down, up (HID usages 79–82).
+    static let usages = 79...82
+
+    static func usage(for input: String) -> Int? {
+        switch input {
+        case UIKeyCommand.inputRightArrow: 79
+        case UIKeyCommand.inputLeftArrow: 80
+        case UIKeyCommand.inputDownArrow: 81
+        case UIKeyCommand.inputUpArrow: 82
+        default: nil
+        }
+    }
+
+    @MainActor private static var noted: [String: Int] = [:]
+
+    @MainActor static func note(path: String) {
+        let count = noted[path, default: 0] + 1
+        noted[path] = count
+        if count <= 3 { VNCDiagnostics.record(category: "keys", "event=arrow-key path=\(path) count=\(count)") }
+    }
 }
 #endif
