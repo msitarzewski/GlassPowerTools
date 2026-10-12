@@ -43,3 +43,18 @@ This is the reason to merge that no amount of shared packaging would have delive
 - Normal native windows on visionOS with shared Glass framing; source resolution kept separate from
   local scale.
 - Optional presentation modes for remote desktops, including a reliable Original view.
+
+## Terminals in and out of tmux, and widgets (2026-10-12)
+
+- Local terminals in tmux live in a background Glass Power Tools process: quitting, updating or force quitting the app,
+  or force quitting an app started from a terminal, leaves them running; it ends itself with the last one, and
+  Settings ▸ Terminal ▸ tmux can end them all.
+- tmux stays the default where it is set (one setting for this Mac, one per host), and any terminal can be opened as a
+  **Basic** one outside it — the word the owner chose for the "+" menu ("new terminal, new basic terminal, new terminal
+  on...").
+- Menus that say "Terminal on" name machines, not the terminals' stored names.
+- Widgets: **Machines** (favourites and recent machines; tap a service to connect) and **Active** (what is open and
+  running). Workgroups and Controls widgets were offered and not chosen.
+- A busy tab glows with a soft cloud of light sweeping across it (the owner's choices: light sweep, softer, slower,
+  cloud-like, not clipped).
+

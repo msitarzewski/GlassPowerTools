@@ -363,3 +363,18 @@ holding only that target, in the git-ignored `.swiftpm/xcode/xcshareddata/xcsche
 `xcodebuild test -workspace .swiftpm/xcode/package.xcworkspace -scheme EditorUITests -destination 'platform=iOS
 Simulator,name=iPhone 17' -clonedSourcePackagesDirPath <resolved SourcePackages> -packageAuthorizationProvider netrc
 -skipPackagePluginValidation -onlyUsePackageVersionsFromResolvedFile`.
+
+## Widgets, App Groups and the test runner, 2026-10-12
+
+- The widget extension is built for macOS, iOS and visionOS and embedded in all three apps. Xcode's automatic signing
+  gives the Mac extension the team's wildcard profile, which cannot grant a `group.` App Group: the sandbox denied the
+  file (Cocoa 257). On a Mac the widget snapshot therefore uses a team-prefixed group, `GPT_WIDGET_GROUP`
+  (`Config/Identity.xcconfig`), which needs no profile; iOS and visionOS extensions have an explicit profile with
+  `group.sh.glas.shared`. `GlassWidgetStore` reads the `GlassWidgetGroup` Info.plist key.
+- App Intents defined in a Swift package work with Xcode 27.2: `Metadata.appintents` lists them in both the app and
+  the extension when each declares an `AppIntentsPackage` that includes the package's.
+- `swift test` cannot reach a VM on a local or virtual network ("No route to host"): macOS's Local Network permission
+  blocks the runner. Tunnel through loopback for live SSH tests (`ssh -N -L 2222:localhost:22`, then
+  `GPT_SSH_TEST_HOST=127.0.0.1 GPT_SSH_TEST_PORT=2222`).
+- A dead SFTP/SSH connection under Citadel surfaces as NIO `ChannelError.ioOnClosedChannel` or `.outputClosed`.
+

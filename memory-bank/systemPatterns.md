@@ -1,7 +1,7 @@
 # System patterns
 
-Status: **intended structure, not yet built.** Nothing in this file describes existing code in this
-repository, because this repository contains no code yet.
+Status: written as the intended structure on 2026-09-10, before any code; **the structure is built**
+and each later section, dated, records a pattern as it was established.
 
 ## Intended shape
 
@@ -111,4 +111,23 @@ used, per-device substitutions, the device's own host) are left out. A payload i
 actor, so an item whose coding is main-actor-isolated in its module travels as JSON and is decoded
 and validated when applied. Tests drive two "devices" over a shared in-memory store and check the
 test fails without the push.
+
+## Background processes, widgets and choices that travel (2026-10-12)
+
+- **A process that must outlive the app runs under launchd as the app itself.** Local tmux (D66): a job in Application
+  Support (no login item) runs the app's executable with `--tmux-host`, chosen in `GlassPowerToolsMain` before SwiftUI
+  starts anything; it spawns tmux (stdout/stderr only inherited) and waits. Programs in panes answer to Glass Power
+  Tools for privacy permissions and sit in the job's own coalition, so no app's Force Quit reaches them. A
+  `ServerManager`-style seam (`MacLocalTmux.Server`) carries every tmux call, so tests swap all of it.
+- **Widgets read a snapshot the app writes for them, never a store of record** (D68, `GlassWidgetData`): written into the
+  App Group only when its content changes, metadata only, schema-numbered; `GlassShellModel.widgetSnapshot()` builds it
+  from the library and Active. Taps are App Intents defined once in the package (`AppIntentsPackage` in the app and the
+  extension) and handed to the app through `GlassWidgetRequests`, which holds a request until the app is ready.
+- **A per-terminal choice travels with the terminal's record:** `withoutTmux` (D67) on `TerminalSession`, the Mac pane
+  intent, the workgroup intent and the reopen record, set at every place a terminal is made and honoured where tmux is
+  decided (`usesTmux`, `assignLocalTmuxSessions`, the offer).
+- **A capability that needs the library's knowledge gets a closure from the composition root**, as `openSessions` did:
+  `GlassTerminalRuntime.hostName` gives terminal menus the machine's name from the catalog.
+- **A long-lived remote connection is wrapped to reopen itself** (`GlassTerminalReconnectingLister`): a call failing
+  because the connection is gone is retried once on a new one; concurrent calls share one reconnect.
 

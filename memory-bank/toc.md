@@ -71,6 +71,16 @@ source applications are obsolete and no longer compile.
 | [Dependencies and the audit's fixes](tasks/2026-09/2026-09-27_release-audit-fixes.md) | What moved and what is blocked upstream; each public-release audit finding, its fix and its proof |
 | [Help, site and updates](tasks/2026-09/2026-09-27_help-site-and-updates.md) | 35 help pages audited from the code, glasspowertools.com and its generator, Sparkle and the release script, and the defects the audit found |
 | [September tasks](tasks/2026-09/README.md) | Monthly index |
+| [tmux sessions (D44)](tasks/2026-10/2026-10-01_tmux-sessions.md) | Per-server tmux, reattach, Active's running sessions, the availability check and one-time offer |
+| [iPhone landscape and AI fixes](tasks/2026-10/2026-10-04_iphone-landscape-and-ai-fixes.md) | The landscape terminal, AI answers that are advice, menu icons, tests that wait on events |
+| [A database through another machine (D45)](tasks/2026-10/2026-10-05_db-through-another-machine.md) | Reaching a database through another host's SSH, and a database address through its own machine |
+| [RDP session bandwidth](tasks/2026-10/2026-10-05_rdp-session-bandwidth.md) | 0 bytes reported to Windows; fixed and verified live |
+| [Vision Pro input and the scroll edge](tasks/2026-10/2026-10-06_visionos-input-and-scroll-edge.md) | Trackpad scrolling, the bolt on the right, pinch-pose measurements for D46 |
+| [Terminal tabs and local tmux (D47)](tasks/2026-10/2026-10-07_terminal-tabs-and-local-tmux.md) | Tab names, rename, the activity wave, drags between windows, local terminals in tmux, favourites and workgroups sync |
+| [Plan: find, tabs, tmux names, workgroups, editor](tasks/2026-10/2026-10-08_find-tabs-tmux-workgroups-editor-plan.md) | Eight owner reports, root causes and five workstreams (W1–W14) |
+| [Apple Screen Sharing](tasks/2026-10/2026-10-11_apple-screen-sharing-protocol.md) | RFB 003.889 and its record layer, Quality, High Performance (D65), the hotspot findings |
+| [tmux under launchd, Basic terminals (D66, D67)](tasks/2026-10/2026-10-12_tmux-under-launchd.md) | The coalition a Force Quit ends, the app as tmux host, the test leak onto the owner's server, terminals outside tmux |
+| [Widgets: Machines and Active (D68)](tasks/2026-10/2026-10-12_widgets-machines-and-active.md) | A snapshot the app writes, App Intents for taps, the Mac's App Group |
 | [October tasks](tasks/2026-10/README.md) | Monthly index: tmux (D44), database through another machine (D45), RDP bandwidth, iPhone landscape, Vision Pro input (D46 proposed) |
 
 This project is `~/Software/glass/GlassPowerTools`. `../GlassEditorKit` was **absorbed on 2026-09-14**

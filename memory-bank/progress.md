@@ -44,6 +44,15 @@ All four capabilities and the shell are built and in daily use on the owner's Ma
 | Vision Pro/iPad/iPhone tab groups back after relaunch; tabs moved between Vision Pro windows (W15, D55) | built | unit (16 tests, each failing without its fix); not yet seen on a device |
 | visionOS plain windows in the window shape; Files folder as window title (W16) | built | unit (shape inventory), visionOS simulator captures; not yet seen on a device |
 | A terminal selection lasts through output (2026-10-09) | built | unit (3 tests through the real view, failing without the fix) |
+| Desktop Keys menu, arrow pad, iPhone keyboard bar; thinned desktop toolbar; arrow keys as priority commands (2026-10-11/12) | built | unit; device (owner: arrow keys "working again") |
+| Local tmux under a launchd-run Glass Power Tools host; ends with the last session; Settings ▸ Terminal ▸ tmux (D66, 2026-10-12) | built | unit + live private-server tests (coalition, exit-empty, host ends with tmux); owner's Dock Force Quit of a probe app under the host ended the probe alone; device (Mac) |
+| Tests never touch the owner's tmux server: panes attach through `MacLocalTmux.server` (2026-10-12) | built | unit (fails without the fix); the owner's session list identical before and after full runs |
+| Basic terminals (D67): ⌃⌘T, "+" ▸ New Terminal / New Basic Terminal / New Terminal on ▸, Open without tmux, Basic Terminal on a host, palette; machine names in those menus | built | unit (13 + naming tests; 7 fail with the core changes undone); device (Mac menu read back through accessibility; owner saw the "+" menu) |
+| Widgets Machines and Active (D68) on iPhone/iPad, Vision Pro, Mac | built | unit (snapshot, store, requests); Mac: extension signed, intents in metadata, snapshot written and read, owner sees correct counts; iPhone and headset installed, not yet seen |
+| Editor project connections reopen when dropped (2026-10-12) | built | unit + live (a real SSH connection ended under a project, scratch VM) |
+| Wrap Long Lines off on iPhone/iPad/Vision Pro (2026-10-12) | built | iOS simulator (`GlassEditorUIKitTests`, 3 of 5 failed before the fix) |
+| iPhone: tapping a workgroup opens its detail (2026-10-12) | built | unit (fails without the fix); device install |
+| The busy tab's light: a soft cloud sweeping the row (2026-10-12) | built | unit (sweep timing), rendered images; owner approved on the Mac |
 
 Package suite: about **1,790 tests**. The last full run with the screen unlocked passed (1,777, early
 2026-09-27); the night's later runs were under a locked screen, where file-protected stores cannot be
@@ -72,6 +81,10 @@ profile, notarization, deploying the site), the behaviour findings listed in `ac
 
 ## Not verified
 
+- **Widgets on iPhone and Vision Pro (D68):** installed, not yet placed or tapped. On the Mac, taps
+  (connect, show machine, show Active) have not been reported either.
+- **D66 in daily use:** the owner's tmux server predates it; the launchd host starts with the next
+  server (after a reboot or End All Local Terminals).
 - **Vision Pro:** runs 0.4.283 (2026-10-06); the owner has used desktops and trackpad scrolling on
   it. The tmux, database and visionOS window changes since 0.4.254 have not been gone through on it.
 - **Database scroll edge on the Mac** (hard top edge so content does not print through the

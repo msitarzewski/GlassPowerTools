@@ -27,26 +27,42 @@ anything touching real servers (SSH and database tests use the disposable test V
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
-## 2026-10-12 (morning) — tmux hosted by the app in the background (D66 revised)
+## 2026-10-12 — end of the session (before a compaction)
 
-**Installed: 0.4.374 on the Mac** (07:46). The launchd job runs the app as `--tmux-host`, so terminals keep the app's
-privacy permissions; tmux and the host end with the last session; Settings ▸ Terminal shows the state and can end them
-all. A test leak onto the owner's tmux server was found and fixed (8ce39c3). Measured and the owner's Force Quit probe
-passed; see the task note. Then D67 (130c879): terminals can be opened without tmux
-(⌃⌘T New Plain Terminal Tab, "+" menu, Connect Saved Host's switch, Plain Terminal on a host on every device); the local
-toggle moved to Settings ▸ Terminal ▸ tmux. Building 0.4.375 for Mac, iPhone and Vision Pro. His server of 00:44 still
-predates D66.
+**Installed: Mac 0.4.388; iPhone and Vision Pro 0.4.385.** Nothing pushed. Leave the owner's one-space README edit and
+the uncommitted `testArrowKeysReachTheTerminal` in `UITests/GlassTerminalUITests.swift` (it fails in the visionOS
+simulator on an accessibility scene error; not to commit). **Next: the owner brings a new list after the compaction.**
 
-## 2026-10-12 (early) — tmux server under launchd (D66); desktop keys
+Shipped today, each committed with its evidence (task notes: `2026-10-12_tmux-under-launchd.md`,
+`2026-10-12_widgets-machines-and-active.md`):
+- **D66, local tmux in a background Glass Power Tools process.** A Force Quit of an app run from a pane ended every
+  local terminal: the panes shared a resource coalition whose app had quit (reproduced with a probe and the owner's
+  Dock clicks). launchd now runs the app's own executable as `--tmux-host`, which starts tmux, so panes keep the app's
+  privacy permissions; `exit-empty` is turned on so tmux and the host end with the last session; Settings ▸ Terminal ▸
+  tmux shows it and can end it. **The owner's own server (started 00:44) predates D66** and keeps running as before
+  until it ends (a reboot, or End All Local Terminals).
+- **Rule 63 leak fixed (8ce39c3):** test windows' panes attached with this Mac's tmux and made six sessions on the
+  owner's server. Every tmux call now goes through `MacLocalTmux.server`; stand-ins name an inert tmux.
+- **D67, Basic terminals:** any terminal can be opened outside tmux (File ▸ New Basic Terminal Tab ⌃⌘T; "+" ▸ New
+  Terminal, New Basic Terminal, New Terminal on ▸ every host by machine name; Connect Saved Host's "Open without
+  tmux"; Basic Terminal beside Files on a host on every device; palette). The local tmux toggle moved to Settings ▸
+  Terminal ▸ tmux.
+- **D68, widgets:** Machines and Active on iPhone/iPad, Vision Pro and now the Mac, from a snapshot the app writes,
+  taps as App Intents. On the Mac the snapshot is in a team-prefixed App Group (the wildcard-signed extension could not
+  be given `group.sh.glas.shared`). The owner sees correct counts on the Mac; iPhone and headset not yet reported.
+- **Editor:** a project's SFTP connection reopens itself when dropped (fc7653e; live test kills a real connection);
+  Wrap Long Lines off works on iPhone/iPad/Vision Pro (8b444a9; simulator tests in `GlassEditorUIKitTests`).
+- **iPhone:** tapping a workgroup opens its detail (276117e).
+- **The busy tab's light:** the activity wave became a soft cloud of light sweeping the row (d45529e, the owner's
+  choices at each step).
+- Overnight (before the session's first compaction): arrow keys as priority commands, the desktop Keys menu, arrow pad
+  and iPhone keyboard bar, the thinned desktop toolbar, push pacing, High Performance mode (D65).
 
-**Installed: 0.4.373 on the Mac** (01:29; macOS-only changes; Vision Pro and iPhone stay at 0.4.372). Since 0.4.367: arrow
-keys as priority commands (2be5122), the desktop Keys menu, arrow pad and keyboard bar (15d25b8), the thinned desktop
-toolbar (e514e74), push pacing (8770d27), and D66 (86815ed, 1e89b18, 0619569): a Force Quit of an app run from a tmux pane
-ended every local terminal; the cause is the resource coalition, reproduced and fixed with a probe
-(`tasks/2026-10/2026-10-12_tmux-under-launchd.md`). **The owner's current server (00:44) predates D66** and is in the quit
-app's coalition; launchd takes over when it ends (reboot, or the owner's choice: ending it ends every session). Until then,
-run test apps with `open`, never from a pane. **Open:** D46 pinch gestures (asked, no answer); High Performance trial with
-the Mac at hand; W39 orb check on the headset; Bonjour availability (owner's call).
+**Open:** D46 pinch gestures (asked "Shall I build it?", unanswered); High Performance tried with a real Mac; the W39
+orb on the headset; Bonjour availability (owner's call); widgets placed and tapped on iPhone and Vision Pro; the next
+Mac release must sign the widget with Developer ID (see `Tools/Release/release-mac.sh`). **Rule 61:** the messages of
+fc7653e, 47b7df8 and 107f1be quote the owner's machine and host names (the code and tests were neutralised); they go
+with the pending pre-publication history scrub, which waits on the owner's word.
 
 ## 2026-10-11 (late night) — High Performance built; quality-switch crash fixed
 

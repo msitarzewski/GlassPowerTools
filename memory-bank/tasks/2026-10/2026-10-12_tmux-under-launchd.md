@@ -102,10 +102,10 @@ host design and asked that it end with its last session and that Settings > Term
 
 Owner: "build both. we need to allow remote sessions without tmux too even if it's been selected as
 default." A terminal carries `withoutTmux` (session, Mac pane intent, workgroup intent, reopen
-record); it claims and attaches nothing and is not offered tmux. Entry points: File > New Plain
+record); it claims and attaches nothing and is not offered tmux. Entry points: File > New Basic
 Terminal Tab (⌃⌘T, free per the running app's menus read through accessibility), "+" menu, empty
-tab's Plain Local Terminal (only with local tmux on), Connect Saved Host's "Open without tmux",
-palette entries, and a Plain Terminal row beside Files in the host detail on every device (hosts
+tab's Basic Local Terminal (only with local tmux on), Connect Saved Host's "Open without tmux",
+palette entries, and a Basic Terminal row beside Files in the host detail on every device (hosts
 that keep terminals in tmux). Settings > Terminal > tmux holds the local toggle (moved from
 Connections), the background status and End All. Tests: 13 new; 7 fail with the core changes
 undone. Terminal 763/763 twice; every module passes; owner's sessions unchanged.
@@ -118,3 +118,10 @@ terminal on...". "+" now reads New Terminal, New Basic Terminal, New Terminal on
 each says). A terminal outside tmux is "Basic" everywhere it is named (File ▸ New Basic Terminal Tab ⌃⌘T, read back
 from the running menu; Basic Local Terminal; Basic Terminal on a host; palette; Settings). No "basic on host" submenu,
 per his list; offered.
+
+## Names and menus after (737fa43, 47b7df8, 107f1be)
+
+The owner named the "+" menu: "new terminal, new basic terminal, new terminal on..."; a terminal outside tmux is
+**Basic** everywhere (renamed from Plain). New Terminal on ▸ lists machines by the catalog's name
+(`GlassTerminalRuntime.hostName`); a stale "Terminal on <old host name>" default gives way to the machine's name, and two
+terminals on one machine get their user names. The palette and Connect Saved Host list the same names.

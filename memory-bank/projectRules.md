@@ -503,3 +503,10 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     memory the outer layout still used. Every headset "SwiftUI layout over-release" crash since 0.4.288 was this
     (2026-10-09, `32fa481`, found with a simulator stress harness and malloc stack logging). A representable returns
     a plain host view from `makeUIView` and builds anything that touches the keyboard on the next main-queue turn.
+65. **Every call to this Mac's tmux goes through `MacLocalTmux.server`, and a stand-in names no real tmux.** A pane's
+    attach once took the static `MacLocalTmux.executablePath()` while everything else asked the server: a test window's
+    pane ran this Mac's tmux and made six sessions on the owner's server, joining any of his of the same name
+    (2026-10-12, `8ce39c3`). Stand-ins name `TmuxStandIn.path`, which is no tmux; anything that starts, stops or asks the
+    default server (`ensureRunning`, `endServer`) is a closure stand-ins leave empty. Check a terminal test run by
+    comparing `tmux list-sessions -F '#{session_name} #{session_created}'` before and after.
+
