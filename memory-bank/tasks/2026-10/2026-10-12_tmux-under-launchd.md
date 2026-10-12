@@ -110,3 +110,11 @@ that keep terminals in tmux). Settings > Terminal > tmux holds the local toggle 
 Connections), the background status and End All. Tests: 13 new; 7 fail with the core changes
 undone. Terminal 763/763 twice; every module passes; owner's sessions unchanged.
 
+
+## "+" menu and the name "Basic" (737fa43, 0.4.376 on all three devices)
+
+Owner: "a cascading menu for all defined hosts with terminals", then "new terminal, new basic terminal, new
+terminal on...". "+" now reads New Terminal, New Basic Terminal, New Terminal on ▸ (saved hosts by name, in tmux as
+each says). A terminal outside tmux is "Basic" everywhere it is named (File ▸ New Basic Terminal Tab ⌃⌘T, read back
+from the running menu; Basic Local Terminal; Basic Terminal on a host; palette; Settings). No "basic on host" submenu,
+per his list; offered.

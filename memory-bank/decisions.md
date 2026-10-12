@@ -1396,4 +1396,5 @@ setting; SSH: per host), and any terminal can be opened plain: New Plain Termina
 Host's "Open without tmux", the palette, and Plain Terminal in a host's detail on every device. The choice is the
 terminal's (`withoutTmux` on the session, the Mac pane and the workgroup) and survives relaunch and workgroups; such a
 terminal is never offered tmux. The local toggle moved from Settings ▸ Connections to Settings ▸ Terminal ▸ tmux, beside
-the background server's controls (130c879).
+the background server's controls (130c879). Named **Basic** wherever it appears, and "+" offers New Terminal, New Basic Terminal and New
+Terminal on ▸ every saved host, in the owner's words (737fa43).
