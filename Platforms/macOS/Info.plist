@@ -26,6 +26,8 @@
 	<string>$(AppIdentifierPrefix)$(GPT_KEYCHAIN_GROUP_SUFFIX)</string>
 	<key>GlassAppGroup</key>
 	<string>$(GPT_APP_GROUP)</string>
+	<key>GlassWidgetGroup</key>
+	<string>$(GPT_WIDGET_GROUP)</string>
 	<key>GlassCloudKitContainer</key>
 	<string>$(GPT_ICLOUD_CONTAINER)</string>
 	<key>GlassKeychainGroupSuffix</key>

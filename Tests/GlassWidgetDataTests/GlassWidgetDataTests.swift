@@ -49,6 +49,13 @@ struct GlassWidgetDataTests {
         var again = snapshot
         again.writtenAt = now.addingTimeInterval(60)
         #expect(try !GlassWidgetStore.write(again, to: url), "nothing changed: no write, no widget woken")
+        // A time with fractions of a second, as a real connection's is: read back to the second,
+        // it is still the same snapshot (on the Mac every minute's write woke every widget).
+        var fractional = snapshot
+        fractional.machines[0].lastConnected = now.addingTimeInterval(-30.456)
+        #expect(try GlassWidgetStore.write(fractional, to: url))
+        fractional.writtenAt = now.addingTimeInterval(120)
+        #expect(try !GlassWidgetStore.write(fractional, to: url), "the same, though its time read back has no fraction")
         let text = try String(contentsOf: url, encoding: .utf8)
         #expect(!text.contains("host") && !text.contains("user"), "names, kinds, times and counts only")
     }

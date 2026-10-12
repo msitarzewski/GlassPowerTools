@@ -17,6 +17,7 @@
 	<key>com.apple.security.application-groups</key>
 	<array>
 		<string>$(GPT_APP_GROUP)</string>
+		<string>$(GPT_WIDGET_GROUP)</string>
 	</array>
 	<key>keychain-access-groups</key>
 	<array>

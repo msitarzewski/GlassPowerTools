@@ -4,6 +4,8 @@
 <dict>
 	<key>GlassAppGroup</key>
 	<string>$(GPT_APP_GROUP)</string>
+	<key>GlassWidgetGroup</key>
+	<string>$(GPT_WIDGET_GROUP)</string>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionPointIdentifier</key>

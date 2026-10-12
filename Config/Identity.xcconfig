@@ -23,6 +23,13 @@ GPT_APP_GROUP = group.sh.glas.shared
 GPT_KEYCHAIN_GROUP_SUFFIX = sh.glas.shared
 GPT_KVSTORE_SUFFIX = sh.glas.app
 
+// The widgets' snapshot (D68). On iPhone, iPad and Vision Pro it is in the App Group above. A Mac's
+// widget extension runs sandboxed, and Xcode signs it with the team's wildcard profile, which cannot
+// grant a `group.` App Group: the sandbox refused the snapshot and the Active widget read 0
+// (2026-10-12). A team-prefixed group needs no profile on a Mac, so there it has one of its own.
+GPT_WIDGET_GROUP = $(GPT_APP_GROUP)
+GPT_WIDGET_GROUP[sdk=macosx*] = $(GPT_DEVELOPMENT_TEAM).$(GPT_BUNDLE_ID).widgets
+
 // Push notifications (CloudKit change notices). `development` matches the development profiles
 // that local builds are signed with; a distributed build must be `production`, which
 // `Tools/Release/release-mac.sh` passes on its command line (D38).

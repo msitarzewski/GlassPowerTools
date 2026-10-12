@@ -16,6 +16,7 @@
 //
 
 import Foundation
+import os
 
 public struct GlassWidgetSnapshot: Codable, Sendable, Equatable {
     public static let currentSchema = 1
@@ -138,10 +139,15 @@ public struct GlassWidgetSnapshot: Codable, Sendable, Equatable {
 /// Where the snapshot lives: a file in the App Group container both the app and the extension
 /// can reach.
 public enum GlassWidgetStore {
-    /// The App Group, from the `GlassAppGroup` Info.plist key the app and the extension both carry.
+    /// The App Group, from the `GlassWidgetGroup` Info.plist key the app and the extension both
+    /// carry: the library's group on iPhone, iPad and Vision Pro, a team-prefixed one of its own on
+    /// a Mac, where the sandboxed extension cannot be given the other (`GPT_WIDGET_GROUP`).
     public static var appGroup: String {
-        (Bundle.main.object(forInfoDictionaryKey: "GlassAppGroup") as? String)
-            .flatMap { $0.isEmpty || $0.hasPrefix("$(") ? nil : $0 } ?? "group.sh.glas.shared"
+        for key in ["GlassWidgetGroup", "GlassAppGroup"] {
+            if let value = Bundle.main.object(forInfoDictionaryKey: key) as? String,
+               !value.isEmpty, !value.hasPrefix("$(") { return value }
+        }
+        return "group.sh.glas.shared"
     }
 
     public static func snapshotURL(appGroup: String = appGroup, fileManager: FileManager = .default) -> URL? {
@@ -150,20 +156,50 @@ public enum GlassWidgetStore {
             .appendingPathComponent("snapshot.json")
     }
 
+    static let logger = Logger(subsystem: "sh.glas", category: "widget-snapshot")
+
+    /// The snapshot, or nil — none written yet, or one this build cannot read. Why it is nil is
+    /// logged: a widget that shows nothing must say why somewhere (the Mac's Active widget showed 0
+    /// against 22 open, 2026-10-12).
     public static func read(from url: URL? = snapshotURL()) -> GlassWidgetSnapshot? {
-        guard let url, let data = try? Data(contentsOf: url),
-              let snapshot = try? decoder.decode(GlassWidgetSnapshot.self, from: data),
-              snapshot.schema == GlassWidgetSnapshot.currentSchema else { return nil }
-        return snapshot
+        guard let url else {
+            logger.error("No App Group container for \(appGroup, privacy: .public)")
+            return nil
+        }
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
+            return nil
+        } catch {
+            logger.error("The snapshot could not be read: \(String(describing: error), privacy: .public)")
+            return nil
+        }
+        do {
+            let snapshot = try decoder.decode(GlassWidgetSnapshot.self, from: data)
+            guard snapshot.schema == GlassWidgetSnapshot.currentSchema else {
+                logger.notice("The snapshot is schema \(snapshot.schema), not \(GlassWidgetSnapshot.currentSchema)")
+                return nil
+            }
+            return snapshot
+        } catch {
+            logger.error("The snapshot could not be decoded: \(String(describing: error), privacy: .public)")
+            return nil
+        }
     }
 
-    /// Writes it when its content changed; true when it did.
+    /// Writes it when its content changed; true when it did. Compared as written — times to the
+    /// second — since a date read back never equals one with fractions of a second: compared as
+    /// values, every snapshot differed, and every write woke every widget once a minute.
     @discardableResult
     public static func write(_ snapshot: GlassWidgetSnapshot, to url: URL? = snapshotURL()) throws -> Bool {
         guard let url else { return false }
-        if let existing = read(from: url), existing.sameContent(as: snapshot) { return false }
+        if var existing = read(from: url) {
+            existing.writtenAt = snapshot.writtenAt
+            if try encoder.encode(existing) == encoder.encode(snapshot) { return false }
+        }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try encoder.encode(snapshot).write(to: url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        try encoder.encode(snapshot).write(to: url, options: [.atomic])
         return true
     }
 
