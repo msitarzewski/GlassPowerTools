@@ -31,3 +31,6 @@
 - 2026-10-12: Wrap Long Lines off ignored on iPhone (8b444a9): reproduced on the simulator (wrapped at open; unwrapped
   lines unreachable), fixed in `GlassTextViewIOS`; new `GlassEditorUIKitTests` (procedure in `techContext.md`).
   Also "+" ▸ New Terminal on lists machine names (47b7df8, 107f1be).
+- 2026-10-12: editor projects on another machine reconnect when their SFTP connection has gone (fc7653e): the
+  iPhone's "NIOCore.ChannelError error 5" (outputClosed) on default.profraw; empty files read fine (live test).
+  `GlassTerminalReconnectingLister`; live editor suite 9/9 on scratch via a loopback tunnel. 0.4.380 on all three.
