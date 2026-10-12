@@ -62,7 +62,11 @@ Shipped today, each committed with its evidence (task notes: `2026-10-12_tmux-un
 orb on the headset; Bonjour availability (owner's call); widgets placed and tapped on iPhone and Vision Pro; the next
 Mac release must sign the widget with Developer ID (see `Tools/Release/release-mac.sh`). **Rule 61:** the messages of
 fc7653e, 47b7df8 and 107f1be quote the owner's machine and host names (the code and tests were neutralised); they go
-with the pending pre-publication history scrub, which waits on the owner's word.
+with the pending pre-publication history scrub, which waits on the owner's word. **Docs (2908a18, the site commit
+after it):** release script checks the Mac widget before notarizing (never run; the Developer ID export may need a
+profile for `<bundle id>.widgets`); BUILDING.md and SECURITY.md current; site and help current, three stale desktop
+claims corrected. **Follow-up:** the app's own VNC setup warning (`DesktopServiceFields.swift:46`) still says every VNC
+session is readable after sign-in; a Mac signed in with a Mac account is encrypted since e7463ce.
 
 ## 2026-10-11 (late night) — High Performance built; quality-switch crash fixed
 
