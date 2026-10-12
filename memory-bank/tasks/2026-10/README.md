@@ -28,3 +28,6 @@
   the same Force Quit. Installed 0.4.373 (Mac).
 - 2026-10-12: background-mode tmux host (D66 revised, 0.4.374) and terminals without tmux (D67, 130c879): New Plain
   Terminal Tab, Plain Terminal per host, tmux settings in Settings ▸ Terminal. Same task note.
+- 2026-10-12: Wrap Long Lines off ignored on iPhone (8b444a9): reproduced on the simulator (wrapped at open; unwrapped
+  lines unreachable), fixed in `GlassTextViewIOS`; new `GlassEditorUIKitTests` (procedure in `techContext.md`).
+  Also "+" ▸ New Terminal on lists machine names (47b7df8, 107f1be).

@@ -351,3 +351,15 @@ Held back, with the reason:
 |---|---|---|
 | tree-sitter | 0.27.0 | SwiftTreeSitter (latest tag and `main`) allows only 0.25.x |
 | swift-crypto | 5.0.0 | postgres-nio's latest release and mysql-nio (upstream and the fork) allow only `< 5.0.0`; Citadel's and swift-nio-ssh's vendored manifests say the same |
+
+## UIKit editor tests on the iOS simulator, 2026-10-12
+
+`Tests/GlassEditorUIKitTests` holds tests of the UIKit editor (`GlassTextViewIOS`, `GlassEditorUIKitEngine`); on a
+Mac the target is empty. `GlassPowerTools-Package` cannot run them on iOS, because other test targets (for example
+`GlasSecretStoreTests`, which uses `homeDirectoryForCurrentUser`) do not compile for iOS. Run them through a scheme
+holding only that target, in the git-ignored `.swiftpm/xcode/xcshareddata/xcschemes/EditorUITests.xcscheme`: a
+`TestAction` with one `TestableReference` whose `BuildableReference` has `BlueprintIdentifier`, `BuildableName` and
+`BlueprintName` all `GlassEditorUIKitTests` and `ReferencedContainer="container:"`. Then:
+`xcodebuild test -workspace .swiftpm/xcode/package.xcworkspace -scheme EditorUITests -destination 'platform=iOS
+Simulator,name=iPhone 17' -clonedSourcePackagesDirPath <resolved SourcePackages> -packageAuthorizationProvider netrc
+-skipPackagePluginValidation -onlyUsePackageVersionsFromResolvedFile`.
