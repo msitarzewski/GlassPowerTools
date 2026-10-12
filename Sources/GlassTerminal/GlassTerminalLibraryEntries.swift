@@ -100,19 +100,21 @@ enum GlassTerminalCommandCenter {
             entries.append(MacCommandCenterEntry(id: "library.tailscale", title: "Tailscale Devices",
                                                  detail: "Library") { runtime.requestShowTailscale() })
         }
-        for server in runtime.sessionManager.serverManager.servers {
+        // By machine: "Connect to oscar", not "Connect to Terminal on oscar" (2026-10-12).
+        let titled = GlassTerminalRuntime.distinguished(runtime.sessionManager.serverManager.servers.map { ($0, runtime.machineTitle(of: $0)) })
+        for (server, machine) in titled {
             entries.append(MacCommandCenterEntry(id: "connection.connect.\(server.id)",
-                title: "Connect to \(server.name)", detail: "Open SSH terminal") {
+                title: "Connect to \(machine)", detail: "Open SSH terminal") {
                 runtime.requestConnect(serverID: server.id)
             })
             if server.keepsSessionsInTmux {
                 entries.append(MacCommandCenterEntry(id: "connection.plain.\(server.id)",
-                    title: "Connect to \(server.name) without tmux", detail: "Open a plain SSH terminal") {
+                    title: "Connect to \(machine) without tmux", detail: "Open a basic SSH terminal") {
                     runtime.requestConnect(serverID: server.id, withoutTmux: true)
                 })
             }
             entries.append(MacCommandCenterEntry(id: "connection.sftp.\(server.id)",
-                title: "Open SFTP · \(server.name)", detail: "Files") {
+                title: "Open SFTP · \(machine)", detail: "Files") {
                 runtime.requestConnect(serverID: server.id, purpose: .sftp)
             })
         }

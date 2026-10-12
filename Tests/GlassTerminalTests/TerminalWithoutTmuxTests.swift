@@ -57,9 +57,17 @@ struct TerminalWithoutTmuxTests {
         let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
         var server = ServerConfiguration(name: "Terminal on alpha", host: "alpha.example.com", username: "ann")
         runtime.hostName = { $0 == server.id ? "Alpha Lab" : nil }
-        #expect(runtime.machineTitle(of: server) == "Alpha Lab — Terminal on alpha")
-        server.name = "Terminal on Alpha Lab"
-        #expect(runtime.machineTitle(of: server) == "Alpha Lab")
+        #expect(runtime.machineTitle(of: server) == "Alpha Lab",
+                "a default name from before the machine was renamed: the machine's name now")
+        server.name = "Admin shell"
+        #expect(runtime.machineTitle(of: server) == "Alpha Lab — Admin shell")
+
+        var root = ServerConfiguration(name: "Terminal on alpha", host: "alpha.example.com", username: "root")
+        root.name = "Terminal on alpha"
+        let ann = ServerConfiguration(name: "Terminal on alpha", host: "alpha.example.com", username: "ann")
+        let bravo = ServerConfiguration(name: "Terminal on bravo", host: "bravo.example.com", username: "ann")
+        let titles = GlassTerminalRuntime.distinguished([(root, "alpha"), (ann, "alpha"), (bravo, "bravo")]).map(\.title)
+        #expect(titles == ["alpha (root)", "alpha (ann)", "bravo"], "two on one machine are told apart; one alone is not")
     }
 
     @Test("Connect without tmux and a plain local terminal reach the connect flow as asked")

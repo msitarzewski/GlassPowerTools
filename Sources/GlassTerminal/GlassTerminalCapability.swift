@@ -121,14 +121,25 @@ public final class GlassTerminalRuntime {
     public var hostName: (@MainActor (UUID) -> String?)?
 
     /// What a menu that says "Terminal on" calls a saved server: its machine's name; for a
-    /// terminal named something else, both. Without the machine, its name less the default
-    /// "Terminal on " a host sheet gives it (`serviceDisplayName`).
+    /// terminal named something else, both. A "Terminal on …" name is the default a host sheet
+    /// gives (`serviceDisplayName`), kept when the machine is renamed since ("Staging — Terminal on
+    /// Tandem Net Staging", 2026-10-12): the machine's name now is the one. Without the machine,
+    /// the name less that default prefix.
     static func machineTitle(serverName: String, hostName: String?) -> String {
         let defaultPrefix = "Terminal on "
         if let hostName = hostName?.trimmingCharacters(in: .whitespacesAndNewlines), !hostName.isEmpty {
-            return serverName == defaultPrefix + hostName || serverName == hostName ? hostName : "\(hostName) — \(serverName)"
+            return serverName.hasPrefix(defaultPrefix) || serverName == hostName ? hostName : "\(hostName) — \(serverName)"
         }
         return serverName.hasPrefix(defaultPrefix) ? String(serverName.dropFirst(defaultPrefix.count)) : serverName
+    }
+
+    /// Titles two terminals on one machine would share get their user names, so a menu tells
+    /// them apart ("oscar (ann)", "oscar (root)").
+    static func distinguished(_ titled: [(ServerConfiguration, String)]) -> [(server: ServerConfiguration, title: String)] {
+        let counts = Dictionary(titled.map { ($0.1, 1) }, uniquingKeysWith: +)
+        return titled.map { server, title in
+            (server, counts[title, default: 0] > 1 ? "\(title) (\(server.username))" : title)
+        }
     }
 
     func machineTitle(of server: ServerConfiguration) -> String {

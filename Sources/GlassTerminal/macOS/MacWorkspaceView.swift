@@ -672,8 +672,8 @@ struct MacWorkspaceView: View {
 
     /// Saved hosts with a terminal, by their machines' names, for "+" ▸ New Terminal on.
     private var terminalHosts: [(server: ServerConfiguration, title: String)] {
-        sessionManager.serverManager.servers
-            .map { ($0, machineTitle(of: $0)) }
+        let titled = sessionManager.serverManager.servers.map { ($0, machineTitle(of: $0)) }
+        return GlassTerminalRuntime.distinguished(titled)
             .sorted { $0.1.localizedStandardCompare($1.1) == .orderedAscending }
     }
 
@@ -830,6 +830,7 @@ private struct MacWorkspaceTabContent: View {
     @State private var credentialPrompt: WorkspaceCredentialPrompt?
     /// Connect Saved Host's "Open without tmux"; off each time the sheet opens.
     @State private var sshWithoutTmux = false
+    @Environment(GlassTerminalRuntime.self) private var terminalRuntime: GlassTerminalRuntime?
 
     @Environment(SessionManager.self) private var sessionManager
     @Environment(SettingsManager.self) private var settingsManager
@@ -1224,6 +1225,15 @@ private struct MacWorkspaceTabContent: View {
         )
     }
 
+    /// Saved hosts by their machines' names, as "+" ▸ New Terminal on lists them.
+    private var sshPickerHosts: [(server: ServerConfiguration, title: String)] {
+        let servers = sessionManager.serverManager.servers
+        return GlassTerminalRuntime.distinguished(servers.map { server in
+            (server, terminalRuntime?.machineTitle(of: server)
+                ?? GlassTerminalRuntime.machineTitle(serverName: server.name, hostName: nil))
+        })
+    }
+
     private var sshPicker: some View {
         NavigationStack {
             Group {
@@ -1234,12 +1244,12 @@ private struct MacWorkspaceTabContent: View {
                         description: Text("Add a host in Connections, then return here to open it in a pane.")
                     )
                 } else {
-                    List(sessionManager.serverManager.servers) { server in
+                    List(sshPickerHosts, id: \.server.id) { server, machine in
                         Button {
                             controller.addSSHPane(serverID: server.id, withoutTmux: sshWithoutTmux)
                         } label: {
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(server.name)
+                                Text(machine)
                                 Text("\(server.username)@\(server.host):\(server.port)"
                                      + (server.keepsSessionsInTmux && !sshWithoutTmux ? " · in tmux" : ""))
                                     .font(.caption.monospaced())
