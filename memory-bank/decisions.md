@@ -1384,4 +1384,7 @@ pane ends the whole coalition (reproduced with a probe and two bystander panes).
 app has launchd run `tmux -u -D` from a job file in Application Support (no login item; starts when a local terminal needs
 it; Interactive; pane environment less SSH_AUTH_SOCK/TMPDIR); a running server is left alone; launchd refusing leaves the
 claim to start tmux as before (1e89b18, 0619569). Under it, the same probe's Force Quit ended the probe alone. Takes over
-only when the current server ends; evidence in `tasks/2026-10/2026-10-12_tmux-under-launchd.md`.
+only when the current server ends; evidence in `tasks/2026-10/2026-10-12_tmux-under-launchd.md`. **Revised the same day
+(9b62ebf):** launchd runs the app's own executable as host (`--tmux-host`), which starts tmux, because panes answer for
+privacy permissions to whatever their chain started from (tmux, run directly, raised its own Desktop prompt); the host
+turns tmux's `exit-empty` back on so the server and host end with the last session; Settings ▸ Terminal can end both.

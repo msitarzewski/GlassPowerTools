@@ -77,3 +77,26 @@ ways without the fix. Terminal suite 747/747 on four runs with the owner's sessi
 before and after. `df5bfea` fixes a timing-flaky output test seen once in those runs. The six
 sessions are left for the owner (he had typed in two while looking into them). No reinstall: the
 app's behaviour is unchanged.
+
+## Background mode: the app hosts tmux (9b62ebf, installed 0.4.374)
+
+Permissions check: under a tmux launchd ran directly, a pane listing the Desktop raised "tmux would
+like to access files in your Desktop folder" (the owner allowed it; tmux now holds that grant); a
+pane of the app-started server read it silently with the app's permission. The owner chose the
+host design and asked that it end with its last session and that Settings > Terminal can end it.
+
+- The job runs the app's executable with `--tmux-host` (`MacTmuxHost`; new `@main` entry chooses it
+  before SwiftUI); it spawns `tmux -u -D` (only stdout/stderr inherited) and waits.
+- `tmux -D` turns `exit-empty` off (measured: an empty -D server stays up); the host turns it on at
+  the first session and kills a server that gets none in 60 s. The host ends with tmux.
+- Settings > Terminal > Local Terminals in the Background: status and End All Local Terminals...
+  (`MacLocalTmux.Server.endServer`, live: `MacTmuxService.stopDefaultServer`).
+- Measured with the Release build, private socket, test label: panes answer to the host, own
+  coalition, no LaunchServices entry, ~35 MB; Downloads listed with no dialog; the owner's Dock
+  Force Quit of a probe run from a pane ended the probe alone (host, tmux, two bystanders alive).
+- Installer script (scratchpad) ignores `--tmux-host` when waiting for the app to quit.
+- Tests 752/752 twice; owner's sessions unchanged. Installed 0.4.374 07:46, no crash report; his
+  20 sessions (13 his own from 07:23–07:42) reattached. The server of 00:44 still predates D66.
+
+Open: the owner asked about a per-terminal choice; proposed moving the tmux toggle from Settings >
+Connections to Settings > Terminal and adding New Plain Terminal (no tmux) — awaiting his answer.

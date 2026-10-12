@@ -27,6 +27,14 @@ anything touching real servers (SSH and database tests use the disposable test V
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
+## 2026-10-12 (morning) — tmux hosted by the app in the background (D66 revised)
+
+**Installed: 0.4.374 on the Mac** (07:46). The launchd job runs the app as `--tmux-host`, so terminals keep the app's
+privacy permissions; tmux and the host end with the last session; Settings ▸ Terminal shows the state and can end them
+all. A test leak onto the owner's tmux server was found and fixed (8ce39c3). Measured and the owner's Force Quit probe
+passed; see the task note. **Awaiting the owner:** move the tmux toggle to Settings ▸ Terminal and add New Plain
+Terminal (proposed). His server of 00:44 still predates D66.
+
 ## 2026-10-12 (early) — tmux server under launchd (D66); desktop keys
 
 **Installed: 0.4.373 on the Mac** (01:29; macOS-only changes; Vision Pro and iPhone stay at 0.4.372). Since 0.4.367: arrow
