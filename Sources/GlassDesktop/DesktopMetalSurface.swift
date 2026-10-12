@@ -399,6 +399,7 @@ final class DesktopMTKView: MTKView {
     @objc private func applicationLostFocus(_ notification: Notification) { releaseFocusState() }
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first else { return }
+        DesktopInputNotes.note("touch", "type=\(touch.type.rawValue) touches=\(touches.count) protocol=\(session?.connection.protocol.rawValue ?? "-")")
         becomeFirstResponder()
         #if os(iOS)
         if pointerMode == .trackpad {
@@ -527,7 +528,10 @@ final class DesktopMTKView: MTKView {
     }
     @objc private func scrollGesture(_ gesture: UIPanGestureRecognizer) {
         guard inputEnabled else { return }
-        if gesture.state == .began { input?.send(.release); scrollTranslation = .zero }
+        if gesture.state == .began {
+            input?.send(.release); scrollTranslation = .zero
+            DesktopInputNotes.note("scroll", "touches=\(gesture.numberOfTouches) protocol=\(session?.connection.protocol.rawValue ?? "-")")
+        }
         let current = gesture.translation(in: self)
         let delta = CGPoint(x: current.x - scrollTranslation.x, y: current.y - scrollTranslation.y)
         scrollTranslation = current
@@ -765,3 +769,15 @@ enum DesktopArrowKeys {
     }
 }
 #endif
+
+/// What a pinch, a drag or a scroll arrived as, the first few of each kind a run, in the
+/// screen-sharing log (the owner, 2026-10-11: a pinch-drag scrolls an RDP desktop and not a Mac's).
+enum DesktopInputNotes {
+    @MainActor private static var counts: [String: Int] = [:]
+
+    @MainActor static func note(_ kind: String, _ detail: String) {
+        let count = counts[kind, default: 0] + 1
+        counts[kind] = count
+        if count <= 5 { VNCDiagnostics.record(category: "input", "event=input kind=\(kind) \(detail)") }
+    }
+}

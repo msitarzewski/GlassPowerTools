@@ -71,6 +71,7 @@ public actor GlassVNCSession: GlassDesktopTransport {
     private var pointerAt = (x: 0, y: 0)
     private var capsLockOn: Bool?
     private var scrollRemainder = (vertical: 0, horizontal: 0)
+    private var scrollsNoted = 0
     /// Kept across connections, and handed to each new client before it runs, so a session opens
     /// at the level and over the area its windows asked for.
     private var quality = GlassDesktopStreamQuality.automatic
@@ -316,6 +317,10 @@ public actor GlassVNCSession: GlassDesktopTransport {
     public func scroll(vertical: Int, horizontal: Int, x: Int, y: Int) async throws {
         let client = try readyClient()
         pointerAt = (x, y)
+        scrollsNoted += 1
+        if scrollsNoted <= 5 {
+            VNCDiagnostics.record(category: "input", "event=vnc-scroll apple=\(client.acceptsAppleScroll) vertical=\(vertical) horizontal=\(horizontal) x=\(x) y=\(y)")
+        }
         if client.acceptsAppleScroll {
             scrollRemainder.vertical += vertical
             scrollRemainder.horizontal += horizontal
