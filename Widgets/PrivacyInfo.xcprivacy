@@ -8,16 +8,9 @@
     <array/>
     <key>NSPrivacyCollectedDataTypes</key>
     <array/>
+    <!-- The widgets read one file the app writes into the App Group container
+         (`GlassWidgetStore`); no required-reason API. -->
     <key>NSPrivacyAccessedAPITypes</key>
-    <array>
-        <dict>
-            <key>NSPrivacyAccessedAPIType</key>
-            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
-            <key>NSPrivacyAccessedAPITypeReasons</key>
-            <array>
-                <string>CA92.1</string>
-            </array>
-        </dict>
-    </array>
+    <array/>
 </dict>
 </plist>

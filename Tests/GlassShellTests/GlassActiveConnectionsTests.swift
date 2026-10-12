@@ -243,6 +243,41 @@ struct GlassActiveConnectionsTests {
         #expect(model.activeSessionCount() == 4)
     }
 
+    /// The widgets' snapshot (2026-10-12): the library's machines and Active, by machine; metadata
+    /// only. The widget before it read a list nothing has written since D26.
+    @Test("the widgets get every machine with services, its favourite star, and what is open and running on it")
+    func widgetSnapshot() async throws {
+        let (model, root, store) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let alphaTerminal = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on alpha")
+        let alphaDatabase = HostServiceLink(endpointID: EndpointID(), kind: .database, displayName: "MySQL on alpha")
+        let bravoDesktop = HostServiceLink(endpointID: EndpointID(), kind: .rdp, displayName: "Desktop on bravo")
+        let alpha = try HostProfile(displayName: "alpha", address: "10.0.0.1", services: [alphaTerminal, alphaDatabase])
+        let bravo = try HostProfile(displayName: "bravo", address: "10.0.0.2", services: [bravoDesktop])
+        let empty = try HostProfile(displayName: "charlie", address: "10.0.0.3", services: [])
+        try await store.upsert(alpha); try await store.upsert(bravo); try await store.upsert(empty)
+        let terminal = StubCapability(kind: .ssh, displayName: "Terminal")
+        terminal.sessions = [session("terminal:1", title: "alpha", endpoints: [alphaTerminal.endpointID])]
+        terminal.running = [running("glass-1", on: alphaTerminal.endpointID), running("glass-2", on: alphaTerminal.endpointID)]
+        let database = StubCapability(kind: .database, displayName: "Database")
+        database.sessions = [session("database:1", title: "MySQL on alpha", endpoints: [alphaDatabase.endpointID])]
+        model.registry.register(terminal); model.registry.register(database)
+        await model.load()
+        await model.refreshRunningSessions()
+        model.toggleFavorite(bravo.id)
+
+        let snapshot = model.widgetSnapshot()
+        let machines = Dictionary(uniqueKeysWithValues: snapshot.machines.map { ($0.name, $0) })
+        #expect(machines["charlie"] == nil, "a machine with nothing to open is not a widget's")
+        #expect(machines["alpha"]?.services.map(\.kind) == [.terminal, .database])
+        #expect(machines["alpha"]?.services.first?.id == alphaTerminal.endpointID.rawValue, "Connect opens this service")
+        #expect(machines["bravo"]?.services.map(\.kind) == [.desktop] && machines["bravo"]?.isFavorite == true)
+        #expect(!snapshot.machines.contains { $0.id == GlassLocalHost.id.rawValue }, "not this device's own entry")
+        let active = try #require(snapshot.active.first { $0.name == "alpha" })
+        #expect(active.open == 2 && active.running == 2 && active.kinds == [.terminal, .database])
+        #expect(active.machineID == alpha.id.rawValue)
+    }
+
     @Test("A session no machine owns is still listed, under Elsewhere, rather than dropped")
     func orphansAreNotHidden() async throws {
         let (model, root, _) = try makeModel()

@@ -30,6 +30,8 @@ let package = Package(
         .library(name: "GlassRDPTransport", targets: ["GlassRDPTransport"]),
         .library(name: "GlassVNCTransport", targets: ["GlassVNCTransport"]),
         .library(name: "GlassDesktop", targets: ["GlassDesktop"]),
+        // The widgets' snapshot and tap intents, shared by the app and the widget extension.
+        .library(name: "GlassWidgetData", targets: ["GlassWidgetData"]),
     ],
     dependencies: [
         // The editor engine's own dependency, previously transitive through GlassEditorKit.
@@ -263,6 +265,7 @@ let package = Package(
                 "GlassHostCatalog",
                 "GlasSecretStore",
                 "GlassEditorCore",
+                "GlassWidgetData",
                 .product(name: "Sparkle", package: "Sparkle", condition: .when(platforms: [.macOS])),
             ],
             // Settings ▸ About ▸ Acknowledgements, from `Tools/Licenses/generate-acknowledgements.py`.
@@ -434,6 +437,10 @@ let package = Package(
             ]
         ),
         .testTarget(name: "GlassShellTests", dependencies: ["GlassShell"]),
+        // What the widgets show and ask for: no UI, nothing but Foundation and App Intents, so
+        // the widget extension carries little.
+        .target(name: "GlassWidgetData"),
+        .testTarget(name: "GlassWidgetDataTests", dependencies: ["GlassWidgetData"]),
     ],
     swiftLanguageModes: [.v6]
 )

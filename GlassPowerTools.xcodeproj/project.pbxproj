@@ -14,7 +14,9 @@
 		6A000000000000000000AB69 /* GlassDesktop in Frameworks */ = {isa = PBXBuildFile; productRef = 6A000000000000000000AB68 /* GlassDesktop */; };
 		6A000000000000000000AB71 /* GlassEditor in Frameworks */ = {isa = PBXBuildFile; productRef = 6A000000000000000000AB70 /* GlassEditor */; };
 		6A000000000000000000AB64 /* GlassLayers in Frameworks */ = {isa = PBXBuildFile; productRef = 6A000000000000000000AB62 /* GlassLayers */; };
-		6A000000000000000000AC0D /* GlassPowerToolsWidgets.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 6A000000000000000000AC0E /* GlassPowerToolsWidgets.appex */; platformFilters = (ios, xros, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		6A000000000000000000AB73 /* GlassWidgetData in Frameworks */ = {isa = PBXBuildFile; productRef = 6A000000000000000000AB72 /* GlassWidgetData */; };
+		6A000000000000000000AC21 /* GlassWidgetData in Frameworks */ = {isa = PBXBuildFile; productRef = 6A000000000000000000AC20 /* GlassWidgetData */; };
+		6A000000000000000000AC0D /* GlassPowerToolsWidgets.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 6A000000000000000000AC0E /* GlassPowerToolsWidgets.appex */; platformFilters = (ios, macos, xros, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -124,6 +126,7 @@
 				6A000000000000000000AB71 /* GlassEditor in Frameworks */,
 				6A000000000000000000AB63 /* GlassShell in Frameworks */,
 				6A000000000000000000AB64 /* GlassLayers in Frameworks */,
+				6A000000000000000000AB73 /* GlassWidgetData in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -138,6 +141,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6A000000000000000000AC21 /* GlassWidgetData in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -196,6 +200,7 @@
 				6A000000000000000000AB66 /* GlassDatabase */,
 				6A000000000000000000AB68 /* GlassDesktop */,
 				6A000000000000000000AB70 /* GlassEditor */,
+				6A000000000000000000AB72 /* GlassWidgetData */,
 			);
 			productName = GlassPowerTools;
 			productReference = 6A000000000000000000AB17 /* GlassPowerTools.app */;
@@ -241,6 +246,7 @@
 			);
 			name = GlassPowerToolsWidgets;
 			packageProductDependencies = (
+				6A000000000000000000AC20 /* GlassWidgetData */,
 			);
 			productName = GlassPowerToolsWidgets;
 			productReference = 6A000000000000000000AC0E /* GlassPowerToolsWidgets.appex */;
@@ -351,6 +357,7 @@
 			isa = PBXTargetDependency;
 			platformFilters = (
 				ios,
+				macos,
 				xros,
 			);
 			target = 6A000000000000000000AC03 /* GlassPowerToolsWidgets */;
@@ -635,7 +642,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ARCHS = arm64;
-				CODE_SIGN_ENTITLEMENTS = Widgets/glasWidgets.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Widgets/GlassPowerToolsWidgets.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Widgets/GlassPowerToolsWidgets-macOS.entitlements";
+				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -648,11 +657,19 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(GPT_BUNDLE_ID).widgets";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
@@ -668,7 +685,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ARCHS = arm64;
-				CODE_SIGN_ENTITLEMENTS = Widgets/glasWidgets.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Widgets/GlassPowerToolsWidgets.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Widgets/GlassPowerToolsWidgets-macOS.entitlements";
+				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -681,11 +700,19 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "$(GPT_BUNDLE_ID).widgets";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator xros xrsimulator";
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
@@ -769,6 +796,14 @@
 		6A000000000000000000AB70 /* GlassEditor */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = GlassEditor;
+		};
+		6A000000000000000000AB72 /* GlassWidgetData */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = GlassWidgetData;
+		};
+		6A000000000000000000AC20 /* GlassWidgetData */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = GlassWidgetData;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

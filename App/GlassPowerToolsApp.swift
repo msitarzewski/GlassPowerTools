@@ -327,6 +327,10 @@ struct GlassPowerToolsApp: App {
         _desktop = State(initialValue: desktop)
         _windowRecovery = State(initialValue: windowRecovery)
         _editor = State(initialValue: editor)
+        // The Machines and Active widgets: their snapshot kept current, and their taps carried
+        // out — one that launched the app included (`GlassWidgetBridge`). Not in a UI-test run,
+        // which must not change what the person's widgets show.
+        if GlassUITestRun.defaults == nil { GlassWidgetBridge.start(model: model) }
         #if os(macOS)
         // D38: Sparkle's scheduled checks, in a build that names a feed and a signing key — and
         // never in a UI-test run.
@@ -412,6 +416,7 @@ struct GlassPowerToolsApp: App {
         // is drawn inside a terminal, a workspace or an editor, and each of those is a view
         // in this scene (or a cover presented from it), not something the shell can reach.
         .environment(model.registry)
+        .modifier(GlassWidgetLibraryOpener())
         .trackWindowPresence(key: "main", recovery: windowRecovery)
         #if os(visionOS)
         // Idle for the time chosen in Settings ▸ General, with other windows open: the window
