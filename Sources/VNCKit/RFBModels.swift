@@ -97,6 +97,10 @@ public enum RFBEncoding: Int32, Sendable {
     /// (`RFBAppleCursorCache`). How Apple's own viewer gets the pointer's shape. Asked for only from
     /// Apple's server (W38).
     case appleCursorImage = 1104
+    /// Apple's media stream (0x3f2, `kSSVideoEncoding_AVCMediaStream`): listed first, a Mac sends its
+    /// High Performance picture over the media stream and no pixels over RFB; its replies about the
+    /// stream arrive as rectangles of it (`RFBAppleMediaNegotiation.swift`).
+    case appleMediaStream = 1010
 
     static let advertised: [RFBEncoding] = [.tight, .zrle, .hextile, .zlib, .copyRect, .rre, .raw,
                                             .cursor, .desktopSize, .extendedDesktopSize, .lastRect]

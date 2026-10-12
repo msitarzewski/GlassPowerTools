@@ -43,6 +43,24 @@ public actor RFBNetworkChannel: RFBByteSource, RFBByteSink {
         report = connection.startDataTransferReport()
     }
 
+    /// This side's address on the connection and the server's, as numbers: a Mac's High Performance
+    /// stream is sent from the Mac's to this side's. Nil before the connection is up.
+    public func addresses() -> (local: String, peer: String)? {
+        guard let path = connection.currentPath,
+              case .hostPort(let local, _)? = path.localEndpoint, case .hostPort(let peer, _)? = path.remoteEndpoint,
+              let localAddress = Self.numeric(local), let peerAddress = Self.numeric(peer) else { return nil }
+        return (localAddress, peerAddress)
+    }
+
+    private static func numeric(_ host: NWEndpoint.Host) -> String? {
+        switch host {
+        case .ipv4(let address): "\(address)"
+        case .ipv6(let address): "\(address)"
+        case .name: nil
+        @unknown default: nil
+        }
+    }
+
     /// The connection's round trip as TCP measures it now: smoothed, and the shortest it has seen.
     /// Nil before the connection is up, after it closes, or before TCP has a sample. Each call
     /// starts the next report.

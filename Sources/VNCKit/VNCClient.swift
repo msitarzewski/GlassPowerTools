@@ -25,12 +25,16 @@ public struct VNCConfiguration: Sendable {
     /// after sign-in, which 3.8 never asks for (`RFBAppleRecordLayer`, 2026-10-11). Off: 3.8, as
     /// common clients answer. Other servers are answered as before either way.
     public var appleProtocol: Bool
+    /// A Mac's High Performance mode (`VNCHighPerformance.swift`): a virtual display of this size,
+    /// its picture over the media stream. Nil, or a Mac that cannot, shows its own displays.
+    public var highPerformance: VNCHighPerformance?
 
     public init(host: String, port: UInt16 = 5900, username: String = "", password: String,
                 sharedSession: Bool = true, clipboardEnabled: Bool = false, requestsAppleDisplayLayout: Bool = true,
                 allowsServerScaling: Bool = true, requestsAppleCursor: Bool = true, display: UInt32? = nil,
-                appleProtocol: Bool = false) {
+                appleProtocol: Bool = false, highPerformance: VNCHighPerformance? = nil) {
         self.appleProtocol = appleProtocol
+        self.highPerformance = highPerformance
         self.host = host; self.port = port; self.username = username; self.password = password
         self.sharedSession = sharedSession; self.clipboardEnabled = clipboardEnabled
         self.requestsAppleDisplayLayout = requestsAppleDisplayLayout
@@ -62,6 +66,11 @@ public struct VNCClientCallbacks: Sendable {
     public var cursorMessage: @Sendable (VNCCursorMessage) -> Void = { _ in }
     /// A ZRLE rectangle had bytes left over and the session went on (`RFBZRLETrailingData`).
     public var zrleTrailingData: @Sendable (RFBZRLETrailingData) -> Void = { _ in }
+    /// What a High Performance session is doing (`VNCHighPerformance.swift`).
+    public var highPerformance: @Sendable (VNCHighPerformanceStatus) -> Void = { _ in }
+    /// One AAC-ELD access unit of a High Performance session's sound, as the Mac sent it: 48 kHz
+    /// stereo, 480 samples. The Mac mutes its own output while it sends it.
+    public var mediaSound: @Sendable ([UInt8]) -> Void = { _ in }
     public init() {}
 }
 
@@ -70,19 +79,24 @@ public struct VNCClientCallbacks: Sendable {
 /// methods may be called concurrently once `connected` has fired.
 public final class VNCClient: Sendable {
     private static let logger = Logger(subsystem: "app.glassdt.vnc", category: "client")
-    private let configuration: VNCConfiguration
-    private let callbacks: VNCClientCallbacks
-    private let source: RFBCountingByteSource
-    private let sink: any RFBByteSink
+    let configuration: VNCConfiguration
+    let callbacks: VNCClientCallbacks
+    let source: RFBCountingByteSource
+    let sink: any RFBByteSink
     /// Under `source` and `sink`: the bytes as they come until a Mac's rekey, then its record layer.
     private let records: RFBAppleRecordLayer
     private let closeAction: @Sendable () async -> Void
     /// The transport's round trip, read every couple of seconds for Automatic; nil for a source
     /// that has none.
     private let roundTrip: (@Sendable () async -> RFBTransportRoundTrip?)?
-    private let state = ClientState()
+    /// This side's and the server's addresses on the connection, which a Mac's media stream is sent
+    /// between; nil for a source that has none.
+    let addressesAction: (@Sendable () async -> (local: String, peer: String)?)?
+    let state = ClientState()
     /// What to ask the server for, and when (`VNCStreaming.swift`).
-    private let planner = RFBStreamPlanner()
+    let planner = RFBStreamPlanner()
+    /// A High Performance session's stream (`VNCHighPerformance.swift`).
+    let mediaState = VNCMediaState()
     /// SetPixelFormat, SetEncodings and FramebufferUpdateRequest, in the order the planner decided
     /// them, written by one task. Input goes straight to the sink: its order against these does
     /// not matter, theirs against each other does.
@@ -93,16 +107,18 @@ public final class VNCClient: Sendable {
         let channel = try RFBNetworkChannel(host: configuration.host, port: configuration.port)
         self.init(configuration: configuration, callbacks: callbacks, source: channel, sink: channel,
                   open: { try await channel.open() }, close: { await channel.close() },
-                  roundTrip: { await channel.roundTrip() })
+                  roundTrip: { await channel.roundTrip() }, addresses: { await channel.addresses() })
     }
 
     public init(configuration: VNCConfiguration, callbacks: VNCClientCallbacks, source: any RFBByteSource,
                 sink: any RFBByteSink, open: @escaping @Sendable () async throws -> Void = {},
                 close: @escaping @Sendable () async -> Void = {},
-                roundTrip: (@Sendable () async -> RFBTransportRoundTrip?)? = nil) {
+                roundTrip: (@Sendable () async -> RFBTransportRoundTrip?)? = nil,
+                addresses: (@Sendable () async -> (local: String, peer: String)?)? = nil) {
         self.configuration = configuration
         self.callbacks = callbacks
         self.roundTrip = roundTrip
+        self.addressesAction = addresses
         let records = RFBAppleRecordLayer(source: source, sink: sink)
         self.records = records
         self.source = RFBCountingByteSource(records)
@@ -235,6 +251,7 @@ public final class VNCClient: Sendable {
             outboxContinuation.finish()
             for task in streaming.dropFirst() { task.cancel() }
             state.cancelWakes()
+            mediaState.stop()
             await closeAction()
             await streaming.first?.value
             await records.finish()
@@ -253,6 +270,8 @@ public final class VNCClient: Sendable {
                           appleDisplayLayout: configuration.requestsAppleDisplayLayout,
                           serverScaling: configuration.allowsServerScaling,
                           appleCursor: configuration.requestsAppleCursor)
+            // High Performance's virtual display goes before the opening messages, as Apple's viewer sends it.
+            try await startHighPerformance(info)
             let opening = planner.openingMessages()
             try await sink.write(opening.pixelFormat)
             try await sink.write(opening.encodings)
@@ -297,6 +316,11 @@ public final class VNCClient: Sendable {
                             + "painted=\(painted.isEmpty ? "none" : painted) lit=\(self.state.content ?? "unknown") "
                             + "level=\(late.level.rawValue) roundTripMs=\(milliseconds(late.roundTrip)) queuedMs=\(milliseconds(late.queued))")
                         last = (counts.updates, counts.frames, counts.rectangles, bytes)
+                    }
+                    // A High Performance stream that owes something and is late ends the session.
+                    if let overdue = self.mediaOverdue() {
+                        self.fail(overdue)
+                        return
                     }
                     // A Mac that does not answer may send nothing at all: looked at here, not only
                     // as messages arrive.
@@ -343,6 +367,12 @@ public final class VNCClient: Sendable {
         let close = closeAction
         Task { await close() }
     }
+
+    /// For the High Performance extension: the planner's next messages, a message in their order,
+    /// and the session's end.
+    func pumpPlanner() { pump() }
+    func sendInOrder(_ message: [UInt8]) { outboxContinuation.yield(message) }
+    func failSession(_ error: RFBError) { fail(error) }
 
     /// Sends what the planner decides now, and looks again when it is waiting on time.
     private func pump() {
@@ -800,7 +830,11 @@ public final class VNCClient: Sendable {
                         callbacks.appleDisplayMetadata(.layout(layout))
                         // A layout none of whose displays holds up leaves the last list in place.
                         if !screens.isEmpty { callbacks.screens(screens) }
+                        mediaLayoutArrived(width: framebuffer.width, height: framebuffer.height)
                         pump()
+                    case .appleMediaStream:
+                        // The Mac's reply about its High Performance stream.
+                        try await readMediaReply()
                     case .appleDisplayInfo:
                         // The older list, which a Mac sends instead of the layout only if it has
                         // none: stepped over, and reported.
@@ -844,7 +878,11 @@ public final class VNCClient: Sendable {
                 }
                 // While waiting for its display, a one-display connection hands on no picture: what it
                 // holds is the whole desktop's, not its display's (W38).
-                let delivers = changed && !planner.holdingForDisplay
+                // In High Performance the picture is the media stream's; the Mac's own pixels, a login's
+                // push or a lone pixel, are not shown over it.
+                let highPerformance = planner.isHighPerformance
+                let delivers = changed && !planner.holdingForDisplay && !highPerformance
+                if highPerformance { offerMedia(framebufferWidth: framebuffer.width, height: framebuffer.height) }
                 if delivers {
                     callbacks.frame(framebuffer.width, framebuffer.height, framebuffer.snapshot())
                 }
@@ -942,7 +980,7 @@ public final class VNCClient: Sendable {
     }
 }
 
-private final class ClientState: @unchecked Sendable {
+final class ClientState: @unchecked Sendable {
     private let lock = NSLock()
     private var cancelled = false
     private var isReady = false

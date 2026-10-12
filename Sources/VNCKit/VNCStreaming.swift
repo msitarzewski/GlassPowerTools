@@ -152,6 +152,7 @@ public extension RFBEncoding {
         case .appleDisplayLayout: "AppleDisplayLayout"
         case .appleCursorPosition: "CursorPos"
         case .appleCursorImage: "CursorImage"
+        case .appleMediaStream: "MediaStream"
         }
     }
 }
@@ -519,6 +520,11 @@ final class RFBStreamPlanner: @unchecked Sendable {
     private var scaleDeclined: Double?
     private var scaleOverride: Double?
 
+    // High Performance: the picture comes over the media stream.
+    private var highPerformance = false
+    /// SetEncodings lists the media stream first, for the rest of the session.
+    private var mediaPreferred = false
+
     // A Mac's pushes.
     private var arming = true
     private var asksForPointerPosition = false
@@ -568,6 +574,10 @@ final class RFBStreamPlanner: @unchecked Sendable {
     static let pushInterval: UInt32 = 0
     /// The all-ones interval: a Mac pushes nothing while it is armed with it.
     static let pushesOff: UInt32 = .max
+    /// High Performance arms one push a second, for a single pixel: its picture is the media stream,
+    /// and the arming is kept only for the pointer's shapes and the layouts that depend on it
+    /// (remotex's `PUSH_INTERVAL_MEDIA_US`).
+    static let highPerformancePushInterval: UInt32 = 1_000_000
 
     /// Two factors the Mac would treat as one.
     static func sameScale(_ a: Double, _ b: Double) -> Bool { abs(a - b) < 0.005 }
@@ -576,7 +586,8 @@ final class RFBStreamPlanner: @unchecked Sendable {
 
     func setQuality(_ value: VNCQuality) {
         lock.withLock {
-            guard quality != value else { return }
+            // High Performance's rate is the Mac's controller's, and its offer's.
+            guard quality != value, !highPerformance else { return }
             quality = value
         }
     }
@@ -609,6 +620,25 @@ final class RFBStreamPlanner: @unchecked Sendable {
 
     /// Which server this is, once the session has started.
     var serverDialect: RFBServerDialect { lock.withLock { dialect } }
+
+    /// High Performance (`RFBAppleMediaSession`): a single pixel is asked for and armed, never a
+    /// scale or a display, at one level throughout — the Mac's pixels are not the picture.
+    func setHighPerformance() {
+        lock.withLock {
+            highPerformance = true
+            serverScaling = false
+            densityScaling = false
+            quality = .balanced
+            armingInterval = Self.highPerformancePushInterval
+            armed = nil
+        }
+    }
+
+    /// From here SetEncodings lists the media stream first: the Mac names its media ports for it, and
+    /// sends a viewer that prefers the stream no pixels.
+    func preferMediaStream() { lock.withLock { mediaPreferred = true } }
+
+    var isHighPerformance: Bool { lock.withLock { highPerformance } }
 
     /// A factor to ask a Mac for whatever the level says, in (0, 1]; nil follows the level.
     func setServerScaleOverride(_ value: Double?) {
@@ -826,6 +856,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
             var encodings = RFBEncoding.setEncodingsValues(profile: active, copyRect: copyRect, dialect: dialect,
                                                            appleDisplayLayout: appleDisplayLayout, appleCursor: appleCursor)
             if asksForPointerPosition { encodings.append(RFBEncoding.pointerPosition.rawValue) }
+            if mediaPreferred { encodings.insert(RFBEncoding.appleMediaStream.rawValue, at: 0) }
             if encodings != advertisedEncodings {
                 advertisedEncodings = encodings
                 out.append(RFBEncoding.setEncodingsMessage(encodings))
@@ -885,9 +916,10 @@ final class RFBStreamPlanner: @unchecked Sendable {
         guard dialect == .apple, arming, appleDisplayLayout, layoutSeen, width > 0, height > 0,
               scaleAsked == nil, displayAsked == nil, !holding else { return }
         let interval = paused ? Self.pushesOff : armingInterval
-        if let armed, armed.interval == interval, armed.width == width, armed.height == height { return }
-        out.append(RFBAppleDisplayLayout.autoFramebufferUpdateMessage(interval: interval, width: width, height: height))
-        armed = (interval, width, height)
+        let (armWidth, armHeight) = highPerformance ? (1, 1) : (width, height)
+        if let armed, armed.interval == interval, armed.width == armWidth, armed.height == armHeight { return }
+        out.append(RFBAppleDisplayLayout.autoFramebufferUpdateMessage(interval: interval, width: armWidth, height: armHeight))
+        armed = (interval, armWidth, armHeight)
     }
 
     /// Whether a Mac is armed to push (`AutoFrameBufferUpdate`). On unless a probe compares.
@@ -1019,7 +1051,7 @@ final class RFBStreamPlanner: @unchecked Sendable {
     /// when everything is; nil when nothing is. A single pixel while waiting for a display.
     private func requestRectangle() -> RFBRectangle? {
         guard width > 0, height > 0 else { return nil }
-        if holding { return RFBRectangle(x: 0, y: 0, width: 1, height: 1) }
+        if holding || highPerformance { return RFBRectangle(x: 0, y: 0, width: 1, height: 1) }
         let whole = RFBRectangle(x: 0, y: 0, width: width, height: height)
         guard let regions else { return whole }
         // A Mac rendering at a scale other than 1 is asked for the whole picture, never part of it.
