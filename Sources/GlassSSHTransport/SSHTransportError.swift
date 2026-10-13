@@ -41,7 +41,7 @@ extension SSHTransportError: LocalizedError {
         case .authenticationFailed: return "Authentication failed"
         case .credentialUnavailable(let message): return message
         case .invalidCredentialEncoding: return "The stored SSH credential is invalid or corrupt"
-        case .unsupportedKeyType(let keyType): return "SSH key type '\(keyType)' is not supported yet. Use RSA or ED25519."
+        case .unsupportedKeyType(let keyType): return Self.unsupportedKeyTypeMessage(keyType)
         case .unsupportedAuthenticationMethod(let message): return message
         case .invalidPrivateKey(let message): return "Invalid SSH key: \(message)"
         case .hostTrustRequired(let challenge): return challenge.summary
@@ -58,6 +58,14 @@ extension SSHTransportError: LocalizedError {
 }
 
 public extension SSHTransportError {
+    /// What a key of a type this app cannot import is told, in one place (B-X18, 2026-10-13). Two
+    /// texts disagreed: one listed ECDSA P-256 as supported while refusing a P-256 key. What is
+    /// true: an imported key is RSA or Ed25519 (`SSHAuthenticationBuilder`); ECDSA P-256 works
+    /// only as a key generated in this device's Secure Enclave.
+    static func unsupportedKeyTypeMessage(_ keyType: String) -> String {
+        "\(keyType) keys can't be imported yet. Use an RSA or Ed25519 key, or generate one in the Secure Enclave from SSH Keys."
+    }
+
     /// The user-facing text glas.sh showed for a failed connection, moved from
     /// `SSHConnection.userFacingMessage(for:server:)` (Models.swift:2615-2700).
     static func userFacingMessage(for error: Error, endpoint: SSHEndpoint, usesPrivateKey: Bool) -> String {
@@ -74,7 +82,7 @@ public extension SSHTransportError {
             case .authenticationFailed: return "Authentication failed for \(endpoint.username)@\(address)."
             case .credentialUnavailable(let message): return message
             case .invalidCredentialEncoding: return "The stored SSH credential is invalid or corrupt. Save or import it again."
-            case .unsupportedKeyType(let keyType): return "\(keyType). Supported key types are RSA, ED25519, and ECDSA P-256."
+            case .unsupportedKeyType(let keyType): return unsupportedKeyTypeMessage(keyType)
             case .unsupportedAuthenticationMethod(let message): return message
             case .invalidPrivateKey: return "The selected SSH key could not be parsed. Verify key contents and passphrase."
             case .hostTrustRequired(let challenge):

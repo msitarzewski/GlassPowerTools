@@ -9,6 +9,18 @@ struct SSHCredentialTests {
         SecretStoreConfiguration(serviceNamePrefix: "com.glasspowertools.transport-tests", accessGroup: nil, useDataProtectionKeychain: true)
     }
 
+    /// B-X18 (2026-10-13): the shown text listed ECDSA P-256 as supported while refusing a P-256
+    /// key, and the error's own description said otherwise. One text now, and it is true.
+    @Test("A key that cannot be imported is told one thing, which does not contradict itself")
+    func unsupportedKeyTypeIsToldOneThing() {
+        let error = SSHTransportError.unsupportedKeyType("ECDSA P-256")
+        let shown = SSHTransportError.userFacingMessage(
+            for: error, endpoint: SSHEndpoint(host: "alpha", username: "me"), usesPrivateKey: true)
+        #expect(shown == error.errorDescription)
+        #expect(shown.hasPrefix("ECDSA P-256 keys can't be imported"))
+        #expect(!shown.contains("Supported key types"))
+    }
+
     @Test func missingPasswordReportsUnavailableWithoutRevealingAnything() async {
         let resolver = SecretStoreCredentialResolver(configuration: testConfiguration)
         let endpoint = SSHEndpoint(host: "box.local", username: "me")

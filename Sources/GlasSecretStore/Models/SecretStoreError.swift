@@ -29,7 +29,8 @@ public enum SecretStoreError: Error, LocalizedError, Sendable {
         case .unableToDelete:
             return "Unable to delete secure item from Keychain."
         case .unsupportedSSHKeyType:
-            return "Unsupported SSH key type. Use RSA or ED25519."
+            // As `SSHTransportError.unsupportedKeyTypeMessage`, which knows the key's type (B-X18).
+            return "This kind of SSH key can't be imported yet. Use an RSA or Ed25519 key, or generate one in the Secure Enclave from SSH Keys."
         case .secureEnclaveUnavailable:
             return "Secure Enclave is unavailable on this device."
         case .secureEnclaveOperationFailed:

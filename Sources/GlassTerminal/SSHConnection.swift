@@ -59,7 +59,7 @@ enum SSHError: LocalizedError {
         case .invalidPort(let port):
             return "Invalid SSH port: \(port)"
         case .unsupportedSSHKeyType(let keyType):
-            return "SSH key type '\(keyType)' is not supported yet. Use RSA or ED25519."
+            return SSHTransportError.unsupportedKeyTypeMessage(keyType)
         case .unsupportedAuthMethod(let message):
             return message
         case .invalidSSHKey(let message):
@@ -541,7 +541,7 @@ class SSHConnection {
             case .sessionNotFound:
                 return "The terminal session is no longer available."
             case .unsupportedSSHKeyType(let keyType):
-                return "\(keyType). Supported key types are RSA, ED25519, and ECDSA P-256."
+                return SSHTransportError.unsupportedKeyTypeMessage(keyType)
             case .unsupportedAuthMethod(let message):
                 return message
             case .invalidSSHKey:
