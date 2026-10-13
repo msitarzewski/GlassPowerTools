@@ -366,7 +366,8 @@ struct TerminalWorkgroupsView: View {
                 .background(.bar)
                 #endif
             }
-            .navigationTitle(workgroup.name)
+            // On an iPad or an unfolded iPhone Duo, on the list column's large-title line (2026-10-12).
+            .glassDetailColumnTitle(workgroup.name)
             .accessibilityIdentifier(
                 "connection-library-detail-live-workgroup-\(workgroup.id.uuidString.lowercased())"
             )
@@ -458,7 +459,8 @@ struct TerminalWorkgroupsView: View {
                 .padding()
                 .background(.bar)
             }
-            .navigationTitle(preset.name)
+            // On an iPad or an unfolded iPhone Duo, on the list column's large-title line (2026-10-12).
+            .glassDetailColumnTitle(preset.name)
             .accessibilityIdentifier(
                 "connection-library-detail-workgroup-\(preset.id.uuidString.lowercased())"
             )
