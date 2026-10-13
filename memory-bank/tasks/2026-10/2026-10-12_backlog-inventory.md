@@ -25,15 +25,19 @@ database name in `GlassCommandPaletteTests.swift` (rule 61; it is still in histo
 Claude's ranking, recorded at the owner's request ("put these in memory by your order of importance"). The
 owner may reorder; the sections below keep the detail. Within a tier, earlier is more important.
 
-**Tier 1 — protect the owner's machines and data** (each small and contained)
-1. B-X1 — a FIFO or a link to `/dev/zero` in a local project hangs the app or exhausts memory.
-2. B-X9 — the editor's save path can follow a swapped parent directory.
-3. B-X21 — Citadel's `writeCompositeSSHString` advances the writer without reserving (`DH-Helpers.swift:264`);
-   reachable, since group-14 key exchange is enabled (`SSHTransport.swift:25`). Prove or rule out a crash first.
-4. B-X3 — a deleted SSH key is quietly replaced by another key, which is then offered to the host.
-5. B-X14 — an unreadable record vanishes without a log line; a stale list can delete another device's record.
-6. B-X8 — a regular expression in Find can hang the app.
-7. B-X23 — keep every device on one build (older builds strip workgroups' tmux names).
+**Tier 1 — protect the owner's machines and data** — **done 2026-10-12** (the owner: "knock out all of 1")
+1. ~~B-X1~~ e56a57f — local reads off the main actor, regular files only, at most 64 MB; large local media
+   shown from disk. *Correction:* Foundation already refused a FIFO or `/dev/zero` at once (as "no
+   permission"), so the hang claimed here was wrong for macOS 27.2; whole-file reads of any size were real.
+2. ~~B-X9~~ b90327f — the save is made relative to its folder held open (`O_NOFOLLOW_ANY`, `openat`,
+   `renameat`); a test that swaps the folder mid-save sent the bytes elsewhere before.
+3. ~~B-X21~~ f2c1950 — Citadel patch C12; the crash was real (a test trapped before the patch).
+4. ~~B-X3~~ 9d4fc68 — worse than listed: a key not yet *arrived* was swapped too, and saving spread it.
+   Now kept, shown "Not on this device"; the add-key sheet hands back its key.
+5. ~~B-X14~~ 77e5523 — a save deletes only records the caller has read; unreadable ones are logged.
+6. ~~B-X8~~ aaf3799 — regex find stops at one second (`.reportProgress` can stop a match; the kit
+   believed it could not) and says so.
+7. ~~B-X23~~ — every device on 0.4.390 (the rule stands: keep them on one build).
 
 **Tier 2 — dated, or gating the first release**
 8. B-F44 — iPhone Duo ships 10-23; the app refuses windows on a phone.

@@ -42,3 +42,7 @@
 - 2026-10-12: [Backlog inventory](2026-10-12_backlog-inventory.md) — everything open across this project, glas.sh,
   glassdb, glassDT and the absorbed packages, checked against the code; IDs B-Q/R/X/F/T/H. Found on the way and
   fixed: SECURITY.md's VNC paragraph; a real database name in a test (rule 61).
+- 2026-10-12: backlog tier 1 done, each fix shown failing without it: local editor reads bounded and off the main
+  actor (B-X1), saves relative to the folder held open (B-X9, pen M-2), Citadel C12 (B-X21), SSH keys not on this
+  device kept (B-X3), stale lists cannot delete synced records (B-X14), regex find stopped at one second (B-X8, pen
+  H-3). 0.4.390 on Mac, iPhone and Vision Pro.

@@ -29,7 +29,7 @@ anything touching real servers (SSH and database tests use the disposable test V
 
 ## 2026-10-12 — end of the session (before a compaction)
 
-**Installed: Mac 0.4.389 (after the compaction); iPhone and Vision Pro 0.4.385.** Nothing pushed. Leave the owner's one-space README edit and
+**Installed: 0.4.390 on Mac, iPhone and Vision Pro** (2026-10-12 19:25, tier 1 of the backlog). Nothing pushed. Leave the owner's one-space README edit and
 the uncommitted `testArrowKeysReachTheTerminal` in `UITests/GlassTerminalUITests.swift` (it fails in the visionOS
 simulator on an accessibility scene error; not to commit). **Next: the owner brings a new list after the compaction.**
 
@@ -74,6 +74,10 @@ the original apps' lists that never came forward. **Its section 0 is the order o
 it): tier 1 protects machines and data (B-X1 FIFO/huge local reads on the main actor, B-X9 save race, B-X21 Citadel
 writer, B-X3 key substitution, B-X14 silent record loss, B-X8 regex hang); tier 2 is dated or release-gating (B-F44
 iPhone Duo 10-23, B-H9 dependency failures, B-X25 sleep/wake, stale docs, B-V4 two-device acceptance). Work from it.
+**Tier 1 done** (the owner: "knock out all of 1"): B-X1 e56a57f, B-X9 b90327f, B-X21 f2c1950 (Citadel C12), B-X3
+9d4fc68, B-X14 77e5523, B-X8 aaf3799, B-X23 (all three devices on 0.4.390). Each test was shown failing without its
+fix. B-X1's "FIFO hangs" was wrong (Foundation refuses at once, as "no permission"); B-X3 was worse than listed (a key
+not yet synced was swapped too). **Next: tier 2**, starting with B-F44 (iPhone Duo, 10-23).
 
 ## 2026-10-11 (late night) — High Performance built; quality-switch crash fixed
 
