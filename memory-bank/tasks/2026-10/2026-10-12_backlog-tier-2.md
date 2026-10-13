@@ -10,7 +10,7 @@ owner (his devices, his accounts, or a decision that publishes something).
 |---|---|---|
 | **found on the way — critical** | swift-nio-ssh N8: an oversized ECDSA signature in the server's key-exchange reply wrote past a stack buffer before the host key was checked (GHSA-998x-vgvp-xwpc / CVE-2026-43798). Upstream's fix and tests ported; the tests trapped before it. | 2ddc207 |
 | B-X25 | After the Mac wakes or the app returns to the foreground, every SSH connection is asked to answer (nio-ssh N7, Citadel F11, `SSHLiveTransports`, `SSHWakeWatcher`); a dead one is shown lost in seconds. The keepalive loop now waits for answers too, so missed keepalives are finally counted. Desktop keys released when the Mac sleeps. Live test through a relay that goes silent. | fd729b1 |
-| B-F44 | iPhone Duo: the window gate is the system's answer (an iPhone 17 Pro Max on iOS 26.5 and an iPhone 18 Pro on 27.0 both report no multiple scenes, read through the debugger, so nothing changes for them); each device's answer is logged once. The database's phone stack re-derives itself after unfolding. Files drag out on iPhone, iPad and Vision Pro. | aa06f51 |
+| B-F44 | iPhone Duo. **The window gate:** `supportsMultipleScenes` and, on a phone, a regular-width scene. Measured on the Duo simulator (iOS 27.1 runtime, downloaded for it): a Duo says yes to multiple scenes folded and unfolded, and folded a new window covered the library with no way back but the app switcher; folded it reads compact, so it now opens in place. Ordinary iPhones (26.5, 27.0) say no; iPads yes. Unfolded is unverified: Xcode 27.2 beta's Device Hub has no fold controls (27.1 branch). The database's phone stack re-derives itself after unfolding. Files drag out on iPhone, iPad and Vision Pro. | aa06f51, then the fold-aware gate |
 | B-H1–B-H4 | Site, help, AGENTS.md and notes corrected against the code (row limit, rich RDP clipboard, xrdp, device lines, floor, shortcut table, release path). | 2aed1f7 |
 | B-T8 (part) | Advisory scan of every upstream's own security advisories (the critical one is not in GitHub's global database). DOMPurify listed at the version Mermaid's bundle carries (3.4.12, not 3.4.16); its advisories look unreachable here (Mermaid `strict`, CSP `default-src 'none'`). The app launches and runs on the iOS 26.5 simulator (iPhone and iPad) — the first run-time check on an OS 26 system. | b29917a |
 | B-H9 | swift-log 1.16.1 and swift-nio 2.104.0 taken after a clean re-test (below); SwiftTerm v1.99 is B-Q28. | this commit |
@@ -87,5 +87,6 @@ same build:
 - **B-R1–B-R6** — the Sparkle key, Developer ID, the first release run, the site, the scrub decision, the
   repository and the first push. **B-R7** — the lawyer's answers above. **B-R8, B-R9** after the first push.
 - **B-Q28** — SwiftTerm v1.99 (recommendation above).
-- **A real iPhone Duo** (from 10-23): the window gate's log line (`windows`), Split View with two Glass windows,
-  folding with a table open, and dragging a file out of Files.
+- **The unfolded Duo** — with Xcode 27.1 beta's Device Hub (pose buttons) or a real Duo from 10-23: the window gate's
+  log line (`windows`, now with the width class), Split View with two Glass windows, folding with a table open, and
+  dragging a file out of Files. The `Duo probe` simulator (iOS 27.1) is set up.
