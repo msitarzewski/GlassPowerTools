@@ -98,7 +98,8 @@ after 0.4.392 also carry: the tree-sitter match limit, B-X5, B-X13, B-X18, B-X22
 
 **Installed: 0.4.391 on Mac, iPhone and Vision Pro** (with the swift-nio-ssh CVE fix). Committed since, not yet
 built for devices: swift-log 1.16.1 / swift-nio 2.104.0, the fold-aware window gate, the alignment work below. HEAD =
-this notes commit; nothing pushed. Leave the owner's README edit and his uncommitted `testArrowKeysReachTheTerminal`.
+this notes commit; nothing pushed. (Corrected 2026-10-13: the README space and `testArrowKeysReachTheTerminal` were
+not the owner's — the test was an agent's probe, 2026-10-11 — and both were discarded at his word.)
 
 - **Duo simulator works here:** iOS 27.1 runtime downloaded (`xcodebuild -downloadPlatform iOS -buildVersion 27.1`);
   Xcode 27.2 beta's own runtime cannot run a Duo. Simulator **"Duo probe"** (`828A54FB-…`, iOS 27.1); Device Hub's pose
@@ -129,8 +130,8 @@ this notes commit; nothing pushed. Leave the owner's README edit and his uncommi
 - **Scratch and Windows 11 are in the Duo probe's library** (added by a temporary UI test, not committed). How to reach
   both machines is in the agent memory runbook (`test-machines-runbook`): Parallels VMs; Windows account `gptrdp`,
   password reset per need into a 0700 file, never printed; tunnels on port 2223, never 2222 (Citadel's tests bind it).
-- **Temporary UI tests** (tour + demo) live only in the scratchpad (`GlassTerminalUITests.tour.swift`); the owner's file
-  is backed up there too (`…owner-backup.swift`) — swap in to run, restore after, never commit.
+- **Temporary UI tests** (tour + demo) live only in the scratchpad (`GlassTerminalUITests.tour.swift`) — swap in to
+  run, restore after, never commit. (The "owner-backup" copy beside it held an agent's probe, discarded 2026-10-13.)
 - **Done 2026-10-13:** workgroup details use `glassDetailColumnTitle` (host, keys, projects already had it through
   `GlassLibraryDetail`); tier 3's tree-sitter overflow — the highlight cursor's match limit, not vendoring.
 - **Next:** unfold the Duo and re-run the tour (content margin; host detail, Active, Settings, Workgroups) — the owner
@@ -139,9 +140,9 @@ this notes commit; nothing pushed. Leave the owner's README edit and his uncommi
 ## 2026-10-12 — end of the session (before a compaction)
 
 **Installed: 0.4.391 on Mac, iPhone and Vision Pro** (with the CVE fix; the Mac at the owner's word, 20:32). 0.4.391
-predates the swift-log/nio bump; the next build carries it. Nothing pushed. Leave the owner's one-space README edit and
-the uncommitted `testArrowKeysReachTheTerminal` in `UITests/GlassTerminalUITests.swift` (it fails in the visionOS
-simulator on an accessibility scene error; not to commit). **Next: the owner brings a new list after the compaction.**
+predates the swift-log/nio bump; the next build carries it. Nothing pushed. (A one-space README edit and an
+uncommitted agent probe, `testArrowKeysReachTheTerminal`, were wrongly called the owner's here; both discarded at
+his word, 2026-10-13.) **Next: the owner brings a new list after the compaction.**
 
 Shipped today, each committed with its evidence (task notes: `2026-10-12_tmux-under-launchd.md`,
 `2026-10-12_widgets-machines-and-active.md`):
