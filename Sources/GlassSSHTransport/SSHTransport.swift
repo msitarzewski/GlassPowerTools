@@ -47,7 +47,8 @@ public enum SSHTransportEvent: Sendable, Equatable {
     case stage(SSHConnectionStage)
     case connected
     case keepAliveMissed(count: Int, maximum: Int)
-    /// The transport declared itself lost (keep-alives exhausted) and closed.
+    /// The transport declared itself lost (keep-alives exhausted, no answer after a wake, or the
+    /// connection found closed under a shell) and closed.
     case lost(String)
     case closed
 }
@@ -61,12 +62,18 @@ public enum SSHTransportEvent: Sendable, Equatable {
 public actor SSHTransport: SSHPooledTransport {
     public nonisolated let route: SSHRoute
     public nonisolated let identity: SSHTransportIdentity
-    public nonisolated let events: AsyncStream<SSHTransportEvent>
+    /// This connection's events. **Each read is a subscription of its own**, so every terminal
+    /// sharing the connection hears every event, its end above all (B-X5); one read after the end
+    /// hears the end. See `SSHTransportEventBroadcast`.
+    public nonisolated var events: AsyncStream<SSHTransportEvent> { eventBroadcast.subscribe() }
 
     private let credentials: any SSHCredentialResolver
     private let trustStore: any SSHHostTrustStore
     private let trustDecider: (any SSHHostTrustDecider)?
-    private let eventContinuation: AsyncStream<SSHTransportEvent>.Continuation
+    private let eventBroadcast = SSHTransportEventBroadcast()
+    /// How this connection ended, recorded as the teardown begins: shells whose channels the
+    /// teardown closes ask it why (`shellEndReason`).
+    private var ending: SSHTransportEvent?
     private let challengeBox = SSHHostKeyChallengeBox()
 
     private var client: SSHClient?
@@ -100,9 +107,6 @@ public actor SSHTransport: SSHPooledTransport {
         self.trustDecider = trustDecider
         self.commandLimit = max(1, commandLimit)
         self.commandPermits = SSHPermitQueue(limit: commandLimit)
-        let (stream, continuation) = AsyncStream<SSHTransportEvent>.makeStream()
-        events = stream
-        eventContinuation = continuation
         _ = SSHEngineAlgorithms.registerHostKeyAlgorithmsOnce
     }
 
@@ -165,6 +169,7 @@ public actor SSHTransport: SSHPooledTransport {
     }
 
     private func teardown(reason: SSHTransportEvent) async {
+        if ending == nil { ending = reason }
         keepAliveTask?.cancel()
         keepAliveTask = nil
         await SSHLiveTransports.shared.remove(self)
@@ -179,8 +184,7 @@ public actor SSHTransport: SSHPooledTransport {
                 Logger.sshTransport.error("SSH client close failed; category=\(String(reflecting: type(of: error)), privacy: .public)")
             }
         }
-        eventContinuation.yield(reason)
-        eventContinuation.finish()
+        eventBroadcast.finish(with: reason)
     }
 
     // MARK: Connect
@@ -354,7 +358,7 @@ public actor SSHTransport: SSHPooledTransport {
     }
 
     private nonisolated func emit(_ event: SSHTransportEvent) {
-        eventContinuation.yield(event)
+        eventBroadcast.yield(event)
     }
 
     // MARK: Keep-alive (glas.sh `startKeepAliveTimer`, Models.swift:2570)
@@ -418,14 +422,34 @@ public actor SSHTransport: SSHPooledTransport {
         await teardown(reason: .lost(reason))
     }
 
+    /// Why a shell's channel closed, asked by the shell as it ends (B-X5): nil when the shell
+    /// itself ended (`exit`, logout) on a connection that stands, or when this connection was
+    /// closed on purpose; otherwise the loss, in words for the terminal to show. A connection found
+    /// closed here — the server or the network ended it before a keep-alive noticed — is declared
+    /// lost now, so every terminal on it hears so, not only the one that asked.
+    func shellEndReason() async -> String? {
+        switch ending {
+        case .lost(let reason): return reason
+        case .some: return nil
+        case nil: break
+        }
+        guard let client, !client.isConnected else { return nil }
+        let reason = "The connection to the server closed"
+        await lostConnection(reason: reason)
+        if case .lost(let recorded) = ending { return recorded }
+        return reason
+    }
+
     // MARK: Channels
 
     /// Opens an interactive shell on a PTY. The channel is ready to accept input on return.
     public func openShell(pty: SSHPTYRequest) async throws -> SSHShellChannel {
         guard let client, client.isConnected else { throw SSHTransportError.notConnected }
-        let channel = SSHShellChannel(pty: pty) { [weak self] in
+        let channel = SSHShellChannel(pty: pty, onActivity: { [weak self] in
             Task { await self?.resetKeepAliveCounter() }
-        }
+        }, connectionEndReason: { [weak self] in
+            await self?.shellEndReason()
+        })
         try await channel.start(client: client, options: route.target.options)
         return channel
     }

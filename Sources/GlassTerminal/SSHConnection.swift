@@ -134,6 +134,9 @@ class SSHConnection {
     private var isTransportConnected = false
     /// `disconnect` ran: a connect still on its way gives back what it gets (W21).
     private var isDisconnected = false
+    /// This connection's loss was reported: the shell's end and the connection's `.lost` each
+    /// say so, and the second must not start the reconnect again (B-X5).
+    private var reportedLoss = false
     private let ownerID = UUID()
     private let trustDecider = TerminalHostTrustDecider()
     private var terminalRows: Int = TerminalGeometry.default.rows
@@ -347,9 +350,7 @@ class SSHConnection {
             case .cancelled:
                 break
             case .failed(let message):
-                if case .connected = self.session?.state { self.session?.reportError(message) }
-                let autoReconnect = GlassUITestRun.settingsDefaults.bool(forKey: UserDefaultsKeys.autoReconnect)
-                self.session?.attemptAutoReconnect(autoReconnectEnabled: autoReconnect)
+                self.connectionLost(message)
             }
         }
     }
@@ -380,14 +381,22 @@ class SSHConnection {
                     Logger.ssh.warning("Keep-alive missed \(count)/\(maximum)")
                 case .lost(let message):
                     self.isTransportConnected = false
-                    if case .connected = self.session?.state { self.session?.reportError(message) }
-                    let autoReconnect = GlassUITestRun.settingsDefaults.bool(forKey: UserDefaultsKeys.autoReconnect)
-                    self.session?.attemptAutoReconnect(autoReconnectEnabled: autoReconnect)
+                    self.connectionLost(message)
                 case .closed:
                     self.isTransportConnected = false
                 }
             }
         }
+    }
+
+    /// The shell could not go on, or the connection under it went: said once, then reconnected
+    /// if the user asked for that. Every terminal sharing a lost connection comes here (B-X5).
+    private func connectionLost(_ message: String) {
+        guard !reportedLoss else { return }
+        reportedLoss = true
+        if case .connected = session?.state { session?.reportError(message) }
+        let autoReconnect = GlassUITestRun.settingsDefaults.bool(forKey: UserDefaultsKeys.autoReconnect)
+        session?.attemptAutoReconnect(autoReconnectEnabled: autoReconnect)
     }
 
     // MARK: - I/O

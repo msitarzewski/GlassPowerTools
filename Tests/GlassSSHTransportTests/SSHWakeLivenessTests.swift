@@ -36,37 +36,48 @@ struct SSHWakeLivenessTests {
 }
 
 /// A TCP relay to the test host that can be made to swallow everything, in both directions,
-/// while every socket stays open.
+/// while every socket stays open — or to cut every connection through it (`cut`).
 final class SilenceableRelay: Sendable {
     private let group: MultiThreadedEventLoopGroup
     private let listener: any Channel
     private let silenced: OSAllocatedUnfairLock<Bool>
+    private let connections: OSAllocatedUnfairLock<[any Channel]>
     let port: Int
 
-    private init(group: MultiThreadedEventLoopGroup, listener: any Channel, silenced: OSAllocatedUnfairLock<Bool>) {
+    private init(group: MultiThreadedEventLoopGroup, listener: any Channel, silenced: OSAllocatedUnfairLock<Bool>,
+                 connections: OSAllocatedUnfairLock<[any Channel]>) {
         self.group = group
         self.listener = listener
         self.silenced = silenced
+        self.connections = connections
         self.port = listener.localAddress?.port ?? 0
     }
 
     static func start(to host: String, port: Int) async throws -> SilenceableRelay {
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         let silenced = OSAllocatedUnfairLock(initialState: false)
+        let connections = OSAllocatedUnfairLock<[any Channel]>(initialState: [])
         let listener = try await ServerBootstrap(group: group)
             .childChannelOption(.autoRead, value: false)
             .childChannelInitializer { inbound in
                 ClientBootstrap(group: group).connect(host: host, port: port).flatMap { outbound in
-                    inbound.pipeline.addHandler(Pass(to: outbound, silenced: silenced)).flatMap {
+                    connections.withLock { $0 += [inbound, outbound] }
+                    return inbound.pipeline.addHandler(Pass(to: outbound, silenced: silenced)).flatMap {
                         outbound.pipeline.addHandler(Pass(to: inbound, silenced: silenced))
                     }.flatMap { inbound.setOption(ChannelOptions.autoRead, value: true) }
                 }
             }
             .bind(host: "127.0.0.1", port: 0).get()
-        return SilenceableRelay(group: group, listener: listener, silenced: silenced)
+        return SilenceableRelay(group: group, listener: listener, silenced: silenced, connections: connections)
     }
 
     func silence() { silenced.withLock { $0 = true } }
+
+    /// Closes every connection through the relay, both sides: what the client sees when the
+    /// server goes down or the network drops it.
+    func cut() {
+        for channel in connections.withLock({ $0 }) { channel.close(promise: nil) }
+    }
 
     func stop() {
         listener.close(promise: nil)

@@ -23,6 +23,7 @@ public enum SSHShellExit: Sendable, Equatable {
     /// The remote side closed cleanly (EOF, `exit`, logout).
     case remoteClosed
     case cancelled
+    /// The shell could not run, or its connection was lost (B-X5): the message says which.
     case failed(String)
 }
 
@@ -40,14 +41,20 @@ public actor SSHShellChannel {
     private var columns: Int
     private var rows: Int
     private let onActivity: @Sendable () -> Void
+    /// Why the connection under this shell ended, if it did: nil means the shell closed its own
+    /// channel on a connection that stands (`SSHTransport.shellEndReason`).
+    private let connectionEndReason: @Sendable () async -> String?
 
-    init(pty: SSHPTYRequest, onActivity: @escaping @Sendable () -> Void) {
+    init(pty: SSHPTYRequest,
+         onActivity: @escaping @Sendable () -> Void,
+         connectionEndReason: @escaping @Sendable () async -> String? = { nil }) {
         let (stream, continuation) = AsyncStream<SSHShellOutput>.makeStream()
         output = stream
         outputContinuation = continuation
         columns = pty.columns
         rows = pty.rows
         self.onActivity = onActivity
+        self.connectionEndReason = connectionEndReason
     }
 
     /// Keep shell line behaviour intact while ensuring CR isn't rewritten to NL (glas.sh
@@ -96,14 +103,14 @@ public actor SSHShellChannel {
                 }
             }
             guard !Task.isCancelled else { finish(.cancelled); return }
-            finish(.remoteClosed)
+            await finishClosed()
         } catch let channelError as ChannelError where SSHTransportError.isChannelClosedError(channelError) {
-            finish(Task.isCancelled ? .cancelled : .remoteClosed)
+            if Task.isCancelled { finish(.cancelled) } else { await finishClosed() }
         } catch is CancellationError {
             finish(.cancelled)
         } catch {
             if Task.isCancelled { finish(.cancelled); return }
-            if SSHTransportError.isChannelClosedError(error) { finish(.remoteClosed); return }
+            if SSHTransportError.isChannelClosedError(error) { await finishClosed(); return }
             // The server would not open the channel (MaxSessions), or never answered: `start` says
             // so, rather than that the channel closed, so the opener can try another connection (W21).
             if SSHTransportError.isSessionChannelRefused(error) {
@@ -128,6 +135,17 @@ public actor SSHShellChannel {
     private func deliver(_ chunk: SSHShellOutput) {
         onActivity()
         outputContinuation.yield(chunk)
+    }
+
+    /// The channel closed. A shell that ended (`exit`, logout) closes its channel on a connection
+    /// that stays up; a channel closed because the connection went is a loss, and says why — it
+    /// read as an `exit`, and the terminal closed (B-X5).
+    private func finishClosed() async {
+        if let reason = await connectionEndReason() {
+            finish(.failed(reason))
+        } else {
+            finish(.remoteClosed)
+        }
     }
 
     private func finish(_ reason: SSHShellExit) {
