@@ -1490,6 +1490,12 @@ struct ThemeEditorView: View {
 struct AddSSHKeyView: View {
     @Environment(SettingsManager.self) private var settingsManager
     @Environment(\.dismiss) private var dismiss
+    /// The key just added, for a form that opened this sheet to choose it (B-X3).
+    private let onAdded: ((StoredSSHKey) -> Void)?
+
+    init(onAdded: ((StoredSSHKey) -> Void)? = nil) {
+        self.onAdded = onAdded
+    }
 
     @State private var name: String = ""
     @State private var privateKey: String = ""
@@ -1579,11 +1585,12 @@ struct AddSSHKeyView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         do {
-                            _ = try settingsManager.addSSHKey(
+                            let added = try settingsManager.addSSHKey(
                                 name: name,
                                 privateKey: privateKey,
                                 passphrase: passphrase.isEmpty ? nil : passphrase
                             )
+                            onAdded?(added)
                             dismiss()
                         } catch {
                             errorMessage = error.localizedDescription

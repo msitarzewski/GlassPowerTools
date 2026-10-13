@@ -126,6 +126,8 @@ final class TerminalServiceDraft: GlassServiceDraft {
         let usesAppDefaultTerminalSize: Bool
         let initialTerminalColumns: Int
         let initialTerminalRows: Int
+        /// The key the server was saved with: kept even when it is not on this device (B-X3).
+        var savedSSHKeyID: UUID? = nil
     }
 
     static let orderedFields: [Field] = [.name, .host, .port, .username, .authentication, .password, .sshKey, .terminalSize]
@@ -221,7 +223,11 @@ final class TerminalServiceDraft: GlassServiceDraft {
         case .password:
             if input.password.isEmpty { issues[.password] = "Enter the SSH password." }
         case .sshKey:
-            if let sshKeyID = input.sshKeyID, input.availableSSHKeyIDs.contains(sshKeyID) { break }
+            // The saved key passes even when it is not on this device — deleted here, or not yet
+            // arrived from another: it still signs in where it is, and an edit to anything else
+            // must not have to change it (B-X3).
+            if let sshKeyID = input.sshKeyID,
+               input.availableSSHKeyIDs.contains(sshKeyID) || sshKeyID == input.savedSSHKeyID { break }
             issues[.sshKey] = "Choose an SSH key that is available to Glass Power Tools."
         case .agent:
             issues[.authentication] = "Choose Password or SSH Key."
@@ -252,7 +258,8 @@ final class TerminalServiceDraft: GlassServiceDraft {
             name: name, host: address, port: port, username: username, authMethod: authMethod,
             password: password, sshKeyID: sshKeyID, availableSSHKeyIDs: Set(settingsManager.sshKeys.map(\.id)),
             usesAppDefaultTerminalSize: usesAppDefaultTerminalSize,
-            initialTerminalColumns: initialTerminalColumns, initialTerminalRows: initialTerminalRows), nameRequired: nameRequired)
+            initialTerminalColumns: initialTerminalColumns, initialTerminalRows: initialTerminalRows,
+            savedSSHKeyID: editing?.sshKeyID), nameRequired: nameRequired)
     }
 
     /// The message a view shows for a field: only once the field was touched or a save tried.
@@ -434,11 +441,20 @@ final class TerminalServiceDraft: GlassServiceDraft {
         }
     }
 
+    /// Chooses a key only when none is chosen: a server newly set to sign in with a key takes the
+    /// first. **A chosen key that is not on this device stays chosen** (2026-10-12, B-X3). It was
+    /// replaced with the first key in the list, so opening a server's form where its key had not
+    /// arrived yet — or had been deleted — and saving any other change gave the server another key,
+    /// and sync carried that to every device.
     func normalizeSelectedSSHKey() {
-        guard authMethod == .sshKey else { return }
-        let availableIDs = Set(settingsManager.sshKeys.map(\.id))
-        if let selected = sshKeyID, availableIDs.contains(selected) { return }
+        guard authMethod == .sshKey, sshKeyID == nil else { return }
         sshKeyID = settingsManager.sshKeys.first?.id
+    }
+
+    /// The chosen key is not on this device: deleted, or not yet arrived from another.
+    var selectedSSHKeyIsMissing: Bool {
+        guard authMethod == .sshKey, let sshKeyID else { return false }
+        return !settingsManager.sshKeys.contains { $0.id == sshKeyID }
     }
 
     var availableJumpHosts: [ServerConfiguration] {
@@ -515,12 +531,10 @@ struct TerminalRequiredFields: View {
                 draft.markTouched(draft.authMethod == .sshKey ? .sshKey : .password)
                 draft.normalizeSelectedSSHKey()
             }
-            .onChange(of: draft.settingsManager.sshKeys.map(\.id)) { previous, current in
-                // A key the user just added from this form is the one they mean: select it rather
-                // than the catalog's first key.
-                if draft.authMethod == .sshKey, let added = current.first(where: { !previous.contains($0) }) {
-                    draft.sshKeyID = added
-                }
+            .onChange(of: draft.settingsManager.sshKeys.map(\.id)) { _, _ in
+                // A first key arriving fills an empty choice. A key added from this form selects
+                // itself (`AddSSHKeyView.onAdded`), so one arriving from another device meanwhile
+                // is not mistaken for it.
                 draft.normalizeSelectedSSHKey()
             }
             .onChange(of: draft.focusRequest) { _, request in
@@ -580,12 +594,22 @@ struct TerminalRequiredFields: View {
             } else {
                 Picker("SSH Key", selection: $draft.sshKeyID) {
                     Text("Select a key").tag(nil as UUID?)
+                    if draft.selectedSSHKeyIsMissing {
+                        Text("Not on this device").tag(draft.sshKeyID)
+                    }
                     ForEach(draft.settingsManager.sshKeys) { key in
                         Text("\(key.name) (\(key.keyTypeBadge))").tag(key.id as UUID?)
                     }
                 }
                 .serverFormControlPresentation()
                 .accessibilityIdentifier("\(identifierPrefix)-ssh-key")
+            }
+            if draft.selectedSSHKeyIsMissing {
+                Text("This server's key isn't on this device: it was deleted here, or hasn't arrived from your other devices yet. Saving keeps it; choose a key to change it.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("\(identifierPrefix)-ssh-key-missing")
             }
             TerminalValidationMessage(message: draft.message(for: .sshKey, in: issues),
                                       identifier: "\(identifierPrefix)-sshKey-validation")
@@ -594,7 +618,7 @@ struct TerminalRequiredFields: View {
                 .sheet(isPresented: $showingAddSSHKey) {
                     // A sheet over this sheet on every platform: the macOS crash once blamed on
                     // nesting was the SSH Key row's accessibility label (W4, 2026-09-10).
-                    AddSSHKeyView()
+                    AddSSHKeyView { draft.sshKeyID = $0.id }
                         .environment(draft.settingsManager)
                 }
         }

@@ -83,6 +83,36 @@ struct TerminalServiceDraftTests {
         #expect(draft.attemptedSave && draft.focusRequest == .port)
     }
 
+    @Test("A server's key that is not on this device stays its key: shown missing, saved unchanged")
+    func missingKeyIsKept() throws {
+        let (servers, settings, suite) = managers()
+        defer { UserDefaults().removePersistentDomain(forName: suite) }
+        let theirs = StoredSSHKey(name: "deploy", algorithm: "ssh-ed25519")
+        let other = StoredSSHKey(name: "laptop", algorithm: "ssh-ed25519")
+        settings.sshKeys = [theirs, other]
+        let draft = TerminalServiceDraft(serverManager: servers, settingsManager: settings)
+        draft.username = "casey"
+        draft.authMethod = .sshKey
+        draft.sshKeyID = theirs.id
+        let saved = try #require(draft.configuration(id: UUID(), address: "192.0.2.6", name: "Terminal on alpha"))
+
+        // On a device where that key has not arrived, or was deleted.
+        settings.sshKeys = [other]
+        let edited = TerminalServiceDraft(editing: saved, serverManager: servers, settingsManager: settings)
+        #expect(edited.sshKeyID == theirs.id, "the form chose another key for the server")
+        #expect(edited.selectedSSHKeyIsMissing)
+        edited.name = "Terminal on alpha, renamed"
+        #expect(edited.validate(address: "192.0.2.6").isEmpty, "an edit to something else must not have to change the key")
+        let resaved = try #require(edited.configuration(id: saved.id, address: "192.0.2.6", name: edited.name))
+        #expect(resaved.sshKeyID == theirs.id)
+
+        // Choosing a key that is not here is still refused; one that is here is fine.
+        edited.sshKeyID = UUID()
+        #expect(edited.validate(address: "192.0.2.6").map(\.field) == ["sshKey"])
+        edited.sshKeyID = other.id
+        #expect(edited.validate(address: "192.0.2.6").isEmpty && !edited.selectedSSHKeyIsMissing)
+    }
+
     @Test("Commit persists under the shell's endpoint id with the host's address; rollback removes it")
     func commitAndRollback() async throws {
         let (servers, settings, suite) = managers()
