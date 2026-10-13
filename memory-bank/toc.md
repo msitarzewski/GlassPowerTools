@@ -85,6 +85,7 @@ source applications are obsolete and no longer compile.
 | [Backlog inventory, 2026-10-12](tasks/2026-10/2026-10-12_backlog-inventory.md) | Every open decision, release step, defect, feature, owed check and limit, including what the original apps and absorbed packages never carried forward; IDs to pick by |
 | [Backlog tier 2, 2026-10-12](tasks/2026-10/2026-10-12_backlog-tier-2.md) | The CVE fix, wake liveness, iPhone Duo, licensing research and lawyer questions, the two-device checklist |
 | [The owner testing, 2026-10-13](tasks/2026-10/2026-10-13_owner-testing-day.md) | Duo, headset input, desktops on phones, Show All Windows, one Command Palette, the Quick Look crash, SSH panes in terminal windows (D70), database errors measured, tunnels kept apart (D69) |
+| [Plan: system integration, 2026-10-13](tasks/2026-10/2026-10-13_system-integration-plan.md) | The Finder (Services, Quick Actions, Finder Sync), App Intents and entities, Share, drag-out windows, Handoff, Controls, search, snippets, File Provider — by platform, Vision Pro included; proposed |
 
 This project is `~/Software/glass/GlassPowerTools`. `../GlassEditorKit` was **absorbed on 2026-09-14**
 — it was already in production behind the SQL, record and SFTP editors, so it was never a future

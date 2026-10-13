@@ -307,7 +307,8 @@ owner may reorder; the sections below keep the detail. Within a tier, earlier is
 
 **Library, shell and platforms**
 - **B-F48** App Intents beyond the widgets: Siri, Shortcuts, Spotlight (opt-in), Handoff; entities for hosts,
-  connections, saved queries and tables (planned in glassdb and glassDT, never carried).
+  connections, saved queries and tables (planned in glassdb and glassDT, never carried). Planned 2026-10-13 with the
+  Finder integration: `2026-10-13_system-integration-plan.md`.
 - **B-F49** The command palette on iPad, iPhone and Vision Pro; typo tolerance; a configurable shortcut; AI tools.
 - **B-F50** Resizable, remembered sidebars on iPad and Vision Pro (owner, 09-13); W33's split gave up resizing.
 - **B-F51** Detach a key from a service in the key manager (owner, 09-14); type the name to delete a key in use.

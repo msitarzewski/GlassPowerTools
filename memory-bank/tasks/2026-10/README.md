@@ -64,3 +64,7 @@
   Palette; a Quick Look crash; SSH panes in terminal windows (D70: a connection belongs to its controller); the
   database's Local Network rule and PostgreSQL's connect errors; tunnels keep their own connections (D69). 0.4.400
   on all three; the owner confirmed the last fix.
+- 2026-10-13 (16:10): [Plan: system integration](2026-10-13_system-integration-plan.md) — the owner: "Let's get a
+  finder integration going … App intents, all of the modern stuff … Be sure visionOS is well represented!" Five
+  phases (entities and intents; the Finder; sharing and drag-out; Controls, search and snippets; File Provider spike),
+  a platform table from Apple's documentation, Vision Pro phase by phase, six decisions for the owner. Proposed.
