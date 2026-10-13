@@ -67,6 +67,19 @@ enum HighlightExtractor {
     /// Rank given to syntax-error regions: below any real capture.
     private static let errorSpecificity = -1
 
+    /// The most matches tree-sitter keeps in progress at once (`ts_query_cursor_set_match_limit`).
+    ///
+    /// Unset, tree-sitter allows any number, and 0.25 numbers their capture lists in 16 bits:
+    /// past 65,535 two matches share one list, and highlighting a large file can crash
+    /// (tree-sitter #5011, fixed by PR 5548 in 0.26.9, which no SwiftTreeSitter release reaches).
+    /// A pattern still waiting for a later sibling keeps one match per earlier candidate, and
+    /// every node revisits every match in progress, so the time grows faster than the array: one
+    /// such pattern over 2,000 numbers took 32 s unlimited and 1.4 s at 256, over 4,000 numbers
+    /// 262 s and 3.0 s (debug build, 2026-10-12). Helix uses 256 (helix-editor/helix#4830). On 16
+    /// real files in 14 languages, up to 2M characters, every limit down to 64 found exactly the
+    /// matches no limit found.
+    static let matchLimit = 256
+
     /// Extract highlight runs for the whole tree.
     ///
     /// - Parameters:
@@ -97,6 +110,7 @@ enum HighlightExtractor {
         }
 
         let cursor = query.execute(in: tree)
+        cursor.matchLimit = matchLimit
 
         while let match = cursor.next() {
             guard evaluator.allows(match) else { continue }
