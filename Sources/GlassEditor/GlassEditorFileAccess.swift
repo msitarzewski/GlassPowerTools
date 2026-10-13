@@ -87,8 +87,73 @@ public struct GlassEditorLocalFileAccess: GlassEditorFileAccess {
         })
     }
 
+    /// The most of a local file the editor reads (2026-10-12), the same as of a file on another
+    /// machine (`GlassTerminalDirectoryLister.fileByteCeiling`): documents are read whole, into
+    /// memory. A larger media file is shown from the disk without being read
+    /// (`GlassEditorDocument.open`).
+    public nonisolated static let byteCeiling = 64 * 1024 * 1024
+
+    /// The file's bytes, read off the main actor — **a regular file only, and at most
+    /// `byteCeiling`** (2026-10-12). The editor kit checked both (its pen-test finding M-4); this
+    /// path, written after it, read any file whole on the main actor: a log or a video of several
+    /// gigabytes went into memory while the window waited. A named pipe or a device was refused only
+    /// by Foundation, which `Data(contentsOf:)` on macOS 27.2 does at once — as "you don't have
+    /// permission", which it is not.
     public func read(_ path: String) async throws -> Data {
-        try Data(contentsOf: URL(filePath: path))
+        try await Task.detached(priority: .userInitiated) {
+            try Self.readRegularFile(atPath: path, limit: Self.byteCeiling)
+        }.value
+    }
+
+    /// A regular file's size and first `length` bytes, without reading the rest; off the main actor.
+    public nonisolated static func head(atPath path: String,
+                                        length: Int = GlassEditorFileKind.sniffLength) async throws -> (size: UInt64, head: Data) {
+        try await Task.detached(priority: .userInitiated) {
+            let (handle, size) = try openRegularFile(atPath: path)
+            return (size, try handle.read(upToCount: length) ?? Data())
+        }.value
+    }
+
+    /// Up to `limit` bytes of a regular file, or why not.
+    nonisolated static func readRegularFile(atPath path: String, limit: Int) throws -> Data {
+        let (handle, size) = try openRegularFile(atPath: path)
+        let name = (path as NSString).lastPathComponent
+        guard size <= UInt64(limit) else {
+            throw GlassEditorReadRefusal.tooLarge(name: name, bytes: size, limit: UInt64(limit))
+        }
+        // One byte past the limit, so a file still growing cannot carry the read beyond it.
+        let data = try handle.read(upToCount: limit + 1) ?? Data()
+        guard data.count <= limit else {
+            throw GlassEditorReadRefusal.tooLarge(name: name, bytes: UInt64(data.count), limit: UInt64(limit))
+        }
+        return data
+    }
+
+    /// The file opened for reading, when it is a regular file. Opened without blocking, so a pipe
+    /// with no writer cannot hold the call; then the *open* file is asked what it is, so nothing can
+    /// be swapped in between a check and the read. Links are followed, as opening a file does.
+    nonisolated static func openRegularFile(atPath path: String) throws -> (FileHandle, UInt64) {
+        let descriptor = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC)
+        guard descriptor >= 0 else { throw readError(errno, path: path) }
+        let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+        var info = Darwin.stat()
+        guard fstat(descriptor, &info) == 0 else { throw readError(errno, path: path) }
+        guard info.st_mode & S_IFMT == S_IFREG else {
+            throw GlassEditorReadRefusal.notAFile(name: (path as NSString).lastPathComponent,
+                                                  what: GlassEditorReadRefusal.describe(mode: info.st_mode))
+        }
+        return (handle, UInt64(max(info.st_size, 0)))
+    }
+
+    /// The error `Data(contentsOf:)` would have thrown, so a missing or forbidden file reads as before.
+    nonisolated static func readError(_ code: Int32, path: String) -> Error {
+        let kind: CocoaError.Code = switch code {
+        case ENOENT, ENOTDIR: .fileReadNoSuchFile
+        case EACCES, EPERM: .fileReadNoPermission
+        default: .fileReadUnknown
+        }
+        return CocoaError(kind, userInfo: [NSFilePathErrorKey: path,
+                                           NSUnderlyingErrorKey: POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO)])
     }
 
     @discardableResult

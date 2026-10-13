@@ -70,6 +70,40 @@ public enum GlassEditorOpenError: LocalizedError, Equatable {
     }
 
     /// Above this, a remote media file is asked about before it is read. Reads are whole-file into
-    /// memory; a local file has no limit because the system viewers map it from disk.
+    /// memory; a large local media file is not read at all, because the system viewers map it from
+    /// disk (`GlassEditorDocument.open`).
     public static let remoteMediaLimit: UInt64 = 64 * 1024 * 1024
+}
+
+/// Why a local file is not read at all (2026-10-12). Not a `GlassEditorOpenError`: those are
+/// questions the window asks, and these are answers. Each reads after "… could not be opened:".
+public enum GlassEditorReadRefusal: LocalizedError, Equatable {
+    /// A named pipe, a device, a socket or a folder: reading one can wait forever or never end.
+    case notAFile(name: String, what: String)
+    /// Larger than the editor reads into memory (`GlassEditorLocalFileAccess.byteCeiling`).
+    case tooLarge(name: String, bytes: UInt64, limit: UInt64)
+
+    public var errorDescription: String? {
+        switch self {
+        case .notAFile(_, let what):
+            "it is \(what), not a file."
+        case .tooLarge(_, let bytes, let limit):
+            "at \(Self.size(bytes)) it is larger than the \(Self.size(limit)) the editor opens. Open it in another app."
+        }
+    }
+
+    static func size(_ bytes: UInt64) -> String {
+        ByteCountFormatter.string(fromByteCount: Int64(clamping: bytes), countStyle: .file)
+    }
+
+    /// What a file's type bits say it is, in words.
+    static func describe(mode: mode_t) -> String {
+        switch mode & S_IFMT {
+        case S_IFIFO: "a named pipe"
+        case S_IFCHR, S_IFBLK: "a device"
+        case S_IFSOCK: "a socket"
+        case S_IFDIR: "a folder"
+        default: "something other than a file"
+        }
+    }
 }

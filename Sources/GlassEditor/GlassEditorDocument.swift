@@ -88,16 +88,26 @@ public final class GlassEditorDocument: Identifiable {
            GlassEditorFileKind.classify(name: name, prefix: Data()) != .text {
             throw GlassEditorOpenError.largeRemoteFile(name: name, bytes: size)
         }
+        // A large media file on this device is shown from the disk and never read whole
+        // (2026-10-12): the viewers read it themselves, and the editor's own read stops at
+        // `GlassEditorLocalFileAccess.byteCeiling`. A large text file goes on to that read and is
+        // refused there, in words.
+        if machine == nil, !asText,
+           let local = try? await GlassEditorLocalFileAccess.head(atPath: path),
+           local.size > UInt64(GlassEditorLocalFileAccess.byteCeiling) {
+            let kind = GlassEditorFileKind.classify(name: name, prefix: local.head)
+            if !kind.isText {
+                return viewing(GlassEditorViewer(kind: kind, fileURL: url, byteCount: Int(clamping: local.size),
+                                                 temporaryDirectory: nil), url: url, machine: machine)
+            }
+        }
         let data = try await access.read(path)
         let kind = asText ? .text : GlassEditorFileKind.classify(name: name, prefix: data.prefix(GlassEditorFileKind.sniffLength))
         if !kind.isText {
             let viewer = machine == nil
                 ? GlassEditorViewer(kind: kind, fileURL: url, byteCount: data.count, temporaryDirectory: nil)
                 : try GlassEditorViewer.copying(data, named: name, kind: kind)
-            let snapshot = DocumentSnapshot(content: "", encoding: .utf8(hadBOM: false),
-                                            lineEndings: LineEndingStyle.platformDefault, origin: .local(url))
-            return GlassEditorDocument(model: GlassEditorModel(snapshot: snapshot, language: .plaintext),
-                                       url: url, machine: machine, viewer: viewer)
+            return viewing(viewer, url: url, machine: machine)
         }
         let decoded = try EncodingDetector.decode(data)
         let snapshot = DocumentSnapshot(content: decoded.content,
@@ -133,6 +143,14 @@ public final class GlassEditorDocument: Identifiable {
             document.hasVeryLongLine = true
         }
         return document
+    }
+
+    /// A document that shows `viewer` rather than text.
+    private static func viewing(_ viewer: GlassEditorViewer, url: URL, machine: String?) -> GlassEditorDocument {
+        let snapshot = DocumentSnapshot(content: "", encoding: .utf8(hadBOM: false),
+                                        lineEndings: LineEndingStyle.platformDefault, origin: .local(url))
+        return GlassEditorDocument(model: GlassEditorModel(snapshot: snapshot, language: .plaintext),
+                                   url: url, machine: machine, viewer: viewer)
     }
 
     /// Characters on one line past which the file is laid out wrapped, and a phone opens it in
