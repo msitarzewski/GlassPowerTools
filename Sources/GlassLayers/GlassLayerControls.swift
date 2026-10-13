@@ -9,11 +9,30 @@ import GlassConnectionUI
 public struct GlassLayerControls: View {
     @Environment(\.glassLayers) private var layers
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    #if !os(visionOS)
+    /// Light, Dark or the system's, for the whole app (`GlassAppAppearance`).
+    @AppStorage(GlassAppAppearance.key, store: GlassUITestRun.settingsDefaults)
+    private var appAppearance: GlassAppAppearance = .system
+    #endif
 
     public init() {}
 
     public var body: some View {
         @Bindable var layers = layers
+        #if !os(visionOS)
+        Section {
+            Picker("Appearance", selection: $appAppearance) {
+                ForEach(GlassAppAppearance.allCases) { appearance in
+                    Text(appearance.title).tag(appearance)
+                }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("app-appearance")
+            .onChange(of: appAppearance) { _, appearance in appearance.apply() }
+        } footer: {
+            Text("System follows this device's Light or Dark setting. A terminal theme keeps its own colours.")
+        }
+        #endif
         Section {
             GlassSettingSlider(
                 title: GlassLayerSettings.opacity.title, value: $layers.state.opacity, detents: [0, 0.5, 1],

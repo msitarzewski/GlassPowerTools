@@ -18,6 +18,12 @@ public final class GlassLayerStore {
     /// stored state of their own. Shown on the About page and asserted by tests.
     public private(set) var migrationSource: GlassLayerMigrationSource
 
+    /// The state as stored, read without migrating or writing anything, for a surface outside
+    /// SwiftUI's environment (the command palette's panel). The default when nothing is stored.
+    public static func storedState(in defaults: UserDefaults = GlassUITestRun.settingsDefaults) -> GlassLayerState {
+        defaults.data(forKey: stateKey).flatMap { try? JSONDecoder().decode(GlassLayerState.self, from: $0) } ?? .default
+    }
+
     public var state: GlassLayerState {
         get { storage }
         set {

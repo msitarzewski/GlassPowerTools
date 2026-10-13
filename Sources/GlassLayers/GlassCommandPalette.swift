@@ -78,6 +78,8 @@ final class MacCommandCenter: NSObject, NSTableViewDataSource, NSTableViewDelega
     private let search = NSSearchField()
     private let table = CommandCenterTableView()
     private let footer = NSTextField(labelWithString: "")
+    /// The windows' own Opacity and Glass (`GlassLayerBackground`), behind everything in the panel.
+    private let backdrop = NSHostingView(rootView: GlassLayerBackground(state: .default, cornerRadius: 24))
     private var entries: [MacCommandCenterEntry] = []
     private var filtered: [MacCommandCenterEntry] = []
     private weak var sourceWindow: NSWindow?
@@ -98,6 +100,13 @@ final class MacCommandCenter: NSObject, NSTableViewDataSource, NSTableViewDelega
         dynamicEntries = []
         entries = additionalEntries + menuEntries(NSApp.mainMenu, path: [], depth: 0)
         if panel == nil { configurePanel() }
+        // As the windows are now: Settings ▸ Appearance's Opacity, Glass and Material, made opaque by
+        // Reduce Transparency. Light or Dark comes from the app's appearance (`GlassAppAppearance`).
+        backdrop.rootView = GlassLayerBackground(
+            state: GlassLayerResolution.resolve(
+                GlassLayerStore.storedState(),
+                reduceTransparency: NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency),
+            cornerRadius: 24)
         search.stringValue = ""
         filterEntries()
         guard let panel else { return }
@@ -150,14 +159,24 @@ final class MacCommandCenter: NSObject, NSTableViewDataSource, NSTableViewDelega
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
-        let material = NSVisualEffectView()
-        material.material = .popover
-        material.blendingMode = .withinWindow
-        material.state = .active
-        material.wantsLayer = true
-        material.layer?.cornerRadius = 12
-        material.layer?.masksToBounds = true
-        panel.contentView = material
+        // Glass as every window is (the owner, 2026-10-13, of a fixed grey panel holding an opaque
+        // white list: "theme this correctly"): the shared layer behind, nothing opaque of its own.
+        let surface = NSView()
+        surface.wantsLayer = true
+        // The frost is drawn in a 24-point rounded rectangle (`GlassCanvasBackdrop`); the panel's
+        // corners match it, or the frost would stop short of them.
+        surface.layer?.cornerRadius = 24
+        surface.layer?.cornerCurve = .continuous
+        surface.layer?.masksToBounds = true
+        backdrop.translatesAutoresizingMaskIntoConstraints = false
+        surface.addSubview(backdrop)
+        NSLayoutConstraint.activate([
+            backdrop.leadingAnchor.constraint(equalTo: surface.leadingAnchor),
+            backdrop.trailingAnchor.constraint(equalTo: surface.trailingAnchor),
+            backdrop.topAnchor.constraint(equalTo: surface.topAnchor),
+            backdrop.bottomAnchor.constraint(equalTo: surface.bottomAnchor),
+        ])
+        panel.contentView = surface
         panel.isReleasedWhenClosed = false
         panel.delegate = self
         search.placeholderString = "Search commands and destinations"
@@ -178,6 +197,9 @@ final class MacCommandCenter: NSObject, NSTableViewDataSource, NSTableViewDelega
         table.onCancel = { [weak self] in self?.dismiss(action: nil) }
         table.setAccessibilityLabel("Matching commands")
         let scroll = NSScrollView()
+        // A scroll view paints its own opaque background unless told not to: the white block.
+        scroll.drawsBackground = false
+        scroll.contentView.drawsBackground = false
         scroll.documentView = table
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true

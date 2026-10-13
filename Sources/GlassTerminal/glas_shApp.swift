@@ -40,6 +40,11 @@ public final class MacTerminalAppDelegate: NSObject, NSApplicationDelegate {
         GlassRemoteChangeReceiver.register()
     }
 
+    /// Settings ▸ Appearance's Light, Dark or System, before any window is shown.
+    public func applicationWillFinishLaunching(_ notification: Notification) {
+        GlassAppAppearance.install()
+    }
+
     // MARK: Window restoration (D54)
     //
     // The app reopens its windows from its own records, which know each terminal window's tabs.

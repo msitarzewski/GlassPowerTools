@@ -11,12 +11,15 @@
 
 #if !os(macOS)
 import UIKit
+import GlassLayers
 import GlassShell
 
 final class GlassPushDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         Task { @MainActor in GlassRemoteChangeReceiver.register() }
+        // Settings ▸ Appearance's Light, Dark or System, for every window as it appears.
+        MainActor.assumeIsolated { GlassAppAppearance.install() }
         return true
     }
 
