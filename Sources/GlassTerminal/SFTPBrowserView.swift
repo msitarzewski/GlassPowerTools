@@ -1450,9 +1450,71 @@ struct SFTPBrowserView: View {
                 }
         }
         #else
-        fileRow(for: entry)
+        if isDirectory(entry) {
+            fileRow(for: entry)
+        } else {
+            fileRow(for: entry)
+                .onDrag { dragItemProvider(for: entry) }
+        }
         #endif
     }
+
+    #if !os(macOS)
+    /// A file dragged out of the browser on iPhone, iPad and Vision Pro (2026-10-12, B-F44): an
+    /// item provider whose file is downloaded when the drop asks for it, through the same verified
+    /// download the Mac's Finder drag uses. Dragging a log off a server into Mail is the iPhone
+    /// Duo's own example of its Split View; an iPad could always make that drag, and nothing was
+    /// offered.
+    private func dragItemProvider(for entry: SFTPBrowserEntry) -> NSItemProvider {
+        let provider = NSItemProvider()
+        guard let client = sftpClient, transferTask == nil, operationInProgress == nil else { return provider }
+        let filename = entry.filename
+        let remotePath = entry.id
+        let serverID = session?.server.id ?? sessionID
+        let transferActivity = transferActivity
+        let size = entry.attributes.size
+        let fileType = UTType(filenameExtension: (filename as NSString).pathExtension) ?? .data
+        provider.suggestedName = filename
+        provider.registerFileRepresentation(forTypeIdentifier: fileType.identifier, fileOptions: [],
+                                            visibility: .all) { completion in
+            let progress = Progress(totalUnitCount: Int64(clamping: size ?? 0))
+            let task = Task { @MainActor in
+                let activityID = UUID()
+                await transferActivity.enqueue(id: activityID, kind: .download, filename: filename, totalBytes: size)
+                await transferActivity.begin(activityID)
+                do {
+                    // A folder of its own, so the name the drop sees is the file's own name.
+                    let folder = FileManager.default.temporaryDirectory
+                        .appendingPathComponent("Dragged-\(UUID().uuidString)", isDirectory: true)
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                    let destination = folder.appendingPathComponent(filename)
+                    try await Self.writePromisedRemoteFile(
+                        client: client, serverID: serverID, remotePath: remotePath,
+                        sourceName: filename, destinationURL: destination
+                    ) { update in
+                        transferActivity.apply(update, to: activityID)
+                        if case .transferring(let completed, let total) = update {
+                            progress.totalUnitCount = Int64(clamping: total)
+                            progress.completedUnitCount = Int64(clamping: completed)
+                        }
+                    }
+                    await transferActivity.complete(activityID)
+                    completion(destination, false, nil)
+                } catch {
+                    if error is CancellationError || (error as? SFTPDownloadWorkerFailure)?.wasCancelled == true {
+                        await transferActivity.cancel(activityID, detail: "Drag cancelled.")
+                    } else {
+                        await transferActivity.fail(activityID, detail: error.localizedDescription)
+                    }
+                    completion(nil, false, error)
+                }
+            }
+            progress.cancellationHandler = { task.cancel() }
+            return progress
+        }
+        return provider
+    }
+    #endif
 
     private var selectionBar: some View {
         HStack(spacing: 12) {
@@ -3468,7 +3530,8 @@ struct SFTPBrowserView: View {
         }
     }
 
-    #if os(macOS)
+    /// A dragged file's verified download into `destinationURL` — the Mac's Finder promise and,
+    /// since 2026-10-12, the item provider an iPhone, iPad or Vision Pro drag hands over.
     private static func writePromisedRemoteFile(
         client: SFTPClient,
         serverID: UUID,
@@ -3498,7 +3561,6 @@ struct SFTPBrowserView: View {
             progress: progress
         )
     }
-    #endif
 
     private func handleFileImport(_ result: Result<[URL], Error>) async {
         switch result {

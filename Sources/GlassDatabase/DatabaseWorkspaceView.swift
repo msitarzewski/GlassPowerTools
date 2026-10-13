@@ -855,6 +855,23 @@ struct DatabaseWorkspaceView: View {
         .onChange(of: compactPath.count) { _, count in
             if let depth = detailDepth, count < depth { detailDepth = nil }
         }
+        // **The stack that comes back shows what was chosen** (2026-10-12, B-F44). Unfolding an
+        // iPhone Duo — or widening Split View on an iPad, or turning a Pro Max — swaps this stack
+        // for the split view mid-session and back again. A table chosen in the split view was one
+        // push away with nobody pushing it; a detail closed there left this stack showing nothing.
+        .task { reconcileCompactPath() }
+    }
+
+    /// Pushes the chosen detail when there is one and it is not shown; returns to the schema when
+    /// the stack shows a detail and nothing is chosen any more. The connection's overview is what
+    /// nothing chosen looks like — the schema list is that screen on a phone.
+    private func reconcileCompactPath() {
+        if tabState.displayed != .connection {
+            showDetailOnCompact()
+        } else if detailDepth != nil {
+            compactPath = NavigationPath()
+            detailDepth = nil
+        }
     }
 
     /// Shows whatever the workspace has selected, on a phone. Called by every route that chooses
