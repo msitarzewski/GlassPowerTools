@@ -115,6 +115,15 @@ struct GlassLibraryOverview: View {
             .padding(.leading, Self.titleInset)
             .padding(.trailing, GlassWindowShape.spatialNestedCanvasInset)
             .padding(.bottom, GlassWindowShape.spatialNestedCanvasInset)
+            #elseif os(iOS)
+            // **Level with the list's "All Connections"** on an iPad or an unfolded iPhone Duo
+            // (2026-10-12; the owner drew a line between the two titles, 20 points apart). That title
+            // is the list column's system large title; a detail column's own is inline by default, so
+            // this one stays ours, raised to the same line: measured on the Duo, the 24-point inset
+            // put it 20 points low.
+            .padding(.horizontal, 24)
+            .padding(.bottom, 24)
+            .padding(.top, Self.titleTop)
             #else
             .padding(24)
             #endif
@@ -128,6 +137,11 @@ struct GlassLibraryOverview: View {
         // column's header, at the same height (W33).
         .glassSpatialColumn("Your Library")
     }
+
+    #if os(iOS)
+    /// The space above the title that sets it on the list column's large-title line.
+    static let titleTop: CGFloat = 4
+    #endif
 
     #if os(visionOS)
     /// Where visionOS sets a column's navigation title from the column's leading edge, measured in
