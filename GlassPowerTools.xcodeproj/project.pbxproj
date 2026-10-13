@@ -17,6 +17,10 @@
 		6A000000000000000000AB73 /* GlassWidgetData in Frameworks */ = {isa = PBXBuildFile; productRef = 6A000000000000000000AB72 /* GlassWidgetData */; };
 		6A000000000000000000AC21 /* GlassWidgetData in Frameworks */ = {isa = PBXBuildFile; productRef = 6A000000000000000000AC20 /* GlassWidgetData */; };
 		6A000000000000000000AC0D /* GlassPowerToolsWidgets.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 6A000000000000000000AC0E /* GlassPowerToolsWidgets.appex */; platformFilters = (ios, macos, xros, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		6A000000000000000000AE0D /* GlassPowerToolsFinder.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 6A000000000000000000AE0E /* GlassPowerToolsFinder.appex */; platformFilters = (macos, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		6A000000000000000000AE21 /* GlassWidgetData in Frameworks */ = {isa = PBXBuildFile; productRef = 6A000000000000000000AE20 /* GlassWidgetData */; };
+		6A000000000000000000AF0D /* GlassPowerToolsQuickActions.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 6A000000000000000000AF0E /* GlassPowerToolsQuickActions.appex */; platformFilters = (macos, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		6A000000000000000000AF21 /* GlassWidgetData in Frameworks */ = {isa = PBXBuildFile; productRef = 6A000000000000000000AF20 /* GlassWidgetData */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -34,6 +38,20 @@
 			remoteGlobalIDString = 6A000000000000000000AC03;
 			remoteInfo = GlassPowerToolsWidgets;
 		};
+		6A000000000000000000AE00 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6A000000000000000000AB01 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6A000000000000000000AE03;
+			remoteInfo = GlassPowerToolsFinder;
+		};
+		6A000000000000000000AF00 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6A000000000000000000AB01 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6A000000000000000000AF03;
+			remoteInfo = GlassPowerToolsQuickActions;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -44,6 +62,8 @@
 			dstSubfolderSpec = 13;
 			files = (
 				6A000000000000000000AC0D /* GlassPowerToolsWidgets.appex in Embed App Extensions */,
+				6A000000000000000000AE0D /* GlassPowerToolsFinder.appex in Embed App Extensions */,
+				6A000000000000000000AF0D /* GlassPowerToolsQuickActions.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -56,6 +76,8 @@
 		6A000000000000000000AB57 /* GlassPowerToolsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GlassPowerToolsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		6A000000000000000000AC0E /* GlassPowerToolsWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = GlassPowerToolsWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		6A000000000000000000AD01 /* Identity.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Identity.xcconfig; path = Config/Identity.xcconfig; sourceTree = SOURCE_ROOT; };
+		6A000000000000000000AE0E /* GlassPowerToolsFinder.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = GlassPowerToolsFinder.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		6A000000000000000000AF0E /* GlassPowerToolsQuickActions.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = GlassPowerToolsQuickActions.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -80,6 +102,20 @@
 				Info.plist,
 			);
 			target = 6A000000000000000000AC03 /* GlassPowerToolsWidgets */;
+		};
+		6A000000000000000000AE0F /* Exceptions for "FinderSync" folder in "GlassPowerToolsFinder" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 6A000000000000000000AE03 /* GlassPowerToolsFinder */;
+		};
+		6A000000000000000000AF0F /* Exceptions for "QuickActions" folder in "GlassPowerToolsQuickActions" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 6A000000000000000000AF03 /* GlassPowerToolsQuickActions */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -111,6 +147,22 @@
 				6A000000000000000000AC0F /* Exceptions for "Widgets" folder in "GlassPowerToolsWidgets" target */,
 			);
 			path = Widgets;
+			sourceTree = "<group>";
+		};
+		6A000000000000000000AE02 /* FinderSync */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				6A000000000000000000AE0F /* Exceptions for "FinderSync" folder in "GlassPowerToolsFinder" target */,
+			);
+			path = FinderSync;
+			sourceTree = "<group>";
+		};
+		6A000000000000000000AF02 /* QuickActions */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				6A000000000000000000AF0F /* Exceptions for "QuickActions" folder in "GlassPowerToolsQuickActions" target */,
+			);
+			path = QuickActions;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -145,6 +197,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		6A000000000000000000AE05 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6A000000000000000000AE21 /* GlassWidgetData in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6A000000000000000000AF05 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6A000000000000000000AF21 /* GlassWidgetData in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -157,6 +225,8 @@
 				6A000000000000000000AD01 /* Identity.xcconfig */,
 				6A000000000000000000AB34 /* UITests */,
 				6A000000000000000000AC02 /* Widgets */,
+				6A000000000000000000AE02 /* FinderSync */,
+				6A000000000000000000AF02 /* QuickActions */,
 				6A000000000000000000AB03 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -167,6 +237,8 @@
 				6A000000000000000000AB17 /* GlassPowerTools.app */,
 				6A000000000000000000AB57 /* GlassPowerToolsUITests.xctest */,
 				6A000000000000000000AC0E /* GlassPowerToolsWidgets.appex */,
+				6A000000000000000000AE0E /* GlassPowerToolsFinder.appex */,
+				6A000000000000000000AF0E /* GlassPowerToolsQuickActions.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -187,6 +259,8 @@
 			);
 			dependencies = (
 				6A000000000000000000AC11 /* PBXTargetDependency */,
+				6A000000000000000000AF01 /* PBXTargetDependency */,
+				6A000000000000000000AE01 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				6A000000000000000000AB30 /* App */,
@@ -252,6 +326,52 @@
 			productReference = 6A000000000000000000AC0E /* GlassPowerToolsWidgets.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		6A000000000000000000AE03 /* GlassPowerToolsFinder */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6A000000000000000000AE09 /* Build configuration list for PBXNativeTarget "GlassPowerToolsFinder" */;
+			buildPhases = (
+				6A000000000000000000AE04 /* Sources */,
+				6A000000000000000000AE05 /* Frameworks */,
+				6A000000000000000000AE06 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				6A000000000000000000AE02 /* FinderSync */,
+			);
+			name = GlassPowerToolsFinder;
+			packageProductDependencies = (
+				6A000000000000000000AE20 /* GlassWidgetData */,
+			);
+			productName = GlassPowerToolsFinder;
+			productReference = 6A000000000000000000AE0E /* GlassPowerToolsFinder.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		6A000000000000000000AF03 /* GlassPowerToolsQuickActions */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6A000000000000000000AF09 /* Build configuration list for PBXNativeTarget "GlassPowerToolsQuickActions" */;
+			buildPhases = (
+				6A000000000000000000AF04 /* Sources */,
+				6A000000000000000000AF05 /* Frameworks */,
+				6A000000000000000000AF06 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				6A000000000000000000AF02 /* QuickActions */,
+			);
+			name = GlassPowerToolsQuickActions;
+			packageProductDependencies = (
+				6A000000000000000000AF20 /* GlassWidgetData */,
+			);
+			productName = GlassPowerToolsQuickActions;
+			productReference = 6A000000000000000000AF0E /* GlassPowerToolsQuickActions.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -270,6 +390,12 @@
 						TestTargetID = 6A000000000000000000AB10;
 					};
 					6A000000000000000000AC03 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					6A000000000000000000AE03 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					6A000000000000000000AF03 = {
 						CreatedOnToolsVersion = 27.0;
 					};
 				};
@@ -293,6 +419,8 @@
 			targets = (
 				6A000000000000000000AB10 /* GlassPowerTools */,
 				6A000000000000000000AC03 /* GlassPowerToolsWidgets */,
+				6A000000000000000000AE03 /* GlassPowerToolsFinder */,
+				6A000000000000000000AF03 /* GlassPowerToolsQuickActions */,
 				6A000000000000000000AB50 /* GlassPowerToolsUITests */,
 			);
 		};
@@ -315,6 +443,20 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		6A000000000000000000AC06 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6A000000000000000000AE06 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6A000000000000000000AF06 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -345,6 +487,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		6A000000000000000000AE04 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6A000000000000000000AF04 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -362,6 +518,22 @@
 			);
 			target = 6A000000000000000000AC03 /* GlassPowerToolsWidgets */;
 			targetProxy = 6A000000000000000000AC00 /* PBXContainerItemProxy */;
+		};
+		6A000000000000000000AE01 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilters = (
+				macos,
+			);
+			target = 6A000000000000000000AE03 /* GlassPowerToolsFinder */;
+			targetProxy = 6A000000000000000000AE00 /* PBXContainerItemProxy */;
+		};
+		6A000000000000000000AF01 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilters = (
+				macos,
+			);
+			target = 6A000000000000000000AF03 /* GlassPowerToolsQuickActions */;
+			targetProxy = 6A000000000000000000AF00 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -724,6 +896,130 @@
 			};
 			name = Release;
 		};
+		6A000000000000000000AE07 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_ENTITLEMENTS = FinderSync/GlassPowerToolsFinder.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FinderSync/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Glass Power Tools Finder";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Michael Sitarzewski.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(GPT_BUNDLE_ID).finder";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		6A000000000000000000AE08 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_ENTITLEMENTS = FinderSync/GlassPowerToolsFinder.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FinderSync/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Glass Power Tools Finder";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Michael Sitarzewski.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(GPT_BUNDLE_ID).finder";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		6A000000000000000000AF07 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_ENTITLEMENTS = QuickActions/GlassPowerToolsQuickActions.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = QuickActions/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "New Glass Power Tools Window Here";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Michael Sitarzewski.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(GPT_BUNDLE_ID).quickactions";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		6A000000000000000000AF08 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_ENTITLEMENTS = QuickActions/GlassPowerToolsQuickActions.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = QuickActions/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "New Glass Power Tools Window Here";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "Copyright © 2026 Michael Sitarzewski.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(GPT_BUNDLE_ID).quickactions";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = macosx;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -759,6 +1055,24 @@
 			buildConfigurations = (
 				6A000000000000000000AC07 /* Debug */,
 				6A000000000000000000AC08 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		6A000000000000000000AE09 /* Build configuration list for PBXNativeTarget "GlassPowerToolsFinder" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6A000000000000000000AE07 /* Debug */,
+				6A000000000000000000AE08 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		6A000000000000000000AF09 /* Build configuration list for PBXNativeTarget "GlassPowerToolsQuickActions" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6A000000000000000000AF07 /* Debug */,
+				6A000000000000000000AF08 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -802,6 +1116,14 @@
 			productName = GlassWidgetData;
 		};
 		6A000000000000000000AC20 /* GlassWidgetData */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = GlassWidgetData;
+		};
+		6A000000000000000000AE20 /* GlassWidgetData */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = GlassWidgetData;
+		};
+		6A000000000000000000AF20 /* GlassWidgetData */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = GlassWidgetData;
 		};

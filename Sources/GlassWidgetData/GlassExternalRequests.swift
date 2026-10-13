@@ -58,3 +58,30 @@ public enum GlassExternalRequests {
         return taken
     }
 }
+
+#if os(macOS)
+import AppKit
+
+public extension GlassExternalRequests {
+    /// From an extension inside the app (`Contents/PlugIns/…appex`): leaves `request` and opens the
+    /// app, which takes it as it comes forward. Throws when it could not be left; the app opening
+    /// is the system's to do.
+    @MainActor
+    static func send(_ request: GlassWidgetRequest, from extensionBundle: Bundle = .main) throws {
+        try leave(request)
+        let app = extensionBundle.bundleURL
+            .deletingLastPathComponent()   // PlugIns
+            .deletingLastPathComponent()   // Contents
+            .deletingLastPathComponent()   // Glass Power Tools.app
+        guard app.pathExtension == "app" else {
+            logger.error("Not inside an app: \(extensionBundle.bundleURL.path, privacy: .private)")
+            return
+        }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.openApplication(at: app, configuration: configuration) { _, error in
+            if let error { logger.error("The app could not be opened: \(error.localizedDescription, privacy: .public)") }
+        }
+    }
+}
+#endif
