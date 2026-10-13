@@ -12,6 +12,11 @@ import os
 import Observation
 import SwiftUI
 import WidgetKit
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 import GlassConnectionKit
 import GlassConnectionUI
 import GlassShell
@@ -29,7 +34,13 @@ enum GlassWidgetBridge {
         var openWorkgroup: @MainActor (UUID) -> Void
         /// The Mac: a terminal window, in a folder when there is one.
         var newLocalTerminal: @MainActor (URL?, OpenWindowAction) -> Void
+        /// The Mac: a tab in the terminal window in front, in a folder.
+        var newLocalTerminalTab: @MainActor (URL, OpenWindowAction) -> Void
+        /// The Mac: a `.command` script run in a new tab.
+        var runInTerminal: @MainActor (URL, OpenWindowAction) -> Void
         var openInEditor: @MainActor ([URL], OpenWindowAction) -> Void
+        /// An `ssh://` link.
+        var openSSHLink: @MainActor (URL) -> Void
         /// The saved workgroups, for the snapshot (Shortcuts and Siri name them).
         var workgroups: @MainActor () -> [GlassWidgetSnapshot.Workgroup]
     }
@@ -46,6 +57,23 @@ enum GlassWidgetBridge {
         self.actions = actions
         GlassWidgetRequests.shared.handle { carryOut($0, model: model) }
         Task { await keepSnapshotCurrent(model: model) }
+        takeExternalRequests()
+        // What the Finder's toolbar button or a Quick Action left in the App Group, whenever the
+        // app comes forward — which is how they bring it forward.
+        NotificationCenter.default.addObserver(forName: becameActive, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { takeExternalRequests() }
+        }
+    }
+
+    #if os(macOS)
+    private static let becameActive = NSApplication.didBecomeActiveNotification
+    #else
+    private static let becameActive = UIApplication.didBecomeActiveNotification
+    #endif
+
+    /// Requests extensions left for the app (`GlassExternalRequests`), carried out as Siri's are.
+    private static func takeExternalRequests() {
+        for request in GlassExternalRequests.take() { GlassWidgetRequests.shared.post(request) }
     }
 
     static func carryOut(_ request: GlassWidgetRequest, model: GlassShellModel) {
@@ -64,8 +92,15 @@ enum GlassWidgetBridge {
             actions?.openWorkgroup(workgroup)
         case .newLocalTerminal(let folder):
             GlassWindowOpener.shared.perform { actions?.newLocalTerminal(folder, $0) }
+        case .newLocalTerminalTab(let folder):
+            GlassWindowOpener.shared.perform { actions?.newLocalTerminalTab(folder, $0) }
+        case .runInTerminal(let script):
+            GlassWindowOpener.shared.perform { actions?.runInTerminal(script, $0) }
         case .openInEditor(let urls):
             GlassWindowOpener.shared.perform { actions?.openInEditor(urls, $0) }
+        case .openSSHLink(let link):
+            ensureLibrary()
+            actions?.openSSHLink(link)
         }
     }
 

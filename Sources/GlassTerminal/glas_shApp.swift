@@ -40,9 +40,24 @@ public final class MacTerminalAppDelegate: NSObject, NSApplicationDelegate {
         GlassRemoteChangeReceiver.register()
     }
 
-    /// Settings ▸ Appearance's Light, Dark or System, before any window is shown.
+    /// What answers the app's Finder services (`NSServices`), set by the composition root before
+    /// launch finishes (D72).
+    public static var servicesProvider: AnyObject?
+    /// The Dock icon's menu, built by the composition root each time it opens (D72).
+    public static var dockMenu: (@MainActor () -> NSMenu?)?
+
+    public func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        Self.dockMenu?()
+    }
+
+    /// Settings ▸ Appearance's Light, Dark or System, before any window is shown; and the Finder
+    /// services, ready for a service that launched the app.
     public func applicationWillFinishLaunching(_ notification: Notification) {
         GlassAppAppearance.install()
+        if let provider = Self.servicesProvider {
+            NSApp.servicesProvider = provider
+            NSUpdateDynamicServices()
+        }
     }
 
     // MARK: Window restoration (D54)

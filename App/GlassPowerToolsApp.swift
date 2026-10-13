@@ -334,6 +334,14 @@ struct GlassPowerToolsApp: App {
         // The Machines and Active widgets: their snapshot kept current, and their taps carried
         // out — one that launched the app included (`GlassWidgetBridge`). Not in a UI-test run,
         // which must not change what the person's widgets show.
+        #if os(macOS)
+        // Finder ▸ Services: New Glass Power Tools Tab Here, Window Here, Open in (D72).
+        if GlassUITestRun.defaults == nil {
+            MacTerminalAppDelegate.servicesProvider = GlassFinderServices()
+            // The Dock icon's menu: New Terminal Window and your machines.
+            MacTerminalAppDelegate.dockMenu = { GlassDockMenu.make() }
+        }
+        #endif
         if GlassUITestRun.defaults == nil {
             // And every other intent's request — Shortcuts, Siri, Spotlight (D72) — carried out
             // with the capabilities that do each.
@@ -344,9 +352,20 @@ struct GlassPowerToolsApp: App {
                     terminal.openLocalTerminal(in: folder, with: openWindow)
                     #endif
                 },
+                newLocalTerminalTab: { folder, openWindow in
+                    #if os(macOS)
+                    terminal.openLocalTerminalTab(in: folder, with: openWindow)
+                    #endif
+                },
+                runInTerminal: { script, openWindow in
+                    #if os(macOS)
+                    terminal.runInTerminal(script, with: openWindow)
+                    #endif
+                },
                 openInEditor: { urls, openWindow in
                     editor.show(editor.open(urls: urls), with: openWindow)
                 },
+                openSSHLink: { terminal.requestOpen(sshLink: $0) },
                 workgroups: {
                     terminal.workgroups.map { GlassWidgetSnapshot.Workgroup(id: $0.id, name: $0.name, terminals: $0.terminals) }
                 }))
@@ -446,11 +465,23 @@ struct GlassPowerToolsApp: App {
         // W39). Opened again after Connections closed last, it opens as its orb.
         .glassConnectionsIdleShrink(model: model, recovery: windowRecovery)
         #endif
-        // A text file opened from the Finder (Open With, or this app as its default editor) or
-        // handed over by another app: into the editor, in the window in front or a new one.
+        // Something opened with the app (D72): a file from the Finder's Open With, or this app as
+        // its default editor, into the editor; on the Mac a folder (Open With, or dropped on the Dock
+        // icon) opens a terminal there and a `.command` script runs in one; an `ssh://` link
+        // connects. Carried out as Siri's requests are (`GlassWidgetBridge`).
         .onOpenURL { url in
-            guard url.isFileURL else { return }
-            if let windowID = editor.open(url) { editor.present(windowID) }
+            #if os(macOS)
+            let isMac = true
+            #else
+            let isMac = false
+            #endif
+            guard let request = GlassWidgetRequest.forOpened(url, isMac: isMac) else { return }
+            if GlassUITestRun.defaults == nil {
+                GlassWidgetRequests.shared.post(request)
+            } else if case .openInEditor(let urls) = request, let windowID = editor.open(urls[0]) {
+                // A UI-test run carries no bridge: its files still open as before.
+                editor.present(windowID)
+            }
         }
         #if os(macOS)
         .onAppear { terminal.attach(to: appDelegate) }

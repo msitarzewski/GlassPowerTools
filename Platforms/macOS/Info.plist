@@ -21,17 +21,112 @@
 				<string>public.yaml</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Folder</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.folder</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Terminal Script</string>
+			<key>CFBundleTypeRole</key>
+			<string>Shell</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.apple.terminal.shell-script</string>
+			</array>
+		</dict>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>SSH Link</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>ssh</string>
+			</array>
+		</dict>
 	</array>
 	<key>GlasKeychainAccessGroup</key>
 	<string>$(AppIdentifierPrefix)$(GPT_KEYCHAIN_GROUP_SUFFIX)</string>
 	<key>GlassAppGroup</key>
 	<string>$(GPT_APP_GROUP)</string>
-	<key>GlassWidgetGroup</key>
-	<string>$(GPT_WIDGET_GROUP)</string>
 	<key>GlassCloudKitContainer</key>
 	<string>$(GPT_ICLOUD_CONTAINER)</string>
 	<key>GlassKeychainGroupSuffix</key>
 	<string>$(GPT_KEYCHAIN_GROUP_SUFFIX)</string>
+	<key>GlassWidgetGroup</key>
+	<string>$(GPT_WIDGET_GROUP)</string>
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>New Glass Power Tools Tab Here</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>newTabHere</string>
+			<key>NSRequiredContext</key>
+			<dict>
+				<key>NSTextContent</key>
+				<string>FilePath</string>
+			</dict>
+			<key>NSSendTypes</key>
+			<array>
+				<string>NSFilenamesPboardType</string>
+				<string>public.plain-text</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>New Glass Power Tools Window Here</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>newWindowHere</string>
+			<key>NSRequiredContext</key>
+			<dict>
+				<key>NSTextContent</key>
+				<string>FilePath</string>
+			</dict>
+			<key>NSSendTypes</key>
+			<array>
+				<string>NSFilenamesPboardType</string>
+				<string>public.plain-text</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Open in Glass Power Tools</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>openInGlassPowerTools</string>
+			<key>NSRequiredContext</key>
+			<dict>
+				<key>NSTextContent</key>
+				<string>FilePath</string>
+			</dict>
+			<key>NSSendTypes</key>
+			<array>
+				<string>NSFilenamesPboardType</string>
+				<string>public.plain-text</string>
+			</array>
+		</dict>
+	</array>
 	<key>SUFeedURL</key>
 	<string>$(GPT_SPARKLE_FEED_URL)</string>
 	<key>SUPublicEDKey</key>
@@ -39,14 +134,14 @@
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>
-			<key>UTTypeIdentifier</key>
-			<string>com.glasspowertools.terminal-tab</string>
-			<key>UTTypeDescription</key>
-			<string>Glass Power Tools terminal tab</string>
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.data</string>
 			</array>
+			<key>UTTypeDescription</key>
+			<string>Glass Power Tools terminal tab</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.glasspowertools.terminal-tab</string>
 		</dict>
 	</array>
 </dict>

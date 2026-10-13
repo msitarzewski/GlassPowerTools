@@ -42,6 +42,27 @@ final class MacWorkspacePreviewRegistry {
     /// A window was found on screen or closed. The reopen list follows it, so it is current
     /// without a quit (`MacWindowsToReopen`, W12).
     @ObservationIgnored var windowsChanged: (() -> Void)?
+    /// How each window adds a tab asked for from outside it, as "+" adds one (D72): set by the
+    /// window's view, which starts the tab's shells.
+    @ObservationIgnored private var tabAdders: [UUID: @MainActor (MacWorkspaceTabRequest) -> Bool] = [:]
+
+    func setTabAdder(windowID: UUID, _ adder: @escaping @MainActor (MacWorkspaceTabRequest) -> Bool) {
+        tabAdders[windowID] = adder
+    }
+
+    /// The terminal window in front — the first in the app's window order — and how to add a tab
+    /// to it: "New Glass Power Tools Tab Here" in the Finder. Nil with none on screen.
+    func frontTabAdder() -> (window: NSWindow, add: @MainActor (MacWorkspaceTabRequest) -> Bool)? {
+        var byWindow: [ObjectIdentifier: (NSWindow, @MainActor (MacWorkspaceTabRequest) -> Bool)] = [:]
+        for (id, entry) in entries {
+            guard let window = entry.window, let adder = tabAdders[id] else { continue }
+            byWindow[ObjectIdentifier(window)] = (window, adder)
+        }
+        for window in NSApp.orderedWindows where window.isVisible || window.isMiniaturized {
+            if let found = byWindow[ObjectIdentifier(window)] { return (found.0, found.1) }
+        }
+        return nil
+    }
 
     func register(_ controller: MacWorkspaceWindowController, window: NSWindow) {
         guard !MacTerminalWindowReader.hasClosed(window),
@@ -54,6 +75,7 @@ final class MacWorkspacePreviewRegistry {
     /// The window has closed: neither it nor its controller is found again, so a window opened
     /// later with the same id starts from its saved tabs.
     func remove(_ id: UUID) {
+        tabAdders.removeValue(forKey: id)
         let wasShown = entries.removeValue(forKey: id) != nil
         built.removeValue(forKey: id)
         if wasShown { windowsChanged?() }

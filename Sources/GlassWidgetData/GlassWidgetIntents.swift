@@ -15,16 +15,39 @@ import AppIntents
 import Foundation
 
 /// What a widget, Shortcuts, Siri or the Finder asks the app for (D72): every intent is carried out
-/// in the app, through `GlassWidgetRequests`.
-public enum GlassWidgetRequest: Sendable, Equatable {
+/// in the app, through `GlassWidgetRequests`. Codable, so an extension in another process — a
+/// Finder toolbar button, a Quick Action — can leave one for the app (`GlassExternalRequests`).
+public enum GlassWidgetRequest: Sendable, Equatable, Codable {
     case connect(machine: UUID, service: UUID)
     case showMachine(UUID)
     case showActive
     case openWorkgroup(UUID)
     /// The Mac: a terminal window here, in `folder` when there is one.
     case newLocalTerminal(folder: URL?)
+    /// The Mac: a tab in the terminal window in front, in `folder` — a window when there is none.
+    case newLocalTerminalTab(folder: URL)
+    /// The Mac: a script (`.command`) run in a new tab, as Terminal runs one.
+    case runInTerminal(URL)
     /// Files and folders into the editor: a folder opens as a project.
     case openInEditor([URL])
+    /// An `ssh://` link: a saved machine connects; another fills in the new-server form.
+    case openSSHLink(URL)
+
+    /// What opening `url` with the app asks for — the Finder's Open With, a folder or script dropped
+    /// on the Dock icon, a link (D72): an `ssh://` link connects; on the Mac a folder opens a terminal
+    /// there and a `.command` script runs in one; anything else goes to the editor. Nil for a link
+    /// the app does not handle.
+    public static func forOpened(_ url: URL, isMac: Bool) -> GlassWidgetRequest? {
+        if url.scheme?.lowercased() == "ssh" { return .openSSHLink(url) }
+        guard url.isFileURL else { return nil }
+        if isMac {
+            let isFolder = (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? url.hasDirectoryPath
+            let isPackage = (try? url.resourceValues(forKeys: [.isPackageKey]).isPackage) ?? false
+            if isFolder && !isPackage { return .newLocalTerminal(folder: url) }
+            if url.pathExtension.lowercased() == "command" { return .runInTerminal(url) }
+        }
+        return .openInEditor([url])
+    }
 }
 
 /// Requests from the widgets, in the app's process. One that arrives before the app has set its

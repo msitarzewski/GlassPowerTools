@@ -238,6 +238,20 @@ public final class GlassTerminalRuntime {
     }
     /// glas.sh's server form, empty or pre-filled (Tailscale import, shell service link).
     public func requestAddServer() { enqueue(.addServer(draft: nil)) }
+
+    /// An `ssh://` link opened with the app (D72): a machine in the library connects as saved; one
+    /// that is not opens the new-server form filled in from the link (`TerminalSSHLink`).
+    public func requestOpen(sshLink url: URL) {
+        guard let link = TerminalSSHLink(url) else {
+            enqueue(.showFailure("That SSH link names no machine Glass Power Tools can connect to. A link looks like ssh://user@host:22."))
+            return
+        }
+        if let server = link.match(in: sessionManager.serverManager.servers) {
+            requestConnect(serverID: server.id)
+        } else {
+            enqueue(.addServer(draft: link.draft))
+        }
+    }
     public func requestEditServer(id: UUID) {
         guard let server = sessionManager.serverManager.server(for: id) else { return }
         enqueue(.editServer(server, hostContext: nil))
@@ -267,6 +281,34 @@ public final class GlassTerminalRuntime {
     /// Connections window drains: a Mac with only terminal windows open would never see it.
     public func openLocalTerminal(in folder: URL?, with openWindow: OpenWindowAction) {
         openWindow(id: "workspace", value: MacLocalTerminalStart.windowRequest(in: folder.map(Self.folderPath(for:))))
+    }
+
+    /// A tab in the terminal window in front, in `folder` — "New Glass Power Tools Tab Here" (D72).
+    /// With no terminal window on screen, or none with room, a window.
+    public func openLocalTerminalTab(in folder: URL, with openWindow: OpenWindowAction) {
+        let request = MacWorkspaceTabRequest(initialPaneIntent: MacLocalTerminalStart.intent(in: Self.folderPath(for: folder)))
+        if !addToFrontWindow(request) { openLocalTerminal(in: folder, with: openWindow) }
+    }
+
+    /// A script opened with the app — a `.command` file from the Finder (D72) — run in a new tab
+    /// of the window in front, in its own folder, as Terminal runs one: its path is typed into the
+    /// tab's shell, escaped as a dropped path is.
+    public func runInTerminal(_ script: URL, with openWindow: OpenWindowAction) {
+        let folder = Self.folderPath(for: script)
+        let ticket = MacStartupCommandBroker.shared.issue(command: TerminalDroppedPaths.escaped(script.standardizedFileURL.path))
+        let intent = MacLocalTerminalStart.intent(in: folder)
+        if !addToFrontWindow(MacWorkspaceTabRequest(initialPaneIntent: intent, startupTicketID: ticket)) {
+            openWindow(id: "workspace", value: MacWorkspaceLaunchRequest(initialPaneIntent: intent, startupTicketID: ticket))
+        }
+    }
+
+    /// Adds the tab to the terminal window in front and brings it forward; false with none.
+    private func addToFrontWindow(_ request: MacWorkspaceTabRequest) -> Bool {
+        guard let front = MacWorkspacePreviewRegistry.shared.frontTabAdder(), front.add(request) else { return false }
+        NSApp.activate()
+        if front.window.isMiniaturized { front.window.deminiaturize(nil) }
+        front.window.makeKeyAndOrderFront(nil)
+        return true
     }
     #endif
 

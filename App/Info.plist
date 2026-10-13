@@ -22,18 +22,29 @@
 			</array>
 		</dict>
 	</array>
-	<key>LSSupportsOpeningDocumentsInPlace</key>
-	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>SSH Link</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>ssh</string>
+			</array>
+		</dict>
+	</array>
 	<key>GlasKeychainAccessGroup</key>
 	<string>$(AppIdentifierPrefix)$(GPT_KEYCHAIN_GROUP_SUFFIX)</string>
 	<key>GlassAppGroup</key>
 	<string>$(GPT_APP_GROUP)</string>
-	<key>GlassWidgetGroup</key>
-	<string>$(GPT_WIDGET_GROUP)</string>
 	<key>GlassCloudKitContainer</key>
 	<string>$(GPT_ICLOUD_CONTAINER)</string>
 	<key>GlassKeychainGroupSuffix</key>
 	<string>$(GPT_KEYCHAIN_GROUP_SUFFIX)</string>
+	<key>GlassWidgetGroup</key>
+	<string>$(GPT_WIDGET_GROUP)</string>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Authenticate to use a hardware-protected SSH key.</string>
 	<key>NSLocalNetworkUsageDescription</key>
@@ -69,14 +80,14 @@
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>
-			<key>UTTypeIdentifier</key>
-			<string>com.glasspowertools.terminal-workgroup-tab</string>
-			<key>UTTypeDescription</key>
-			<string>Glass Power Tools terminal tab</string>
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.data</string>
 			</array>
+			<key>UTTypeDescription</key>
+			<string>Glass Power Tools terminal tab</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.glasspowertools.terminal-workgroup-tab</string>
 		</dict>
 	</array>
 </dict>

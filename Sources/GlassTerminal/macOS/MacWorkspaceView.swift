@@ -381,6 +381,9 @@ struct MacWorkspaceView: View {
                 onWindow: { window in
                     terminalWindow = window
                     MacWorkspacePreviewRegistry.shared.register(windowController, window: window)
+                    MacWorkspacePreviewRegistry.shared.setTabAdder(windowID: windowController.windowID) { request in
+                        addRequestedTab(request)
+                    }
                     // Once per window: back where it was if reopened from its record. Here, on the
                     // main queue after SwiftUI's update, never from inside one.
                     placementTracker.track(window, controller: windowController)
@@ -775,6 +778,15 @@ struct MacWorkspaceView: View {
 
     private func closeTab(_ workspaceID: UUID) {
         closeTabs([workspaceID])
+    }
+
+    /// A tab asked for from outside this window — "New Glass Power Tools Tab Here" in the Finder, a
+    /// script opened with the app (D72) — added and started as "+" adds one. False when the window
+    /// has no room, and the caller opens a window instead.
+    private func addRequestedTab(_ request: MacWorkspaceTabRequest) -> Bool {
+        guard let tab = windowController.addTab(request) else { return false }
+        startLocalPanes(of: tab)
+        return true
     }
 
     private func closeTabs(_ ids: Set<UUID>) {
