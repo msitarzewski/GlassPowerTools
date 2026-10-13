@@ -1,5 +1,5 @@
 {
- "mermaid": "12.1.0",
+ "mermaid": "12.2.0",
  "packages": [
   {
    "license": "MIT",
@@ -494,7 +494,7 @@
      "title": "LICENSE"
     }
    ],
-   "version": "7.2.0"
+   "version": "15.0.0"
   },
   {
    "license": "MIT",
@@ -505,7 +505,7 @@
      "title": "LICENSE"
     }
    ],
-   "version": "8.3.0"
+   "version": "7.2.0"
   },
   {
    "license": "MIT",
@@ -1090,7 +1090,7 @@
      "title": "LICENSE"
     }
    ],
-   "version": "0.16.47"
+   "version": "0.18.10"
   },
   {
    "license": "MIT",
@@ -1156,7 +1156,7 @@
      "title": "LICENSE"
     }
    ],
-   "version": "12.1.0"
+   "version": "12.2.0"
   },
   {
    "license": "MIT",
@@ -1167,7 +1167,7 @@
      "title": "LICENSE"
     }
    ],
-   "version": "1.8.0"
+   "version": "1.9.0"
   },
   {
    "license": "MIT",
@@ -1288,7 +1288,7 @@
      "title": "LICENSE.md"
     }
    ],
-   "version": "14.0.2"
+   "version": "14.0.3"
   }
  ]
 }
