@@ -75,7 +75,8 @@ installed with them to keep one build everywhere.
 **Next (the owner, 16:10): system integration** — "Let's get a finder integration going … they should be available on
 all of the platforms that support them. App intents, all of the modern stuff … Be sure visionOS is well represented!"
 (his screenshot: Finder's Services submenu with other apps' New Tab/Window Here and Open in). Plan:
-`tasks/2026-10/2026-10-13_system-integration-plan.md`; nothing built yet.
+`tasks/2026-10/2026-10-13_system-integration-plan.md`. **Approved (D72): "Do all of the things."** Building phase 1
+(entities and intents) now, each piece committed as it lands.
 
 **Then, for an agent:** tier 3 from the inventory's section 0: B-X2 with B-Q11, B-X6 with B-F32, B-X7, and
 B-X22's second half. Also the database's own `databaseSidebarChrome()`, which still removes the toggle off the

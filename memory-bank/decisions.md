@@ -1448,3 +1448,12 @@ so every window, sheet, menu and AppKit panel follows it; on iPhone and iPad, ea
 `overrideUserInterfaceStyle`, windows opened later included. Applied before the first window shows
 (`applicationWillFinishLaunching`; the iOS delegate's launch). **Not on Vision Pro** (D63). A terminal theme keeps its
 own colours; its Automatic canvas follows the app's appearance. Evidence: `GlassAppAppearanceTests`.
+
+## D72 — System integration on every platform: the whole plan — Approved 2026-10-13
+**Approved by the owner:** "Do all of the things. Wonderful ideas!" — every phase of
+`tasks/2026-10/2026-10-13_system-integration-plan.md`, the optional pieces included (Finder Quick Actions and the
+Finder toolbar button), with the agent's recommendations on the open questions: `ssh://` links open in the app (Q1);
+Services **and** Quick Actions (Q2) and a Finder Sync toolbar button (Q3), as "all of the things"; machine names in
+system search only once switched on in Settings ▸ Privacy (Q4); `.command` files run in a new tab, `.sh` files open in
+the editor (Q5); order 1 → 2 → 3 → 4, then a spike for 5 (Q6). Built phase by phase, each piece committed as it lands
+(the standing "commit each piece as it lands"); nothing claimed working on a device until the owner has seen it.
