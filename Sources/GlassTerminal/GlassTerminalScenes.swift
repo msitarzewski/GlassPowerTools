@@ -52,6 +52,9 @@ public struct GlassTerminalScenes: Scene {
                 // The reopen list and the launch offer, if this is the first window of the launch:
                 // Connections need not have appeared (W12).
                 .modifier(MacLaunchReopen(asker: "a terminal window"))
+                // Windows opened from outside any window — Siri, a Finder service — open from here
+                // too (`GlassWindowOpener`, D72).
+                .glassRegistersWindowOpener()
                 .environment(runtime)
                 .environment(sessionManager)
                 .environment(settingsManager)
@@ -101,6 +104,7 @@ public struct GlassTerminalScenes: Scene {
         WindowGroup(id: "terminal", for: UUID.self) { $workgroupID in
             if let workgroupID {
                 VisionTerminalWorkgroupView(workgroupID: workgroupID)
+                    .glassRegistersWindowOpener()
                     .environment(runtime)
                     .environment(sessionManager)
                     .environment(settingsManager)

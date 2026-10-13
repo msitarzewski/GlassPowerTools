@@ -32,6 +32,11 @@ public enum GlassLibraryWindows {
 
     static func register(_ window: NSWindow) { windows.add(window) }
 
+    /// Whether a Connections window is open, shown or in the Dock, without bringing it forward.
+    public static var isOpen: Bool {
+        windows.allObjects.contains { $0.isVisible || $0.isMiniaturized }
+    }
+
     /// Brings a Connections window forward — false when none is open, so the caller opens one.
     @discardableResult
     public static func bringForward() -> Bool {

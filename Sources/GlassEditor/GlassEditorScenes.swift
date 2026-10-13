@@ -518,7 +518,7 @@ public final class GlassEditorRuntime {
     /// Shows the windows an open named: each as a window where windows exist; on a phone, the last
     /// of them in place, since only one is on screen. One rule for an editor window's own Open…
     /// and for the library's.
-    func show(_ windows: [UUID], with openWindow: OpenWindowAction) {
+    public func show(_ windows: [UUID], with openWindow: OpenWindowAction) {
         if GlassWindowPresentation.canOpenWindows {
             for id in windows { openWindow(id: Self.windowID, value: id) }
         } else if let last = windows.last {
@@ -693,6 +693,7 @@ public struct GlassEditorScenes: Scene {
                 .environment(runtime)
                 .glassLayers(runtime.layers)
                 .glassEditorWindowPresenter(runtime)
+                .glassRegistersWindowOpener()
                 .modifier(GlassEditorRestoredWindowGuard(runtime: runtime, windowID: windowID))
         } defaultValue: {
             runtime.newWindowID()

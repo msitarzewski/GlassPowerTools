@@ -17,23 +17,33 @@ import GlassConnectionUI
 import GlassShell
 import GlassWidgetData
 
-/// The widget intents, as part of the app: a tap on a widget runs them here.
+/// The intents — the widgets' and Shortcuts', Siri's and Spotlight's (D72) — as part of the app.
 struct GlassPowerToolsAppIntents: AppIntentsPackage {
     static var includedPackages: [any AppIntentsPackage.Type] { [GlassWidgetIntents.self] }
 }
 
 @MainActor
 enum GlassWidgetBridge {
-    /// Opens the Connections window, from a window that can. Set when the library first appears;
-    /// a tap that wants the library while it is closed opens it with this.
-    static var openLibrary: (() -> Void)?
-    private static var started = false
+    /// What the bridge asks of the capabilities, given by the composition root, which holds them.
+    struct Actions {
+        var openWorkgroup: @MainActor (UUID) -> Void
+        /// The Mac: a terminal window, in a folder when there is one.
+        var newLocalTerminal: @MainActor (URL?, OpenWindowAction) -> Void
+        var openInEditor: @MainActor ([URL], OpenWindowAction) -> Void
+        /// The saved workgroups, for the snapshot (Shortcuts and Siri name them).
+        var workgroups: @MainActor () -> [GlassWidgetSnapshot.Workgroup]
+    }
 
-    /// Carries out widget taps from now on (any that launched the app first included), and keeps
-    /// the snapshot current for as long as the app runs.
-    static func start(model: GlassShellModel) {
+    private static var started = false
+    private static var actions: Actions?
+
+    /// Carries out every intent's request from now on — a widget's tap, Shortcuts, Siri, Spotlight;
+    /// any that launched the app first included — and keeps the snapshot current for as long as the
+    /// app runs.
+    static func start(model: GlassShellModel, actions: Actions) {
         guard !started else { return }
         started = true
+        self.actions = actions
         GlassWidgetRequests.shared.handle { carryOut($0, model: model) }
         Task { await keepSnapshotCurrent(model: model) }
     }
@@ -41,6 +51,7 @@ enum GlassWidgetBridge {
     static func carryOut(_ request: GlassWidgetRequest, model: GlassShellModel) {
         switch request {
         case let .connect(machine, service):
+            ensureLibrary()
             model.connect(hostID: HostID(rawValue: machine), endpointID: EndpointID(rawValue: service))
         case .showMachine(let machine):
             showLibrary()
@@ -48,16 +59,44 @@ enum GlassWidgetBridge {
         case .showActive:
             showLibrary()
             model.showActiveConnections()
+        case .openWorkgroup(let workgroup):
+            ensureLibrary()
+            actions?.openWorkgroup(workgroup)
+        case .newLocalTerminal(let folder):
+            GlassWindowOpener.shared.perform { actions?.newLocalTerminal(folder, $0) }
+        case .openInEditor(let urls):
+            GlassWindowOpener.shared.perform { actions?.openInEditor(urls, $0) }
         }
     }
 
+    /// The Connections window, brought forward or opened.
     private static func showLibrary() {
         #if os(macOS)
-        if !GlassLibraryWindows.bringForward() { openLibrary?() }
+        if !GlassLibraryWindows.bringForward() { GlassWindowOpener.shared.perform { $0.openConnections() } }
         #elseif os(visionOS)
         // The one Connections window, brought forward (`openConnections`).
-        openLibrary?()
+        GlassWindowOpener.shared.perform { $0.openConnections() }
         #endif
+    }
+
+    /// A Connections window to carry a connection out: the capabilities run their requests — and
+    /// ask for passwords and host trust — from its views. With only terminal windows open, a widget's
+    /// Connect waited for a library window that never came (found building D72, 2026-10-13). One
+    /// already open stays where it is.
+    private static func ensureLibrary() {
+        #if os(macOS)
+        if !GlassLibraryWindows.isOpen { GlassWindowOpener.shared.perform { $0.openConnections() } }
+        #elseif os(visionOS)
+        GlassWindowOpener.shared.perform { $0.openConnections() }
+        #endif
+    }
+
+    /// What the widgets, Shortcuts and Siri read: the library's machines and Active, and the
+    /// terminal's workgroups.
+    private static func snapshot(model: GlassShellModel) -> GlassWidgetSnapshot {
+        var snapshot = model.widgetSnapshot()
+        snapshot.workgroups = actions?.workgroups() ?? []
+        return snapshot
     }
 
     /// How long a quiet library goes before the snapshot is written anyway: a running session's
@@ -66,17 +105,21 @@ enum GlassWidgetBridge {
 
     private static func keepSnapshotCurrent(model: GlassShellModel) async {
         while !Task.isCancelled {
-            write(model.widgetSnapshot())
+            write(snapshot(model: model))
             await nextChange(in: model, orAfter: refreshInterval)
             // A burst of changes — a workgroup opening six terminals — is one write.
             try? await Task.sleep(for: .seconds(1))
         }
     }
 
-    /// Writes the snapshot when it changed, and only then wakes the widgets.
+    /// Writes the snapshot when it changed, and only then wakes the widgets and tells Siri and
+    /// Shortcuts the names their phrases can use.
     static func write(_ snapshot: GlassWidgetSnapshot) {
         do {
-            if try GlassWidgetStore.write(snapshot) { WidgetCenter.shared.reloadAllTimelines() }
+            if try GlassWidgetStore.write(snapshot) {
+                WidgetCenter.shared.reloadAllTimelines()
+                GlassPowerToolsShortcuts.updateAppShortcutParameters()
+            }
         } catch {
             GlassWidgetBridgeLog.logger.error("The widgets' snapshot could not be written: \(error.localizedDescription, privacy: .public)")
         }
@@ -88,7 +131,7 @@ enum GlassWidgetBridge {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             gate.continuation = continuation
             withObservationTracking {
-                _ = model.widgetSnapshot()
+                _ = snapshot(model: model)
             } onChange: {
                 Task { @MainActor in gate.open() }
             }
@@ -113,14 +156,10 @@ enum GlassWidgetBridgeLog {
     static let logger = Logger(subsystem: "sh.glas", category: "widgets")
 }
 
-/// Gives the bridge a way to open Connections, from the library's own window.
+/// The library window's `openWindow`, for opening windows from outside any window
+/// (`GlassWindowOpener`); every other kind of window registers its own.
 struct GlassWidgetLibraryOpener: ViewModifier {
-    @Environment(\.openWindow) private var openWindow
-
     func body(content: Content) -> some View {
-        content.onAppear {
-            let openWindow = openWindow
-            GlassWidgetBridge.openLibrary = { openWindow.openConnections() }
-        }
+        content.glassRegistersWindowOpener()
     }
 }

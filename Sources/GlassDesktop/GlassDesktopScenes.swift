@@ -28,6 +28,7 @@ public struct GlassDesktopScenes: Scene {
         WindowGroup(id: "desktop-session", for: UUID.self) { $endpointID in
             DesktopSessionHost(runtime: runtime, endpointID: endpointID.map(EndpointID.init(rawValue:)))
                 .glassLayers(runtime.layers)
+                .glassRegistersWindowOpener()
         }
         #if os(visionOS)
         .windowStyle(.plain)

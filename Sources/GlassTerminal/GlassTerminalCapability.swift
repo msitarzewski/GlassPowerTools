@@ -24,6 +24,14 @@ public enum GlassTerminalOpenPurpose: Sendable { case terminal, sftp }
 /// The shell's outcome callback for one connect attempt (see `GlassCapabilityOutcome`).
 public typealias GlassCapabilityReport = @MainActor (GlassCapabilityOutcome) -> Void
 
+/// A saved workgroup as the app's system integration sees it (D72): its id, name and how many
+/// terminals it opens. Nothing else of the preset leaves the terminal.
+public struct GlassTerminalWorkgroup: Sendable, Equatable, Identifiable {
+    public let id: UUID
+    public let name: String
+    public let terminals: Int
+}
+
 /// Owns glas.sh's managers for the process. One per app, created in the composition root.
 @MainActor @Observable
 public final class GlassTerminalRuntime {
@@ -251,6 +259,30 @@ public final class GlassTerminalRuntime {
     }
     /// macOS: a new workspace window with a local shell. Elsewhere this is a no-op.
     public func requestLocalTerminal(withoutTmux: Bool = false) { enqueue(.localTerminal(withoutTmux: withoutTmux)) }
+
+    #if os(macOS)
+    /// A terminal window on this Mac, in `folder` when there is one — a file stands for the folder
+    /// it is in — opened straight from outside any window: Siri, Shortcuts, a Finder service, the
+    /// Dock (D72). In tmux as this Mac's setting says. Not through the request queue, which only the
+    /// Connections window drains: a Mac with only terminal windows open would never see it.
+    public func openLocalTerminal(in folder: URL?, with openWindow: OpenWindowAction) {
+        openWindow(id: "workspace", value: MacLocalTerminalStart.windowRequest(in: folder.map(Self.folderPath(for:))))
+    }
+    #endif
+
+    /// The folder a file or folder URL names: the folder itself, or the one holding the file.
+    nonisolated static func folderPath(for url: URL) -> String {
+        let standardized = url.standardizedFileURL
+        let isFolder = (try? standardized.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? url.hasDirectoryPath
+        return (isFolder ? standardized : standardized.deletingLastPathComponent()).path(percentEncoded: false)
+    }
+
+    /// The saved workgroups, for Shortcuts and Siri (D72): metadata only.
+    public var workgroups: [GlassTerminalWorkgroup] {
+        settingsManager.layoutPresets.map {
+            GlassTerminalWorkgroup(id: $0.id, name: $0.name, terminals: $0.sessionIntents.count)
+        }
+    }
 
     // MARK: The device's own shell (D8)
 

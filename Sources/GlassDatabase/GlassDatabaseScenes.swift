@@ -31,6 +31,7 @@ public struct GlassDatabaseScenes: Scene {
                     .environment(sessionManager)
                     .environment(settingsManager)
                     .glassLayers(runtime.layers)
+                    .glassRegistersWindowOpener()
                     .onDisappear { sessionManager.releaseWorkspace(workspaceID) }
             } else {
                 ContentUnavailableView(

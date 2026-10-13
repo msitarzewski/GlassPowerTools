@@ -18,6 +18,7 @@ import GlassDesktop
 import VNCKit
 import GlassEditor
 import GlassEditorCore
+import GlassWidgetData
 
 /// The app; on a Mac, also the background process that keeps local terminals running
 /// (`MacTmuxHost`), which must start nothing of the app's, so it is chosen before SwiftUI is.
@@ -333,7 +334,23 @@ struct GlassPowerToolsApp: App {
         // The Machines and Active widgets: their snapshot kept current, and their taps carried
         // out — one that launched the app included (`GlassWidgetBridge`). Not in a UI-test run,
         // which must not change what the person's widgets show.
-        if GlassUITestRun.defaults == nil { GlassWidgetBridge.start(model: model) }
+        if GlassUITestRun.defaults == nil {
+            // And every other intent's request — Shortcuts, Siri, Spotlight (D72) — carried out
+            // with the capabilities that do each.
+            GlassWidgetBridge.start(model: model, actions: GlassWidgetBridge.Actions(
+                openWorkgroup: { terminal.requestOpenWorkgroup($0) },
+                newLocalTerminal: { folder, openWindow in
+                    #if os(macOS)
+                    terminal.openLocalTerminal(in: folder, with: openWindow)
+                    #endif
+                },
+                openInEditor: { urls, openWindow in
+                    editor.show(editor.open(urls: urls), with: openWindow)
+                },
+                workgroups: {
+                    terminal.workgroups.map { GlassWidgetSnapshot.Workgroup(id: $0.id, name: $0.name, terminals: $0.terminals) }
+                }))
+        }
         #if os(macOS)
         // D38: Sparkle's scheduled checks, in a build that names a feed and a signing key — and
         // never in a UI-test run.

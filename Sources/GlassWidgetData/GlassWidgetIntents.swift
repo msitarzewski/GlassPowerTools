@@ -14,11 +14,17 @@
 import AppIntents
 import Foundation
 
-/// What a widget asks for.
+/// What a widget, Shortcuts, Siri or the Finder asks the app for (D72): every intent is carried out
+/// in the app, through `GlassWidgetRequests`.
 public enum GlassWidgetRequest: Sendable, Equatable {
     case connect(machine: UUID, service: UUID)
     case showMachine(UUID)
     case showActive
+    case openWorkgroup(UUID)
+    /// The Mac: a terminal window here, in `folder` when there is one.
+    case newLocalTerminal(folder: URL?)
+    /// Files and folders into the editor: a folder opens as a project.
+    case openInEditor([URL])
 }
 
 /// Requests from the widgets, in the app's process. One that arrives before the app has set its

@@ -28,12 +28,42 @@ public struct GlassWidgetSnapshot: Codable, Sendable, Equatable {
     public var machines: [Machine]
     /// What was running when it was written, by machine.
     public var active: [ActiveMachine]
+    /// The saved workgroups, by name: what Shortcuts and Siri can open (D72, 2026-10-13). Absent
+    /// from snapshots written before, which read as none.
+    public var workgroups: [Workgroup]
 
-    public init(writtenAt: Date = Date(), machines: [Machine] = [], active: [ActiveMachine] = []) {
+    public init(writtenAt: Date = Date(), machines: [Machine] = [], active: [ActiveMachine] = [],
+                workgroups: [Workgroup] = []) {
         self.schema = Self.currentSchema
         self.writtenAt = writtenAt
         self.machines = machines
         self.active = active
+        self.workgroups = workgroups
+    }
+
+    private enum CodingKeys: String, CodingKey { case schema, writtenAt, machines, active, workgroups }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schema = try container.decode(Int.self, forKey: .schema)
+        writtenAt = try container.decode(Date.self, forKey: .writtenAt)
+        machines = try container.decode([Machine].self, forKey: .machines)
+        active = try container.decode([ActiveMachine].self, forKey: .active)
+        workgroups = try container.decodeIfPresent([Workgroup].self, forKey: .workgroups) ?? []
+    }
+
+    /// A saved workgroup: its terminals open together.
+    public struct Workgroup: Codable, Sendable, Equatable, Identifiable {
+        public var id: UUID
+        public var name: String
+        /// How many terminals it opens.
+        public var terminals: Int
+
+        public init(id: UUID, name: String, terminals: Int) {
+            self.id = id
+            self.name = name
+            self.terminals = terminals
+        }
     }
 
     public enum ServiceKind: String, Codable, Sendable, CaseIterable {
@@ -132,7 +162,7 @@ public struct GlassWidgetSnapshot: Codable, Sendable, Equatable {
     /// The same snapshot apart from when it was written: a write that changes nothing else need
     /// not wake every widget.
     public func sameContent(as other: GlassWidgetSnapshot) -> Bool {
-        machines == other.machines && active == other.active && schema == other.schema
+        machines == other.machines && active == other.active && workgroups == other.workgroups && schema == other.schema
     }
 }
 
