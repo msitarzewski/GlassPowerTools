@@ -4,8 +4,12 @@
 platforms that support them. App intents, all of the modern stuff … Be sure visionOS is well represented!" His
 screenshot: Finder ▸ Services with other apps' "New … Tab Here", "New … Window Here" and "Open in …".
 **Status:** **Approved 2026-10-13 (D72)**: "Do all of the things. Wonderful ideas!" — every phase, the optional
-pieces included; the questions answered as recommended (D72). **Phase 1 built (0.4.403), phase 2 built (0.4.404);**
-progress and evidence in `activeContext.md` and the commits named there. Absorbs backlog B-F48 (App Intents, Shortcuts, Spotlight, Handoff;
+pieces included; the questions answered as recommended (D72). **Built:**
+- **Phase 1** (0.4.403) and **phase 2** (0.4.404).
+- **Phase 3:** Send Files, drag-out windows and Handoff. The native share extension is held for the owner's call.
+- **Phase 4** (0.4.406).
+
+Progress and evidence are in `activeContext.md` and the commits named there. **Phase 5's spike is next.** Absorbs backlog B-F48 (App Intents, Shortcuts, Spotlight, Handoff;
 entities for hosts, connections, saved queries and tables, planned in glassdb and glassDT, never carried).
 **Owner:** the agent (coordinator). **Authorization:** the plan only; building waits for the owner's go.
 

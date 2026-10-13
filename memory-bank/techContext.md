@@ -406,3 +406,22 @@ Simulator,name=iPhone 17' -clonedSourcePackagesDirPath <resolved SourcePackages>
 - **A locked Mac fails about 23 terminal tests** with EPERM, "mktemp failed" or `cannotCreateTemporaryFile`:
   files written with complete protection cannot be created or read while the screen is locked (B-X27). Check
   `CGSSessionCopyCurrentDictionary` → `CGSSessionScreenIsLocked` before blaming a change.
+
+## System integration facts, 2026-10-13 (D72)
+
+- **Services that show without being switched on:** declare them as Ghostty, iTerm2 and CotEditor do (read from the
+  installed apps): `NSRequiredContext = {NSTextContent: FilePath}` and `NSSendTypes = [NSFilenamesPboardType,
+  public.plain-text]`.
+- **Content types:** `.command` is `com.apple.terminal.shell-script`, and `.sh` is `public.shell-script`. Both
+  conform to plain text.
+- **New macOS extension targets** in the hand-written project: `GlassPowerToolsFinder` (Finder Sync) and
+  `GlassPowerToolsQuickActions` (an action extension, `com.apple.services`,
+  `NSExtensionServiceAllowsFinderPreviewItem`). Both are sandboxed, use the team App Group (`GPT_WIDGET_GROUP`), and
+  are embedded on the Mac only. The release script must sign them (B-R2).
+- **App Intents:** every intent in `GlassWidgetData` goes into the app's and the widget extension's metadata.
+  Check `Metadata.appintents/extract.actionsdata` after a build. App Shortcuts live in the app target, eight of
+  the ten allowed.
+- **Controls:** a control template has no branches (`ControlWidgetTemplateBuilder`), so one intent per control.
+  Controls exist on macOS 26 and iOS 18, not visionOS.
+- **`swift build` compiles only the Mac:** code under `#if os(iOS) || os(visionOS)` is checked only by the
+  `xcodebuild` builds for those platforms.

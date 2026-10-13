@@ -154,3 +154,19 @@ test fails without the push.
 - **Driver quirks are normalised where the driver is wrapped** (GlassDBKit): `PostgreSQLEngine.connectFailure`
   turns PostgresNIO's redacted `PSQLError` into the server's words, or into the network error MySQLNIO throws for the
   same failure, so `DatabaseConnectionFailure` words both engines with one set of cases.
+
+## The system's ways in, one path (D72, 2026-10-13)
+
+- **Every way in posts one request** (`GlassWidgetRequest`, in `GlassWidgetData`): widgets, Siri, Shortcuts,
+  Spotlight, controls, Finder services, Open With, the Dock, `ssh://` links and Handoff. `GlassWidgetBridge` (App)
+  carries each out with the capabilities. A request that needs an answer back, such as Send Files, awaits a service
+  the app installs instead (`GlassAppServices`).
+- **Windows open from outside any window through `GlassWindowOpener`**, which every kind of window registers. A
+  connection first makes sure a Connections window exists (`ensureLibrary`), because its views run the
+  capabilities' requests and prompts.
+- **On the Mac, what is opened with the app and Handoff go to the app delegate** (`MacTerminalAppDelegate.openURLs`,
+  `continueActivity`), never a scene's `onOpenURL`: SwiftUI opens a scene's window to deliver one.
+- **Extensions in other processes hand off through the App Group** (`GlassExternalRequests`): they leave a request
+  and open the app, which takes it as it comes forward. A request expires after a minute.
+- **A dragged `NSUserActivity` makes a window where it is dropped** (`GlassServiceDrag`; `Transferable` cannot). The
+  window group claims the activity with `handlesExternalEvents`.

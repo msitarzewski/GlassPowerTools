@@ -97,8 +97,23 @@ all of the platforms that support them. App intents, all of the modern stuff …
     - The Quick Action.
     - A sandboxed extension waking the app.
   - **Release script:** it must sign the two new extensions with Developer ID (B-R2).
-- **Next: phase 3** — the share sheet's Send to a Machine, drag a machine out to make its window (Vision Pro
-  first), Handoff.
+- **Phase 3 built (0.4.405–0.4.406):**
+  - Send Files to a Machine, a Shortcuts action, so it reaches the share sheet through a shortcut. It uses the
+    W14 never-replace upload and a shared `openSFTPConnection`. Not yet sent to a real machine.
+  - Drag a terminal or desktop out of a host's detail into its own window: Vision Pro (in the room) and iPad
+    (desktops). A dragged `NSUserActivity` is claimed with `handlesExternalEvents`; a headset terminal reserves a
+    workgroup.
+  - Handoff for the terminal, database or desktop in front. The activity carries only the endpoint, and the Mac
+    takes it in the app delegate.
+  - **Not built, the owner's call:** a native share extension. iOS share extensions cannot wake the app, so the
+    upload would run in the extension with the SSH stack and Keychain credentials, which the plan ruled out.
+- **Phase 4 built (0.4.406):**
+  - Controls on the Mac 26, iPhone and iPad: Open Terminal on a chosen machine, Active Connections, and New
+    Terminal Window on the Mac.
+  - Machines and workgroups in search, **off until Settings ▸ Privacy ▸ Show Machines in Search**.
+  - "What's open in Glass Power Tools?" answered in place with a card.
+- **Phase 5 next:** a spike of the File Provider (machines in the Finder and Files sidebars), read-only first.
+  Then the owner's devices check all of the above.
 
 **Then, for an agent:** tier 3 from the inventory's section 0: B-X2 with B-Q11, B-X6 with B-F32, B-X7, and
 B-X22's second half. Also the database's own `databaseSidebarChrome()`, which still removes the toggle off the
