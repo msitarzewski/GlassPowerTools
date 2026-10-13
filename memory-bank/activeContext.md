@@ -88,9 +88,11 @@ after 0.4.392 also carry: the tree-sitter match limit, B-X5, B-X13, B-X18, B-X22
 - **Waiting on the owner:** unfold the Duo (tour re-run; the unfolded-window and "N Views Open" items); B-X27;
   B-X10/B-X11 (database breadcrumb, Query commands on table tabs — need the Mac on screen and a design call);
   B-X4 (Mac drag-select in tmux history — needs the Mac unlocked).
-- **Next for an agent:** rerun the terminal suite with the screen unlocked (expect 0 failures); B-X5's second half
-  (database and desktop tunnels outside W21's pool); the database's Local Network check (EPERM/EACCES vs the
-  measured EHOSTUNREACH).
+- **Next for an agent (done 2026-10-13 ~12:40):** the terminal suite passes unlocked (779). The database's Local
+  Network check was replaced by the terminal's measured rule, now `GlassLocalNetworkAccess` in the shell. Measuring
+  it found every PostgreSQL connect failure, a wrong password included, reading "PSQLError error 1", and fixed it
+  (`PostgreSQLEngine.connectFailure`). B-X5's second half was closed by design: tunnels keep their own
+  connections (`GlassTerminalPortForward`).
 
 ## 2026-10-12 (late) — before the second compaction: the iPhone Duo on its simulator
 

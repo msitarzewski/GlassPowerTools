@@ -868,9 +868,16 @@ enum GlassTerminalHostAddressSync {
 
 // MARK: - Lending the host's SSH transport to another capability (D7)
 
-/// The shell's `GlassHostPortForward` over a real `SSHTunnel`. Closing it also releases this
-/// borrower's claim on the transport, so a transport opened only for a tunnel goes away with it
-/// while one shared with a live terminal session stays up.
+/// The shell's `GlassHostPortForward` over a real `SSHTunnel`, on a connection of its own: closing
+/// it closes that connection.
+///
+/// **Not on the terminals' shared connections (W21's pool), on purpose** (B-X5, 2026-10-13). The
+/// pool exists for the server's limits, and a tunnel is not what they count: `MaxSessions` counts
+/// shell, login and subsystem sessions and permits forwarding even at 0 (sshd_config(5)), and a
+/// tunnel adds one sign-in when it opens. Sharing would put a desktop's frames or a large result
+/// on the same TCP stream as every keystroke, which OpenSSH users see as interactive lag on a
+/// multiplexed connection (openssh-unix-dev, 2009-10 and 2011-03), and would end the tunnel with
+/// the terminals' connection.
 private final class GlassTerminalPortForward: GlassHostPortForward {
     let localPort: Int
     private let tunnel: SSHTunnel

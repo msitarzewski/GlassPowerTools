@@ -60,7 +60,9 @@ owner may reorder; the sections below keep the detail. Within a tier, earlier is
   limit (256, Helix's) keeps the ids far below 16 bits and bounds the time too; measured on 16 real files in 14
   languages that no limit down to 64 changes a match.
 18. ~~B-X5~~ 9ee28f3 (2026-10-13) — every terminal on a lost shared connection says so; none closes as if exited.
-    Left: database and desktop tunnels still connect outside W21's pool.
+    The leftover is closed as by design: database and desktop tunnels keep their own connections, because
+    MaxSessions does not count forwarding, a tunnel adds one sign-in, and a shared stream would lag every
+    terminal behind a desktop's frames (`GlassTerminalPortForward`).
 18a. **B-X27** (new, 2026-10-13) — files written with complete protection cannot be created or read while the Mac
     is locked: recordings, SFTP downloads, desktop captures made while away may fail.
 19. B-X4 — drag-select cannot reach tmux history on the Mac.
@@ -169,7 +171,7 @@ owner may reorder; the sections below keep the detail. Within a tier, earlier is
   added from the form is not selected (`ServerFormViews.swift:437`, `:597`).
 - **B-X4** Drag-select stops at the screen in tmux history on the Mac (Select All takes the history, ec226f9).
 - **B-X5** Losing a shared SSH connection marks one terminal lost; the others just see their shell end.
-  Database and desktop tunnels connect outside W21's pool.
+  Database and desktop tunnels connect outside W21's pool — kept, by design (2026-10-13; reasons at `GlassTerminalPortForward`).
 - **B-X6** Colour distortion during motion on RDP (AVC444 partial regions / LC1 path), reported by the owner on
   the GNOME host on 09-08 and never fixed or carried forward; glassDT's plan was expected-pixel tests and an
   AVC420/legacy picker (B-O9).
