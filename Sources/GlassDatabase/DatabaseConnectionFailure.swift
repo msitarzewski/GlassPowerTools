@@ -16,10 +16,16 @@
 //  and the tunnel is the answer for every one of them. The raw error goes to the log, where
 //  somebody debugging can have it.
 //
+//  Two failures have their own words (2026-10-13, measured against the test VM): a name that does
+//  not resolve, and "No route to host" to a machine on the local network, which is what the system
+//  keeping the app off the local network looks like (`GlassLocalNetworkAccess`). Both used to get
+//  the tunnel advice, or PostgreSQL's "PSQLError error 1".
+//
 
 import Foundation
 import OSLog
 import NIOCore
+import GlassShell
 
 enum DatabaseConnectionFailure {
 
@@ -35,8 +41,16 @@ enum DatabaseConnectionFailure {
         Logger.connections.error(
             "\(config.engine.rawValue, privacy: .public) transport failure: \(String(describing: error), privacy: .private)"
         )
+        // Without a tunnel the app reaches the database's host itself, so the name and the network
+        // are this device's to resolve; through one, the database is on this device's loopback.
+        if !config.usesHostTunnel, isUnknownHost(error) {
+            return "No machine named \(config.host) could be found. Edit this database and check its host name."
+        }
         var message = "\(config.name) didn't answer at \(config.host):\(config.port)."
-        if !config.usesHostTunnel {
+        if !config.usesHostTunnel, GlassLocalNetworkAccess.mayBeDenial(error),
+           GlassLocalNetworkAccess.isLikelyLocalHost(config.host) {
+            message += " " + GlassLocalNetworkAccess.advice
+        } else if !config.usesHostTunnel {
             message += " Databases are usually set up to accept connections only from the machine "
                 + "they run on. Edit this database and turn on \"Reach it through this machine's "
                 + "Terminal service\" under Advanced."
@@ -50,11 +64,18 @@ enum DatabaseConnectionFailure {
         return message
     }
 
-    /// Whether the failure happened below the database protocol — no route, no listener, no
-    /// permission — rather than being the server's own refusal. `IOError` carries the kernel's
-    /// answer and `ChannelError` the timeouts and resets above it; `NIOPosix`'s own connection
-    /// error is not visible from this module and arrives wrapped in one of these two.
+    /// Whether the failure happened below the database protocol — no name, no route, no
+    /// listener, no permission — rather than being the server's own refusal. `IOError` carries the
+    /// kernel's answer, `ChannelError` the timeouts and resets above it, and `SocketAddressError`
+    /// a name that did not resolve; `NIOPosix`'s own connection error is not visible from this
+    /// module and reaches it unwrapped to one of these (`PostgreSQLEngine.connectFailure`).
     private static func isTransportFailure(_ error: Error) -> Bool {
-        error is IOError || error is ChannelError
+        error is IOError || error is ChannelError || error is SocketAddressError
+            || error is SocketAddressError.UnknownHost
+    }
+
+    /// A host name that resolved to nothing, as both drivers throw it (measured).
+    private static func isUnknownHost(_ error: Error) -> Bool {
+        error is SocketAddressError.UnknownHost
     }
 }

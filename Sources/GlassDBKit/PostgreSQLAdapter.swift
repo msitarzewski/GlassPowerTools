@@ -50,13 +50,43 @@ public final class PostgreSQLEngine: DatabaseEngine, @unchecked Sendable {
             tls: tls
         )
         configuration.options.tlsServerName = serverName
-        let connection = try await PostgresConnection.connect(
-            on: eventLoopGroup.next(),
-            configuration: configuration,
-            id: 1,
-            logger: logger
-        )
+        let connection: PostgresConnection
+        do {
+            connection = try await PostgresConnection.connect(
+                on: eventLoopGroup.next(),
+                configuration: configuration,
+                id: 1,
+                logger: logger
+            )
+        } catch let error as PSQLError {
+            throw Self.connectFailure(error, host: host, port: port)
+        }
         return PostgreSQLDatabaseConnection(connection: connection, logger: logger)
+    }
+
+    /// What `connect` throws, in a form the app can word. PostgresNIO keeps a `PSQLError`'s
+    /// details out of its description on purpose, so every failure to connect reached the user as
+    /// "The operation couldn't be completed. (PostgresNIO.PSQLError error 1.)" — a wrong password
+    /// included (measured 2026-10-13 against the test VM; queries go through the older API, whose
+    /// `PostgresError` reads well). The server's refusal becomes its own words. A failure to reach
+    /// it becomes the error underneath, unwrapped from NIO's connection error to the one MySQLNIO
+    /// throws for the same failure (an `IOError`, or the unknown host), so both engines are worded
+    /// alike.
+    static func connectFailure(_ error: PSQLError, host: String, port: Int) -> any Error {
+        switch error.code {
+        case .server:
+            if let message = error.serverInfo?[.message] { return DatabaseError.server(message) }
+        case .connectionError:
+            guard let underlying = error.underlying else { break }
+            guard let connection = underlying as? NIOConnectionError else { return underlying }
+            if let lookup = connection.dnsAError ?? connection.dnsAAAAError { return lookup }
+            return connection.connectionErrors.first?.error ?? connection
+        case .sslUnsupported:
+            return DatabaseError.tlsRequiredButUnavailable(host: host, port: port)
+        default:
+            break
+        }
+        return error
     }
 
     /// Delegates to the one policy-to-NIOSSL mapping in `DatabaseTLSConfiguration.swift`, shared

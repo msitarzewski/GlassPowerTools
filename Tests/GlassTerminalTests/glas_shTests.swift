@@ -7442,21 +7442,21 @@ struct glas_shTests {
     }
 
     @Test @MainActor func connectionManagerIdentifiesLocalNetworkSSHHosts() {
-        #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("localhost"))
-        #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("nas.local"))
-        #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("10.20.30.40"))
-        #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("172.16.0.1"))
-        #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("172.31.255.255"))
-        #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("192.168.1.20"))
-        #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("169.254.1.2"))
-        #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("127.0.0.1"))
-        #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("[fe80::1]"))
-        #expect(TerminalConnectFlow.isLikelyLocalNetworkHost("fd12::20"))
+        #expect(GlassLocalNetworkAccess.isLikelyLocalHost("localhost"))
+        #expect(GlassLocalNetworkAccess.isLikelyLocalHost("nas.local"))
+        #expect(GlassLocalNetworkAccess.isLikelyLocalHost("10.20.30.40"))
+        #expect(GlassLocalNetworkAccess.isLikelyLocalHost("172.16.0.1"))
+        #expect(GlassLocalNetworkAccess.isLikelyLocalHost("172.31.255.255"))
+        #expect(GlassLocalNetworkAccess.isLikelyLocalHost("192.168.1.20"))
+        #expect(GlassLocalNetworkAccess.isLikelyLocalHost("169.254.1.2"))
+        #expect(GlassLocalNetworkAccess.isLikelyLocalHost("127.0.0.1"))
+        #expect(GlassLocalNetworkAccess.isLikelyLocalHost("[fe80::1]"))
+        #expect(GlassLocalNetworkAccess.isLikelyLocalHost("fd12::20"))
 
-        #expect(!TerminalConnectFlow.isLikelyLocalNetworkHost("example.com"))
-        #expect(!TerminalConnectFlow.isLikelyLocalNetworkHost("172.32.0.1"))
-        #expect(!TerminalConnectFlow.isLikelyLocalNetworkHost("192.167.1.20"))
-        #expect(!TerminalConnectFlow.isLikelyLocalNetworkHost("not-an-address"))
+        #expect(!GlassLocalNetworkAccess.isLikelyLocalHost("example.com"))
+        #expect(!GlassLocalNetworkAccess.isLikelyLocalHost("172.32.0.1"))
+        #expect(!GlassLocalNetworkAccess.isLikelyLocalHost("192.167.1.20"))
+        #expect(!GlassLocalNetworkAccess.isLikelyLocalHost("not-an-address"))
     }
 
     @Test @MainActor func localConnectionFailureAddsActionablePermissionGuidance() {
@@ -7483,12 +7483,12 @@ struct glas_shTests {
     /// failure the system's denial could cause gets it — measured, "No route to host" (errno 65).
     @Test @MainActor func localNetworkGuidanceOnlyWhereTheDenialCouldBeTheCause() {
         let noRoute = IOError(errnoCode: EHOSTUNREACH, reason: "connect(descriptor:addr:size:)")
-        #expect(SSHConnection.mayBeLocalNetworkDenial(noRoute))
-        #expect(SSHConnection.mayBeLocalNetworkDenial(NSError(domain: NSPOSIXErrorDomain, code: Int(EHOSTUNREACH))))
-        #expect(SSHConnection.mayBeLocalNetworkDenial(NSError(domain: "DNSServiceErrorDomain", code: -65_570)))
-        #expect(!SSHConnection.mayBeLocalNetworkDenial(IOError(errnoCode: ECONNREFUSED, reason: "connect")))
-        #expect(!SSHConnection.mayBeLocalNetworkDenial(ChannelError.connectTimeout(.seconds(10))))
-        #expect(!SSHConnection.mayBeLocalNetworkDenial(SSHError.authenticationFailed))
+        #expect(GlassLocalNetworkAccess.mayBeDenial(noRoute))
+        #expect(GlassLocalNetworkAccess.mayBeDenial(NSError(domain: NSPOSIXErrorDomain, code: Int(EHOSTUNREACH))))
+        #expect(GlassLocalNetworkAccess.mayBeDenial(NSError(domain: "DNSServiceErrorDomain", code: -65_570)))
+        #expect(!GlassLocalNetworkAccess.mayBeDenial(IOError(errnoCode: ECONNREFUSED, reason: "connect")))
+        #expect(!GlassLocalNetworkAccess.mayBeDenial(ChannelError.connectTimeout(.seconds(10))))
+        #expect(!GlassLocalNetworkAccess.mayBeDenial(SSHError.authenticationFailed))
 
         for (base, diagnostics) in [("Connection refused by nas.local:22. Verify SSH is running on that port.", nil),
                                     ("Connection to nas.local:22 timed out.", nil),

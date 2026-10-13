@@ -781,7 +781,7 @@ struct TerminalConnectFlow: ViewModifier {
                         base: error.localizedDescription,
                         diagnostics: nil,
                         host: server.host,
-                        mayBeLocalNetworkDenial: SSHConnection.mayBeLocalNetworkDenial(error)
+                        mayBeLocalNetworkDenial: GlassLocalNetworkAccess.mayBeDenial(error)
                     )
                     connectionFailureMessage = message
                     report(.failed(message), for: server.id)
@@ -982,54 +982,10 @@ struct TerminalConnectFlow: ViewModifier {
            !diagnostics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             sections.append(diagnostics)
         }
-        if mayBeLocalNetworkDenial, isLikelyLocalNetworkHost(host) {
-            #if os(macOS)
-            let settings = "System Settings"
-            #else
-            let settings = "Settings"
-            #endif
-            sections.append(
-                "If the machine is on, Glass Power Tools may not be allowed on the local network. In \(settings), open Privacy & Security > Local Network, allow Glass Power Tools, then try again."
-            )
+        if mayBeLocalNetworkDenial, GlassLocalNetworkAccess.isLikelyLocalHost(host) {
+            sections.append(GlassLocalNetworkAccess.advice)
         }
         return sections.joined(separator: "\n\n")
-    }
-
-    static func isLikelyLocalNetworkHost(_ rawHost: String) -> Bool {
-        var host = rawHost.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if host.hasPrefix("["), host.hasSuffix("]") {
-            host.removeFirst()
-            host.removeLast()
-        }
-
-        if host == "localhost" || host.hasSuffix(".local") {
-            return true
-        }
-
-        if host.contains(":") {
-            let address = host.split(separator: "%", maxSplits: 1).first.map(String.init) ?? host
-            return address == "::1"
-                || address.hasPrefix("fc")
-                || address.hasPrefix("fd")
-                || address.hasPrefix("fe8")
-                || address.hasPrefix("fe9")
-                || address.hasPrefix("fea")
-                || address.hasPrefix("feb")
-        }
-
-        let octets = host.split(separator: ".", omittingEmptySubsequences: false)
-        let values = octets.compactMap { Int($0) }
-        guard octets.count == 4,
-              values.count == 4,
-              values.allSatisfy({ (0...255).contains($0) }) else {
-            return false
-        }
-
-        return values[0] == 10
-            || values[0] == 127
-            || (values[0] == 169 && values[1] == 254)
-            || (values[0] == 172 && (16...31).contains(values[1]))
-            || (values[0] == 192 && values[1] == 168)
     }
 
     private func submitPassword(

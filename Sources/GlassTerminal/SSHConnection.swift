@@ -604,21 +604,6 @@ class SSHConnection {
         return "Could not connect to \(server.host):\(server.port)."
     }
 
-    /// Whether this failure could be the system keeping Glass off the local network (B-X13,
-    /// 2026-10-13). Measured: a connection to a machine on the local network from a process
-    /// without Local Network access fails at once with "No route to host" (EHOSTUNREACH, errno
-    /// 65); a refused port is errno 61, and a timeout or a rejected sign-in is the machine
-    /// answering. "No route" also means the machine is off, so this is a *may*. A name lookup
-    /// the system refuses says "policy denied" (kDNSServiceErr_PolicyDenied, -65570).
-    static func mayBeLocalNetworkDenial(_ error: Error) -> Bool {
-        let nsError = error as NSError
-        if nsError.domain == NSPOSIXErrorDomain, nsError.code == Int(EHOSTUNREACH) { return true }
-        if nsError.code == -65_570 { return true }
-        if let ioError = error as? IOError, ioError.errnoCode == EHOSTUNREACH { return true }
-        let raw = String(describing: error).lowercased()
-        return raw.contains("no route to host") || raw.contains("(errno: 65)") || raw.contains("policy denied")
-    }
-
     static func normalizedHost(_ host: String) -> String {
         host
             .trimmingCharacters(in: .whitespacesAndNewlines)

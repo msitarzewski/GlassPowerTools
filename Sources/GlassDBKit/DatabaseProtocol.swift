@@ -14,10 +14,14 @@ public enum DatabaseError: Error, LocalizedError {
     case unsupportedParameter(String)
     case unsupportedCapability(DatabaseCapability, engine: String)
     case queryTimedOut
+    /// The server answered and refused, in its own words ("password authentication failed for
+    /// user …"): more specific than anything written here.
+    case server(String)
 
     public var errorDescription: String? {
         switch self {
         case .unexpectedResult(let message): return message
+        case .server(let message): return message
         case .invalidTLSCertificate(let message):
             return "The configured TLS certificate is invalid: \(message)"
         case .tlsRequiredButUnavailable(let host, let port):

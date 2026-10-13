@@ -216,11 +216,10 @@ class DatabaseSessionManager {
             await session.hostTunnel?.close()
             session.hostTunnel = nil
             session.engine = nil
-            let propagatedError = Self.actionableConnectionError(error, config: config)
-            session.state = .error(propagatedError.localizedDescription)
+            session.state = .error(error.localizedDescription)
             sessions.removeValue(forKey: sessionID)
-            Logger.database.error("Connection failed: \(propagatedError)")
-            throw propagatedError
+            Logger.database.error("Connection failed: \(error)")
+            throw error
         }
 
         return sessionID
@@ -971,36 +970,6 @@ class DatabaseSessionManager {
         ].contains { normalized.contains($0) }
     }
 
-    nonisolated static func isLocalNetworkPermissionDenied(
-        domain: String,
-        code: Int,
-        message: String
-    ) -> Bool {
-        let normalizedDomain = domain.lowercased()
-        let normalizedMessage = message.lowercased()
-        if code == -65_570 { return true } // kDNSServiceErr_PolicyDenied
-        if normalizedDomain == NSPOSIXErrorDomain.lowercased(), code == 1 || code == 13 {
-            return true
-        }
-        return normalizedMessage.contains("policy denied")
-            || normalizedMessage.contains("local network access")
-            || normalizedMessage.contains("local network permission")
-    }
-
-    private nonisolated static func actionableConnectionError(
-        _ error: any Error,
-        config: DatabaseConnectionConfig
-    ) -> any Error {
-        guard config.engine.supportsNetworkTransport else { return error }
-        let nsError = error as NSError
-        guard isLocalNetworkPermissionDenied(
-            domain: nsError.domain,
-            code: nsError.code,
-            message: error.localizedDescription
-        ) else { return error }
-        return SessionError.localNetworkPermissionDenied
-    }
-
     /// The database password only. A reconnect needs no second secret: the tunnel, when there
     /// is one, is opened by the capability that owns the host's SSH service, with its own.
     private static func storedCredentials(
@@ -1060,7 +1029,6 @@ class DatabaseSessionManager {
     enum SessionError: Error, LocalizedError {
         case notConnected
         case connectionLost
-        case localNetworkPermissionDenied
         case invalidConfiguration(String)
         /// No saved password could be found for a service that needs one. Distinct from an empty
         /// password the user chose: that one is *found*, and connects.
@@ -1072,8 +1040,6 @@ class DatabaseSessionManager {
                 return "No active database connection."
             case .connectionLost:
                 return "The database connection timed out or was closed. Reconnect to continue."
-            case .localNetworkPermissionDenied:
-                return "Local Network access is off for Glass Power Tools. Allow it in Settings, then reconnect."
             case .invalidConfiguration(let message):
                 return message
             case .credentialMissing(let name):

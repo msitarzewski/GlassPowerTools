@@ -7,6 +7,7 @@
 
 import SwiftUI
 import GlassLayers
+import GlassShell
 import Foundation
 import CoreGraphics
 import Security
@@ -389,7 +390,7 @@ class TerminalSession: Identifiable, Hashable {
     var pendingHostKeyChallenge: HostKeyTrustChallenge?
     var lastConnectionDiagnostics: String?
     /// The last failure could have been the system keeping Glass off the local network
-    /// (`SSHConnection.mayBeLocalNetworkDenial`), so the failure message may suggest it.
+    /// (`GlassLocalNetworkAccess.mayBeDenial`), so the failure message may suggest it.
     var lastConnectionMayBeLocalNetworkDenial = false
     var connectionProgress: ConnectionProgressStage?
     
@@ -854,7 +855,7 @@ class TerminalSession: Identifiable, Hashable {
             Logger.ssh.error(
                 "SSH connect error (\(self.server.host):\(self.server.port)); category=\(String(reflecting: type(of: error)), privacy: .public)"
             )
-            lastConnectionMayBeLocalNetworkDenial = SSHConnection.mayBeLocalNetworkDenial(error)
+            lastConnectionMayBeLocalNetworkDenial = GlassLocalNetworkAccess.mayBeDenial(error)
             lastConnectionDiagnostics =
                 "Attempted: \(server.host):\(server.port)\nAuth method: \(server.authMethod.displayName)\nHost key mode: \(mode.rawValue)\nFailure category: \(String(reflecting: type(of: error)))"
             connectionProgress = nil
