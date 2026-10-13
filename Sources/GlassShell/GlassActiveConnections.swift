@@ -335,18 +335,31 @@ struct GlassActiveConnectionsList: View {
     @State private var collapsed: Set<String> = []
     /// The running sessions chosen to open together or end (W13).
     @State private var selection = GlassActiveSelection()
+    @Environment(\.glassLibraryIsStacked) private var isStacked
+
+    /// The machines to connect to, here where no detail column shows them: a phone, a folded
+    /// iPhone Duo, or an iPad window as narrow as one.
+    private var launcherInList: GlassActiveLauncher? {
+        guard isStacked else { return nil }
+        let launcher = model.activeLauncher()
+        return launcher.isEmpty ? nil : launcher
+    }
 
     var body: some View {
         let machines = model.activeMachines()
         let chosen = selection.chosen(in: machines)
         List(selection: listSelection(machines)) {
             if machines.isEmpty {
+                let launcher = launcherInList
                 ContentUnavailableView("Nothing Is Open",
                                        systemImage: "bolt.slash",
-                                       description: Text("Connect to a machine and it appears here while the session is live."))
+                                       description: Text(launcher == nil
+                                                         ? "Connect to a machine and it appears here while the session is live."
+                                                         : "Choose a machine below to connect to it. It appears here while the session is live."))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                     .selectionDisabled()
+                if let launcher { GlassActiveLauncherSections(model: model, launcher: launcher) }
             }
             ForEach(machines) { machine in
                 machineGroup(machine, chosen: chosen)
@@ -756,7 +769,8 @@ struct GlassActiveSessionRow: View {
 }
 
 /// The detail column on a wide layout. Rows switch rather than select, so there is nothing to
-/// detail; this says what the column is for instead of sitting blank.
+/// detail; this says what the column is for instead of sitting blank — and while nothing is open,
+/// offers the machines to connect to (`GlassActiveLauncher`).
 struct GlassActiveConnectionsDetail: View {
     /// How a row is closed where this is read: a Mac mouse cannot swipe. And how several running
     /// sessions are chosen there (W13).
@@ -772,14 +786,19 @@ struct GlassActiveConnectionsDetail: View {
 
     var body: some View {
         let count = model.activeSessionCount()
-        ContentUnavailableView(
-            count == 0 ? "Nothing Is Open" : "\(count) live",
-            systemImage: "bolt.fill",
-            description: Text(count == 0
-                              ? "Connect to a machine and it appears under Active while the session is live."
-                              : Self.closeHint))
-            // On the headset a header with nothing to name, for the window's sidebar toggle (W33).
-            .glassSpatialColumn("")
+        let launcher = model.activeLauncher()
+        if count == 0, !launcher.isEmpty {
+            GlassActiveLauncherPage(model: model, launcher: launcher)
+        } else {
+            ContentUnavailableView(
+                count == 0 ? "Nothing Is Open" : "\(count) live",
+                systemImage: "bolt.fill",
+                description: Text(count == 0
+                                  ? "Connect to a machine and it appears under Active while the session is live."
+                                  : Self.closeHint))
+                // On the headset a header with nothing to name, for the window's sidebar toggle (W33).
+                .glassSpatialColumn("")
+        }
     }
 }
 

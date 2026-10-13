@@ -79,4 +79,9 @@ public extension EnvironmentValues {
     /// tab, whose content is hosted on its own: the tab bar beside the window, the toolbar below
     /// it, what VoiceOver could find and what a pinch could reach.
     @Entry var glassLibraryOutOfSight = false
+    /// True inside the library's compact stack — a phone, a folded iPhone Duo, an iPad window as
+    /// narrow as one — where a panel's detail is a push away rather than a column beside its list.
+    /// A column's own width class cannot say this: an iPad's list column is compact in landscape
+    /// too, beside the detail (measured 2026-10-12).
+    @Entry var glassLibraryIsStacked = false
 }

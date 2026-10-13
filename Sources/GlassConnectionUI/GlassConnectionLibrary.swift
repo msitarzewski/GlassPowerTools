@@ -368,6 +368,7 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
                 }
             }
         }
+        .environment(\.glassLibraryIsStacked, true)
         .onChange(of: compactPath) { _, path in
             if path.last != .detail {
                 selection = nil

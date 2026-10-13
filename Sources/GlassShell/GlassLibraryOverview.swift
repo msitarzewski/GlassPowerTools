@@ -108,25 +108,7 @@ struct GlassLibraryOverview: View {
                 connectionsSection
                 if !statistics.mostUsed.isEmpty { mostUsedSection }
             }
-            #if os(visionOS)
-            // Level with the column's title on the left (visionOS sets it 24 points in), and at
-            // least the terminal's margin from the window's own edges, right and bottom (owner,
-            // 2026-10-10: "I like the minimum space that terminal provides as a margin").
-            .padding(.leading, Self.titleInset)
-            .padding(.trailing, GlassWindowShape.spatialNestedCanvasInset)
-            .padding(.bottom, GlassWindowShape.spatialNestedCanvasInset)
-            #elseif os(iOS)
-            // **Level with the list's "All Connections"** on an iPad or an unfolded iPhone Duo
-            // (2026-10-12; the owner drew a line between the two titles, 20 points apart). That title
-            // is the list column's system large title; a detail column's own is inline by default, so
-            // this one stays ours, raised to the same line: measured on the Duo, the 24-point inset
-            // put it 20 points low.
-            .padding(.horizontal, 24)
-            .padding(.bottom, 24)
-            .padding(.top, Self.titleTop)
-            #else
-            .padding(24)
-            #endif
+            .glassDetailPageInsets()
             .frame(maxWidth: 760, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
@@ -137,17 +119,6 @@ struct GlassLibraryOverview: View {
         // column's header, at the same height (W33).
         .glassSpatialColumn("Your Library")
     }
-
-    #if os(iOS)
-    /// The space above the title that sets it on the list column's large-title line.
-    static let titleTop: CGFloat = 4
-    #endif
-
-    #if os(visionOS)
-    /// Where visionOS sets a column's navigation title from the column's leading edge, measured in
-    /// the visionOS 27 simulator; the overview's left edge follows it.
-    static let titleInset: CGFloat = 24
-    #endif
 
     /// The four figures, in one even row, or two even rows of two where the column is narrow:
     /// every tile the same width, so their edges line up with the chart and the list below. An
@@ -225,4 +196,43 @@ struct GlassLibraryOverview: View {
             }
         }
     }
+}
+
+/// Where a detail column's scrolling page sets its content: the overview, and Active's when
+/// nothing is open. Each draws its own large title as the first line of the page.
+private struct GlassDetailPageInsets: ViewModifier {
+    #if os(visionOS)
+    /// Where visionOS sets a column's navigation title from the column's leading edge, measured in
+    /// the visionOS 27 simulator; the page's left edge follows it.
+    static let titleInset: CGFloat = 24
+    #endif
+
+    func body(content: Content) -> some View {
+        content
+            #if os(visionOS)
+            // Level with the column's title on the left (visionOS sets it 24 points in), and at
+            // least the terminal's margin from the window's own edges, right and bottom (owner,
+            // 2026-10-10: "I like the minimum space that terminal provides as a margin").
+            .padding(.leading, Self.titleInset)
+            .padding(.trailing, GlassWindowShape.spatialNestedCanvasInset)
+            .padding(.bottom, GlassWindowShape.spatialNestedCanvasInset)
+            #elseif os(iOS)
+            // **Level with the list's "All Connections"** on an iPad or an unfolded iPhone Duo
+            // (2026-10-12; the owner drew a line between the two titles, 20 points apart). That title
+            // is the list column's system large title; a detail column's own is inline by default, so
+            // this one stays ours, raised to the same line: measured on the Duo, the 24-point inset
+            // put it 20 points low.
+            .padding(.horizontal, 24)
+            .padding(.bottom, 24)
+            .padding(.top, GlassDetailColumnTitleMetrics.top)
+            #else
+            .padding(24)
+            #endif
+    }
+}
+
+extension View {
+    /// This detail column page's insets: its title on the list column's title line, and its
+    /// edges where the overview's are.
+    func glassDetailPageInsets() -> some View { modifier(GlassDetailPageInsets()) }
 }
