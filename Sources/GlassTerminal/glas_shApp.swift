@@ -50,6 +50,17 @@ public final class MacTerminalAppDelegate: NSObject, NSApplicationDelegate {
         Self.dockMenu?()
     }
 
+    /// What is opened with the app — the Finder's Open With, a drop on the Dock icon, an `ssh://`
+    /// link — taken here rather than by a scene's `onOpenURL` (D72; the owner, 2026-10-13: "Open with
+    /// opens a new connections window along with the desired file"). SwiftUI delivers a URL to a
+    /// scene by opening one of its windows when none is open, so every Open With brought up a
+    /// Connections window too. Set by the composition root.
+    public static var openURLs: (@MainActor ([URL]) -> Void)?
+
+    public func application(_ application: NSApplication, open urls: [URL]) {
+        Self.openURLs?(urls)
+    }
+
     /// Settings ▸ Appearance's Light, Dark or System, before any window is shown; and the Finder
     /// services, ready for a service that launched the app.
     public func applicationWillFinishLaunching(_ notification: Notification) {
