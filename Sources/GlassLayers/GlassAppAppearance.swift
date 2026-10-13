@@ -48,10 +48,10 @@ public enum GlassAppAppearance: String, CaseIterable, Identifiable, Sendable {
         guard windowObserver == nil else { return }
         windowObserver = NotificationCenter.default.addObserver(
             forName: UIWindow.didBecomeVisibleNotification, object: nil, queue: .main
-        ) { notification in
-            MainActor.assumeIsolated {
-                (notification.object as? UIWindow)?.overrideUserInterfaceStyle = stored().interfaceStyle
-            }
+        ) { _ in
+            // Every window again, the new one among them: nothing is carried across from the
+            // notification, which Swift's isolation checking will not let into the main actor.
+            MainActor.assumeIsolated { stored().apply() }
         }
         #endif
     }
