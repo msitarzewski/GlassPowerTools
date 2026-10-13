@@ -7462,19 +7462,41 @@ struct glas_shTests {
     @Test @MainActor func localConnectionFailureAddsActionablePermissionGuidance() {
         let localMessage = TerminalConnectFlow.connectionFailureMessage(
             base: "Could not reach nas.local:22.",
-            diagnostics: "Connection timed out.",
-            host: "nas.local"
+            diagnostics: "Attempted: nas.local:22",
+            host: "nas.local",
+            mayBeLocalNetworkDenial: true
         )
-        #expect(localMessage.contains("Connection timed out."))
+        #expect(localMessage.contains("Attempted: nas.local:22"))
         #expect(localMessage.contains("Privacy & Security > Local Network"))
         #expect(localMessage.contains("allow Glass Power Tools"))
 
         let remoteMessage = TerminalConnectFlow.connectionFailureMessage(
             base: "Could not reach example.com:22.",
             diagnostics: nil,
-            host: "example.com"
+            host: "example.com",
+            mayBeLocalNetworkDenial: true
         )
-        #expect(!remoteMessage.contains("Local Network access"))
+        #expect(!remoteMessage.contains("Local Network"))
+    }
+
+    /// B-X13 (2026-10-13): the guidance was added to any failure on a local-looking host. Only a
+    /// failure the system's denial could cause gets it — measured, "No route to host" (errno 65).
+    @Test @MainActor func localNetworkGuidanceOnlyWhereTheDenialCouldBeTheCause() {
+        let noRoute = IOError(errnoCode: EHOSTUNREACH, reason: "connect(descriptor:addr:size:)")
+        #expect(SSHConnection.mayBeLocalNetworkDenial(noRoute))
+        #expect(SSHConnection.mayBeLocalNetworkDenial(NSError(domain: NSPOSIXErrorDomain, code: Int(EHOSTUNREACH))))
+        #expect(SSHConnection.mayBeLocalNetworkDenial(NSError(domain: "DNSServiceErrorDomain", code: -65_570)))
+        #expect(!SSHConnection.mayBeLocalNetworkDenial(IOError(errnoCode: ECONNREFUSED, reason: "connect")))
+        #expect(!SSHConnection.mayBeLocalNetworkDenial(ChannelError.connectTimeout(.seconds(10))))
+        #expect(!SSHConnection.mayBeLocalNetworkDenial(SSHError.authenticationFailed))
+
+        for (base, diagnostics) in [("Connection refused by nas.local:22. Verify SSH is running on that port.", nil),
+                                    ("Connection to nas.local:22 timed out.", nil),
+                                    ("Authentication failed for me@nas.local:22.", "Auth method: Password")] {
+            let message = TerminalConnectFlow.connectionFailureMessage(
+                base: base, diagnostics: diagnostics, host: "nas.local", mayBeLocalNetworkDenial: false)
+            #expect(!message.contains("Local Network"), "\(base)")
+        }
     }
 
     #if os(macOS)

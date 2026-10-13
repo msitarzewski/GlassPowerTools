@@ -780,7 +780,8 @@ struct TerminalConnectFlow: ViewModifier {
                     let message = Self.connectionFailureMessage(
                         base: error.localizedDescription,
                         diagnostics: nil,
-                        host: server.host
+                        host: server.host,
+                        mayBeLocalNetworkDenial: SSHConnection.mayBeLocalNetworkDenial(error)
                     )
                     connectionFailureMessage = message
                     report(.failed(message), for: server.id)
@@ -812,7 +813,8 @@ struct TerminalConnectFlow: ViewModifier {
                 let failure = Self.connectionFailureMessage(
                     base: message,
                     diagnostics: session.lastConnectionDiagnostics,
-                    host: server.host
+                    host: server.host,
+                    mayBeLocalNetworkDenial: session.lastConnectionMayBeLocalNetworkDenial
                 )
                 connectionFailureMessage = failure
                 report(.failed(failure), for: server.id)
@@ -965,19 +967,29 @@ struct TerminalConnectFlow: ViewModifier {
         return server
     }
 
+    /// The failure, its diagnostics, and — only where the failure could be the system keeping
+    /// Glass off the local network, and the host is on it — how to allow that. It was offered
+    /// for any failure on a local-looking host: a refused port, a timeout, a wrong password
+    /// (B-X13, 2026-10-13).
     static func connectionFailureMessage(
         base: String,
         diagnostics: String?,
-        host: String
+        host: String,
+        mayBeLocalNetworkDenial: Bool
     ) -> String {
         var sections = [base]
         if let diagnostics,
            !diagnostics.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             sections.append(diagnostics)
         }
-        if isLikelyLocalNetworkHost(host) {
+        if mayBeLocalNetworkDenial, isLikelyLocalNetworkHost(host) {
+            #if os(macOS)
+            let settings = "System Settings"
+            #else
+            let settings = "Settings"
+            #endif
             sections.append(
-                "Local Network access may be required for this host. In System Settings, open Privacy & Security > Local Network, allow Glass Power Tools, then try again."
+                "If the machine is on, Glass Power Tools may not be allowed on the local network. In \(settings), open Privacy & Security > Local Network, allow Glass Power Tools, then try again."
             )
         }
         return sections.joined(separator: "\n\n")
