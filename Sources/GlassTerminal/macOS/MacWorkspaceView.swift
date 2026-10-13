@@ -36,6 +36,8 @@ struct MacWorkspaceView: View {
     @State private var isConfirmingTabClose = false
     /// The tab being renamed in the sidebar, and the name as typed (2026-10-07).
     @State private var renamingTabID: UUID?
+    /// The sidebar row under the pointer, which shows its close box.
+    @State private var hoveredTabID: UUID?
     @State private var renameText = ""
     @FocusState private var renameFieldFocused: Bool
     @State private var pendingWindowClose = false
@@ -137,6 +139,12 @@ struct MacWorkspaceView: View {
         let tabIdentity = controller.windowIdentity(
             servers: sessionManager.serverManager.servers
         )
+        // Each tab's own close box, on the row under the pointer and the one shown (the owner,
+        // 2026-10-13: "Each tab should have a close box"), as Safari's sidebar tabs have. It closes
+        // as ⌘W does, asking first when the tab would stop something.
+        let showsCloseBox = renamingTabID != controller.workspaceID
+            && (hoveredTabID == controller.workspaceID || windowController.selectedTabID == controller.workspaceID)
+        HStack(spacing: 4) {
             Label {
                 VStack(alignment: .leading, spacing: 1) {
                     if renamingTabID == controller.workspaceID {
@@ -181,6 +189,20 @@ struct MacWorkspaceView: View {
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: controller.isProducingOutput)
+            if showsCloseBox {
+                Button("Close Tab", systemImage: "xmark") { requestCloseTabs([controller.workspaceID]) }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.borderless)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .help("Close Tab")
+                    .accessibilityIdentifier("mac-workspace-tab-close-\(controller.workspaceID.uuidString.lowercased())")
+            }
+        }
+        .onHover { inside in
+            if inside { hoveredTabID = controller.workspaceID } else if hoveredTabID == controller.workspaceID { hoveredTabID = nil }
+        }
+        .accessibilityAction(named: "Close Tab") { requestCloseTabs([controller.workspaceID]) }
         .tag(controller.workspaceID)
         .accessibilityLabel(tabIdentity.title)
         .accessibilityValue(tabIdentity.subtitle ?? "")
@@ -892,7 +914,7 @@ private struct MacWorkspaceTabContent: View {
                 titleVisibility: .visible
             ) {
                 Button("Close Pane", role: .destructive) {
-                    controller.removeFocusedPane(sessionManager: sessionManager)
+                    closeFocusedPane()
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
@@ -999,12 +1021,24 @@ private struct MacWorkspaceTabContent: View {
 
     /// A local pane is done: its shell ended, or it was closed — in tmux, detached (D47).
     private func closeLocalPane(_ paneID: UUID) {
+        closePane(paneID)
+    }
+
+    /// Closes a pane, and the tab with its last one — every Close Pane: the menu's, the
+    /// confirmation's, a failed connection's, a local pane's own. A failed connection's removed
+    /// the pane alone and left the tab empty, offering New Terminal with the failure still behind
+    /// it (the owner, 2026-10-13: "when I choose close pane it shouldn't linger").
+    private func closePane(_ paneID: UUID) {
         guard !controller.isClosed else { return }
         let closesWorkspace = controller.state.root?.panes.count == 1
         controller.removePane(paneID, sessionManager: sessionManager)
         if closesWorkspace {
             onCloseEmptyTab()
         }
+    }
+
+    private func closeFocusedPane() {
+        if let paneID = controller.focusedPaneID { closePane(paneID) }
     }
 
     @ViewBuilder
@@ -1045,7 +1079,38 @@ private struct MacWorkspaceTabContent: View {
                 .background(.regularMaterial, in: .rect(cornerRadius: showsPaneChrome ? 18 : 0))
             }
         case .ssh:
-            if !persistentStateReady {
+            sshPane(pane, isFocused: isFocused, showsPaneChrome: showsPaneChrome)
+                // **The connection belongs to the pane, not to its placeholder** (2026-10-13). The
+                // task was on the placeholder; partway through connecting the session is shown
+                // (`initialTerminalPresentation`), the placeholder gives way to the terminal, and
+                // SwiftUI cancelled the task and the connection with it — every SSH pane opened in
+                // a window already open failed, "Could not connect to …", a CancellationError in the
+                // log (the owner: "these always fail"). Here, the switch keeps it; it starts once
+                // saved hosts are read, and again on Retry (the error cleared).
+                .task(id: "\(savedHostsReady)|\(controller.error(for: pane.id) ?? "")") {
+                    guard savedHostsReady else { return }
+                    await controller.prepareSSHPaneIfNeeded(
+                        pane,
+                        sessionManager: sessionManager,
+                        settingsManager: settingsManager,
+                        window: windowSettings
+                    )
+                }
+        }
+    }
+
+    /// The saved hosts an SSH pane is opened by have been read — the library's catalog has
+    /// answered, or failed to (which the pane then says). A tab restored at launch asked before the
+    /// catalog had answered and was told "The saved server no longer exists" of a server the
+    /// library still had (the owner's Switchyard tab, 2026-10-13, after an install relaunched the app).
+    private var savedHostsReady: Bool {
+        let servers = sessionManager.serverManager
+        return persistentStateReady && (servers.familyCatalogLoaded || servers.serverCatalogLoadError != nil)
+    }
+
+    @ViewBuilder
+    private func sshPane(_ pane: MacWorkspacePane, isFocused: Bool, showsPaneChrome: Bool) -> some View {
+            if !savedHostsReady {
                 ProgressView("Loading saved hosts…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(.regularMaterial, in: .rect(cornerRadius: 18))
@@ -1087,16 +1152,7 @@ private struct MacWorkspaceTabContent: View {
                 .simultaneousGesture(TapGesture().onEnded { controller.focus(pane.id) })
             } else {
                 sshPlaceholder(for: pane)
-                    .task(id: controller.error(for: pane.id)) {
-                        await controller.prepareSSHPaneIfNeeded(
-                            pane,
-                            sessionManager: sessionManager,
-                            settingsManager: settingsManager,
-                            window: windowSettings
-                        )
-                    }
             }
-        }
     }
 
     private func sshPlaceholder(for pane: MacWorkspacePane) -> some View {
@@ -1115,10 +1171,12 @@ private struct MacWorkspaceTabContent: View {
                             credentialPrompt = WorkspaceCredentialPrompt(paneID: pane.id, server: server)
                         }
                     }
-                    Button("Retry") { controller.retryPane(pane.id) }
+                    // "Reconnect", as every other surface says it (the owner, 2026-10-13: "it should
+                    // simply say 'Reconnect'").
+                    Button("Reconnect") { controller.retryPane(pane.id) }
                     Button("Connections") { openWindow(id: "main") }
                     Button("Close Pane", role: .destructive) {
-                        controller.removePane(pane.id, sessionManager: sessionManager)
+                        closePane(pane.id)
                     }
                 }
             } else {
@@ -1201,7 +1259,7 @@ private struct MacWorkspaceTabContent: View {
                 if settingsManager.confirmBeforeClosing && controller.focusedPaneCloseStopsWork {
                     showingPaneCloseConfirmation = true
                 } else {
-                    controller.removeFocusedPane(sessionManager: sessionManager)
+                    closeFocusedPane()
                 }
             },
             focusNextPane: { controller.focusNextPane() },
