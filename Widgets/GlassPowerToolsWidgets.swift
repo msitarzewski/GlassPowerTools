@@ -17,6 +17,7 @@ import GlassWidgetData
 struct GlassPowerToolsWidgets: WidgetBundle {
     var body: some Widget {
         MachinesWidget()
+        MachineWidget()
         ActiveWidget()
     }
 }

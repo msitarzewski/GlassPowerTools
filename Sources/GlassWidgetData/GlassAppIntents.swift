@@ -189,3 +189,16 @@ public struct GlassNewTerminalIntent: AppIntent {
     }
 }
 #endif
+
+// MARK: - Widgets
+
+/// The Machine widget's one setting: which machine it shows.
+public struct GlassMachineWidgetConfiguration: WidgetConfigurationIntent {
+    public static let title: LocalizedStringResource = "Machine"
+    public static let description = IntentDescription("Choose the machine this widget shows.")
+
+    @Parameter(title: "Machine") public var machine: GlassMachineEntity?
+
+    public init() {}
+    public init(machine: GlassMachineEntity?) { self.machine = machine }
+}
