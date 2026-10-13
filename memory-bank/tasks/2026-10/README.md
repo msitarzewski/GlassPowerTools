@@ -49,3 +49,6 @@
 - 2026-10-12: [Backlog tier 2](2026-10-12_backlog-tier-2.md) — CVE-2026-43798 (swift-nio-ssh, critical) fixed first;
   sleep/wake liveness, iPhone Duo, docs, DOMPurify record, swift-log/nio, full suite green; licensing research,
   two-device checklist and the owner's decisions recorded. iPhone and Vision Pro on 0.4.391.
+- 2026-10-12 (late): the iPhone Duo on its simulator (iOS 27.1 runtime): fold-aware window gate (fac5ead), titles on
+  the large-title line in two-column layouts (132007c, detail-column modifier), scratch and Windows 11 in the
+  simulator's library; owner's next asks recorded in `activeContext.md` (Active by service, four Duo defects).

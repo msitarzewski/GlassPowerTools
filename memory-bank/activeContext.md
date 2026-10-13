@@ -27,6 +27,38 @@ anything touching real servers (SSH and database tests use the disposable test V
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
+## 2026-10-12 (late) — before the second compaction: the iPhone Duo on its simulator
+
+**Installed: 0.4.391 on Mac, iPhone and Vision Pro** (with the swift-nio-ssh CVE fix). Committed since, not yet
+built for devices: swift-log 1.16.1 / swift-nio 2.104.0, the fold-aware window gate, the alignment work below. HEAD =
+this notes commit; nothing pushed. Leave the owner's README edit and his uncommitted `testArrowKeysReachTheTerminal`.
+
+- **Duo simulator works here:** iOS 27.1 runtime downloaded (`xcodebuild -downloadPlatform iOS -buildVersion 27.1`);
+  Xcode 27.2 beta's own runtime cannot run a Duo. Simulator **"Duo probe"** (`828A54FB-…`, iOS 27.1); Device Hub's pose
+  buttons (folded / half / open, along the bottom) appeared after the owner updated Components. `XCUIScreen.main` is the
+  *outer* display — capture `app.windows.firstMatch.screenshot()` (it comes out rotated: rotate −90°).
+- **Measured on it:** a Duo reports `supportsMultipleScenes` yes + phone idiom, folded and unfolded; folded (466 pt,
+  compact) a scene request *succeeds* and covers the library with no way back but the switcher → gate = scenes AND (not a
+  phone OR regular width) (fac5ead, rule 43). Unfolded is regular width (two columns).
+- **Alignment (owner: "fix the header and content alignments across the app for Duo", then chose the large-title
+  line):** Your Library raised to All Connections' line (132007c); detail columns via `glassDetailColumnTitle`
+  (GlassConnectionUI; host detail uses it; iOS 27 puts detail titles in the toolbar row and `.toolbar(removing: .title)`
+  does not remove it, so the modifier owns the navigation title). **Unverified:** the 12-pt content margin (needs an
+  unfolded run). Other detail panels (Workgroups, SSH Keys, Collections, Active) not yet given the modifier.
+- **Owner's new ask — Active's empty detail:** instead of a second "Nothing Is Open", show the defined machines by
+  service: "Terminal > [machines with terminals], Database > […], Desktop > […]" — and first check what the Mac and an
+  iPad in landscape show there.
+- **Seen on the Duo, to fix:** two "Tools" buttons in a folded terminal (capsule + bar); the bottom bar white under a
+  black terminal; unfolded, a connection opened as its own window that took the screen (not beside the library); folded,
+  the system's "N Views Open" chip covers the start of the library's large title.
+- **Scratch and Windows 11 are in the Duo probe's library** (added by a temporary UI test, not committed). How to reach
+  both machines is in the agent memory runbook (`test-machines-runbook`): Parallels VMs; Windows account `gptrdp`,
+  password reset per need into a 0700 file, never printed; tunnels on port 2223, never 2222 (Citadel's tests bind it).
+- **Temporary UI tests** (tour + demo) live only in the scratchpad (`GlassTerminalUITests.tour.swift`); the owner's file
+  is backed up there too (`…owner-backup.swift`) — swap in to run, restore after, never commit.
+- **Next:** unfold the Duo and re-run the tour (measure content margin; host detail, Active, Settings); the Active
+  machines-by-service detail; the four Duo defects above; then tier 3 (tree-sitter overflow first).
+
 ## 2026-10-12 — end of the session (before a compaction)
 
 **Installed: 0.4.391 on Mac, iPhone and Vision Pro** (with the CVE fix; the Mac at the owner's word, 20:32). 0.4.391
