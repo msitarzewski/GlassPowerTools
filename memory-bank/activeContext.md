@@ -9,10 +9,13 @@ The owner decided on 2026-09-26 to stop adding features and prepare the first pu
 All four capabilities (terminal, databases, remote desktops, editor) and the shell are built; see
 `progress.md` for what is verified and how.
 
-**Authorization in force:** local edits, tests, builds and local commits for release preparation.
+**Authorization in force:** local edits, tests, builds and local commits for release preparation and for
+what the owner asks while testing ("go with your recommendations, commit each piece as it lands"). Mac builds
+are installed over the running app when ready (the owner, 2026-10-08: "install mac builds when ready since we
+have tmux"), except while he says he is working in it.
 **Not authorized without the owner's explicit word:** pushing, opening pull requests or issues
-upstream, deploying the site, the git history rewrite, installing over a running copy of the app,
-anything touching real servers (SSH and database tests use the disposable test VM only).
+upstream, deploying the site, the git history rewrite, anything touching real servers (SSH and database tests
+use the disposable test VM only).
 
 ## Release-prep checklist
 
@@ -27,77 +30,50 @@ anything touching real servers (SSH and database tests use the disposable test V
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
-## 2026-10-13 (~06:10) — the owner testing: headset input, the unfolded Duo, the desktop
+## 2026-10-13 (~13:30) — where things stand
 
-**0.4.395 on all three** (06:41): everything below — headset input, the desktop's presentation, the Duo, Show All
-Windows with the pinch on desktops too, the desktop's clipboard-sharing note. oscar's clipboard: Share clipboard is off
-until its Desktop service turns it on (default off, a trust boundary) — told to the owner.
+**State:** **0.4.400 on the Mac, Vision Pro and iPhone** (13:22); no new crash reports; working tree clean;
+everything committed, nothing pushed. The day's record, with every commit and its evidence, is
+`tasks/2026-10/2026-10-13_owner-testing-day.md`. Decisions: D24 amended (the library keeps UIKit's sidebar toggle
+on iPhone and iPad), D69 (tunnels keep their own SSH connections), D70 (a connection belongs to its controller,
+never to a view's task).
 
-- **Headset, hardware keyboard:** held delete now repeats (priority key command, `.repeatable`, action SwiftTerm's
-  `deleteBackward`); arrows repeatable too. **Selection:** pinch and hold, then drag (the owner's choice), or hold
-  on a selection's end to move it; Copy via `UIEditMenuInteraction`. Unverified on the device — the owner's to try.
-- **Duo:** the terminal's colour into every corner; the library keeps UIKit's sidebar toggle on iPhone/iPad (D24
-  amended — "How do I get back to the main all connections?"); **phones present sessions in place even unfolded**
-  (a window took the whole screen, and a phone cannot end a scene: "not supported for this device idiom").
-- **Desktop ("feels web … no way to get back"):** ContentUnavailableView on the black, the error as its
-  description; iPad desktop windows in a NavigationStack (their bar was never drawn); Close ends the scene via
-  UIKit; `--demo-open desktop-disconnected`. Seen on iPhone and iPad simulators.
-- **Leftover on the owner's Duo simulator:** a desktop window restored from before shows "Desktop Not Found" —
-  close it from the "Views Open" switcher (a phone cannot close it from inside).
-- **Mermaid 12.2.0** came in through the scheme's pre-action (D35) during a build — expected, committed.
-- **11:2x the owner's screenshots, all done:** overview tiles — a tabbed terminal no longer repeats under Other
-  (`terminal-session:` ids; Files browsers get a Files group), the second caption line legible, **Settings ▸
-  Terminal ▸ Show All Windows ▸ Blur previews** (this Mac, `GlassShowAllWindows.blursPreviewsKey`); the app menu —
-  **one Command Palette** owned by the shell (`GlassShellPaletteCommands` + `GlassCommandPaletteSources`; menu test
-  guards ⇧⌘P/⌘K), Check for Updates hidden until a build has its Sparkle key (B-R1). **A real crash found:** 0.4.393
-  aborted in Quick Look at 05:58 (`setPreviewItem` on a view already showing a file) — each file its own view now.
-  0.4.397 carries all of it.
-- **~11:45 terminal windows (0.4.398):** every SSH pane opened in an existing window was failing — a
-  CancellationError ("Could not connect to …"): the connection task sat on the placeholder, which SwiftUI removed as
-  the session was shown. Task now on the pane. Restored SSH tabs waited for nothing and asked before the catalog had
-  answered ("saved server no longer exists") — now wait for `familyCatalogLoaded`. Retry → Reconnect; every Close Pane
-  closes the tab with its last pane; a close box per sidebar tab. **Asked the owner** what the red circles mark (a
-  lighter band at the sidebar's trailing edge? the top-right corner?) before touching window chrome.
-- **~12:00 (0.4.399):** the red circles were rounded corners meeting square ones: a connecting or failed SSH pane
-  drew its material rounded even when it filled the tab. It is square there now, and rounded only among split
-  panes. The owner's SY Staging tab still said "saved server no longer exists" while its subtitle came from that
-  saved server. The first catalog answer can come before every machine's record. A pane told its server was
-  missing now asks again as soon as the server is saved (`MacWorkspaceController.failedForMissingServer`). The
-  owner will say whether SY Staging connects on 0.4.399.
-- **~13:15 (0.4.400):** the owner confirmed the corners were fixed. **"+" ▸ New Terminal on still failed** ("Could
-  not connect", a CancellationError), while All Connections worked. The connection was still in a view's task
-  (the pane's), which SwiftUI cancels when a new tab is drawn again as it settles. The controller now owns each
-  pane's connection (`startSSHPaneIfNeeded`), and only closing the pane or the tab cancels it. The test fails with
-  the view's old await. 0.4.400 also carries the database's Local Network and PostgreSQL error fixes.
-- **Show All Windows** (was Show All Terminals; the owner: include every service type, "one component?"):
-  `GlassShowAllWindows` in the shell (action set by the terminal, which draws the overlay; button beside every ⚡);
-  overlay = terminal windows' groups + Databases, Desktops, Editor from `registry.openSessions()`; a desktop tile
-  shows its last frame. ⇧⌘\ / Window ▸ Show All Windows. "Nothing at all from a desktop" did not reproduce (menu
-  and key both opened it with the desktop raised) — the owner to retry on 0.4.394 and say if focus was inside the
-  desktop or it was full screen.
+**Authorization in force today:** "go with your recommendations, commit each piece as it lands"; Mac builds
+installed when ready unless the owner says he is working (he accepted every install today); iPhone and Vision Pro
+installed with them to keep one build everywhere.
 
-## 2026-10-13 (~01:30) — overnight: Duo fixes, 0.4.392, tier 3 begun
+**Confirmed by the owner today:**
+- Square SSH panes where they fill the tab (0.4.399).
+- "+" ▸ New Terminal on connects (0.4.400: "it works"). It had failed twice with a `CancellationError`, because the
+  connection ran in a view's task: first the placeholder's, then the pane's. D70 records the rule.
 
-**State:** everything committed (76a5c7f … HEAD); nothing pushed. **0.4.392 on the Mac and the iPhone** (installed
-03:44, not launched — locked); **the Vision Pro on 0.4.392 too** (installed and launched once the owner woke it). All three on one build. Builds
-after 0.4.392 also carry: the tree-sitter match limit, B-X5, B-X13, B-X18, B-X22 (first half).
+**Built today, not yet confirmed on a device:**
+- Headset: held delete and arrows repeat; pinch and hold, then drag, selects.
+- Desktops on phones and iPad: the system's unavailable view; sessions in place on phones; an iPad window's bar
+  and Close.
+- Show All Windows across every kind of window, with Blur previews (Settings ▸ Terminal ▸ Show All Windows; the
+  owner asked whether it was in, and was told where).
+- One Command Palette.
+- The Quick Look crash fix.
+- Database connect errors: the shared Local Network rule; PostgreSQL in the server's words.
 
-- **Done:** Active's machines by service (76a5c7f); the folded-Duo terminal — one Tools, no white strip (e8fa7ba);
-  workgroup detail titles (a53f2e3); tree-sitter overflow by the highlight cursor's match limit, measured instead of
-  vendoring (0b5d421); B-X5 every terminal on a lost shared connection says so (9ee28f3); B-X13 Local Network
-  guidance only for "No route to host" (461dc59); B-X18 one true unsupported-key message (44f6b2a); B-X22 unsafe
-  remote names left out (be02fe5).
-- **Found:** B-X27 — files written with complete protection fail on a locked Mac (measured per class); it is why
-  the terminal suite needs an unlocked screen (23 issues tonight, all this) and why live remote saves failed. **The
-  owner's decision** (inventory B-X27: recommended complete-unless-open for recordings/downloads).
-- **Waiting on the owner:** unfold the Duo (tour re-run; the unfolded-window and "N Views Open" items); B-X27;
-  B-X10/B-X11 (database breadcrumb, Query commands on table tabs — need the Mac on screen and a design call);
-  B-X4 (Mac drag-select in tmux history — needs the Mac unlocked).
-- **Next for an agent (done 2026-10-13 ~12:40):** the terminal suite passes unlocked (779). The database's Local
-  Network check was replaced by the terminal's measured rule, now `GlassLocalNetworkAccess` in the shell. Measuring
-  it found every PostgreSQL connect failure, a wrong password included, reading "PSQLError error 1", and fixed it
-  (`PostgreSQLEngine.connectFailure`). B-X5's second half was closed by design: tunnels keep their own
-  connections (`GlassTerminalPortForward`).
+**Waiting on the owner:**
+- B-X27: the protection class for files written while the Mac may be locked. Recommended complete-unless-open
+  for recordings and downloads.
+- Unfold the Duo simulator for the tour re-run (content margin; the unfolded-window and "N Views Open" items).
+- B-X10/B-X11: a design call.
+- B-X4: Mac drag-select in tmux history.
+- Headset input to try on the device.
+- B-V4 two-device run; B-R1–R7; B-Q28.
+- A desktop's clipboard: Share clipboard is off by default per Desktop service, as he was told.
+
+**Next for an agent:** tier 3 from the inventory's section 0: B-X2 with B-Q11, B-X6 with B-F32, B-X7, and
+B-X22's second half. Also the database's own `databaseSidebarChrome()`, which still removes the toggle off the
+Mac (D24's amendment).
+
+**Rule 61:** the messages of 998a225 and 1da944b quote two of the owner's names. They are left under his earlier
+ruling (no history rewrite for messages); files were neutralised. Never quote his tab, host or machine names in
+code, notes or messages: use "an SSH tab of the owner's" or "a desktop".
 
 ## 2026-10-12 (late) — before the second compaction: the iPhone Duo on its simulator
 

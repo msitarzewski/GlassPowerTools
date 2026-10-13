@@ -53,8 +53,17 @@ All four capabilities and the shell are built and in daily use on the owner's Ma
 | Wrap Long Lines off on iPhone/iPad/Vision Pro (2026-10-12) | built | iOS simulator (`GlassEditorUIKitTests`, 3 of 5 failed before the fix) |
 | iPhone: tapping a workgroup opens its detail (2026-10-12) | built | unit (fails without the fix); device install |
 | The busy tab's light: a soft cloud sweeping the row (2026-10-12) | built | unit (sweep timing), rendered images; owner approved on the Mac |
+| Every terminal on a lost shared SSH connection says so (B-X5, 2026-10-13) | built | unit; gated live test through a relay that cuts the connection |
+| Terminal windows (2026-10-13): SSH panes connect from "+" ▸ New Terminal on, in windows already open and in restored tabs; a pane's connection held by its controller (D70); Reconnect; Close Pane closes the tab with its last pane; a close box per tab; square panes where they fill the tab | built | unit (each fails without its fix; the D70 test reproduces the owner's CancellationError); device (owner, Mac: "it works", corners confirmed) |
+| Show All Windows (2026-10-13): every kind of window, one button beside every ⚡, the pinch on terminal and desktop windows, Blur previews | built | unit (grouping; one owner of ⇧⌘\); device (owner's screenshots of the overview on the Mac) |
+| One Command Palette owned by the shell; Check for Updates only when configured (2026-10-13) | built | unit (a menu-bar test finds two owners with the old declarations); device (Mac menu read back) |
+| Database connect errors (2026-10-13): one measured Local Network rule (`GlassLocalNetworkAccess`); PostgreSQL in the server's words; unknown hosts named | built | unit with the drivers' own errors; server (test VM: wrong password); the denial measured from a runner without Local Network access |
+| Desktops on phones and iPad (2026-10-13): the system's unavailable view, sessions in place on phones, a bar and a working Close in iPad windows | built | iPhone, iPad and iPhone Duo simulators; desktop and library UI tests |
+| Quick Look: a view per file (the 05:58 crash on 0.4.393) | built | not reproduced; the fix removes the only call that crashed; no crash since |
+| Database Local Network and tunnel limits closed: tunnels keep their own connections (D69) | decided | sshd_config(5); OpenSSH reports of multiplexing lag |
 
-Package suite: about **1,790 tests**. The last full run with the screen unlocked passed (1,777, early
+Suites run 2026-10-13 with the screen unlocked: terminal 781, database 280, DBKit 321, shell 28, all passing
+(the whole package not re-counted that day). Earlier: about **1,790 tests**. The last full run with the screen unlocked passed (1,777, early
 2026-09-27); the night's later runs were under a locked screen, where file-protected stores cannot be
 read — they fail the same 137 tests before and after the night's changes, and every new test passes.
 Vendored suites: swift-nio-ssh 363, Citadel 58, RDPKit 1,015. Release builds succeed for macOS, iOS
@@ -85,7 +94,12 @@ profile, notarization, deploying the site), the behaviour findings listed in `ac
   (connect, show machine, show Active) have not been reported either.
 - **D66 in daily use:** the owner's tmux server predates it; the launchd host starts with the next
   server (after a reboot or End All Local Terminals).
-- **Vision Pro:** runs the same build as the Mac and the iPhone (0.4.390 on 2026-10-12); the owner has used
+- **Headset input (2026-10-13):** held delete and arrows repeating, and pinch-and-hold-then-drag selection, are
+  built and installed (0.4.393 on) but not yet tried by the owner; UIKit keys and gestures are out of the package
+  tests' reach.
+- **The unfolded Duo tour** (the 12-pt content margin, host detail, Active, Settings, Workgroups) waits on the
+  simulator being unfolded.
+- **Vision Pro:** runs the same build as the Mac and the iPhone (0.4.400 on 2026-10-13); the owner has used
   desktops, trackpad scrolling and the editor's toolbar on it. Not every change since has been gone through on it
   (the inventory's B-V1 lists what is owed).
 - **Database scroll edge on the Mac** (hard top edge so content does not print through the
@@ -113,6 +127,10 @@ profile, notarization, deploying the site), the behaviour findings listed in `ac
 - VNC is encrypted after sign-in only to a Mac signed in with a Mac account (its own revision, e7463ce);
   a password alone or a non-Mac server is not (no VeNCrypt, no tunnel). The setup form says which (262ba7a).
 - tree-sitter 0.27 and swift-crypto 5 wait on upstream releases (`techContext.md`).
+- **B-X27 (2026-10-13):** files written with complete protection fail while the Mac is locked (recordings, SFTP
+  downloads, desktop captures; ~23 terminal tests). The protection class is the owner's decision.
+- The database's own sidebar chrome still removes UIKit's toggle off the Mac (`databaseSidebarChrome()`); the
+  library no longer does (D24, amended 2026-10-13).
 - The legacy `SFTPRemoteEditorView` sheet remains as a fallback; the owner has been asked whether to
   delete it.
 - **Default text editor (owner, 2026-09-27):** built 2026-09-30 (`28a0b6e`) — an Alternate editor for plain

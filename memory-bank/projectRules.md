@@ -512,3 +512,13 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     default server (`ensureRunning`, `endServer`) is a closure stand-ins leave empty. Check a terminal test run by
     comparing `tmux list-sessions -F '#{session_name} #{session_created}'` before and after.
 
+
+66. **A connection outlives the view that asked for it.** Never run a connection, or anything that must survive a
+    redraw, inside a SwiftUI `.task`: SwiftUI cancels a view's task whenever it removes the view, and it removes views it
+    is about to draw again. The view asks; the controller holds the task; only the owner's own close cancels it (D70,
+    `MacWorkspaceController.startSSHPaneIfNeeded`). The tell is "Could not connect" with `CancellationError` in the log
+    while the same machine opened another way works. Moving the task to a longer-lived view is not a fix: it failed
+    a second time on 2026-10-13.
+67. **Ask before calling an uncommitted change the owner's.** Two stray edits — a README space and an agent's own UI
+    probe — were carried for days as "the owner's" and worked around at every commit and test run, on a guess nobody
+    checked (2026-10-13). Look at the change and its history (`git log`, the session record), then ask.

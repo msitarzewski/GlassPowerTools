@@ -1414,3 +1414,27 @@ container for them alone (`GlassWidgetData`, metadata only, schema-numbered), ne
 defaults; a tap is an App Intent run in the app (connect a service, show a machine, show Active), not a URL scheme,
 keeping D4's removal of the old schemes. The extension is now built for the Mac as well (sandboxed, App Group).
 Evidence: `tasks/2026-10/2026-10-12_widgets-machines-and-active.md` (cd6a2f1).
+
+## D69 — Database and desktop tunnels keep their own SSH connections — Implemented 2026-10-13
+**Status and provenance:** the agent's recommendation under the owner's standing "go with your recommendations",
+reported to him the same day; it closes B-X5's leftover ("tunnels connect outside W21's pool").
+**Decision:** a tunnel (`GlassTerminalCapability.openPortForward`) and an editor project's SFTP lister open their own
+connection, not one from the terminals' pool (`SSHConnection.transportPool`, W21). The pool exists for the server's
+limits, and a tunnel is not what they count: `MaxSessions` counts shell, login and subsystem sessions and permits
+forwarding even at 0 (sshd_config(5)); a tunnel adds one sign-in when it opens. Sharing would put a desktop's frames
+or a large result on the same TCP stream as every keystroke, which OpenSSH users report as interactive lag on a
+multiplexed connection (openssh-unix-dev, 2009-10 and 2011-03), and would end the tunnel with the terminals'
+connection. Wake checks still reach every connection (`SSHLiveTransports`). Evidence: cf5c64e; the reasons are at
+`GlassTerminalPortForward`.
+
+## D70 — A connection belongs to its controller, never to a view's task — Implemented 2026-10-13
+**Status and provenance:** found by the owner twice in one day ("+" ▸ New Terminal on: "these always fail", then
+"Didn't work"), fixed in 795ce5d and 9ce83d9.
+**Decision:** work that must outlive a redraw — an SSH pane's connection first of all — runs in a task its
+controller holds (`MacWorkspaceController.startSSHPaneIfNeeded`), and only the owner's own end (closing the pane,
+the tab or the window) cancels it. A SwiftUI `.task` may *ask* for it but must not run it: SwiftUI cancels a view's
+task whenever it removes the view, and it removes views it is about to draw again (a placeholder giving way to the
+terminal; a new tab drawn twice as it settles). Each time the symptom was "Could not connect to …" with
+`CancellationError` in the log, while the same machine opened another way worked. Test:
+`anSSHPaneKeepsConnectingWhenTheViewThatAskedGoesAway` (fails with the view's await). Evidence:
+`tasks/2026-10/2026-10-13_owner-testing-day.md`.

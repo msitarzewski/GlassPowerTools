@@ -381,7 +381,28 @@ Simulator,name=iPhone 17' -clonedSourcePackagesDirPath <resolved SourcePackages>
 - App Intents defined in a Swift package work with Xcode 27.2: `Metadata.appintents` lists them in both the app and
   the extension when each declares an `AppIntentsPackage` that includes the package's.
 - `swift test` cannot reach a VM on a local or virtual network ("No route to host"): macOS's Local Network permission
-  blocks the runner. Tunnel through loopback for live SSH tests (`ssh -N -L 2222:localhost:22`, then
-  `GPT_SSH_TEST_HOST=127.0.0.1 GPT_SSH_TEST_PORT=2222`).
+  blocks the runner. Tunnel through loopback for live SSH tests (`ssh -N -L 2223:localhost:22`, then
+  `GPT_SSH_TEST_HOST=127.0.0.1 GPT_SSH_TEST_PORT=2223`; not 2222, which Citadel's own tests bind).
 - A dead SFTP/SSH connection under Citadel surfaces as NIO `ChannelError.ioOnClosedChannel` or `.outputClosed`.
 
+
+## Driver errors, Local Network and the locked Mac, 2026-10-13
+
+- **The test runner is a ready-made Local Network denial.** Lacking the permission, it shows exactly what a denied
+  app sees: connecting to a machine on the local or virtual network fails at once with EHOSTUNREACH ("No route to
+  host", errno 65) from the SSH engine, MySQLNIO and PostgresNIO alike. That is how `GlassLocalNetworkAccess` was
+  measured. A refused port is errno 61.
+- **PostgresNIO 1.33 redacts its connect errors.** `PostgresConnection.connect` throws `PSQLError`, whose
+  `description` is a fixed generic sentence and whose `localizedDescription` is "PostgresNIO.PSQLError error 1".
+  The detail is in `String(reflecting:)`, `serverInfo[.message]` and `underlying` (a `NIOConnectionError` for
+  transport failures, holding `dnsAError`/`dnsAAAAError` and `connectionErrors`). The older query API
+  (`connection.query(_:_:)` returning `EventLoopFuture`) throws `PostgresError`, which reads well. GlassDBKit
+  converts at connect (`PostgreSQLEngine.connectFailure`).
+- **MySQLNIO** throws NIO's own errors for transport failures: `IOError`, and `SocketAddressError.UnknownHost`
+  for a name that does not resolve. Its server refusals (`MySQLError`) read well.
+- **Live database tests against the test VM:** tunnel its ports to loopback (for example
+  `ssh -N -L 15432:localhost:5432`) and set `GPT_DB_TEST_HOST=127.0.0.1` with the port (`GPT_DB_TEST_PG_PORT`).
+  A wrong-password test needs no credentials.
+- **A locked Mac fails about 23 terminal tests** with EPERM, "mktemp failed" or `cannotCreateTemporaryFile`:
+  files written with complete protection cannot be created or read while the screen is locked (B-X27). Check
+  `CGSSessionCopyCurrentDictionary` → `CGSSessionScreenIsLocked` before blaming a change.

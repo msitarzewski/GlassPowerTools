@@ -81,9 +81,10 @@ source applications are obsolete and no longer compile.
 | [Apple Screen Sharing](tasks/2026-10/2026-10-11_apple-screen-sharing-protocol.md) | RFB 003.889 and its record layer, Quality, High Performance (D65), the hotspot findings |
 | [tmux under launchd, Basic terminals (D66, D67)](tasks/2026-10/2026-10-12_tmux-under-launchd.md) | The coalition a Force Quit ends, the app as tmux host, the test leak onto the owner's server, terminals outside tmux |
 | [Widgets: Machines and Active (D68)](tasks/2026-10/2026-10-12_widgets-machines-and-active.md) | A snapshot the app writes, App Intents for taps, the Mac's App Group |
-| [October tasks](tasks/2026-10/README.md) | Monthly index: tmux (D44), database through another machine (D45), RDP bandwidth, iPhone landscape, Vision Pro input (D46 proposed) |
+| [October tasks](tasks/2026-10/README.md) | Monthly index: tmux (D44), database through another machine (D45), RDP bandwidth, iPhone landscape, Vision Pro input (D46 proposed), the owner's testing day of 2026-10-13 (D69, D70) |
 | [Backlog inventory, 2026-10-12](tasks/2026-10/2026-10-12_backlog-inventory.md) | Every open decision, release step, defect, feature, owed check and limit, including what the original apps and absorbed packages never carried forward; IDs to pick by |
 | [Backlog tier 2, 2026-10-12](tasks/2026-10/2026-10-12_backlog-tier-2.md) | The CVE fix, wake liveness, iPhone Duo, licensing research and lawyer questions, the two-device checklist |
+| [The owner testing, 2026-10-13](tasks/2026-10/2026-10-13_owner-testing-day.md) | Duo, headset input, desktops on phones, Show All Windows, one Command Palette, the Quick Look crash, SSH panes in terminal windows (D70), database errors measured, tunnels kept apart (D69) |
 
 This project is `~/Software/glass/GlassPowerTools`. `../GlassEditorKit` was **absorbed on 2026-09-14**
 — it was already in production behind the SQL, record and SFTP editors, so it was never a future

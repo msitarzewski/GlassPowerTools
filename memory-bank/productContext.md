@@ -58,3 +58,22 @@ This is the reason to merge that no amount of shared packaging would have delive
 - A busy tab glows with a soft cloud of light sweeping across it (the owner's choices: light sweep, softer, slower,
   cloud-like, not clipped).
 
+
+## One overview, one palette, and a way back on every screen (2026-10-13)
+
+- **Show All Windows** (⇧⌘\, the button beside every ⚡, a pinch in on terminal and desktop windows) shows every
+  window the app has open: terminal windows with a tile per tab, then Files, Databases, Desktops and Editor. A desktop's
+  tile is its last picture. Settings ▸ Terminal ▸ Show All Windows ▸ **Blur previews** softens the pictures for
+  screenshots that can be shared.
+- **One Command Palette** (⇧⌘P, or ⌘K) holds every capability's entries: machines, connections, schemas and tables, and
+  the front window's own commands.
+- **A phone shows a session in place**, folded or not, with its back chevron and the ⚡: a phone cannot close a window
+  from inside it. An iPad's desktop window has its bar and a working Close. A desktop that is not connected says so in
+  the system's own view, not in a card ("this feels web").
+- **The library keeps the system's sidebar toggle on iPhone and iPad**, so a two-column screen always has a way back
+  to All Connections.
+- **A terminal window's tabs each have a close box**; a failed pane offers Reconnect, Connections and Close Pane, and
+  closing the last pane closes the tab.
+- **Database errors say what happened in plain words:** the server's own refusal ("password authentication failed
+  for user …"), "No machine named … could be found", and, for a machine on the local network that cannot be reached,
+  where to allow Local Network access.

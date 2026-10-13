@@ -136,3 +136,21 @@ test fails without the push.
 - **A long-lived remote connection is wrapped to reopen itself** (`GlassTerminalReconnectingLister`): a call failing
   because the connection is gone is retried once on a new one; concurrent calls share one reconnect.
 
+
+## One owner for a shared control; connections outlive their views (2026-10-13)
+
+- **A control every window carries is one component in the shell, filled by capabilities.** As the ⚡ is
+  (`GlassActiveConnections`): Show All Windows (`GlassShowAllWindows`: the terminal sets the action and draws the
+  overlay, the composition root supplies `openSessions`, the button sits beside every ⚡), the window pinch
+  (`GlassWindowPinch`, `GlassWindowPinchMonitor`, only on windows whose content does not pinch to zoom), and the
+  Command Palette (`GlassShellPaletteCommands` owns ⇧⌘P and ⌘K; capabilities register entries through
+  `GlassCommandPaletteSources`). Two capabilities each declaring a command gave the app menu two of it, and which one a
+  key opened was SwiftUI's choice; a menu-bar test now holds each shared key to its one owner.
+- **A connection belongs to its controller, never to a view's `.task`** (D70). A view asks
+  (`startSSHPaneIfNeeded`), the controller holds the task, and only closing the pane or tab cancels it.
+- **One rule per platform behaviour, in the shell, when two capabilities meet it:** `GlassLocalNetworkAccess` decides
+  whether a failure could be the Local Network permission and words the advice, for the terminal and the database
+  alike. It was two rules, and only the measured one was right.
+- **Driver quirks are normalised where the driver is wrapped** (GlassDBKit): `PostgreSQLEngine.connectFailure`
+  turns PostgresNIO's redacted `PSQLError` into the server's words, or into the network error MySQLNIO throws for the
+  same failure, so `DatabaseConnectionFailure` words both engines with one set of cases.

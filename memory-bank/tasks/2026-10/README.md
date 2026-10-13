@@ -55,3 +55,12 @@
 - 2026-10-12 (late, after the compaction): Active with nothing open offers the library's machines by service
   (Terminal, Database, Desktop) — the detail page beside the list, or the list itself on a compact stack; seen on the
   folded Duo and an iPad in landscape. Details in `activeContext.md`.
+- 2026-10-13 (overnight): tier 3 begun — tree-sitter's match limit instead of vendoring (0b5d421); every terminal on a
+  lost shared connection says so (B-X5); Local Network guidance only for "No route to host" (B-X13); B-X18; B-X22's
+  first half. Found: B-X27, complete file protection on a locked Mac (the owner's call). All three on 0.4.392.
+- 2026-10-13: [The owner testing: Duo, headset, desktops, Show All Windows, terminal windows, database errors](2026-10-13_owner-testing-day.md)
+  — the folded Duo's corners and sidebar toggle (D24 amended); held keys and selection on the headset; desktops'
+  unavailable view and a way back on phones; Show All Windows across every kind of window, Blur previews; one Command
+  Palette; a Quick Look crash; SSH panes in terminal windows (D70: a connection belongs to its controller); the
+  database's Local Network rule and PostgreSQL's connect errors; tunnels keep their own connections (D69). 0.4.400
+  on all three; the owner confirmed the last fix.

@@ -71,9 +71,12 @@ owner may reorder; the sections below keep the detail. Within a tier, earlier is
 22. B-X6 with B-F32 — RDP colour distortion in motion, and the graphics-mode escape.
 23. B-X7 — RDP on Vision Pro asks for twice the pixels; whole-frame copies.
 24. ~~B-X13~~ 461dc59 (2026-10-13) — the terminal's Local Network guidance follows the error (measured: a denial is
-    "No route to host", errno 65). Follow-up: the database's own check looks for EPERM/EACCES instead.
+    "No route to host", errno 65). Follow-up done b1e9e3c: the database uses the same rule (`GlassLocalNetworkAccess`),
+    and measuring it found PostgreSQL's connect failures, a wrong password included, reading "PSQLError error 1";
+    fixed in the same commit.
 25. B-X12, B-X26 — look again: grid rows over the header; the first headset terminal window small.
-26. B-X15–B-X20, B-X24, B-X22 — the rest.
+26. B-X15–B-X20, B-X24, B-X22 — the rest (B-X18 done 44f6b2a; B-X22's first half done be02fe5, its second half —
+    project reach ignoring pinned host keys — open).
 
 **Tier 4 — the owner's decisions, best taken in one sitting** (each unblocks work)
 27. B-Q1 (D46 pinch gestures), B-Q4 (D63 light/dark), B-Q2 (D50), B-Q6 (SSH tabs in the remote folder).
