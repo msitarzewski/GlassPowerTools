@@ -83,10 +83,22 @@ all of the platforms that support them. App intents, all of the modern stuff …
     window, so a widget's Connect waited with only terminal windows open.
   - A configurable Machine widget.
   - Not yet seen by the owner.
-- **Phase 2 (the Finder) next:**
-  - Services and a front-window registry for New Tab Here.
-  - Open With a folder or a `.command` file; the Dock menu; `ssh://` links.
-  - Quick Actions and Finder Sync extensions. These write a request to the App Group and wake the app.
+- **Phase 2 (the Finder) built, 0.4.404:**
+  - Services (Tab Here, Window Here, Open in), declared as Ghostty, iTerm2 and CotEditor declare theirs.
+  - Open With a folder or a `.command` file, a drop on the Dock icon, and the Dock menu.
+  - `ssh://` links: a saved machine connects; another fills in the new-server form.
+  - A Finder Sync toolbar button and a Quick Action, as two new macOS extension targets
+    (`GlassPowerToolsFinder`, `GlassPowerToolsQuickActions`). They hand off through `GlassExternalRequests`.
+  - The owner's report "Open with opens a new connections window" is fixed: the Mac takes opened URLs in its
+    app delegate.
+  - **To verify on the owner's Mac:**
+    - Services show without being switched on.
+    - The toolbar button after it is switched on.
+    - The Quick Action.
+    - A sandboxed extension waking the app.
+  - **Release script:** it must sign the two new extensions with Developer ID (B-R2).
+- **Next: phase 3** — the share sheet's Send to a Machine, drag a machine out to make its window (Vision Pro
+  first), Handoff.
 
 **Then, for an agent:** tier 3 from the inventory's section 0: B-X2 with B-Q11, B-X6 with B-F32, B-X7, and
 B-X22's second half. Also the database's own `databaseSidebarChrome()`, which still removes the toggle off the

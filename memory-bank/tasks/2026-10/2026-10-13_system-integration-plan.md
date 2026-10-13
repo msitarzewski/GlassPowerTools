@@ -4,7 +4,8 @@
 platforms that support them. App intents, all of the modern stuff … Be sure visionOS is well represented!" His
 screenshot: Finder ▸ Services with other apps' "New … Tab Here", "New … Window Here" and "Open in …".
 **Status:** **Approved 2026-10-13 (D72)**: "Do all of the things. Wonderful ideas!" — every phase, the optional
-pieces included; the questions answered as recommended (D72). Building phase 1. Absorbs backlog B-F48 (App Intents, Shortcuts, Spotlight, Handoff;
+pieces included; the questions answered as recommended (D72). **Phase 1 built (0.4.403), phase 2 built (0.4.404);**
+progress and evidence in `activeContext.md` and the commits named there. Absorbs backlog B-F48 (App Intents, Shortcuts, Spotlight, Handoff;
 entities for hosts, connections, saved queries and tables, planned in glassdb and glassDT, never carried).
 **Owner:** the agent (coordinator). **Authorization:** the plan only; building waits for the owner's go.
 
