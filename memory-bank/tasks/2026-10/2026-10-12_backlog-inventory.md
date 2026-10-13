@@ -205,8 +205,11 @@ owner may reorder; the sections below keep the detail. Within a tier, earlier is
   — `SessionRecorder` (index and recordings), `SFTPBrowserView` downloads, `DesktopSessionModel` captures. Seen as
   terminal test failures (recording deletion, tmux offer, setup saves), the same with or without the change under
   test; this is also why the suite has needed an unlocked screen. A session recorded or a download running while
-  the owner is away is the product case. Likely fix: `.completeUntilFirstUserAuthentication` (macOS), measured on a
-  locked Mac first.
+  the owner is away is the product case. **Measured on the locked Mac (macOS 27.2, 00:50):** none — write and read;
+  complete — neither; complete-unless-open — write, not read; until-first-authentication — both. **The owner's
+  decision (security):** recordings and downloads may hold secrets. Recommended: complete-unless-open for recordings
+  and downloads (created and continued while locked, still unreadable to anyone while locked) with the recorder's
+  index kept in memory or written until-first-authentication; not a blanket downgrade.
 
 ## 4. Features: requests, approved and proposed
 
