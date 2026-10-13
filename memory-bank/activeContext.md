@@ -27,6 +27,24 @@ anything touching real servers (SSH and database tests use the disposable test V
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
+## 2026-10-13 (~06:10) — the owner testing: headset input, the unfolded Duo, the desktop
+
+**0.4.393 on all three** (headset and iPhone ~05:45, Mac 05:49): carries the headset input below. Committed after
+it (next build): the desktop changes, the Duo corner, the library's sidebar toggle, Mermaid 12.2.0.
+
+- **Headset, hardware keyboard:** held delete now repeats (priority key command, `.repeatable`, action SwiftTerm's
+  `deleteBackward`); arrows repeatable too. **Selection:** pinch and hold, then drag (the owner's choice), or hold
+  on a selection's end to move it; Copy via `UIEditMenuInteraction`. Unverified on the device — the owner's to try.
+- **Duo:** the terminal's colour into every corner; the library keeps UIKit's sidebar toggle on iPhone/iPad (D24
+  amended — "How do I get back to the main all connections?"); **phones present sessions in place even unfolded**
+  (a window took the whole screen, and a phone cannot end a scene: "not supported for this device idiom").
+- **Desktop ("feels web … no way to get back"):** ContentUnavailableView on the black, the error as its
+  description; iPad desktop windows in a NavigationStack (their bar was never drawn); Close ends the scene via
+  UIKit; `--demo-open desktop-disconnected`. Seen on iPhone and iPad simulators.
+- **Leftover on the owner's Duo simulator:** a desktop window restored from before shows "Desktop Not Found" —
+  close it from the "Views Open" switcher (a phone cannot close it from inside).
+- **Mermaid 12.2.0** came in through the scheme's pre-action (D35) during a build — expected, committed.
+
 ## 2026-10-13 (~01:30) — overnight: Duo fixes, 0.4.392, tier 3 begun
 
 **State:** everything committed (76a5c7f … HEAD); nothing pushed. **0.4.392 on the Mac and the iPhone** (installed
