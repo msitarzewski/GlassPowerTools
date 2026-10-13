@@ -17,20 +17,16 @@ import Foundation
 /// - The engine holds no state: two calls with the same query and snapshot
 ///   return the same ranges.
 ///
-/// ## Known limitation: regex is synchronous and unbounded (M5)
+/// ## A regular expression searches for at most `regexTimeBudget`
 ///
-/// `.regex` queries are handed to `NSRegularExpression`, which offers no step
-/// budget, no timeout, and no cancellation. A pathological user-supplied pattern
-/// (`(a+)+$`, `(a|aa)+$`) backtracks exponentially and blocks the calling thread
-/// until it finishes — and NSRegularExpression cannot be interrupted mid-match,
-/// so no in-place guard can stop it. The exposure is a self-inflicted local hang
-/// (the user's own find field, on the user's own file), not attacker-reachable
-/// input, so it is accepted for v1 and recorded rather than hidden
-/// (`FuzzPenTests.catastrophicBacktrackingSurface`, `progress.md` M5). The
-/// proper fix is an async, off-main-actor find the UI can abandon; that is an
-/// architecture change deferred to M5, not a repair that belongs here. Callers
-/// running untrusted patterns on the main actor should treat this as a live
-/// constraint.
+/// A pathological pattern (`(a+)+$`, `(a|aa)+$`) backtracks exponentially, and
+/// find runs on the main actor. It was recorded as unfixable in place, on the
+/// belief that `NSRegularExpression` cannot be interrupted mid-match (H-3, M5).
+/// It can: with `.reportProgress` the enumeration block is called periodically
+/// *during* a long match, and setting `stop` there ends it — measured
+/// 2026-10-12, `(a+)+$` over forty `a`s and a `!` stopped at 200 ms of a 200 ms
+/// budget. So a regex search past the budget stops and throws
+/// `EditorError.findTookTooLong` rather than holding the app.
 public enum FindEngine: Sendable {
 
     // MARK: - Matching
@@ -182,8 +178,7 @@ public enum FindEngine: Sendable {
             }
         case .regex:
             let regex = try compiledRegex(for: query)
-            let whole = NSRange(location: 0, length: text.length)
-            candidates = regex.matches(in: snapshot, options: [], range: whole).map {
+            candidates = try regexMatches(regex, in: snapshot, budget: regexTimeBudget).map {
                 RawMatch(range: $0.range.lowerBound..<$0.range.upperBound, regexResult: $0)
             }
         }
@@ -194,6 +189,31 @@ public enum FindEngine: Sendable {
 
         assert(isAscendingNonOverlapping(kept.map(\.range)), "FindEngine produced overlapping or unsorted matches")
         return kept
+    }
+
+    /// How long a regular expression may search before it is stopped. Long enough for any
+    /// reasonable pattern over a large file; short enough that a runaway one is an interruption
+    /// rather than a frozen window.
+    public static let regexTimeBudget: Duration = .seconds(1)
+
+    /// Every match, as `NSRegularExpression.matches(in:options:range:)` returns them, stopped once
+    /// `budget` has passed. `.reportProgress` is what lets a single runaway match be stopped.
+    static func regexMatches(_ regex: NSRegularExpression, in snapshot: String,
+                             budget: Duration) throws -> [NSTextCheckingResult] {
+        let clock = ContinuousClock()
+        let deadline = clock.now + budget
+        var results: [NSTextCheckingResult] = []
+        var timedOut = false
+        let whole = NSRange(location: 0, length: (snapshot as NSString).length)
+        regex.enumerateMatches(in: snapshot, options: [.reportProgress], range: whole) { result, _, stop in
+            if let result { results.append(result) }
+            if clock.now >= deadline {
+                timedOut = true
+                stop.pointee = true
+            }
+        }
+        if timedOut { throw EditorError.findTookTooLong }
+        return results
     }
 
     /// Compiles `query.pattern`, translating ICU's failure into `EditorError`.

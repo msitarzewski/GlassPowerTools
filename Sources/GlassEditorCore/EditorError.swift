@@ -30,4 +30,7 @@ public enum EditorError: Error, Sendable, Hashable {
 
     // Find
     case invalidPattern(reason: String)
+    /// A regular expression searched for longer than `FindEngine.regexTimeBudget` and was stopped:
+    /// nested quantifiers such as `(a+)+$` backtrack exponentially (H-3, 2026-10-12).
+    case findTookTooLong
 }

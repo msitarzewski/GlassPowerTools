@@ -182,6 +182,21 @@ struct GlassEditorWorkspaceTests {
 
     // MARK: Find
 
+    /// B-X8: a runaway regular expression is stopped and said so, rather than holding the window.
+    @Test func aRunawayRegexIsStoppedAndSaysSo() async throws {
+        let root = try makeRoot(); defer { try? FileManager.default.removeItem(at: root) }
+        let url = try write(String(repeating: "a", count: 40) + "!", named: "run.txt", in: root)
+        let workspace = makeWorkspace()
+        let opened = await workspace.open(url)
+        _ = try #require(opened)
+        workspace.findUsesRegularExpression = true
+        workspace.findQuery = "(a+)+$"
+        let started = ContinuousClock.now
+        workspace.findNext()
+        #expect(ContinuousClock.now - started < .seconds(3), "the search was not stopped")
+        #expect(workspace.message?.hasPrefix("The search was stopped after a second") == true, "\(workspace.message ?? "")")
+    }
+
     @Test func findAndReplaceRunThroughTheDocument() async throws {
         let root = try makeRoot(); defer { try? FileManager.default.removeItem(at: root) }
         let url = try write("red green red blue red", named: "colours.txt", in: root)

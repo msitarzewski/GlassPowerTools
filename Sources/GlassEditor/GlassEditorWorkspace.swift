@@ -621,14 +621,23 @@ public final class GlassEditorWorkspace {
     }
 
     /// Moves the selection to the next match, wrapping. Nothing happens when there is no match,
-    /// which is the honest response to a search that found nothing.
+    /// which is the honest response to a search that found nothing. A regular expression stopped
+    /// for taking too long says so, since "nothing happened" would read as "no match".
     public func findNext(reverse: Bool = false) {
         guard let document = selectedDocument, !findQuery.isEmpty else { return }
         let from = document.model.selectedRange
-        let match = reverse
-            ? try? document.model.previousMatch(of: findQueryValue, before: from.lowerBound)
-            : try? document.model.nextMatch(of: findQueryValue, after: from.upperBound)
-        guard let found = match ?? nil else { return }
+        let match: Range<Int>?
+        do {
+            match = reverse
+                ? try document.model.previousMatch(of: findQueryValue, before: from.lowerBound)
+                : try document.model.nextMatch(of: findQueryValue, after: from.upperBound)
+        } catch EditorError.findTookTooLong {
+            message = "The search was stopped after a second: this pattern backtracks too much. Simplify it — nested repeats like (a+)+ are the usual cause."
+            return
+        } catch {
+            return
+        }
+        guard let found = match else { return }
         document.model.selectedRange = found
     }
 
