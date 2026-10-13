@@ -84,3 +84,23 @@ struct GlassSentFilesTests {
         #expect(GlassSentFiles(machine: "alpha", folder: "~", arrived: [], failed: []).summary == "Nothing was sent.")
     }
 }
+
+/// A terminal dragged out of the library and dropped in the room (D72, Vision Pro): the dropped
+/// window reserves a workgroup for its server, and that server's next session goes into it.
+@Suite("Windows waiting for a dropped terminal")
+@MainActor
+struct DroppedTerminalWindowTests {
+    @Test("a reservation is taken once, by its own server; a released one is gone")
+    func reservations() {
+        let runtime = GlassTerminalRuntime()
+        let alpha = UUID(), bravo = UUID()
+        let window = runtime.reserveWindow(forServer: alpha)
+        #expect(runtime.takeReservedWindow(forServer: bravo) == nil)
+        #expect(runtime.takeReservedWindow(forServer: alpha) == window)
+        #expect(runtime.takeReservedWindow(forServer: alpha) == nil, "a second session opens a window of its own")
+
+        let failed = runtime.reserveWindow(forServer: bravo)
+        runtime.releaseReservation(failed)
+        #expect(runtime.takeReservedWindow(forServer: bravo) == nil)
+    }
+}

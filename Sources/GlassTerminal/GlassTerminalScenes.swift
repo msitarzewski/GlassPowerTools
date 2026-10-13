@@ -114,14 +114,19 @@ public struct GlassTerminalScenes: Scene {
                     // The app's own list, not the system's restoration, which stays off below.
                     .modifier(TerminalWorkgroupWindowPresence(workgroupID: workgroupID))
             } else {
-                ContentUnavailableView(
-                    "Terminal Workgroup Not Found",
-                    systemImage: "rectangle.stack.badge.minus",
-                    description: Text("Open a terminal from Connections to begin.")
-                )
-                .trackWindowPresence(key: "terminal-workgroup-missing", recovery: windowRecoveryManager)
+                // A window with no workgroup: one made by dropping a terminal dragged out of the
+                // library (D72), which becomes that terminal where it stands; or the old "not found".
+                VisionTerminalDropWindow()
+                    .glassRegistersWindowOpener()
+                    .environment(runtime)
+                    .environment(sessionManager)
+                    .environment(settingsManager)
+                    .glassLayers(runtime.layers)
+                    .trackWindowPresence(key: "terminal-workgroup-missing", recovery: windowRecoveryManager)
             }
         }
+        // A terminal dragged out of the library opens here, where it is dropped (`GlassServiceDrag`).
+        .handlesExternalEvents(matching: [GlassServiceDrag.terminalActivity])
         // Plain, with Apple's glass drawn by the window itself (`GlassSpatialWindowGlass`), in
         // Apple's corner, as strong as the window's Blur. The system's own window (cfd5094) gave
         // the canvas a corner to nest in, but its glass is always there while the window has

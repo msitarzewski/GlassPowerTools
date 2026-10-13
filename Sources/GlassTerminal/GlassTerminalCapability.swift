@@ -417,6 +417,28 @@ public final class GlassTerminalRuntime {
         workgroupsAwaitingWindow.append(workgroupID)
     }
 
+    /// Vision Pro: windows made by dropping a terminal dragged out of the library (D72), each
+    /// waiting for its server's session, by server id. The session goes into the window's own
+    /// workgroup rather than a new window, so it stands where it was dropped.
+    @ObservationIgnored private var windowsAwaitingSession: [UUID: UUID] = [:]
+
+    /// A workgroup id for a dropped window to show once `serverID`'s session is ready.
+    func reserveWindow(forServer serverID: UUID) -> UUID {
+        let workgroupID = UUID()
+        windowsAwaitingSession[serverID] = workgroupID
+        return workgroupID
+    }
+
+    /// The dropped window waiting for `serverID`'s session, taken once.
+    func takeReservedWindow(forServer serverID: UUID) -> UUID? {
+        windowsAwaitingSession.removeValue(forKey: serverID)
+    }
+
+    /// A dropped window that stopped waiting — its connection failed or was turned down.
+    func releaseReservation(_ workgroupID: UUID) {
+        windowsAwaitingSession = windowsAwaitingSession.filter { $0.value != workgroupID }
+    }
+
     func takeWorkgroupAwaitingWindow() -> UUID? {
         workgroupsAwaitingWindow.isEmpty ? nil : workgroupsAwaitingWindow.removeFirst()
     }

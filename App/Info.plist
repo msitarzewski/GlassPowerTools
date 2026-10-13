@@ -49,6 +49,11 @@
 	<string>Authenticate to use a hardware-protected SSH key.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Glass Power Tools uses your local network to connect to servers you choose.</string>
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>com.glasspowertools.open-terminal</string>
+		<string>com.glasspowertools.open-desktop</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationPreferredDefaultSceneSessionRole</key>

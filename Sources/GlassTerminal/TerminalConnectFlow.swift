@@ -702,7 +702,10 @@ struct TerminalConnectFlow: ViewModifier {
     private func presentTerminalWindow(for session: TerminalSession,
                                        windowSettings: GlassWindowOverrides = GlassWindowOverrides()) {
         #if os(visionOS)
+        // A window dropped in the room for this server (D72) shows it; otherwise a new window.
+        let reserved = runtime.takeReservedWindow(forServer: session.server.id)
         let workgroupID = sessionManager.createWorkgroup(
+            id: reserved ?? UUID(),
             name: session.server.name,
             colorTag: session.server.colorTag,
             windowSettings: windowSettings
@@ -713,7 +716,7 @@ struct TerminalConnectFlow: ViewModifier {
             connectionFailureMessage = "The terminal could not be added to its workgroup."
             return
         }
-        openWindow(id: "terminal", value: workgroupID)
+        if reserved == nil { openWindow(id: "terminal", value: workgroupID) }
         #elseif os(iOS)
         let workgroupID = sessionManager.createWorkgroup(
             name: session.server.name,

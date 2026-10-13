@@ -474,6 +474,12 @@ public struct GlassShellLibraryView: View {
             }
         }
         .layoutPriority(0)
+        #if os(iOS) || os(visionOS)
+        // Dragged out of the library, a terminal or desktop opens its own window where it is let go
+        // — in the room, on Vision Pro (`GlassServiceDrag`, D72). Not on a phone, which has one
+        // window, nor for a service with no setup behind it.
+        .glassServiceDrag(endpoint: service.endpointID, kind: service.kind, enabled: !isUnconfigured(service, host: host))
+        #endif
         // Wordless, like the library row: the glyph carries the meaning and the label stays for
         // assistive technology and the tooltip.
         let connect = Button("Connect", systemImage: "play.fill") { model.connect(hostID: host.id, endpointID: service.endpointID) }

@@ -26,10 +26,14 @@ public struct GlassDesktopScenes: Scene {
 
     public var body: some Scene {
         WindowGroup(id: "desktop-session", for: UUID.self) { $endpointID in
-            DesktopSessionHost(runtime: runtime, endpointID: endpointID.map(EndpointID.init(rawValue:)))
+            DesktopWindowRoot(runtime: runtime, endpointID: endpointID)
                 .glassLayers(runtime.layers)
                 .glassRegistersWindowOpener()
         }
+        #if os(iOS) || os(visionOS)
+        // A desktop dragged out of the library opens here, where it is dropped (`GlassServiceDrag`).
+        .handlesExternalEvents(matching: [GlassServiceDrag.desktopActivity])
+        #endif
         #if os(visionOS)
         .windowStyle(.plain)
         #endif
@@ -69,6 +73,41 @@ public struct GlassDesktopScenes: Scene {
         .restorationBehavior(.disabled)
         .defaultLaunchBehavior(.suppressed)
         #endif
+    }
+}
+
+/// A desktop window: the desktop its value names, or — for a window made by dropping a desktop
+/// dragged out of the library (D72), which has no value — the desktop the drop's activity names,
+/// standing where it was let go.
+struct DesktopWindowRoot: View {
+    let runtime: GlassDesktopRuntime
+    let endpointID: UUID?
+    @State private var dropped: UUID?
+    /// A moment for a drop's activity to arrive before a window with no desktop says so.
+    @State private var waited = false
+
+    var body: some View {
+        Group {
+            if let shown = endpointID ?? dropped {
+                DesktopSessionHost(runtime: runtime, endpointID: EndpointID(rawValue: shown))
+                    .id(shown)
+            } else if waited {
+                DesktopSessionHost(runtime: runtime, endpointID: nil)
+            } else {
+                ProgressView().controlSize(.large)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        #if os(iOS) || os(visionOS)
+        .onContinueUserActivity(GlassServiceDrag.desktopActivity) { activity in
+            if endpointID == nil, dropped == nil { dropped = GlassServiceDrag.endpoint(from: activity) }
+        }
+        #endif
+        .task {
+            guard endpointID == nil else { return }
+            try? await Task.sleep(for: .seconds(2))
+            waited = true
+        }
     }
 }
 
