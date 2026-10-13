@@ -15,6 +15,7 @@
 
 import Foundation
 import GlassConnectionKit
+import os
 
 /// Read and write the configuration a capability owns for one of its services.
 ///
@@ -78,9 +79,31 @@ public extension GlassServiceStore {
         try await setConfiguration(encoded, for: endpointID)
     }
 
-    /// Every decodable record of one kind, in no particular order. Undecodable entries are skipped.
+    /// Every decodable record of one kind, in no particular order. Undecodable entries are skipped
+    /// — and said so in the log, once per record per run (2026-10-12, B-X14): a service that
+    /// vanished from a list left no trace of why.
     func configurations<T: Decodable>(_ type: T.Type, ofKind kind: HostServiceKind) -> [EndpointID: T] {
-        configurations(ofKind: kind).compactMapValues { try? JSONDecoder().decode(type, from: $0) }
+        var decoded: [EndpointID: T] = [:]
+        for (endpointID, data) in configurations(ofKind: kind) {
+            do {
+                decoded[endpointID] = try JSONDecoder().decode(type, from: data)
+            } catch {
+                GlassServiceStoreLog.unreadable(kind: kind, endpointID: endpointID, error: error)
+            }
+        }
+        return decoded
+    }
+}
+
+/// The store's log lines.
+@MainActor
+enum GlassServiceStoreLog {
+    static let logger = Logger(subsystem: "com.glasspowertools", category: "service-store")
+    private static var reported: Set<EndpointID> = []
+
+    static func unreadable(kind: HostServiceKind, endpointID: EndpointID, error: Error) {
+        guard reported.insert(endpointID).inserted else { return }
+        logger.notice("Skipped a \(kind.rawValue, privacy: .public) record this build cannot read (\(endpointID.rawValue.uuidString, privacy: .public)), probably written by a newer build; it is kept as it is. \(String(describing: error), privacy: .private)")
     }
 }
 

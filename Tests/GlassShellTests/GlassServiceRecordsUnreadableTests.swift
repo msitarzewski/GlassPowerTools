@@ -42,6 +42,30 @@ struct GlassServiceRecordsUnreadableTests {
         #expect(records(store).all()[EndpointID(rawValue: mine.id)] == mine)
     }
 
+    /// B-X14: the terminal and the database write from a list read earlier. A record another
+    /// device added after that read must survive a save made from it.
+    @Test func aRecordArrivingAfterTheLastReadIsNotDeletedByAStaleList() async throws {
+        let store = GlassInMemoryServiceStore(defaultKind: .rdp)
+        let records = records(store)
+        let mine = Record(id: UUID(), name: "alpha")
+        try await records.replaceAll(with: [mine])
+        let list = Array(records.all().values)       // what this device's list was built from
+
+        let theirs = Record(id: UUID(), name: "bravo") // arrives through sync, not yet re-read
+        store.setConfiguration(try JSONEncoder().encode(theirs), kind: .rdp, for: EndpointID(rawValue: theirs.id))
+
+        var edited = list[0]
+        edited.name = "alpha, renamed"
+        try await records.replaceAll(with: [edited])
+
+        #expect(records.all()[EndpointID(rawValue: theirs.id)] == theirs, "a stale list deleted a record it never showed")
+        #expect(records.all()[EndpointID(rawValue: mine.id)] == edited)
+
+        // Once read, it is the caller's to delete.
+        try await records.replaceAll(with: [edited])
+        #expect(records.all()[EndpointID(rawValue: theirs.id)] == nil)
+    }
+
     @Test func deletingARecordStillDeletesIt() async throws {
         let store = GlassInMemoryServiceStore(defaultKind: .rdp)
         let gone = Record(id: UUID(), name: "bravo")

@@ -21,6 +21,13 @@ public struct GlassServiceRecords<Record: Codable> {
     private let store: any GlassServiceStore
     private let kind: HostServiceKind
     private let identify: (Record) -> EndpointID
+    /// What this caller has been shown — the records `all()` last returned, and those it wrote
+    /// since — or nil before it has read anything. Shared by copies of this value.
+    private let shown = Shown()
+
+    private final class Shown {
+        var ids: Set<EndpointID>?
+    }
 
     public init(store: any GlassServiceStore, kind: HostServiceKind,
                 id identify: @escaping (Record) -> EndpointID) {
@@ -33,6 +40,12 @@ public struct GlassServiceRecords<Record: Codable> {
     /// rather than fatal, matching the catalog backend's rule: one unreadable service must not take
     /// a whole library down with it.
     public func all() -> [EndpointID: Record] {
+        let records = readable()
+        shown.ids = Set(records.keys)
+        return records
+    }
+
+    private func readable() -> [EndpointID: Record] {
         store.configurations(Record.self, ofKind: kind)
     }
 
@@ -73,11 +86,22 @@ public struct GlassServiceRecords<Record: Codable> {
         // is not deleted by the user: it was never shown to them. Removing it here made every save,
         // favorite, "last connected" stamp and delete erase the newer build's records, and the
         // erasure synced to every device (2026-09-27). glassDT refused to write instead.
-        let readable = Set(all().keys)
+        let readable = Set(readable().keys)
+        // **And only what the caller has been shown** (2026-10-12, B-X14). The terminal and the
+        // database build `records` from a list read earlier; a record another device added since —
+        // arrived through sync, not yet re-read — is missing from that list without anyone having
+        // deleted it, and the next save here deleted it everywhere. A caller that has read nothing
+        // through this value is taken at its word, as before.
+        let known = shown.ids ?? readable
 
         for endpointID in current.keys
         where wanted[endpointID] == nil && readable.contains(endpointID) && !preserving.contains(endpointID) {
+            guard known.contains(endpointID) else {
+                GlassServiceStoreLog.logger.notice("Kept a \(kind.rawValue, privacy: .public) record (\(endpointID.rawValue.uuidString, privacy: .public)) that arrived after this device last read its list")
+                continue
+            }
             try await store.setConfiguration(nil, for: endpointID)
+            shown.ids?.remove(endpointID)
         }
         let encoder = JSONEncoder()
         // Sorted, so the same record always encodes to the same bytes.
@@ -87,6 +111,7 @@ public struct GlassServiceRecords<Record: Codable> {
             if let stored = current[endpointID], Self.sameJSON(stored, encoded) { continue }
             try await store.setConfiguration(encoded, for: endpointID)
         }
+        shown.ids?.formUnion(wanted.keys)
     }
 
     /// Whether two encodings hold the same value. Bytes alone are not enough: `JSONEncoder` does
