@@ -25,9 +25,10 @@ public enum GlassShowAllWindows {
     /// can be shared without what the windows show (the owner, 2026-10-13). This device's choice,
     /// not synced: it is about this screen.
     public static let blursPreviewsKey = "com.glasspowertools.showAllWindows.blursPreviews"
-    /// Slight: enough that text cannot be read at a tile's size, little enough that a window is
-    /// still recognisable by its shape and colours.
-    public static let previewBlurRadius: CGFloat = 5
+    /// Slight: letters run together so nothing can be read, even zoomed into a screenshot, while
+    /// lines, indents and colours keep their shape. It was 5, which left a smudge (the owner,
+    /// 2026-10-13: "it's a bunch though. still recognize lines, just not read them kind of blur").
+    public static let previewBlurRadius: CGFloat = 1.5
 
     /// Opens or closes the overview. Set by the capability that draws it — the terminal, on the
     /// Mac; nil elsewhere, and then the button is not drawn rather than drawn dead.
