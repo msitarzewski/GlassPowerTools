@@ -161,10 +161,14 @@ struct DesktopSessionHost: View {
                     Label("Desktop Not Found", systemImage: "display")
                 } description: {
                     Text("This desktop has no saved configuration. Edit the service in the library to set it up, or remove it.")
+                    // A phone cannot end a window itself ("not supported for this device idiom", the
+                    // Duo, 2026-10-13), so it says where it can be closed instead of offering a
+                    // button that does nothing (the owner: "this doesn't close, fwiw").
+                    if !GlassWindowPresentation.canOpenWindows {
+                        Text("Close this window in the app switcher.")
+                    }
                 } actions: {
-                    // The window's own way out, where the system draws none — an iPad's. A phone
-                    // cannot end a window itself ("not supported for this device idiom", the Duo,
-                    // 2026-10-13); its windows close from the system's switcher.
+                    // The window's own way out, where the system draws none — an iPad's.
                     if GlassWindowPresentation.canOpenWindows {
                         Button("Close") { closeWindow() }
                     }
