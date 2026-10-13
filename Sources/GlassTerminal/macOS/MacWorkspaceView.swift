@@ -1086,7 +1086,7 @@ private struct MacWorkspaceTabContent: View {
                     // Told its server was not saved, and now it is: ask again. The library's first
                     // answer can come before every machine's record has (one synced in later, say),
                     // and the pane kept saying "The saved server no longer exists" of a server the
-                    // library then had (the owner's SY Staging tab, 2026-10-13).
+                    // library then had (an SSH tab of the owner's, 2026-10-13).
                     if controller.failedForMissingServer(pane.id), isSaved(pane) {
                         controller.retryPane(pane.id)
                         return
@@ -1104,7 +1104,7 @@ private struct MacWorkspaceTabContent: View {
     /// The saved hosts an SSH pane is opened by have been read — the library's catalog has
     /// answered, or failed to (which the pane then says). A tab restored at launch asked before the
     /// catalog had answered and was told "The saved server no longer exists" of a server the
-    /// library still had (the owner's Switchyard tab, 2026-10-13, after an install relaunched the app).
+    /// library still had (an SSH tab of the owner's, 2026-10-13, after an install relaunched the app).
     private var savedHostsReady: Bool {
         let servers = sessionManager.serverManager
         return persistentStateReady && (servers.familyCatalogLoaded || servers.serverCatalogLoadError != nil)

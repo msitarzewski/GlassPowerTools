@@ -505,7 +505,7 @@ public struct DesktopSessionView: View {
                     if !session.connection.clipboardEnabled {
                         // Off unless the service shares it — said here, rather than leaving the remote
                         // clipboard grey for no reason anyone can see (the owner, 2026-10-13: "the
-                        // clipboard sync is failing with oscar … Not sure if I was supposed to do something").
+                        // clipboard sync is failing with <a desktop> … Not sure if I was supposed to do something").
                         Text("Clipboard sharing is off for this desktop. Turn on Share clipboard in its service settings, then reconnect.")
                     }
                     Button(session.connection.clipboardEnabled ? "Send Clipboard" : "Type Clipboard Text") { sendClipboard() }
