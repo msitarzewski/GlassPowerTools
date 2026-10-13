@@ -291,3 +291,40 @@ public struct GlassSendFilesIntent: AppIntent {
         return (urls, staging)
     }
 }
+
+#if !os(visionOS)
+/// The Open Terminal control's one setting: which machine (D72). Control Center, the Mac's menu bar,
+/// the Lock Screen and the iPhone's Action button; Vision Pro has no controls.
+public struct GlassMachineControlConfiguration: ControlConfigurationIntent {
+    public static let title: LocalizedStringResource = "Machine"
+    public static let description = IntentDescription("Choose the machine this control opens a terminal on.")
+
+    @Parameter(title: "Machine") public var machine: GlassMachineEntity?
+
+    public init() {}
+}
+
+/// What the Open Terminal control runs: the chosen machine's terminal, or — none chosen yet — the
+/// library, where one can be. One intent whatever the configuration, as a control's template has
+/// no branches. Not offered in Shortcuts, which has Open Terminal itself.
+public struct GlassOpenTerminalControlIntent: AppIntent {
+    public static let title: LocalizedStringResource = "Open Terminal"
+    public static let openAppWhenRun = true
+    public static let isDiscoverable = false
+
+    @Parameter(title: "Machine") public var machine: GlassMachineEntity?
+
+    public init() {}
+    public init(machine: GlassMachineEntity?) { self.machine = machine }
+
+    @MainActor
+    public func perform() async throws -> some IntentResult {
+        if let machine {
+            try GlassIntentConnect.open(.terminal, on: machine)
+        } else {
+            GlassWidgetRequests.shared.post(.showActive)
+        }
+        return .result()
+    }
+}
+#endif

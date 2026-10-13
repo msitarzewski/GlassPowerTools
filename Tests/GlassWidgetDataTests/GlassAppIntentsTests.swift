@@ -107,6 +107,16 @@ struct GlassAppIntentsTests {
                           .openInEditor([file])])
     }
 
+    @Test("the Open Terminal control opens its machine's terminal, or the library when none is chosen")
+    func control() async throws {
+        let machines = try await GlassMachineQuery.entities(in: library)
+        let asked = try await withLibrary {
+            _ = try await GlassOpenTerminalControlIntent(machine: machines[alpha]!).perform()
+            _ = try await GlassOpenTerminalControlIntent(machine: nil).perform()
+        }
+        #expect(asked == [.connect(machine: alpha, service: alphaTerminal), .showActive])
+    }
+
     #if os(macOS)
     @Test("New Terminal Window asks for a terminal in the folder given, or none")
     func newTerminal() async throws {

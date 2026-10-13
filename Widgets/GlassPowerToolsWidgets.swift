@@ -19,6 +19,14 @@ struct GlassPowerToolsWidgets: WidgetBundle {
         MachinesWidget()
         MachineWidget()
         ActiveWidget()
+        #if !os(visionOS)
+        // Controls (D72): Control Center, the Mac's menu bar, the Lock Screen, the Action button.
+        OpenTerminalControl()
+        ShowActiveControl()
+        #if os(macOS)
+        NewTerminalControl()
+        #endif
+        #endif
     }
 }
 
