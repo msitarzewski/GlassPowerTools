@@ -52,3 +52,6 @@
 - 2026-10-12 (late): the iPhone Duo on its simulator (iOS 27.1 runtime): fold-aware window gate (fac5ead), titles on
   the large-title line in two-column layouts (132007c, detail-column modifier), scratch and Windows 11 in the
   simulator's library; owner's next asks recorded in `activeContext.md` (Active by service, four Duo defects).
+- 2026-10-12 (late, after the compaction): Active with nothing open offers the library's machines by service
+  (Terminal, Database, Desktop) — the detail page beside the list, or the list itself on a compact stack; seen on the
+  folded Duo and an iPad in landscape. Details in `activeContext.md`.

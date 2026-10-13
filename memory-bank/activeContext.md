@@ -45,9 +45,12 @@ this notes commit; nothing pushed. Leave the owner's README edit and his uncommi
   (GlassConnectionUI; host detail uses it; iOS 27 puts detail titles in the toolbar row and `.toolbar(removing: .title)`
   does not remove it, so the modifier owns the navigation title). **Unverified:** the 12-pt content margin (needs an
   unfolded run). Other detail panels (Workgroups, SSH Keys, Collections, Active) not yet given the modifier.
-- **Owner's new ask — Active's empty detail:** instead of a second "Nothing Is Open", show the defined machines by
-  service: "Terminal > [machines with terminals], Database > […], Desktop > […]" — and first check what the Mac and an
-  iPad in landscape show there.
+- **Done after the compaction — Active's empty detail** (owner: "Terminal > [machines with terminals], Database >
+  […]"): the Mac, an iPad in landscape and the headset all showed the same "Nothing Is Open". Now the detail page lists
+  the library's machines under Terminal, Database, Desktop (setup tab order); a row connects that service; on a compact
+  stack the same sections follow "Nothing Is Open" in the list (`GlassActiveLauncher.swift`, `glassLibraryIsStacked` —
+  an iPad's list column is compact in landscape too, so the width class could not decide). Seen on the folded Duo and an
+  iPad Pro 11-inch landscape; the Mac not yet on screen (comes with 0.4.392).
 - **Seen on the Duo, to fix:** two "Tools" buttons in a folded terminal (capsule + bar); the bottom bar white under a
   black terminal; unfolded, a connection opened as its own window that took the screen (not beside the library); folded,
   the system's "N Views Open" chip covers the start of the library's large title.
@@ -56,8 +59,9 @@ this notes commit; nothing pushed. Leave the owner's README edit and his uncommi
   password reset per need into a 0700 file, never printed; tunnels on port 2223, never 2222 (Citadel's tests bind it).
 - **Temporary UI tests** (tour + demo) live only in the scratchpad (`GlassTerminalUITests.tour.swift`); the owner's file
   is backed up there too (`…owner-backup.swift`) — swap in to run, restore after, never commit.
-- **Next:** unfold the Duo and re-run the tour (measure content margin; host detail, Active, Settings); the Active
-  machines-by-service detail; the four Duo defects above; then tier 3 (tree-sitter overflow first).
+- **Next:** unfold the Duo and re-run the tour (measure content margin; host detail, Active, Settings) — the owner
+  asked to unfold it; the four Duo defects above; `glassDetailColumnTitle` for the other panels; 0.4.392; then tier 3
+  (tree-sitter overflow first).
 
 ## 2026-10-12 — end of the session (before a compaction)
 
