@@ -50,14 +50,16 @@ import Glibc
 /// directory yields a user-owned file. This matches every atomic-rename editor;
 /// it is disclosed here rather than surprising a caller.
 ///
-/// The save path resolves symlinks and the parent directory once, then creates,
-/// renames, and fsyncs by path. A local attacker able to write to an
-/// intermediate parent directory could, within the save window, swap a directory
-/// component for a symlink and redirect where the write lands (a classic TOCTOU;
-/// pen finding M-2). Closing that fully needs a dirfd-relative rewrite
-/// (`open(O_DIRECTORY|O_NOFOLLOW)` + `renameat`); it is tracked for M5. The
-/// final-component race is already benign — `rename(2)` does not follow a symlink
-/// at the target, so a swapped-in link is simply replaced.
+/// The save path resolves the parent directory to its real path once, opens it
+/// refusing a symlink in any component (`O_NOFOLLOW_ANY`), and then creates,
+/// renames and fsyncs relative to that open directory (`openat`, `renameat`).
+/// A local attacker able to write to an intermediate parent directory used to be
+/// able, within the save window, to swap a directory component for a symlink and
+/// redirect where the write landed (a classic TOCTOU; pen finding M-2, closed
+/// 2026-10-12): a swap before the open now fails the save, and one after it
+/// cannot move a directory already held open. The final-component race is
+/// benign — `renameat` does not follow a symlink at the target, so a swapped-in
+/// link is simply replaced.
 ///
 /// ## Symlinks
 ///
@@ -123,6 +125,12 @@ public enum AtomicSaver: Sendable {
 
     /// The byte-level half, exposed for callers that already hold encoded data.
     public static func writeAtomically(_ data: Data, to url: URL) throws {
+        try writeAtomically(data, to: url, afterChoosingDirectory: {})
+    }
+
+    /// `afterChoosingDirectory` runs once the folder is chosen and before anything is written into
+    /// it: the window a swapped folder would use (pen finding M-2). For tests.
+    static func writeAtomically(_ data: Data, to url: URL, afterChoosingDirectory: () throws -> Void) throws {
         // Resolve first: the temp file has to be a sibling of the *real* file.
         // `resolveDestination` follows a leaf symlink to its target explicitly,
         // including a *dangling* one whose target does not exist yet —
@@ -130,30 +138,43 @@ public enum AtomicSaver: Sendable {
         // so the rename would clobber the link into a regular file instead of
         // writing through it (pen-suite finding).
         let destination = resolveDestination(url)
-        let directory = destination.deletingLastPathComponent()
-        let destinationPath = destination.path
+        let name = destination.lastPathComponent
 
-        let mode = preservedMode(ofExistingFileAt: destinationPath) ?? defaultNewFileMode
+        // The folder by its real path, every link in it resolved, then held open: from here on the
+        // temp file, the rename and the sync are made relative to that open folder, so a component
+        // swapped for a link afterwards cannot redirect them (pen finding M-2, closed 2026-10-12).
+        // It is opened refusing a link anywhere in the path — the resolved path has none, so one
+        // there now was swapped in, and the save stops rather than follow it.
+        let directoryPath = try canonicalPath(of: destination.deletingLastPathComponent().path)
+        let directory = directoryPath.withCString { open($0, O_RDONLY | O_DIRECTORY | O_CLOEXEC | noFollowAnywhere) }
+        guard directory >= 0 else {
+            throw EditorError.saveFailed(reason: "could not open the folder \(directoryPath): \(errnoDescription())")
+        }
+        defer { close(directory) }
+        try afterChoosingDirectory()
 
-        let temporaryPath = directory
-            .appendingPathComponent(temporaryName(for: destination.lastPathComponent))
-            .path
+        let mode = preservedMode(of: name, in: directory) ?? defaultNewFileMode
+        let temporary = temporaryName(for: name)
 
         // Created 0600, then widened to `mode` once the content is in place:
         // there is never an instant where a file that is about to hold private
         // content is readable by anyone else.
-        let descriptor = temporaryPath.withCString { open($0, O_WRONLY | O_CREAT | O_EXCL, 0o600) }
+        let descriptor = temporary.withCString {
+            openat(directory, $0, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
+        }
         guard descriptor >= 0 else {
             throw EditorError.saveFailed(
-                reason: "could not create temporary file in \(directory.path): \(errnoDescription())"
+                reason: "could not create temporary file in \(directoryPath): \(errnoDescription())"
             )
         }
+
+        func removeTemporary() { _ = temporary.withCString { unlinkat(directory, $0, 0) } }
 
         // From here on every exit path removes the temp file. A save that fails
         // must not litter the user's directory with half-written droppings.
         func failing(_ error: EditorError) -> EditorError {
             close(descriptor)
-            _ = temporaryPath.withCString { unlink($0) }
+            removeTemporary()
             return error
         }
 
@@ -175,21 +196,39 @@ public enum AtomicSaver: Sendable {
         guard close(descriptor) == 0 else {
             // Capture close's errno *before* unlink overwrites it (pen finding L-1).
             let reason = errnoDescription()
-            _ = temporaryPath.withCString { unlink($0) }
+            removeTemporary()
             throw EditorError.saveFailed(reason: "close failed: \(reason)")
         }
 
-        // The atomic step.
-        let renamed = temporaryPath.withCString { source in
-            destinationPath.withCString { target in rename(source, target) }
+        // The atomic step, within the one folder held open.
+        let renamed = temporary.withCString { source in
+            name.withCString { target in renameat(directory, source, directory, target) }
         }
         guard renamed == 0 else {
             let reason = errnoDescription()
-            _ = temporaryPath.withCString { unlink($0) }
-            throw EditorError.atomicRenameFailed(reason: "\(temporaryPath) -> \(destinationPath): \(reason)")
+            removeTemporary()
+            throw EditorError.atomicRenameFailed(reason: "\(directoryPath)/\(temporary) -> \(name): \(reason)")
         }
 
-        syncDirectory(at: directory.path)
+        // Make the rename itself durable. Best-effort: the data is already committed and named.
+        _ = fsync(directory)
+    }
+
+    /// `open` refusing a symbolic link in any component of the path, where the platform offers it.
+    #if canImport(Darwin)
+    private static let noFollowAnywhere = O_NOFOLLOW_ANY
+    #else
+    private static let noFollowAnywhere: Int32 = 0
+    #endif
+
+    /// The path with every link in it resolved (`realpath(3)`). Unlike `URL.resolvingSymlinksInPath()`,
+    /// which turns `/private/var/…` back into `/var/…` — a link.
+    private static func canonicalPath(of path: String) throws -> String {
+        guard let resolved = realpath(path, nil) else {
+            throw EditorError.saveFailed(reason: "could not find the folder \(path): \(errnoDescription())")
+        }
+        defer { free(resolved) }
+        return String(cString: resolved)
     }
 
     // MARK: - Primitives
@@ -280,10 +319,10 @@ public enum AtomicSaver: Sendable {
         return result
     }
 
-    /// POSIX mode of an existing destination, or `nil` if there is nothing there.
+    /// POSIX mode of an existing destination in `directory`, or `nil` if there is nothing there.
     ///
-    /// Uses `stat`, which follows symlinks, matching the follow-the-link save
-    /// policy: the mode that matters is the target's.
+    /// Follows a symlink, matching the follow-the-link save policy: the mode
+    /// that matters is the target's.
     ///
     /// The setuid and setgid bits are **stripped** (pen finding M-1). The kernel
     /// clears them on write to a file's content; re-arming them via `fchmod`
@@ -292,20 +331,10 @@ public enum AtomicSaver: Sendable {
     /// meaningful only on directories, which this never writes, but costs
     /// nothing to keep). A save therefore clears setuid/setgid — documented
     /// behavior, matching every mainstream editor.
-    private static func preservedMode(ofExistingFileAt path: String) -> mode_t? {
+    private static func preservedMode(of name: String, in directory: Int32) -> mode_t? {
         var info = stat()
-        guard path.withCString({ stat($0, &info) }) == 0 else { return nil }
+        guard name.withCString({ fstatat(directory, $0, &info, 0) }) == 0 else { return nil }
         return info.st_mode & 0o1777
-    }
-
-    /// Make the rename itself durable. Best-effort: a filesystem that refuses to
-    /// open a directory for reading is not a reason to report a failed save when
-    /// the data is already committed and named.
-    private static func syncDirectory(at path: String) {
-        let descriptor = path.withCString { open($0, O_RDONLY) }
-        guard descriptor >= 0 else { return }
-        _ = fsync(descriptor)
-        close(descriptor)
     }
 
     private static func errnoDescription() -> String {
