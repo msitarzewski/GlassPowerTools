@@ -29,8 +29,8 @@ anything touching real servers (SSH and database tests use the disposable test V
 
 ## 2026-10-13 (~01:30) — overnight: Duo fixes, 0.4.392, tier 3 begun
 
-**State:** everything committed (76a5c7f … HEAD); nothing pushed. **0.4.392 on the Mac**; the iPhone and Vision
-Pro were locked — a retry loop in the session scratchpad installs each when it unlocks (check the devices). Builds
+**State:** everything committed (76a5c7f … HEAD); nothing pushed. **0.4.392 on the Mac and the iPhone** (installed
+03:44, not launched — locked); **the Vision Pro is still on 0.4.391** (locked until the retry loop gave up at 04:37). Builds
 after 0.4.392 also carry: the tree-sitter match limit, B-X5, B-X13, B-X18, B-X22 (first half).
 
 - **Done:** Active's machines by service (76a5c7f); the folded-Duo terminal — one Tools, no white strip (e8fa7ba);
