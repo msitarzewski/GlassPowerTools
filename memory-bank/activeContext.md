@@ -45,6 +45,13 @@ until its Desktop service turns it on (default off, a trust boundary) — told t
 - **Leftover on the owner's Duo simulator:** a desktop window restored from before shows "Desktop Not Found" —
   close it from the "Views Open" switcher (a phone cannot close it from inside).
 - **Mermaid 12.2.0** came in through the scheme's pre-action (D35) during a build — expected, committed.
+- **11:2x the owner's screenshots, all done:** overview tiles — a tabbed terminal no longer repeats under Other
+  (`terminal-session:` ids; Files browsers get a Files group), the second caption line legible, **Settings ▸
+  Terminal ▸ Show All Windows ▸ Blur previews** (this Mac, `GlassShowAllWindows.blursPreviewsKey`); the app menu —
+  **one Command Palette** owned by the shell (`GlassShellPaletteCommands` + `GlassCommandPaletteSources`; menu test
+  guards ⇧⌘P/⌘K), Check for Updates hidden until a build has its Sparkle key (B-R1). **A real crash found:** 0.4.393
+  aborted in Quick Look at 05:58 (`setPreviewItem` on a view already showing a file) — each file its own view now.
+  0.4.397 carries all of it.
 - **Show All Windows** (was Show All Terminals; the owner: include every service type, "one component?"):
   `GlassShowAllWindows` in the shell (action set by the terminal, which draws the overlay; button beside every ⚡);
   overlay = terminal windows' groups + Databases, Desktops, Editor from `registry.openSessions()`; a desktop tile
