@@ -895,9 +895,19 @@ final class GlassTerminalDirectoryLister: GlassHostDirectoryLister {
     }
 
     func list(_ path: String) async throws -> [GlassHostDirectoryEntry] {
-        try await sftp.list(path).map {
-            GlassHostDirectoryEntry(name: $0.name, isDirectory: $0.attributes.isDirectory)
+        Self.entries(from: try await sftp.list(path))
+    }
+
+    /// The folder's entries as the editor gets them, **without names it must not join onto the
+    /// folder** (S5; B-X22, 2026-10-13): the server sends the names, and the editor builds each
+    /// child's path from one, so a name with `/` or NUL in it, or `.`/`..`, would reach outside the
+    /// folder it was listed from. Left out, and counted in the log.
+    static func entries(from listed: [SFTPEntry]) -> [GlassHostDirectoryEntry] {
+        let safe = listed.filter(\.hasSafeName)
+        if safe.count < listed.count {
+            Logger.ssh.error("SFTP listing: left out \(listed.count - safe.count, privacy: .public) entries whose names are not a single path component")
         }
+        return safe.map { GlassHostDirectoryEntry(name: $0.name, isDirectory: $0.attributes.isDirectory) }
     }
 
     /// Reads the whole file, in the chunks SFTP actually delivers: a read is answered with *at
