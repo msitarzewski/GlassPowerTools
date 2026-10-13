@@ -959,6 +959,12 @@ final class MacWorkspaceController {
         persist()
     }
 
+    /// The pane's last attempt found no saved server by its id.
+    func failedForMissingServer(_ paneID: UUID) -> Bool {
+        if case .savedServerNotFound = pendingCredentialErrorsByPaneID[paneID] { return true }
+        return false
+    }
+
     func retryPane(_ paneID: UUID) {
         guard !isClosed else { return }
         errorsByPaneID.removeValue(forKey: paneID)

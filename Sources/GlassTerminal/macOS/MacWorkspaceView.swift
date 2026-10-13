@@ -1087,8 +1087,16 @@ private struct MacWorkspaceTabContent: View {
                 // a window already open failed, "Could not connect to …", a CancellationError in the
                 // log (the owner: "these always fail"). Here, the switch keeps it; it starts once
                 // saved hosts are read, and again on Retry (the error cleared).
-                .task(id: "\(savedHostsReady)|\(controller.error(for: pane.id) ?? "")") {
+                .task(id: "\(savedHostsReady)|\(controller.error(for: pane.id) ?? "")|\(isSaved(pane))") {
                     guard savedHostsReady else { return }
+                    // Told its server was not saved, and now it is: ask again. The library's first
+                    // answer can come before every machine's record has (one synced in later, say),
+                    // and the pane kept saying "The saved server no longer exists" of a server the
+                    // library then had (the owner's SY Staging tab, 2026-10-13).
+                    if controller.failedForMissingServer(pane.id), isSaved(pane) {
+                        controller.retryPane(pane.id)
+                        return
+                    }
                     await controller.prepareSSHPaneIfNeeded(
                         pane,
                         sessionManager: sessionManager,
@@ -1108,12 +1116,17 @@ private struct MacWorkspaceTabContent: View {
         return persistentStateReady && (servers.familyCatalogLoaded || servers.serverCatalogLoadError != nil)
     }
 
+    /// Whether the pane's server is among the saved hosts now.
+    private func isSaved(_ pane: MacWorkspacePane) -> Bool {
+        pane.intent.serverID.flatMap { sessionManager.serverManager.server(for: $0) } != nil
+    }
+
     @ViewBuilder
     private func sshPane(_ pane: MacWorkspacePane, isFocused: Bool, showsPaneChrome: Bool) -> some View {
             if !savedHostsReady {
                 ProgressView("Loading saved hosts…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(.regularMaterial, in: .rect(cornerRadius: 18))
+                    .background(.regularMaterial, in: .rect(cornerRadius: showsPaneChrome ? 18 : 0))
             } else if let session = controller.session(for: pane.id) {
                 TerminalWindowView(
                     session: session,
@@ -1151,11 +1164,14 @@ private struct MacWorkspaceTabContent: View {
                 .contentShape(Rectangle())
                 .simultaneousGesture(TapGesture().onEnded { controller.focus(pane.id) })
             } else {
-                sshPlaceholder(for: pane)
+                sshPlaceholder(for: pane, showsPaneChrome: showsPaneChrome)
             }
     }
 
-    private func sshPlaceholder(for pane: MacWorkspacePane) -> some View {
+    /// Square where the pane fills its tab, as a local pane's: rounded corners met the window's
+    /// square sidebar and toolbar edges (the owner, 2026-10-13: "rounded corners meeting square …
+    /// these should be square"). Rounded only among split panes, which have room around them.
+    private func sshPlaceholder(for pane: MacWorkspacePane, showsPaneChrome: Bool) -> some View {
         Group {
             if controller.isLoading(pane.id) {
                 ProgressView("Connecting…")
@@ -1184,7 +1200,7 @@ private struct MacWorkspaceTabContent: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.regularMaterial, in: .rect(cornerRadius: 18))
+        .background(.regularMaterial, in: .rect(cornerRadius: showsPaneChrome ? 18 : 0))
         .contentShape(Rectangle())
         .onTapGesture { controller.focus(pane.id) }
     }
