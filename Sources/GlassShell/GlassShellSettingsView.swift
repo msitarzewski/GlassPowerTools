@@ -184,7 +184,11 @@ public struct GlassShellSettingsView: View {
     private func shellPage(_ page: GlassShellSettingsPage) -> some View {
         switch page {
         case .general: general
-        case .appearance: GlassLayerControls()
+        case .appearance:
+            GlassLayerControls()
+            #if os(macOS)
+            showAllWindowsSection
+            #endif
         case .privacy: privacy
         case .about: EmptyView()   // `GlassShellAboutView`, outside a form
         }
@@ -193,6 +197,24 @@ public struct GlassShellSettingsView: View {
     @AppStorage(GlassAvailabilityMonitor.settingKey, store: GlassUITestRun.settingsDefaults) private var showsAvailability = false
     #if os(visionOS)
     @AppStorage(GlassConnectionsIdleShrink.settingKey, store: GlassUITestRun.settingsDefaults) private var idleShrinkSeconds = GlassConnectionsIdleShrink.standard.rawValue
+    #endif
+
+    #if os(macOS)
+    @AppStorage(GlassShowAllWindows.blursPreviewsKey, store: GlassUITestRun.settingsDefaults)
+    private var blursShowAllWindowsPreviews = false
+
+    /// Show All Windows' look, beside every window's own: it applies to every window in that view (the
+    /// owner, 2026-10-13: "We should move it to appearance since it applies to all of the windows in that
+    /// mode"). It was on the terminal's Connections page, where he did not find it.
+    private var showAllWindowsSection: some View {
+        Section(GlassShowAllWindows.title) {
+            Toggle("Blur previews", isOn: $blursShowAllWindowsPreviews)
+                .accessibilityIdentifier("settings-show-all-windows-blur")
+            Text("Softens what each window shows in Show All Windows (⇧⌘\\), so a screenshot of it can be shared. Names stay sharp. This Mac only.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
     #endif
 
     private var general: some View {

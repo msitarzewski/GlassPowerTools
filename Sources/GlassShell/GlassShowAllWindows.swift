@@ -21,7 +21,7 @@ public enum GlassShowAllWindows {
     public static let title = "Show All Windows"
     public static let symbolName = "rectangle.3.group"
 
-    /// Settings ▸ Terminal ▸ Blur previews: the overview's pictures softened, so a screenshot of it
+    /// Settings ▸ Appearance ▸ Show All Windows ▸ Blur previews: the overview's pictures softened, so a screenshot of it
     /// can be shared without what the windows show (the owner, 2026-10-13). This device's choice,
     /// not synced: it is about this screen.
     public static let blursPreviewsKey = "com.glasspowertools.showAllWindows.blursPreviews"

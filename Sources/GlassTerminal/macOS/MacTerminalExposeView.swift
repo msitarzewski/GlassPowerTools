@@ -11,6 +11,7 @@
 #if os(macOS)
 import AppKit
 import SwiftUI
+import GlassLayers
 import GlassShell
 
 struct MacTerminalExposeView: View {
@@ -18,8 +19,8 @@ struct MacTerminalExposeView: View {
     let insets: EdgeInsets
     @Environment(SessionManager.self) private var sessionManager
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// Settings ▸ Terminal ▸ Blur previews (GlassShowAllWindows.blursPreviewsKey).
-    @AppStorage(GlassShowAllWindows.blursPreviewsKey) private var blursPreviews = false
+    /// Settings ▸ Appearance ▸ Show All Windows ▸ Blur previews (GlassShowAllWindows.blursPreviewsKey).
+    @AppStorage(GlassShowAllWindows.blursPreviewsKey, store: GlassUITestRun.settingsDefaults) private var blursPreviews = false
     @State private var appeared = false
     @State private var hovered: MacTerminalExposeItemID?
     @State private var dropTarget: UUID?
