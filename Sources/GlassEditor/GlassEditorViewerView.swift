@@ -30,6 +30,8 @@ struct GlassEditorViewerView: View {
             case .image, .pdf, .video, .audio:
                 #if os(macOS)
                 GlassQuickLookView(url: viewer.fileURL)
+                    // A view per file: one is never given another's (`GlassQuickLookView`).
+                    .id(viewer.fileURL)
                 #else
                 touchViewer
                 #endif
@@ -77,8 +79,12 @@ extension GlassEditorFileKind {
 }
 
 #if os(macOS)
-/// Quick Look in a view. The preview item is replaced when the URL changes; the view is closed
-/// when it goes, so a playing video stops with its tab.
+/// Quick Look in a view, one per file (`.id` at the call site): the view is closed when it goes,
+/// so a playing video stops with its tab.
+///
+/// **Never given a second file.** Setting `previewItem` on a view already showing one aborted the
+/// app inside Quick Look (`-[QLPreviewView setPreviewItem:…]` → `_QLRaiseAssert`, 0.4.393, the
+/// owner's Mac, 2026-10-13 05:58). A new file is a new view.
 private struct GlassQuickLookView: NSViewRepresentable {
     let url: URL
 
@@ -89,9 +95,7 @@ private struct GlassQuickLookView: NSViewRepresentable {
         return view
     }
 
-    func updateNSView(_ view: QLPreviewView, context: Context) {
-        if (view.previewItem as? NSURL) as URL? != url { view.previewItem = url as NSURL }
-    }
+    func updateNSView(_ view: QLPreviewView, context: Context) {}
 
     static func dismantleNSView(_ view: QLPreviewView, coordinator: ()) {
         view.close()
