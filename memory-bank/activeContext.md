@@ -75,8 +75,18 @@ installed with them to keep one build everywhere.
 **Next (the owner, 16:10): system integration** — "Let's get a finder integration going … they should be available on
 all of the platforms that support them. App intents, all of the modern stuff … Be sure visionOS is well represented!"
 (his screenshot: Finder's Services submenu with other apps' New Tab/Window Here and Open in). Plan:
-`tasks/2026-10/2026-10-13_system-integration-plan.md`. **Approved (D72): "Do all of the things."** Building phase 1
-(entities and intents) now, each piece committed as it lands.
+`tasks/2026-10/2026-10-13_system-integration-plan.md`. **Approved (D72): "Do all of the things."**
+- **Phase 1 done, 0.4.403 on all three (16:52):**
+  - Entities for machines, services and workgroups, read from the widget snapshot.
+  - Ten intents and seven App Shortcuts; the built metadata was checked.
+  - `GlassWindowOpener`, which every kind of window registers. Requests used to run only from the Connections
+    window, so a widget's Connect waited with only terminal windows open.
+  - A configurable Machine widget.
+  - Not yet seen by the owner.
+- **Phase 2 (the Finder) next:**
+  - Services and a front-window registry for New Tab Here.
+  - Open With a folder or a `.command` file; the Dock menu; `ssh://` links.
+  - Quick Actions and Finder Sync extensions. These write a request to the App Group and wake the app.
 
 **Then, for an agent:** tier 3 from the inventory's section 0: B-X2 with B-Q11, B-X6 with B-F32, B-X7, and
 B-X22's second half. Also the database's own `databaseSidebarChrome()`, which still removes the toggle off the
