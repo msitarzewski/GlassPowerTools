@@ -2,14 +2,16 @@
 //  MacTerminalExposeView.swift
 //  Glass Power Tools — GlassTerminal
 //
-//  What Show All Terminals draws (`MacTerminalExpose`): the dimmed, blurred backdrop, a group per
-//  terminal window with a live tile per tab, and the "Not in a window" group of tmux sessions no
-//  tab shows. Tiles are `MacWorkspacePreview`s — images, never terminals.
+//  What Show All Windows draws (`MacTerminalExpose`): the dimmed, blurred backdrop, a group per
+//  terminal window with a live tile per tab, the "Not in a window" group of tmux sessions no tab
+//  shows, and a group per other kind of window — Databases, Desktops, Editor (2026-10-13). Tiles
+//  are `MacWorkspacePreview`s and sessions' own snapshots — images, never live surfaces.
 //
 
 #if os(macOS)
 import AppKit
 import SwiftUI
+import GlassShell
 
 struct MacTerminalExposeView: View {
     let expose: MacTerminalExpose
@@ -30,7 +32,8 @@ struct MacTerminalExposeView: View {
         let windowGroups = MacTerminalExposeModel.groups(windows: windows.map(\.controller),
                                                          servers: sessionManager.serverManager.servers)
         let unshown = MacTerminalExposeModel.notInAWindowGroup(expose.unshownSessions).map { [$0] } ?? []
-        return MacTerminalExposeModel.filtered(windowGroups + unshown, by: expose.filter)
+        let others = MacTerminalExposeModel.otherGroups(expose.otherSessions)
+        return MacTerminalExposeModel.filtered(windowGroups + unshown + others, by: expose.filter)
     }
 
     var body: some View {
@@ -75,7 +78,7 @@ struct MacTerminalExposeView: View {
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Show All Terminals")
+        .accessibilityLabel(GlassShowAllWindows.title)
         .accessibilityIdentifier("terminal-expose")
     }
 
@@ -101,9 +104,11 @@ struct MacTerminalExposeView: View {
     private func canvas(_ groups: [MacTerminalExposeGroup], _ layout: MacTerminalExposeLayout) -> some View {
         let tabs = Dictionary(windows.flatMap(\.controller.tabs).map { ($0.workspaceID, $0) },
                               uniquingKeysWith: { first, _ in first })
+        let sessions = Dictionary(expose.otherSessions.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         return ZStack(alignment: .topLeading) {
             ForEach(Array(zip(groups, layout.groups)), id: \.0.id) { group, frames in
-                groupView(group, frames: frames, tileSize: layout.tileSize, tabs: tabs, scrolls: layout.scrolls)
+                groupView(group, frames: frames, tileSize: layout.tileSize, tabs: tabs, sessions: sessions,
+                          scrolls: layout.scrolls)
                     .frame(width: frames.frame.width, height: frames.frame.height)
                     .position(x: frames.frame.midX, y: frames.frame.midY)
             }
@@ -111,7 +116,8 @@ struct MacTerminalExposeView: View {
     }
 
     private func groupView(_ group: MacTerminalExposeGroup, frames: MacTerminalExposeLayout.Group,
-                           tileSize: CGSize, tabs: [UUID: MacWorkspaceController], scrolls: Bool) -> some View {
+                           tileSize: CGSize, tabs: [UUID: MacWorkspaceController],
+                           sessions: [String: GlassOpenSession], scrolls: Bool) -> some View {
         let windowID: UUID? = if case .window(let id) = group.id { id } else { nil }
         let origin = frames.frame.origin
         let targeted = windowID != nil && dropTarget == windowID
@@ -129,7 +135,7 @@ struct MacTerminalExposeView: View {
                         expose.choose(.tab(window.controller.selectedTabID))
                     }
                 }
-            Label(group.title, systemImage: windowID == nil ? "rectangle.dashed" : "macwindow")
+            Label(group.title, systemImage: Self.symbol(for: group))
                 .font(.headline)
                 .lineLimit(1)
                 .foregroundStyle(.primary)
@@ -138,6 +144,7 @@ struct MacTerminalExposeView: View {
                 .allowsHitTesting(false)
             ForEach(Array(zip(group.tiles, frames.tileFrames)), id: \.0.id) { tile, frame in
                 tileView(tile, tab: tabID(tile.id).flatMap { tabs[$0] }, windowID: windowID,
+                         session: sessionID(tile.id).flatMap { sessions[$0] },
                          size: tileSize, alwaysVisible: !scrolls)
                     .position(x: frame.midX - origin.x, y: frame.midY - origin.y)
             }
@@ -154,9 +161,19 @@ struct MacTerminalExposeView: View {
         .accessibilityLabel(group.title)
     }
 
+    /// A terminal window's group, the tmux sessions no window shows, or a kind of window by the
+    /// symbol its sessions carry.
+    private static func symbol(for group: MacTerminalExposeGroup) -> String {
+        switch group.id {
+        case .window: "macwindow"
+        case .notInAWindow: "rectangle.dashed"
+        case .kind: group.tiles.first?.symbolName ?? "macwindow"
+        }
+    }
+
     @ViewBuilder
     private func tileView(_ tile: MacTerminalExposeTile, tab: MacWorkspaceController?, windowID: UUID?,
-                          size: CGSize, alwaysVisible: Bool) -> some View {
+                          session: GlassOpenSession?, size: CGSize, alwaysVisible: Bool) -> some View {
         let selected = expose.selection == tile.id
         let hovering = hovered == tile.id
         Group {
@@ -164,6 +181,8 @@ struct MacTerminalExposeView: View {
                 MacTerminalExposeTabTile(tab: tab, tile: tile, selected: selected, hovering: hovering,
                                          alwaysVisible: alwaysVisible)
                     .onDrag { MacWorkspaceTabDrag(windowID: windowID, workspaceID: tab.workspaceID).itemProvider() }
+            } else if case .session = tile.id {
+                MacTerminalExposeWindowTile(tile: tile, session: session, selected: selected, hovering: hovering)
             } else {
                 MacTerminalExposeSessionTile(tile: tile, selected: selected) { expose.choose(tile.id) }
             }
@@ -188,10 +207,15 @@ struct MacTerminalExposeView: View {
         if case .tab(let workspaceID) = id { workspaceID } else { nil }
     }
 
+    private func sessionID(_ id: MacTerminalExposeItemID) -> String? {
+        if case .session(let sessionID) = id { sessionID } else { nil }
+    }
+
     private func identifier(_ id: MacTerminalExposeItemID) -> String {
         switch id {
         case .tab(let workspaceID): "terminal-expose-tab-\(workspaceID.uuidString.lowercased())"
         case .tmux(let name): "terminal-expose-tmux-\(name)"
+        case .session(let id): "expose-session-\(id)"
         }
     }
 
@@ -270,6 +294,58 @@ private struct MacTerminalExposeTabTile: View {
             }
             .shadow(color: .black.opacity(0.35), radius: hovering ? 14 : 8, y: 4)
             .contentShape(.rect(cornerRadius: 10))
+    }
+}
+
+/// Another kind of window — a desktop, a database, an editor: its picture where its session can
+/// draw one (a desktop's screen), else its symbol, name and state. Choosing it brings the window
+/// forward (`GlassOpenSession.activate`).
+private struct MacTerminalExposeWindowTile: View {
+    let tile: MacTerminalExposeTile
+    let session: GlassOpenSession?
+    let selected: Bool
+    let hovering: Bool
+
+    var body: some View {
+        let picture = session?.snapshot?()
+        ZStack {
+            if let picture {
+                picture.resizable().aspectRatio(contentMode: .fit)
+            } else {
+                VStack(spacing: 6) {
+                    Image(systemName: tile.symbolName ?? "macwindow")
+                        .font(.system(size: 26))
+                        .foregroundStyle(.secondary)
+                    Text(tile.title)
+                        .font(.headline)
+                        .lineLimit(1)
+                    if let detail = tile.detail {
+                        Text(detail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.center)
+                    }
+                }
+                .padding(10)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(alignment: .bottom) {
+            if picture != nil, selected || hovering {
+                MacTerminalExposeCaption(title: tile.title, detail: tile.detail)
+                    .padding(8)
+                    .transition(.opacity)
+            }
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(selected ? Color.accentColor : Color.white.opacity(0.16), lineWidth: selected ? 3 : 1)
+        }
+        .shadow(color: .black.opacity(0.35), radius: hovering ? 14 : 8, y: 4)
+        .contentShape(.rect(cornerRadius: 10))
     }
 }
 

@@ -865,6 +865,15 @@ public struct GlassActiveConnectionsToolbarContent: ToolbarContent {
     private var dismissCurrent: (@MainActor () -> Void)? { explicitDismiss ?? route?.dismissCurrent }
 
     public var body: some ToolbarContent {
+        #if os(macOS)
+        // Show All Windows, beside the ⚡ in every window that carries it: one control, the same
+        // everywhere (GlassShowAllWindows, 2026-10-13).
+        if show != nil, GlassShowAllWindows.toggle != nil {
+            ToolbarItem(placement: GlassActiveConnectionsToolbarModifier.placement) {
+                GlassShowAllWindowsButton()
+            }
+        }
+        #endif
         if let show {
             ToolbarItem(placement: GlassActiveConnectionsToolbarModifier.placement) {
                 GlassActiveConnectionsButton {

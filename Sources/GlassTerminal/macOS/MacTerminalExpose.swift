@@ -2,10 +2,12 @@
 //  MacTerminalExpose.swift
 //  Glass Power Tools — GlassTerminal
 //
-//  Show All Terminals (W9; the owner, 2026-10-08: "Mission Control / Exposé for Terminal windows
-//  *and their tabs* like macOS does"). Every terminal window becomes a group of live tiles, one per
-//  tab, on a dimmed, blurred screen above the app's windows. Choosing a tile brings its window
-//  forward on that tab; dragging a tile onto another group moves the tab there, still running.
+//  Show All Windows — Show All Terminals until 2026-10-13 (W9; the owner, 2026-10-08: "Mission
+//  Control / Exposé for Terminal windows *and their tabs* like macOS does"). Every terminal window
+//  becomes a group of live tiles, one per tab, on a dimmed, blurred screen above the app's windows.
+//  Choosing a tile brings its window forward on that tab; dragging a tile onto another group moves
+//  the tab there, still running. Since 2026-10-13 every other open window joins it, a group per
+//  kind — Databases, Desktops, Editor — from the shell's list of open sessions (`GlassShowAllWindows`).
 //
 //  Opened by ⇧⌘\ (Safari's Show All Tabs), Window ▸ Show All Terminals, a toolbar button in
 //  Connections and in every terminal window, and a two-finger pinch in on a terminal window. A
@@ -19,13 +21,16 @@
 import AppKit
 import Observation
 import SwiftUI
+import GlassShell
 
 // MARK: What it shows
 
-/// A tile: a tab of a terminal window, or a tmux session on this Mac that no tab shows.
+/// A tile: a tab of a terminal window, a tmux session on this Mac that no tab shows, or another
+/// capability's open window — a desktop, a database, an editor — by its `GlassOpenSession` id.
 enum MacTerminalExposeItemID: Hashable {
     case tab(UUID)
     case tmux(String)
+    case session(String)
 }
 
 struct MacTerminalExposeTile: Identifiable, Equatable {
@@ -43,6 +48,8 @@ struct MacTerminalExposeTile: Identifiable, Equatable {
     var isBusy = false
     /// The tmux session's own name, so "glass-3" finds "Terminal 3".
     var sessionName: String?
+    /// Another capability's window: its symbol, where it has no picture.
+    var symbolName: String?
 
     /// The line under the name: the repository's, else the folder.
     var location: String? { repository ?? folder }
@@ -56,6 +63,8 @@ struct MacTerminalExposeGroup: Identifiable, Equatable {
     enum ID: Hashable {
         case window(UUID)
         case notInAWindow
+        /// Another capability's windows, by the kind in their session ids ("desktop").
+        case kind(String)
     }
 
     let id: ID
@@ -127,6 +136,25 @@ enum MacTerminalExposeModel {
                                   detail: GlassTerminalCapability.runningDetails(session),
                                   sessionName: session.name)
         })
+    }
+
+    /// Every other capability's open windows, a group per kind in the setup's order — Databases,
+    /// Desktops, then the editor's — each window a tile. The terminal's own are its windows' groups.
+    static func otherGroups(_ sessions: [GlassOpenSession]) -> [MacTerminalExposeGroup] {
+        let kinds: [(prefix: String, title: String)] = [("database", "Databases"), ("desktop", "Desktops"), ("editor", "Editor")]
+        let known = Set(kinds.map(\.prefix) + ["terminal"])
+        let groups = kinds.compactMap { kind -> MacTerminalExposeGroup? in
+            let tiles = sessions.filter { GlassShowAllWindows.kind(of: $0) == kind.prefix }.map(tile(for:))
+            return tiles.isEmpty ? nil : MacTerminalExposeGroup(id: .kind(kind.prefix), title: kind.title, tiles: tiles)
+        }
+        // A kind added later still shows, under its sessions' own word, rather than going missing.
+        let others = sessions.filter { !known.contains(GlassShowAllWindows.kind(of: $0) ?? "") }
+        return others.isEmpty ? groups : groups + [MacTerminalExposeGroup(id: .kind("other"), title: "Other", tiles: others.map(tile(for:)))]
+    }
+
+    static func tile(for session: GlassOpenSession) -> MacTerminalExposeTile {
+        MacTerminalExposeTile(id: .session(session.id), title: session.title, detail: session.subtitle,
+                              symbolName: session.symbolName)
     }
 
     /// The selection, kept while its tile is shown; else the first tile shown. Typing or a window
@@ -525,8 +553,13 @@ final class MacTerminalExpose {
         self.registry = registry
     }
 
-    /// Something to show: a terminal window, or the overlay itself to close.
-    var isAvailable: Bool { isShown || !registry.shownWindows.isEmpty }
+    /// Something to show: a window, or the overlay itself to close.
+    var isAvailable: Bool { isShown || !registry.shownWindows.isEmpty || !otherSessions.isEmpty }
+
+    /// Every other capability's open windows (`GlassShowAllWindows.openSessions`), read when asked.
+    var otherSessions: [GlassOpenSession] {
+        (GlassShowAllWindows.openSessions?() ?? []).filter { GlassShowAllWindows.kind(of: $0) != "terminal" }
+    }
 
     func toggle(_ context: Context) {
         isShown ? close() : show(context)
@@ -594,6 +627,10 @@ final class MacTerminalExpose {
             bringForward(shown.window)
         case .tmux(let name):
             reopen(name)
+        case .session(let id):
+            guard let session = otherSessions.first(where: { $0.id == id }) else { return }
+            close()
+            session.activate()
         }
     }
 

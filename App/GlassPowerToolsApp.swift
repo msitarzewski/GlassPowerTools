@@ -178,6 +178,9 @@ struct GlassPowerToolsApp: App {
         // D1: and its open windows belong in the one session switcher, for the same reason and
         // through the same escape hatch. Read at draw time so the list follows the editor's state.
         model.registry.registerSessionProvider(id: "editor") { [editor] in editor.openSessions() }
+        // Show All Windows lists every open window beside the terminal's (GlassShowAllWindows):
+        // the composition root is the one place that holds every capability's sessions.
+        GlassShowAllWindows.openSessions = { [model] in model.registry.openSessions() }
         // Stage C: Projects in the library, the same way. Answering "is that machine this one?"
         // needs the catalog, which the editor deliberately does not hold, so the answer is supplied
         // from here. Pinned host keys are not consulted yet: the catalog's own local record (D8) is

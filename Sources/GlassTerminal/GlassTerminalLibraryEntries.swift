@@ -44,16 +44,10 @@ public struct GlassTerminalLibraryToolbar: View {
         }
         .help("Local Terminal")
         .accessibilityIdentifier("connection-library-local-terminal-toolbar")
-        // The owner's "system tool in the connections window" (W9): every terminal window and its
-        // tabs at once. Its key is Window ▸ Show All Terminals', not this button's (rule 39).
-        Button {
-            MacTerminalExpose.shared.toggle(.init(runtime: runtime, openWindow: openWindow))
-        } label: {
-            Label("Show All Terminals", systemImage: "rectangle.3.group")
-        }
-        .help("Show All Terminals")
-        .disabled(!MacTerminalExpose.shared.isAvailable)
-        .accessibilityIdentifier("connection-library-show-all-terminals")
+        // The owner's "system tool in the connections window" (W9): every window at once — the
+        // same button every window carries (GlassShowAllWindows). Its key is Window ▸ Show All
+        // Windows', not this button's (rule 39).
+        GlassShowAllWindowsButton()
         #endif
     }
 }
@@ -156,7 +150,7 @@ struct TerminalLibraryCommands: Commands {
             Button("Workgroups") { runtime.showWorkgroups(openWindow: openWindow) }
             // ⇧⌘\ is Safari's Show All Tabs; here, every terminal window and its tabs (W9). This
             // item is its one owner, and it works from any window, Connections included.
-            Button("Show All Terminals") {
+            Button(GlassShowAllWindows.title) {
                 MacTerminalExpose.shared.toggle(.init(runtime: runtime, openWindow: openWindow))
             }
             .keyboardShortcut("\\", modifiers: [.command, .shift])

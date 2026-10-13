@@ -280,22 +280,23 @@ struct MenuBarPlacementTests {
                 "Window ▸ Workgroups is offered by \(offeredBy.sorted()); it belongs to TerminalLibraryCommands, once.")
     }
 
-    /// ⇧⌘\ is Show All Terminals (W9, 2026-10-08), Safari's key for its Show All Tabs. Its one
+    /// ⇧⌘\ is Show All Windows (W9, 2026-10-08, Show All Terminals until 2026-10-13), Safari's key
+    /// for its Show All Tabs. Its one
     /// owner is the Window menu item, which works from any window, Connections included; the
     /// toolbar buttons that open the same overview carry no key. AppKit's own View ▸ Show All Tabs
     /// is let go of the key at run time (`MacTerminalExposeShortcut`), and that only shows in the
     /// running app's menu bar.
-    @Test func shiftCommandBackslashIsShowAllTerminalsAlone() throws {
+    @Test func shiftCommandBackslashIsShowAllWindowsAlone() throws {
         #expect(try owners(of: #"\\"#, modifiers: ["command", "shift"]) == ["GlassTerminalLibraryEntries.swift"],
-                "⇧⌘\\ is Window ▸ Show All Terminals; a second declaration leaves one of them keyless or dead.")
+                "⇧⌘\\ is Window ▸ Show All Windows; a second declaration leaves one of them keyless or dead.")
         var offeredBy: [String] = []
         for file in try swiftSources() {
             let text = try String(contentsOf: file, encoding: .utf8)
-            if text.contains("CommandGroup(after: .singleWindowList)"), text.contains(#"Button("Show All Terminals")"#) {
+            if text.contains("CommandGroup(after: .singleWindowList)"), text.contains("Button(GlassShowAllWindows.title)") {
                 offeredBy.append(file.lastPathComponent)
             }
         }
-        #expect(offeredBy == ["GlassTerminalLibraryEntries.swift"], "Window ▸ Show All Terminals is offered by \(offeredBy.sorted()).")
+        #expect(offeredBy == ["GlassTerminalLibraryEntries.swift"], "Window ▸ Show All Windows is offered by \(offeredBy.sorted()).")
     }
 
     // MARK: Reading the sources

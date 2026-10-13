@@ -148,9 +148,25 @@ public final class GlassDesktopCapability: GlassCapability {
                 endpointIDs: [connection.id],
                 activate: { [runtime] in runtime.enqueue(.show(connectionID: connection.id)) },
                 close: { _ = session.close() },
-                isConnected: session.isConnected
+                isConnected: session.isConnected,
+                // The remote screen as it last arrived: Show All Windows' tile (2026-10-13).
+                snapshot: { session.frame.flatMap(Self.picture(of:)) }
             )
         }
+    }
+
+    /// A frame as a picture, over the frame's own bytes — BGRA in memory, which is what the
+    /// renderer uploads (`DesktopMetalRenderer`). Drawn only while something shows it.
+    static func picture(of frame: GlassRDPFrame) -> Image? {
+        guard let provider = CGDataProvider(data: frame.pixels as CFData),
+              let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let image = CGImage(width: frame.width, height: frame.height, bitsPerComponent: 8, bitsPerPixel: 32,
+                                  bytesPerRow: frame.bytesPerRow, space: space,
+                                  bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipFirst.rawValue
+                                                           | CGBitmapInfo.byteOrder32Little.rawValue),
+                                  provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
+        else { return nil }
+        return Image(decorative: image, scale: 1)
     }
 
     /// Open in Screen Sharing, on the Mac, for a VNC desktop (`DesktopScreenSharing`).

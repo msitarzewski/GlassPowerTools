@@ -165,6 +165,14 @@ public final class GlassTerminalRuntime {
             settingsManager.hostKeyVerificationMode == HostKeyVerificationMode.ask.rawValue
         }
         wakeWatcher = SSHWakeWatcher()
+        #if os(macOS)
+        // Show All Windows is drawn here, with every terminal window's tabs as live tiles; the
+        // shell's button and every window's toolbar reach it through this (GlassShowAllWindows).
+        GlassShowAllWindows.toggle = { [weak self] openWindow in
+            guard let self else { return }
+            MacTerminalExpose.shared.toggle(.init(runtime: self, openWindow: openWindow))
+        }
+        #endif
     }
 
     /// Asks every SSH connection to answer after a wake or a return to the foreground (B-X25).

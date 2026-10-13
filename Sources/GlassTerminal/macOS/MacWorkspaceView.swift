@@ -541,14 +541,11 @@ struct MacWorkspaceView: View {
                     .accessibilityIdentifier("mac-workspace-overview")
             }
             .glassKeepVisibleWhenCompact()
-            // Every terminal window and its tabs, not just this one's (W9). ⇧⌘\ is the Window
-            // menu item's, not this button's.
+            // Every window and every terminal tab, not just this one's (W9; every kind of window
+            // since 2026-10-13). ⇧⌘\ is the Window menu item's, not this button's. The item keeps
+            // its old id, so a toolbar arranged around it stays arranged.
             ToolbarItem(id: "show-all-terminals") {
-                Button("Show All Terminals", systemImage: "rectangle.3.group") {
-                    MacTerminalExpose.shared.toggle(exposeContext)
-                }
-                .help("Show All Terminals")
-                .accessibilityIdentifier("mac-workspace-show-all-terminals")
+                GlassShowAllWindowsButton()
             }
             .glassKeepVisibleWhenCompact()
             ToolbarItem(id: "save-workspace") {

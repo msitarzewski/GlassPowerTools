@@ -276,6 +276,12 @@ public struct DesktopSessionView: View {
         #if !os(visionOS)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) { sessionActions }
+            #if os(macOS)
+            // Show All Windows, beside the ⚡, as in every window (GlassShowAllWindows).
+            ToolbarItem(placement: GlassActiveConnectionsToolbarModifier.placement) {
+                GlassShowAllWindowsButton()
+            }
+            #endif
             if let showActiveConnections {
                 // The trailing edge on every platform, after the session's own controls.
                 ToolbarItem(placement: GlassActiveConnectionsToolbarModifier.placement) {
