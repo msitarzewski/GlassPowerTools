@@ -11,9 +11,13 @@
 //
 
 import SwiftUI
+import os
 import GlassShell
 import GlassLayers
 import GlassConnectionKit
+#if os(iOS)
+import UIKit
+#endif
 
 public struct GlassDesktopScenes: Scene {
     private let runtime: GlassDesktopRuntime
@@ -75,11 +79,36 @@ struct DesktopSessionHost: View {
     let endpointID: EndpointID?
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openWindow) private var openWindow
+    #if os(iOS)
+    /// This window's scene, so Close can end it (`closeWindow`).
+    @State private var windowScene: UIWindowScene?
+    #endif
     @State private var loaded = false
     /// The desktop's session still open in its display windows after its own window closed (W30),
     /// looked up once as the window appears: this window joins it rather than connecting again.
     @State private var liveSession: DesktopSessionModel?
     @State private var lookedForLiveSession = false
+
+    /// Closes this window. On iOS neither `dismiss` nor `dismissWindow` closed a desktop window
+    /// from its root — Close was tapped and the window stayed (the Duo simulator, 2026-10-13) — so
+    /// its scene is ended through UIKit. That works where windows do (an iPad); a phone answers
+    /// "not supported for this device idiom", which is logged.
+    private func closeWindow() {
+        #if os(iOS)
+        let log = Logger(subsystem: "com.glasspowertools", category: "windows")
+        if let session = windowScene?.session {
+            log.notice("Closing a desktop window: ending its scene \(session.persistentIdentifier, privacy: .public)")
+            UIApplication.shared.requestSceneSessionDestruction(session, options: nil) { error in
+                log.error("A desktop window's scene did not end: \(String(describing: error), privacy: .public)")
+            }
+        } else {
+            log.notice("Closing a desktop window: no scene found; dismissing")
+            dismiss()
+        }
+        #else
+        dismiss()
+        #endif
+    }
 
     /// The ⚡ in this window: bring the library forward on its Active list.
     private var showActive: (@MainActor () -> Void)? {
@@ -94,6 +123,10 @@ struct DesktopSessionHost: View {
         // opens a ~640-point window, the toolbar collapses into an overflow chevron and every
         // label truncates. Observed 2026-09-14.
         demoOrContent.frame(maxWidth: .infinity, maxHeight: .infinity)
+            .desktopWindowBar()
+            #if os(iOS)
+            .background { WindowSceneReader { windowScene = $0 } }
+            #endif
     }
 
     @ViewBuilder
@@ -114,21 +147,28 @@ struct DesktopSessionHost: View {
             if let live = liveSession {
                 DesktopSessionView(session: live, viewport: live.primaryViewport,
                                    onOutcome: { runtime.reportOutcome($0, for: endpointID) },
-                                   onClose: { dismiss() },
+                                   onClose: { closeWindow() },
                                    showActiveConnections: showActive)
             } else if !lookedForLiveSession {
                 ProgressView().controlSize(.large)
             } else if let endpointID, let connection = runtime.connection(for: endpointID) {
                 DesktopSessionView(connection: connection, app: runtime.app,
                                    onOutcome: { runtime.reportOutcome($0, for: endpointID) },
-                                   onClose: { dismiss() },
+                                   onClose: { closeWindow() },
                                    showActiveConnections: showActive)
             } else if loaded {
-                ContentUnavailableView(
-                    "Desktop Not Found",
-                    systemImage: "display",
-                    description: Text("This desktop has no saved configuration. Edit the service in the library to set it up, or remove it.")
-                )
+                ContentUnavailableView {
+                    Label("Desktop Not Found", systemImage: "display")
+                } description: {
+                    Text("This desktop has no saved configuration. Edit the service in the library to set it up, or remove it.")
+                } actions: {
+                    // The window's own way out, where the system draws none — an iPad's. A phone
+                    // cannot end a window itself ("not supported for this device idiom", the Duo,
+                    // 2026-10-13); its windows close from the system's switcher.
+                    if GlassWindowPresentation.canOpenWindows {
+                        Button("Close") { closeWindow() }
+                    }
+                }
             } else {
                 ProgressView().controlSize(.large)
             }
@@ -269,3 +309,42 @@ public struct GlassDesktopBootstrap<Content: View>: View {
     }
 }
 
+
+extension View {
+    /// A desktop's own window on iPadOS, inside a navigation container — which is what draws the
+    /// session's bar: its name, Settings, Clipboard and the ⚡. Without one none of it was drawn,
+    /// and the window could be left only from the app switcher (2026-10-13, the owner on the
+    /// unfolded iPhone Duo: "I see no way to get back to the previous screen"). The Mac draws the
+    /// toolbar on the window itself; the headset puts it in an ornament.
+    @ViewBuilder func desktopWindowBar() -> some View {
+        #if os(iOS)
+        NavigationStack { self }
+        #else
+        self
+        #endif
+    }
+}
+
+#if os(iOS)
+/// The window scene a SwiftUI view is in, read from a view of its own as it joins a window.
+struct WindowSceneReader: UIViewRepresentable {
+    let onScene: (UIWindowScene?) -> Void
+
+    func makeUIView(context: Context) -> ReaderView { ReaderView(onScene: onScene) }
+    func updateUIView(_ view: ReaderView, context: Context) {}
+
+    final class ReaderView: UIView {
+        private let onScene: (UIWindowScene?) -> Void
+        init(onScene: @escaping (UIWindowScene?) -> Void) {
+            self.onScene = onScene
+            super.init(frame: .zero)
+            isUserInteractionEnabled = false
+        }
+        required init?(coder: NSCoder) { nil }
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            onScene(window?.windowScene)
+        }
+    }
+}
+#endif

@@ -174,6 +174,8 @@ enum GlassDemoMode {
                 name: "bravo", host: "192.0.2.20", picture: picture,
                 windowSettings: windowSettings,
                 opensSettings: surface == "desktop-settings")
+        case "desktop-disconnected":
+            await desktop.requestDemoDisconnectedDesktop(name: "bravo", host: "192.0.2.20")
         case "desktop-displays", "desktop-quality":
             // W30: a host with two displays, a window each, on one connection; `desktop-quality`
             // opens Desktop Settings ▸ Connection (Quality and the readout) over the desktop's window.

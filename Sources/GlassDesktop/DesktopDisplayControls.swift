@@ -277,6 +277,7 @@ struct DesktopDisplayWindowHost: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .desktopWindowBar()
         .onAppear(perform: resolve)
     }
 

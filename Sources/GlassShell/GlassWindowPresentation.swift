@@ -20,7 +20,7 @@ import UIKit
 #endif
 
 public enum GlassWindowPresentation {
-    /// True where a second window is possible: macOS, visionOS, iPadOS — and an unfolded iPhone Duo.
+    /// True where a second window is possible and useful: macOS, visionOS, iPadOS — never a phone.
     ///
     /// A capability that opens windows must ask this and present in place when the answer is no —
     /// a full-screen cover over the library, which is what a window is on a phone anyway.
@@ -35,9 +35,14 @@ public enum GlassWindowPresentation {
     /// Apple keeps side-by-side windows for the inner display. So a phone opens windows only when the
     /// active scene is regular width — the Duo unfolded — and presents in place otherwise, a 50/50
     /// Split View half included. (An idiom check alone refused the unfolded Duo; the system's answer
-    /// alone sent the folded one into the switcher.) The unfolded half is unverified: Xcode 27.2
-    /// beta's Device Hub has no fold controls, which came with the 27.1 branch. Each distinct answer
-    /// is logged once (category `windows`).
+    /// alone sent the folded one into the switcher.) Each distinct answer is logged once (category
+    /// `windows`).
+    ///
+    /// **Not even unfolded** (2026-10-13, measured on the Duo simulator with the 27.1 runtime's pose
+    /// controls): a session's window took the whole inner display rather than standing beside the
+    /// library, and a desktop window has no bar of its own there, so the owner was left with "no way
+    /// to get back to the previous screen" but the app switcher. In place, a session gets its back
+    /// chevron and the ⚡. So a phone presents in place, folded or not.
     ///
     /// **Ask it where you need it; never store the answer.** Stored as a property's default it is
     /// read during app construction, before any scene has connected — and at that moment
@@ -52,7 +57,7 @@ public enum GlassWindowPresentation {
         let width = activeSceneWidth
         report(multipleScenes: multipleScenes, idiom: idiom, width: width)
         guard multipleScenes else { return false }
-        return idiom != .phone || width == .regular
+        return idiom != .phone
         #else
         true
         #endif

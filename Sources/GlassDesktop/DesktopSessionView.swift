@@ -211,10 +211,14 @@ public struct DesktopSessionView: View {
                     .offset(x: viewport.presentation.panX, y: viewport.presentation.panY)
 
                     if session.frame == nil {
+                        // The system's own unavailable-content view, as Apple's apps say a thing is
+                        // not there — not a panel of our own (the owner on the unfolded Duo,
+                        // 2026-10-13: "This feels web, so of out of place").
                         connectionStatus
-                            .padding(28).frame(maxWidth: 520)
-                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
-                            .padding(12)
+                            #if !os(visionOS)
+                            // On the desktop's black, so its words are light.
+                            .environment(\.colorScheme, .dark)
+                            #endif
                     }
                 }
                 .onChange(of: geometry.size, initial: true) { _, size in
@@ -242,10 +246,14 @@ public struct DesktopSessionView: View {
                     GlassCanvasBackdrop(blurAmount: profile.frost)
                 }
                 #elseif !os(visionOS)
-                if session.frame == nil || viewport.presentation.mode == .original { Color.black }
+                // Into every edge: on a phone on its side the system's controls keep a margin, and
+                // it showed white beside the black (the unfolded Duo, 2026-10-13).
+                if session.frame == nil || viewport.presentation.mode == .original { Color.black.ignoresSafeArea() }
                 #endif
             }
-            if session.failurePresentation == nil, session.rendererError == nil, let error = session.errorMessage {
+            // Over a live picture only: without one, the status view says it (`connectionStatus`).
+            if session.frame != nil, session.failurePresentation == nil, session.rendererError == nil,
+               let error = session.errorMessage {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "exclamationmark.triangle")
                     Text(error).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
@@ -493,29 +501,41 @@ public struct DesktopSessionView: View {
                 // Window, and the toolbar was getting busy (the owner, 2026-10-11).
     }
 
+    /// What stands where the desktop will be: the system's spinner while it signs in or waits for
+    /// the first picture, and otherwise the system's unavailable-content view — the state, the
+    /// reason, and what to do. The error that would have been a banner below is its description.
     @ViewBuilder private var connectionStatus: some View {
         if let failure = session.failurePresentation {
-            VStack(spacing: 16) {
-                Image(systemName: "exclamationmark.triangle").font(.largeTitle)
-                Text(failure.title).font(.title2)
-                Text(failure.message).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                HStack {
-                    Button("Reconnect") { Task { await session.reconnect() } }.buttonStyle(.borderedProminent)
-                    Button("Close") { session.close() }.buttonStyle(.bordered)
-                }
+            ContentUnavailableView {
+                Label(failure.title, systemImage: "exclamationmark.triangle")
+            } description: {
+                Text(failure.message)
+            } actions: {
+                Button("Reconnect") { Task { await session.reconnect() } }.buttonStyle(.borderedProminent)
                 Button("Enter Credentials") { Task { await session.requestCredentials() } }
                     .disabled(session.isApprovingCertificate)
+                Button("Close") { session.close() }
                 DisclosureGroup("Technical Details") {
                     ScrollView { Text(failure.details).font(.caption).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
                         .frame(maxHeight: 120)
                 }
+                .frame(maxWidth: 480)
+            }
+        } else if session.state == .connecting || session.state == .connected {
+            VStack(spacing: 20) {
+                ProgressView { Text(session.status) }.controlSize(.large)
+                // Signed in and still no picture: a way out other than leaving.
+                if session.state == .connected, !session.needsCredentials {
+                    Button("Reconnect") { Task { await session.reconnect() } }.buttonStyle(.bordered)
+                }
             }
         } else {
-            VStack(spacing: 16) {
-                if session.state == .connecting || session.state == .connected { ProgressView() }
-                Image(systemName: "desktopcomputer").font(.largeTitle)
-                Text(session.status).font(.title2)
-                if session.state != .connecting && !session.needsCredentials {
+            ContentUnavailableView {
+                Label(session.status, systemImage: "desktopcomputer")
+            } description: {
+                if let error = session.errorMessage { Text(error) }
+            } actions: {
+                if !session.needsCredentials {
                     Button("Reconnect") { Task { await session.reconnect() } }.buttonStyle(.borderedProminent)
                     Button("Enter Credentials") { Task { await session.requestCredentials() } }
                         .disabled(session.isApprovingCertificate)

@@ -53,6 +53,27 @@ extension GlassDesktopRuntime {
         enqueue(.show(connectionID: connection.id))
     }
 
+    /// Screenshots only (`--demo-open desktop-disconnected`): a desktop whose session was up and
+    /// has dropped, with the error that came with it — what its window shows then (2026-10-13).
+    public func requestDemoDisconnectedDesktop(name: String, host: String) async {
+        let app = DesktopAppModel(storageDirectory: FileManager.default.temporaryDirectory
+            .appendingPathComponent("glass-demo-\(UUID())"))
+        await app.load()
+        let connection = DesktopConnection(name: name, host: host, username: "ann")
+        var operations = DesktopSessionOperations()
+        operations.connect = { _, _ in }
+        operations.disconnect = { _ in }
+        operations.resize = { _, _, _ in }
+        let model = DesktopSessionModel(connection: connection, app: app, operations: operations)
+        do {
+            try await model.connect(username: "ann", domain: nil, password: "")
+            await model.receive(.state(.disconnected), attempt: model.attemptID, connection: connection)
+        } catch { return }
+        model.errorMessage = GlassRDPError.notConnected.localizedDescription
+        demoSessions[connection.id] = model
+        enqueue(.show(connectionID: connection.id))
+    }
+
     /// Screenshots only (`--demo-glass`, W28): a desktop window at a given glass — its Background
     /// Frost — and, when given, a remote screen faded to `opacity`.
     public static func demoWindowSettings(frost: Double, opacity: Double?) -> GlassWindowOverrides {
