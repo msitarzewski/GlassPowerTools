@@ -47,8 +47,10 @@ UIKit keys and gestures cannot be reached from the package tests.
   windows. Database and editor windows don't get it, because they pinch to zoom. "Clipboard sync is failing": it
   never failed. Share clipboard is off by default (a trust boundary), and the Clipboard menu now says so.
 - **0f1e2ef.** A tabbed terminal no longer repeats under Other: it is left to its window's group, and Files
-  browsers get their own group. The caption's second line is legible. **Settings ▸ Terminal ▸ Show All Windows ▸
-  Blur previews**: this Mac's choice, not synced.
+  browsers get their own group. The caption's second line is legible. **Blur previews**: this Mac's choice, not
+  synced. It was put on the terminal's Connections page, and the owner could not find it ("I don't have that
+  option"). It moved to **Settings ▸ Appearance ▸ Show All Windows** at his word: "it applies to all of the windows
+  in that mode".
 
 **App menu (922503f).** "This menu needs attention":
 - Command Palette… was listed twice, once by the terminal and once by the database.
@@ -116,7 +118,7 @@ Database and desktop tunnels keep their own SSH connections; reasons in D69 and 
 
 ## Validation
 
-- Suites with the screen unlocked: terminal 781, database 280, DBKit 321, shell 28. The owner's tmux sessions
+- Suites with the screen unlocked: terminal 781, shell 280, database 321, DBKit 28. The owner's tmux sessions
   were unchanged by every run (md5 of `tmux list-sessions` before and after).
 - Release builds for macOS, iOS and visionOS on every version from 0.4.392 to 0.4.400.
 - Devices:

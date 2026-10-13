@@ -62,7 +62,7 @@ All four capabilities and the shell are built and in daily use on the owner's Ma
 | Quick Look: a view per file (the 05:58 crash on 0.4.393) | built | not reproduced; the fix removes the only call that crashed; no crash since |
 | Database Local Network and tunnel limits closed: tunnels keep their own connections (D69) | decided | sshd_config(5); OpenSSH reports of multiplexing lag |
 
-Suites run 2026-10-13 with the screen unlocked: terminal 781, database 280, DBKit 321, shell 28, all passing
+Suites run 2026-10-13 with the screen unlocked: terminal 781, shell 280, database 321, DBKit 28, all passing
 (the whole package not re-counted that day). Earlier: about **1,790 tests**. The last full run with the screen unlocked passed (1,777, early
 2026-09-27); the night's later runs were under a locked screen, where file-protected stores cannot be
 read — they fail the same 137 tests before and after the night's changes, and every new test passes.

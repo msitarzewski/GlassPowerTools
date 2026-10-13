@@ -63,7 +63,7 @@ This is the reason to merge that no amount of shared packaging would have delive
 
 - **Show All Windows** (⇧⌘\, the button beside every ⚡, a pinch in on terminal and desktop windows) shows every
   window the app has open: terminal windows with a tile per tab, then Files, Databases, Desktops and Editor. A desktop's
-  tile is its last picture. Settings ▸ Terminal ▸ Show All Windows ▸ **Blur previews** softens the pictures for
+  tile is its last picture. Settings ▸ Appearance ▸ Show All Windows ▸ **Blur previews** softens the pictures for
   screenshots that can be shared.
 - **One Command Palette** (⇧⌘P, or ⌘K) holds every capability's entries: machines, connections, schemas and tables, and
   the front window's own commands.

@@ -51,8 +51,8 @@ installed with them to keep one build everywhere.
 - Headset: held delete and arrows repeat; pinch and hold, then drag, selects.
 - Desktops on phones and iPad: the system's unavailable view; sessions in place on phones; an iPad window's bar
   and Close.
-- Show All Windows across every kind of window, with Blur previews (Settings ▸ Terminal ▸ Show All Windows; the
-  owner asked whether it was in, and was told where).
+- Show All Windows across every kind of window, with Blur previews. The toggle sat on the terminal's Connections
+  page, where the owner could not find it; it moved to Settings ▸ Appearance ▸ Show All Windows at his word (0.4.401).
 - One Command Palette.
 - The Quick Look crash fix.
 - Database connect errors: the shared Local Network rule; PostgreSQL in the server's words.
