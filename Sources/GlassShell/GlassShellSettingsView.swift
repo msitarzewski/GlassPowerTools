@@ -2,6 +2,7 @@ import GlassLayers
 import SwiftUI
 import GlassConnectionUI
 import GlasSecretStore
+import GlassWidgetData
 
 public enum GlassShellSettingsPage: String, CaseIterable, Hashable, Sendable {
     case general, appearance, privacy, about
@@ -269,6 +270,9 @@ public struct GlassShellSettingsView: View {
         }
     }
 
+    /// Settings ▸ Privacy ▸ Show Machines in Search (D72): off unless switched on.
+    @AppStorage(GlassSpotlight.settingKey, store: GlassUITestRun.settingsDefaults) private var showsMachinesInSearch = false
+
     private var privacy: some View {
         Group {
             Section("Credentials") {
@@ -298,6 +302,13 @@ public struct GlassShellSettingsView: View {
                      + "that one again on another device.")
                     .font(.footnote).foregroundStyle(.secondary)
                     .accessibilityIdentifier("settings-device-bound-note")
+            }
+            // D72: the system's search knows your machines only if you say so.
+            Section {
+                Toggle("Show Machines in Search", isOn: $showsMachinesInSearch)
+                    .accessibilityIdentifier("settings-search-machines")
+            } footer: {
+                Text("Your machines' and workgroups' names in Spotlight and Siri on this device, to open them from there. Names only; addresses and credentials are never indexed.")
             }
         }
     }

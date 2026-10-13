@@ -19,6 +19,7 @@ import UIKit
 #endif
 import GlassConnectionKit
 import GlassConnectionUI
+import GlassLayers
 import GlassShell
 import GlassWidgetData
 
@@ -66,6 +67,11 @@ enum GlassWidgetBridge {
         }
         Task { await keepSnapshotCurrent(model: model) }
         takeExternalRequests()
+        // The search index follows the setting, both ways, as soon as it changes.
+        updateSearch(force: false)
+        NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { updateSearch(force: false) }
+        }
         // What the Finder's toolbar button or a Quick Action left in the App Group, whenever the
         // app comes forward — which is how they bring it forward.
         NotificationCenter.default.addObserver(forName: becameActive, object: nil, queue: .main) { _ in
@@ -78,6 +84,17 @@ enum GlassWidgetBridge {
     #else
     private static let becameActive = UIApplication.didBecomeActiveNotification
     #endif
+
+    /// Machines and workgroups in the system's search, as Settings ▸ Privacy says (D72): indexed
+    /// when the library changes, and again — or cleared — when the setting does.
+    private static var searchShown: Bool?
+
+    private static func updateSearch(_ snapshot: GlassWidgetSnapshot? = GlassWidgetStore.read(), force: Bool = true) {
+        let enabled = GlassUITestRun.settingsDefaults.bool(forKey: GlassSpotlight.settingKey)
+        guard force || enabled != searchShown else { return }
+        searchShown = enabled
+        Task { await GlassSpotlight.update(snapshot, enabled: enabled) }
+    }
 
     /// Requests extensions left for the app (`GlassExternalRequests`), carried out as Siri's are.
     private static func takeExternalRequests() {
@@ -170,6 +187,7 @@ enum GlassWidgetBridge {
             if try GlassWidgetStore.write(snapshot) {
                 WidgetCenter.shared.reloadAllTimelines()
                 GlassPowerToolsShortcuts.updateAppShortcutParameters()
+                updateSearch(snapshot)
             }
         } catch {
             GlassWidgetBridgeLog.logger.error("The widgets' snapshot could not be written: \(error.localizedDescription, privacy: .public)")

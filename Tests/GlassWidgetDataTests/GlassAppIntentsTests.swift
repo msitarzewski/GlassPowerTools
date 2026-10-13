@@ -183,3 +183,22 @@ struct GlassSendFilesIntentTests {
         #expect(asked.count == 1)
     }
 }
+
+/// What the system's search is given (D72): names and kinds of service, nothing else.
+@Suite("Search")
+struct GlassSpotlightTests {
+    @Test("a machine is indexed by its name and its services' kinds; a workgroup by its name")
+    func attributes() {
+        let machine = GlassMachineEntity(id: UUID(), name: "alpha", services: [
+            .init(id: UUID(), kind: .database, name: "Orders"), .init(id: UUID(), kind: .terminal, name: "Terminal"),
+        ])
+        let attributes = machine.attributeSet
+        #expect(attributes.title == "alpha")
+        #expect(attributes.contentDescription == "Terminal, Database")
+        #expect(attributes.keywords?.contains("database") == true)
+        #expect(attributes.contentURL == nil && attributes.url == nil, "no address of any kind")
+
+        let workgroup = GlassWorkgroupEntity(id: UUID(), name: "Deploy", terminals: 3).attributeSet
+        #expect(workgroup.title == "Deploy" && workgroup.contentDescription == "Workgroup · 3 terminals")
+    }
+}
