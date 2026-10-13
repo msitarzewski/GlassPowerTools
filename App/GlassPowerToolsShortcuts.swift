@@ -58,10 +58,18 @@ struct GlassPowerToolsShortcuts: AppShortcutsProvider {
             intent: GlassShowActiveIntent(),
             phrases: [
                 "Show my active connections in \(.applicationName)",
-                "What's open in \(.applicationName)",
             ],
             shortTitle: "Active Connections",
             systemImageName: "bolt.fill")
+        // Answered in place, without opening the app.
+        AppShortcut(
+            intent: GlassWhatsOpenIntent(),
+            phrases: [
+                "What's open in \(.applicationName)",
+                "What's running in \(.applicationName)",
+            ],
+            shortTitle: "What's Open",
+            systemImageName: "bolt.horizontal")
         #if os(macOS)
         AppShortcut(
             intent: GlassNewTerminalIntent(),

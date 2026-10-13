@@ -202,3 +202,21 @@ struct GlassSpotlightTests {
         #expect(workgroup.title == "Deploy" && workgroup.contentDescription == "Workgroup · 3 terminals")
     }
 }
+
+/// "What's open in Glass Power Tools?" (D72).
+@Suite("What's Open")
+struct GlassWhatsOpenTests {
+    @Test("one sentence: how much is open and running, and where")
+    func sentence() {
+        #expect(GlassWhatsOpenIntent.sentence(for: nil).hasPrefix("Open Glass Power Tools once"))
+        #expect(GlassWhatsOpenIntent.sentence(for: GlassWidgetSnapshot()) == "Nothing is open or running.")
+        let one = GlassWidgetSnapshot(active: [.init(machineID: UUID(), name: "alpha", open: 2, running: 0, kinds: [.terminal])])
+        #expect(GlassWhatsOpenIntent.sentence(for: one) == "2 open on alpha.")
+        let two = GlassWidgetSnapshot(active: [
+            .init(machineID: UUID(), name: "alpha", open: 1, running: 3, kinds: [.terminal]),
+            .init(machineID: nil, name: "Elsewhere", open: 0, running: 1, kinds: [.terminal]),
+            .init(machineID: UUID(), name: "idle", open: 0, running: 0, kinds: []),
+        ])
+        #expect(GlassWhatsOpenIntent.sentence(for: two) == "1 open and 4 running on 2 machines.")
+    }
+}
