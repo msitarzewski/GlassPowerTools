@@ -6,6 +6,12 @@
 release and writes each package's name, version, licence and licence text.
 
 Usage: mermaid-licenses.py <node_modules> <mermaid version> <output.json>
+       mermaid-licenses.py --pin-embedded <list.json> <mermaid.min.js>
+
+The second form corrects the list to the versions the bundle itself declares (2026-10-12). npm
+resolves a dependency's range to its newest release, while the bundle carries the one Mermaid was
+built with: the list said DOMPurify 3.4.16 for a bundle holding 3.4.12, and an advisory scan read
+the wrong version from it.
 
 Exit 3 when a package's licence is not one already reviewed below. The caller then keeps the
 bundled Mermaid it has: a licence nobody has read does not ship.
@@ -38,7 +44,30 @@ def licence_of(meta, texts):
     return "UNKNOWN"
 
 
+# A bundled package's version, as the bundle states it.
+EMBEDDED = {"dompurify": re.compile(r"DOMPurify (\d+\.\d+\.\d+)")}
+
+
+def pin_embedded(list_path, bundle_path):
+    with open(bundle_path, encoding="utf-8", errors="replace") as handle:
+        bundle = handle.read()
+    with open(list_path, encoding="utf-8") as handle:
+        listing = json.load(handle)
+    for entry in listing["packages"]:
+        pattern = EMBEDDED.get(entry["name"])
+        found = pattern.search(bundle) if pattern else None
+        if found and found.group(1) != entry["version"]:
+            print(f"mermaid-licenses: {entry['name']} {entry['version']} -> {found.group(1)}, as bundled")
+            entry["version"] = found.group(1)
+    with open(list_path, "w", encoding="utf-8") as handle:
+        json.dump(listing, handle, indent=1, ensure_ascii=False, sort_keys=True)
+        handle.write("\n")
+
+
 def main():
+    if sys.argv[1] == "--pin-embedded":
+        pin_embedded(sys.argv[2], sys.argv[3])
+        return
     root, version, output = sys.argv[1], sys.argv[2], sys.argv[3]
     packages, unreviewed = {}, []
     for dirpath, dirnames, filenames in os.walk(root):

@@ -43,6 +43,8 @@ actual="sha512-$(openssl dgst -sha512 -binary "$work/m.tgz" | base64 | tr -d '\n
 if [ "$actual" != "$integrity" ]; then say "integrity mismatch for $latest; keeping ${current:-none}"; exit 0; fi
 tar -xzf "$work/m.tgz" -C "$work" package/dist/mermaid.min.js package/LICENSE 2>/dev/null \
   || tar -xzf "$work/m.tgz" -C "$work" package/dist/mermaid.min.js || { say "tarball lacks dist/mermaid.min.js; keeping ${current:-none}"; exit 0; }
+python3 "$ROOT/Tools/Mermaid/mermaid-licenses.py" --pin-embedded "$work/licenses.json" "$work/package/dist/mermaid.min.js" \
+  || { say "could not read the bundled versions; keeping ${current:-none}"; exit 0; }
 cp "$work/package/dist/mermaid.min.js" "$DEST/mermaid.min.js"
 [ -f "$work/package/LICENSE" ] && cp "$work/package/LICENSE" "$DEST/LICENSE"
 echo "$latest" > "$DEST/VERSION"

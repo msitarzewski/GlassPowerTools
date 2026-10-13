@@ -62,6 +62,20 @@ struct AcknowledgementsTests {
         #expect(components.filter { $0.group == "Inside Mermaid" }.count > 50)
     }
 
+    /// The list's DOMPurify is the one inside the bundle (2026-10-12): npm resolved the newest in
+    /// its range, 3.4.16, for a bundle carrying 3.4.12, and the acknowledgements said 3.4.16.
+    @Test("Mermaid's list names DOMPurify at the version the bundle carries")
+    func mermaidListMatchesBundledDOMPurify() throws {
+        let bundle = try String(contentsOf: Self.root.appendingPathComponent("Sources/GlassEditor/Resources/Mermaid/mermaid.min.js"),
+                                encoding: .utf8)
+        let embedded = try #require(bundle.firstMatch(of: /DOMPurify (\d+\.\d+\.\d+)/)?.1).description
+        let packages = try #require(json("Documentation/ThirdPartyLicenses/mermaid/bundled-packages.json")["packages"] as? [[String: Any]])
+        let listed = packages.first { $0["name"] as? String == "dompurify" }?["version"] as? String
+        #expect(listed == embedded, "run Tools/Mermaid/mermaid-licenses.py --pin-embedded, then generate-acknowledgements.py")
+        #expect(try GlassAcknowledgements.load().first { $0.name.lowercased() == "dompurify" }?.version == embedded,
+                "\(Self.regenerate)")
+    }
+
     @Test("groups read in a fixed order, with nothing left out")
     func grouping() throws {
         let components = try GlassAcknowledgements.load()
