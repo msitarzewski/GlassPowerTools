@@ -29,8 +29,9 @@ anything touching real servers (SSH and database tests use the disposable test V
 
 ## 2026-10-13 (~06:10) — the owner testing: headset input, the unfolded Duo, the desktop
 
-**0.4.393 on all three** (headset and iPhone ~05:45, Mac 05:49): carries the headset input below. Committed after
-it (next build): the desktop changes, the Duo corner, the library's sidebar toggle, Mermaid 12.2.0.
+**0.4.395 on all three** (06:41): everything below — headset input, the desktop's presentation, the Duo, Show All
+Windows with the pinch on desktops too, the desktop's clipboard-sharing note. oscar's clipboard: Share clipboard is off
+until its Desktop service turns it on (default off, a trust boundary) — told to the owner.
 
 - **Headset, hardware keyboard:** held delete now repeats (priority key command, `.repeatable`, action SwiftTerm's
   `deleteBackward`); arrows repeatable too. **Selection:** pinch and hold, then drag (the owner's choice), or hold
