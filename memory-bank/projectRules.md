@@ -317,12 +317,12 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     designing a surface these apps had, open the file. A guess that happens to work is still a
     guess, and it will not carry the decisions the original made for reasons it wrote down.
 
-43. **One answer to "can this device open a window".** `GlassWindowPresentation.canOpenWindows`,
-    which is the system's `supportsMultipleScenes` (it also catches an iPad with multiwindow
-    switched off). Until 2026-10-12 it also required a non-phone idiom, but an
-    iPhone answers no on its own (measured that day on iOS 26.5 and 27.0 simulators), and the clause would only have
-    refused the iPhone Duo a window the system says it can open. A Duo's answer is logged the
-    first time it is asked (category `windows`). Any
+43. **One answer to "can this device open a window".** `GlassWindowPresentation.canOpenWindows`:
+    the system's `supportsMultipleScenes` (which also catches an iPad with multiwindow switched off)
+    and, on a phone, a regular-width scene in front. Every ordinary iPhone answers no to the first
+    (measured 2026-10-12 on iOS 26.5 and 27.0 simulators). The iPhone Duo answers yes **folded and
+    unfolded**, and folded a new window covers the library with no way back but the app switcher, so
+    a phone opens windows only unfolded (regular width). Each answer is logged once (`windows`). Any
     capability that answers a user action with `openWindow` must ask it first and present in place
     when the answer is no — otherwise the tap does nothing at all, with no window, no error and no
     log line to find it by.
