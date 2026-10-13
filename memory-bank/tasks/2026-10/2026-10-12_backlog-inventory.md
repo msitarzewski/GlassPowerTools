@@ -59,7 +59,10 @@ owner may reorder; the sections below keep the detail. Within a tier, earlier is
 - ~~tree-sitter capture-pool overflow~~ 0b5d421 (2026-10-13) — not vendored after all: the highlight cursor's match
   limit (256, Helix's) keeps the ids far below 16 bits and bounds the time too; measured on 16 real files in 14
   languages that no limit down to 64 changes a match.
-18. B-X5 — a dropped shared SSH connection leaves terminals that do not say so.
+18. ~~B-X5~~ 9ee28f3 (2026-10-13) — every terminal on a lost shared connection says so; none closes as if exited.
+    Left: database and desktop tunnels still connect outside W21's pool.
+18a. **B-X27** (new, 2026-10-13) — files written with complete protection cannot be created or read while the Mac
+    is locked: recordings, SFTP downloads, desktop captures made while away may fail.
 19. B-X4 — drag-select cannot reach tmux history on the Mac.
 20. B-X10, B-X11 — the database breadcrumb; Query commands dead on table tabs.
 21. B-X2 with B-Q11 — the editor notices an outside change only at save; then retire the legacy sheet.
@@ -197,6 +200,13 @@ owner may reorder; the sections below keep the detail. Within a tier, earlier is
 - **B-X25** No sleep or wake handling anywhere (`NSWorkspace` sleep/wake unobserved; scene phase only releases
   input). The lifecycle rule asks for it.
 - **B-X26** The first terminal window opened too small on Vision Pro (glas.sh, 08-01) — look again on the headset.
+- **B-X27** Complete file protection on a locked Mac (found 2026-10-13, 00:40, the screen locked): writes with
+  `FileProtectionType.complete` / `.completeFileProtection` fail with EPERM, and files so written cannot be read
+  — `SessionRecorder` (index and recordings), `SFTPBrowserView` downloads, `DesktopSessionModel` captures. Seen as
+  terminal test failures (recording deletion, tmux offer, setup saves), the same with or without the change under
+  test; this is also why the suite has needed an unlocked screen. A session recorded or a download running while
+  the owner is away is the product case. Likely fix: `.completeUntilFirstUserAuthentication` (macOS), measured on a
+  locked Mac first.
 
 ## 4. Features: requests, approved and proposed
 
