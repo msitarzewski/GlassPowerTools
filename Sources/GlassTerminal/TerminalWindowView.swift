@@ -361,9 +361,11 @@ struct TerminalWindowView: View {
         // Under the keyboard's accessory, and the home indicator, the terminal's colour too. With a
         // hardware keyboard the accessory stands alone at the bottom of the screen, and the strip
         // the terminal gives up to it showed the page behind: white under a black terminal
-        // (2026-10-12, the iPhone Duo).
+        // (2026-10-12, the iPhone Duo). Every edge, not only the bottom: folded, the Duo keeps its
+        // system controls on one side, and the corner where that side's inset meets the bottom's
+        // stayed white (the owner's screenshot, 2026-10-13).
         .background {
-            windowTheme.canvasBackgroundColor.color.ignoresSafeArea(edges: .bottom)
+            windowTheme.canvasBackgroundColor.color.ignoresSafeArea()
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             // An iPhone on its side has no height to spare: Tools moves to the top bar instead.
