@@ -8,6 +8,7 @@
 import SwiftUI
 import GlassLayers
 import GlassConnectionUI
+import GlassShell
 #if canImport(UIKit)
 import UIKit
 #elseif canImport(AppKit)
@@ -183,6 +184,9 @@ struct TerminalWindowView: View {
     
     var body: some View {
         terminalWindowIdentity
+            // The terminal in front, offered on your other devices (D72): Continue opens the same
+            // machine's terminal there. Only the focused pane of a window offers itself.
+            .glassHandoff(endpoint: isTerminalActive ? session.server.id : nil, title: session.server.name)
             // The title arrives by callback rather than a published change, so a program
             // animating it does not re-render this window (2026-10-07).
             .onChange(of: terminalHostModel.currentDirectory, initial: true) { _, directory in

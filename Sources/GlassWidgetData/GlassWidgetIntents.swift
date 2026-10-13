@@ -32,6 +32,8 @@ public enum GlassWidgetRequest: Sendable, Equatable, Codable {
     case openInEditor([URL])
     /// An `ssh://` link: a saved machine connects; another fills in the new-server form.
     case openSSHLink(URL)
+    /// A service continued from another device (Handoff): the machine that owns it, connected.
+    case continueSession(endpoint: UUID)
 
     /// What opening `url` with the app asks for — the Finder's Open With, a folder or script dropped
     /// on the Dock icon, a link (D72): an `ssh://` link connects; on the Mac a folder opens a terminal

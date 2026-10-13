@@ -350,6 +350,12 @@ struct GlassPowerToolsApp: App {
                 }
             }
         }
+        // Handoff: a terminal, database or desktop continued from another device (D72).
+        MacTerminalAppDelegate.continueActivity = { activity in
+            guard let endpoint = GlassHandoff.endpoint(from: activity) else { return false }
+            GlassWidgetRequests.shared.post(.continueSession(endpoint: endpoint))
+            return true
+        }
         if GlassUITestRun.defaults == nil {
             // Finder ▸ Services: New Glass Power Tools Tab Here, Window Here, Open in (D72).
             MacTerminalAppDelegate.servicesProvider = GlassFinderServices()
@@ -487,6 +493,12 @@ struct GlassPowerToolsApp: App {
         .glassConnectionsIdleShrink(model: model, recovery: windowRecovery)
         #endif
         #if !os(macOS)
+        // Handoff: a terminal, database or desktop continued from another device (D72).
+        .onContinueUserActivity(GlassHandoff.activityType) { activity in
+            if let endpoint = GlassHandoff.endpoint(from: activity) {
+                GlassWidgetRequests.shared.post(.continueSession(endpoint: endpoint))
+            }
+        }
         // Something opened with the app (D72): a file handed over by another app into the editor;
         // an `ssh://` link connects. Carried out as Siri's requests are (`GlassWidgetBridge`). The
         // Mac takes these in its app delegate (`MacTerminalAppDelegate.openURLs`), so an Open With

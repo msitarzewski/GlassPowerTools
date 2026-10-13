@@ -290,6 +290,8 @@ struct DatabaseWorkspaceView: View {
         .databaseWorkspaceWindowBackground()
         .onPreferenceChange(SQLRunAvailabilityKey.self) { tableRunAvailability = $0 }
         .databaseWorkspaceWindowChrome()
+        // Offered on your other devices while in front (D72): Continue opens the same database.
+        .glassHandoff(endpoint: session?.connectionConfig.id, title: session?.connectionConfig.name ?? "Database")
         #if os(macOS)
         .focusedSceneValue(\.macCommandCenterEntries, commandCenterDestinations)
         // ⌘N, while a database workspace is focused, means a new SQL document. The shell owns the

@@ -53,6 +53,7 @@
 	<array>
 		<string>com.glasspowertools.open-terminal</string>
 		<string>com.glasspowertools.open-desktop</string>
+		<string>com.glasspowertools.session</string>
 	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>

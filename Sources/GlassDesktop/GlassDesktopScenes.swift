@@ -163,6 +163,9 @@ struct DesktopSessionHost: View {
         // opens a ~640-point window, the toolbar collapses into an overflow chevron and every
         // label truncates. Observed 2026-09-14.
         demoOrContent.frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Offered on your other devices while in front (D72): Continue opens the same desktop.
+            .glassHandoff(endpoint: endpointID?.rawValue,
+                          title: endpointID.flatMap { runtime.connection(for: $0)?.name } ?? "Desktop")
             .desktopWindowBar()
             #if os(iOS)
             .background { WindowSceneReader { windowScene = $0 } }

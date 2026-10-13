@@ -127,6 +127,10 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>com.glasspowertools.session</string>
+	</array>
 	<key>SUFeedURL</key>
 	<string>$(GPT_SPARKLE_FEED_URL)</string>
 	<key>SUPublicEDKey</key>

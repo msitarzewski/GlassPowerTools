@@ -109,6 +109,14 @@ enum GlassWidgetBridge {
         case .openSSHLink(let link):
             ensureLibrary()
             actions?.openSSHLink(link)
+        case .continueSession(let endpoint):
+            // Handoff names the service; this device's library knows its machine (D26).
+            guard let host = model.host(owningEndpoint: EndpointID(rawValue: endpoint)) else {
+                GlassWidgetBridgeLog.logger.notice("A continued session names a service this library does not have")
+                return
+            }
+            ensureLibrary()
+            model.connect(hostID: host.id, endpointID: EndpointID(rawValue: endpoint))
         }
     }
 

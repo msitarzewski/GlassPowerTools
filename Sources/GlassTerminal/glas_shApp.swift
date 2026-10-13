@@ -61,6 +61,15 @@ public final class MacTerminalAppDelegate: NSObject, NSApplicationDelegate {
         Self.openURLs?(urls)
     }
 
+    /// Handoff from another device (D72), taken here for the same reason as `openURLs`: a scene's
+    /// handler would bring up a Connections window to receive it. Set by the composition root.
+    public static var continueActivity: (@MainActor (NSUserActivity) -> Bool)?
+
+    public func application(_ application: NSApplication, continue userActivity: NSUserActivity,
+                            restorationHandler: @escaping ([any NSUserActivityRestoring]) -> Void) -> Bool {
+        Self.continueActivity?(userActivity) ?? false
+    }
+
     /// Settings ▸ Appearance's Light, Dark or System, before any window is shown; and the Finder
     /// services, ready for a service that launched the app.
     public func applicationWillFinishLaunching(_ notification: Notification) {
