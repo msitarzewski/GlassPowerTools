@@ -172,6 +172,8 @@ public final class GlassTerminalRuntime {
             guard let self else { return }
             MacTerminalExpose.shared.toggle(.init(runtime: self, openWindow: openWindow))
         }
+        // ⇧⌘\ is Show All Windows' from the start, before any window could press it.
+        MacTerminalExposeShortcut.install()
         #endif
     }
 

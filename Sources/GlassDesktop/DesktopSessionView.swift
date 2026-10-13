@@ -273,6 +273,10 @@ public struct DesktopSessionView: View {
         // desktop a band of screen on a phone.
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        #if os(macOS)
+        // A pinch in opens Show All Windows, as on a terminal (the desktop does not pinch to zoom).
+        .glassShowAllWindowsOnPinch()
+        #endif
         #if !os(visionOS)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) { sessionActions }
@@ -498,6 +502,12 @@ public struct DesktopSessionView: View {
                     .accessibilityValue(showDisplayOptions ? "Open" : "Closed")
 
                 Menu("Clipboard", systemImage: "document.on.clipboard") {
+                    if !session.connection.clipboardEnabled {
+                        // Off unless the service shares it — said here, rather than leaving the remote
+                        // clipboard grey for no reason anyone can see (the owner, 2026-10-13: "the
+                        // clipboard sync is failing with oscar … Not sure if I was supposed to do something").
+                        Text("Clipboard sharing is off for this desktop. Turn on Share clipboard in its service settings, then reconnect.")
+                    }
                     Button(session.connection.clipboardEnabled ? "Send Clipboard" : "Type Clipboard Text") { sendClipboard() }
                         .disabled(!session.isConnected)
                     Button("Copy Remote Clipboard") { copyRemoteClipboard() }.disabled(!session.isConnected || session.remoteClipboard == nil)

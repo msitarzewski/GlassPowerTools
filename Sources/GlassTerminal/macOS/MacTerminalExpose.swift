@@ -360,81 +360,10 @@ enum MacTerminalExposeNavigation {
 
 // MARK: Pinch
 
-/// A two-finger pinch, added up over one gesture. Only a deliberate one counts: an ordinary hand
-/// resting on the trackpad, or a scroll that wobbles, moves the total far less than this.
-struct MacTerminalExposePinch {
-    /// The summed magnification a gesture must reach. A deliberate pinch passes it in a fraction
-    /// of a second; a stray one does not.
-    static let threshold: CGFloat = 0.3
-
-    enum Outcome: Equatable {
-        case pinchedIn
-        case pinchedOut
-    }
-
-    private(set) var total: CGFloat = 0
-    private var answered = false
-
-    /// One magnify event. Answers at most once per gesture.
-    mutating func track(_ magnification: CGFloat, phase: NSEvent.Phase) -> Outcome? {
-        if phase.contains(.began) {
-            total = 0
-            answered = false
-        }
-        if phase.contains(.ended) || phase.contains(.cancelled) {
-            total = 0
-            answered = false
-            return nil
-        }
-        guard !answered, magnification.isFinite else { return nil }
-        total += magnification
-        if total <= -Self.threshold {
-            answered = true
-            return .pinchedIn
-        }
-        if total >= Self.threshold {
-            answered = true
-            return .pinchedOut
-        }
-        return nil
-    }
-}
-
-/// Watches one window's pinches and keeps every one of them from the views inside it: a terminal
-/// is never zoomed or sent anything by a pinch. Events in other windows pass untouched.
-struct MacTerminalExposePinchMonitor: NSViewRepresentable {
-    let onPinch: (MacTerminalExposePinch.Outcome) -> Void
-
-    func makeNSView(context: Context) -> MonitorView { MonitorView() }
-    func updateNSView(_ view: MonitorView, context: Context) { view.onPinch = onPinch }
-    static func dismantleNSView(_ view: MonitorView, coordinator: ()) { view.stop() }
-
-    final class MonitorView: NSView {
-        var onPinch: ((MacTerminalExposePinch.Outcome) -> Void)?
-        private var monitor: Any?
-        private var pinch = MacTerminalExposePinch()
-
-        override func hitTest(_ point: NSPoint) -> NSView? { nil }
-
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            stop()
-            guard window != nil else { return }
-            // Before anyone presses ⇧⌘\ in this window, not at the first use of the overlay.
-            MacTerminalExposeShortcut.install()
-            monitor = NSEvent.addLocalMonitorForEvents(matching: .magnify) { [weak self] event in
-                guard let self, let window = self.window, event.window === window else { return event }
-                if let outcome = self.pinch.track(event.magnification, phase: event.phase) { self.onPinch?(outcome) }
-                return nil
-            }
-        }
-
-        func stop() {
-            if let monitor { NSEvent.removeMonitor(monitor) }
-            monitor = nil
-        }
-    }
-}
+/// The pinch and its window monitor moved to the shell with Show All Windows (2026-10-13), so a
+/// desktop's window opens the overview the same way (`GlassWindowPinch`). The terminal's names stay.
+typealias MacTerminalExposePinch = GlassWindowPinch
+typealias MacTerminalExposePinchMonitor = GlassWindowPinchMonitor
 
 // MARK: ⇧⌘\
 

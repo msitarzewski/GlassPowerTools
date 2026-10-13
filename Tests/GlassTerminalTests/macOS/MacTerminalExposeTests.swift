@@ -2,6 +2,7 @@
 import AppKit
 import Foundation
 import Testing
+import GlassShell
 @testable import GlassTerminal
 
 /// Show All Terminals (W9, 2026-10-08): every terminal window as a group of live tiles, one per

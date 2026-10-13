@@ -52,3 +52,109 @@ public struct GlassShowAllWindowsButton: View {
         }
     }
 }
+
+#if os(macOS)
+import AppKit
+
+/// A two-finger pinch, added up over one gesture. Only a deliberate one counts: an ordinary hand
+/// resting on the trackpad, or a scroll that wobbles, moves the total far less than this. (Moved
+/// from the terminal's Show All Terminals, 2026-10-13, where it was `MacTerminalExposePinch`.)
+public struct GlassWindowPinch {
+    /// The summed magnification a gesture must reach. A deliberate pinch passes it in a fraction
+    /// of a second; a stray one does not.
+    public static let threshold: CGFloat = 0.3
+
+    public enum Outcome: Equatable {
+        case pinchedIn
+        case pinchedOut
+    }
+
+    public private(set) var total: CGFloat = 0
+    private var answered = false
+
+    public init() {}
+
+    /// One magnify event. Answers at most once per gesture.
+    public mutating func track(_ magnification: CGFloat, phase: NSEvent.Phase) -> Outcome? {
+        if phase.contains(.began) {
+            total = 0
+            answered = false
+        }
+        if phase.contains(.ended) || phase.contains(.cancelled) {
+            total = 0
+            answered = false
+            return nil
+        }
+        guard !answered, magnification.isFinite else { return nil }
+        total += magnification
+        if total <= -Self.threshold {
+            answered = true
+            return .pinchedIn
+        }
+        if total >= Self.threshold {
+            answered = true
+            return .pinchedOut
+        }
+        return nil
+    }
+}
+
+/// Watches one window's pinches and keeps every one of them from the views inside it: nothing in
+/// the window is zoomed or sent anything by a pinch. Events in other windows pass untouched. So it
+/// belongs only on windows whose content does not pinch to zoom — a terminal's, a desktop's — not
+/// a database's diagram or an editor's text, which do.
+public struct GlassWindowPinchMonitor: NSViewRepresentable {
+    let onPinch: (GlassWindowPinch.Outcome) -> Void
+
+    public init(onPinch: @escaping (GlassWindowPinch.Outcome) -> Void) { self.onPinch = onPinch }
+
+    public func makeNSView(context: Context) -> MonitorView { MonitorView() }
+    public func updateNSView(_ view: MonitorView, context: Context) { view.onPinch = onPinch }
+    public static func dismantleNSView(_ view: MonitorView, coordinator: ()) { view.stop() }
+
+    public final class MonitorView: NSView {
+        var onPinch: ((GlassWindowPinch.Outcome) -> Void)?
+        private var monitor: Any?
+        private var pinch = GlassWindowPinch()
+
+        override public func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        override public func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            stop()
+            guard window != nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .magnify) { [weak self] event in
+                guard let self, let window = self.window, event.window === window else { return event }
+                if let outcome = self.pinch.track(event.magnification, phase: event.phase) { self.onPinch?(outcome) }
+                return nil
+            }
+        }
+
+        func stop() {
+            if let monitor { NSEvent.removeMonitor(monitor) }
+            monitor = nil
+        }
+    }
+}
+
+private struct GlassShowAllWindowsOnPinch: ViewModifier {
+    @Environment(\.openWindow) private var openWindow
+
+    func body(content: Content) -> some View {
+        content.background {
+            GlassWindowPinchMonitor { outcome in
+                if outcome == .pinchedIn { GlassShowAllWindows.toggle?(openWindow) }
+            }
+        }
+    }
+}
+
+public extension View {
+    /// A pinch in on this window opens Show All Windows, as it does on a terminal's (the owner,
+    /// 2026-10-13: "it just doesn't activate while on a desktop with the gesture"). Only for a window
+    /// whose content does not pinch to zoom (`GlassWindowPinchMonitor`).
+    func glassShowAllWindowsOnPinch() -> some View {
+        modifier(GlassShowAllWindowsOnPinch())
+    }
+}
+#endif
