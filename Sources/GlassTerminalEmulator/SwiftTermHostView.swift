@@ -1798,6 +1798,9 @@ private final class ReviewingTerminalView: TerminalView {
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
+        #if os(visionOS)
+        installHoldToSelect()
+        #endif
         onWindowAttachmentChanged?()
     }
 
@@ -1807,6 +1810,94 @@ private final class ReviewingTerminalView: TerminalView {
         guard rows > 0 else { return 0 }
         return getOptimalFrameSize().height / CGFloat(rows)
     }
+
+    #if os(visionOS)
+    /// **Pinch and hold, then drag, selects** — the way visionOS selects text (the owner on the
+    /// headset, 2026-10-13: "the pinch drag select method doesn't work … I can triple click and get
+    /// a whole line but I can't adjust it after"). SwiftTerm's long press only opened a menu, a
+    /// pinch-drag scrolls, and a drag after a triple tap went to the scrolling too. Held, the
+    /// selection starts at the character looked at — or, held on either end of the selection there
+    /// is, moves that end; dragging while held extends it; letting go offers Copy. A plain
+    /// pinch-drag still scrolls, and a double or triple tap still selects a word or a line.
+    private lazy var holdToSelect: UILongPressGestureRecognizer = {
+        let recognizer = UILongPressGestureRecognizer(target: self, action: #selector(holdToSelectChanged(_:)))
+        recognizer.minimumPressDuration = 0.5
+        return recognizer
+    }()
+
+    /// The Copy menu after a hold: `UIMenuController`, which SwiftTerm uses, is deprecated on
+    /// visionOS since 1.0.
+    private lazy var selectionMenu = UIEditMenuInteraction(delegate: nil)
+
+    private func installHoldToSelect() {
+        guard holdToSelect.view == nil else { return }
+        addInteraction(selectionMenu)
+        // SwiftTerm's own long press (`setupGestures`, 0.7 s) shows a menu and would answer the
+        // same hold; it is the only long press on this view.
+        for recognizer in gestureRecognizers ?? [] where recognizer is UILongPressGestureRecognizer {
+            recognizer.isEnabled = false
+        }
+        addGestureRecognizer(holdToSelect)
+    }
+
+    /// The buffer cell under `point` (the view scrolls over the whole buffer, so rows count from
+    /// its first line, as SwiftTerm's own hit test does), or nil before the font is measured.
+    private func bufferCell(at point: CGPoint) -> Position? {
+        let terminal = getTerminal()
+        guard terminal.cols > 0, terminal.rows > 0 else { return nil }
+        let size = getOptimalFrameSize()
+        let width = size.width / CGFloat(terminal.cols), height = size.height / CGFloat(terminal.rows)
+        guard width > 0, height > 0, width.isFinite, height.isFinite else { return nil }
+        let column = min(max(0, Int(point.x / width)), terminal.cols - 1)
+        let row = max(0, Int(point.y / height))
+        return Position(col: column, row: row)
+    }
+
+    @objc private func holdToSelectChanged(_ gesture: UILongPressGestureRecognizer) {
+        guard let cell = bufferCell(at: gesture.location(in: self)) else { return }
+        switch gesture.state {
+        case .began:
+            _ = becomeFirstResponder()
+            selectionMenu.dismissMenu()
+            if selection.active, Self.isNear(cell, selection.end) {
+                selection.pivot = selection.start
+            } else if selection.active, Self.isNear(cell, selection.start) {
+                selection.pivot = selection.end
+            } else {
+                selection.setSelection(start: cell, end: cell)
+                selection.pivot = cell
+            }
+            selection.pivotExtend(bufferPosition: cell)
+        case .changed:
+            selection.pivotExtend(bufferPosition: cell)
+        case .ended:
+            selection.pivotExtend(bufferPosition: cell)
+            showCopyMenu()
+        default:
+            break
+        }
+    }
+
+    /// Within reach of a selection's end for a hold aimed by the eyes: SwiftTerm's own drag asks
+    /// for 3 columns and 2 rows.
+    private static func isNear(_ cell: Position, _ end: Position) -> Bool {
+        abs(cell.col - end.col) < 3 && abs(cell.row - end.row) < 2
+    }
+
+    private func showCopyMenu() {
+        let terminal = getTerminal()
+        guard selection.active, terminal.cols > 0, terminal.rows > 0 else { return }
+        let size = getOptimalFrameSize()
+        let width = size.width / CGFloat(terminal.cols), height = size.height / CGFloat(terminal.rows)
+        let start = selection.start, end = selection.end
+        let region = CGRect(x: start.row == end.row ? CGFloat(start.col) * width : 0,
+                            y: CGFloat(start.row) * height,
+                            width: start.row == end.row ? CGFloat(end.col - start.col + 1) * width : bounds.width,
+                            height: CGFloat(end.row - start.row + 1) * height)
+        selectionMenu.presentEditMenu(with: UIEditMenuConfiguration(identifier: nil,
+                                                                    sourcePoint: CGPoint(x: region.midX, y: region.minY)))
+    }
+    #endif
 
     @objc override func paste(_ sender: Any?) {
         guard let text = UIPasteboard.general.string, !text.isEmpty else { return }
@@ -1819,8 +1910,28 @@ private final class ReviewingTerminalView: TerminalView {
         commands.append(correctedFunctionKeyCommand(input: UIKeyCommand.f12))
         // Not while text is being composed, nor under the Kitty keyboard protocol: SwiftTerm's own
         // handling of the press is the right one then.
-        if markedTextRange == nil, getTerminal().keyboardEnhancementFlags.isEmpty { commands += Self.arrowCommands }
+        if markedTextRange == nil, getTerminal().keyboardEnhancementFlags.isEmpty {
+            commands += Self.arrowCommands
+            commands.append(Self.deleteCommand)
+        }
         return commands
+    }
+
+    /// **Delete, held, repeats** (the owner on visionOS with a hardware keyboard, 2026-10-13: held
+    /// delete deleted one character). SwiftTerm repeats the keys it takes in `pressesBegan` on a
+    /// timer of its own, but delete is not one of them: it reaches `deleteBackward` through the
+    /// text system, and on the headset nothing repeated it. As a key command with priority that
+    /// may repeat, the system repeats it; the action is SwiftTerm's own `deleteBackward`, so the
+    /// byte it sends and its text bookkeeping stay SwiftTerm's.
+    private static let deleteCommand: UIKeyCommand = {
+        let command = UIKeyCommand(input: UIKeyCommand.inputDelete, modifierFlags: [], action: #selector(deleteHeld(_:)))
+        command.wantsPriorityOverSystemBehavior = true
+        command.repeatBehavior = .repeatable
+        return command
+    }()
+
+    @objc private func deleteHeld(_ command: UIKeyCommand) {
+        deleteBackward()
     }
 
     /// **The arrow keys ahead of the system** (the owner on visionOS 27.2, 2026-10-11: no arrow
@@ -1836,6 +1947,8 @@ private final class ReviewingTerminalView: TerminalView {
             modifiers.map { flags in
                 let command = UIKeyCommand(input: input, modifierFlags: flags, action: #selector(sendArrow(_:)))
                 command.wantsPriorityOverSystemBehavior = true
+                // Held, an arrow repeats, as SwiftTerm's own handling of it did (2026-10-13).
+                command.repeatBehavior = .repeatable
                 return command
             }
         }
