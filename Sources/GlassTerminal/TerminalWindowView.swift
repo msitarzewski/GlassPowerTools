@@ -358,9 +358,16 @@ struct TerminalWindowView: View {
                 ))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        // Under the keyboard's accessory, and the home indicator, the terminal's colour too. With a
+        // hardware keyboard the accessory stands alone at the bottom of the screen, and the strip
+        // the terminal gives up to it showed the page behind: white under a black terminal
+        // (2026-10-12, the iPhone Duo).
+        .background {
+            windowTheme.canvasBackgroundColor.color.ignoresSafeArea(edges: .bottom)
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             // An iPhone on its side has no height to spare: Tools moves to the top bar instead.
-            if !softwareKeyboardVisible && !isPhoneLandscape {
+            if !keyboardToolsShown && !isPhoneLandscape {
             bottomStatusBar
                 .controlSize(.small)
                 .glassEffect(.regular, in: .capsule)
@@ -374,7 +381,7 @@ struct TerminalWindowView: View {
             }
         }
         .toolbar {
-            if isPhoneLandscape && isTerminalActive && !softwareKeyboardVisible {
+            if isPhoneLandscape && isTerminalActive && !keyboardToolsShown {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         bottomStatusBarContents(compact: true, inMenu: true)
@@ -1424,6 +1431,12 @@ struct TerminalWindowView: View {
     /// automatic theme, which follows the system.
     private var themeColorScheme: ColorScheme? {
         windowTheme.resolvedAppearance.colorScheme
+    }
+
+    /// The keyboard's accessory is up, with its own Tools: the terminal's would be a second.
+    /// The accessory says so itself; the keyboard's frame is the fallback.
+    private var keyboardToolsShown: Bool {
+        softwareKeyboardVisible || terminalHostModel.keyboardAccessoryShown
     }
 
     /// An iPhone on its side: compact height.

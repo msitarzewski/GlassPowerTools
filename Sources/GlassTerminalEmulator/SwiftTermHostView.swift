@@ -399,6 +399,17 @@ public final class SwiftTermHostModel: ObservableObject {
     public private(set) var allowsFocusOwnership = true
     private var nextSemanticEventSequence: UInt64 = 1
 
+    /// Whether the terminal's keyboard accessory — Dismiss, Tools, the cursor pad, Keys — is on
+    /// screen: with the software keyboard, or alone at the bottom of the screen while a hardware
+    /// keyboard is in use. Told by the accessory itself as it joins or leaves a window, so no
+    /// keyboard frame has to be converted between screens: on a folded iPhone Duo that conversion
+    /// missed, and the terminal's own Tools stayed on screen above the accessory's (2026-10-12).
+    @Published public private(set) var keyboardAccessoryShown = false
+
+    func keyboardAccessoryMoved(shown: Bool) {
+        if keyboardAccessoryShown != shown { keyboardAccessoryShown = shown }
+    }
+
     #if os(iOS)
     private var keyboardToolsView: (UIView & UIContentView)?
 
@@ -1467,16 +1478,19 @@ private final class MinimalTerminalAccessoryView: UIToolbar {
     #endif
     private weak var terminalView: ReviewingTerminalView?
     private let onDismissKeyboard: @MainActor () -> Void
+    private let onShownChange: @MainActor (Bool) -> Void
     private var appliedCursorDelta = SwiftTermCursorScrubDelta.zero
     private var lockedCursorAxis: SwiftTermCursorScrubAxis?
     private var cursorDrainTask: Task<Void, Never>?
 
     init(
         terminalView: ReviewingTerminalView,
-        onDismissKeyboard: @escaping @MainActor () -> Void
+        onDismissKeyboard: @escaping @MainActor () -> Void,
+        onShownChange: @escaping @MainActor (Bool) -> Void
     ) {
         self.terminalView = terminalView
         self.onDismissKeyboard = onDismissKeyboard
+        self.onShownChange = onShownChange
         super.init(frame: CGRect(x: 0, y: 0, width: 0, height: 44))
         sizeToFit()
         #if os(iOS)
@@ -1589,6 +1603,11 @@ private final class MinimalTerminalAccessoryView: UIToolbar {
             cancelCursorScrub()
         }
         super.willMove(toWindow: newWindow)
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        onShownChange(window != nil)
     }
 
     private func makeMenu() -> UIMenu {
@@ -1981,6 +2000,7 @@ private final class SwiftTermEngine: TerminalEngine {
         onRendererDiagnostics: @escaping (SwiftTermRendererDiagnostics) -> Void,
         onOSC52Decision: @escaping (SwiftTermOSC52Decision) -> Void,
         onDismissKeyboard: @escaping @MainActor () -> Void,
+        onKeyboardAccessoryShown: @escaping @MainActor (Bool) -> Void,
         alternateScreenScroll: @escaping () -> (@MainActor (CGFloat, Bool) -> Bool)? = { nil }
     ) {
         let terminalView = ReviewingTerminalView(frame: .zero)
@@ -2000,7 +2020,8 @@ private final class SwiftTermEngine: TerminalEngine {
         terminalView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         terminalView.inputAccessoryView = MinimalTerminalAccessoryView(
             terminalView: terminalView,
-            onDismissKeyboard: onDismissKeyboard
+            onDismissKeyboard: onDismissKeyboard,
+            onShownChange: onKeyboardAccessoryShown
         )
         containerView.isOpaque = false
         containerView.backgroundColor = .clear
@@ -2545,6 +2566,9 @@ public struct SwiftTermHostView: UIViewRepresentable {
             },
             onDismissKeyboard: { [weak model] in
                 model?.dismissInputFocus()
+            },
+            onKeyboardAccessoryShown: { [weak model] shown in
+                model?.keyboardAccessoryMoved(shown: shown)
             },
             alternateScreenScroll: { [weak model] in model?.onAlternateScreenScroll }
         )
