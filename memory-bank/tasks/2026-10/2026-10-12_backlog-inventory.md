@@ -188,13 +188,14 @@ owner may reorder; the sections below keep the detail. Within a tier, earlier is
 - **B-X15** "FocusedValue update tried to update multiple times per frame" at Mac launch.
 - **B-X16** Tab records lost after the crashes of 10-08 — partly explained, path B fixed.
 - **B-X17** "display index not found 1/4" in the Mac agent's log on every 003.889 session.
-- **B-X18** The ECDSA error text contradicts itself (`SSHTransportError.swift:44` vs `:77`).
+- **B-X18** ~~The ECDSA error text contradicts itself~~ (44f6b2a, 2026-10-13): one message, true to what imports.
 - **B-X19** visionOS library search unreachable through accessibility; schema sidebar rows have no button trait.
 - **B-X20** The database workspace window can shrink when its id is not found (`GlassDatabaseScenes.swift:35`).
 - **B-X21** Vendored Citadel's `writeCompositeSSHString` (`DH-Helpers.swift:264`) moves the writer index without
   reserving, the pattern patch C2 fixed elsewhere (`:82` and `:117` reserve first); C6 overloads drop options (the app does not use them). S6 (credentials not zeroed) and S7
   (Keychain read before the host key is checked) need a Citadel change.
-- **B-X22** Remote listing never checks `hasSafeName`; project reach ignores pinned host keys (both low).
+- **B-X22** ~~Remote listing never checks `hasSafeName`~~ (be02fe5, 2026-10-13); project reach ignores pinned host keys (low,
+  a convenience: open).
 - **B-X23** Older device builds strip workgroups' tmux names when they re-save — keep devices on one build.
 - **B-X24** Insert Path does not bring the Mac window forward; "Files failed once from a cold app" (never
   reproduced); the Mac app crashes on an accessibility snapshot after the connection-failure alert (XCTest only).
@@ -203,7 +204,8 @@ owner may reorder; the sections below keep the detail. Within a tier, earlier is
 - **B-X26** The first terminal window opened too small on Vision Pro (glas.sh, 08-01) — look again on the headset.
 - **B-X27** Complete file protection on a locked Mac (found 2026-10-13, 00:40, the screen locked): writes with
   `FileProtectionType.complete` / `.completeFileProtection` fail with EPERM, and files so written cannot be read
-  — `SessionRecorder` (index and recordings), `SFTPBrowserView` downloads, `DesktopSessionModel` captures. Seen as
+  — `SessionRecorder` (index and recordings), `SFTPBrowserView` downloads **and the remote editor's save** (its
+  local staging folder; live save tests fail while locked), `DesktopSessionModel` captures. Seen as
   terminal test failures (recording deletion, tmux offer, setup saves), the same with or without the change under
   test; this is also why the suite has needed an unlocked screen. A session recorded or a download running while
   the owner is away is the product case. **Measured on the locked Mac (macOS 27.2, 00:50):** none — write and read;
