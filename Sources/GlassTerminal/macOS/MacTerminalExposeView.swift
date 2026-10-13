@@ -18,6 +18,8 @@ struct MacTerminalExposeView: View {
     let insets: EdgeInsets
     @Environment(SessionManager.self) private var sessionManager
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Settings ▸ Terminal ▸ Blur previews (GlassShowAllWindows.blursPreviewsKey).
+    @AppStorage(GlassShowAllWindows.blursPreviewsKey) private var blursPreviews = false
     @State private var appeared = false
     @State private var hovered: MacTerminalExposeItemID?
     @State private var dropTarget: UUID?
@@ -179,10 +181,11 @@ struct MacTerminalExposeView: View {
         Group {
             if let tab, let windowID {
                 MacTerminalExposeTabTile(tab: tab, tile: tile, selected: selected, hovering: hovering,
-                                         alwaysVisible: alwaysVisible)
+                                         alwaysVisible: alwaysVisible, blurred: blursPreviews)
                     .onDrag { MacWorkspaceTabDrag(windowID: windowID, workspaceID: tab.workspaceID).itemProvider() }
             } else if case .session = tile.id {
-                MacTerminalExposeWindowTile(tile: tile, session: session, selected: selected, hovering: hovering)
+                MacTerminalExposeWindowTile(tile: tile, session: session, selected: selected, hovering: hovering,
+                                            blurred: blursPreviews)
             } else {
                 MacTerminalExposeSessionTile(tile: tile, selected: selected) { expose.choose(tile.id) }
             }
@@ -266,9 +269,13 @@ private struct MacTerminalExposeTabTile: View {
     let selected: Bool
     let hovering: Bool
     let alwaysVisible: Bool
+    let blurred: Bool
 
     var body: some View {
         MacWorkspacePreview(controller: tab, alwaysVisible: alwaysVisible)
+            // The picture only, never its name: Blur previews (GlassShowAllWindows.blursPreviewsKey).
+            .blur(radius: blurred ? GlassShowAllWindows.previewBlurRadius : 0)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
             .overlay(alignment: .bottom) {
                 if tile.isBusy {
                     MacTerminalActivityShimmer(color: tab.workgroupColor?.color ?? .accentColor)
@@ -305,12 +312,14 @@ private struct MacTerminalExposeWindowTile: View {
     let session: GlassOpenSession?
     let selected: Bool
     let hovering: Bool
+    let blurred: Bool
 
     var body: some View {
         let picture = session?.snapshot?()
         ZStack {
             if let picture {
                 picture.resizable().aspectRatio(contentMode: .fit)
+                    .blur(radius: blurred ? GlassShowAllWindows.previewBlurRadius : 0)
             } else {
                 VStack(spacing: 6) {
                     Image(systemName: tile.symbolName ?? "macwindow")
@@ -396,16 +405,19 @@ private struct MacTerminalExposeCaption: View {
                 .font(.callout.weight(.semibold))
                 .lineLimit(1)
             if let detail {
+                // Legible over whatever the tile shows (the owner, 2026-10-13: "TIL that there's
+                // actually a second line. Let's make sure that's legible"): secondary grey on a thin
+                // material let the terminal's text behind show through it.
                 Text(detail)
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
+                    .font(.footnote.monospaced())
+                    .foregroundStyle(.primary.opacity(0.78))
                     .lineLimit(1)
                     .truncationMode(detailTruncation)
             }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+        .background(.thickMaterial, in: RoundedRectangle(cornerRadius: 8))
     }
 }
 

@@ -192,6 +192,9 @@ final class MacWorkspacePreviewRegistry {
         locate(sessionID: sessionID)?.tab.windowIdentity(servers: servers).title
     }
 
+    /// Whether a window on screen shows this session in one of its tabs.
+    func shows(sessionID: UUID) -> Bool { locate(sessionID: sessionID) != nil }
+
     /// Brings the window holding the session forward, on its tab.
     @discardableResult
     func reveal(sessionID: UUID) -> Bool {

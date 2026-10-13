@@ -7,6 +7,7 @@
 
 import SwiftUI
 import GlassLayers
+import GlassShell
 import GlassSSHTransport
 import UniformTypeIdentifiers
 import GlasSecretStore
@@ -38,6 +39,11 @@ struct GeneralSettingsView: View {
     #if os(macOS)
     #endif
     
+    #if os(macOS)
+    /// Show All Windows' Blur previews, kept on this Mac (GlassShowAllWindows.blursPreviewsKey).
+    @AppStorage(GlassShowAllWindows.blursPreviewsKey) private var blursOverviewPreviews = false
+    #endif
+
     var body: some View {
         @Bindable var settings = settingsManager
         
@@ -54,6 +60,16 @@ struct GeneralSettingsView: View {
                     }
             }
             
+            #if os(macOS)
+            Section(GlassShowAllWindows.title) {
+                Toggle("Blur previews", isOn: $blursOverviewPreviews)
+                    .accessibilityIdentifier("settings-show-all-windows-blur")
+                Text("Softens what each window shows in Show All Windows (⇧⌘\\), so a screenshot of it can be shared. Names stay sharp. This Mac only.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            #endif
+
             Section("Terminal Behavior") {
                 Toggle("Keep scrollback during session", isOn: $settings.saveScrollback)
                     .onChange(of: settings.saveScrollback) { _, _ in

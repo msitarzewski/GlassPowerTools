@@ -27,6 +27,9 @@ struct MacShowAllWindowsTests {
         #expect(groups[1].tiles.map(\.title) == ["bravo", "charlie"])
         #expect(groups[1].tiles.map(\.id) == [.session("desktop:2"), .session("desktop:5")])
         #expect(groups[1].tiles.first?.symbolName == "display")
+        // A Files browser no tab shows comes first, as its own kind of window.
+        let files = MacTerminalExposeModel.otherGroups([session("terminal-session:7", "SFTP on alpha", symbol: "folder")])
+        #expect(files.map(\.title) == ["Files"])
         #expect(!groups.flatMap(\.tiles).contains { $0.title == "alpha" }, "a terminal is shown by its window's group")
     }
 

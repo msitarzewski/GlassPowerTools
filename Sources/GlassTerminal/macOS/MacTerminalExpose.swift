@@ -138,10 +138,12 @@ enum MacTerminalExposeModel {
         })
     }
 
-    /// Every other capability's open windows, a group per kind in the setup's order — Databases,
-    /// Desktops, then the editor's — each window a tile. The terminal's own are its windows' groups.
+    /// Every other open window, a group per kind — the terminal's Files browsers, then the setup's
+    /// order: Databases, Desktops, then the editor's — each window a tile. The terminal's tabs are
+    /// their windows' groups (`MacTerminalExpose.otherSessions` leaves them out).
     static func otherGroups(_ sessions: [GlassOpenSession]) -> [MacTerminalExposeGroup] {
-        let kinds: [(prefix: String, title: String)] = [("database", "Databases"), ("desktop", "Desktops"), ("editor", "Editor")]
+        let kinds: [(prefix: String, title: String)] = [("terminal-session", "Files"), ("database", "Databases"),
+                                                         ("desktop", "Desktops"), ("editor", "Editor")]
         let known = Set(kinds.map(\.prefix) + ["terminal"])
         let groups = kinds.compactMap { kind -> MacTerminalExposeGroup? in
             let tiles = sessions.filter { GlassShowAllWindows.kind(of: $0) == kind.prefix }.map(tile(for:))
@@ -485,9 +487,24 @@ final class MacTerminalExpose {
     /// Something to show: a window, or the overlay itself to close.
     var isAvailable: Bool { isShown || !registry.shownWindows.isEmpty || !otherSessions.isEmpty }
 
-    /// Every other capability's open windows (`GlassShowAllWindows.openSessions`), read when asked.
+    /// Every open window that is not already a tab here (`GlassShowAllWindows.openSessions`), read
+    /// when asked. A terminal shows as its window's tab: a workgroup ("terminal:") always, and a
+    /// terminal in no workgroup ("terminal-session:") when a window's tab shows it — listed again
+    /// under Other it was a pale copy of the tab (the owner, 2026-10-13: "why isn't this window in
+    /// the workgroup, and why is it that color?"). One no tab shows is a Files browser, a window of
+    /// its own.
     var otherSessions: [GlassOpenSession] {
-        (GlassShowAllWindows.openSessions?() ?? []).filter { GlassShowAllWindows.kind(of: $0) != "terminal" }
+        (GlassShowAllWindows.openSessions?() ?? []).filter { session in
+            switch GlassShowAllWindows.kind(of: session) {
+            case "terminal":
+                return false
+            case "terminal-session":
+                let id = session.id.split(separator: ":", maxSplits: 1).last.flatMap { UUID(uuidString: String($0)) }
+                return id.map { !registry.shows(sessionID: $0) } ?? false
+            default:
+                return true
+            }
+        }
     }
 
     func toggle(_ context: Context) {

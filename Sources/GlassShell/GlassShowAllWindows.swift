@@ -21,6 +21,14 @@ public enum GlassShowAllWindows {
     public static let title = "Show All Windows"
     public static let symbolName = "rectangle.3.group"
 
+    /// Settings ▸ Terminal ▸ Blur previews: the overview's pictures softened, so a screenshot of it
+    /// can be shared without what the windows show (the owner, 2026-10-13). This device's choice,
+    /// not synced: it is about this screen.
+    public static let blursPreviewsKey = "com.glasspowertools.showAllWindows.blursPreviews"
+    /// Slight: enough that text cannot be read at a tile's size, little enough that a window is
+    /// still recognisable by its shape and colours.
+    public static let previewBlurRadius: CGFloat = 5
+
     /// Opens or closes the overview. Set by the capability that draws it — the terminal, on the
     /// Mac; nil elsewhere, and then the button is not drawn rather than drawn dead.
     public static var toggle: (@MainActor (OpenWindowAction) -> Void)?
