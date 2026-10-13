@@ -58,6 +58,12 @@ until its Desktop service turns it on (default off, a trust boundary) — told t
   answered ("saved server no longer exists") — now wait for `familyCatalogLoaded`. Retry → Reconnect; every Close Pane
   closes the tab with its last pane; a close box per sidebar tab. **Asked the owner** what the red circles mark (a
   lighter band at the sidebar's trailing edge? the top-right corner?) before touching window chrome.
+- **~12:00 (0.4.399):** the red circles were rounded corners meeting square ones: a connecting or failed SSH pane
+  drew its material rounded even when it filled the tab. It is square there now, and rounded only among split
+  panes. The owner's SY Staging tab still said "saved server no longer exists" while its subtitle came from that
+  saved server. The first catalog answer can come before every machine's record. A pane told its server was
+  missing now asks again as soon as the server is saved (`MacWorkspaceController.failedForMissingServer`). The
+  owner will say whether SY Staging connects on 0.4.399.
 - **Show All Windows** (was Show All Terminals; the owner: include every service type, "one component?"):
   `GlassShowAllWindows` in the shell (action set by the terminal, which draws the overlay; button beside every ⚡);
   overlay = terminal windows' groups + Databases, Desktops, Editor from `registry.openSessions()`; a desktop tile
