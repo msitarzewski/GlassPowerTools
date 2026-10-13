@@ -73,7 +73,7 @@ should have produced before any of that was written. Rule 57.
 | **Idle-hiding policy for overview chrome** | `MacOverviewIdlePolicy`, same file | macOS only, pure | |
 | **Running-workgroup card grid** | `TerminalWorkgroupsView.swift:379` | macOS only | A *third* card treatment (see drift below) |
 | **Cross-capability session list and gallery** | `GlassOpenSession`, `GlassSessionSwitcher`, `GlassSessionGallery`, `Sources/GlassShell/` | Everywhere | The gap all of the above left: they switch within one capability |
-| **Desktop still image** | None. `DesktopSessionModel` holds a framebuffer and builds `CGImage` for the cursor (`:621`) but exposes no frame snapshot | — | Moot today: the desktop contributes no sessions (D31) |
+| **Desktop still image** | None. `DesktopSessionModel` holds a framebuffer and builds `CGImage` for the cursor (`updateCursorImage`) but exposes no frame snapshot | — | Desktops do contribute sessions to Active (`GlassDesktopCapability.openSessions`, `Sources/GlassDesktop/GlassDesktopCapability.swift:139`), with no `snapshot`, so their cards show a name and a symbol. *Corrected 2026-10-12: this row said the desktop contributed none (D31).* |
 | **Database / editor still image** | None, and none wanted | — | A card with a name and a symbol is the right answer for both |
 
 **Known drift to settle when the gallery is next touched:** there are now four card treatments —
@@ -82,22 +82,27 @@ grid's, and `GlassSessionCard`. They differ in corner radius, border and how sel
 `GlassSessionCard` is the candidate to absorb the others, and the two terminal ones should adopt
 it rather than a fifth being added.
 
-## Contextual File items and Mac key owners (2026-09-25)
+## Contextual File items and Mac key owners (2026-09-25; keys rechecked 2026-10-12)
 
 One menu item per key, aimed by the focused window: the window publishes a focused scene value with
 the item's title and action, or nothing (the item is then disabled, never borrowed from another
-window). `MenuBarPlacementTests` holds a single-owner guard per key.
+window). `MenuBarPlacementTests` holds a single-owner guard for ⌘N, ⌘S, ⌘W, ⌘O (and ⌥⌘O's absence),
+⇧⌘E, ⌘F, ⌘G, ⇧⌘G, ⌥⌘G, ⌥⇧⌘G, ⌘T and ⇧⌘\; ⇧⌘O, ⌥⌘E and ⌃⌘T have none yet.
 
 | Key | Owner | What the window says |
 |---|---|---|
 | ⌘N | shell (`\.glassNewItem`) | New Host · New Terminal Window · New SQL Document · New Document |
 | ⌘S | shell (`\.glassSaveItem`, D37) | Save… / Save (editor) · Save SQL Document… (database) |
 | ⌘W | `GlassCloseCommandRouter` (registered, never declared) | editor: the document, and the window with its last document unless a project is open |
-| ⌘O / ⌥⌘O | editor's Open File… / Open Project… | runs its own panel from any window |
+| ⌘O | editor's Open… — files and folders; a folder opens as a project in its own window | runs its own panel from any window. ⌥⌘O (Open Project…) was removed 2026-10-08 (`50f6cae`) and is guarded as undeclared |
 | ⇧⌘O | database's Open SQL Document… | |
 | ⇧⌘E | editor's New Editor Window — opens on a blank document | |
 | ⌥⌘E | database's Explain Plan (moved from ⇧⌘E, 2026-09-25) | |
+| ⌘F / ⌘G / ⇧⌘G | shell's Edit ▸ Find ▸ Find… / Find Next / Find Previous (`\.glassFindItem`, `GlassShellFindCommands`, 2026-10-08) | the terminal workspace only, today; ⌘G was Terminal Grid |
+| ⌥⌘G / ⌥⇧⌘G | terminal's Terminal Grid / Terminal Carousel (`MacWorkspaceCommands`, moved from ⌘G 2026-10-08) | |
 | ⌘T | terminal (Mac workspace; visionOS platform commands) | |
+| ⌃⌘T | terminal's New Basic Terminal Tab — a local shell outside tmux (`MacWorkspaceCommands`, 2026-10-12) | |
+| ⇧⌘\ | terminal's Window ▸ Show All Terminals (`GlassTerminalLibraryEntries`, 2026-10-08) | works from any window |
 
 ## Synced preferences beside the catalog (2026-10-08)
 

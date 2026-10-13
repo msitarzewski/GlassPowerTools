@@ -48,8 +48,9 @@ three separately pinned copies of the shared packages.
   host's terminal, database and desktop coexist is the product's differentiator.
 
 **Deployment targets observed in the source apps:** glas.sh macOS 26.0, iOS 26.0, visionOS 26.0;
-glassdb macOS 27.0, iOS 26.0, visionOS 26.0; glassDT 26.0 on all three. The merged product must pick
-one floor deliberately and record it.
+glassdb macOS 27.0, iOS 26.0, visionOS 26.0; glassDT 26.0 on all three. The merged product chose
+26.0 on macOS, iOS and visionOS, `arm64` only (approved 2026-09-10, kept by D12): recorded in
+`memory-bank/decisions.md`, `memory-bank/techContext.md` and `Documentation/BUILDING.md`.
 
 **Existing installations whose data must be preserved:** `/Applications/glassDT.app` (`app.glassdt`),
 glas.sh (`sh.glas.app`) and glassdb (`app.glassdb`), all signed by team 7JQGQ7CRH8. All three already

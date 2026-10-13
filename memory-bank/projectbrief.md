@@ -58,7 +58,10 @@ separate applications cannot compose that way.
 - Matching competitors feature for feature inside any single capability. Depth is chosen for what a
   user needs while already looking at that host.
 - Shipping to an App Store at this stage. None of the three source apps is published, which is why
-  merging carries no product-identity cost.
+  merging carries no product-identity cost. *Superseded 2026-09-25 by D38 (`decisions.md`): the Mac
+  ships outside the App Store (Developer ID, notarized, updated by Sparkle), because the App Store
+  requires a sandbox a local shell cannot live in; iPhone, iPad and Vision Pro go to TestFlight, then
+  the App Store. Neither has happened yet (2026-10-12).*
 
 ## Constraints carried in
 

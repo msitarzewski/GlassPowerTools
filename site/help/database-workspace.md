@@ -73,7 +73,7 @@ If the server closes the connection, the workspace shows **Disconnected** and ke
 
 Open **Settings** and choose **Databases**. The same page is **All Databases** in a database window's own settings, under the gear in its toolbar.
 
-- **Result row limit** and **Query history limit** keep memory use bounded.
+- **Result row limit** (1 to 100,000; default 1,000) and **Query history limit** (1 to 10,000; default 500) keep memory use bounded. The row limit caps what a single `SELECT` loads.
 - **Redact literals in query history** replaces quoted strings and numbers before a statement is kept in history. It never changes what is sent to the database.
 - **Notify when a query fails** shows a private notification with no SQL, schema names or server details.
 - **SQL editor text** and **Results grid text** set their text sizes, with line numbers and JSON formatting in the record editor.

@@ -321,12 +321,19 @@ be measured headless with an `ImageRenderer` probe — `Tools/ChartProbe` is the
 
 ## Release and hosting, 2026-09-25 (D38, D39)
 
-Not built yet. Mac releases: Developer ID + notarization + Sparkle (macOS-only dependency), feed
-`https://glasspowertools.com/appcast.xml`; `aps-environment` must be `production` in release builds
-(`Platforms/macOS/macOS.entitlements` says `development`); a Developer ID profile must carry the
-CloudKit container, App Group and Keychain group. iOS, iPadOS, visionOS: TestFlight, then the App
-Store. The site is static, built into `_site/`; where and how it is hosted is kept out of this repository
-(private infrastructure notes).
+**Built 2026-09-27 (`a1c07ec`, `8ddb1eb`); never run.** No release has been made and the site has
+not been deployed (`activeContext.md`, 2026-10-12). Mac releases: Developer ID + notarization + Sparkle
+(macOS-only dependency), feed `https://glasspowertools.com/appcast.xml`, made by
+`Tools/Release/release-mac.sh` (the feed entry by `Tools/Release/appcast.py`, into
+`site/static/appcast.xml`). The entitlements read `$(GPT_APS_ENVIRONMENT)`, `development` in
+`Config/Identity.xcconfig`; the script archives with `production` and refuses a build without it, an
+empty `GPT_SPARKLE_PUBLIC_KEY`, a missing Developer ID certificate, or a widget not signed into the
+app's App Group. Still the owner's: the Sparkle key, a Developer ID profile carrying the CloudKit
+container, App Group and Keychain group, the first run, and deploying the site (inventory B-R1–B-R4).
+iOS, iPadOS, visionOS: TestFlight, then the App Store (D38; no tooling yet). The site is static:
+`Tools/Site/build_site.py` builds `site/` into the ignored `_site/` and fails on a broken link or
+anchor; where and how it is hosted is kept out of this repository (private infrastructure notes).
+Procedure: `Documentation/BUILDING.md`, "Releasing the Mac app" and "The website".
 
 ## Dependencies, 2026-09-27
 

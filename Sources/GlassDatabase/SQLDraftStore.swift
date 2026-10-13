@@ -107,9 +107,9 @@ final class SQLDraftStore {
     /// so the tab you are typing in cannot evict itself. A store that grows forever is its own bug.
     static let maximumDraftsPerConnection = 24
     static let maximumBytesPerConnection = 8 * 1_024 * 1_024
-    /// A connection file untouched for this long is deleted on first use. Deleting a *connection*
-    /// should also delete its drafts; that hook belongs in `ConnectionManager` and is not wired
-    /// yet — see `removeAll(connectionID:)`.
+    /// A connection file untouched for this long is deleted on first use. Deleting a connection
+    /// deletes its drafts at once (`ConnectionManager`'s delete calls `removeAll(connectionID:)`);
+    /// this expiry catches the rest.
     static let expiry: TimeInterval = 90 * 24 * 60 * 60
 
     private let directory: URL

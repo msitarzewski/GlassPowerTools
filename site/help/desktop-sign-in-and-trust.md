@@ -60,7 +60,7 @@ These RDP features and setups are not available:
 - Multiple remote monitors. An RDP session shows one monitor.
 - UDP transport. Connections use TCP.
 
-Clipboard sharing is limited to text. See [Keyboard, pointer, clipboard and audio](desktop-input.md).
+Files are not shared through the clipboard. Over RDP a copy carries its text, formatting and images; over VNC, only text. See [Keyboard, pointer, clipboard and audio](desktop-input.md#share-the-clipboard).
 
 > [!NOTE]
-> The RDP engine has been tested against Windows 11, signing in with Network Level Authentication, and against a Linux RDP server. Other versions of Windows and Windows Server have not been tried. The Windows 11 host did not offer resizing, so on it the remote resolution stays fixed.
+> The RDP engine has been tested against Windows 11, signing in with Network Level Authentication, and against two Linux RDP servers, GNOME Remote Desktop and xrdp. Other versions of Windows and Windows Server have not been tried. The Windows 11 host did not offer resizing, so on it the remote resolution stays fixed.

@@ -48,6 +48,11 @@ evaluation, including a selection click.
    substantial change to the most feature-dense view in the app (selection rectangles, frozen
    columns, inline edit, context menus, accessibility); iOS and visionOS would keep SwiftUI.
 
+*Correction, 2026-10-12:* the grid has no inline edit. A row is edited in the **Edit Row** editor,
+opened by double-clicking the row or from its row number's context menu (`openEditor(for:)` in
+`TableDetailView.swift`). The rest of that list is in the grid: a cell-range selection
+(`selectedRectangle`), frozen columns (`gridFrozen`), context menus and accessibility labels.
+
 ## Option 1, partly built — 2026-09-25
 
 In the tree (uncommitted), shipped in 0.4.218 onward: the displayed-row indices memoized

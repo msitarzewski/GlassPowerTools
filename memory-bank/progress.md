@@ -17,7 +17,7 @@ All four capabilities and the shell are built and in daily use on the owner's Ma
 | Host library sync through CloudKit; credentials and host-key pins through iCloud Keychain (D18, D19, D21, D23) | built | unit; device (CloudKit delivering between Mac and iPhone). The two-device acceptance run of D26 has not been done |
 | Terminal: SSH, host trust, keys (file and Secure Enclave), tabs, themes, workgroups, local shell on Mac, SFTP browser, port forwarding | built | unit, UI, server (OpenSSH 10.2: shell, SFTP, RSA and Ed25519 sign-in), device |
 | Databases: MySQL, PostgreSQL, SQLite; TLS modes; host tunnel; browser, grid, record editor, query editor, Explain, history, read-only services | built | unit, server (MySQL 8, PostgreSQL: 21 live integration tests plus the engine's own), device |
-| Remote desktops: RDP (RDPKit) and VNC (VNCKit), certificate policy, resize following the window, audio, clipboard | built | unit (RDPKit 1,015 tests), server (Windows 11 with NLA — 2026-09-14 and again 2026-09-27; a GNOME RDP server), device (Mac, iPhone) |
+| Remote desktops: RDP (RDPKit) and VNC (VNCKit), certificate policy, resize following the window, audio, clipboard | built | unit (RDPKit 1,015 tests), server (Windows 11 with NLA — 2026-09-14 and again 2026-09-27; GNOME Remote Desktop; xrdp 0.9.24 in the disposable Docker fixture, 6/6 checks 2026-09-27), device (Mac, iPhone) |
 | Editor: documents, projects on this device and over SFTP, New File, first save into a project, viewers, Markdown preview with Mermaid, 16 grammars, TextKit 1 on the Mac (D36) | built | unit, UI on iPhone simulator, server (7 live remote-editing tests), device (Mac) |
 | Acknowledgements and licence notices (generated, guarded by tests) | built | unit |
 | Database through another machine, or to a private address through its own machine's Terminal (D45, 2026-10-05) | built | unit, server (scratch tunnel to a network address); owner's production server through its app server |
@@ -27,7 +27,7 @@ All four capabilities and the shell are built and in daily use on the owner's Ma
 | Local terminals kept in tmux on the Mac (D47): reattach after a quit or install, close detaches, Active lists This Mac's sessions, windows reopen after a quit (2026-10-07/08) | built | unit (fake tmux server; policies mutation-checked), tmux commands live on tmux 3.7c, device (the owner's Mac: this session survived and reattached across installs) |
 | SwiftTerm 1.20: answers XTVERSION, so TUIs use synchronized output (D48) | built | unit (`TerminalCapabilityProbeTests`; the XTVERSION test fails on 1.18), device (Mac, the owner using Claude Code) |
 | Local shells get the Mac's environment and `TERM_PROGRAM=GlassPowerTools` | built | unit, device (Mac) |
-| Dependency update check, on demand and weekly (D48) | built | survey live (8 of 30 pins behind); `--test swiftterm@1.18.0` fails as it should; the weekly LaunchAgent installed, first run not yet seen |
+| Dependency update check, on demand and weekly (D48) | built | survey live (8 of 30 pins behind); `--test swiftterm@1.18.0` fails as it should; the weekly LaunchAgent (Mondays 08:00) ran on 2026-10-12: 9 of 30 pins behind, three updates failing (B-H9) |
 | Mac tabs: names from what runs in them, rename, activity wave, Finder drop, drag between windows and reorder (2026-10-07/08) | built | unit (naming, throttle, drop escaping with a zsh/bash round trip, drag rules), device (Mac: rename, drag between windows confirmed by the owner) |
 | Scrolling in tmux: local and SSH on the Mac, a pan on iPhone, iPad and Vision Pro (2026-10-08) | built | unit, live (commands through `sh` against tmux 3.7c); Mac local confirmed by the owner; iOS/visionOS not yet seen |
 | Vision Pro windows draw Apple's glass themselves at their Glass; terminal and remote desktop completely clear at 0 (D59, D60, 2026-10-10) | built | unit, visionOS simulator captures; the terminal's earlier form on device (0.4.336); split-view windows keep system glass (observed limit) |
@@ -85,8 +85,9 @@ profile, notarization, deploying the site), the behaviour findings listed in `ac
   (connect, show machine, show Active) have not been reported either.
 - **D66 in daily use:** the owner's tmux server predates it; the launchd host starts with the next
   server (after a reboot or End All Local Terminals).
-- **Vision Pro:** runs 0.4.283 (2026-10-06); the owner has used desktops and trackpad scrolling on
-  it. The tmux, database and visionOS window changes since 0.4.254 have not been gone through on it.
+- **Vision Pro:** runs the same build as the Mac and the iPhone (0.4.390 on 2026-10-12); the owner has used
+  desktops, trackpad scrolling and the editor's toolbar on it. Not every change since has been gone through on it
+  (the inventory's B-V1 lists what is owed).
 - **Database scroll edge on the Mac** (hard top edge so content does not print through the
   toolbar): built, not seen — no screen capture without screen-recording permission.
 - **The D26 two-device acceptance run:** add a host with a key on one device, connect from another
@@ -99,10 +100,10 @@ profile, notarization, deploying the site), the behaviour findings listed in `ac
 
 ## Known and open
 
-- **Vision Pro (2026-10-08):** a SwiftUI stack-layout crash (over-release, garbage pointers) while a
-  terminal shows a Mac's tmux session running Claude Code; Release builds only, not reproduced under
-  Address Sanitizer; the headset runs an xrOS 27.2 beta. Active there skips a machine it cannot sign
-  in to without asking, silently. One SSH tmux listing failed there, cause unknown.
+- **Vision Pro (2026-10-08):** the SwiftUI stack-layout crash while a terminal showed a Mac's tmux
+  session was fixed by `32fa481` (2026-10-09: the simulator stress harness crashed 17 of 30 before, 0 of 24
+  after; none on the headset since — 2026-10-08 plan note, W10). Still open there: Active skips a machine
+  it cannot sign in to without asking; one SSH tmux listing failed, cause unknown.
 - A tab-to-new-window drag (outside any window) is not supported; "Move Tab to New Window" covers it.
 - A database workspace's tabs do not survive leaving and returning on a phone; its session and SQL
   drafts do.
@@ -114,8 +115,8 @@ profile, notarization, deploying the site), the behaviour findings listed in `ac
 - tree-sitter 0.27 and swift-crypto 5 wait on upstream releases (`techContext.md`).
 - The legacy `SFTPRemoteEditorView` sheet remains as a fallback; the owner has been asked whether to
   delete it.
-- **Backlog (owner, 2026-09-27):** let Glass Power Tools be set as the Mac's default text editor
-  (declare editable document types so Finder's "Open With ▸ Change All" and `open` reach the editor).
+- **Default text editor (owner, 2026-09-27):** built 2026-09-30 (`28a0b6e`) — an Alternate editor for plain
+  text, source, JSON, XML, Markdown and YAML; not yet opened from the Finder (B-V3).
 - glassDT parity audit findings: `tasks/2026-09/2026-09-27_glassdt-parity-audit.md`.
 - Library sync (2026-09-28): whole-account fetch, deletions dated by statement, no set-up service can
   vanish through a merge, per-record apply with visible failures, dry-run mode. Proven on the Mac

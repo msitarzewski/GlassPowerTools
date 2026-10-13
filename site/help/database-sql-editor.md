@@ -28,7 +28,7 @@ The run button runs the statement at the cursor, or the selection when there is 
 
 A statement that changes data, is destructive or cannot be classified opens **Review SQL Before Executing**, which names the kind of SQL in the script. Choose **Execute** to run it or **Cancel**. When several statements run, the first error stops the rest.
 
-A single `SELECT` returns at most 1,000 rows. When there are more, the bar under the results says **more available — loaded result limited to 1000**. Other statements are sent as written.
+A single `SELECT` returns up to 1,000 rows. To change that, set **Result row limit** (1 to 100,000) in Settings ▸ **Databases**, or, on Mac, iPad and Vision Pro, for one window under **Settings** (gear) ▸ **This Window** in its toolbar; see [Database settings](database-workspace.md#database-settings). When there are more rows than the limit, the bar under the results says so, for example **more available — loaded result limited to 1000**. Other statements are sent as written.
 
 ## Explain a query
 
