@@ -44,6 +44,12 @@ it (next build): the desktop changes, the Duo corner, the library's sidebar togg
 - **Leftover on the owner's Duo simulator:** a desktop window restored from before shows "Desktop Not Found" —
   close it from the "Views Open" switcher (a phone cannot close it from inside).
 - **Mermaid 12.2.0** came in through the scheme's pre-action (D35) during a build — expected, committed.
+- **Show All Windows** (was Show All Terminals; the owner: include every service type, "one component?"):
+  `GlassShowAllWindows` in the shell (action set by the terminal, which draws the overlay; button beside every ⚡);
+  overlay = terminal windows' groups + Databases, Desktops, Editor from `registry.openSessions()`; a desktop tile
+  shows its last frame. ⇧⌘\ / Window ▸ Show All Windows. "Nothing at all from a desktop" did not reproduce (menu
+  and key both opened it with the desktop raised) — the owner to retry on 0.4.394 and say if focus was inside the
+  desktop or it was full screen.
 
 ## 2026-10-13 (~01:30) — overnight: Duo fixes, 0.4.392, tier 3 begun
 
