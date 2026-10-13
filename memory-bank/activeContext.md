@@ -27,6 +27,27 @@ anything touching real servers (SSH and database tests use the disposable test V
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
+## 2026-10-13 (~01:30) — overnight: Duo fixes, 0.4.392, tier 3 begun
+
+**State:** everything committed (76a5c7f … HEAD); nothing pushed. **0.4.392 on the Mac**; the iPhone and Vision
+Pro were locked — a retry loop in the session scratchpad installs each when it unlocks (check the devices). Builds
+after 0.4.392 also carry: the tree-sitter match limit, B-X5, B-X13, B-X18, B-X22 (first half).
+
+- **Done:** Active's machines by service (76a5c7f); the folded-Duo terminal — one Tools, no white strip (e8fa7ba);
+  workgroup detail titles (a53f2e3); tree-sitter overflow by the highlight cursor's match limit, measured instead of
+  vendoring (0b5d421); B-X5 every terminal on a lost shared connection says so (9ee28f3); B-X13 Local Network
+  guidance only for "No route to host" (461dc59); B-X18 one true unsupported-key message (44f6b2a); B-X22 unsafe
+  remote names left out (be02fe5).
+- **Found:** B-X27 — files written with complete protection fail on a locked Mac (measured per class); it is why
+  the terminal suite needs an unlocked screen (23 issues tonight, all this) and why live remote saves failed. **The
+  owner's decision** (inventory B-X27: recommended complete-unless-open for recordings/downloads).
+- **Waiting on the owner:** unfold the Duo (tour re-run; the unfolded-window and "N Views Open" items); B-X27;
+  B-X10/B-X11 (database breadcrumb, Query commands on table tabs — need the Mac on screen and a design call);
+  B-X4 (Mac drag-select in tmux history — needs the Mac unlocked).
+- **Next for an agent:** rerun the terminal suite with the screen unlocked (expect 0 failures); B-X5's second half
+  (database and desktop tunnels outside W21's pool); the database's Local Network check (EPERM/EACCES vs the
+  measured EHOSTUNREACH).
+
 ## 2026-10-12 (late) — before the second compaction: the iPhone Duo on its simulator
 
 **Installed: 0.4.391 on Mac, iPhone and Vision Pro** (with the swift-nio-ssh CVE fix). Committed since, not yet
