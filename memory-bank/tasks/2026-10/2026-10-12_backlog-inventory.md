@@ -68,7 +68,8 @@ owner may reorder; the sections below keep the detail. Within a tier, earlier is
 21. B-X2 with B-Q11 — the editor notices an outside change only at save; then retire the legacy sheet.
 22. B-X6 with B-F32 — RDP colour distortion in motion, and the graphics-mode escape.
 23. B-X7 — RDP on Vision Pro asks for twice the pixels; whole-frame copies.
-24. B-X13 — Local Network blamed for any failure.
+24. ~~B-X13~~ 461dc59 (2026-10-13) — the terminal's Local Network guidance follows the error (measured: a denial is
+    "No route to host", errno 65). Follow-up: the database's own check looks for EPERM/EACCES instead.
 25. B-X12, B-X26 — look again: grid rows over the header; the first headset terminal window small.
 26. B-X15–B-X20, B-X24, B-X22 — the rest.
 
