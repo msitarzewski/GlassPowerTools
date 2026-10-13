@@ -562,34 +562,9 @@ struct DatabaseCommands: Commands {
     @FocusedValue(\.databaseWorkspaceCommandActions) private var workspaceActions
     @Environment(\.openWindow) private var openWindow
 
-    private func presentCommandPalette() {
-        let connections = connectionManager.connections.map { config in
-            MacCommandCenterEntry(id: "connection.connect.\(config.id)", title: "connect: \(config.name)",
-                                  detail: "Open a database connection window") {
-                sessionManager.paletteConnectionRequest = config.id
-                openWindow.openConnections()
-            }
-        }
-        let catalog = MacDatabasePaletteCatalog(sessionManager: sessionManager) { id, selection in
-            let request = DatabaseWorkspaceWindowRequest.additional(sessionID: id, initialSelection: selection)
-            openWindow(id: "database-workspace", value: sessionManager.registerWorkspace(request))
-        }
-        GlassCommandPalette.present(
-            additionalEntries: connections + (commandCenterEntries ?? []).filter { !$0.id.hasPrefix("connection.connect.") },
-            destinations: { try await catalog.entries(for: $0) })
-    }
-
     var body: some Commands {
-        CommandGroup(after: .appInfo) {
-            Button("Command Palette…") {
-                presentCommandPalette()
-            }
-            .keyboardShortcut("p", modifiers: [.command, .shift])
-            Button("Command Palette (Alternate)…") {
-                presentCommandPalette()
-            }
-            .keyboardShortcut("k", modifiers: .command)
-        }
+        // Command Palette… is the shell's, once (GlassShellPaletteCommands); the database's
+        // connections and table search reach it through GlassCommandPaletteSources (2026-10-13).
         // File owns the SQL document lifecycle per the macOS HIG.
         //
         // **Added after, never replacing.** This group used to replace `.newItem`, to remove the

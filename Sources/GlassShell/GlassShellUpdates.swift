@@ -84,8 +84,13 @@ public struct GlassShellUpdateCommands: Commands {
 
     public var body: some Commands {
         CommandGroup(after: .appInfo) {
-            Button("Check for Updates…") { GlassShellUpdates.shared.checkForUpdates() }
-                .disabled(!GlassShellUpdates.shared.isConfigured || !GlassShellUpdates.shared.canCheck)
+            // Only in a build that can check: one without its feed and signing key (every build
+            // before the release run, B-R1) showed the item greyed out for good (the owner,
+            // 2026-10-13, at the app menu: "This menu needs attention").
+            if GlassShellUpdates.shared.isConfigured {
+                Button("Check for Updates…") { GlassShellUpdates.shared.checkForUpdates() }
+                    .disabled(!GlassShellUpdates.shared.canCheck)
+            }
         }
     }
 }

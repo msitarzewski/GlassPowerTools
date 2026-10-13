@@ -152,18 +152,6 @@ struct MacWorkspaceCommands: Commands {
     @FocusedValue(\.macMoveWorkspaceTabsAction) private var moveTabsAction
     @Environment(\.openWindow) private var openWindow
 
-    private func presentCommandPalette() {
-        let connections = sessionManager.serverManager.servers.map { server in
-            MacCommandCenterEntry(id: "connection.connect.\(server.id)", title: "connect: \(server.name)",
-                                  detail: "Open an SSH terminal window") {
-                sessionManager.paletteConnectionRequest = server.id
-                openWindow(id: "main")
-            }
-        }
-        GlassCommandPalette.present(additionalEntries:
-            connections + (commandCenterEntries ?? []).filter { !$0.id.hasPrefix("connection.connect.") })
-    }
-
     var body: some Commands {
         CommandGroup(after: .sidebar) {
             // ⌘G is Find Next, the shell's (`GlassShellFindCommands`); Grid moved to ⌥⌘G and
@@ -188,16 +176,8 @@ struct MacWorkspaceCommands: Commands {
                 .disabled(entry == nil)
             }
         }
-        CommandGroup(after: .appInfo) {
-            Button("Command Palette…") {
-                presentCommandPalette()
-            }
-            .keyboardShortcut("p", modifiers: [.command, .shift])
-            Button("Command Palette (Alternate)…") {
-                presentCommandPalette()
-            }
-            .keyboardShortcut("k", modifiers: .command)
-        }
+        // Command Palette… is the shell's, once (GlassShellPaletteCommands); the terminal's
+        // machines reach it through GlassCommandPaletteSources (2026-10-13).
         // The terminal's File items, **added after** the shell's New group and never replacing it.
         //
         // Two scenes replacing the same placement is not a merge — SwiftUI keeps one of them, and

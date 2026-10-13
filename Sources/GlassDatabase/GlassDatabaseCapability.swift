@@ -13,6 +13,7 @@ import SwiftUI
 import OSLog
 import GlassConnectionKit
 import GlassShell
+import GlassConnectionUI
 import GlassLayers
 
 /// The shell's outcome callback for one connect attempt (see `GlassCapabilityOutcome`).
@@ -86,6 +87,26 @@ public final class GlassDatabaseRuntime {
         // The same store the shell uses, so appearance cannot drift between a database canvas
         // and a terminal canvas.
         settingsManager = SettingsManager(loadImmediately: false, layers: resolvedLayers)
+        #if os(macOS)
+        // The one Command Palette's database entries: a connection window for each saved
+        // connection, and a search that reaches into their schemas and tables (2026-10-13).
+        let connectionManager = self.connectionManager, sessionManager = self.sessionManager
+        GlassCommandPaletteSources.register(id: "database", entries: { openWindow in
+            connectionManager.connections.map { config in
+                MacCommandCenterEntry(id: "connection.connect.\(config.id)", title: "connect: \(config.name)",
+                                      detail: "Open a database connection window") {
+                    sessionManager.paletteConnectionRequest = config.id
+                    openWindow.openConnections()
+                }
+            }
+        }, destinations: { openWindow in
+            let catalog = MacDatabasePaletteCatalog(sessionManager: sessionManager) { id, selection in
+                let request = DatabaseWorkspaceWindowRequest.additional(sessionID: id, initialSelection: selection)
+                openWindow(id: "database-workspace", value: sessionManager.registerWorkspace(request))
+            }
+            return { try await catalog.entries(for: $0) }
+        })
+        #endif
     }
 
     #if DEBUG

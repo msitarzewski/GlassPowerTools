@@ -376,4 +376,49 @@ public enum GlassCommandPalette {
     }
 }
 
+/// What each capability adds to the one palette — its connections, and where a search can take
+/// the user — registered once by the capability; the shell's Command Palette… presents them with
+/// the focused window's own commands (`GlassShellPaletteCommands`).
+///
+/// The terminal and the database each declared Command Palette… on ⇧⌘P and ⌘K, each with its own
+/// connections: the app menu listed both twice, and which palette a key opened was SwiftUI's
+/// choice (the owner, 2026-10-13: "This menu needs attention").
+@MainActor
+public enum GlassCommandPaletteSources {
+    public typealias Search = (String) async throws -> [MacCommandCenterEntry]
+
+    private struct Source {
+        let id: String
+        let entries: @MainActor (OpenWindowAction) -> [MacCommandCenterEntry]
+        let destinations: (@MainActor (OpenWindowAction) -> Search)?
+    }
+
+    private static var sources: [Source] = []
+
+    /// Registers `id`'s entries, replacing any it registered before.
+    public static func register(id: String,
+                                entries: @escaping @MainActor (OpenWindowAction) -> [MacCommandCenterEntry],
+                                destinations: (@MainActor (OpenWindowAction) -> Search)? = nil) {
+        sources.removeAll { $0.id == id }
+        sources.append(Source(id: id, entries: entries, destinations: destinations))
+    }
+
+    /// Every capability's entries, then the focused window's own commands; its connections are
+    /// the capabilities' already, so the window's are left out.
+    public static func entries(windowEntries: [MacCommandCenterEntry], openWindow: OpenWindowAction) -> [MacCommandCenterEntry] {
+        sources.flatMap { $0.entries(openWindow) } + windowEntries.filter { !$0.id.hasPrefix("connection.connect.") }
+    }
+
+    public static func present(windowEntries: [MacCommandCenterEntry], openWindow: OpenWindowAction) {
+        let searches = sources.compactMap { $0.destinations?(openWindow) }
+        GlassCommandPalette.present(
+            additionalEntries: entries(windowEntries: windowEntries, openWindow: openWindow),
+            destinations: searches.isEmpty ? nil : { query in
+                var found: [MacCommandCenterEntry] = []
+                for search in searches { found += try await search(query) }
+                return found
+            })
+    }
+}
+
 #endif

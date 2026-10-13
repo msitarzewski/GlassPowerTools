@@ -299,6 +299,14 @@ struct MenuBarPlacementTests {
         #expect(offeredBy == ["GlassTerminalLibraryEntries.swift"], "Window ▸ Show All Windows is offered by \(offeredBy.sorted()).")
     }
 
+    /// Command Palette… is the shell's, once (2026-10-13). The terminal and the database each
+    /// declared it on ⇧⌘P and ⌘K, and the app menu listed it twice; which palette the key opened
+    /// was SwiftUI's choice.
+    @Test func commandPaletteKeysHaveOneOwner() throws {
+        #expect(try owners(of: "p", modifiers: ["command", "shift"]) == ["GlassShellPaletteCommands.swift"])
+        #expect(try owners(of: "k", modifiers: ["command"]) == ["GlassShellPaletteCommands.swift"])
+    }
+
     // MARK: Reading the sources
 
     /// The files declaring `key` with exactly these modifiers, in any order and spelling of the
