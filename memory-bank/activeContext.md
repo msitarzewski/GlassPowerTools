@@ -51,17 +51,23 @@ this notes commit; nothing pushed. Leave the owner's README edit and his uncommi
   stack the same sections follow "Nothing Is Open" in the list (`GlassActiveLauncher.swift`, `glassLibraryIsStacked` —
   an iPad's list column is compact in landscape too, so the width class could not decide). Seen on the folded Duo and an
   iPad Pro 11-inch landscape; the Mac not yet on screen (comes with 0.4.392).
-- **Seen on the Duo, to fix:** two "Tools" buttons in a folded terminal (capsule + bar); the bottom bar white under a
-  black terminal; unfolded, a connection opened as its own window that took the screen (not beside the library); folded,
-  the system's "N Views Open" chip covers the start of the library's large title.
+- **Seen on the Duo, to fix:** ~~two "Tools" buttons in a folded terminal~~ and ~~the bottom bar white under a black
+  terminal~~ — fixed 2026-10-13 (the keyboard accessory reports itself on screen; the terminal paints under it; seen on
+  the Duo). Still open: unfolded, a connection opened as its own window that took the screen (needs the unfolded Duo);
+  folded, the system's "N Views Open" chip covers the start of the library's large title — it is iOS's own chrome (not
+  in our code; nothing published about it): compare an Apple app with several windows on the Duo before changing ours.
+- **0.4.392 (2026-10-13 ~00:00):** built for all three from a53f2e3 (the Duo work, Active's machines, the terminal
+  fix, the workgroup titles); **Mac installed**; iPhone and Vision Pro were locked, and a retry loop in the session
+  scratchpad installs each when it unlocks. The tree-sitter match limit landed after this build: it goes in the next.
 - **Scratch and Windows 11 are in the Duo probe's library** (added by a temporary UI test, not committed). How to reach
   both machines is in the agent memory runbook (`test-machines-runbook`): Parallels VMs; Windows account `gptrdp`,
   password reset per need into a 0700 file, never printed; tunnels on port 2223, never 2222 (Citadel's tests bind it).
 - **Temporary UI tests** (tour + demo) live only in the scratchpad (`GlassTerminalUITests.tour.swift`); the owner's file
   is backed up there too (`…owner-backup.swift`) — swap in to run, restore after, never commit.
-- **Next:** unfold the Duo and re-run the tour (measure content margin; host detail, Active, Settings) — the owner
-  asked to unfold it; the four Duo defects above; `glassDetailColumnTitle` for the other panels; 0.4.392; then tier 3
-  (tree-sitter overflow first).
+- **Done 2026-10-13:** workgroup details use `glassDetailColumnTitle` (host, keys, projects already had it through
+  `GlassLibraryDetail`); tier 3's tree-sitter overflow — the highlight cursor's match limit, not vendoring.
+- **Next:** unfold the Duo and re-run the tour (content margin; host detail, Active, Settings, Workgroups) — the owner
+  was asked to unfold it; the two Duo items left above; tier 3 from B-X5 (shared SSH connection loss).
 
 ## 2026-10-12 — end of the session (before a compaction)
 

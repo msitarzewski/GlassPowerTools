@@ -56,6 +56,9 @@ owner may reorder; the sections below keep the detail. Within a tier, earlier is
 17. B-R8, B-R9 — after the first push: retire the old repositories; send the upstream contributions.
 
 **Tier 3 — defects felt in daily use**
+- ~~tree-sitter capture-pool overflow~~ 0b5d421 (2026-10-13) — not vendored after all: the highlight cursor's match
+  limit (256, Helix's) keeps the ids far below 16 bits and bounds the time too; measured on 16 real files in 14
+  languages that no limit down to 64 changes a match.
 18. B-X5 — a dropped shared SSH connection leaves terminals that do not say so.
 19. B-X4 — drag-select cannot reach tmux history on the Mac.
 20. B-X10, B-X11 — the database breadcrumb; Query commands dead on table tabs.

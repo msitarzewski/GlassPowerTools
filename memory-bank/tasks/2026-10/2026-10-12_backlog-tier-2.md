@@ -24,6 +24,9 @@ with the overflow half of PR 5548 backported (capture-pool ids 16 → 32 bits; t
 separate), as a local package of the same identity, which overrides the remote one — the way Citadel and
 swift-nio-ssh are carried. Jumping to 0.26/0.27 instead would also change the C API and the grammars' ABI under
 SwiftTreeSitter 0.25. Until then the editor's 2M-character highlighting limit is the only bound.
+**Resolved otherwise (2026-10-13, 0b5d421):** measured first — tree-sitter's own match limit on the highlight cursor
+(256) keeps every capture-list id far below 16 bits and also bounds the time a pending pattern costs (2,000-number
+array: 32 s → 1.4 s; 4,000: 262 s → 3.0 s, debug); no real file in 14 languages loses a match even at 64. No vendoring.
 
 ## B-H9 — the weekly dependency check's three failures
 
