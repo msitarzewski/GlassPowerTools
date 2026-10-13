@@ -953,7 +953,7 @@ public final class GlassShellModel: GlassServiceStore {
     /// Internal rather than private so the selection can be tested directly. Reaching it through
     /// `hostAccess` proves nothing without a registered `.ssh` capability, and the rule being
     /// tested — which machine is chosen — is independent of whether one is registered.
-    func sshMember(of host: GlassShellHost) -> HostProfile? {
+    public func sshMember(of host: GlassShellHost) -> HostProfile? {
         let candidates = host.members.filter { $0.services.contains { $0.kind == .ssh } }
         guard let address = host.address, !address.isEmpty else {
             // No address to agree with: only one candidate is unambiguous.

@@ -41,6 +41,8 @@ enum GlassWidgetBridge {
         var openInEditor: @MainActor ([URL], OpenWindowAction) -> Void
         /// An `ssh://` link.
         var openSSHLink: @MainActor (URL) -> Void
+        /// Files to a machine's folder; what happened, in a sentence.
+        var sendFiles: GlassAppServices.SendFiles
         /// The saved workgroups, for the snapshot (Shortcuts and Siri name them).
         var workgroups: @MainActor () -> [GlassWidgetSnapshot.Workgroup]
     }
@@ -56,6 +58,12 @@ enum GlassWidgetBridge {
         started = true
         self.actions = actions
         GlassWidgetRequests.shared.handle { carryOut($0, model: model) }
+        // Answered in place, for Shortcuts to say: a connection that may need its host trusted,
+        // which the Connections window asks about.
+        GlassAppServices.shared.sendFiles = { files, machine, folder in
+            ensureLibrary()
+            return try await actions.sendFiles(files, machine, folder)
+        }
         Task { await keepSnapshotCurrent(model: model) }
         takeExternalRequests()
         // What the Finder's toolbar button or a Quick Action left in the App Group, whenever the
@@ -183,6 +191,18 @@ enum GlassWidgetBridge {
         func open() {
             continuation?.resume()
             continuation = nil
+        }
+    }
+}
+
+extension GlassWidgetBridge {
+    enum SendError: LocalizedError {
+        case notInLibrary
+
+        var errorDescription: String? {
+            switch self {
+            case .notInLibrary: "That machine is no longer in your library, or has no Terminal service to send through."
+            }
         }
     }
 }

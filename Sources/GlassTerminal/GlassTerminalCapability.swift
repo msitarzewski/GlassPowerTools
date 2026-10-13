@@ -1131,6 +1131,21 @@ extension GlassTerminalCapability {
 
     /// One connection's lister, as `openDirectoryLister` describes.
     private func openConnectedLister(host: HostProfile) async throws -> GlassTerminalDirectoryLister {
+        let connection = try await openSFTPConnection(host: host)
+        return GlassTerminalDirectoryLister(
+            sftp: connection.sftp,
+            client: connection.client,
+            transport: connection.transport,
+            owner: connection.owner,
+            serverID: connection.server.id
+        )
+    }
+
+    /// An SFTP session on the host's saved SSH service, on a connection of its own: its
+    /// credentials, its jump chain, its host trust asked for as every connection asks (D14). The
+    /// caller closes the client and releases `owner` on `transport`.
+    private func openSFTPConnection(host: HostProfile) async throws
+        -> (sftp: any SFTPSession, client: SFTPClient, transport: SSHTransport, owner: UUID, server: ServerConfiguration) {
         guard let link = host.services.first(where: { $0.kind == .ssh }),
               let server = runtime.sessionManager.serverManager.server(for: link.endpointID.rawValue)
         else { throw GlassPortForwardError.unavailable }
@@ -1154,13 +1169,7 @@ extension GlassTerminalCapability {
             try await transport.connect()
             let sftp = try await transport.openSFTP()
             let extensions = await sftp.serverExtensions
-            return GlassTerminalDirectoryLister(
-                sftp: sftp,
-                client: SFTPClient(session: sftp, extensions: extensions),
-                transport: transport,
-                owner: owner,
-                serverID: server.id
-            )
+            return (sftp, SFTPClient(session: sftp, extensions: extensions), transport, owner, server)
         } catch let error as SSHTransportError {
             await transport.release(owner: owner)
             switch error {
@@ -1172,6 +1181,48 @@ extension GlassTerminalCapability {
         } catch {
             await transport.release(owner: owner)
             throw error
+        }
+    }
+
+    /// Files sent to a machine from Shortcuts, Siri or the share sheet (D72): into `folder` on it —
+    /// relative to the home folder, or absolute; the home folder itself when there is none — each
+    /// under a name nothing there has, through the Files browser's verified upload, as a file dropped
+    /// on a terminal goes (W14). Nothing there is ever replaced.
+    public func sendFiles(_ files: [URL], toHost host: HostProfile, folder: String?) async throws -> GlassSentFiles {
+        let connection = try await openSFTPConnection(host: host)
+        let result: GlassSentFiles
+        do {
+            let home = try await connection.client.getRealPath(atPath: ".")
+            let target = GlassSentFiles.remoteFolder(folder, home: home)
+            guard let attributes = try? await connection.client.getAttributes(at: target.path),
+                  attributes.fileType == .directory else {
+                throw GlassSentFiles.Failure.noFolder(target.shown, machine: host.displayName)
+            }
+            let drop = TerminalRemoteDropHost(client: connection.client, serverID: connection.server.id,
+                                              upload: SFTPBrowserView.uploadDroppedFile)
+            let outcomes = await drop.send(files, into: target.path)
+            result = GlassSentFiles(
+                machine: host.displayName, folder: target.shown,
+                arrived: outcomes.filter { $0.remotePath != nil }.map(\.name),
+                failed: outcomes.compactMap { outcome in outcome.failure.map { (outcome.name, Self.sendReason($0)) } }
+                    .map { GlassSentFiles.Problem(name: $0.0, reason: $0.1) })
+        } catch {
+            try? await connection.client.close()
+            await connection.transport.release(owner: connection.owner)
+            throw error
+        }
+        try? await connection.client.close()
+        await connection.transport.release(owner: connection.owner)
+        return result
+    }
+
+    /// A drop's failure, as sending a file says it.
+    private static func sendReason(_ failure: TerminalRemoteDropFailure) -> String {
+        switch failure {
+        case .folderRefused: "the folder could not be read. Check that your account can write to it."
+        case .connectionLost: "the connection ended. Send it again."
+        case .didNotFinish: "the upload didn't finish. Send it again."
+        default: failure.reason
         }
     }
 
@@ -1278,5 +1329,53 @@ extension GlassTerminalCapability {
         } catch {
             return .unavailable
         }
+    }
+}
+
+/// What `GlassTerminalCapability.sendFiles` did (D72): the files that arrived, and the ones that did
+/// not with why, in words for the person who sent them.
+public struct GlassSentFiles: Sendable, Equatable {
+    public struct Problem: Sendable, Equatable {
+        public let name: String
+        public let reason: String
+    }
+
+    public enum Failure: Error, LocalizedError, Equatable {
+        case noFolder(String, machine: String)
+
+        public var errorDescription: String? {
+            switch self {
+            case let .noFolder(folder, machine): "\(machine) has no folder \(folder). Choose a folder that exists, or leave it empty for your home folder."
+            }
+        }
+    }
+
+    public let machine: String
+    /// The folder, as the person would write it: `~`, `~/Uploads`, `/srv/share`.
+    public let folder: String
+    public let arrived: [String]
+    public let failed: [Problem]
+
+    /// One sentence for Siri or Shortcuts to say.
+    public var summary: String {
+        var parts: [String] = []
+        if !arrived.isEmpty {
+            let what = arrived.count == 1 ? arrived[0] : "\(arrived.count) files"
+            parts.append("Sent \(what) to \(folder) on \(machine).")
+        }
+        for problem in failed { parts.append("\(problem.name) wasn't sent: \(problem.reason)") }
+        return parts.isEmpty ? "Nothing was sent." : parts.joined(separator: " ")
+    }
+
+    /// The folder to send into: `folder` under the home folder, or absolute as given; the home
+    /// folder for none. `shown` is how to name it back.
+    static func remoteFolder(_ folder: String?, home: String) -> (path: String, shown: String) {
+        let base = home.count > 1 && home.hasSuffix("/") ? String(home.dropLast()) : home
+        var trimmed = (folder ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed == "~" || trimmed.isEmpty { return (base, "~") }
+        if trimmed.hasPrefix("~/") { trimmed.removeFirst(2) }
+        if trimmed.hasPrefix("/") { return (trimmed, trimmed) }
+        while trimmed.hasSuffix("/") { trimmed.removeLast() }
+        return (base + "/" + trimmed, "~/" + trimmed)
     }
 }

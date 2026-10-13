@@ -111,7 +111,8 @@ struct GlassPowerToolsApp: App {
             // Link-only. The capability is the one deleting, so asking it to delete again through
             // `removeService` would call straight back into the delete that is running.
             discard: { [weak model] id in await model?.detachService(EndpointID(rawValue: id)) })
-        model.registry.register(GlassTerminalCapability(runtime: terminal))
+        let terminalCapability = GlassTerminalCapability(runtime: terminal)
+        model.registry.register(terminalCapability)
         // D26 stage 4: the key manager is a library panel, and the terminal is what holds SSH key
         // material. The shell presents; the capability keeps the lifecycle it already owns.
         model.attachKeyStore(terminal.keyStore())
@@ -380,6 +381,12 @@ struct GlassPowerToolsApp: App {
                     editor.show(editor.open(urls: urls), with: openWindow)
                 },
                 openSSHLink: { terminal.requestOpen(sshLink: $0) },
+                sendFiles: { files, machine, folder in
+                    guard let host = model.host(HostID(rawValue: machine)), let member = model.sshMember(of: host) else {
+                        throw GlassWidgetBridge.SendError.notInLibrary
+                    }
+                    return try await terminalCapability.sendFiles(files, toHost: member, folder: folder).summary
+                },
                 workgroups: {
                     terminal.workgroups.map { GlassWidgetSnapshot.Workgroup(id: $0.id, name: $0.name, terminals: $0.terminals) }
                 }))

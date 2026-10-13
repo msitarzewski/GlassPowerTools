@@ -60,3 +60,27 @@ struct TerminalSSHLinkTests {
         #expect(draft.host == "bravo.example.com" && draft.port == 2200 && draft.username == "carol")
     }
 }
+
+/// Files sent to a machine from Shortcuts or the share sheet (D72).
+@Suite("Sending files to a machine")
+struct GlassSentFilesTests {
+    @Test("the folder is the home folder, a folder under it, or an absolute one, named back as written")
+    func folders() {
+        #expect(GlassSentFiles.remoteFolder(nil, home: "/home/ann") == ("/home/ann", "~"))
+        #expect(GlassSentFiles.remoteFolder(" ~ ", home: "/home/ann/") == ("/home/ann", "~"))
+        #expect(GlassSentFiles.remoteFolder("Uploads/", home: "/home/ann") == ("/home/ann/Uploads", "~/Uploads"))
+        #expect(GlassSentFiles.remoteFolder("~/a b", home: "/home/ann") == ("/home/ann/a b", "~/a b"))
+        #expect(GlassSentFiles.remoteFolder("/srv/share", home: "/home/ann") == ("/srv/share", "/srv/share"))
+        #expect(GlassSentFiles.remoteFolder(nil, home: "/") == ("/", "~"))
+    }
+
+    @Test("one sentence says what arrived and what did not, and why")
+    func summary() {
+        let one = GlassSentFiles(machine: "alpha", folder: "~", arrived: ["notes.md"], failed: [])
+        #expect(one.summary == "Sent notes.md to ~ on alpha.")
+        let mixed = GlassSentFiles(machine: "alpha", folder: "~/Uploads", arrived: ["a.png", "b.png"],
+                                   failed: [.init(name: "c.mov", reason: "the upload didn't finish. Send it again.")])
+        #expect(mixed.summary == "Sent 2 files to ~/Uploads on alpha. c.mov wasn't sent: the upload didn't finish. Send it again.")
+        #expect(GlassSentFiles(machine: "alpha", folder: "~", arrived: [], failed: []).summary == "Nothing was sent.")
+    }
+}

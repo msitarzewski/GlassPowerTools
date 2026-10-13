@@ -129,3 +129,47 @@ private extension GlassMachineQuery {
         Dictionary(uniqueKeysWithValues: snapshot.machines.map { ($0.id, GlassMachineEntity($0)) })
     }
 }
+
+/// Send Files to a Machine (D72).
+@Suite("Sending files", .serialized)
+@MainActor
+struct GlassSendFilesIntentTests {
+    @Test("a file with no path of its own is written to a staging folder; one on disk is used as it is")
+    func localCopies() throws {
+        let onDisk = FileManager.default.temporaryDirectory.appendingPathComponent("glass-\(UUID().uuidString).txt")
+        try Data("on disk".utf8).write(to: onDisk)
+        defer { try? FileManager.default.removeItem(at: onDisk) }
+        let carried = IntentFile(data: Data("carried".utf8), filename: "carried.txt")
+
+        let copies = try GlassSendFilesIntent.localCopies(of: [IntentFile(fileURL: onDisk, filename: "x"), carried])
+        defer { if let staging = copies.staging { try? FileManager.default.removeItem(at: staging) } }
+        #expect(copies.urls.first == onDisk)
+        #expect(copies.urls.last?.lastPathComponent == "carried.txt")
+        #expect(try String(contentsOf: copies.urls[1], encoding: .utf8) == "carried")
+        #expect(copies.staging != nil)
+        #expect(throws: GlassIntentError.self) { _ = try GlassSendFilesIntent.localCopies(of: []) }
+    }
+
+    @Test("it sends through the app's service and says what it said; a machine with no terminal is refused")
+    func perform() async throws {
+        let alpha = GlassMachineEntity(id: UUID(), name: "alpha", services: [.init(id: UUID(), kind: .terminal, name: "Terminal")])
+        let bravo = GlassMachineEntity(id: UUID(), name: "bravo", services: [.init(id: UUID(), kind: .desktop, name: "Desktop")])
+        let saved = GlassAppServices.shared.sendFiles
+        defer { GlassAppServices.shared.sendFiles = saved }
+        var asked: [(Int, UUID, String?)] = []
+        GlassAppServices.shared.sendFiles = { files, machine, folder in
+            asked.append((files.count, machine, folder))
+            return "Sent 1 file."
+        }
+        let intent = GlassSendFilesIntent()
+        intent.files = [IntentFile(data: Data("x".utf8), filename: "x.txt")]
+        intent.machine = alpha
+        intent.folder = "Uploads"
+        _ = try await intent.perform()
+        #expect(asked.count == 1 && asked[0].0 == 1 && asked[0].1 == alpha.id && asked[0].2 == "Uploads")
+
+        intent.machine = bravo
+        await #expect(throws: GlassIntentError.self) { _ = try await intent.perform() }
+        #expect(asked.count == 1)
+    }
+}
