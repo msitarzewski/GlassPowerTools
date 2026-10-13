@@ -64,6 +64,11 @@ until its Desktop service turns it on (default off, a trust boundary) — told t
   saved server. The first catalog answer can come before every machine's record. A pane told its server was
   missing now asks again as soon as the server is saved (`MacWorkspaceController.failedForMissingServer`). The
   owner will say whether SY Staging connects on 0.4.399.
+- **~13:15 (0.4.400):** the owner confirmed the corners were fixed. **"+" ▸ New Terminal on still failed** ("Could
+  not connect", a CancellationError), while All Connections worked. The connection was still in a view's task
+  (the pane's), which SwiftUI cancels when a new tab is drawn again as it settles. The controller now owns each
+  pane's connection (`startSSHPaneIfNeeded`), and only closing the pane or the tab cancels it. The test fails with
+  the view's old await. 0.4.400 also carries the database's Local Network and PostgreSQL error fixes.
 - **Show All Windows** (was Show All Terminals; the owner: include every service type, "one component?"):
   `GlassShowAllWindows` in the shell (action set by the terminal, which draws the overlay; button beside every ⚡);
   overlay = terminal windows' groups + Databases, Desktops, Editor from `registry.openSessions()`; a desktop tile
