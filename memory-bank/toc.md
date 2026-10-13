@@ -83,6 +83,7 @@ source applications are obsolete and no longer compile.
 | [Widgets: Machines and Active (D68)](tasks/2026-10/2026-10-12_widgets-machines-and-active.md) | A snapshot the app writes, App Intents for taps, the Mac's App Group |
 | [October tasks](tasks/2026-10/README.md) | Monthly index: tmux (D44), database through another machine (D45), RDP bandwidth, iPhone landscape, Vision Pro input (D46 proposed) |
 | [Backlog inventory, 2026-10-12](tasks/2026-10/2026-10-12_backlog-inventory.md) | Every open decision, release step, defect, feature, owed check and limit, including what the original apps and absorbed packages never carried forward; IDs to pick by |
+| [Backlog tier 2, 2026-10-12](tasks/2026-10/2026-10-12_backlog-tier-2.md) | The CVE fix, wake liveness, iPhone Duo, licensing research and lawyer questions, the two-device checklist |
 
 This project is `~/Software/glass/GlassPowerTools`. `../GlassEditorKit` was **absorbed on 2026-09-14**
 — it was already in production behind the SQL, record and SFTP editors, so it was never a future

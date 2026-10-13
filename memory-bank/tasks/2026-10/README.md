@@ -46,3 +46,6 @@
   actor (B-X1), saves relative to the folder held open (B-X9, pen M-2), Citadel C12 (B-X21), SSH keys not on this
   device kept (B-X3), stale lists cannot delete synced records (B-X14), regex find stopped at one second (B-X8, pen
   H-3). 0.4.390 on Mac, iPhone and Vision Pro.
+- 2026-10-12: [Backlog tier 2](2026-10-12_backlog-tier-2.md) — CVE-2026-43798 (swift-nio-ssh, critical) fixed first;
+  sleep/wake liveness, iPhone Duo, docs, DOMPurify record, swift-log/nio, full suite green; licensing research,
+  two-device checklist and the owner's decisions recorded. iPhone and Vision Pro on 0.4.391.

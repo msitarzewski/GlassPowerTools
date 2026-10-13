@@ -29,7 +29,9 @@ anything touching real servers (SSH and database tests use the disposable test V
 
 ## 2026-10-12 — end of the session (before a compaction)
 
-**Installed: 0.4.390 on Mac, iPhone and Vision Pro** (2026-10-12 19:25, tier 1 of the backlog). Nothing pushed. Leave the owner's one-space README edit and
+**Installed: iPhone and Vision Pro 0.4.391 (with the CVE fix); Mac 0.4.390** — the owner cancelled the Mac's quit
+prompt at 20:17 (working), so its 0.4.391 waits in `$SP/dd-mac` for his word. 0.4.391 predates the swift-log/nio
+bump; the next build carries it. Nothing pushed. Leave the owner's one-space README edit and
 the uncommitted `testArrowKeysReachTheTerminal` in `UITests/GlassTerminalUITests.swift` (it fails in the visionOS
 simulator on an accessibility scene error; not to commit). **Next: the owner brings a new list after the compaction.**
 
@@ -77,7 +79,13 @@ iPhone Duo 10-23, B-H9 dependency failures, B-X25 sleep/wake, stale docs, B-V4 t
 **Tier 1 done** (the owner: "knock out all of 1"): B-X1 e56a57f, B-X9 b90327f, B-X21 f2c1950 (Citadel C12), B-X3
 9d4fc68, B-X14 77e5523, B-X8 aaf3799, B-X23 (all three devices on 0.4.390). Each test was shown failing without its
 fix. B-X1's "FIFO hangs" was wrong (Foundation refuses at once, as "no permission"); B-X3 was worse than listed (a key
-not yet synced was swapped too). **Next: tier 2**, starting with B-F44 (iPhone Duo, 10-23).
+not yet synced was swapped too).
+**Tier 2 local work done** (`tasks/2026-10/2026-10-12_backlog-tier-2.md`): CVE-2026-43798 in swift-nio-ssh fixed first
+(2ddc207, critical, found by the advisory scan); B-X25 wake (fd729b1), B-F44 Duo (aa06f51), B-H1–H4 docs (2aed1f7),
+DOMPurify record (b29917a), swift-log/nio taken and the full suite passing (B-H9, B-T5). **Waiting on the owner:**
+B-V4 two-device run (checklist in the note), B-T8's device QA, B-R7 a lawyer, B-Q28 SwiftTerm v1.99 (recommend stay on
+1.20), the release path B-R1–B-R6, and the Mac install. **Next after that: tier 3**, with the tree-sitter overflow crash
+added (vendor 0.25.10 with the fix backported; no SwiftTreeSitter release reaches 0.26).
 
 ## 2026-10-11 (late night) — High Performance built; quality-switch crash fixed
 

@@ -46,9 +46,11 @@ owner may reorder; the sections below keep the detail. Within a tier, earlier is
 10. ~~B-X25~~ fd729b1 — after a wake every SSH connection is asked to answer.
 11. ~~B-H1–B-H4~~ 2aed1f7.
 12. B-V4 — the D26 two-device acceptance and sync checks: the product's central promise, never run end to end.
-13. B-T5 — a full package run with the screen unlocked (last 09-27).
-14. B-T8 — release QA: OS 26 at run time, Instruments, an assistive-technology pass, IME and layouts, OSV.
-15. B-R7 — RDP and H.264/HEVC licensing clearance before any distribution.
+    **The owner's, with two devices:** the checklist is in `2026-10-12_backlog-tier-2.md`.
+13. ~~B-T5~~ — the full suite passes, screen unlocked (2026-10-12).
+14. B-T8 — release QA. Done: the advisory scan (it found the critical CVE) and a launch on iOS 26.5. The owner's:
+    Instruments, an assistive-technology pass, IME and layouts on devices.
+15. B-R7 — RDP and H.264/HEVC licensing. Researched (tier-2 note); **the questions are for a lawyer.**
 16. B-R1 → B-R4, then B-Q27, B-R5, B-R6 — the owner's release path in order: Sparkle key, Developer ID,
     the first release run, the site; then the scrub decision, the repository, the first push.
 17. B-R8, B-R9 — after the first push: retire the old repositories; send the upstream contributions.
