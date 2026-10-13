@@ -39,11 +39,12 @@ owner may reorder; the sections below keep the detail. Within a tier, earlier is
    believed it could not) and says so.
 7. ~~B-X23~~ — every device on 0.4.390 (the rule stands: keep them on one build).
 
-**Tier 2 — dated, or gating the first release**
-8. B-F44 — iPhone Duo ships 10-23; the app refuses windows on a phone.
-9. B-H9 with B-Q28 — the dependency check's three failures; follow SwiftTerm's Ghostty-based v1.99 or not.
-10. B-X25 — nothing handles sleep and wake.
-11. B-H1–B-H4 — public pages and notes that contradict the app.
+**Tier 2 — dated, or gating the first release** — local work **done 2026-10-12**
+(`2026-10-12_backlog-tier-2.md`); found on the way and fixed first: CVE-2026-43798 in swift-nio-ssh (2ddc207)
+8. ~~B-F44~~ aa06f51 — the window gate follows the system (regular iPhones measured: no); Duo unverified, logged.
+9. ~~B-H9~~ — swift-log and swift-nio updates were never at fault; taken. B-Q28 (SwiftTerm v1.99) is the owner's.
+10. ~~B-X25~~ fd729b1 — after a wake every SSH connection is asked to answer.
+11. ~~B-H1–B-H4~~ 2aed1f7.
 12. B-V4 — the D26 two-device acceptance and sync checks: the product's central promise, never run end to end.
 13. B-T5 — a full package run with the screen unlocked (last 09-27).
 14. B-T8 — release QA: OS 26 at run time, Instruments, an assistive-technology pass, IME and layouts, OSV.

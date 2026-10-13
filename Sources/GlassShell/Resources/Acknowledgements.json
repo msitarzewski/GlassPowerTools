@@ -127,7 +127,7 @@
    "license": "Apache-2.0",
    "name": "SwiftNIO",
    "note": "Contains llhttp; see llhttp.",
-   "revision": "21de5f08c1a166a6dd293d0e587ad977bf8dac5d",
+   "revision": "6db9d9abd92ad7399b8a564cafbb87d3507245fa",
    "source": "https://github.com/apple/swift-nio",
    "texts": [
     {
@@ -139,7 +139,7 @@
      "title": "NOTICE.txt"
     }
    ],
-   "version": "2.103.0"
+   "version": "2.104.0"
   },
   {
    "group": "Networking",
@@ -223,7 +223,7 @@
    "id": "swift-log",
    "license": "Apache-2.0",
    "name": "Swift Logging",
-   "revision": "9c6fb14227f55d8f711ce3847dc2f419fb0ecacb",
+   "revision": "4038b6a4f74a1426f47eb1dd5b4bb5628a15d597",
    "source": "https://github.com/apple/swift-log",
    "texts": [
     {
@@ -235,7 +235,7 @@
      "title": "NOTICE.txt"
     }
    ],
-   "version": "1.15.1"
+   "version": "1.16.1"
   },
   {
    "group": "Swift libraries",
