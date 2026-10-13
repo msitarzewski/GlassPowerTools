@@ -52,6 +52,12 @@ until its Desktop service turns it on (default off, a trust boundary) — told t
   guards ⇧⌘P/⌘K), Check for Updates hidden until a build has its Sparkle key (B-R1). **A real crash found:** 0.4.393
   aborted in Quick Look at 05:58 (`setPreviewItem` on a view already showing a file) — each file its own view now.
   0.4.397 carries all of it.
+- **~11:45 terminal windows (0.4.398):** every SSH pane opened in an existing window was failing — a
+  CancellationError ("Could not connect to …"): the connection task sat on the placeholder, which SwiftUI removed as
+  the session was shown. Task now on the pane. Restored SSH tabs waited for nothing and asked before the catalog had
+  answered ("saved server no longer exists") — now wait for `familyCatalogLoaded`. Retry → Reconnect; every Close Pane
+  closes the tab with its last pane; a close box per sidebar tab. **Asked the owner** what the red circles mark (a
+  lighter band at the sidebar's trailing edge? the top-right corner?) before touching window chrome.
 - **Show All Windows** (was Show All Terminals; the owner: include every service type, "one component?"):
   `GlassShowAllWindows` in the shell (action set by the terminal, which draws the overlay; button beside every ⚡);
   overlay = terminal windows' groups + Databases, Desktops, Editor from `registry.openSessions()`; a desktop tile
