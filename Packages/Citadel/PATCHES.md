@@ -41,6 +41,7 @@ diff -ru --exclude=.git /tmp/citadel Packages/Citadel
 | C9 | Unexpected channel data and an internal key error are reported as errors instead of terminating the process (`fatalError`). | `ChannelUnwrapper.swift`, `DirectTCPIP+Client.swift`, `OpenSSHKey.swift` |
 | C10 | The debug description of an SFTP handle printed the wrong hex digits (it shifted by 8 bits instead of 4). | `SFTPFile.swift` |
 | C11 | An SFTP packet may declare at most 16 MiB; a larger or zero length is rejected before any body is buffered, so a hostile server cannot make the client reserve up to 4 GiB. | `SFTPMessageParser.swift` |
+| C12 | A composite SSH string written into a buffer with no room left no longer traps: its length placeholder is written rather than skipped over, as C2 does for SFTP. Diffie-Hellman group 14 writes one into the exchange-hash buffer after the server's KEXINIT, so a server could choose a KEXINIT that ended the app. | `DH-Helpers.swift` |
 
 ## Features used by Glass Power Tools
 

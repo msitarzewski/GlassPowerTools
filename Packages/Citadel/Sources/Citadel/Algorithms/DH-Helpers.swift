@@ -259,9 +259,11 @@ extension ByteBuffer {
     /// wrap the body into this function, which will take the returned total length and use that as the string length.
     @discardableResult
     mutating func writeCompositeSSHString(_ compositeFunction: (inout ByteBuffer) throws -> Int) rethrows -> Int {
-        // Reserve 4 bytes for the length.
+        // Reserve 4 bytes for the length. Written, not skipped over: moving the writer index past
+        // the buffer's capacity traps, and Diffie-Hellman group 14 calls this on a buffer the
+        // server's KEXINIT has filled (Glass Power Tools patch C12, as C2 for SFTP).
         let originalWriterIndex = self.writerIndex
-        self.moveWriterIndex(forwardBy: 4)
+        self.writeInteger(UInt32(0))
         
         var writtenLength: Int
         do {
