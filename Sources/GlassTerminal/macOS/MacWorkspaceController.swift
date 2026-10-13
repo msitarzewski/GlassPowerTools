@@ -25,6 +25,9 @@ final class MacWorkspaceController {
     private(set) var state: MacWorkspaceRestorationState
     private(set) var sessionsByPaneID: [UUID: TerminalSession] = [:]
     private(set) var loadingPaneIDs: Set<UUID> = []
+    /// SSH connections under way, by pane: the controller's, so no view's lifetime ends one
+    /// (`startSSHPaneIfNeeded`). Cancelled when the pane or the tab closes.
+    @ObservationIgnored private var sshConnectionsByPaneID: [UUID: Task<Void, Never>] = [:]
     private(set) var errorsByPaneID: [UUID: String] = [:]
     private(set) var pendingCredentialErrorsByPaneID: [UUID: SessionOpenError] = [:]
     private(set) var explicitStartupCommandsByPaneID: [UUID: String] = [:]
@@ -933,6 +936,7 @@ final class MacWorkspaceController {
         if let tmuxSession = pane.intent.localTmuxSession {
             letGoOfLocalTmuxSession(tmuxSession, wasShown: localRuntimesByPaneID[paneID] != nil)
         }
+        sshConnectionsByPaneID.removeValue(forKey: paneID)?.cancel()
         if let session = sessionsByPaneID.removeValue(forKey: paneID) {
             sessionManager.closeSession(session)
         }
@@ -974,11 +978,12 @@ final class MacWorkspaceController {
     func disconnectSSHPane(_ paneID: UUID, sessionManager: SessionManager) {
         guard !isClosed,
               state.root?.pane(id: paneID)?.intent.kind == .ssh else { return }
+        sshConnectionsByPaneID.removeValue(forKey: paneID)?.cancel()
         if let session = sessionsByPaneID.removeValue(forKey: paneID) {
             sessionManager.closeSession(session)
         }
         loadingPaneIDs.remove(paneID)
-        errorsByPaneID[paneID] = "The SSH session ended. Retry to reconnect."
+        errorsByPaneID[paneID] = "The SSH session ended. Reconnect to continue."
     }
 
     @discardableResult
@@ -1014,6 +1019,34 @@ final class MacWorkspaceController {
             }
         ).prepareOffscreen(columns: session.currentTerminalGeometry.columns,
                            rows: session.currentTerminalGeometry.rows)
+    }
+
+    /// Starts the pane's connection, unless it has a session, is connecting or has failed — in a
+    /// task this controller holds, not the caller's (2026-10-13).
+    ///
+    /// The pane's view started it in its own `.task`, and SwiftUI cancels that when it removes the
+    /// view. A tab made from "+" ▸ New Terminal on is drawn, removed and drawn again while it
+    /// settles, so its connection was cancelled partway — "Could not connect to …", a
+    /// CancellationError in the log — while the same machine opened from Connections worked (the
+    /// owner, 2026-10-13). 0.4.398 moved the task from the placeholder to the pane, which fixed
+    /// windows already open but not this. Only closing the pane or the tab ends a connection now.
+    func startSSHPaneIfNeeded(
+        _ pane: MacWorkspacePane,
+        sessionManager: SessionManager,
+        settingsManager: SettingsManager,
+        window: GlassWindowOverrides = GlassWindowOverrides()
+    ) {
+        guard !isClosed, sshConnectionsByPaneID[pane.id] == nil else { return }
+        sshConnectionsByPaneID[pane.id] = Task { [weak self] in
+            await self?.prepareSSHPaneIfNeeded(pane, sessionManager: sessionManager,
+                                               settingsManager: settingsManager, window: window)
+            self?.sshConnectionsByPaneID[pane.id] = nil
+        }
+    }
+
+    /// The pane's connection under way, for tests to wait on.
+    func sshConnection(for paneID: UUID) -> Task<Void, Never>? {
+        sshConnectionsByPaneID[paneID]
     }
 
     func prepareSSHPaneIfNeeded(
@@ -1151,6 +1184,8 @@ final class MacWorkspaceController {
         }
         isClosed = true
         lifecycleGeneration &+= 1
+        for connection in sshConnectionsByPaneID.values { connection.cancel() }
+        sshConnectionsByPaneID.removeAll()
         for lookup in repositoryLookups.values { lookup.cancel() }
         repositoryLookups.removeAll()
         let sessions = Array(sessionsByPaneID.values)

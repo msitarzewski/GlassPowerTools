@@ -332,17 +332,12 @@ struct MacWorkspaceView: View {
             let tabs = windowController.tabs
             for tab in tabs { startLocalPanes(of: tab) }
             // Each SSH connection progresses independently, even in unvisited tabs.
-            let connections = tabs.flatMap { tab in
-                (tab.state.root?.panes ?? []).filter { $0.intent.kind == .ssh }.map { pane in
-                    Task { @MainActor in
-                        await tab.prepareSSHPaneIfNeeded(
-                            pane, sessionManager: sessionManager, settingsManager: settingsManager,
-                            window: windowController.windowSettings
-                        )
-                    }
+            for tab in tabs {
+                for pane in tab.state.root?.panes ?? [] where pane.intent.kind == .ssh {
+                    tab.startSSHPaneIfNeeded(pane, sessionManager: sessionManager, settingsManager: settingsManager,
+                                             window: windowController.windowSettings)
                 }
             }
-            for connection in connections { await connection.value }
         }
         .onChange(of: followsActivity) { _, enabled in
             guard var preset = currentWorkgroupPreset,
@@ -1080,13 +1075,12 @@ private struct MacWorkspaceTabContent: View {
             }
         case .ssh:
             sshPane(pane, isFocused: isFocused, showsPaneChrome: showsPaneChrome)
-                // **The connection belongs to the pane, not to its placeholder** (2026-10-13). The
-                // task was on the placeholder; partway through connecting the session is shown
-                // (`initialTerminalPresentation`), the placeholder gives way to the terminal, and
-                // SwiftUI cancelled the task and the connection with it — every SSH pane opened in
-                // a window already open failed, "Could not connect to …", a CancellationError in the
-                // log (the owner: "these always fail"). Here, the switch keeps it; it starts once
-                // saved hosts are read, and again on Retry (the error cleared).
+                // **The connection is the controller's, not this view's** (2026-10-13). It ran in the
+                // placeholder's task, then in the pane's: SwiftUI cancels a view's task when it removes
+                // the view — the placeholder giving way to the terminal, a new tab drawn twice as it
+                // settles — and the connection went with it, "Could not connect to …", a
+                // CancellationError in the log. This task only asks (`startSSHPaneIfNeeded`): once
+                // saved hosts are read, and again on Reconnect (the error cleared).
                 .task(id: "\(savedHostsReady)|\(controller.error(for: pane.id) ?? "")|\(isSaved(pane))") {
                     guard savedHostsReady else { return }
                     // Told its server was not saved, and now it is: ask again. The library's first
@@ -1097,7 +1091,7 @@ private struct MacWorkspaceTabContent: View {
                         controller.retryPane(pane.id)
                         return
                     }
-                    await controller.prepareSSHPaneIfNeeded(
+                    controller.startSSHPaneIfNeeded(
                         pane,
                         sessionManager: sessionManager,
                         settingsManager: settingsManager,

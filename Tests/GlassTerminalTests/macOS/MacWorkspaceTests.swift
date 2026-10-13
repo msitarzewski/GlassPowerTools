@@ -1873,6 +1873,87 @@ struct MacWorkspaceTests {
         #expect(controller.recordersByPaneID[paneID] == nil)
     }
 
+    /// The owner, 2026-10-13: "+" ▸ New Terminal on failed — "Could not connect to …", a
+    /// CancellationError — while the same machine opened from Connections worked. The connection
+    /// ran in the pane view's task, and SwiftUI cancels that when it removes the view, as it does
+    /// while a new tab settles. A connection under way, its asker cancelled, still connects.
+    @Test @MainActor func anSSHPaneKeepsConnectingWhenTheViewThatAskedGoesAway() async throws {
+        final class SlowManager: SessionManager {
+            override func createAuthorizedSessionByServerID(
+                _ serverID: UUID,
+                settingsManager: SettingsManager,
+                startupCommand: String? = nil,
+                tmux: TerminalTmuxAttachment? = nil,
+                configure: (@MainActor (TerminalSession) -> Void)? = nil,
+                initialTerminalPresentation: TerminalSession.InitialTerminalPresentationRequest? = nil
+            ) async throws -> AuthorizedSessionLaunch {
+                // A connection under way: cancelled with the task it runs in, as the real one is.
+                try await Task.sleep(for: .milliseconds(300))
+                let session = TerminalSession(server: ServerConfiguration(name: "Alpha", host: "alpha.test", username: "tester"))
+                session.state = .connected
+                return AuthorizedSessionLaunch(session: session)
+            }
+        }
+        let fixture = try WorkspaceDefaultsFixture()
+        defer { fixture.cleanup() }
+        let controller = MacWorkspaceController(workspaceID: fixture.workspaceID, defaults: fixture.defaults)
+        controller.addPane(intent: .ssh(serverID: UUID()), axis: .horizontal)
+        let pane = try #require(controller.focusedPane)
+        let manager = SlowManager(loadImmediately: false)
+        let settings = SettingsManager(loadImmediately: false)
+
+        // The pane's view asks, then is removed: its task is cancelled.
+        let view = Task { @MainActor in
+            controller.startSSHPaneIfNeeded(pane, sessionManager: manager, settingsManager: settings)
+            try? await Task.sleep(for: .seconds(10))
+        }
+        try await Task.sleep(for: .milliseconds(50))
+        view.cancel()
+        let connection = try #require(controller.sshConnection(for: pane.id))
+        await connection.value
+
+        #expect(controller.error(for: pane.id) == nil)
+        #expect(controller.session(for: pane.id)?.state == .connected)
+        controller.closeAllSessions(sessionManager: manager)
+    }
+
+    /// Closing the pane is what ends a connection under way, now that no view does.
+    @Test @MainActor func closingAPaneEndsItsConnectionUnderWay() async throws {
+        final class HangingManager: SessionManager {
+            var cancelled = false
+            override func createAuthorizedSessionByServerID(
+                _ serverID: UUID,
+                settingsManager: SettingsManager,
+                startupCommand: String? = nil,
+                tmux: TerminalTmuxAttachment? = nil,
+                configure: (@MainActor (TerminalSession) -> Void)? = nil,
+                initialTerminalPresentation: TerminalSession.InitialTerminalPresentationRequest? = nil
+            ) async throws -> AuthorizedSessionLaunch {
+                do {
+                    try await Task.sleep(for: .seconds(30))
+                } catch {
+                    cancelled = true
+                    throw error
+                }
+                return AuthorizedSessionLaunch(session: TerminalSession(server: ServerConfiguration(name: "Alpha", host: "alpha.test", username: "tester")))
+            }
+        }
+        let fixture = try WorkspaceDefaultsFixture()
+        defer { fixture.cleanup() }
+        let controller = MacWorkspaceController(workspaceID: fixture.workspaceID, defaults: fixture.defaults)
+        controller.addPane(intent: .ssh(serverID: UUID()), axis: .horizontal)
+        let pane = try #require(controller.focusedPane)
+        let manager = HangingManager(loadImmediately: false)
+        controller.startSSHPaneIfNeeded(pane, sessionManager: manager, settingsManager: SettingsManager(loadImmediately: false))
+        let connection = try #require(controller.sshConnection(for: pane.id))
+        try await Task.sleep(for: .milliseconds(50))
+
+        controller.removePane(pane.id, sessionManager: manager)
+        await connection.value
+        #expect(manager.cancelled)
+        controller.closeAllSessions(sessionManager: manager)
+    }
+
     @Test @MainActor func closedWorkspaceRejectsLateOrNewSSHPreparation() async throws {
         let fixture = try WorkspaceDefaultsFixture()
         defer { fixture.cleanup() }
