@@ -30,19 +30,21 @@ use the disposable test VM only).
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
-## 2026-10-13 (~13:30) — where things stand
+## 2026-10-13 (~16:15) — where things stand
 
-**State:** **0.4.400 on the Mac, Vision Pro and iPhone** (13:22); no new crash reports; working tree clean;
+**State:** **0.4.402 on the Mac, Vision Pro and iPhone** (14:05); no new crash reports; working tree clean;
 everything committed, nothing pushed. The day's record, with every commit and its evidence, is
 `tasks/2026-10/2026-10-13_owner-testing-day.md`. Decisions: D24 amended (the library keeps UIKit's sidebar toggle
 on iPhone and iPad), D69 (tunnels keep their own SSH connections), D70 (a connection belongs to its controller,
-never to a view's task).
+never to a view's task), D71 (the app's own Light, Dark or System).
 
 **Authorization in force today:** "go with your recommendations, commit each piece as it lands"; Mac builds
 installed when ready unless the owner says he is working (he accepted every install today); iPhone and Vision Pro
 installed with them to keep one build everywhere.
 
 **Confirmed by the owner today:**
+- 0.4.402: the lighter Show All Windows blur, Settings ▸ Appearance ▸ System/Light/Dark and the palette in the
+  windows' glass: "Yeah, this looks good."
 - Square SSH panes where they fill the tab (0.4.399).
 - "+" ▸ New Terminal on connects (0.4.400: "it works"). It had failed twice with a `CancellationError`, because the
   connection ran in a view's task: first the placeholder's, then the pane's. D70 records the rule.
@@ -70,7 +72,12 @@ installed with them to keep one build everywhere.
 - B-V4 two-device run; B-R1–R7; B-Q28.
 - A desktop's clipboard: Share clipboard is off by default per Desktop service, as he was told.
 
-**Next for an agent:** tier 3 from the inventory's section 0: B-X2 with B-Q11, B-X6 with B-F32, B-X7, and
+**Next (the owner, 16:10): system integration** — "Let's get a finder integration going … they should be available on
+all of the platforms that support them. App intents, all of the modern stuff … Be sure visionOS is well represented!"
+(his screenshot: Finder's Services submenu with other apps' New Tab/Window Here and Open in). Plan:
+`tasks/2026-10/2026-10-13_system-integration-plan.md`; nothing built yet.
+
+**Then, for an agent:** tier 3 from the inventory's section 0: B-X2 with B-Q11, B-X6 with B-F32, B-X7, and
 B-X22's second half. Also the database's own `databaseSidebarChrome()`, which still removes the toggle off the
 Mac (D24's amendment).
 

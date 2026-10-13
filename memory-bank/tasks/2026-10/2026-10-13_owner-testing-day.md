@@ -5,8 +5,8 @@ and the iPhone Duo simulator, and clear agent-side tier-3 items in the time betw
 **Owner:** the agent (coordinator); every report and every choice below is the owner's.
 **Authorization:** "go with your recommendations, commit each piece as it lands"; Mac builds installed when
 ready (he accepted each one today). Nothing pushed.
-**End state (13:25):** **0.4.400 on the Mac, Vision Pro and iPhone**; no new crash reports; the working tree is
-clean. The owner confirmed the last fix ("+" ▸ New Terminal on): "it works".
+**End state (16:15):** **0.4.402 on the Mac, Vision Pro and iPhone**; no new crash reports; the working tree is
+clean. The owner confirmed "+" ▸ New Terminal on ("it works") and 0.4.402 ("looks good").
 
 ## Overnight, before the owner was up (tier 3)
 
@@ -115,6 +115,9 @@ developer forums, thread 765285).
   Light or Dark (`GlassAppAppearance`), the application's appearance on the Mac and each window's style on
   iPhone and iPad.
 - Tests: `GlassAppAppearanceTests`. The appearance test fails with `apply()` emptied.
+- The first 0.4.402 iOS build failed: the window observer passed a notification into the main actor (Swift 6
+  region isolation). The observer now re-applies the choice to every window, and nothing was installed until it built.
+- **The owner, on 0.4.402: "Yeah, this looks good."**
 
 ## B-X5's leftover — closed by design (cf5c64e, D69)
 
