@@ -1361,4 +1361,38 @@ extension EndToEndTests {
         XCTAssertNoThrow(try self.channel.interactInMemory())
         XCTAssertThrowsError(try reply.futureResult.wait())
     }
+
+    /// N7: a keepalive whose answer can be waited for. The test server refuses the request, which
+    /// proves it is there just as well.
+    func testKeepAliveWithAPromiseCompletesWhenTheServerAnswers() throws {
+        XCTAssertNoThrow(try self.channel.configureWithHarness(TestHarness()))
+        XCTAssertNoThrow(try self.channel.activate())
+        XCTAssertNoThrow(try self.channel.interactInMemory())
+
+        let clientSSHHandler = try XCTUnwrap(self.channel.clientSSHHandler)
+        let answered = self.channel.client.eventLoop.makePromise(of: Void.self)
+        clientSSHHandler.sendKeepAlive(promise: answered)
+        XCTAssertNoThrow(try self.channel.interactInMemory())
+        XCTAssertNoThrow(try answered.futureResult.wait())
+    }
+
+    /// N7: a keepalive that never gets its answer fails when the connection goes, rather than
+    /// waiting forever.
+    func testKeepAliveWithAPromiseFailsWhenTheConnectionGoesFirst() throws {
+        XCTAssertNoThrow(try self.channel.configureWithHarness(TestHarness()))
+        XCTAssertNoThrow(try self.channel.activate())
+        XCTAssertNoThrow(try self.channel.interactInMemory())
+
+        let clientSSHHandler = try XCTUnwrap(self.channel.clientSSHHandler)
+        var outcome: Result<Void, Error>?
+        let answered = self.channel.client.eventLoop.makePromise(of: Void.self)
+        answered.futureResult.whenComplete { outcome = $0 }
+        clientSSHHandler.sendKeepAlive(promise: answered)
+        XCTAssertNil(outcome, "answered before the server could have")
+        // The network swallows the request: it never reaches the server.
+        while (try? self.channel.client.readOutbound(as: IOData.self)) != nil {}
+        XCTAssertNoThrow(try self.channel.client.close().wait())
+        self.channel.run()
+        guard case .failure = outcome else { return XCTFail("still waiting after the connection went: \(String(describing: outcome))") }
+    }
 }

@@ -405,6 +405,30 @@ extension NIOSSHHandler {
         self.sendGlobalRequestsIfPossible()
     }
 
+    /// Sends `keepalive@openssh.com` and completes `promise` when the server answers — with success
+    /// or with a refusal, since either proves it is there — or fails it if the connection ends
+    /// first (Glass Power Tools patch N7). `sendKeepAlive()` asks for the same reply and drops it,
+    /// so a peer that went away silently — a Mac that slept, a network that changed — was never
+    /// noticed until TCP gave up, minutes later. This function is **not** thread-safe: call from
+    /// the event loop.
+    public func sendKeepAlive(promise: EventLoopPromise<Void>) {
+        let reply = promise.futureResult.eventLoop.makePromise(of: ByteBuffer?.self)
+        reply.futureResult.whenComplete { result in
+            switch result {
+            case .success:
+                promise.succeed(())
+            case .failure(let error as NIOSSHError) where error.type == .globalRequestRefused:
+                promise.succeed(())
+            case .failure(let error):
+                promise.fail(error)
+            }
+        }
+        self.sendGlobalRequestMessage(
+            .init(wantReply: true, type: .unknown("keepalive@openssh.com", ByteBuffer())),
+            promise: reply
+        )
+    }
+
     /// Sends a global request of any kind. This is commonly used for TCP forwarding requests, but can be used to extend the protocol.
     ///
     /// This function is **not** thread-safe: it may only be called from on the channel.

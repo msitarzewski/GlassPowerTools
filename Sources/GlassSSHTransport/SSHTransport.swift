@@ -167,6 +167,7 @@ public actor SSHTransport: SSHPooledTransport {
     private func teardown(reason: SSHTransportEvent) async {
         keepAliveTask?.cancel()
         keepAliveTask = nil
+        await SSHLiveTransports.shared.remove(self)
         let forwards = Array(remoteForwards.values)
         remoteForwards.removeAll()
         for forward in forwards { await forward.close() }
@@ -317,6 +318,7 @@ public actor SSHTransport: SSHPooledTransport {
         }
         emit(.connected)
         startKeepAlive(options: target.options)
+        await SSHLiveTransports.shared.add(self)
     }
 
     /// Modern algorithms first, then one retry with Citadel's compatibility set when the hop
@@ -368,7 +370,10 @@ public actor SSHTransport: SSHPooledTransport {
                 try? await Task.sleep(for: .seconds(interval))
                 guard !Task.isCancelled, let self else { break }
                 do {
-                    try await client.sendKeepAlive()
+                    // Waits for the answer (Citadel F11): a send that only queued the request
+                    // never failed on a connection that had died silently, so nothing was ever
+                    // counted as missed.
+                    try await client.checkAlive(timeout: .seconds(Int64(max(5, interval))))
                     await self.resetKeepAliveCounter()
                 } catch {
                     let missed = await self.recordMissedKeepAlive(maximum: maximum)
@@ -378,6 +383,23 @@ public actor SSHTransport: SSHPooledTransport {
                     }
                 }
             }
+        }
+    }
+
+    /// Asks the server to answer now, and ends the connection as lost if it does not in `timeout`
+    /// (2026-10-12, B-X25). Called when the Mac wakes and when the app comes back to the
+    /// foreground: a connection that died while the device slept looked alive — a terminal took
+    /// typing and showed nothing — until TCP gave up minutes later. Lost is what every surface
+    /// already shows with Reconnect, and a terminal in tmux reattaches.
+    public func checkAlive(timeout: Duration = .seconds(8)) async {
+        guard let client, client.isConnected, !ownership.isClosing else { return }
+        let milliseconds = Int64(timeout.components.seconds) * 1000
+            + Int64(timeout.components.attoseconds / 1_000_000_000_000_000)
+        do {
+            try await client.checkAlive(timeout: .milliseconds(max(1, milliseconds)))
+            resetKeepAliveCounter()
+        } catch {
+            await lostConnection(reason: "The connection stopped answering — the device slept, or the network changed")
         }
     }
 
@@ -561,6 +583,32 @@ public actor SSHTransport: SSHPooledTransport {
         }
         func openDirectAsyncChannel(toHost host: String, port: Int) async throws -> NIOAsyncChannel<ByteBuffer, ByteBuffer> {
             try await transport.openDirectAsyncChannel(toHost: host, port: port)
+        }
+    }
+}
+
+/// Every connected transport in the process, held weakly (2026-10-12, B-X25): what a wake asks to
+/// answer. Terminals share connections through `SSHTransportPool`, but an editor project, a
+/// forward and a database or desktop tunnel each hold their own, so the pool alone would miss them.
+public actor SSHLiveTransports {
+    public static let shared = SSHLiveTransports()
+
+    private struct Entry { weak var transport: SSHTransport? }
+    private var entries: [ObjectIdentifier: Entry] = [:]
+
+    func add(_ transport: SSHTransport) { entries[ObjectIdentifier(transport)] = Entry(transport: transport) }
+    func remove(_ transport: SSHTransport) { entries[ObjectIdentifier(transport)] = nil }
+
+    func contains(_ transport: SSHTransport) -> Bool { entries[ObjectIdentifier(transport)]?.transport != nil }
+
+    /// Asks every connected transport to answer at once; those that do not are shown lost.
+    public func checkAllAlive(timeout: Duration = .seconds(8)) async {
+        entries = entries.filter { $0.value.transport != nil }
+        let transports = entries.values.compactMap(\.transport)
+        await withTaskGroup(of: Void.self) { group in
+            for transport in transports {
+                group.addTask { await transport.checkAlive(timeout: timeout) }
+            }
         }
     }
 }

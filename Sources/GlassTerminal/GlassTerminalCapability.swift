@@ -164,7 +164,11 @@ public final class GlassTerminalRuntime {
         trustBroker = TerminalHostTrustBroker {
             settingsManager.hostKeyVerificationMode == HostKeyVerificationMode.ask.rawValue
         }
+        wakeWatcher = SSHWakeWatcher()
     }
+
+    /// Asks every SSH connection to answer after a wake or a return to the foreground (B-X25).
+    private let wakeWatcher: SSHWakeWatcher
 
     /// Wires the terminal's saved-server storage to the shell's catalog (D26) and its host
     /// adoption (D27). Called once, by the composition root, which is the only place that can see

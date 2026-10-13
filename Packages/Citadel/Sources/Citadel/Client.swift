@@ -411,6 +411,29 @@ public final class SSHClient {
         onNewSession(newSession)
     }
     
+    /// Whether the server answers within `timeout`: a keepalive@openssh.com that waits for its
+    /// reply (Glass Power Tools feature F11, on swift-nio-ssh's N7). `sendKeepAlive()` only sends,
+    /// so a connection that died silently — a Mac that slept, a network that changed — passed it
+    /// until TCP gave up minutes later.
+    ///
+    /// - Throws: `SSHClient.NotAnswering` when no answer comes in time, or the connection's own
+    ///   error when it ends first.
+    public func checkAlive(timeout: TimeAmount) async throws {
+        let session = self.session
+        guard session.channel.isActive else { throw NotAnswering() }
+        let loop = session.channel.eventLoop
+        let answered = loop.makePromise(of: Void.self)
+        loop.execute { [sshHandler = session.sshHandler] in
+            sshHandler.value.sendKeepAlive(promise: answered)
+        }
+        let deadline = loop.scheduleTask(in: timeout) { answered.fail(NotAnswering()) }
+        defer { deadline.cancel() }
+        try await answered.futureResult.get()
+    }
+
+    /// The server did not answer a keepalive in time.
+    public struct NotAnswering: Error, Equatable {}
+
     /// Sends a keepalive@openssh.com global request to keep the connection alive.
     public func sendKeepAlive() async throws {
         let session = self.session

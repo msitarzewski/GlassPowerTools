@@ -328,6 +328,13 @@ public struct DesktopSessionView: View {
             if shouldClose { if let onClose { onClose() } else { dismiss() } }
         }
         .onChange(of: scenePhase) { _, phase in if phase != .active { session.releaseInput() } }
+        #if os(macOS)
+        // A Mac going to sleep is not a scene-phase change, and a key held at that moment would
+        // stay down on the remote computer until the session ended (B-X25).
+        .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.willSleepNotification)) { _ in
+            session.releaseInput()
+        }
+        #endif
         // Report once, when the session genuinely reaches a terminal state. `.connecting` is not
         // an outcome and neither is having opened a window.
         .onChange(of: session.state) { _, state in

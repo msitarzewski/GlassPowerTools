@@ -57,6 +57,7 @@ diff -ru --exclude=.git /tmp/citadel Packages/Citadel
 | F8 | `SFTPFileAttributes.fileType` and `isRegularFile`, from the permission bits' file-type field. | `SFTPFileFlags.swift` |
 | F9 | `SFTPFile.read(_: [ReadRequest])`: up to 8 ranges (2 MiB) in flight at once, returned in request order. | `SFTPFile.swift`, `SFTPClient.swift` |
 | F10 | `executeCommand(_:maxResponseSize:executionTimeout:)`: a time limit, and task cancellation closes the channel. | `ExecClient.swift` |
+| F11 | `SSHClient.checkAlive(timeout:)`: a keepalive that waits for the server's answer, failing with `SSHClient.NotAnswering` (uses swift-nio-ssh N7). Used after the Mac wakes and when the app returns to the foreground. | `Client.swift` |
 
 New error cases for these: `SFTPError.invalidPacketLength`, `SFTPError.unsupportedExtension`,
 `CitadelError.commandExecutionTimedOut` (`Errors.swift`). `SFTPClient`'s initializer and response
