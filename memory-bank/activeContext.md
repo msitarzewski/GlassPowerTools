@@ -53,6 +53,9 @@ installed with them to keep one build everywhere.
   and Close.
 - Show All Windows across every kind of window, with Blur previews. The toggle sat on the terminal's Connections
   page, where the owner could not find it; it moved to Settings ▸ Appearance ▸ Show All Windows at his word (0.4.401).
+  He loved the blur but found it too strong; it went from 5 to 1.5 pt, so lines show and letters do not (0.4.402).
+- **App appearance (D71, 0.4.402):** Settings ▸ Appearance ▸ System, Light or Dark, on the Mac, iPhone and iPad.
+  The command palette now has the windows' glass and no white list.
 - One Command Palette.
 - The Quick Look crash fix.
 - Database connect errors: the shared Local Network rule; PostgreSQL in the server's words.

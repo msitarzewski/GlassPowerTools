@@ -1438,3 +1438,13 @@ terminal; a new tab drawn twice as it settles). Each time the symptom was "Could
 `CancellationError` in the log, while the same machine opened another way worked. Test:
 `anSSHPaneKeepsConnectingWhenTheViewThatAskedGoesAway` (fails with the view's await). Evidence:
 `tasks/2026-10/2026-10-13_owner-testing-day.md`.
+
+## D71 — The app has its own Light, Dark or System — Implemented 2026-10-13
+**Status and provenance:** asked for by the owner, 2026-10-13, when the command palette drew in the Mac's appearance:
+"TIL we don't allow the user to choose (in Appearance) Light, Dark, System. Then it should follow that."
+**Decision:** Settings ▸ Appearance opens with Appearance: System, Light or Dark (`GlassAppAppearance`, key
+`com.glasspowertools.appearance`), a choice for this device, not synced. On the Mac it is `NSApplication.appearance`,
+so every window, sheet, menu and AppKit panel follows it; on iPhone and iPad, each `UIWindow`'s
+`overrideUserInterfaceStyle`, windows opened later included. Applied before the first window shows
+(`applicationWillFinishLaunching`; the iOS delegate's launch). **Not on Vision Pro** (D63). A terminal theme keeps its
+own colours; its Automatic canvas follows the app's appearance. Evidence: `GlassAppAppearanceTests`.

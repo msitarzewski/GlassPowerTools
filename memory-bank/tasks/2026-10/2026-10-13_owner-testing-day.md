@@ -103,6 +103,19 @@ developer forums, thread 765285).
 - **Tests:** they use the drivers' own failures: an `.invalid` name and a refused loopback port, plus a gated
   wrong password against the test server. Each fails with the change undone.
 
+## Afternoon: Blur previews' place and strength; the app's Light or Dark (0.4.401–0.4.402)
+
+- Blur previews moved to **Settings ▸ Appearance ▸ Show All Windows** (0.4.401). The owner could not find it on
+  the terminal's Connections page. He then found it too strong: "still recognize lines, just not read them kind of
+  blur". He chose a lighter blur (1.5 pt, was 5) over pixelation or noise.
+- The command palette: "theme this correctly (transparency, user selected app theme (light/dark))". It now has
+  the windows' own glass (`GlassLayerBackground`, read through `GlassLayerStore.storedState`), 24-point corners
+  to match the frost, and no opaque scroll-view background. Asked which light or dark it should follow, he
+  answered that the app had no choice of its own and should have one. **D71:** Settings ▸ Appearance ▸ System,
+  Light or Dark (`GlassAppAppearance`), the application's appearance on the Mac and each window's style on
+  iPhone and iPad.
+- Tests: `GlassAppAppearanceTests`. The appearance test fails with `apply()` emptied.
+
 ## B-X5's leftover — closed by design (cf5c64e, D69)
 
 Database and desktop tunnels keep their own SSH connections; reasons in D69 and at `GlassTerminalPortForward`.

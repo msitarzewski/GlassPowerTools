@@ -66,7 +66,8 @@ This is the reason to merge that no amount of shared packaging would have delive
   tile is its last picture. Settings ▸ Appearance ▸ Show All Windows ▸ **Blur previews** softens the pictures for
   screenshots that can be shared.
 - **One Command Palette** (⇧⌘P, or ⌘K) holds every capability's entries: machines, connections, schemas and tables, and
-  the front window's own commands.
+  the front window's own commands. It is drawn in the windows' own glass.
+- **Settings ▸ Appearance ▸ System, Light or Dark** (D71) sets the whole app's look on the Mac, iPhone and iPad.
 - **A phone shows a session in place**, folded or not, with its back chevron and the ⚡: a phone cannot close a window
   from inside it. An iPad's desktop window has its bar and a working Close. A desktop that is not connected says so in
   the system's own view, not in a card ("this feels web").
