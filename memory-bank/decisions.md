@@ -615,6 +615,14 @@ That is the whole standard. It now applies to the terminal workspace
 (`GlassTerminal/macOS/MacWorkspaceView.swift`) and the library (`GlassConnectionLibrary`), and is
 what any future window with a sidebar should do.
 
+**Amended 2026-10-13 (the owner's question on the unfolded iPhone Duo: "How do I get back to the main
+all connections from the active connections window?"):** the library had also followed glassdb in
+removing the toggle on iPhone and iPad. A screen that shows the list and its detail with the sidebar
+folded away then had no way back but an edge swipe. The library leaves UIKit's own toggle alone there
+too — still the system's item, never a placed one; UIKit shows it only while the sidebar can be
+hidden. (The database's own `databaseSidebarChrome()` still removes it off the Mac; look at it the
+same way when a narrow two-column layout shows the problem there.)
+
 ### Why it kept regressing, stated so it stops
 
 Glass Power Tools had inherited `.toolbar(removing: .sidebarToggle)` — twice in the terminal — plus a

@@ -296,17 +296,17 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
                 .navigationSplitViewColumnWidth(min: GlassLibraryColumnLayout.navigationMinimum,
                                                  ideal: GlassLibraryColumnLayout.navigationIdeal,
                                                  max: GlassLibraryColumnLayout.navigationMaximum)
-                // **AppKit's own sidebar toggle on macOS, left alone — the family standard.**
+                // **The system's own sidebar toggle, left alone — the family standard (D24).**
                 //
-                // glassdb's `databaseSidebarChrome()` removes it on every platform *except* macOS
-                // (`glassdb/Constants.swift:267-273`), and glas.sh never removed it. Left alone it
-                // sits at the sidebar's trailing edge, stays out of the overflow menu, and moves
-                // with the column. A replacement button does none of that: it is an ordinary
-                // toolbar item, so it drops into the overflow with its title once the toolbar
-                // fills, and it disappears with the sidebar region when the column collapses.
-                #if !os(macOS)
-                .toolbar(removing: .sidebarToggle)
-                #endif
+                // On macOS AppKit's item sits at the sidebar's trailing edge, stays out of the
+                // overflow menu, and moves with the column. A replacement button does none of
+                // that: it is an ordinary toolbar item, so it drops into the overflow with its
+                // title once the toolbar fills, and it disappears with the sidebar region when the
+                // column collapses. glassdb removed the toggle everywhere but macOS
+                // (`databaseSidebarChrome()`), and this followed it — until an unfolded iPhone Duo
+                // showed the list and its detail with the sidebar folded away and nothing to bring
+                // it back (the owner, 2026-10-13: "How do I get back to the main all connections?").
+                // UIKit shows its toggle only while the sidebar can be hidden.
         } content: {
             Group {
                 // A panel owns both columns while it is open, the way `libraryResults` switched on
