@@ -306,7 +306,9 @@ public struct GlassLibraryDetail<Content: View, Actions: View>: View {
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .glassActionBarSurface()
         }
-        .navigationTitle(title)
+        // The navigation title, and on an iPad or an unfolded iPhone Duo a large title on the list
+        // column's line instead of the system's in the toolbar row (2026-10-12).
+        .glassDetailColumnTitle(title)
         // On the headset the column's own header, where the navigation bar's title was (W33).
         .glassSpatialColumn(title)
     }
