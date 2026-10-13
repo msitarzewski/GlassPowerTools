@@ -29,9 +29,8 @@ anything touching real servers (SSH and database tests use the disposable test V
 
 ## 2026-10-12 — end of the session (before a compaction)
 
-**Installed: iPhone and Vision Pro 0.4.391 (with the CVE fix); Mac 0.4.390** — the owner cancelled the Mac's quit
-prompt at 20:17 (working), so its 0.4.391 waits in `$SP/dd-mac` for his word. 0.4.391 predates the swift-log/nio
-bump; the next build carries it. Nothing pushed. Leave the owner's one-space README edit and
+**Installed: 0.4.391 on Mac, iPhone and Vision Pro** (with the CVE fix; the Mac at the owner's word, 20:32). 0.4.391
+predates the swift-log/nio bump; the next build carries it. Nothing pushed. Leave the owner's one-space README edit and
 the uncommitted `testArrowKeysReachTheTerminal` in `UITests/GlassTerminalUITests.swift` (it fails in the visionOS
 simulator on an accessibility scene error; not to commit). **Next: the owner brings a new list after the compaction.**
 
