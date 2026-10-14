@@ -121,6 +121,7 @@ struct GlassAllWindowsCard: View {
                 }
                 .frame(maxWidth: .infinity)
                 .aspectRatio(GlassGalleryLayout.aspectRatio, contentMode: .fit)
+                .overlay { GlassAllWindowsMark(image: session.mark?()) }
                 .overlay {
                     RoundedRectangle(cornerRadius: 12).strokeBorder(.white.opacity(0.16), lineWidth: 1)
                 }
@@ -154,6 +155,30 @@ struct GlassAllWindowsCard: View {
             .buttonStyle(.plain)
             .padding(6)
             .accessibilityLabel("\(session.closeTitle) \(session.title)")
+        }
+    }
+}
+
+/// The AI agent's mark over a card's picture, as the Mac draws it over a tile
+/// (`MacTerminalExposeAgentMark`): a suggestion, not a statement — 18% of the picture's width
+/// within 18 to 52 points, white at 40%, lightening what is under it, nothing behind it.
+struct GlassAllWindowsMark: View {
+    let image: Image?
+
+    var body: some View {
+        if let image {
+            GeometryReader { proxy in
+                let side = min(52, max(18, proxy.size.width * 0.18))
+                image
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: side, height: side)
+                    .foregroundStyle(.white.opacity(0.4))
+                    .blendMode(.plusLighter)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
         }
     }
 }

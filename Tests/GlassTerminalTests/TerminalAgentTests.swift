@@ -93,6 +93,21 @@ struct TerminalAgentTests {
         }
     }
 
+    /// The iPhone, iPad and Vision Pro draw the marks from the asset catalog (All Windows,
+    /// 2026-10-14); the Mac from `logoSVG`. One drawing: each asset is that SVG, byte for byte,
+    /// and each is in the compiled catalog under the name the code asks for.
+    @Test("every mark is in the asset catalog, the same SVG the Mac draws")
+    @MainActor func marksInTheAssetCatalog() throws {
+        let catalog = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/GlassTerminal/Resources/AgentMarks.xcassets")
+        for agent in TerminalAgent.allCases {
+            let file = catalog.appendingPathComponent("\(agent.markName).imageset/\(agent.markName).svg")
+            #expect(try String(contentsOf: file, encoding: .utf8) == agent.logoSVG, "\(agent): the asset differs from logoSVG")
+            #expect(TerminalAgent.markBundle.image(forResource: agent.markName) != nil, "\(agent): not in the compiled catalog")
+        }
+    }
+
     /// The alpha of `svg` drawn 96 points square.
     @MainActor private static func coverage(_ svg: String) throws -> [UInt8] {
         let image = try #require(NSImage(data: Data(svg.utf8)))

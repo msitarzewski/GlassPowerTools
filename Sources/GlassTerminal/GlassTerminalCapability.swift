@@ -625,7 +625,8 @@ public final class GlassTerminalCapability: GlassCapability {
                 closeTitle: Self.closeTitle(for: [session]),
                 closeSymbolName: Self.closeSymbolName(for: [session]),
                 isConnected: session.state == .connected,
-                snapshot: { Self.preview(of: session) }
+                snapshot: { Self.preview(of: session) },
+                mark: { Self.agent(of: session)?.markImage }
             )
         }
     }
@@ -682,6 +683,10 @@ public final class GlassTerminalCapability: GlassCapability {
                 snapshot: {
                     let shown = workgroup.selectedSessionID.flatMap { manager.session(for: $0) } ?? live[0]
                     return Self.preview(of: shown)
+                },
+                mark: {
+                    let shown = workgroup.selectedSessionID.flatMap { manager.session(for: $0) } ?? live[0]
+                    return Self.agent(of: shown)?.markImage
                 }
             )
         }
@@ -716,6 +721,13 @@ public final class GlassTerminalCapability: GlassCapability {
 
     static func closeSymbolName(for live: [TerminalSession]) -> String {
         closeTitle(for: live) == "Detach" ? "eject" : "xmark"
+    }
+
+    /// The AI agent a terminal is running: from tmux's answer, read every few seconds off the
+    /// Mac (`readTmuxPaneIfDue`), else, for Claude Code, from the title it set.
+    static func agent(of session: TerminalSession) -> TerminalAgent? {
+        TerminalAgent.identify(program: session.tmuxPane?.program, arguments: session.tmuxPane?.programArguments,
+                               title: session.tmuxPane?.title ?? session.terminalHostModel.terminalTitle)
     }
 
     /// A still of a terminal, in whatever image type this platform uses. 800px wide is the

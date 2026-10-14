@@ -514,7 +514,7 @@
    "id": "lobe-icons",
    "license": "MIT",
    "name": "Lobe Icons",
-   "note": "The monochrome marks of the AI agents a terminal can run (Claude Code, Codex, opencode, Gemini CLI, Cursor, GitHub Copilot, Qwen Code, Kimi), from packages/static-svg/icons, carried as SVG text in TerminalAgent.swift; Codex's path data is written out command by command, the same shape, because macOS's SVG reader misread its compact form. The marks are their owners' trademarks.",
+   "note": "The monochrome marks of the AI agents a terminal can run (Claude Code, Codex, opencode, Gemini CLI, Cursor, GitHub Copilot, Qwen Code, Kimi), from packages/static-svg/icons, carried as SVG text in TerminalAgent.swift, and the same SVG files in Sources/GlassTerminal/Resources/AgentMarks.xcassets for iPhone, iPad and Vision Pro; Codex's path data is written out command by command, the same shape, because macOS's SVG reader misread its compact form. The marks are their owners' trademarks.",
    "revision": "05a9b8c41e4735a4a2b6d2f1e43574bd8ec6c8cb",
    "source": "https://github.com/lobehub/lobe-icons",
    "texts": [

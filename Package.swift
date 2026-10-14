@@ -326,6 +326,9 @@ let package = Package(
                 .product(name: "NIOFoundationCompat", package: "swift-nio"),
                 .product(name: "Logging", package: "swift-log"),
             ],
+            // The AI agents' marks as template images, for the iPhone, iPad and Vision Pro, which
+            // cannot draw SVG text as the Mac does (`TerminalAgent.markImage`).
+            resources: [.process("Resources")],
             // glas.sh builds with Xcode's approachable concurrency: default MainActor isolation
             // plus these upcoming features. Same code, same rules, expressed for SwiftPM.
             swiftSettings: [

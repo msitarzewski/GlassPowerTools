@@ -50,6 +50,10 @@ public struct GlassOpenSession: Identifiable {
     /// useful where a card waiting for a screenshot would not be. Asked at draw time, never
     /// stored — a picture of a terminal is stale the moment it is taken.
     public let snapshot: (@MainActor () -> Image?)?
+    /// What runs in it, as a mark over its picture: the AI agent a terminal is running (the
+    /// owner, 2026-10-14: "the whole 9" — All Windows off the Mac marks them as the Mac does). A
+    /// template image; nil for none.
+    public let mark: (@MainActor () -> Image?)?
     /// The services this session is a connection through — a terminal's server, a database's
     /// connection. The library turns these into the machine the session belongs to, so a
     /// capability never has to know a host id. Several for a workgroup that spans machines.
@@ -68,7 +72,7 @@ public struct GlassOpenSession: Identifiable {
                 close: @escaping @MainActor @Sendable () -> Void,
                 closeTitle: String = "Close", closeSymbolName: String = "xmark",
                 isConnected: Bool = true, connectedEndpointIDs: [EndpointID]? = nil,
-                snapshot: (@MainActor () -> Image?)? = nil) {
+                snapshot: (@MainActor () -> Image?)? = nil, mark: (@MainActor () -> Image?)? = nil) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
@@ -81,6 +85,7 @@ public struct GlassOpenSession: Identifiable {
         self.closeTitle = closeTitle
         self.closeSymbolName = closeSymbolName
         self.snapshot = snapshot
+        self.mark = mark
     }
 }
 
