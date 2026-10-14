@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The Mac's share extension runs sandboxed. It reads the files it is handed, copies them into
+	     the team-prefixed App Group (GPT_WIDGET_GROUP, Config/Identity.xcconfig) for the app to send,
+	     and reads the library's snapshot there for the machines' names — nothing else, and never a
+	     credential. -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>$(GPT_WIDGET_GROUP)</string>
+	</array>
+</dict>
+</plist>

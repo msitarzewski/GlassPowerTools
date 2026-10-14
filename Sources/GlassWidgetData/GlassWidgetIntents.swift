@@ -35,6 +35,9 @@ public enum GlassWidgetRequest: Sendable, Equatable, Codable {
     /// A service continued from another device (Handoff): the machine that owns it, connected —
     /// for a terminal in tmux, in that session: the tab showing it, or one attached to it.
     case continueSession(endpoint: UUID, tmux: String?)
+    /// The Mac's share extension (D72, the owner chose "mac only"): files copied into the App Group,
+    /// to send to a folder on a machine; the copies go once they are sent.
+    case sendFiles([URL], machine: UUID, folder: String?)
 
     /// What opening `url` with the app asks for — the Finder's Open With, a folder or script dropped
     /// on the Dock icon, a link (D72): an `ssh://` link connects; on the Mac a folder opens a terminal

@@ -27,6 +27,23 @@ public enum GlassExternalRequests {
             .appendingPathComponent("Requests", isDirectory: true)
     }
 
+    /// Where an extension copies the files a request names (the share extension's), one folder per
+    /// request, beside the requests themselves. The app removes each once it is done with it.
+    public static func stagingFolder(appGroup: String = GlassWidgetStore.appGroup) -> URL? {
+        folder(appGroup: appGroup)?.appendingPathComponent("Staged", isDirectory: true)
+    }
+
+    /// Staged folders older than a day — a request that never reached the app — removed.
+    public static func clearStaleStaging(in staging: URL? = stagingFolder(), now: Date = Date()) {
+        guard let staging,
+              let names = try? FileManager.default.contentsOfDirectory(atPath: staging.path) else { return }
+        for name in names {
+            let item = staging.appendingPathComponent(name)
+            let made = (try? item.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? .distantPast
+            if now.timeIntervalSince(made) > 86_400 { try? FileManager.default.removeItem(at: item) }
+        }
+    }
+
     /// Leaves `request` for the app.
     public static func leave(_ request: GlassWidgetRequest, in folder: URL? = folder(), now: Date = Date()) throws {
         guard let folder else { throw CocoaError(.fileNoSuchFile) }

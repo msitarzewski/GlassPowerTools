@@ -62,9 +62,26 @@ struct GlassOpenedURLTests {
             .newLocalTerminal(folder: nil), .newLocalTerminal(folder: url), .newLocalTerminalTab(folder: url),
             .runInTerminal(url), .openInEditor([url, url]), .openSSHLink(try #require(URL(string: "ssh://alpha"))),
             .continueSession(endpoint: UUID(), tmux: nil), .continueSession(endpoint: UUID(), tmux: "glass-3"),
+            .sendFiles([url], machine: UUID(), folder: nil), .sendFiles([url, url], machine: UUID(), folder: "Uploads"),
         ]
         for request in all {
             #expect(try JSONDecoder().decode(GlassWidgetRequest.self, from: JSONEncoder().encode(request)) == request)
         }
+    }
+
+    @Test("files staged for a send that never reached the app go after a day; newer ones stay")
+    func staleStaging() throws {
+        let staging = try scratch()
+        defer { try? FileManager.default.removeItem(at: staging) }
+        let now = Date(timeIntervalSince1970: 1_790_000_000)
+        let old = staging.appendingPathComponent("old", isDirectory: true)
+        let fresh = staging.appendingPathComponent("fresh", isDirectory: true)
+        for folder in [old, fresh] { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
+        try FileManager.default.setAttributes([.creationDate: now.addingTimeInterval(-90_000)], ofItemAtPath: old.path)
+        try FileManager.default.setAttributes([.creationDate: now.addingTimeInterval(-60)], ofItemAtPath: fresh.path)
+
+        GlassExternalRequests.clearStaleStaging(in: staging, now: now)
+        #expect(!FileManager.default.fileExists(atPath: old.path))
+        #expect(FileManager.default.fileExists(atPath: fresh.path))
     }
 }

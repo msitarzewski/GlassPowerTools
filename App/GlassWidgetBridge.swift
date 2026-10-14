@@ -99,9 +99,33 @@ enum GlassWidgetBridge {
         Task { await GlassSpotlight.update(snapshot, enabled: enabled) }
     }
 
+    /// The share extension's copies, once sent: the request's own staging folder goes.
+    private static func removeStaged(_ files: [URL]) {
+        guard let staging = GlassExternalRequests.stagingFolder()?.standardizedFileURL.path else { return }
+        for folder in Set(files.map { $0.deletingLastPathComponent().standardizedFileURL })
+        where folder.path.hasPrefix(staging + "/") {
+            try? FileManager.default.removeItem(at: folder)
+        }
+    }
+
+    /// What a send from the share sheet did, said where the person is: an alert on the Mac.
+    private static func say(_ message: String) {
+        #if os(macOS)
+        let alert = NSAlert()
+        alert.messageText = "Send to a Machine"
+        alert.informativeText = message
+        alert.addButton(withTitle: "OK")
+        NSApp.activate()
+        alert.runModal()
+        #else
+        GlassWidgetBridgeLog.logger.notice("\(message, privacy: .private)")
+        #endif
+    }
+
     /// Requests extensions left for the app (`GlassExternalRequests`), carried out as Siri's are.
     private static func takeExternalRequests() {
         for request in GlassExternalRequests.take() { GlassWidgetRequests.shared.post(request) }
+        GlassExternalRequests.clearStaleStaging()
     }
 
     static func carryOut(_ request: GlassWidgetRequest, model: GlassShellModel) {
@@ -129,6 +153,19 @@ enum GlassWidgetBridge {
         case .openSSHLink(let link):
             ensureLibrary()
             actions?.openSSHLink(link)
+        case let .sendFiles(files, machine, folder):
+            // From the Mac's share extension: sent as Shortcuts' Send Files is, then said.
+            Task { @MainActor in
+                defer { Self.removeStaged(files) }
+                ensureLibrary()
+                let message: String
+                do {
+                    message = try await actions?.sendFiles(files, machine, folder) ?? "Glass Power Tools could not send the files."
+                } catch {
+                    message = error.localizedDescription
+                }
+                Self.say(message)
+            }
         case let .continueSession(endpoint, tmux):
             // Handoff names the service; this device's library knows its machine (D26).
             guard let host = model.host(owningEndpoint: EndpointID(rawValue: endpoint)) else {
