@@ -1954,6 +1954,9 @@ private struct TerminalPasteReviewSheet: View {
                 if !request.exceedsMaximumSize {
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Paste") { onPaste(editedText) }
+                            // ⌘↩ sends it: Return is the text's own, a new line in what is pasted
+                            // (the owner, 2026-10-14: "should allow a command return to submit").
+                            .keyboardShortcut(.return, modifiers: .command)
                             .disabled(!canPaste)
                     }
                 }
