@@ -97,6 +97,14 @@ nonisolated enum TerminalAgent: String, CaseIterable, Sendable {
         "iflow": .iFlow,
     ]
 
+    /// Hidden folders an agent installs itself into, so a program run from inside one is that agent
+    /// whatever the program is called: Hermes Agent lives in `~/.hermes/hermes-agent` (its
+    /// installer's `HERMES_HOME`), and on another machine of the owner's tmux said only `python3`
+    /// (2026-10-14). A hidden folder only — a project folder called `hermes` is not Hermes.
+    private static let byHome: [String: TerminalAgent] = [
+        ".hermes": .hermes,
+    ]
+
     /// Packages known only by their npm name, scope and all: `dsh` alone is also the distributed
     /// shell that runs a command on many machines, so DeepSeek Harness is told by its package.
     private static let byPackage: [String: TerminalAgent] = [
@@ -122,6 +130,16 @@ nonisolated enum TerminalAgent: String, CaseIterable, Sendable {
         let first = words.first.map { ($0 as NSString).lastPathComponent.lowercased() }
         if let first, let agent = byName[first] { return agent }
         if let target = launched(words)?.target, let agent = agent(for: target) { return agent }
+        // The program, or the script it runs, inside an agent's own install folder.
+        let paths = [words.first] + [launched(words)?.target].map { target -> String? in
+            if case .script(let script)? = target { return script }
+            return nil
+        }
+        for path in paths.compactMap({ $0 }) {
+            if let agent = path.lowercased().split(separator: "/").lazy.compactMap({ byHome[String($0)] }).first {
+                return agent
+            }
+        }
         // Claude Code names itself in its title; nothing else here does so plainly. Only where the
         // program is not known by a name of its own.
         if name.map(needsCommandLine) ?? true,

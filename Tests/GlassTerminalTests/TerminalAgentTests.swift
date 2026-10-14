@@ -99,6 +99,17 @@ struct TerminalAgentTests {
         #expect(TerminalAgent.needsCommandLine("uv") && TerminalAgent.needsCommandLine("bash"))
     }
 
+    /// The owner's machine: tmux said `python3` for Hermes Agent (2026-10-14).
+    @Test("an agent's own hidden install folder tells it, whatever its program and script are called")
+    func installFolder() {
+        func told(_ line: String) -> TerminalAgent? {
+            TerminalAgent.identify(program: "python3", arguments: TerminalAgent.identifyingWords(line))
+        }
+        #expect(told("/home/u/.hermes/hermes-agent/.venv/bin/python3 /home/u/.hermes/hermes-agent/hermes_cli/main.py") == .hermes)
+        #expect(told("python3 /home/u/.hermes/hermes-agent/run.py --profile x") == .hermes)
+        #expect(told("python3 /Users/a/Projects/hermes/app.py") == nil, "a project folder is not an install")
+    }
+
     @Test("only an interpreter's script is kept from a command line: a program's arguments can hold a secret")
     func identifyingWords() {
         #expect(TerminalAgent.identifyingWords("node /x/codex.js --api-key sk-1") == "node /x/codex.js")
