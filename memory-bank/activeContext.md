@@ -30,25 +30,32 @@ use the disposable test VM only).
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
-## 2026-10-14 (~10:45) — RESUME HERE
+## 2026-10-14 (~11:30) — RESUME HERE
 
-**State:** 0.4.424 on the Mac and iPhone (10:40); the Vision Pro is locked (CoreDevice 4016) and still on 0.4.423 —
-retry `devicectl device install app` with `$SP/dd-vision` when it is worn. No crash reports since 2026-10-13 18:47. Working tree
-clean; everything committed, nothing pushed. The owner is at the Mac, testing as he goes. **Mac installs go when ready,
-never held on our judgement** (the owner: "No need to hold on quitting right now. All tmux all day."); devices too.
+**State:** 0.4.426 on the Mac and iPhone (11:20); the Vision Pro has been locked (CoreDevice 4016)
+since 0.4.423 — retry `devicectl device install app` with `$SP/dd-vision` when it is worn. No crash reports since
+2026-10-13 18:47. Everything committed, nothing pushed. The owner said he was packing up (~11:10). **Mac installs go when
+ready, never held on our judgement** (the owner: "No need to hold on quitting right now. All tmux all day."); devices too.
 
-**In flight, waiting on the owner:**
-- **Desktop clipboard (0.4.417):** he was to connect to the GNOME desktop, copy both ways, and say so. Then read
-  `/usr/bin/log show --predicate 'subsystem == "app.glassdt.rdp" AND eventMessage CONTAINS "clipboard"'`:
-  `event=clipboard-ready` means the server opened it (the waiting fix covers it); `event=clipboard channel=… ready=false
-  messages=0` at session end means it never did — the next thing to chase. The Windows 11 VM cannot show it: its RDP
-  session waits at the sign-in screen while the VM's console user is signed in.
-- **Show All Windows agent marks (0.4.421–423):** his last look was at 0.4.421; 0.4.422 found the 3 missing, 0.4.423 made
-  the mark "a suggestion vs. a statement". He has not seen 0.4.423.
-  He then said "the logo for codex appears to be incorrect": the artwork was Lobe Icons' mark, but CoreSVG (what
-  `NSImage` reads SVG with) misread a run of its compact arcs and drew a lump with a bite out of it. 034cc34 writes its
-  path out command by command; `logosDrawTheirWholePath` requires each mark to draw as its path written out in full
-  (Codex differed in 2,204 of 9,216 pixels before; the other seven matched). In 0.4.424.
+**Waiting on the owner:**
+- **Desktop clipboard, second fix (26d5778, 0.4.425).** He reported "Clipboard didn't transfer" on the GNOME desktop.
+  The log showed Monitor Ready arriving (`event=clipboard-ready`) and then nothing either way. Cause: after Monitor Ready
+  "the client MUST send a Format List PDU" (MS-RDPECLIP 3.2.5.1.2); RDPKit sent only capabilities and the temporary
+  directory. Now it sends the clipboard as it stands (empty when nothing). The session's closing line now lists every
+  clipboard message both ways by type (`received=… sent=…`, `:fail` on a refused response, never content). He copies both
+  ways, disconnects, says so; read `/usr/bin/log show --last 1h --predicate 'subsystem == "app.glassdt.rdp" AND
+  eventMessage CONTAINS "clipboard"'`. Odd in the old log: two Monitor Readies in one session and no server
+  capabilities counted — the new line will show whether GNOME re-sends Monitor Ready.
+- **Show All Windows on iPhone and Vision Pro — a proposal, his to decide** (he asked "consider what expose looks like
+  on both"). iPhone: Active becomes the overview, a Safari-like two-column grid of cards by machine (`GlassSessionCard`
+  survived the 2026-09-21 gallery removal, `f2ed368`, whose point was one place), reached from ⚡ and a pinch; no second
+  switcher. Vision Pro: leave space to the system; the Connections window's Active shows the same cards and choosing one
+  brings that window forward (`openWindow`); the per-window tab grid/carousel gets agent marks. Marks off the Mac need
+  the SVGs as assets (UIImage reads no SVG); off-Mac agents only from tmux panes or Claude Code's title. His two
+  questions: cards in Active on the iPhone, or keep text rows? On the headset, cards in Connections, or keep a list?
+  Unchecked: whether an off-screen iPhone terminal's `previewImage` is current.
+- **Links and paths in the terminal's right-click menu; Watch Log File (af433a3, 0.4.426).** Not yet seen by him.
+- **Agent marks (0.4.424):** "Codex looks great." Whether the softer look is quiet enough is still open.
 
 **Built 2026-10-13 evening and 2026-10-14** (evidence: `tasks/2026-10/2026-10-13_tier-3-evening.md`; decisions D73):
 - B-X2 (editor looks again on coming forward), B-X22's second half (this Mac's projects from the disk), B-F32 (Graphics
