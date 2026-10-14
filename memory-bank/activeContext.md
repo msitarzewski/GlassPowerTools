@@ -32,7 +32,7 @@ use the disposable test VM only).
 
 ## 2026-10-14 (~11:30) — RESUME HERE
 
-**State:** 0.4.435 on the Mac and iPhone (14:22); the Vision Pro has been locked (CoreDevice 4016)
+**State:** 0.4.437 on the Mac and iPhone (14:46); the Vision Pro has been locked (CoreDevice 4016)
 since 0.4.423 — retry `devicectl device install app` with `$SP/dd-vision` when it is worn. No crash reports since
 2026-10-13 18:47. Everything committed, nothing pushed. The owner said he was packing up (~11:10). **Mac installs go when
 ready, never held on our judgement** (the owner: "No need to hold on quitting right now. All tmux all day."); devices too.
@@ -52,6 +52,12 @@ ready, never held on our judgement** (the owner: "No need to hold on quitting ri
   Clipboard menu, saved per desktop (`DesktopConnection.clipboardSyncsAutomatically`, default on, old records on), also
   "Sync clipboard automatically" in the service's settings; off, Send Clipboard / Copy Remote Clipboard still work.
   Not yet seen by him.
+- **Hermes unmarked on another machine (14:35, his picture) — open.** Nothing local runs it. 0f0c837 (0.4.437) reads
+  launchers: `python -m <module>` (`hermes_cli`, `hermes_agent`), `uv run`/`uv tool run`/`uvx`/`pipx run`/`npx`/
+  `bunx`/`pnpm dlx`/`yarn dlx`, and shell-script launchers; inline `-c`/`-e` code never kept. Asked him for, on that
+  machine: `tmux list-panes -a -F '#{pane_current_command} #{pane_pid}'; pgrep -af hermes || pgrep -lf hermes`. If
+  the terminal is not in tmux, nothing tells the program. Also 91b5b2b (0.4.436): ⌘↩ sends a reviewed paste.
+  Offered, unanswered: All Windows cards refreshing about once a second, and a left terminal keeping its last picture.
 - **Command Palette, done this round** (cf237ab, fdc871c, 4690038; 0.4.430): every library service as "Connect: …"
   (desktops included; the database's old entries connected nothing); the terminal's commands from any window (New
   Connection, local terminals, a machine's Files and no-tmux terminal, saved workgroups); every project, Favorites'
