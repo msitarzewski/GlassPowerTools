@@ -77,8 +77,8 @@ owner may reorder; the sections below keep the detail. Within a tier, earlier is
     and measuring it found PostgreSQL's connect failures, a wrong password included, reading "PSQLError error 1";
     fixed in the same commit.
 25. B-X12, B-X26 — look again: grid rows over the header; the first headset terminal window small.
-26. B-X15–B-X20, B-X24, B-X22 — the rest (B-X18 done 44f6b2a; B-X22's first half done be02fe5, its second half —
-    project reach ignoring pinned host keys — open).
+26. B-X15–B-X20, B-X24 — the rest (B-X18 done 44f6b2a; ~~B-X22~~ both halves done: be02fe5, and on 2026-10-13
+    (0.4.411) a project on a saved machine that is this Mac by its pinned host key opens from the disk).
 
 **Tier 4 — the owner's decisions, best taken in one sitting** (each unblocks work)
 27. B-Q1 (D46 pinch gestures), B-Q4 (D63 light/dark), B-Q2 (D50), B-Q6 (SSH tabs in the remote folder).
@@ -204,8 +204,10 @@ owner may reorder; the sections below keep the detail. Within a tier, earlier is
 - **B-X21** Vendored Citadel's `writeCompositeSSHString` (`DH-Helpers.swift:264`) moves the writer index without
   reserving, the pattern patch C2 fixed elsewhere (`:82` and `:117` reserve first); C6 overloads drop options (the app does not use them). S6 (credentials not zeroed) and S7
   (Keychain read before the host key is checked) need a Citadel change.
-- **B-X22** ~~Remote listing never checks `hasSafeName`~~ (be02fe5, 2026-10-13); project reach ignores pinned host keys (low,
-  a convenience: open).
+- **B-X22** ~~Remote listing never checks `hasSafeName`~~ (be02fe5, 2026-10-13); ~~project reach ignores pinned host
+  keys~~ (2026-10-13, 0.4.411): the Projects panel and Files ▸ Open in Editor ask `GlassMachineIdentity.reach` with
+  the saved machine's pinned keys (`GlassTerminalRuntime.pinnedHostKeyFingerprints`), looked up only on a device
+  with host keys of its own. Not yet seen with the owner's own library.
 - **B-X23** Older device builds strip workgroups' tmux names when they re-save — keep devices on one build.
 - **B-X24** Insert Path does not bring the Mac window forward; "Files failed once from a cold app" (never
   reproduced); the Mac app crashes on an accessibility snapshot after the connection-failure alert (XCTest only).

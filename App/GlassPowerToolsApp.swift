@@ -185,9 +185,28 @@ struct GlassPowerToolsApp: App {
         GlassShowAllWindows.openSessions = { [model] in model.registry.openSessions() }
         // Stage C: Projects in the library, the same way. Answering "is that machine this one?"
         // needs the catalog, which the editor deliberately does not hold, so the answer is supplied
-        // from here. Pinned host keys are not consulted yet: the catalog's own local record (D8) is
-        // what "this machine" means today, and the key comparison becomes load-bearing when the
-        // remote reader can actually open a folder over SSH.
+        // from here: the catalog's own local record (D8), or a saved machine whose Terminal service's
+        // pinned host key is one of this Mac's own (B-X22) — a project on it is read from the disk,
+        // not over SSH to itself. Keys are looked up only on a device that has host keys at all.
+        let projectReach: @MainActor (GlassShellHost) -> GlassEditorProjectReach = { [terminal] host in
+            let terminalServices = host.services.filter { (service: HostServiceLink) in service.kind == .ssh }
+            let local = GlassMachineIdentity.localHostKeyFingerprints()
+            var pinned: Set<String> = []
+            #if os(macOS)
+            if !host.isLocal, !local.isEmpty {
+                for service in terminalServices {
+                    pinned.formUnion(terminal.pinnedHostKeyFingerprints(serverID: service.endpointID.rawValue))
+                }
+            }
+            #endif
+            return GlassMachineIdentity.reach(
+                hostName: host.displayName,
+                isLocalHostRecord: host.isLocal,
+                remoteFingerprints: pinned,
+                hasTerminalService: !terminalServices.isEmpty,
+                localFingerprints: local
+            )
+        }
         let projectsPanel = GlassEditorProjectsPanelModel()
         let library = model
         model.registry.registerLibraryPanel(
@@ -196,14 +215,7 @@ struct GlassPowerToolsApp: App {
                 guard let host = library.host(hostID) else {
                     return .unreachable(host: project.displayName)
                 }
-                return GlassMachineIdentity.reach(
-                    hostName: host.displayName,
-                    isLocalHostRecord: host.isLocal,
-                    remoteFingerprints: [],
-                    hasTerminalService: host.services.contains(where: { (service: HostServiceLink) in
-                        service.kind == .ssh
-                    })
-                )
+                return projectReach(host)
             }
         )
         // Stage D: how the editor reads a folder on another machine. It borrows the capability
@@ -276,12 +288,10 @@ struct GlassPowerToolsApp: App {
         // Workgroups is a panel in the library, not a window: its menu items open it there.
         terminal.showLibraryPanel = { [weak model] panelID in model?.showPanel(panelID) }
         terminal.openFolderAsProject = { @MainActor serverID, path in
-            let hostID = library.host(owningEndpoint: EndpointID(rawValue: serverID))?.id
-            let project = GlassEditorProject(hostID: hostID, path: path)
-            let reach: GlassEditorProjectReach = hostID == nil
-                ? .thisMachine
-                : .overSSH(host: library.host(owningEndpoint: EndpointID(rawValue: serverID))?
-                    .displayName ?? project.displayName)
+            let host = library.host(owningEndpoint: EndpointID(rawValue: serverID))
+            let project = GlassEditorProject(hostID: host?.id, path: path)
+            // This Mac browsed over SSH opens from the disk too (B-X22).
+            let reach: GlassEditorProjectReach = host.map { projectReach($0) } ?? .thisMachine
             // The returned id is a window that has to be *shown*; dropping it left the project
             // opened into a workspace nothing was displaying.
             if let windowID = editorRuntime.openProject(project, reach: reach) {

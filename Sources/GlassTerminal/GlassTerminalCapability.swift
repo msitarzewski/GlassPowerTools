@@ -290,6 +290,16 @@ public final class GlassTerminalRuntime {
         SSHHostKeyIdentity.isThisMachine(pinnedKeys: Self.pinnedHostKeys(server), localKeys: Self.localHostKeys())
     }
 
+    /// The fingerprints (`SHA256:…`) of the host keys pinned for the machine whose Terminal service is
+    /// `serverID`; empty for none, or a service not in the library. The editor compares them with this
+    /// Mac's own, so a project on a saved machine that is this Mac is read from the disk rather than
+    /// over SSH to itself (B-X22, `GlassMachineIdentity.reach`).
+    public func pinnedHostKeyFingerprints(serverID: UUID) -> Set<String> {
+        guard let server = sessionManager.serverManager.server(for: serverID) else { return [] }
+        return Set(Self.pinnedHostKeys(server).compactMap { Data(base64Encoded: $0) }
+            .map(PinnedSSHHostKey.sha256Fingerprint(for:)))
+    }
+
     static var localHostKeys: () -> Set<String> = { SSHHostKeyIdentity.localHostKeys() }
     static var pinnedHostKeys: (ServerConfiguration) -> Set<String> = { server in
         (try? SecretStoreHostTrustStore(configuration: KeychainManager.hostTrustConfig)

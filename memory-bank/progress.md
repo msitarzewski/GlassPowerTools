@@ -130,10 +130,13 @@ profile, notarization, deploying the site), the behaviour findings listed in `ac
 - tree-sitter 0.27 and swift-crypto 5 wait on upstream releases (`techContext.md`).
 - **B-X27 (2026-10-13):** files written with complete protection fail while the Mac is locked (recordings, SFTP
   downloads, desktop captures; ~23 terminal tests). The protection class is the owner's decision.
-- The database's own sidebar chrome still removes UIKit's toggle off the Mac (`databaseSidebarChrome()`); the
-  library no longer does (D24, amended 2026-10-13).
+- The database's own sidebar chrome removes UIKit's toggle off the Mac (`databaseSidebarChrome()`), as the library
+  no longer does (D24, amended 2026-10-13). Looked at again 2026-10-13: no dead end — on an iPad (and any regular
+  width) the database places the editor's `GlassSidebarToggle` instead (W32), a compact width is a stack with no
+  sidebar, and the headset's header has its own. No change.
 - The legacy `SFTPRemoteEditorView` sheet remains as a fallback; the owner has been asked whether to
-  delete it.
+  delete it (B-Q11). Nothing is lost by deleting it now: the editor checks for an outside change as its window
+  comes forward too (B-X2, 2026-10-13).
 - **Default text editor (owner, 2026-09-27):** built 2026-09-30 (`28a0b6e`) — an Alternate editor for plain
   text, source, JSON, XML, Markdown and YAML; not yet opened from the Finder (B-V3).
 - glassDT parity audit findings: `tasks/2026-09/2026-09-27_glassdt-parity-audit.md`.

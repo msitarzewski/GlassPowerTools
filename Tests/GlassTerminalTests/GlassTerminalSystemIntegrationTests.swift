@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import GlasSecretStore
 @testable import GlassTerminal
 
 /// What the terminal gives Shortcuts, Siri and the Finder (D72, 2026-10-13).
@@ -167,6 +168,22 @@ struct ThisMacHandoffTests {
         withThisMac(pinned: ["AAAAC3NzaC1lZDI1NTE5AAAAIMAC"], tabShowsIt: false) { runtime, server in
             #expect(runtime.requestContinue(serverID: server, tmuxSession: "glass-3") == .attachLocally("glass-3"))
             #expect(runtime.takeRequests().isEmpty, "no SSH connection to itself")
+        }
+    }
+
+    /// B-X22: the editor reads a project on a saved machine that is this Mac from the disk. It is
+    /// told by fingerprint, in the form it reads this Mac's own keys in (`/etc/ssh` lines).
+    @Test("a saved machine's pinned keys reach the editor as fingerprints in the form it reads this Mac's in")
+    func pinnedFingerprints() {
+        let blob = "AAAAC3NzaC1lZDI1NTE5AAAAIMAC"
+        withThisMac(pinned: [blob], tabShowsIt: false) { runtime, server in
+            let local = OpenSSHPublicKeyLine.sha256Fingerprint(in: "ssh-ed25519 \(blob) root@example")
+            #expect(local != nil)
+            #expect(runtime.pinnedHostKeyFingerprints(serverID: server) == Set([local].compactMap { $0 }))
+            #expect(runtime.pinnedHostKeyFingerprints(serverID: UUID()).isEmpty, "a service not in the library has keys")
+        }
+        withThisMac(pinned: [], tabShowsIt: false) { runtime, server in
+            #expect(runtime.pinnedHostKeyFingerprints(serverID: server).isEmpty)
         }
     }
 
