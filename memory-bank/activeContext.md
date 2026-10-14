@@ -30,56 +30,42 @@ use the disposable test VM only).
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
-## 2026-10-13 (~23:00) — RESUME HERE
+## 2026-10-14 (~10:20) — RESUME HERE
 
-**State:** 0.4.423 on all three (10:19). Mac installs go when ready: the owner, "No need to hold on quitting right now. All tmux all day." The owner is back
-(23:10). No new crash reports. The owner is out; his
-test list is unchanged (below, at 19:35). The Mac's screen is locked, which accounts for B-X27's test failures
-(the wallpaper test included).
+**State:** 0.4.423 on the Mac, iPhone and Vision Pro (10:19). No crash reports since 2026-10-13 18:47. Working tree
+clean; everything committed, nothing pushed. The owner is at the Mac, testing as he goes. **Mac installs go when ready,
+never held on our judgement** (the owner: "No need to hold on quitting right now. All tmux all day."); devices too.
 
-**Done while he was out** (`tasks/2026-10/2026-10-13_tier-3-evening.md`):
-- **B-X2** (7a47183): the editor looks for an outside change as its window comes forward and as a tab is chosen.
-- **B-X22's second half** (9f2532a): a project on a saved machine that is this Mac opens from the disk.
-- **B-F32** (0.4.412): Settings ▸ a Desktop service ▸ Graphics: Automatic, H.264 (4:2:0) or Without H.264. Live on
-  the Windows 11 VM. **For the owner:** try H.264 (4:2:0) on the GNOME host where colours smeared (B-X6).
-- **AI agents marked in Show All Windows** (0.4.421, the owner: "detect when an AI agent is running … put a
-  monochrome logo in the center of the window in expose mode"): `TerminalAgent` reads the foreground program — tmux's
-  `#{pane_current_command}` (now in `TerminalTmux.contextFormat`, every tmux terminal on every device), this Mac's
-  process table outside tmux — and, for an interpreter or a version-named file (Claude Code's native installer runs
-  `2.1.296`), the command line's first words only. Lobe Icons' marks (MIT, @05a9b8c, as Agency Agents vendors them).
-  Seen on the owner's Mac: 9 Claude Code and 8 Codex sessions found, 10 shells not. **0.4.422:** his Show All Windows
-  missed 3 of 17: a tab read tmux only when its output settled, and a working agent's spinner never settles. Now read
-  every 5 s while output runs unbroken (local and SSH), and everything when Show All Windows opens. **0.4.423:** "a
-  suggestion vs. a statement" — smaller (18 % of the tile, 18–52 pt), no disc, white at 40 % drawn `plusLighter`.
-- **Error suggestions can be paused** (0.4.419, the owner: "a need to pause on device AI suggestions … Maybe a
-  pause/disable in the suggestion modal?"): the card's pause menu — Pause in This Terminal (until it closes), Turn Off
-  Error Suggestions — and Settings ▸ Terminal ▸ Suggest fixes for errors. Device-local, not synced.
-- **Markdown preview escapes text** (0.4.418, 2026-10-14, the owner: a "Blocked Plug-in" pill previewing a project's
-  notes): swift-markdown's `HTMLFormatter` escaped nothing, so `<embed>` in backticks became an element.
-  `GlassEditorMarkdownHTML` escapes text, code, headings and attributes; raw HTML passes as Markdown means.
-- **Desktop clipboard** (0.4.417, 2026-10-14): a copy waits for an RDP server to open its clipboard instead of
-  failing into "Clipboard sharing is disabled or was not negotiated"; new log lines say whether the server ever
-  opened it. **Waiting on the owner:** connect to the GNOME desktop, copy both ways, then read
-  `event=clipboard` lines (subsystem `app.glassdt.rdp`).
-- **Favorites hold services, projects, workgroups and folders too** (D73, 0.4.415, his ask): sections by kind, his
-  choice; stars in a service's menu, a project's and a workgroup's menu, and Files' toolbar for the folder in view.
-- **Black backgrounds show the glass** (0.4.414, his ask on return): btop's black, and any background that is pure
-  black under a dark theme or the theme's own colour, is drawn as the terminal's empty background; other colours
-  stay solid (`TerminalClearBlacks`).
-- **Saved queries for Siri and Shortcuts** (0.4.413): "Open the ‹query› query in Glass Power Tools" opens it in a new
-  SQL tab on its database, connecting first, never running it.
-- The database's sidebar toggle was looked at again: no dead end, no change.
-- **0.4.410 onwards embeds the inert File Provider extension** (`GlassPowerToolsFiles.appex`, no domain), so it is
-  now installed on the Mac, as the spike left it in the project.
+**In flight, waiting on the owner:**
+- **Desktop clipboard (0.4.417):** he was to connect to the GNOME desktop, copy both ways, and say so. Then read
+  `/usr/bin/log show --predicate 'subsystem == "app.glassdt.rdp" AND eventMessage CONTAINS "clipboard"'`:
+  `event=clipboard-ready` means the server opened it (the waiting fix covers it); `event=clipboard channel=… ready=false
+  messages=0` at session end means it never did — the next thing to chase. The Windows 11 VM cannot show it: its RDP
+  session waits at the sign-in screen while the VM's console user is signed in.
+- **Show All Windows agent marks (0.4.421–423):** his last look was at 0.4.421; 0.4.422 found the 3 missing, 0.4.423 made
+  the mark "a suggestion vs. a statement". He has not seen 0.4.423.
 
-**Add to his test list:**
-- Edit a file in the editor, change it elsewhere, and come back to the window: it asks.
-- A Desktop service's Graphics setting.
-- "Open the ‹saved query› query in Glass Power Tools", connected and not.
-- Favorites: star a service, a project, a workgroup and a folder in Files; each opens from Favorites, and arrives on
-  the other devices.
+**Built 2026-10-13 evening and 2026-10-14** (evidence: `tasks/2026-10/2026-10-13_tier-3-evening.md`; decisions D73):
+- B-X2 (editor looks again on coming forward), B-X22's second half (this Mac's projects from the disk), B-F32 (Graphics
+  per Desktop service), saved queries for Siri and Shortcuts, Favorites beyond machines (D73: sections by kind; stars
+  on services, projects, workgroups and Files' folder), a whole-row right-click on a machine's service rows.
+- Black backgrounds show the glass (`TerminalClearBlacks`): btop's black is the terminal's empty background.
+- Desktop clipboard waits for the server (above). Markdown preview escapes text (`GlassEditorMarkdownHTML`; the
+  "Blocked Plug-in" pill). Error suggestions can be paused per terminal or turned off (Settings ▸ Terminal).
+- AI agents marked in Show All Windows (`TerminalAgent`, `TerminalProcessTable`, Lobe Icons MIT @05a9b8c): tmux's
+  `#{pane_current_command}` in the shared pane query, read every 5 s while output runs and when the overlay opens;
+  an interpreter's or a version-named program's command line, first words only (Claude Code's installer runs
+  `2.1.296`). tmux does not announce program changes; control mode (D53, proposed) would.
+- 0.4.410 onwards embeds the inert File Provider extension (no domain registered).
 
-**Next for an agent:** B-X7 (needs the headset).
+**His test list** (also the 19:35 list below): the editor asking on coming forward; a Desktop's Graphics setting (try
+H.264 (4:2:0) on the GNOME host for B-X6); "Open the ‹query› query"; Favorites of each kind, and on other devices.
+
+**Next for an agent:** B-X7 (needs the headset). Phase 5's File Provider domain trial waits for him.
+
+**Rules in force:** rule 61 (never his machine, tab, window or workgroup names — his screenshots show several); prove
+each test fails without its fix; compare `tmux list-sessions` md5 around terminal tests; check
+`CGSSessionScreenIsLocked` before blaming a red suite; build with `$SP/build-install-4NN.zsh` (copy the last with sed).
 
 ## 2026-10-13 (~19:35) — the owner's test list
 
