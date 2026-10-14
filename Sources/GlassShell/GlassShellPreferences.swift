@@ -39,6 +39,9 @@ public struct GlassShellPreferences: Codable, Equatable, Sendable {
     public var hosts: [HostID: HostRecord] = [:]
     /// Optional so a file written before the history existed still decodes.
     public var connectionHistory: [ConnectionEvent]?
+    /// Favourites that are not machines (2026-10-13), each with its sync clock, keyed by
+    /// `GlassFavorite.key`. An unfavourite is kept, dated, so it travels. Optional for older files.
+    public var favoriteItems: [String: GlassFavoriteItemsPayload.Mark]?
 
     /// Adds a connection, dropping what falls outside the window or over the limit.
     public mutating func recordConnection(_ event: ConnectionEvent) {

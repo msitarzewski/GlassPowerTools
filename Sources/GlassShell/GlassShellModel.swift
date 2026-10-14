@@ -1393,6 +1393,71 @@ public final class GlassShellModel: GlassServiceStore {
         Task { try? await favoritesSync.push(payload) }
     }
 
+    // MARK: Favourites beyond machines (2026-10-13)
+
+    /// How long an unfavourite is kept so it can travel to devices that have not heard of it.
+    static let favoriteTombstoneLifetime: TimeInterval = 90 * 24 * 60 * 60
+
+    public func isFavorite(_ item: GlassFavorite) -> Bool {
+        preferences.favoriteItems?[item.key]?.isFavorite ?? false
+    }
+
+    public func toggleFavorite(_ item: GlassFavorite) { setFavorite(item, !isFavorite(item)) }
+
+    public func setFavorite(_ item: GlassFavorite, _ isFavorite: Bool, at now: Date = Date()) {
+        guard item.isValid, self.isFavorite(item) != isFavorite else { return }
+        var items = preferences.favoriteItems ?? [:]
+        items[item.key] = .init(item: item, isFavorite: isFavorite, changedAt: now)
+        // Unfavourites old enough to have reached every device go.
+        items = items.filter { $0.value.isFavorite || now.timeIntervalSince($0.value.changedAt) < Self.favoriteTombstoneLifetime }
+        preferences.favoriteItems = items
+        do { try persistPreferences() } catch { errorMessage = GlassShellError.message(for: error) }
+        pushFavoriteItems()
+    }
+
+    /// The favourites that are not machines, in Favorites' section order and, within a kind, the
+    /// most recently starred first. Whether each still names something is the caller's to ask:
+    /// a project or a workgroup may be gone on this device, or not have arrived yet.
+    public var favoriteItems: [GlassFavorite] {
+        (preferences.favoriteItems ?? [:]).values
+            .filter(\.isFavorite)
+            .sorted { ($0.item.kind, $1.changedAt) < ($1.item.kind, $0.changedAt) }
+            .map(\.item)
+    }
+
+    private var favoriteItemsSync: GlassSettingsSyncService<GlassFavoriteItemsPayload>?
+
+    /// Attaches the rest of Favorites to iCloud, as `startSynchronizingFavorites` does machines.
+    public func startSynchronizingFavoriteItems(with service: GlassSettingsSyncService<GlassFavoriteItemsPayload>) async {
+        favoriteItemsSync = service
+        await service.start(onMerge: { [weak self] incoming in self?.applyFavoriteItems(incoming) })
+        pushFavoriteItems()
+    }
+
+    public var favoriteItemsPayload: GlassFavoriteItemsPayload {
+        GlassFavoriteItemsPayload(marks: preferences.favoriteItems ?? [:])
+    }
+
+    /// Takes each newer mark from another device.
+    public func applyFavoriteItems(_ incoming: GlassFavoriteItemsPayload) {
+        var items = preferences.favoriteItems ?? [:]
+        var changed = false
+        for (key, mark) in incoming.marks where key == mark.item.key && mark.item.isValid
+            && GlassFavoriteItemsPayload.replaces(mark, items[key]) {
+            items[key] = mark
+            changed = true
+        }
+        guard changed else { return }
+        preferences.favoriteItems = items
+        do { try persistPreferences() } catch { errorMessage = GlassShellError.message(for: error) }
+    }
+
+    private func pushFavoriteItems() {
+        guard let favoriteItemsSync else { return }
+        let payload = favoriteItemsPayload
+        Task { try? await favoriteItemsSync.push(payload) }
+    }
+
     /// Merges a consolidated host's member records into its canonical record **in the catalog**:
     /// every service moves to the canonical record, aliases and tags are unioned, the emptied
     /// members are deleted — and a service the machine now has twice is kept once.
