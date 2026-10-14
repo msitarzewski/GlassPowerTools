@@ -407,30 +407,26 @@ private struct MacTerminalExposeSessionTile: View {
 }
 
 /// Which AI agent a tile's terminal is running (the owner, 2026-10-14: "put a monochrome logo in
-/// the center of the window in expose mode"): the agent's mark, one colour and translucent, sized to
-/// the tile, on a faint disc so it reads over any picture, sharp or blurred.
+/// the center of the window in expose mode"): the agent's mark, small, white and translucent, sized
+/// to the tile, so it reads over any picture, sharp or blurred, without covering it.
 private struct MacTerminalExposeAgentMark: View {
     let agent: TerminalAgent
 
     var body: some View {
         GeometryReader { geometry in
-            let side = min(max(min(geometry.size.width, geometry.size.height) * 0.3, 28), 88)
-            ZStack {
-                // Translucent, the picture showing through (the owner, 2026-10-14: "The icons could
-                // use transparency too"); the faint disc keeps it apart from busy text.
-                Circle()
-                    .fill(.black.opacity(0.22))
-                    .frame(width: side * 1.6, height: side * 1.6)
-                    .blur(radius: side * 0.22)
-                if let logo = agent.logo {
-                    Image(nsImage: logo)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: side, height: side)
-                        .foregroundStyle(.white.opacity(0.55))
-                }
+            // A suggestion, not a statement (the owner, 2026-10-14: "smaller, and more white and
+            // translucent"): small, no disc, and drawn as light added to the picture — white that
+            // brightens what is under it rather than covering it, so the terminal reads through.
+            let side = min(max(min(geometry.size.width, geometry.size.height) * 0.18, 18), 52)
+            if let logo = agent.logo {
+                Image(nsImage: logo)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: side, height: side)
+                    .foregroundStyle(.white.opacity(0.4))
+                    .blendMode(.plusLighter)
+                    .frame(width: geometry.size.width, height: geometry.size.height)
             }
-            .frame(width: geometry.size.width, height: geometry.size.height)
         }
         .allowsHitTesting(false)
         .accessibilityElement()

@@ -32,7 +32,7 @@ use the disposable test VM only).
 
 ## 2026-10-13 (~23:00) — RESUME HERE
 
-**State:** 0.4.422 on all three (10:01). Mac installs go when ready: the owner, "No need to hold on quitting right now. All tmux all day." The owner is back
+**State:** 0.4.423 on all three (10:19). Mac installs go when ready: the owner, "No need to hold on quitting right now. All tmux all day." The owner is back
 (23:10). No new crash reports. The owner is out; his
 test list is unchanged (below, at 19:35). The Mac's screen is locked, which accounts for B-X27's test failures
 (the wallpaper test included).
@@ -49,8 +49,8 @@ test list is unchanged (below, at 19:35). The Mac's screen is locked, which acco
   `2.1.296`), the command line's first words only. Lobe Icons' marks (MIT, @05a9b8c, as Agency Agents vendors them).
   Seen on the owner's Mac: 9 Claude Code and 8 Codex sessions found, 10 shells not. **0.4.422:** his Show All Windows
   missed 3 of 17: a tab read tmux only when its output settled, and a working agent's spinner never settles. Now read
-  every 5 s while output runs unbroken (local and SSH), and everything when Show All Windows opens; the mark is
-  translucent (white 55 %, faint disc).
+  every 5 s while output runs unbroken (local and SSH), and everything when Show All Windows opens. **0.4.423:** "a
+  suggestion vs. a statement" — smaller (18 % of the tile, 18–52 pt), no disc, white at 40 % drawn `plusLighter`.
 - **Error suggestions can be paused** (0.4.419, the owner: "a need to pause on device AI suggestions … Maybe a
   pause/disable in the suggestion modal?"): the card's pause menu — Pause in This Terminal (until it closes), Turn Off
   Error Suggestions — and Settings ▸ Terminal ▸ Suggest fixes for errors. Device-local, not synced.
