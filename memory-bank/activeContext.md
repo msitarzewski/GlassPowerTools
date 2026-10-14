@@ -52,7 +52,8 @@ ready, never held on our judgement** (the owner: "No need to hold on quitting ri
   Clipboard menu, saved per desktop (`DesktopConnection.clipboardSyncsAutomatically`, default on, old records on), also
   "Sync clipboard automatically" in the service's settings; off, Send Clipboard / Copy Remote Clipboard still work.
   Not yet seen by him.
-- **Hermes unmarked on another machine (14:35, his picture) — open.** Nothing local runs it. 0f0c837 (0.4.437) reads
+- **Hermes unmarked on another machine (14:35, his picture) — resolved 16:18** (his screenshot of the tile with the
+  Hermes mark: "nice!"; it was the install-folder rule, 047986d). Nothing local runs it. 0f0c837 (0.4.437) reads
   launchers: `python -m <module>` (`hermes_cli`, `hermes_agent`), `uv run`/`uv tool run`/`uvx`/`pipx run`/`npx`/
   `bunx`/`pnpm dlx`/`yarn dlx`, and shell-script launchers; inline `-c`/`-e` code never kept. Asked him for, on that
   machine: `tmux list-panes -a -F '#{pane_current_command} #{pane_pid}'; pgrep -af hermes || pgrep -lf hermes`. If
