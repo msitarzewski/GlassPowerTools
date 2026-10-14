@@ -30,6 +30,58 @@ use the disposable test VM only).
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
+## 2026-10-13 (~19:35) — RESUME HERE
+
+**State:** 0.4.409 on the Mac, Vision Pro and iPhone (19:31); no new crash reports since 18:47 (fixed); working
+tree clean; everything committed, nothing pushed. The owner is out and will test when back. **His instruction:
+"Go ahead with 5"**: the File Provider spike.
+
+**Built today under D72** (plan: `tasks/2026-10/2026-10-13_system-integration-plan.md`; patterns in
+`systemPatterns.md` "The system's ways in"; facts in `techContext.md` "System integration facts"):
+- **Phase 1:** entities, ten intents, App Shortcuts, `GlassWindowOpener`, and the Machine widget.
+- **Phase 2:** Finder Services, Open With a folder or `.command` file, the Dock menu, `ssh://`, a Finder Sync
+  toolbar button, and a Quick Action.
+- **Phase 3:**
+  - Send Files to a Machine (Shortcuts).
+  - Drag a terminal or desktop out into its own window (Vision Pro, and iPad for desktops).
+  - Handoff, continuing a terminal in its tmux session.
+  - **The Mac share extension** (the owner chose "1 mac only").
+- **Phase 4:** controls, opt-in search (Settings ▸ Privacy), and the "What's Open" snippet.
+- **Mac extension targets in the hand-written project:** Finder, QuickActions and Share. Add more with
+  `$SP/add_mac_extension.py <hexpair> <Target> <Folder> <entitlements> "<display>" <bundle-suffix>`.
+
+**Owner reports today, all fixed:**
+- Open With brought up a Connections window: the Mac now takes opens in its app delegate.
+- Handoff made a new tmux session: it now attaches by name.
+- Handoff missed the open tab: it now finds this Mac's local tab, via `SSHHostKeyIdentity`.
+- Two Quick Look crashes (fixed 0.4.398 and 0.4.408).
+
+**Owner to test when back:**
+1. Handoff from the iPhone into a tmux session on this Mac (0.4.409).
+2. Services, the Quick Action, the toolbar button (switch it on in System Settings ▸ General ▸ Login Items &
+   Extensions), and the Dock menu.
+3. Share ▸ Send to a Machine, and Send Files from Shortcuts. Neither has sent to a real machine yet.
+4. Siri and Spotlight phrases; controls; the Machine widget.
+5. Vision Pro: drag a Terminal or Desktop row out of a host's detail into the room.
+6. The opt-in search setting.
+
+**Phase 5 (now):** a spike, read-only. Present a machine's SFTP home as a location in the Finder and Files
+sidebars with an `NSFileProviderReplicatedExtension` (macOS 11, iOS 16, visionOS 1; a visionOS App Store block
+is reported, forum 802442).
+- **Measure first:** can a sandboxed File Provider extension reach the SSH stack and the Keychain access group,
+  and enumerate one folder?
+- **Hard questions:** credentials in the extension (unavoidable here); host trust cannot be prompted inside the
+  extension, so only already-pinned keys are accepted; sync semantics.
+- **Deliver:** a written spike note with measurements and a recommendation, and a Mac-only proof of concept
+  behind a debug flag if it works. Nothing is shipped as working until the owner has seen it.
+
+**Standing:**
+- "Go with your recommendations, commit each piece as it lands"; install Mac builds when ready.
+- Build and install with `$SP/build-install-4NN.zsh` (copy the last one with `sed`).
+- Prove each test fails without its fix; compare `tmux list-sessions` md5 before and after terminal tests.
+- Rule 61: never write the owner's machine or tab names.
+- `$SP` = the session scratchpad.
+
 ## 2026-10-13 (~16:15) — where things stand
 
 **State:** **0.4.402 on the Mac, Vision Pro and iPhone** (14:05); no new crash reports; working tree clean;
