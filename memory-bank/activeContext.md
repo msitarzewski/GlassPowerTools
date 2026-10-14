@@ -30,9 +30,10 @@ use the disposable test VM only).
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
-## 2026-10-14 (~10:20) — RESUME HERE
+## 2026-10-14 (~10:45) — RESUME HERE
 
-**State:** 0.4.423 on the Mac, iPhone and Vision Pro (10:19). No crash reports since 2026-10-13 18:47. Working tree
+**State:** 0.4.424 on the Mac and iPhone (10:40); the Vision Pro is locked (CoreDevice 4016) and still on 0.4.423 —
+retry `devicectl device install app` with `$SP/dd-vision` when it is worn. No crash reports since 2026-10-13 18:47. Working tree
 clean; everything committed, nothing pushed. The owner is at the Mac, testing as he goes. **Mac installs go when ready,
 never held on our judgement** (the owner: "No need to hold on quitting right now. All tmux all day."); devices too.
 
@@ -44,6 +45,10 @@ never held on our judgement** (the owner: "No need to hold on quitting right now
   session waits at the sign-in screen while the VM's console user is signed in.
 - **Show All Windows agent marks (0.4.421–423):** his last look was at 0.4.421; 0.4.422 found the 3 missing, 0.4.423 made
   the mark "a suggestion vs. a statement". He has not seen 0.4.423.
+  He then said "the logo for codex appears to be incorrect": the artwork was Lobe Icons' mark, but CoreSVG (what
+  `NSImage` reads SVG with) misread a run of its compact arcs and drew a lump with a bite out of it. 034cc34 writes its
+  path out command by command; `logosDrawTheirWholePath` requires each mark to draw as its path written out in full
+  (Codex differed in 2,204 of 9,216 pixels before; the other seven matched). In 0.4.424.
 
 **Built 2026-10-13 evening and 2026-10-14** (evidence: `tasks/2026-10/2026-10-13_tier-3-evening.md`; decisions D73):
 - B-X2 (editor looks again on coming forward), B-X22's second half (this Mac's projects from the disk), B-F32 (Graphics
