@@ -32,7 +32,7 @@ use the disposable test VM only).
 
 ## 2026-10-14 (~11:30) — RESUME HERE
 
-**State:** 0.4.433 on the Mac and iPhone (14:03), 0.4.434 building; the Vision Pro has been locked (CoreDevice 4016)
+**State:** 0.4.435 on the Mac and iPhone (14:22); the Vision Pro has been locked (CoreDevice 4016)
 since 0.4.423 — retry `devicectl device install app` with `$SP/dd-vision` when it is worn. No crash reports since
 2026-10-13 18:47. Everything committed, nothing pushed. The owner said he was packing up (~11:10). **Mac installs go when
 ready, never held on our judgement** (the owner: "No need to hold on quitting right now. All tmux all day."); devices too.
@@ -71,9 +71,13 @@ ready, never held on our judgement** (the owner: "No need to hold on quitting ri
   bars' frames — on iOS 26 a touch in a bar's empty part can pass to the list underneath, so a hit-test check
   failed on the simulator — and the list waits for the pull; 3 iPhone-simulator UI tests: pull, hold, ⚡ tap still
   Active); 77c6506 (agent marks: the 8 SVGs in `Resources/AgentMarks.xcassets`, byte-equal to `logoSVG` by test;
-  `GlassOpenSession.mark`). In 0.4.434 (building, uncommitted until it compiles for all three): Vision Pro — hold
-  ⚡ (pinch held) brings Connections forward with All Windows as a sheet (`GlassAllWindowsSheet`); Siri/Shortcuts
-  "Show all windows in Glass Power Tools" (`GlassShowAllWindowsIntent`, `.showAllWindows`) on every platform.
+  `GlassOpenSession.mark`). d4d0eda (0.4.434): Vision Pro — hold ⚡ (pinch held) brings Connections forward with All Windows as a sheet
+  (`GlassAllWindowsSheet`); Siri/Shortcuts "Show all windows in Glass Power Tools" (`GlassShowAllWindowsIntent`) on
+  every platform. 30c5c83 (0.4.435): 20 more agents (the owner: "detect hermes, openclaw, and as many as we can...
+  agency agents installer has a good list") — OpenClaw, Hermes Agent, Mistral Vibe, ZCode, Aider, DeepSeek Harness
+  (by npm package only; `dsh` is also the distributed shell), Amp, Goose, Cline, Kilo Code, OpenHands, Grok CLI, Kiro,
+  Trae Agent, Qoder (Lobe Icons 1.95.1 marks, paths written out), Crush, Droid, Auggie, Plandex, iFlow (no Lobe mark:
+  `sparkles`). Windsurf, Antigravity, Osaurus are desktop apps. Vision Pro parts compiled only (headset locked).
   iPhone's Select-by-pinch fixed (389b7ce).
 - **Links and paths in the terminal's right-click menu; Watch Log File (af433a3, 0.4.426).** Not yet seen by him.
 - **Agent marks (0.4.424):** "Codex looks great." Whether the softer look is quiet enough is still open.
