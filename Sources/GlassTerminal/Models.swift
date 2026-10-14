@@ -1302,7 +1302,18 @@ class TerminalSession: Identifiable, Hashable {
     /// One waiting task per burst rather than one per chunk: it sleeps until the latest output is
     /// `outputSettleDelay` old, then announces the quiet once.
     private func noteOutputForSettle() {
-        lastOutputInstant = .now
+        let now = ContinuousClock.now
+        lastOutputInstant = now
+        // A program that never pauses — an agent's spinner — is read once an interval while it
+        // prints, not only when it stops: what it is, and its title, were otherwise unknown for as
+        // long as it worked (2026-10-14, the owner's Show All Windows missing agents). Only output
+        // that has gone on unbroken for an interval: a burst is read as it settles, as before.
+        if outputSettleTask == nil {
+            outputBurstStart = now
+        } else if tmuxPaneRead == nil, let start = outputBurstStart, now - start >= tmuxPaneReadInterval,
+                  let due = tmuxPaneReadDue, now >= due {
+            readTmuxPaneIfDue()
+        }
         guard outputSettleTask == nil else { return }
         outputSettleTask = Task { @MainActor [weak self] in
             while let due = self?.outputSettleDue, ContinuousClock.now < due {
@@ -1315,6 +1326,9 @@ class TerminalSession: Identifiable, Hashable {
             readTmuxPaneIfDue()
         }
     }
+
+    /// When the output now arriving began without a pause.
+    @ObservationIgnored private var outputBurstStart: ContinuousClock.Instant?
 
     private var outputSettleDue: ContinuousClock.Instant? {
         lastOutputInstant.map { $0 + outputSettleDelay }

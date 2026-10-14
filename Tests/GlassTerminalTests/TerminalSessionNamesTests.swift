@@ -198,6 +198,29 @@ struct TerminalSessionNamesTests {
         session.state = .disconnected
     }
 
+    /// An agent's spinner never lets output settle: read once an interval while it prints, or
+    /// what it runs stays unknown for as long as it works (2026-10-14, Show All Windows missing
+    /// agents).
+    @Test("a terminal printing without pause is read once an interval while it prints, never closer")
+    func readsWhilePrinting() async throws {
+        let host = Host()
+        let interval = Duration.milliseconds(300)
+        let session = await terminal(host, interval: interval)
+        #expect(await eventually { host.reads == 1 }, "once attached")
+        // Output every 10 ms against a 10 s settle delay: it never settles, however loaded the
+        // machine (the whole suite at once), so any read during it is a read while printing.
+        session.outputSettleDelay = .seconds(10)
+        let start = ContinuousClock.now
+        while host.reads < 3, ContinuousClock.now - start < .seconds(6) {
+            session.feedTerminalData(Data("⠋".utf8))
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(host.reads >= 3, "read while printing, not only at rest: \(host.reads)")
+        let gaps = zip(host.readTimes.dropFirst(), host.readTimes).map { $0 - $1 }
+        #expect(gaps.allSatisfy { $0 >= interval - .milliseconds(5) }, "never closer than the interval: \(gaps)")
+        session.state = .disconnected
+    }
+
     @Test("a name given on another device is picked up without reconnecting, and taking it away there shows the automatic name again")
     func nameFromElsewhere() async throws {
         let host = Host()

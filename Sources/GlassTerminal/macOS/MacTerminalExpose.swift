@@ -541,6 +541,8 @@ final class MacTerminalExpose {
         }
         observe(panel)
         Task { await refreshUnshownSessions() }
+        // What each terminal runs, read now: its tile's mark follows when the answer comes.
+        for shown in registry.shownWindows { for tab in shown.controller.tabs { tab.refreshPaneStates() } }
     }
 
     func close(animated: Bool = true) {

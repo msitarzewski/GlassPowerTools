@@ -409,6 +409,11 @@ final class MacWorkspaceController {
         if repositorySweptAt.map({ ContinuousClock.now - $0 >= localRepositoryInterval }) ?? true {
             refreshRepositories()
         }
+        // And what its local tmux sessions run, and their titles: read only as output settled, so an
+        // agent working without pause was never named, nor marked in Show All Windows (2026-10-14).
+        if localContextAskedAt.map({ ContinuousClock.now - $0 >= localRepositoryInterval }) ?? true {
+            refreshLocalTmuxContext()
+        }
         quietTask?.cancel()
         quietTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: Self.activityLinger)
@@ -426,7 +431,16 @@ final class MacWorkspaceController {
     /// `MacLocalTmux.server`, which tests replace.
     func refreshLocalTmuxContext() {
         guard !isClosed, localRuntimesByPaneID.keys.contains(where: { localTmuxSession(for: $0) != nil }) else { return }
+        localContextAskedAt = .now
         MacLocalTmux.contextReads.ask(self)
+    }
+    @ObservationIgnored private var localContextAskedAt: ContinuousClock.Instant?
+
+    /// Everything its panes' tmux sessions say, read now where a read is due: as Show All Windows
+    /// opens, so its marks are of what runs now (2026-10-14).
+    func refreshPaneStates() {
+        refreshLocalTmuxContext()
+        for terminal in sessionsByPaneID.values { terminal.readTmuxPaneIfDue() }
     }
 
     /// What this Mac's tmux said its sessions show, by session: each local pane in tmux takes its
