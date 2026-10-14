@@ -24,6 +24,16 @@ public enum GlassTerminalOpenPurpose: Sendable { case terminal, sftp }
 /// The shell's outcome callback for one connect attempt (see `GlassCapabilityOutcome`).
 public typealias GlassCapabilityReport = @MainActor (GlassCapabilityOutcome) -> Void
 
+/// What continuing a terminal from another device did (D72).
+public enum GlassTerminalContinuation: Equatable, Sendable {
+    /// A tab already showing it came forward.
+    case revealed
+    /// It is this Mac's own tmux session and no tab shows it: attach a local terminal to it.
+    case attachLocally(String)
+    /// A connection was asked for, through the Connections window's flow.
+    case connecting
+}
+
 /// A saved workgroup as the app's system integration sees it (D72): its id, name and how many
 /// terminals it opens. Nothing else of the preset leaves the terminal.
 public struct GlassTerminalWorkgroup: Sendable, Equatable, Identifiable {
@@ -244,17 +254,56 @@ public final class GlassTerminalRuntime {
     /// it — never a new session (the owner, 2026-10-13: a Handoff "opened a new terminal window, with
     /// tmux, in my home directory … and it left a detached tmux session in Active"). Without tmux there
     /// is no shell to share, so it connects as the library does.
-    /// Returns true when a tab already showing it was brought forward, so nothing connects.
+    ///
+    /// **This Mac, continued on this Mac** (the owner, 2026-10-13: "It found the right tmux session, but
+    /// created a new window and tab when the tab with that session was already open"): a phone SSH'd
+    /// into this Mac hands off one of this Mac's own tmux sessions, which a local tab here shows. When
+    /// the machine named is this Mac — its pinned host key is one of this Mac's own
+    /// (`SSHHostKeyIdentity`) — the local tab comes forward, or a local terminal attaches; it never
+    /// dials itself over SSH.
     @discardableResult
-    public func requestContinue(serverID: UUID, tmuxSession: String?) -> Bool {
+    public func requestContinue(serverID: UUID, tmuxSession: String?) -> GlassTerminalContinuation {
         guard let name = tmuxSession, TerminalTmux.isValidSessionName(name) else {
             requestConnect(serverID: serverID)
-            return false
+            return .connecting
         }
-        if revealOpenTerminal(serverID: serverID, tmuxSession: name) { return true }
+        if revealOpenTerminal(serverID: serverID, tmuxSession: name) { return .revealed }
+        #if os(macOS)
+        if let server = sessionManager.serverManager.server(for: serverID), isThisMac(server) {
+            return Self.revealLocalTmuxSession(name) ? .revealed : .attachLocally(name)
+        }
+        #endif
         enqueue(.connect(serverID: serverID, purpose: .terminal, report: nil, tmux: TerminalTmuxAttachment(name: name)))
-        return false
+        return .connecting
     }
+
+    #if os(macOS)
+    /// Goes to the local tab showing this Mac's tmux session, as Active's Open does (one stand-in for
+    /// tests, `GlassTerminalCapability.revealLocalTmuxSession`).
+    static var revealLocalTmuxSession: @MainActor (String) -> Bool {
+        GlassTerminalCapability.revealLocalTmuxSession
+    }
+
+    /// Whether `server` is this Mac, by its pinned host key (`SSHHostKeyIdentity`); tests replace
+    /// the keys.
+    func isThisMac(_ server: ServerConfiguration) -> Bool {
+        SSHHostKeyIdentity.isThisMachine(pinnedKeys: Self.pinnedHostKeys(server), localKeys: Self.localHostKeys())
+    }
+
+    static var localHostKeys: () -> Set<String> = { SSHHostKeyIdentity.localHostKeys() }
+    static var pinnedHostKeys: (ServerConfiguration) -> Set<String> = { server in
+        (try? SecretStoreHostTrustStore(configuration: KeychainManager.hostTrustConfig)
+            .authorizedKeys(host: server.host, port: server.port)) ?? []
+    }
+
+    /// A terminal window on this Mac attached to its tmux session `name` — a session continued from
+    /// another device that no tab here shows.
+    public func openLocalTerminal(tmuxSession name: String, with openWindow: OpenWindowAction) {
+        var intent = MacWorkspacePaneIntent.local
+        intent.localTmuxSession = name
+        openWindow(id: "workspace", value: MacWorkspaceLaunchRequest(initialPaneIntent: intent))
+    }
+    #endif
 
     /// Brings forward the terminal here showing `serverID`'s tmux session `name`; false with none.
     func revealOpenTerminal(serverID: UUID, tmuxSession name: String) -> Bool {

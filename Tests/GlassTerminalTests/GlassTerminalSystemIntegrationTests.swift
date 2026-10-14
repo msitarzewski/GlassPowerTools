@@ -114,7 +114,7 @@ struct TerminalHandoffTests {
     func attachesByName() {
         let runtime = GlassTerminalRuntime()
         let server = UUID()
-        #expect(runtime.requestContinue(serverID: server, tmuxSession: "glass-3") == false)
+        #expect(runtime.requestContinue(serverID: server, tmuxSession: "glass-3") == .connecting)
         let attached = runtime.takeRequests().contains { request in
             if case let .connect(id, _, _, tmux, _) = request { return id == server && tmux?.name == "glass-3" && tmux?.takeOver == false }
             return false
@@ -132,3 +132,51 @@ struct TerminalHandoffTests {
     }
 
 }
+
+#if os(macOS)
+/// A terminal continued on this Mac that is one of this Mac's own tmux sessions (the owner,
+/// 2026-10-13: "It found the right tmux session, but created a new window and tab when the tab with
+/// that session was already open"): a phone SSH'd into this Mac hands off this Mac's own session.
+@Suite("Continuing this Mac's own tmux session", .serialized)
+@MainActor
+struct ThisMacHandoffTests {
+    private func withThisMac(pinned: Set<String>, tabShowsIt: Bool,
+                             _ body: (GlassTerminalRuntime, UUID) -> Void) {
+        let runtime = GlassTerminalRuntime()
+        let mac = ServerConfiguration(name: "This Mac over SSH", host: "mac.example.com", username: "ann")
+        runtime.sessionManager.serverManager.servers = [mac]
+        let saved = (GlassTerminalRuntime.localHostKeys, GlassTerminalRuntime.pinnedHostKeys,
+                     GlassTerminalCapability.revealLocalTmuxSession)
+        defer {
+            GlassTerminalRuntime.localHostKeys = saved.0
+            GlassTerminalRuntime.pinnedHostKeys = saved.1
+            GlassTerminalCapability.revealLocalTmuxSession = saved.2
+        }
+        GlassTerminalRuntime.localHostKeys = { ["AAAAC3NzaC1lZDI1NTE5AAAAIMAC"] }
+        GlassTerminalRuntime.pinnedHostKeys = { _ in pinned }
+        GlassTerminalCapability.revealLocalTmuxSession = { _ in tabShowsIt }
+        body(runtime, mac.id)
+    }
+
+    @Test("its local tab comes forward; with none, a local terminal attaches — never SSH to itself")
+    func thisMac() {
+        withThisMac(pinned: ["AAAAC3NzaC1lZDI1NTE5AAAAIMAC"], tabShowsIt: true) { runtime, server in
+            #expect(runtime.requestContinue(serverID: server, tmuxSession: "glass-3") == .revealed)
+            #expect(runtime.takeRequests().isEmpty, "nothing connects")
+        }
+        withThisMac(pinned: ["AAAAC3NzaC1lZDI1NTE5AAAAIMAC"], tabShowsIt: false) { runtime, server in
+            #expect(runtime.requestContinue(serverID: server, tmuxSession: "glass-3") == .attachLocally("glass-3"))
+            #expect(runtime.takeRequests().isEmpty, "no SSH connection to itself")
+        }
+    }
+
+    @Test("another machine — a different key, or none pinned — is reached over SSH as before")
+    func anotherMachine() {
+        for pinned: Set<String> in [["AAAAC3NzaC1lZDI1NTE5AAAAIOTHER"], []] {
+            withThisMac(pinned: pinned, tabShowsIt: true) { runtime, server in
+                #expect(runtime.requestContinue(serverID: server, tmuxSession: "glass-3") == .connecting)
+            }
+        }
+    }
+}
+#endif

@@ -394,6 +394,11 @@ struct GlassPowerToolsApp: App {
                     return try await terminalCapability.sendFiles(files, toHost: member, folder: folder).summary
                 },
                 continueTerminal: { server, tmux in terminal.requestContinue(serverID: server, tmuxSession: tmux) },
+                attachLocalTerminal: { name, openWindow in
+                    #if os(macOS)
+                    terminal.openLocalTerminal(tmuxSession: name, with: openWindow)
+                    #endif
+                },
                 workgroups: {
                     terminal.workgroups.map { GlassWidgetSnapshot.Workgroup(id: $0.id, name: $0.name, terminals: $0.terminals) }
                 }))

@@ -21,6 +21,7 @@ import GlassConnectionKit
 import GlassConnectionUI
 import GlassLayers
 import GlassShell
+import GlassTerminal
 import GlassWidgetData
 
 /// The intents — the widgets' and Shortcuts', Siri's and Spotlight's (D72) — as part of the app.
@@ -44,9 +45,10 @@ enum GlassWidgetBridge {
         var openSSHLink: @MainActor (URL) -> Void
         /// Files to a machine's folder; what happened, in a sentence.
         var sendFiles: GlassAppServices.SendFiles
-        /// A terminal continued from another device in its tmux session: true when a tab here
-        /// already showing it came forward.
-        var continueTerminal: @MainActor (_ server: UUID, _ tmux: String) -> Bool
+        /// A terminal continued from another device in its tmux session.
+        var continueTerminal: @MainActor (_ server: UUID, _ tmux: String) -> GlassTerminalContinuation
+        /// The Mac: a local terminal window attached to this Mac's tmux session.
+        var attachLocalTerminal: @MainActor (_ tmux: String, OpenWindowAction) -> Void
         /// The saved workgroups, for the snapshot (Shortcuts and Siri name them).
         var workgroups: @MainActor () -> [GlassWidgetSnapshot.Workgroup]
     }
@@ -174,7 +176,14 @@ enum GlassWidgetBridge {
             }
             // A terminal in tmux continues in that session: the tab showing it, or one attached.
             if let tmux, host.services.contains(where: { $0.endpointID.rawValue == endpoint && $0.kind == .ssh }) {
-                if actions?.continueTerminal(endpoint, tmux) != true { ensureLibrary() }
+                switch actions?.continueTerminal(endpoint, tmux) {
+                case .revealed:
+                    break
+                case .attachLocally(let name):
+                    GlassWindowOpener.shared.perform { actions?.attachLocalTerminal(name, $0) }
+                case .connecting, nil:
+                    ensureLibrary()
+                }
                 return
             }
             ensureLibrary()

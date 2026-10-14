@@ -46,15 +46,9 @@ public enum GlassMachineIdentity {
         directory: String = hostKeyDirectory,
         fileManager: FileManager = .default
     ) -> Set<String> {
-        guard let names = try? fileManager.contentsOfDirectory(atPath: directory) else { return [] }
-        var fingerprints: Set<String> = []
-        for name in names where name.hasPrefix("ssh_host_") && name.hasSuffix("_key.pub") {
-            let path = (directory as NSString).appendingPathComponent(name)
-            guard let line = try? String(contentsOfFile: path, encoding: .utf8),
-                  let fingerprint = OpenSSHPublicKeyLine.sha256Fingerprint(in: line) else { continue }
-            fingerprints.insert(fingerprint)
-        }
-        return fingerprints
+        // The key files are read once, for the editor and the terminal alike (`SSHHostKeyIdentity`).
+        Set(SSHHostKeyIdentity.localHostKeyLines(directory: directory, fileManager: fileManager)
+            .compactMap(OpenSSHPublicKeyLine.sha256Fingerprint(in:)))
     }
 
     /// Whether a host whose SSH key fingerprints are `remoteFingerprints` is this machine.
