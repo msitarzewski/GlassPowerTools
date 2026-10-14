@@ -32,7 +32,7 @@ use the disposable test VM only).
 
 ## 2026-10-14 (~11:30) — RESUME HERE
 
-**State:** 0.4.430 on the Mac and iPhone (12:08); the Vision Pro has been locked (CoreDevice 4016)
+**State:** 0.4.431 on the Mac and iPhone (13:18); the Vision Pro has been locked (CoreDevice 4016)
 since 0.4.423 — retry `devicectl device install app` with `$SP/dd-vision` when it is worn. No crash reports since
 2026-10-13 18:47. Everything committed, nothing pushed. The owner said he was packing up (~11:10). **Mac installs go when
 ready, never held on our judgement** (the owner: "No need to hold on quitting right now. All tmux all day."); devices too.
@@ -58,14 +58,13 @@ ready, never held on our judgement** (the owner: "No need to hold on quitting ri
   folders, saved queries ("Open Query: …", via Siri's request) and tmux sessions running with no window ("Attach: …").
   The three capabilities drain queued requests when a Connections window appears (`onChange(initial: true)`). Not yet
   seen by him.
-- **Show All Windows on iPhone and Vision Pro — a proposal, his to decide** (he asked "consider what expose looks like
-  on both"). iPhone: Active becomes the overview, a Safari-like two-column grid of cards by machine (`GlassSessionCard`
-  survived the 2026-09-21 gallery removal, `f2ed368`, whose point was one place), reached from ⚡ and a pinch; no second
-  switcher. Vision Pro: leave space to the system; the Connections window's Active shows the same cards and choosing one
-  brings that window forward (`openWindow`); the per-window tab grid/carousel gets agent marks. Marks off the Mac need
-  the SVGs as assets (UIImage reads no SVG); off-Mac agents only from tmux panes or Claude Code's title. His two
-  questions: cards in Active on the iPhone, or keep text rows? On the headset, cards in Connections, or keep a list?
-  Unchecked: whether an off-screen iPhone terminal's `previewImage` is current.
+- **Show All Windows off the Mac — partly decided (13:15).** Proposal given in full (hold ⚡ as the trigger; iPhone/iPad
+  card overview; Vision Pro cards in the Connections window; agent marks as assets). His answers: keep the Mac's own
+  Show All Windows button; **no hold-⚡ trigger** ("that lightning icon doesn't show reliably everywhere. So keep the
+  current system on mac" — ⚡ is not in the Mac's terminal windows by design, which draw their own Show All Windows
+  button). Still his to say: the iPhone and Vision Pro entry and whether the cards live inside Active (the original
+  proposal) or apart. The pinch that turned on Select was the iPhone's Active list: 389b7ce (0.4.431) gives the list a
+  selection only in Select mode off the Mac and lets the system end edit mode but not begin it; device-only, he checks.
 - **Links and paths in the terminal's right-click menu; Watch Log File (af433a3, 0.4.426).** Not yet seen by him.
 - **Agent marks (0.4.424):** "Codex looks great." Whether the softer look is quiet enough is still open.
 
