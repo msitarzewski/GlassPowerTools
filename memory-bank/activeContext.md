@@ -113,6 +113,10 @@ all of the platforms that support them. App intents, all of the modern stuff …
     the tmux session. The receiving device brings forward the tab showing that session, even a background tab,
     or attaches to it by name, never a new session. The owner's leftover detached session is his to End in
     Active.
+  - **A second Quick Look crash (0.4.406, 18:47), fixed in 0.4.408:** SwiftUI's dismantle closed a `QLPreviewView`
+    that had already closed itself on leaving its window, and Quick Look aborted on the second close.
+    Reproduced in a separate process: both teardown orders abort by default and survive with
+    `shouldCloseWithWindow = false`, which is now set.
 - **Phase 4 built (0.4.406):**
   - Controls on the Mac 26, iPhone and iPad: Open Terminal on a chosen machine, Active Connections, and New
     Terminal Window on the Mac.
