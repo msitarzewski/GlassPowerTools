@@ -32,7 +32,7 @@ use the disposable test VM only).
 
 ## 2026-10-14 (~11:30) — RESUME HERE
 
-**State:** 0.4.428 building (0.4.427 on the Mac and iPhone since 11:43); the Vision Pro has been locked (CoreDevice 4016)
+**State:** 0.4.428 on the Mac and iPhone (11:56); the Vision Pro has been locked (CoreDevice 4016)
 since 0.4.423 — retry `devicectl device install app` with `$SP/dd-vision` when it is worn. No crash reports since
 2026-10-13 18:47. Everything committed, nothing pushed. The owner said he was packing up (~11:10). **Mac installs go when
 ready, never held on our judgement** (the owner: "No need to hold on quitting right now. All tmux all day."); devices too.
