@@ -68,3 +68,4 @@
   finder integration going … App intents, all of the modern stuff … Be sure visionOS is well represented!" Five
   phases (entities and intents; the Finder; sharing and drag-out; Controls, search and snippets; File Provider spike),
   a platform table from Apple's documentation, Vision Pro phase by phase, six decisions for the owner. Proposed.
+- 2026-10-13 (19:40): [Spike: machines in the Finder and Files (D72 phase 5)](2026-10-13_file-provider-spike.md) — in progress.
