@@ -1052,3 +1052,107 @@ struct SourceScaleTests {
         model.close()
     }
 }
+
+/// The owner, 2026-10-14: "Clipboard sharing is disabled or was not negotiated" over a desktop with
+/// sharing on. A Mac sends its clipboard as the window comes forward, before an RDP server has
+/// opened its clipboard (Monitor Ready) — Windows does once the user's session has signed in — so the
+/// first copy was lost behind that banner. Now it waits for the clipboard and goes when it opens.
+@Suite("A copy waits for the remote clipboard")
+@MainActor
+struct DesktopClipboardWaitTests {
+    @MainActor final class Sent { var copies: [GlassClipboardContent] = []; var typed: [String] = [] }
+
+    private func connected(_ fixture: SessionFixture, sent: Sent) async throws -> DesktopSessionModel {
+        try await fixture.prepare()
+        var operations = fixture.operations
+        operations.sendClipboard = { _, content in sent.copies.append(content) }
+        operations.delay = { _ in }
+        let model = fixture.model(operations)
+        try await fixture.ready(model)
+        return model
+    }
+
+    private func settle() async { for _ in 0..<20 { await Task.yield() } }
+
+    @Test("RDP: a copy before the clipboard opens waits, without an error, and goes when it opens")
+    func waitsThenSends() async throws {
+        let fixture = try SessionFixture(); defer { fixture.clean() }
+        let sent = Sent()
+        let model = try await connected(fixture, sent: sent)
+        #expect(!model.remoteClipboardIsOpen)
+
+        model.pasteClipboard("first")
+        model.pasteClipboard("latest")
+        await settle()
+        #expect(sent.copies.isEmpty, "a copy went to a clipboard that was not open")
+        #expect(model.errorMessage != "The remote computer hasn't opened its clipboard to this app yet.")
+
+        await model.receive(.clipboardReady, attempt: model.attemptID, connection: fixture.connection)
+        await settle()
+        #expect(model.remoteClipboardIsOpen)
+        #expect(sent.copies == ["latest"], "only the latest copy waits: a clipboard holds one thing")
+
+        model.pasteClipboard("after")
+        await settle()
+        #expect(sent.copies == ["latest", "after"])
+        model.close()
+    }
+
+    @Test("still closed after the wait: the desktop says why, once, and the notice goes when it opens")
+    func saysWhyOnce() async throws {
+        let fixture = try SessionFixture(); defer { fixture.clean() }
+        let sent = Sent()
+        let model = try await connected(fixture, sent: sent)
+        model.pasteClipboard("copy")
+        await settle()
+        let notice = DesktopSessionModel.clipboardWaitingMessage(fixture.connection.name)
+        #expect(model.errorMessage == notice)
+
+        model.errorMessage = nil
+        model.pasteClipboard("another")
+        await settle()
+        #expect(model.errorMessage == nil, "the notice came twice in one connection")
+
+        model.errorMessage = notice
+        await model.receive(.clipboardReady, attempt: model.attemptID, connection: fixture.connection)
+        await settle()
+        #expect(model.errorMessage == nil)
+        #expect(sent.copies == ["another"])
+        model.close()
+    }
+
+    @Test("VNC needs no opening: a copy goes as soon as the desktop is there")
+    func vncIsOpen() async throws {
+        let fixture = try SessionFixture(credentialAccess: DesktopCredentialAccess(retrieve: { _, _, _ in
+            RDPCredential(username: DesktopConnection.passwordOnlyAccount, password: "vnc secret")
+        }, save: { _, _, _ in }, delete: { _, _ in }, availability: { _, _ in .available }, migrate: { _, _, _ in }))
+        defer { fixture.clean() }
+        fixture.connection = DesktopConnection(name: "Mac", host: "mac.example", port: 5900, protocol: .vnc)
+        fixture.connection.clipboardEnabled = true
+        let sent = Sent()
+        try await fixture.prepare()
+        var operations = fixture.operations
+        operations.sendClipboard = { _, content in sent.copies.append(content) }
+        let model = fixture.model(operations)
+        await model.start()
+        await model.receive(.state(.connected), attempt: model.attemptID, connection: fixture.connection)
+        #expect(model.remoteClipboardIsOpen)
+        model.pasteClipboard("copy")
+        await settle()
+        #expect(sent.copies == ["copy"])
+        model.close()
+    }
+
+    @Test("with sharing off nothing waits: the text is typed, as before")
+    func sharingOff() async throws {
+        let fixture = try SessionFixture(); defer { fixture.clean() }
+        fixture.connection.clipboardEnabled = false
+        let sent = Sent()
+        let model = try await connected(fixture, sent: sent)
+        model.pasteClipboard("typed")
+        await settle()
+        #expect(sent.copies.isEmpty)
+        #expect(model.errorMessage == nil || model.errorMessage != DesktopSessionModel.clipboardWaitingMessage(fixture.connection.name))
+        model.close()
+    }
+}

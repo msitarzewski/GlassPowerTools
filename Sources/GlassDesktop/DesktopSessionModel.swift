@@ -63,6 +63,10 @@ struct DesktopSessionOperations {
     var resize: @MainActor (any GlassDesktopTransport, DesktopSize, Int) async throws -> Void = {
         try await $0.resize(width: $1.width, height: $1.height, desktopScale: $2)
     }
+    /// A copy to the remote clipboard; tests see when it goes.
+    var sendClipboard: @MainActor (any GlassDesktopTransport, GlassClipboardContent) async throws -> Void = {
+        try await $0.sendClipboard($1)
+    }
     var delay: @MainActor (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
     var save: @MainActor (DesktopAppModel, DesktopConnection, String) async throws -> Void = { try await $0.save($1, password: $2) }
     var recordConnection: @MainActor (DesktopAppModel, DesktopConnection, Date) async -> Void = {
@@ -99,6 +103,17 @@ public final class DesktopSessionModel {
     /// The server's latest copy, in every form it offered; the session view puts it on the local
     /// clipboard (D42a).
     public private(set) var remoteClipboard: GlassClipboardContent?
+    /// Whether the remote side's clipboard is open. An RDP server opens it with Monitor Ready, once
+    /// the remote session is signed in — on Windows when its clipboard process starts, seconds after
+    /// the desktop appears; VNC needs no such step. Until then a copy waits (`pendingClipboard`).
+    public private(set) var remoteClipboardIsOpen = false
+    /// The latest copy made here before the remote clipboard opened: sent when it does. Only the
+    /// latest, as a clipboard holds one thing.
+    private var pendingClipboard: GlassClipboardContent?
+    /// The attempt the "still waiting" notice was scheduled for: said once per connection.
+    private var clipboardWaitNoticeAttempt: UUID?
+    /// How long a copy waits before the desktop says why it has not gone across.
+    static let clipboardWaitNotice: Duration = .seconds(20)
     /// What the desktop's window draws with. Its mode, opacity, key colour, tolerance and edge
     /// softness are the window's settings resolved over All Desktops' (`apply`, W25); its zoom, pan
     /// and tilt are the window's own.
@@ -990,13 +1005,43 @@ public final class DesktopSessionModel {
 
     public func sendText(_ text: String) { sendInput { try await $0.sendText(text) } }
     /// Shares a local copy with the remote clipboard, or, with clipboard sharing off, types its text.
+    ///
+    /// **Before the remote clipboard opens, the copy waits; it does not fail** (the owner,
+    /// 2026-10-14: "Clipboard sharing is disabled or was not negotiated" over a desktop that had
+    /// sharing on). A Mac sends its clipboard as the window comes forward — before Windows or GNOME
+    /// has opened theirs — so the first copy of every session was lost behind that banner. If the
+    /// clipboard has not opened `clipboardWaitNotice` after the copy, the desktop says why, once.
     public func pasteClipboard(_ content: GlassClipboardContent) {
         let clipboardEnabled = connection.clipboardEnabled
+        if clipboardEnabled, isConnected, !remoteClipboardIsOpen {
+            pendingClipboard = content
+            noteClipboardWaiting()
+            return
+        }
+        let send = operations.sendClipboard
         sendInput { target in
-            if clipboardEnabled { try await target.sendClipboard(content) }
+            if clipboardEnabled { try await send(target, content) }
             else if let text = content.text { try await target.sendText(text) }
         }
     }
+    /// What the desktop says when a copy has waited and the remote clipboard has still not opened.
+    static func clipboardWaitingMessage(_ name: String) -> String {
+        "\(name) hasn't opened its clipboard yet, so your copy is waiting and goes across once it does. If it never does, the remote computer is set not to share its clipboard over Remote Desktop."
+    }
+
+    private func noteClipboardWaiting() {
+        let attempt = attemptID
+        guard clipboardWaitNoticeAttempt != attempt else { return }
+        clipboardWaitNoticeAttempt = attempt
+        let name = connection.name, delay = operations.delay
+        Task { [weak self] in
+            try? await delay(Self.clipboardWaitNotice)
+            guard let self, attempt == attemptID, isConnected, !remoteClipboardIsOpen,
+                  pendingClipboard != nil, errorMessage == nil else { return }
+            errorMessage = Self.clipboardWaitingMessage(name)
+        }
+    }
+
     // MARK: Accessory keys
 
     /// Control, Option, Command or Shift for the next key: from the Keys menu, since a headset's or a
@@ -1095,6 +1140,7 @@ public final class DesktopSessionModel {
         cancelResize()
         audio.stop()
         frame = nil; capabilities = nil; remoteClipboard = nil
+        remoteClipboardIsOpen = false; pendingClipboard = nil
         closeDisplayConnections()
         screens = []; selectedScreenID = nil
         linkStatistics = nil; displayWindowRequests = []; appliedDisplayWindows = false
@@ -1147,7 +1193,11 @@ public final class DesktopSessionModel {
         case .state(let value):
             let wasConnected = isConnected
             state = value
-            if value == .connected { recordFirstDesktopIfReady(snapshot: snapshot); updateDisplayConnections() }
+            if value == .connected {
+                // VNC's cut text needs no negotiation: open as soon as the desktop is.
+                if snapshot.protocol == .vnc { remoteClipboardIsOpen = true }
+                recordFirstDesktopIfReady(snapshot: snapshot); updateDisplayConnections()
+            }
             else if case .failed(let message) = value {
                 attemptIsTerminal = true
                 clearRemoteState(); errorMessage = message; started = false
@@ -1178,6 +1228,15 @@ public final class DesktopSessionModel {
         case .linkStatistics(let value):
             if isConnected { linkStatistics = value }
         case .clipboard(let value): if isConnected, snapshot.clipboardEnabled { remoteClipboard = value }
+        case .clipboardReady:
+            guard state == .connecting || isConnected else { return }
+            remoteClipboardIsOpen = true
+            // The copy that waited goes now, and the notice about it, if it was given, goes too.
+            if errorMessage == Self.clipboardWaitingMessage(snapshot.name) { errorMessage = nil }
+            if let waiting = pendingClipboard {
+                pendingClipboard = nil
+                pasteClipboard(waiting)
+            }
         case .highPerformance(let value):
             if isConnected || state == .connecting { highPerformanceStatus = value }
         case .audio(let sample):

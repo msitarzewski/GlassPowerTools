@@ -16,6 +16,8 @@ import GlassRDPTransport
     var firstFrame: GlassRDPFrame?
     var frameCount = 0
     var connected = false
+    var connectedAt: Date?
+    var clipboardReadyAt: Date?
     var failure: String?
     private var events: Task<Void, Never>?
     private var frames: Task<Void, Never>?
@@ -27,7 +29,8 @@ import GlassRDPTransport
                 switch event {
                 case .certificate(let value): certificate = value
                 case .displayCapabilities(let value): capabilities = value
-                case .state(.connected): connected = true
+                case .state(.connected): connected = true; connectedAt = Date()
+                case .clipboardReady: clipboardReadyAt = Date()
                 case .state(.failed(let message)): failure = message
                 default: break
                 }
@@ -80,7 +83,9 @@ import GlassRDPTransport
                 GlassRDPConfiguration(host: host, port: port, username: username,
                                       password: password.trimmingCharacters(in: .whitespacesAndNewlines),
                                       width: 1280, height: 800, requiresNLA: true,
-                                      approvedCertificateSHA256: pin, graphicsMode: graphics)
+                                      approvedCertificateSHA256: pin,
+                                      clipboardEnabled: ProcessInfo.processInfo.environment["GPT_RDP_CLIPBOARD"] == "1",
+                                      graphicsMode: graphics)
             )
         } catch {
             print("connect threw: \(error)")
@@ -120,6 +125,15 @@ import GlassRDPTransport
                 try? await Task.sleep(for: .seconds(hold))
             }
             print("frames seen   : \(await probe.frameCount)")
+            // GPT_RDP_CLIPBOARD=1: when the server opened its clipboard, against when the desktop was ready.
+            if ProcessInfo.processInfo.environment["GPT_RDP_CLIPBOARD"] == "1" {
+                let desktop = await probe.connectedAt, clipboard = await probe.clipboardReadyAt
+                if let desktop, let clipboard {
+                    print("clipboard     : opened \(String(format: "%.2f", clipboard.timeIntervalSince(desktop)))s after the desktop was ready")
+                } else {
+                    print("clipboard     : not opened while connected")
+                }
+            }
             await probe.finish()
             print("RESULT: PASS")
             exit(0)

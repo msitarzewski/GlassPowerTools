@@ -176,6 +176,10 @@ public enum GlassRDPEvent: Sendable, Equatable {
     case displayCapabilities(GlassRDPDisplayCapabilities)
     case cursor(GlassRDPCursor)
     case clipboard(GlassClipboardContent)
+    /// The remote side opened its clipboard (RDP's Monitor Ready): copies can go across from now on.
+    /// Not when the desktop appears — Windows opens it once the user's session is signed in, which
+    /// can be seconds later. VNC needs no such step and never sends it.
+    case clipboardReady
     case audio(GlassRDPAudioSample)
     /// The displays inside the remote framebuffer. Empty means the host published no layout.
     case screens([GlassRemoteScreen])

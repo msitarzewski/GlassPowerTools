@@ -147,7 +147,7 @@ public final class DesktopDisplayConnection: Identifiable {
             density = value.first(where: { $0.id == display })?.density ?? value.first?.density
         case .linkStatistics(let value):
             if state == .connected { linkStatistics = value }
-        case .clipboard, .audio, .certificate, .displayCapabilities, .highPerformance:
+        case .clipboard, .clipboardReady, .audio, .certificate, .displayCapabilities, .highPerformance:
             // The clipboard is the desktop's connection's (D42a), and a Mac sends no sound or
             // certificate; nor does a display connection resize its display.
             break

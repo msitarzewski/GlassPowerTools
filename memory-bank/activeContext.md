@@ -32,7 +32,7 @@ use the disposable test VM only).
 
 ## 2026-10-13 (~23:00) — RESUME HERE
 
-**State:** 0.4.416 on all three (2026-10-14, 07:24). The owner is back
+**State:** 0.4.417 on all three (2026-10-14, 07:38). The owner is back
 (23:10). No new crash reports. The owner is out; his
 test list is unchanged (below, at 19:35). The Mac's screen is locked, which accounts for B-X27's test failures
 (the wallpaper test included).
@@ -42,6 +42,10 @@ test list is unchanged (below, at 19:35). The Mac's screen is locked, which acco
 - **B-X22's second half** (9f2532a): a project on a saved machine that is this Mac opens from the disk.
 - **B-F32** (0.4.412): Settings ▸ a Desktop service ▸ Graphics: Automatic, H.264 (4:2:0) or Without H.264. Live on
   the Windows 11 VM. **For the owner:** try H.264 (4:2:0) on the GNOME host where colours smeared (B-X6).
+- **Desktop clipboard** (0.4.417, 2026-10-14): a copy waits for an RDP server to open its clipboard instead of
+  failing into "Clipboard sharing is disabled or was not negotiated"; new log lines say whether the server ever
+  opened it. **Waiting on the owner:** connect to the GNOME desktop, copy both ways, then read
+  `event=clipboard` lines (subsystem `app.glassdt.rdp`).
 - **Favorites hold services, projects, workgroups and folders too** (D73, 0.4.415, his ask): sections by kind, his
   choice; stars in a service's menu, a project's and a workgroup's menu, and Files' toolbar for the folder in view.
 - **Black backgrounds show the glass** (0.4.414, his ask on return): btop's black, and any background that is pure

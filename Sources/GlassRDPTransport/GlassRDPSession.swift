@@ -166,7 +166,7 @@ public actor GlassRDPSession {
 
     public func sendClipboard(_ content: GlassClipboardContent) throws {
         guard let clipboard = controls?.snapshot.clipboard else {
-            throw GlassRDPError.unsupported("Clipboard sharing is disabled or was not negotiated.")
+            throw GlassRDPError.unsupported("The remote computer hasn't opened its clipboard to this app yet.")
         }
         clipboard.publishLocalContent(RDPClipboardRichContent(text: content.text, html: content.html,
                                                               rtf: content.rtf, png: content.png))
@@ -238,6 +238,8 @@ public actor GlassRDPSession {
                 events.yield(.displayCapabilities(capabilities(display.capabilities)))
             },
             onClipboardReady: { clipboard in
+                logger.notice("event=clipboard-ready")
+                defer { events.yield(.clipboardReady) }
                 // Every format the server offers, not only its text (D42a).
                 clipboard.setRemoteContentHandler { rich in
                     events.yield(.clipboard(GlassClipboardContent(text: rich.text, html: rich.html,
@@ -262,6 +264,11 @@ public actor GlassRDPSession {
         // says whether H.264 4:4:4 was on the table.
         if let version = report.rdpGraphicsSelectedCapabilityVersion {
             logger.notice("event=graphics profile=\(configuration.graphicsCapabilityProfile.rawValue, privacy: .public) version=\(String(format: "0x%08X", version), privacy: .public) flags=\(String(format: "0x%08X", report.rdpGraphicsSelectedCapabilityFlags ?? 0), privacy: .public)")
+        }
+        // Whether the server gave the clipboard a channel at all, and whether anything crossed it:
+        // "never offered" and "offered late" are different fixes.
+        if configuration.clipboardEnabled {
+            logger.notice("event=clipboard channel=\(report.rdpClipboardChannelID.map(String.init) ?? "none", privacy: .public) ready=\(controls.snapshot.clipboard != nil) messages=\(report.rdpClipboardMessages?.count ?? 0)")
         }
         if let failure = controls.snapshot.failure { return failure }
         if report.status == "failure" {
