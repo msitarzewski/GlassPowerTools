@@ -862,6 +862,24 @@ struct VNCSessionSelectionTests {
     }
 }
 
+/// B-F32 (`DesktopGraphicsModeTests.swift`): the saved graphics choice is what the server is asked for.
+@Suite("A desktop's graphics choice reaches the connection")
+@MainActor
+struct DesktopGraphicsModeConnectionTests {
+    @Test(arguments: DesktopGraphicsMode.allCases)
+    func theSavedChoiceIsAskedFor(_ mode: DesktopGraphicsMode) async throws {
+        let fixture = try SessionFixture()
+        defer { fixture.clean() }
+        fixture.connection.graphicsMode = mode
+        try await fixture.prepare()
+        #expect(fixture.connection.graphicsMode == mode, "the choice was not saved")
+        let model = fixture.model()
+        try await fixture.ready(model)
+        #expect(fixture.configurations.last?.graphicsMode == GlassRDPGraphicsMode(mode))
+        model.close()
+    }
+}
+
 @Suite("Initial desktop size")
 @MainActor
 struct InitialDesktopSizeTests {

@@ -30,7 +30,29 @@ use the disposable test VM only).
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
-## 2026-10-13 (~19:35) — RESUME HERE
+## 2026-10-13 (~23:00) — RESUME HERE
+
+**State:** 0.4.412 on the Mac. The iPhone and Vision Pro are on 0.4.409: both were unreachable (CoreDevice 4016) at
+the 0.4.410–412 installs, so install them first when they are back. No new crash reports. The owner is out; his
+test list is unchanged (below, at 19:35). The Mac's screen is locked, which accounts for B-X27's test failures
+(the wallpaper test included).
+
+**Done while he was out** (`tasks/2026-10/2026-10-13_tier-3-evening.md`):
+- **B-X2** (7a47183): the editor looks for an outside change as its window comes forward and as a tab is chosen.
+- **B-X22's second half** (9f2532a): a project on a saved machine that is this Mac opens from the disk.
+- **B-F32** (0.4.412): Settings ▸ a Desktop service ▸ Graphics: Automatic, H.264 (4:2:0) or Without H.264. Live on
+  the Windows 11 VM. **For the owner:** try H.264 (4:2:0) on the GNOME host where colours smeared (B-X6).
+- The database's sidebar toggle was looked at again: no dead end, no change.
+- **0.4.410 onwards embeds the inert File Provider extension** (`GlassPowerToolsFiles.appex`, no domain), so it is
+  now installed on the Mac, as the spike left it in the project.
+
+**Add to his test list:**
+- Edit a file in the editor, change it elsewhere, and come back to the window: it asks.
+- A Desktop service's Graphics setting.
+
+**Next for an agent:** B-X7 (needs the headset); B-F48's tail (saved queries and tables as entities).
+
+## 2026-10-13 (~19:35) — the owner's test list
 
 **State:** 0.4.409 on the Mac, Vision Pro and iPhone (19:31); no new crash reports since 18:47 (fixed); working
 tree clean; everything committed, nothing pushed. The owner is out and will test when back. **His instruction:

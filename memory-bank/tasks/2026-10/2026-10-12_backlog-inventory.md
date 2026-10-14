@@ -70,7 +70,8 @@ owner may reorder; the sections below keep the detail. Within a tier, earlier is
 21. ~~B-X2~~ (2026-10-13, 0.4.410) — the editor looks again as its window comes forward and as a tab is chosen,
     and asks once per change (`GlassEditorWorkspace.checkForOutsideChange`). **B-Q11 is now unblocked** — the
     owner's: delete the legacy sheet, which only opens when nothing else can take the file.
-22. B-X6 with B-F32 — RDP colour distortion in motion, and the graphics-mode escape.
+22. B-X6 with ~~B-F32~~ — RDP colour distortion in motion; the graphics-mode escape is built (2026-10-13, 0.4.412:
+    Settings ▸ Desktop ▸ Graphics). B-X6 itself waits for the owner's GNOME host.
 23. B-X7 — RDP on Vision Pro asks for twice the pixels; whole-frame copies.
 24. ~~B-X13~~ 461dc59 (2026-10-13) — the terminal's Local Network guidance follows the error (measured: a denial is
     "No route to host", errno 65). Follow-up done b1e9e3c: the database uses the same rule (`GlassLocalNetworkAccess`),
@@ -282,7 +283,8 @@ owner may reorder; the sections below keep the detail. Within a tier, earlier is
 - **B-F31** Remote background detected through the host's SSH (GNOME/KDE, Windows `IDesktopWallpaper`, macOS),
   feeding the existing mask; the manual picker as fallback. An owner requirement in glassDT ("pairing should
   automatically detect the remote background settings"), never carried; its blocker is gone.
-- **B-F32** A graphics mode picker (Automatic / AVC420 / Legacy), the escape route for B-X6.
+- **B-F32** ~~A graphics mode picker (Automatic / AVC420 / Legacy), the escape route for B-X6~~ (2026-10-13): Automatic,
+  H.264 (4:2:0), Without H.264, per Desktop service; live on the Windows 11 VM (`2026-10-13_tier-3-evening.md`).
 - **B-F33** Servers that cannot resize: offer Resize to Window, Scale to Fit and Actual Pixels honestly (both
   tested RDP servers advertise no display control).
 - **B-F34** VNC and RDP through an SSH tunnel, with an encrypted/unencrypted indicator in the session; VeNCrypt.

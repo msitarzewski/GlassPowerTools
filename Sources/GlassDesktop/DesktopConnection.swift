@@ -18,6 +18,23 @@ public enum DesktopProtocol: String, Codable, CaseIterable, Sendable {
     public var displayName: String { self == .rdp ? "Remote Desktop (RDP)" : "Screen Sharing (VNC)" }
 }
 
+/// Which pictures a Remote Desktop server is asked for (B-F32): Automatic, or a way out when a server
+/// draws badly with H.264 4:4:4 — colours that smear while things move (B-X6). Saved per service; a
+/// record written before it existed decodes as Automatic.
+public enum DesktopGraphicsMode: String, Codable, CaseIterable, Sendable {
+    case automatic
+    case h264
+    case withoutH264
+
+    public var displayName: String {
+        switch self {
+        case .automatic: "Automatic"
+        case .h264: "H.264 (4:2:0)"
+        case .withoutH264: "Without H.264"
+        }
+    }
+}
+
 public struct DesktopConnection: Identifiable, Codable, Equatable, Sendable {
     public var id: EndpointID
     public var hostID: HostID?
@@ -38,6 +55,8 @@ public struct DesktopConnection: Identifiable, Codable, Equatable, Sendable {
     public var audioEnabled: Bool
     public var certificateSHA256: String?
     public var `protocol`: DesktopProtocol
+    /// Remote Desktop only; Screen Sharing has no choice to make.
+    public var graphicsMode: DesktopGraphicsMode
 
     /// Password-only VNC servers have no account; the shared credential store still needs one.
     public static let passwordOnlyAccount = "vnc-password"
@@ -64,6 +83,7 @@ public struct DesktopConnection: Identifiable, Codable, Equatable, Sendable {
         self.desktop = .standard
         self.clipboardEnabled = false
         self.audioEnabled = false
+        self.graphicsMode = .automatic
     }
 
     public var address: String { host.contains(":") ? "[\(host)]:\(port)" : "\(host):\(port)" }
@@ -76,7 +96,7 @@ public struct DesktopConnection: Identifiable, Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id, hostID, name, host, port, username, domain, credentialID, mobility, authentication, tags, isFavorite
         case createdAt, lastConnectedAt, desktop, clipboardEnabled, audioEnabled, certificateSHA256
-        case `protocol`
+        case `protocol`, graphicsMode
     }
 
     public init(from decoder: any Decoder) throws {
@@ -100,6 +120,8 @@ public struct DesktopConnection: Identifiable, Codable, Equatable, Sendable {
         audioEnabled = try values.decode(Bool.self, forKey: .audioEnabled)
         certificateSHA256 = try values.decodeIfPresent(String.self, forKey: .certificateSHA256)
         `protocol` = try values.decodeIfPresent(DesktopProtocol.self, forKey: .protocol) ?? .rdp
+        // A mode a later build adds reads as Automatic here rather than failing the whole record.
+        graphicsMode = (try? values.decodeIfPresent(DesktopGraphicsMode.self, forKey: .graphicsMode)) ?? .automatic
     }
 
     public func validated() throws -> Self {
@@ -137,6 +159,7 @@ public struct DesktopConnection: Identifiable, Codable, Equatable, Sendable {
             value.authentication = .networkLevel
             value.certificateSHA256 = nil
             value.audioEnabled = false
+            value.graphicsMode = .automatic
             guard value.username.utf8.count <= 63 else { throw DesktopError.invalidAccount }
         }
         guard value.username.count <= 255, value.domain.count <= 255,

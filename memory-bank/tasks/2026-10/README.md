@@ -68,4 +68,8 @@
   finder integration going … App intents, all of the modern stuff … Be sure visionOS is well represented!" Five
   phases (entities and intents; the Finder; sharing and drag-out; Controls, search and snippets; File Provider spike),
   a platform table from Apple's documentation, Vision Pro phase by phase, six decisions for the owner. Proposed.
-- 2026-10-13 (19:40): [Spike: machines in the Finder and Files (D72 phase 5)](2026-10-13_file-provider-spike.md) — in progress.
+- 2026-10-13 (19:40): [Spike: machines in the Finder and Files (D72 phase 5)](2026-10-13_file-provider-spike.md) — done
+  as far as it goes unattended; registering a domain waits for the owner.
+- 2026-10-13 (22:30): [Tier 3, the evening](2026-10-13_tier-3-evening.md) — B-X2 (the editor looks again when its
+  window comes forward), B-X22's second half (this Mac's projects from the disk), B-F32 (a Graphics choice per
+  Desktop service, live on the Windows 11 VM). 0.4.412 on the Mac; devices unreachable.

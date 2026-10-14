@@ -34,6 +34,18 @@ extension GlassRDPConfiguration: Equatable {
             && lhs.password == rhs.password && lhs.width == rhs.width && lhs.height == rhs.height
             && lhs.requiresNLA == rhs.requiresNLA && lhs.approvedCertificateSHA256 == rhs.approvedCertificateSHA256
             && lhs.clipboardEnabled == rhs.clipboardEnabled && lhs.audioEnabled == rhs.audioEnabled
+            && lhs.graphicsMode == rhs.graphicsMode
+    }
+}
+
+extension GlassRDPGraphicsMode {
+    /// The saved choice, as the transport takes it (B-F32).
+    init(_ mode: DesktopGraphicsMode) {
+        switch mode {
+        case .automatic: self = .automatic
+        case .h264: self = .h264
+        case .withoutH264: self = .withoutH264
+        }
     }
 }
 
@@ -670,7 +682,8 @@ public final class DesktopSessionModel {
                 requiresNLA: value.authentication == .networkLevel,
                 approvedCertificateSHA256: value.certificateSHA256,
                 clipboardEnabled: value.clipboardEnabled, audioEnabled: value.audioEnabled,
-                desktopScaleFactor: currentScaleFactor))
+                desktopScaleFactor: currentScaleFactor,
+                graphicsMode: GlassRDPGraphicsMode(value.graphicsMode)))
             // The server is already being asked for this size, so no immediate second request.
             lastRequestedSize = initial
             lastRequestedScaleFactor = nil

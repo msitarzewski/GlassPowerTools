@@ -31,6 +31,7 @@ Open **Advanced** for everything optional. The RDP-only rows are hidden when you
 | **Desktop size** | Width and height in pixels, 1920 × 1080 by default. Each side must be from 200 to 8192, and the width must be even. |
 | **Share clipboard** | Shares the clipboard with the remote computer: text, formatting and images over RDP, text over VNC. Off by default. See [Keyboard, pointer, clipboard and audio](desktop-input.md). |
 | **Remote audio** (RDP) | Plays the remote computer's sound on this device. Off by default. |
+| **Graphics** (RDP) | Which pictures the remote computer is asked to send. **Automatic**, the default, uses its best picture. If colours smear while things move, choose **H.264 (4:2:0)**, which leaves out H.264's 4:4:4 form; a computer that does not offer it sends its other pictures instead. If the picture breaks up or stays blank, choose **Without H.264**. Takes effect the next time you connect. |
 | **Credential storage** | **iCloud Keychain** (the default) syncs the password to your other devices through iCloud Keychain. **This device only** keeps it here. |
 
 With **Match Window Size** on, which is the default, an RDP session asks for the size of its window rather than **Desktop size**. On a Mac, **Desktop size** also sets how large a new session window opens. See [Resolution, scaling and zoom](desktop-display-and-scaling.md).

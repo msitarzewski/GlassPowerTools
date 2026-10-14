@@ -57,6 +57,7 @@ final class DesktopServiceDraft: GlassServiceDraft {
     var desktopHeightText: String
     var clipboardEnabled: Bool
     var audioEnabled: Bool
+    var graphicsMode: DesktopGraphicsMode
     var mobility: SecretMobilityPolicy
 
     // MARK: Reveal
@@ -78,6 +79,7 @@ final class DesktopServiceDraft: GlassServiceDraft {
         desktopHeightText = String(DesktopSize.standard.height)
         clipboardEnabled = false
         audioEnabled = false
+        graphicsMode = .automatic
         // D18: this project's credentials synchronize by default. glassDT defaulted a desktop to
         // `.deviceOnly`; following it here would have silently contradicted the decision that
         // Stage 3.5 made precisely so the third credential kind would arrive settled.
@@ -97,6 +99,7 @@ final class DesktopServiceDraft: GlassServiceDraft {
         desktopHeightText = String(connection.desktop.height)
         clipboardEnabled = connection.clipboardEnabled
         audioEnabled = connection.audioEnabled
+        graphicsMode = connection.graphicsMode
         mobility = connection.mobility
     }
 
@@ -232,6 +235,7 @@ final class DesktopServiceDraft: GlassServiceDraft {
         connection.desktop = typedDesktopSize() ?? .standard
         connection.clipboardEnabled = clipboardEnabled
         connection.audioEnabled = audioEnabled
+        connection.graphicsMode = graphicsMode
         connection.mobility = mobility
         try await app.save(connection, password: password.isEmpty ? nil : password)
     }

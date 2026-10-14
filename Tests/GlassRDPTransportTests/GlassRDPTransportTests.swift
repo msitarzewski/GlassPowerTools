@@ -1,6 +1,7 @@
 import CoreVideo
 import Foundation
 @testable import GlassRDPTransport
+import RDPKit
 import Testing
 
 @Test func canonicalFrameCopiesPaddedRowsWithoutLosingPixels() throws {
@@ -67,4 +68,21 @@ import Testing
         }
     }
     await session.disconnect()
+}
+
+/// B-F32: each graphics choice asks the engine for the matching capability profile — H.264 4:2:0 is
+/// graphics pipeline 8.1, without H.264 is 8.0 — and Automatic stays the default.
+@Test func graphicsModeChoosesTheEngineProfile() throws {
+    let base = GlassRDPConfiguration(host: "server.example", username: "alice", password: "secret",
+                                     width: 1280, height: 800)
+    #expect(base.graphicsMode == .automatic)
+    #expect(try GlassRDPSession.engineConfiguration(base).graphicsCapabilityProfile == .automatic)
+    let expected: [GlassRDPGraphicsMode: RDPGraphicsCapabilityProfile] = [
+        .automatic: .automatic, .h264: .avc420, .withoutH264: .legacy,
+    ]
+    for mode in GlassRDPGraphicsMode.allCases {
+        var configuration = base
+        configuration.graphicsMode = mode
+        #expect(try GlassRDPSession.engineConfiguration(configuration).graphicsCapabilityProfile == expected[mode])
+    }
 }

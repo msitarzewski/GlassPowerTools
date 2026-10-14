@@ -32,28 +32,9 @@ public actor GlassRDPSession {
 
     public func connect(_ configuration: GlassRDPConfiguration) throws {
         guard worker == nil else { throw GlassRDPError.alreadyConnected }
-        let host = configuration.host.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !host.isEmpty, configuration.port > 0, !configuration.username.isEmpty,
-              (200...8192).contains(configuration.width), (200...8192).contains(configuration.height),
-              configuration.width.isMultiple(of: 2) else { throw GlassRDPError.invalidConfiguration }
-        var engineConfiguration = RDPConnectionConfiguration(
-            host: host, port: configuration.port,
-            credentials: try RDPCredentials.validated(username: configuration.username,
-                                                      domain: configuration.domain, password: configuration.password),
-            graphicsFrameCaptureLimit: nil,
-            desktopWidth: UInt16(configuration.width), desktopHeight: UInt16(configuration.height),
-            desktopScaleFactor: UInt32(configuration.desktopScaleFactor),
-            clipboardEnabled: configuration.clipboardEnabled, audioPlaybackEnabled: configuration.audioEnabled
-        )
-        engineConfiguration.requireNetworkLevelAuthentication = configuration.requiresNLA
-        if let fingerprint = configuration.approvedCertificateSHA256 {
-            guard let pin = RDPServerCertificateTrustKey(host: host, port: configuration.port, sha256: fingerprint) else {
-                throw GlassRDPError.invalidConfiguration
-            }
-            engineConfiguration.certificatePolicy = .pinned(pin)
-        }
+        let engineConfiguration = try Self.engineConfiguration(configuration)
         let id = UUID()
-        Self.logger.notice("event=connect attempt=\(id.uuidString, privacy: .public) width=\(configuration.width) height=\(configuration.height) scale=\(configuration.desktopScaleFactor)")
+        Self.logger.notice("event=connect attempt=\(id.uuidString, privacy: .public) width=\(configuration.width) height=\(configuration.height) scale=\(configuration.desktopScaleFactor) graphics=\(configuration.graphicsMode.rawValue, privacy: .public)")
         let cancel = RDPConnectionCancellation()
         let controls = Controls()
         self.activeID = id; self.cancellation = cancel; self.controls = controls
@@ -66,6 +47,42 @@ public actor GlassRDPSession {
             let result = Self.run(engineConfiguration, controls: controls, cancellation: cancel,
                                   frames: frameSink, events: eventSink)
             await self?.finished(id: id, error: result)
+        }
+    }
+
+    /// What the engine is asked for, from what the app saved.
+    nonisolated static func engineConfiguration(_ configuration: GlassRDPConfiguration) throws -> RDPConnectionConfiguration {
+        let host = configuration.host.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !host.isEmpty, configuration.port > 0, !configuration.username.isEmpty,
+              (200...8192).contains(configuration.width), (200...8192).contains(configuration.height),
+              configuration.width.isMultiple(of: 2) else { throw GlassRDPError.invalidConfiguration }
+        var engineConfiguration = RDPConnectionConfiguration(
+            host: host, port: configuration.port,
+            credentials: try RDPCredentials.validated(username: configuration.username,
+                                                      domain: configuration.domain, password: configuration.password),
+            graphicsFrameCaptureLimit: nil,
+            desktopWidth: UInt16(configuration.width), desktopHeight: UInt16(configuration.height),
+            desktopScaleFactor: UInt32(configuration.desktopScaleFactor),
+            clipboardEnabled: configuration.clipboardEnabled, audioPlaybackEnabled: configuration.audioEnabled,
+            graphicsCapabilityProfile: profile(configuration.graphicsMode)
+        )
+        engineConfiguration.requireNetworkLevelAuthentication = configuration.requiresNLA
+        if let fingerprint = configuration.approvedCertificateSHA256 {
+            guard let pin = RDPServerCertificateTrustKey(host: host, port: configuration.port, sha256: fingerprint) else {
+                throw GlassRDPError.invalidConfiguration
+            }
+            engineConfiguration.certificatePolicy = .pinned(pin)
+        }
+        return engineConfiguration
+    }
+
+    /// The engine's capability profile for a mode: H.264 4:2:0 is graphics pipeline 8.1 with AVC420
+    /// enabled; without H.264 is 8.0, which has none (MS-RDPEGFX 2.2.3).
+    nonisolated static func profile(_ mode: GlassRDPGraphicsMode) -> RDPGraphicsCapabilityProfile {
+        switch mode {
+        case .automatic: .automatic
+        case .h264: .avc420
+        case .withoutH264: .legacy
         }
     }
 
@@ -241,6 +258,11 @@ public actor GlassRDPSession {
                     isAccepted: configuration.certificatePolicy.accepts(certificate, host: configuration.host, port: configuration.port))))
             }, cancellation: cancellation
         )
+        // Which graphics the server chose, for "the colours smear" (B-X6): the version it confirmed
+        // says whether H.264 4:4:4 was on the table.
+        if let version = report.rdpGraphicsSelectedCapabilityVersion {
+            logger.notice("event=graphics profile=\(configuration.graphicsCapabilityProfile.rawValue, privacy: .public) version=\(String(format: "0x%08X", version), privacy: .public) flags=\(String(format: "0x%08X", report.rdpGraphicsSelectedCapabilityFlags ?? 0), privacy: .public)")
+        }
         if let failure = controls.snapshot.failure { return failure }
         if report.status == "failure" {
             if controls.snapshot.receivedFrame, Self.endedNormally(report) { return nil }

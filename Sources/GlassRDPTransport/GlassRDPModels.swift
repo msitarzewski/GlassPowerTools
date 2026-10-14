@@ -1,5 +1,17 @@
 import Foundation
 
+/// Which pictures the server is asked for (B-F32). Automatic offers everything the engine decodes,
+/// H.264 4:4:4 first; the others are the way out when a server draws badly with it — colours that
+/// smear while things move (B-X6).
+public enum GlassRDPGraphicsMode: String, Sendable, CaseIterable {
+    /// Every graphics pipeline version through 10.7, H.264 4:4:4 included.
+    case automatic
+    /// H.264 4:2:0 only (graphics pipeline 8.1): never the 4:4:4 reconstruction.
+    case h264
+    /// No H.264 at all (graphics pipeline 8.0): the server's other codecs.
+    case withoutH264
+}
+
 public struct GlassRDPConfiguration: Sendable {
     public var host: String
     public var port: UInt16
@@ -15,16 +27,19 @@ public struct GlassRDPConfiguration: Sendable {
     /// The scale the server should lay the first desktop out at, 100–500 percent
     /// (MS-RDPBCGR 2.2.1.3.2 desktopScaleFactor). The display channel's layouts carry their own.
     public var desktopScaleFactor: Int
+    public var graphicsMode: GlassRDPGraphicsMode
 
     public init(host: String, port: UInt16 = 3389, username: String, domain: String? = nil,
                 password: String, width: Int = 1440, height: Int = 900, requiresNLA: Bool = true,
                 approvedCertificateSHA256: String? = nil, clipboardEnabled: Bool = false,
-                audioEnabled: Bool = false, desktopScaleFactor: Int = 100) {
+                audioEnabled: Bool = false, desktopScaleFactor: Int = 100,
+                graphicsMode: GlassRDPGraphicsMode = .automatic) {
         self.host = host; self.port = port; self.username = username; self.domain = domain
         self.password = password; self.width = width; self.height = height
         self.requiresNLA = requiresNLA; self.approvedCertificateSHA256 = approvedCertificateSHA256
         self.clipboardEnabled = clipboardEnabled; self.audioEnabled = audioEnabled
         self.desktopScaleFactor = min(500, max(100, desktopScaleFactor))
+        self.graphicsMode = graphicsMode
     }
 }
 

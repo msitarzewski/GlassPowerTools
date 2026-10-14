@@ -164,6 +164,23 @@ struct DesktopAdvancedFields: View {
             if draft.showsRDPOnlyFields {
                 Toggle("Remote audio", isOn: $draft.audioEnabled)
                     .accessibilityIdentifier("\(identifierPrefix)-audio")
+
+                // B-F32: the way out when a server draws badly with the best codec (B-X6).
+                desktopLabeledContent("Graphics") {
+                    Picker("Graphics", selection: $draft.graphicsMode) {
+                        ForEach(DesktopGraphicsMode.allCases, id: \.self) { mode in
+                            Text(mode.displayName).tag(mode)
+                        }
+                    }
+                    .desktopControlPresentation()
+                    .accessibilityIdentifier("\(identifierPrefix)-graphics")
+                }
+                if draft.graphicsMode != .automatic || draft.editing != nil {
+                    Text("If colours smear while things move, choose H.264 (4:2:0). If the picture breaks up or stays blank, choose Without H.264. Takes effect the next time you connect.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             desktopLabeledContent("Credential storage") {

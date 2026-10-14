@@ -6,6 +6,8 @@ import GlassRDPTransport
 // secret is not in a command line or a process list.
 //
 // Usage: GlassWindowsRDPProbe <host> <port> <username> <password-file>
+// GPT_RDP_GRAPHICS=automatic|h264|withoutH264 asks for that graphics mode (B-F32); the version the
+// server chose is in the session's log (`event=graphics`).
 
 @MainActor final class Probe {
     let session = GlassRDPSession()
@@ -63,6 +65,13 @@ import GlassRDPTransport
             exit(2)
         }
 
+        let graphics = ProcessInfo.processInfo.environment["GPT_RDP_GRAPHICS"]
+            .map { GlassRDPGraphicsMode(rawValue: $0) } ?? .automatic
+        guard let graphics else {
+            FileHandle.standardError.write(Data("GPT_RDP_GRAPHICS is automatic, h264 or withoutH264\n".utf8))
+            exit(2)
+        }
+        print("graphics      : \(graphics.rawValue)")
         let probe = await Probe()
         let started = Date()
         do {
@@ -71,7 +80,7 @@ import GlassRDPTransport
                 GlassRDPConfiguration(host: host, port: port, username: username,
                                       password: password.trimmingCharacters(in: .whitespacesAndNewlines),
                                       width: 1280, height: 800, requiresNLA: true,
-                                      approvedCertificateSHA256: pin)
+                                      approvedCertificateSHA256: pin, graphicsMode: graphics)
             )
         } catch {
             print("connect threw: \(error)")
