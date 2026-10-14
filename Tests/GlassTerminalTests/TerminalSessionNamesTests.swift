@@ -20,12 +20,15 @@ struct TerminalSessionNamesTests {
         var given = ""
         var title = "alpha.example.com"
         var directory = "/home/ann/src/app/Sources"
+        /// The foreground program and the pane's shell, as tmux says them; empty says nothing.
+        var program = ""
+        var pid = ""
         var repository: (top: String, branch: String)? = ("/home/ann/src/app", "main")
         /// How long a read takes on the host.
         var delay: Duration = .zero
 
         func answer() -> String {
-            let pane = [TerminalTmux.paneMarker, "/home/ann", directory, "alpha.example.com", "alpha", given, title]
+            let pane = [TerminalTmux.paneMarker, "/home/ann", directory, "alpha.example.com", "alpha", given, program, pid, title]
                 .joined(separator: "\t")
             guard let repository else { return pane + "\n" }
             return pane + "\n" + [TerminalRepository.remoteMarker, repository.top, "../.git", repository.branch, "/home/ann"]
@@ -80,7 +83,7 @@ struct TerminalSessionNamesTests {
     @Test("one command reads what a session says about itself; the session is its argument, never part of the script")
     func readCommand() throws {
         #expect(TerminalTmux.paneStateCommand(session: "it's")
-                == #"sh -c 'PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; s=$1; tmux -u has-session -t "=$s" 2>/dev/null || exit 0; c=$(tmux -u display-message -p -t "=$s:" '\''#{pane_current_path}\#t#{host}\#t#{host_short}\#t#{@glass-name}\#t#{pane_title}'\'' 2>/dev/null) || exit 0; printf '\''__glass_pane__\t%s\t%s\n'\'' "$HOME" "$c"; set -- "$(tmux -u display-message -p -t "=$s:" '\''#{pane_current_path}'\'' 2>/dev/null)"; case $1 in /*) ;; *) exit 0;; esac; command -v git >/dev/null 2>&1 || exit 0; if [ -x /usr/bin/xcode-select ] && ! /usr/bin/xcode-select -p >/dev/null 2>&1; then exit 0; fi; cd -- "$1" 2>/dev/null || exit 0; t=$(git rev-parse --show-toplevel --git-common-dir 2>/dev/null) || exit 0; b=$(git symbolic-ref --short -q HEAD 2>/dev/null || git rev-parse --short=7 HEAD 2>/dev/null); h=$(cd -- "$HOME" 2>/dev/null && pwd -P); printf '\''__glass_repo__\n%s\n%s\n%s\n'\'' "$t" "$b" "$h"' _ 'it'\''s'"#)
+                == #"sh -c 'PATH="$PATH:/opt/homebrew/bin:/usr/local/bin"; s=$1; tmux -u has-session -t "=$s" 2>/dev/null || exit 0; c=$(tmux -u display-message -p -t "=$s:" '\''#{pane_current_path}\#t#{host}\#t#{host_short}\#t#{@glass-name}\#t#{pane_current_command}\#t#{pane_pid}\#t#{pane_title}'\'' 2>/dev/null) || exit 0; printf '\''__glass_pane__\t%s\t%s\n'\'' "$HOME" "$c"; p=$(tmux -u display-message -p -t "=$s:" '\''#{pane_pid}'\'' 2>/dev/null); g=$(ps -o tpgid= -p "$p" 2>/dev/null | tr -d '\'' '\''); [ -n "$g" ] && [ "$g" -gt 0 ] 2>/dev/null && printf '\''__glass_program__\t%s\n'\'' "$(ps -o args= -p "$g" 2>/dev/null)"; set -- "$(tmux -u display-message -p -t "=$s:" '\''#{pane_current_path}'\'' 2>/dev/null)"; case $1 in /*) ;; *) exit 0;; esac; command -v git >/dev/null 2>&1 || exit 0; if [ -x /usr/bin/xcode-select ] && ! /usr/bin/xcode-select -p >/dev/null 2>&1; then exit 0; fi; cd -- "$1" 2>/dev/null || exit 0; t=$(git rev-parse --show-toplevel --git-common-dir 2>/dev/null) || exit 0; b=$(git symbolic-ref --short -q HEAD 2>/dev/null || git rev-parse --short=7 HEAD 2>/dev/null); h=$(cd -- "$HOME" 2>/dev/null && pwd -P); printf '\''__glass_repo__\n%s\n%s\n%s\n'\'' "$t" "$b" "$h"' _ 'it'\''s'"#)
         #expect(TerminalTmux.paneStateCommand(session: "a:b") == nil, "a session name tmux would misread")
 
         let host = Host()
@@ -98,6 +101,25 @@ struct TerminalSessionNamesTests {
                 == TerminalTmux.PaneState(directory: "/home/ann/src/app/Sources", home: "/home/ann"),
                 "tmux's default title, the host name, is no title; outside a repository, none")
         #expect(TerminalTmux.parsePaneState("") == nil, "tmux said nothing: the session is gone")
+    }
+
+    /// Which AI agent a terminal runs (2026-10-14): the program tmux names, and for an interpreter
+    /// the script, from the host's own `ps` — never the rest of the command line.
+    @Test("the read says the foreground program, and an interpreter's script, but no more of its command line")
+    func readProgram() throws {
+        let host = Host()
+        host.program = "node"
+        host.pid = "4242"
+        let answer = host.answer() + TerminalTmux.programMarker + "\tnode /usr/lib/node_modules/@openai/codex/bin/codex.js --api-key sk-secret\n"
+        let state = try #require(TerminalTmux.parsePaneState(answer))
+        #expect(state.program == "node" && state.shellProcessID == 4242)
+        #expect(state.programArguments == "node /usr/lib/node_modules/@openai/codex/bin/codex.js")
+        #expect(TerminalAgent.identify(program: state.program, arguments: state.programArguments, title: state.title) == .codex)
+
+        host.program = "mysql"
+        let secret = host.answer() + TerminalTmux.programMarker + "\tmysql -psecret\n"
+        #expect(try #require(TerminalTmux.parsePaneState(secret)).programArguments == "mysql",
+                "a program's own arguments are not kept: only an interpreter's script")
     }
 
     /// Against a private tmux server, through a `tmux` on the PATH that names its socket, so the
@@ -141,6 +163,7 @@ struct TerminalSessionNamesTests {
         }
         let state = try #require(read("glass-5"))
         #expect(state.givenName == "deploys" && state.title == "✳ Claude Code")
+        #expect(state.program == "sleep" && (state.shellProcessID ?? 0) > 0, "the foreground program and its shell")
         #expect(state.directory == app + "/Sources" && state.home == home)
         #expect(state.repository.map { [$0.name, $0.branch] } == ["app", "feature/x"])
         #expect(read("glass-6") == nil, "a session that is not running says nothing")

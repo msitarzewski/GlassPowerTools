@@ -286,6 +286,8 @@ private struct MacTerminalExposeTabTile: View {
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: tile.isBusy)
+            // The agent the tab is running, in the middle of its picture.
+            .overlay { if let agent = tile.agent { MacTerminalExposeAgentMark(agent: agent) } }
             .overlay(alignment: .bottom) {
                 if selected || hovering {
                     // `repo · branch · folder` loses its end, where the least is said; a folder
@@ -367,9 +369,18 @@ private struct MacTerminalExposeSessionTile: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            Image(systemName: "terminal")
-                .font(.system(size: 26))
-                .foregroundStyle(.secondary)
+            if let logo = tile.agent?.logo {
+                Image(nsImage: logo)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 30, height: 30)
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Running \(tile.agent?.displayName ?? "")")
+            } else {
+                Image(systemName: "terminal")
+                    .font(.system(size: 26))
+                    .foregroundStyle(.secondary)
+            }
             Text(tile.title)
                 .font(.headline)
                 .lineLimit(1)
@@ -392,6 +403,37 @@ private struct MacTerminalExposeSessionTile: View {
                 .strokeBorder(selected ? Color.accentColor : Color.white.opacity(0.16), lineWidth: selected ? 3 : 1)
         }
         .contentShape(.rect(cornerRadius: 10))
+    }
+}
+
+/// Which AI agent a tile's terminal is running (the owner, 2026-10-14: "put a monochrome logo in
+/// the center of the window in expose mode"): the agent's mark, one colour, sized to the tile, on a
+/// soft disc so it reads over any picture, sharp or blurred.
+private struct MacTerminalExposeAgentMark: View {
+    let agent: TerminalAgent
+
+    var body: some View {
+        GeometryReader { geometry in
+            let side = min(max(min(geometry.size.width, geometry.size.height) * 0.3, 28), 88)
+            ZStack {
+                Circle()
+                    .fill(.black.opacity(0.42))
+                    .frame(width: side * 1.6, height: side * 1.6)
+                    .blur(radius: side * 0.18)
+                if let logo = agent.logo {
+                    Image(nsImage: logo)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: side, height: side)
+                        .foregroundStyle(.white.opacity(0.92))
+                        .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
+                }
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+        }
+        .allowsHitTesting(false)
+        .accessibilityElement()
+        .accessibilityLabel("Running \(agent.displayName)")
     }
 }
 

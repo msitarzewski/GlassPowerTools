@@ -104,6 +104,7 @@ The two BoringSSL texts, and where they came from, are in `Documentation/ThirdPa
 | Asset | Source | Licence |
 |---|---|---|
 | The database icon (`HeroiconCircleStack`) | Heroicons v2.2.0 `outline/circle-stack`, Tailwind Labs, redrawn as a SwiftUI path | MIT, `Documentation/ThirdPartyLicenses/heroicons/LICENSE` |
+| AI agents' marks in Show All Windows (`TerminalAgent`) | Lobe Icons @ `05a9b8c41e4735a4a2b6d2f1e43574bd8ec6c8cb`, `packages/static-svg/icons`, LobeHub: eight monochrome SVGs, byte for byte but for the `<title>`, carried as text. The marks are their owners' trademarks | MIT, © 2023 LobeHub, `Documentation/ThirdPartyLicenses/lobe-icons/LICENSE` |
 
 ## Authored for this application
 

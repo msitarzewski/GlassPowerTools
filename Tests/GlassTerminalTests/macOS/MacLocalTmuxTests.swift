@@ -223,12 +223,15 @@ struct MacLocalTmuxTests {
 
     @Test("what tmux says a pane shows: its host name is not a title; the name a tab gave the session comes too")
     func context() {
-        #expect(MacLocalTmux.parseContext("/Users/ann/src\talpha.example.com\talpha\t\talpha.example.com\n")
+        #expect(MacLocalTmux.parseContext("/Users/ann/src\talpha.example.com\talpha\t\t\t\talpha.example.com\n")
                 == MacWorkspacePaneContext(title: nil, directory: "/Users/ann/src"))
-        #expect(MacLocalTmux.parseContext("/Users/ann/src\talpha.example.com\talpha\t\talpha\n")?.title == nil)
-        #expect(MacLocalTmux.parseContext("/Users/ann/src\talpha.example.com\talpha\tbuild\t✳ Fix the build\tnow\n")
-                == MacWorkspacePaneContext(title: "✳ Fix the build\tnow", directory: "/Users/ann/src", givenName: "build"))
-        #expect(MacLocalTmux.parseContext("relative\th\th\t\t\n") == MacWorkspacePaneContext(title: nil, directory: nil))
+        #expect(MacLocalTmux.parseContext("/Users/ann/src\talpha.example.com\talpha\t\t\t\talpha\n")?.title == nil)
+        #expect(MacLocalTmux.parseContext("/Users/ann/src\talpha.example.com\talpha\tbuild\tclaude\t0\t✳ Fix the build\tnow\n")
+                == MacWorkspacePaneContext(title: "✳ Fix the build\tnow", directory: "/Users/ann/src", givenName: "build",
+                                           program: "claude"))
+        #expect(MacLocalTmux.parseContext("relative\th\th\t\t\t\t\n") == MacWorkspacePaneContext(title: nil, directory: nil))
+        // The older five-field line, from a tmux asked before 2026-10-14, does not read as anything.
+        #expect(MacLocalTmux.parseContext("/Users/ann/src\th\th\t\ttitle\n") == nil)
         #expect(MacLocalTmux.parseContext("garbage") == nil)
     }
 
@@ -357,8 +360,9 @@ struct MacLocalTmuxTests {
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: shim.path)
         let contexts = try #require(MacLocalTmux.contexts(tmux: shim.path, environment: environment))
         #expect(contexts.keys.sorted() == ["glass-1", "glass-2"])
-        #expect(contexts["glass-1"] == MacWorkspacePaneContext(title: "✳ Claude Code: fix", directory: work))
-        #expect(contexts["glass-2"] == MacWorkspacePaneContext(title: nil, directory: "/usr", givenName: "deploys; \"$HOME\""),
+        #expect(contexts["glass-1"] == MacWorkspacePaneContext(title: "✳ Claude Code: fix", directory: work, program: "sleep"))
+        #expect(contexts["glass-2"] == MacWorkspacePaneContext(title: nil, directory: "/usr", givenName: "deploys; \"$HOME\"",
+                                                               program: "sleep"),
                 "tmux's own title, the host's name, is no title")
         #expect(run(["kill-server"]) == 0)
         #expect(MacLocalTmux.contexts(tmux: shim.path, environment: environment) == nil, "no server: nothing read")
@@ -921,7 +925,7 @@ struct MacLocalTmuxTests {
             }
             guard command == read else { return "" }
             readTimes.append(.now)
-            let pane = [TerminalTmux.paneMarker, "/home/ann", directory, "alpha.example.com", "alpha", given, title]
+            let pane = [TerminalTmux.paneMarker, "/home/ann", directory, "alpha.example.com", "alpha", given, "", "", title]
                 .joined(separator: "\t")
             let answer = pane + "\n" + (repository.map {
                 [TerminalRepository.remoteMarker, $0.top, "../.git", $0.branch, "/home/ann"].joined(separator: "\n") + "\n"

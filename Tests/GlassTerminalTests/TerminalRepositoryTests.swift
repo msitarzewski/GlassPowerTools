@@ -452,7 +452,7 @@ struct TerminalRepositoryTests {
             commands.all.append(command)
             guard command == read else { return "" }
             // No program's title: tmux's own is the host's name.
-            let pane = [TerminalTmux.paneMarker, "/home/ann", folder, "alpha.example.com", "alpha", "", "alpha.example.com"]
+            let pane = [TerminalTmux.paneMarker, "/home/ann", folder, "alpha.example.com", "alpha", "", "", "", "alpha.example.com"]
                 .joined(separator: "\t") + "\n"
             return commands.inRepository
                 ? pane + "__glass_repo__\n/home/ann/src/app\n../.git\n\(commands.branch)\n/home/ann\n" : pane

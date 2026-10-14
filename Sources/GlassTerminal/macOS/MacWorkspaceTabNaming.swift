@@ -25,6 +25,10 @@ nonisolated struct MacWorkspacePaneContext: Equatable, Sendable {
     /// The home folder of the account the pane's tmux session runs as, when a host said it (W19):
     /// a remote folder is then named as Active names it, and home names nothing.
     var home: String? = nil
+    /// The foreground program, as tmux names it, and its program and script (`TerminalAgent`,
+    /// 2026-10-14). Only tmux answers the first; nil everywhere else.
+    var program: String? = nil
+    var programArguments: String? = nil
 }
 
 enum MacWorkspaceTabNaming {

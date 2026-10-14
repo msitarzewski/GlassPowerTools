@@ -15,6 +15,7 @@
 #if os(macOS)
 import AppKit
 import Foundation
+import GlassTerminalEmulator
 import os
 
 enum MacLocalTmux {
@@ -290,8 +291,21 @@ enum MacLocalTmux {
     /// tmux titles a pane with the host name until a program sets one; that is not a title.
     nonisolated static func parseContext(_ output: String) -> MacWorkspacePaneContext? {
         TerminalTmux.parseContext(output).map {
-            MacWorkspacePaneContext(title: $0.title, directory: $0.directory, givenName: $0.givenName)
+            MacWorkspacePaneContext(title: $0.title, directory: $0.directory, givenName: $0.givenName,
+                                    program: $0.program,
+                                    programArguments: foregroundArguments(program: $0.program, shell: $0.shellProcessID))
         }
+    }
+
+    /// For a program tmux names too plainly — an interpreter (`node`), or a file named for its
+    /// version (Claude Code's `2.1.296`) — how it was run, from this Mac's process table. Not read
+    /// for any other program, nor kept beyond the words that say which
+    /// (`TerminalAgent.identifyingWords`).
+    nonisolated static func foregroundArguments(program: String?, shell: Int32?) -> String? {
+        guard let program, TerminalAgent.needsCommandLine(program),
+              let shell, let group = TerminalProcessTable.foregroundGroup(ofShell: shell),
+              let commandLine = TerminalProcessTable.commandLine(of: group) else { return nil }
+        return TerminalAgent.identifyingWords(commandLine)
     }
 
     /// Gives a session the name its tab was given, or takes it away (W6). Off the main thread,

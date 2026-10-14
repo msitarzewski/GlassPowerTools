@@ -4113,6 +4113,12 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
         return children.contains { $0 > 0 }
     }
 
+    var foregroundCommandLine: String? {
+        guard let process = terminalView.process, process.running, process.childfd >= 0 else { return nil }
+        let group = tcgetpgrp(process.childfd)
+        return group > 0 ? TerminalProcessTable.commandLine(of: group) : nil
+    }
+
     var currentWorkingDirectory: String? {
         guard terminalView.process.running, terminalView.process.shellPid > 0 else { return nil }
         var info = proc_vnodepathinfo()
@@ -4346,6 +4352,10 @@ public final class SwiftTermLocalProcessRuntime {
     /// True for foreground or background jobs, false for an inspected idle
     /// shell, and nil when process inspection is unavailable.
     public var hasActiveChildProcesses: Bool? { engine?.hasActiveChildProcesses }
+
+    /// The command line of the program in the terminal's foreground — the shell itself when it is
+    /// idle; nil when it cannot be read. What tells which AI agent a terminal runs (2026-10-14).
+    public var foregroundCommandLine: String? { engine?.foregroundCommandLine }
 
     /// Read the owned shell's directory even when it has no OSC 7 integration.
     public var currentWorkingDirectory: String? {

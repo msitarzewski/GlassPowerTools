@@ -294,6 +294,22 @@ final class MacWorkspaceController {
         return (localRuntimesByPaneID[id] != nil && localTmuxSession(for: id) == nil)
             || loadingPaneIDs.contains(id) || sessionsByPaneID[id]?.closeStopsWork == true
     }
+    /// The AI agent a pane is running (2026-10-14): from tmux's answer for a pane in tmux, here or
+    /// on its host; from this Mac's process table for a local pane outside tmux; else, for Claude
+    /// Code, from the title it set.
+    func agent(for paneID: UUID) -> TerminalAgent? {
+        let context = paneContextByPaneID[paneID]
+        if localRuntimesByPaneID[paneID] != nil, localTmuxSession(for: paneID) == nil {
+            let commandLine = localRuntimesByPaneID[paneID]?.foregroundCommandLine.flatMap(TerminalAgent.identifyingWords)
+            return TerminalAgent.identify(program: nil, arguments: commandLine, title: context?.title)
+        }
+        return TerminalAgent.identify(program: context?.program, arguments: context?.programArguments,
+                                      title: context?.title)
+    }
+
+    /// The agent the focused pane is running, if any.
+    var focusedAgent: TerminalAgent? { focusedPaneID.flatMap(agent(for:)) }
+
     var focusedPane: MacWorkspacePane? {
         guard let focusedPaneID else { return nil }
         return state.root?.pane(id: focusedPaneID)
@@ -448,7 +464,8 @@ final class MacWorkspaceController {
         guard !isClosed, state.root?.pane(id: paneID) != nil,
               sessionsByPaneID[paneID] == nil || sessionsByPaneID[paneID] === terminal else { return }
         setPaneContext(MacWorkspacePaneContext(title: pane.title, directory: pane.directory, givenName: pane.givenName,
-                                               home: pane.home), for: paneID)
+                                               home: pane.home, program: pane.program,
+                                               programArguments: pane.programArguments), for: paneID)
         // The read says the repository too: no lookup of its own (W11's took two commands).
         repositoryLookedUpAt[paneID] = .now
         setRepository(pane.repository.map { .repository($0) } ?? .none, for: paneID)

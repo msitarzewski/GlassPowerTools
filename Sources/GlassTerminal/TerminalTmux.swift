@@ -233,10 +233,12 @@ enum TerminalTmux {
     // MARK: What a session says about itself (W11, 2026-10-09)
 
     /// What `display-message` prints for a session's active pane: its folder, the host's names
-    /// (tmux's default pane title), the name a tab gave the session (W6), and last its title, so
-    /// that the title may hold anything. This Mac's tabs ask with it (`MacLocalTmux.context`), and
-    /// so do terminals on every other device (`paneStateCommand`).
-    nonisolated static let contextFormat = "#{pane_current_path}\t#{host}\t#{host_short}\t#{\(givenNameOption)}\t#{pane_title}"
+    /// (tmux's default pane title), the name a tab gave the session (W6), the program in the
+    /// foreground and the pane's shell's process (2026-10-14: which AI agent a terminal is running,
+    /// `TerminalAgent`), and last its title, so that the title may hold anything. This Mac's tabs ask
+    /// with it (`MacLocalTmux.context`), and so do terminals on every other device (`paneStateCommand`).
+    nonisolated static let contextFormat = "#{pane_current_path}\t#{host}\t#{host_short}\t#{\(givenNameOption)}"
+        + "\t#{pane_current_command}\t#{pane_pid}\t#{pane_title}"
 
     /// What a session's active pane shows, and what the session is called.
     nonisolated struct PaneState: Equatable, Sendable {
@@ -248,17 +250,29 @@ enum TerminalTmux {
         /// The home folder of the account asked, so a folder is named as a tab names it.
         var home: String?
         var repository: TerminalRepository?
+        /// The foreground program's name, as tmux says it (`node` for a script run by node).
+        var program: String? = nil
+        /// The pane's shell's process, on the machine tmux runs on.
+        var shellProcessID: Int32? = nil
+        /// The foreground program and the script it runs, where the machine said them: what tells
+        /// one node script from another. Never the rest of its command line, which can hold a secret.
+        var programArguments: String? = nil
     }
 
     /// Reads one `contextFormat` line.
     nonisolated static func parseContext(_ output: String) -> PaneState? {
         let fields = output.trimmingCharacters(in: .newlines)
-            .split(separator: "\t", maxSplits: 4, omittingEmptySubsequences: false).map(String.init)
-        guard fields.count == 5 else { return nil }
+            .split(separator: "\t", maxSplits: 6, omittingEmptySubsequences: false).map(String.init)
+        guard fields.count == 7 else { return nil }
         return PaneState(givenName: TerminalSessionNaming.displayText(fields[3]),
-                         title: TerminalSessionNaming.programTitle(fields[4], hostNames: [fields[1], fields[2]]),
-                         directory: fields[0].hasPrefix("/") ? fields[0] : nil)
+                         title: TerminalSessionNaming.programTitle(fields[6], hostNames: [fields[1], fields[2]]),
+                         directory: fields[0].hasPrefix("/") ? fields[0] : nil,
+                         program: fields[4].isEmpty ? nil : fields[4],
+                         shellProcessID: Int32(fields[5]).flatMap { $0 > 0 ? $0 : nil })
     }
+
+    /// Starts the line with the foreground program's command line, in a pane-state read.
+    nonisolated static let programMarker = "__glass_program__"
 
     /// Starts the line a pane-state read prints: the home folder, then the `contextFormat` fields.
     nonisolated static let paneMarker = "__glass_pane__"
@@ -274,6 +288,12 @@ enum TerminalTmux {
         let script = "s=$1; tmux -u has-session -t \"=$s\" 2>/dev/null || exit 0; "
             + "c=$(tmux -u display-message -p -t \"=$s:\" \(quoted(contextFormat)) 2>/dev/null) || exit 0; "
             + "printf '\(paneMarker)\\t%s\\t%s\\n' \"$HOME\" \"$c\"; "
+            // The foreground program's command line: the terminal's process group, from its shell.
+            // `ps -o tpgid=` and `-o args=` read the same on Linux and on a Mac; a host without them
+            // says nothing, and the program's name stands alone.
+            + "p=$(tmux -u display-message -p -t \"=$s:\" '#{pane_pid}' 2>/dev/null); "
+            + "g=$(ps -o tpgid= -p \"$p\" 2>/dev/null | tr -d ' '); "
+            + "[ -n \"$g\" ] && [ \"$g\" -gt 0 ] 2>/dev/null && printf '\(programMarker)\\t%s\\n' \"$(ps -o args= -p \"$g\" 2>/dev/null)\"; "
             + "set -- \"$(tmux -u display-message -p -t \"=$s:\" '#{pane_current_path}' 2>/dev/null)\"; "
             + TerminalRepository.remoteScript
         return "sh -c \(quoted(searchPath + script)) _ \(quoted(session))"
@@ -285,6 +305,9 @@ enum TerminalTmux {
         let fields = line.dropFirst(paneMarker.count + 1).split(separator: "\t", maxSplits: 1, omittingEmptySubsequences: false)
         guard fields.count == 2, var state = parseContext(String(fields[1])) else { return nil }
         state.home = fields[0].hasPrefix("/") ? String(fields[0]) : nil
+        if let program = output.split(separator: "\n").last(where: { $0.hasPrefix(programMarker + "\t") }) {
+            state.programArguments = TerminalAgent.identifyingWords(String(program.dropFirst(programMarker.count + 1)))
+        }
         state.repository = TerminalRepository.parseRemote(output).repository
         return state
     }

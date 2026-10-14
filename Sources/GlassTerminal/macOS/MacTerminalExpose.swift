@@ -50,6 +50,9 @@ struct MacTerminalExposeTile: Identifiable, Equatable {
     var sessionName: String?
     /// Another capability's window: its symbol, where it has no picture.
     var symbolName: String?
+    /// The AI agent the tab's focused pane, or the tmux session, is running: its logo sits in the
+    /// middle of the tile (2026-10-14).
+    var agent: TerminalAgent? = nil
 
     /// The line under the name: the repository's, else the folder.
     var location: String? { repository ?? folder }
@@ -95,7 +98,8 @@ enum MacTerminalExposeModel {
                               title: tab.windowIdentity(servers: servers, home: home).title,
                               folder: folder(of: tab, home: home),
                               repository: repositoryLocation(of: tab, home: home),
-                              isBusy: tab.isProducingOutput)
+                              isBusy: tab.isProducingOutput,
+                              agent: tab.focusedAgent)
     }
 
     /// The focused pane's folder. A local one under the home folder is written `~/…`; a remote
@@ -134,7 +138,9 @@ enum MacTerminalExposeModel {
             MacTerminalExposeTile(id: .tmux(session.name),
                                   title: MacWorkspaceTabNaming.tmuxDisplayName(session.name),
                                   detail: GlassTerminalCapability.runningDetails(session),
-                                  sessionName: session.name)
+                                  sessionName: session.name,
+                                  agent: TerminalAgent.identify(program: session.command, arguments: nil,
+                                                                title: session.title))
         })
     }
 

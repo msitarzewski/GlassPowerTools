@@ -32,7 +32,7 @@ use the disposable test VM only).
 
 ## 2026-10-13 (~23:00) — RESUME HERE
 
-**State:** 0.4.419 on all three (09:11). Mac installs go when ready: the owner, "No need to hold on quitting right now. All tmux all day." The owner is back
+**State:** 0.4.421 on all three (09:43). Mac installs go when ready: the owner, "No need to hold on quitting right now. All tmux all day." The owner is back
 (23:10). No new crash reports. The owner is out; his
 test list is unchanged (below, at 19:35). The Mac's screen is locked, which accounts for B-X27's test failures
 (the wallpaper test included).
@@ -42,6 +42,12 @@ test list is unchanged (below, at 19:35). The Mac's screen is locked, which acco
 - **B-X22's second half** (9f2532a): a project on a saved machine that is this Mac opens from the disk.
 - **B-F32** (0.4.412): Settings ▸ a Desktop service ▸ Graphics: Automatic, H.264 (4:2:0) or Without H.264. Live on
   the Windows 11 VM. **For the owner:** try H.264 (4:2:0) on the GNOME host where colours smeared (B-X6).
+- **AI agents marked in Show All Windows** (0.4.421, the owner: "detect when an AI agent is running … put a
+  monochrome logo in the center of the window in expose mode"): `TerminalAgent` reads the foreground program — tmux's
+  `#{pane_current_command}` (now in `TerminalTmux.contextFormat`, every tmux terminal on every device), this Mac's
+  process table outside tmux — and, for an interpreter or a version-named file (Claude Code's native installer runs
+  `2.1.296`), the command line's first words only. Lobe Icons' marks (MIT, @05a9b8c, as Agency Agents vendors them).
+  Seen on the owner's Mac: 9 Claude Code and 8 Codex sessions found, 10 shells not. Not seen on screen by him yet.
 - **Error suggestions can be paused** (0.4.419, the owner: "a need to pause on device AI suggestions … Maybe a
   pause/disable in the suggestion modal?"): the card's pause menu — Pause in This Terminal (until it closes), Turn Off
   Error Suggestions — and Settings ▸ Terminal ▸ Suggest fixes for errors. Device-local, not synced.
