@@ -4,6 +4,7 @@ import Testing
 import GlassConnectionKit
 import GlassHostCatalog
 import GlassLayers
+import GlassWidgetData
 @testable import GlassShell
 
 /// The Command Palette's connections come from the library (the owner, 2026-10-14: "Let's get
@@ -82,6 +83,48 @@ struct GlassShellPaletteConnectionsTests {
         #expect(name("Terminal", .ssh) == "Terminal on alpha")
         #expect(name("MySQL on alpha", .database) == "MySQL on alpha")
         #expect(name("reports", .database) == "reports on alpha")
+    }
+
+    @Test("places: every project and Favorites' folders as Favorites opens them, saved queries, and sessions running with no window")
+    func places() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("GlassPalettePlaces-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let model = GlassShellModel(storageDirectory: root.appendingPathComponent("app"), sharedContainerURL: nil,
+                                    resolveSharedContainer: false, accessGroup: "TEST.sh.glas.shared",
+                                    layers: GlassLayerStore())
+        await model.load()
+        let project = UUID(), gone = UUID()
+        let logs = GlassFavorite.folder(endpoint: EndpointID(), path: "/var/log")
+        var opened: [String] = []
+        model.describeFavorite = { item in
+            switch item {
+            case .project(let id) where id == project:
+                return GlassFavoriteDescription(title: "site", subtitle: "/srv/site · This Mac",
+                                                symbol: .system("folder"), open: { opened.append("project") })
+            case .folder:
+                return GlassFavoriteDescription(title: "log", subtitle: "/var/log on alpha",
+                                                symbol: .system("folder"), open: { opened.append("folder") })
+            default:
+                return nil
+            }
+        }
+        model.setFavorite(logs, true)
+        model.runningSessions = [
+            GlassRunningSession(id: "a", title: "build", symbolName: "terminal", endpointID: EndpointID(),
+                                isAttachedElsewhere: false, open: { opened.append("running") }, takeOver: {}, end: {}),
+            GlassRunningSession(id: "b", title: "shown", symbolName: "terminal", endpointID: EndpointID(),
+                                isAttachedElsewhere: false, isOpenHere: true, open: {}, takeOver: {}, end: {}),
+        ]
+        let query = GlassWidgetSnapshot.SavedQuery(id: UUID(), name: "Orders", database: "MySQL on alpha")
+
+        var connections = 0
+        let entries = model.palettePlaces(projects: [project, gone], savedQueries: [query],
+                                          openConnections: { connections += 1 })
+        #expect(entries.map(\.title) == ["Open Project: site", "Open Folder: log", "Open Query: Orders", "Attach: build"],
+                "a project no longer listed is left out, and so is a session a window here shows")
+        for entry in entries where !entry.title.hasPrefix("Open Query") { entry.action() }
+        #expect(opened == ["project", "folder", "running"])
+        #expect(connections == 1, "Files opens in a Connections window, opened when none is")
     }
 }
 #endif

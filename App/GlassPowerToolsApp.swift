@@ -429,6 +429,24 @@ struct GlassPowerToolsApp: App {
             MacTerminalAppDelegate.dockMenu = { GlassDockMenu.make() }
         }
         #endif
+        // The database's saved queries as Shortcuts, Siri and the Command Palette name them: with
+        // their database as the library names it, so two "Orders" queries differ. Never their SQL.
+        let savedQueries: @MainActor () -> [GlassWidgetSnapshot.SavedQuery] = { [weak model] in
+            guard let model else { return [] }
+            return database.savedQueryEntries.compactMap { entry in
+                let endpoint = EndpointID(rawValue: entry.connectionID)
+                guard let host = model.host(owningEndpoint: endpoint),
+                      let service = host.services.first(where: { $0.endpointID == endpoint }) else { return nil }
+                return GlassWidgetSnapshot.SavedQuery(id: entry.id, name: entry.name,
+                                                      database: "\(service.displayName) on \(host.displayName)")
+            }
+        }
+        #if os(macOS)
+        // The Command Palette's places (2026-10-14): projects, Favorites' folders, saved queries and
+        // sessions running with no window here.
+        model.registerPalettePlaces(projects: { editorRuntime.projects.projects.map(\.id) },
+                                    savedQueries: savedQueries)
+        #endif
         if GlassUITestRun.defaults == nil {
             // And every other intent's request — Shortcuts, Siri, Spotlight (D72) — carried out
             // with the capabilities that do each.
@@ -468,16 +486,7 @@ struct GlassPowerToolsApp: App {
                 workgroups: {
                     terminal.workgroups.map { GlassWidgetSnapshot.Workgroup(id: $0.id, name: $0.name, terminals: $0.terminals) }
                 },
-                savedQueries: {
-                    // Named with their database as the library names it, so two "Orders" queries differ.
-                    database.savedQueryEntries.compactMap { entry in
-                        let endpoint = EndpointID(rawValue: entry.connectionID)
-                        guard let host = model.host(owningEndpoint: endpoint),
-                              let service = host.services.first(where: { $0.endpointID == endpoint }) else { return nil }
-                        return GlassWidgetSnapshot.SavedQuery(id: entry.id, name: entry.name,
-                                                              database: "\(service.displayName) on \(host.displayName)")
-                    }
-                },
+                savedQueries: savedQueries,
                 openSavedQuery: { database.openSavedQuery($0) }))
         }
         #if os(macOS)

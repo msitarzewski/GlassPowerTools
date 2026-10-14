@@ -16,6 +16,7 @@ import SwiftUI
 import GlassConnectionKit
 import GlassConnectionUI
 import GlassLayers
+import GlassWidgetData
 
 public extension GlassShellModel {
     /// Lists the library's services in the Command Palette, replacing any list registered before.
@@ -59,6 +60,55 @@ public extension GlassShellModel {
             return name
         }
         return "\(name) on \(host.displayName)"
+    }
+
+    // MARK: Places (2026-10-14)
+
+    /// Lists the Command Palette's places: every project, Favorites' folders, the database's saved
+    /// queries and the sessions running on the machines with no window here. The composition root
+    /// hands over what the shell does not hold: the editor's projects and the database's queries.
+    func registerPalettePlaces(projects: @escaping @MainActor () -> [UUID],
+                               savedQueries: @escaping @MainActor () -> [GlassWidgetSnapshot.SavedQuery]) {
+        GlassCommandPaletteSources.register(id: "places") { [weak self] openWindow in
+            self?.palettePlaces(projects: projects(), savedQueries: savedQueries(),
+                                openConnections: { openWindow.openConnections() }) ?? []
+        }
+    }
+
+    /// Each opened the way its usual place opens it: a project or a folder as Favorites does
+    /// (`describeFavorite`), a saved query as Siri does (`GlassWidgetRequest.openSavedQuery`), a
+    /// running session as Active does. A folder opens in Files, which a Connections window carries
+    /// out, so one is opened first when none is.
+    func palettePlaces(projects: [UUID], savedQueries: [GlassWidgetSnapshot.SavedQuery],
+                       openConnections: @escaping @MainActor () -> Void) -> [MacCommandCenterEntry] {
+        var entries: [MacCommandCenterEntry] = []
+        for id in projects {
+            guard let project = describeFavorite?(.project(id)) else { continue }
+            entries.append(MacCommandCenterEntry(id: "project.\(id)", title: "Open Project: \(project.title)",
+                                                 detail: project.subtitle) { project.open() })
+        }
+        for item in favoriteItems {
+            guard case .folder = item, let folder = describeFavorite?(item) else { continue }
+            entries.append(MacCommandCenterEntry(id: "folder.\(item.key)", title: "Open Folder: \(folder.title)",
+                                                 detail: folder.subtitle) {
+                if !GlassLibraryWindows.isOpen { openConnections() }
+                folder.open()
+            })
+        }
+        for query in savedQueries {
+            entries.append(MacCommandCenterEntry(id: "query.\(query.id)", title: "Open Query: \(query.name)",
+                                                 detail: query.database) {
+                GlassWidgetRequests.shared.post(.openSavedQuery(query.id))
+            })
+        }
+        for session in runningSessions where !session.isOpenHere {
+            let machine = host(owningEndpoint: session.endpointID)?.displayName
+            entries.append(MacCommandCenterEntry(
+                id: "running.\(session.id)", title: "Attach: \(session.title)",
+                detail: ([session.subtitle, machine].compactMap { $0 } + ["running, no window here"]).joined(separator: " · ")
+            ) { [weak self] in self?.open(session) })
+        }
+        return entries
     }
 }
 #endif
