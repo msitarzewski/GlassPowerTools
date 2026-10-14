@@ -7,6 +7,7 @@
 
 import SwiftUI
 import GlassShell
+import GlassConnectionKit
 import GlassLayers
 import GlassConnectionUI
 import NIOCore
@@ -474,6 +475,7 @@ struct SFTPBrowserView: View {
     @Environment(SettingsManager.self) private var settingsManager
     @Environment(\.dismiss) private var dismiss
     @Environment(\.glassOpenFolderAsProject) private var openFolderAsProject
+    @Environment(\.glassFavorites) private var favorites
     @Environment(\.glassOpenFileInEditor) private var openFileInEditor
     @Environment(\.glassEditorFileScreen) private var editorFileScreen
     #if os(visionOS)
@@ -2518,6 +2520,12 @@ struct SFTPBrowserView: View {
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .cancellationAction) { doneButton }
 
+        // The folder you are in, starred into Favorites (2026-10-13: "SFTP (at the current folder
+        // depth)"): it opens Files here again, from any device.
+        if favorites != nil, session != nil {
+            ToolbarItem(placement: .primaryAction) { favoriteFolderButton }
+        }
+
         ToolbarItem(placement: .primaryAction) { actionsMenu }
 
         // Not on the headset: there the bar's middle is the title's, and a breadcrumb in it left
@@ -2528,6 +2536,20 @@ struct SFTPBrowserView: View {
             pathBreadcrumb
         }
         #endif
+    }
+
+    @ViewBuilder private var favoriteFolderButton: some View {
+        if let favorites, let session {
+            let folder = GlassFavorite.folder(endpoint: EndpointID(rawValue: session.server.id), path: currentPath)
+            let isFavorite = favorites.isFavorite(folder)
+            Button(isFavorite ? "Remove This Folder from Favorites" : "Add This Folder to Favorites",
+                   systemImage: isFavorite ? "star.fill" : "star") {
+                favorites.toggle(folder)
+            }
+            .labelStyle(.iconOnly)
+            .help(isFavorite ? "Remove This Folder from Favorites" : "Add This Folder to Favorites")
+            .accessibilityIdentifier("sftp-favorite-folder")
+        }
     }
 
     /// Ends the transfers and the connection, then closes the window.

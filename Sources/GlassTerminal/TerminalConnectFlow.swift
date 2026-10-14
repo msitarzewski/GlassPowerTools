@@ -835,10 +835,11 @@ struct TerminalConnectFlow: ViewModifier {
             presentTerminalWindow(for: session)
             return
         }
+        let folder = runtime.takeFilesFolder(for: session.server.id)
         #if os(iOS)
-        iOSRouter.showSFTP(sessionID: session.id)
+        iOSRouter.showSFTP(sessionID: session.id, initialPath: folder)
         #else
-        openWindow(id: "sftp", value: SFTPBrowserContext(sessionID: session.id))
+        openWindow(id: "sftp", value: SFTPBrowserContext(sessionID: session.id, initialPath: folder))
         #endif
     }
 

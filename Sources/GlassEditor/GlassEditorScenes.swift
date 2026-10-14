@@ -460,6 +460,9 @@ public final class GlassEditorRuntime {
     /// another machine, and a remote project says so rather than failing quietly.
     public var remoteAccess: ((HostID) async throws -> any GlassEditorFileAccess)?
 
+    /// Favorites, for a project's star (2026-10-13). Supplied by the composition root.
+    public var favorites: GlassFavoritesAccess?
+
     /// The ⚡ in the editor's toolbar. Supplied by the composition root.
     public var showActiveConnections: GlassShowActiveConnections?
 

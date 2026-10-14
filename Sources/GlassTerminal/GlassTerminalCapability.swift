@@ -120,6 +120,8 @@ public final class GlassTerminalRuntime {
     /// What "Open in Editor" does to a folder in the Files browser. Set by the composition root;
     /// nil means nothing can open a project here and the menu item is not offered.
     public var openFolderAsProject: GlassOpenFolderAsProject?
+    /// Favorites, for Files' star and a workgroup's (2026-10-13). Supplied by the composition root.
+    public var favorites: GlassFavoritesAccess?
 
     /// What "Edit" does to a file in the Files browser: opens it in the editor, as a tab.
     public var openFileInEditor: GlassOpenFileInEditor?
@@ -238,9 +240,24 @@ public final class GlassTerminalRuntime {
     /// `withoutTmux`: a plain shell, though the server keeps its terminals in tmux.
     public func requestConnect(serverID: UUID, purpose: GlassTerminalOpenPurpose = .terminal,
                                report: GlassCapabilityReport? = nil, withoutTmux: Bool = false) {
+        if purpose == .sftp { filesFolders[serverID] = nil }
         enqueue(.connect(serverID: serverID, purpose: purpose == .sftp ? .sftp : .terminal, report: report,
                          withoutTmux: withoutTmux))
     }
+
+    /// Files on a machine, opened at `folder` — a folder in Favorites (2026-10-13). The folder waits
+    /// by machine for the browser the connection opens, through a password prompt or a trust
+    /// question; asking for Files there without one forgets it.
+    public func requestFiles(serverID: UUID, at folder: String) {
+        enqueue(.connect(serverID: serverID, purpose: .sftp, report: nil))
+        filesFolders[serverID] = folder
+    }
+
+    /// The folder Files should open at for `serverID`, once.
+    func takeFilesFolder(for serverID: UUID) -> String? {
+        filesFolders.removeValue(forKey: serverID)
+    }
+    @ObservationIgnored private var filesFolders: [UUID: String] = [:]
     /// Open a saved workgroup preset (all of its terminals) through the launch plan.
     public func requestOpenWorkgroup(_ presetID: UUID) {
         guard let preset = settingsManager.layoutPresets.first(where: { $0.id == presetID }) else { return }
@@ -1003,6 +1020,7 @@ public struct GlassTerminalBootstrap<Content: View>: View {
                runtime.sessionManager.session(for: context.sessionID) != nil {
                 SFTPBrowserView(sessionID: context.sessionID, initialPath: context.initialPath)
                     .environment(\.glassOpenFolderAsProject, runtime.openFolderAsProject)
+                    .environment(\.glassFavorites, runtime.favorites)
                     .environment(\.glassOpenFileInEditor, runtime.openFileInEditor)
                     .environment(\.glassEditorFileScreen, runtime.editorFileScreen)
             } else {

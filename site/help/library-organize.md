@@ -13,6 +13,17 @@ A yellow star appears beside the host's name, and the host is listed under **Fav
 
 Favorites travel to your other devices: marking a host on your Mac marks it on your Vision Pro, and removing it removes it everywhere. The host for the device itself, such as **This Mac**, is the exception, because every device has its own.
 
+## Add a service, project, workgroup or folder to Favorites
+
+**Favorites** can also hold the things you open most, each in its own section under the hosts: **Services**, **Projects**, **Workgroups** and **Folders**.
+
+- **A service:** select its host, then right-click the service in **Services**, or touch and hold it (pinch and hold on Vision Pro), and choose **Add Favorite**. Choosing it in **Favorites** connects to that service.
+- **A project:** in **Projects**, right-click the project or touch and hold it, and choose **Add Favorite**. Choosing it opens the project.
+- **A workgroup:** in **Workgroups**, right-click a saved workgroup or touch and hold it, and choose **Add Favorite**. Choosing it opens its terminals.
+- **A folder on a machine:** in **Files**, go to the folder and choose the star (**Add This Folder to Favorites**) in the toolbar. Choosing it opens **Files** at that folder. Its menu also has **Open as Project**.
+
+A click or tap on one of these opens it straight away. To take one out, right-click it in **Favorites** (or touch and hold it) and choose **Remove Favorite**, or choose the same command where you added it. These favorites travel to your other devices too. One whose service, project or workgroup is not on a device, or has not arrived yet, is not listed there, and appears once it does.
+
 ## Find hosts you used recently
 
 **Recent** lists up to ten hosts, most recently connected first. A host appears there only after a session on it actually connects. Unlike favorites, **Recent** is kept on each device.

@@ -21,6 +21,7 @@
 import SwiftUI
 import GlassConnectionKit
 import GlassConnectionUI
+import GlassShell
 
 /// Selection and presentation for both columns. Held outside them because they are two columns of
 /// one split view, and a `@State` in one cannot be read by the other.
@@ -124,6 +125,14 @@ public struct GlassEditorProjectsPanel: View {
                     .contextMenu {
                         Button("Open", systemImage: "arrow.up.forward.app") { open(project) }
                         Button("Rename", systemImage: "pencil") { beginRenaming(project) }
+                        // In Favorites, under its machines (2026-10-13).
+                        if let favorites = runtime.favorites {
+                            let isFavorite = favorites.isFavorite(.project(project.id))
+                            Button(isFavorite ? "Remove Favorite" : "Add Favorite",
+                                   systemImage: isFavorite ? "star.slash" : "star") {
+                                favorites.toggle(.project(project.id))
+                            }
+                        }
                         Button("Remove from Library", systemImage: "trash", role: .destructive) {
                             panel.pendingRemoval = project
                         }
@@ -170,6 +179,7 @@ public struct GlassEditorProjectsPanel: View {
         let reach = reach(project)
         return GlassLibraryConnectionRow(
             name: project.displayName,
+            isFavorite: runtime.favorites?.isFavorite(.project(project.id)) ?? false,
             nameAccessibilityIdentifier: "project-row-\(project.displayName)"
         ) {
             // Where it is, under what it is called: the machine, then the folder. A project on

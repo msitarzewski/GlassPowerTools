@@ -32,7 +32,7 @@ use the disposable test VM only).
 
 ## 2026-10-13 (~23:00) — RESUME HERE
 
-**State:** 0.4.414 on all three (23:17). The owner is back
+**State:** 0.4.415 on all three (23:52). The owner is back
 (23:10). No new crash reports. The owner is out; his
 test list is unchanged (below, at 19:35). The Mac's screen is locked, which accounts for B-X27's test failures
 (the wallpaper test included).
@@ -42,6 +42,8 @@ test list is unchanged (below, at 19:35). The Mac's screen is locked, which acco
 - **B-X22's second half** (9f2532a): a project on a saved machine that is this Mac opens from the disk.
 - **B-F32** (0.4.412): Settings ▸ a Desktop service ▸ Graphics: Automatic, H.264 (4:2:0) or Without H.264. Live on
   the Windows 11 VM. **For the owner:** try H.264 (4:2:0) on the GNOME host where colours smeared (B-X6).
+- **Favorites hold services, projects, workgroups and folders too** (D73, 0.4.415, his ask): sections by kind, his
+  choice; stars in a service's menu, a project's and a workgroup's menu, and Files' toolbar for the folder in view.
 - **Black backgrounds show the glass** (0.4.414, his ask on return): btop's black, and any background that is pure
   black under a dark theme or the theme's own colour, is drawn as the terminal's empty background; other colours
   stay solid (`TerminalClearBlacks`).
@@ -55,6 +57,8 @@ test list is unchanged (below, at 19:35). The Mac's screen is locked, which acco
 - Edit a file in the editor, change it elsewhere, and come back to the window: it asks.
 - A Desktop service's Graphics setting.
 - "Open the ‹saved query› query in Glass Power Tools", connected and not.
+- Favorites: star a service, a project, a workgroup and a folder in Files; each opens from Favorites, and arrives on
+  the other devices.
 
 **Next for an agent:** B-X7 (needs the headset).
 

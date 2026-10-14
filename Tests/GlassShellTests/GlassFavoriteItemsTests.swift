@@ -146,4 +146,36 @@ struct GlassFavoriteItemsTests {
         #expect(decoded.favoriteItems == nil)
         #expect(decoded.hosts.values.first?.isFavorite == true)
     }
+
+    @Test("Favorites lists what it can name: a service by its machine, the rest as described, filtered by search")
+    func rows() async throws {
+        let root = try folder(); defer { try? FileManager.default.removeItem(at: root) }
+        let model = makeModel(root, "mac")
+        await model.load()
+        _ = try await model.adoptService(kind: .ssh, hostName: "alpha", address: "alpha.example", serviceName: "Terminal")
+        let alpha = try #require(model.catalogHosts.first { $0.displayName == "alpha" })
+        let terminal = try #require(model.host(alpha.id)?.services.first { $0.kind == .ssh })
+
+        let deploy = UUID(), gone = UUID()
+        model.describeFavorite = { item in
+            guard case .workgroup(let id) = item, id == deploy else { return nil }
+            return GlassFavoriteDescription(title: "Deploy", subtitle: "3 terminals", symbol: .system("rectangle.3.group"),
+                                            open: {})
+        }
+        model.toggleFavorite(.service(terminal.endpointID))
+        model.toggleFavorite(.workgroup(deploy))
+        model.toggleFavorite(.project(gone))
+
+        let rows = model.favoriteRows(matching: "")
+        #expect(rows.map(\.description.title) == ["alpha", "Deploy"],
+                "a service called only by its kind is named by its machine; what is gone is not listed")
+        #expect(rows.first?.description.openTitle == "Connect")
+        #expect(model.favoriteRows(matching: "terminals").map(\.description.title) == ["Deploy"])
+        #expect(model.favoriteRows(matching: "nothing like it").isEmpty)
+        #expect(model.isFavorite(.project(gone)), "the star stays, for when the project arrives")
+
+        // The service removed: its favourite is no longer listed.
+        try await model.removeService(terminal.endpointID, from: alpha.id)
+        #expect(model.favoriteRows(matching: "").map(\.description.title) == ["Deploy"])
+    }
 }

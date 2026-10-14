@@ -298,6 +298,52 @@ struct GlassPowerToolsApp: App {
                 editorRuntime.present(windowID)
             }
         }
+        // Favorites beyond machines (2026-10-13): the editor's and the terminal's stars ask the
+        // shell, and the shell asks here how a project, a workgroup or a folder is named and opened.
+        terminal.favorites = model.favoritesAccess
+        editor.favorites = model.favoritesAccess
+        model.describeFavorite = { [weak model] item in
+            guard let model else { return nil }
+            switch item {
+            case .service:
+                return nil   // The shell's own.
+            case .project(let id):
+                guard let project = editorRuntime.projects.projects.first(where: { $0.id == id }) else { return nil }
+                let reach: GlassEditorProjectReach
+                if let hostID = project.hostID {
+                    guard let host = model.host(hostID) else { return nil }
+                    reach = projectReach(host)
+                } else {
+                    reach = .thisMachine
+                }
+                return GlassFavoriteDescription(
+                    title: project.displayName,
+                    subtitle: "\(project.path) · \(reach.badge)",
+                    symbol: .system("chevron.left.forwardslash.chevron.right"),
+                    open: { editorRuntime.present(editorRuntime.openProject(project, reach: reach)) })
+            case .workgroup(let id):
+                guard let workgroup = terminal.workgroups.first(where: { $0.id == id }) else { return nil }
+                return GlassFavoriteDescription(
+                    title: workgroup.name,
+                    subtitle: workgroup.terminals == 1 ? "1 terminal" : "\(workgroup.terminals) terminals",
+                    symbol: .system("rectangle.3.group"),
+                    open: { terminal.requestOpenWorkgroup(id) })
+            case .folder(let endpoint, let path):
+                guard let host = model.host(owningEndpoint: endpoint),
+                      host.services.contains(where: { $0.endpointID == endpoint && $0.kind == .ssh }) else { return nil }
+                let name = path == "/" ? "/" : (path as NSString).lastPathComponent
+                return GlassFavoriteDescription(
+                    title: name,
+                    subtitle: "\(path) on \(host.displayName)",
+                    symbol: .system("folder"),
+                    open: { terminal.requestFiles(serverID: endpoint.rawValue, at: path) },
+                    actions: [
+                        .init(title: "Open as Project", symbolName: "chevron.left.forwardslash.chevron.right") {
+                            terminal.openFolderAsProject?(endpoint.rawValue, path)
+                        },
+                    ])
+            }
+        }
         // "Edit" on a file in the Files browser opens it in the editor, as a tab, and saves back
         // over the same connection through the verified commit.
         terminal.openFileInEditor = { @MainActor serverID, path in
@@ -332,6 +378,12 @@ struct GlassPowerToolsApp: App {
             Task { @MainActor in
                 await model.startSynchronizingFavorites(
                     with: GlassSettingsSyncService(favoritesStore: GlassUbiquitousSettingsStore())
+                )
+            }
+            // And the rest of Favorites (2026-10-13), under a key of its own.
+            Task { @MainActor in
+                await model.startSynchronizingFavoriteItems(
+                    with: GlassSettingsSyncService(favoriteItemsStore: GlassUbiquitousSettingsStore())
                 )
             }
         }

@@ -1457,3 +1457,22 @@ Services **and** Quick Actions (Q2) and a Finder Sync toolbar button (Q3), as "a
 system search only once switched on in Settings ▸ Privacy (Q4); `.command` files run in a new tab, `.sh` files open in
 the editor (Q5); order 1 → 2 → 3 → 4, then a spike for 5 (Q6). Built phase by phase, each piece committed as it lands
 (the standing "commit each piece as it lands"); nothing claimed working on a device until the owner has seen it.
+
+## D73 — Favorites hold machines, services, projects, workgroups and folders — Implemented 2026-10-13
+**Owner:** "Favorites should be machines OR services OR projects OR Workgroups OR SFTP (at the current folder
+depth), yes?" Asked how the list should look, he chose **sections by kind** (Machines, Services, Projects,
+Workgroups, Folders), over one list by last use or one ordered by hand.
+**Decision:**
+- Machines keep their mark on the host and D49's sync, unchanged, so older builds read them as before.
+- The other four are `GlassFavorite`s, each kept with its sync clock in the shell's preferences and synced by D49's
+  rule (newest change wins, an unstar travels, a tie keeps the star) under their own key,
+  `shell-favorite-items-envelope-v1`, which older builds neither read nor write. An unstar is dropped after 90 days.
+- A folder is a machine's Terminal service and an absolute path: the folder Files was showing when it was starred.
+  It opens Files there; its menu also opens it as a project. A terminal in that folder is not built: it needs tmux's
+  start directory carried into the remote startup command.
+- The shell names and connects services; the composition root describes projects, workgroups and folders
+  (`GlassShellModel.describeFavorite`). A favourite whose thing is gone, or has not reached the device yet, is not
+  listed, and its star is kept for when it does.
+- Stars: the machine row (as before), a service's menu in a machine's details, a project's and a saved workgroup's
+  menu, and Files' toolbar (Add This Folder to Favorites). A favourite row opens on one click or tap, as a Finder
+  sidebar favourite does.

@@ -29,6 +29,8 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
     private var presentationAnchor: () -> AnyView = { AnyView(EmptyView()) }
     /// Surfaces that are not lists of hosts — Workgroups, Network — in sidebar order.
     private var panels: [GlassLibraryPanel] = []
+    /// Favorites' other sections — services, projects, workgroups, folders (2026-10-13).
+    private var favoriteSections: GlassLibraryExtraSections?
     /// Which panel is open, or nil while the library is showing hosts. Held here rather than
     /// beside `scope` so the two cannot disagree about what is on screen.
     @State private var openPanelID: String?
@@ -184,6 +186,16 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
         .accessibilityIdentifier("glass-library-panel-\(panel.id)")
     }
 
+    /// Sections Favorites shows under its machines: the shell's other favourites, which only it can
+    /// name and open. Counted in the sidebar's Favorites row.
+    public func favoriteSections(_ sections: GlassLibraryExtraSections) -> Self {
+        var copy = self
+        copy.favoriteSections = sections
+        return copy
+    }
+
+    private var favoriteExtraCount: Int { favoriteSections?.count("") ?? 0 }
+
     public func sidebarActions<Actions: View>(@ViewBuilder _ actions: @escaping () -> Actions) -> Self {
         var copy = self
         copy.sidebarActions = { AnyView(actions()) }
@@ -289,6 +301,7 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
         NavigationSplitView(columnVisibility: $columnVisibility) {
             GlassLibraryNavigation(projection: projection, scope: $scope,
                                    openPanelID: $openPanelID, onOpenPanel: { open($0) },
+                                   favoriteExtraCount: favoriteExtraCount,
                                    onSelect: { openPanelID = nil },
                                    extras: { panelSidebarSections },
                                    libraryExtras: { librarySectionPanelRows })
@@ -341,6 +354,7 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
             withLibraryToolbar(
                 GlassLibraryNavigation(projection: projection, scope: $scope,
                                        openPanelID: $openPanelID, onOpenPanel: { open($0) },
+                                       favoriteExtraCount: favoriteExtraCount,
                                        onSelect: {
                                            openPanelID = nil
                                            compactPath = [.results]
@@ -391,7 +405,8 @@ public struct GlassConnectionLibrary<ID: Hashable & Sendable, Row: View, Detail:
         GlassLibraryResults(items: visibleItems, title: projection.title(for: scope),
                             selection: $selection, searchText: $searchText,
                             onActivate: onActivate, row: row,
-                            backgroundActions: listActions, onRefresh: refreshAction)
+                            backgroundActions: listActions, onRefresh: refreshAction,
+                            extraSections: scope == .favorites ? favoriteSections : nil)
     }
 
     #if os(visionOS)

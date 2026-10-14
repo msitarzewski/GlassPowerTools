@@ -21,6 +21,8 @@ public struct GlassLibraryNavigation<ID: Hashable & Sendable, Extras: View, Libr
     /// carried no tag, so the list went on showing All Connections while Active was open).
     @Binding private var openPanelID: String?
     private let onOpenPanel: (String) -> Void
+    /// Favorites that are not machines, counted with them in the Favorites row.
+    private let favoriteExtraCount: Int
     private let favoriteSymbol: String
     private let onSelect: () -> Void
     private let extras: () -> Extras
@@ -32,11 +34,13 @@ public struct GlassLibraryNavigation<ID: Hashable & Sendable, Extras: View, Libr
     public init(projection: GlassLibraryProjection<ID>, scope: Binding<GlassLibraryScope>,
                 openPanelID: Binding<String?> = .constant(nil),
                 onOpenPanel: @escaping (String) -> Void = { _ in },
+                favoriteExtraCount: Int = 0,
                 favoriteSymbol: String = "star", onSelect: @escaping () -> Void = {},
                 @ViewBuilder extras: @escaping () -> Extras,
                 @ViewBuilder libraryExtras: @escaping () -> LibraryExtras = { EmptyView() }) {
         _openPanelID = openPanelID
         self.onOpenPanel = onOpenPanel
+        self.favoriteExtraCount = favoriteExtraCount
         self.projection = projection
         _scope = scope
         self.favoriteSymbol = favoriteSymbol
@@ -64,8 +68,10 @@ public struct GlassLibraryNavigation<ID: Hashable & Sendable, Extras: View, Libr
 
     public var body: some View {
         List(selection: selection) {
-            GlassLibraryCategories(projection: projection, category: { value, title, _ in
-                category(value, title: title, symbol: symbol(for: value)).tag(GlassLibrarySidebarSelection.scope(value))
+            GlassLibraryCategories(projection: projection, favoriteExtraCount: favoriteExtraCount,
+                                   category: { value, title, count in
+                category(value, title: title, symbol: symbol(for: value), count: count)
+                    .tag(GlassLibrarySidebarSelection.scope(value))
             }, extras: libraryExtras)
             extras()
         }
@@ -82,11 +88,11 @@ public struct GlassLibraryNavigation<ID: Hashable & Sendable, Extras: View, Libr
         }
     }
 
-    private func category(_ value: GlassLibraryScope, title: String, symbol: String) -> some View {
+    private func category(_ value: GlassLibraryScope, title: String, symbol: String, count: Int) -> some View {
         HStack {
             Label(title, systemImage: symbol)
             Spacer()
-            Text(projection.itemCount(in: value), format: .number)
+            Text(count, format: .number)
                 .foregroundStyle(.secondary)
         }
         .contentShape(Rectangle())

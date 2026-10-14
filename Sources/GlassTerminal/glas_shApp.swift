@@ -237,8 +237,8 @@ final class IOSAppRouter {
         return true
     }
 
-    func showSFTP(sessionID: UUID) {
-        sftpContext = SFTPBrowserContext(sessionID: sessionID)
+    func showSFTP(sessionID: UUID, initialPath: String? = nil) {
+        sftpContext = SFTPBrowserContext(sessionID: sessionID, initialPath: initialPath)
     }
 }
 

@@ -18,13 +18,17 @@ public struct GlassLibraryResults<ID: Hashable & Sendable, Row: View>: View {
     /// Pull to refresh. The library already knows how to pull, merge and publish — this is the
     /// user asking it to, instead of waiting for a launch or a push that may never arrive.
     private let onRefresh: (() async -> Void)?
+    /// Sections after the machines — Favorites' services, projects, workgroups and folders
+    /// (2026-10-13). With any, the machines get a section of their own above them.
+    private let extraSections: GlassLibraryExtraSections?
 
     /// Supply already scoped/filtered items from GlassLibraryProjection.
     public init(items: [GlassLibraryItem<ID>], title: String, selection: Binding<ID?>,
                 searchText: Binding<String>, onActivate: @escaping (ID) -> Void,
                 @ViewBuilder row: @escaping (GlassLibraryItem<ID>) -> Row,
                 backgroundActions: @escaping () -> AnyView = { AnyView(EmptyView()) },
-                onRefresh: (() async -> Void)? = nil) {
+                onRefresh: (() async -> Void)? = nil,
+                extraSections: GlassLibraryExtraSections? = nil) {
         self.items = items
         self.title = title
         _selection = selection
@@ -33,11 +37,14 @@ public struct GlassLibraryResults<ID: Hashable & Sendable, Row: View>: View {
         self.row = row
         self.backgroundActions = backgroundActions
         self.onRefresh = onRefresh
+        self.extraSections = extraSections
     }
+
+    private var extraCount: Int { extraSections?.count(searchText) ?? 0 }
 
     public var body: some View {
         List(selection: $selection) {
-            if items.isEmpty {
+            if items.isEmpty && extraCount == 0 {
                 // An empty state is the one thing a first-time user is guaranteed to see. On the
                 // headset a `ContentUnavailableView` at its default scale is a small card adrift in
                 // a large pane, so it is given the row's own breathing room rather than being left
@@ -52,23 +59,13 @@ public struct GlassLibraryResults<ID: Hashable & Sendable, Row: View>: View {
                 }
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
-            } else {
-                ForEach(items) { item in
-                    // **One shape per row, the list's own.** On the headset these rows also carried
-                    // spatial padding and a hover effect of their own, so gaze lit a rectangle
-                    // inside the list's row inside nothing — "a nested CSS cluster that eye
-                    // tracking reveals layer by layer" (2026-09-28). The list's row is the target.
-                    row(item).tag(item.id)
-                        .contentShape(Rectangle())
-                        .glassSpatialListRow()
-                        .onTapGesture { selection = item.id }
-                        #if os(macOS)
-                        .simultaneousGesture(TapGesture(count: 2).onEnded {
-                            selection = item.id
-                            onActivate(item.id)
-                        })
-                        #endif
+            } else if extraCount > 0, let extraSections {
+                if !items.isEmpty {
+                    Section(extraSections.itemsTitle) { rows }
                 }
+                extraSections.content(searchText)
+            } else {
+                rows
             }
         }
         // The first row must not open underneath the toolbar. Two causes, both cheap to rule out:
@@ -118,4 +115,40 @@ public struct GlassLibraryResults<ID: Hashable & Sendable, Row: View>: View {
         }
     }
 
+    @ViewBuilder private var rows: some View {
+        ForEach(items) { item in
+            // **One shape per row, the list's own.** On the headset these rows also carried
+            // spatial padding and a hover effect of their own, so gaze lit a rectangle
+            // inside the list's row inside nothing — "a nested CSS cluster that eye
+            // tracking reveals layer by layer" (2026-09-28). The list's row is the target.
+            row(item).tag(item.id)
+                .contentShape(Rectangle())
+                .glassSpatialListRow()
+                .onTapGesture { selection = item.id }
+                #if os(macOS)
+                .simultaneousGesture(TapGesture(count: 2).onEnded {
+                    selection = item.id
+                    onActivate(item.id)
+                })
+                #endif
+        }
+    }
+}
+
+/// Sections a library list shows after its machines (2026-10-13): Favorites' services, projects,
+/// workgroups and folders, which the shell draws because only it can name and open them.
+public struct GlassLibraryExtraSections {
+    /// What the machines' own section is called when there are other sections under it.
+    public let itemsTitle: String
+    /// How many rows match the search, the empty string included — the sidebar's count.
+    public let count: (String) -> Int
+    /// The sections, filtered by the search.
+    public let content: (String) -> AnyView
+
+    public init(itemsTitle: String = "Machines", count: @escaping (String) -> Int,
+                content: @escaping (String) -> AnyView) {
+        self.itemsTitle = itemsTitle
+        self.count = count
+        self.content = content
+    }
 }

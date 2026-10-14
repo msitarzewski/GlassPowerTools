@@ -12,7 +12,7 @@ When you are signed in to iCloud, the hosts you add on one device appear on your
 | SSH keys generated in the Secure Enclave | This device only |
 | Services that sign in with a Secure Enclave key | This device only |
 | The host for this device (**This Mac**, **This iPad**, **This iPhone** or **This Apple Vision Pro**) and its services | This device only |
-| Favorites | Your other devices. The device's own host (**This Mac** and the others) is the exception: a favorite there stays on the device. |
+| Favorites | Your other devices: hosts, and the services, projects, workgroups and folders in **Favorites**. The device's own host (**This Mac** and the others) is the exception: a favorite there stays on the device. |
 | Terminal Workgroups | Your other devices, while **Sync terminal settings** is on (see [Workgroups](terminal-workgroups.md)) |
 | **Recent**, and which service **Connect opens** | This device only |
 | Window appearance (**Settings** ▸ **Appearance**) | This device only |

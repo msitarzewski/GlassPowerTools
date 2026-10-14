@@ -11,6 +11,7 @@
 
 import SwiftUI
 import GlassConnectionUI
+import GlassShell
 
 enum ConnectionWorkgroupSelection: Hashable {
     case live(UUID)
@@ -221,6 +222,7 @@ struct TerminalWorkgroupsView: View {
                     // detail shows — a Mac workgroup's tabs, else its sessions.
                     GlassLibraryConnectionRow(name: preset.name,
                                               subtitle: Self.tabCount(Self.tabTotal(preset)),
+                                              isFavorite: runtime.favorites?.isFavorite(.workgroup(preset.id)) ?? false,
                                               color: preset.colorTag.color)
                     .tag(ConnectionWorkgroupSelection.preset(preset.id))
                     .accessibilityLabel(
@@ -245,6 +247,14 @@ struct TerminalWorkgroupsView: View {
                         }
                         Button("Duplicate", systemImage: "plus.square.on.square") {
                             model.editorContext = .duplicate(preset)
+                        }
+                        // In Favorites, under its machines (2026-10-13).
+                        if let favorites = runtime.favorites {
+                            let isFavorite = favorites.isFavorite(.workgroup(preset.id))
+                            Button(isFavorite ? "Remove Favorite" : "Add Favorite",
+                                   systemImage: isFavorite ? "star.slash" : "star") {
+                                favorites.toggle(.workgroup(preset.id))
+                            }
                         }
                         Divider()
                         Button("Delete…", systemImage: "trash", role: .destructive) {

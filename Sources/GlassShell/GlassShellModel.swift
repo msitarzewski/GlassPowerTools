@@ -85,6 +85,9 @@ public final class GlassShellModel: GlassServiceStore {
     /// 2026-09-19). Every capability that replaces the library on a phone wants this; the
     /// database is the first to use it.
     public var hostToShow: HostID?
+    /// How Favorites names and opens a project, a workgroup or a folder (2026-10-13): supplied by
+    /// the composition root, which holds the editor and the terminal. Nil for anything not there.
+    @ObservationIgnored public var describeFavorite: (@MainActor (GlassFavorite) -> GlassFavoriteDescription?)?
     /// A library panel something asked to be shown — the ⚡ asking for **Active**. The library
     /// view observes it, opens the panel, and clears it. Same shape as `hostToShow`.
     public var panelToShow: String?

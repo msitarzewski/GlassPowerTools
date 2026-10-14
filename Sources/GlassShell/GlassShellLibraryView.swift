@@ -86,6 +86,8 @@ public struct GlassShellLibraryView: View {
             // Active first: it sits inside the Library section, after the three categories.
             .libraryPanels([model.activeConnectionsPanel()] + model.libraryPanels() + model.registry.libraryPanels)
             .panelToOpen($panelRequest)
+            // Favorites' services, projects, workgroups and folders, in sections under its machines.
+            .favoriteSections(model.favoriteSections)
             // Right-click, long-press or pinch-and-hold anywhere in the list — including the empty
             // space below the machines, which is where you are looking when what you want is a new
             // one. The same button the toolbar's + is.
@@ -333,6 +335,13 @@ public struct GlassShellLibraryView: View {
                 ForEach(host.services) { service in
                     serviceRow(service, host: host)
                         .contextMenu {
+                            // A service of its own in Favorites (2026-10-13), beside its machine.
+                            let favorite = GlassFavorite.service(service.endpointID)
+                            Button(model.isFavorite(favorite) ? "Remove Favorite" : "Add Favorite",
+                                   systemImage: model.isFavorite(favorite) ? "star.slash" : "star") {
+                                model.toggleFavorite(favorite)
+                            }
+                            .labelStyle(.titleAndIcon)
                             // A built-in local service has nothing stored behind it, so there is
                             // nothing to remove — and offering the item would only produce an
                             // error the user could not act on.
@@ -461,7 +470,14 @@ public struct GlassShellLibraryView: View {
                 .accessibilityValue(GlassServiceStatusDot.description(isConnected: isConnected, availability: availability))
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 2) {
-                Text(service.displayName).lineLimit(1).truncationMode(.tail)
+                HStack(spacing: 6) {
+                    Text(service.displayName).lineLimit(1).truncationMode(.tail)
+                    // After the name, as a favourite machine's star is.
+                    if model.isFavorite(.service(service.endpointID)) {
+                        Image(systemName: "star.fill").font(GlassSpatialMetrics.rowSubtitleFont)
+                            .foregroundStyle(.yellow).accessibilityLabel("Favorite")
+                    }
+                }
                 // **A link with nothing behind it says so here.** Until now the only way to find
                 // out was to press Connect and be told "has no saved configuration" — which is how
                 // a machine ends up with two Terminals that look identical, one of them dead: the
