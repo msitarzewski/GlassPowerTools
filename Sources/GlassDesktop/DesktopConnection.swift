@@ -52,6 +52,11 @@ public struct DesktopConnection: Identifiable, Codable, Equatable, Sendable {
     public var lastConnectedAt: Date?
     public var desktop: DesktopSize
     public var clipboardEnabled: Bool
+    /// With the clipboard shared, whether copies cross by themselves — a copy on the remote
+    /// machine lands here, and on a Mac one made here goes there — or only with Send Clipboard and
+    /// Copy Remote Clipboard (the owner, 2026-10-14: "an auto clipboard toggle somewhere? this is
+    /// magic"). On unless turned off; a record from before reads as on.
+    public var clipboardSyncsAutomatically: Bool
     public var audioEnabled: Bool
     public var certificateSHA256: String?
     public var `protocol`: DesktopProtocol
@@ -82,6 +87,7 @@ public struct DesktopConnection: Identifiable, Codable, Equatable, Sendable {
         self.createdAt = Date()
         self.desktop = .standard
         self.clipboardEnabled = false
+        self.clipboardSyncsAutomatically = true
         self.audioEnabled = false
         self.graphicsMode = .automatic
     }
@@ -96,7 +102,7 @@ public struct DesktopConnection: Identifiable, Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case id, hostID, name, host, port, username, domain, credentialID, mobility, authentication, tags, isFavorite
         case createdAt, lastConnectedAt, desktop, clipboardEnabled, audioEnabled, certificateSHA256
-        case `protocol`, graphicsMode
+        case `protocol`, graphicsMode, clipboardSyncsAutomatically
     }
 
     public init(from decoder: any Decoder) throws {
@@ -117,6 +123,7 @@ public struct DesktopConnection: Identifiable, Codable, Equatable, Sendable {
         lastConnectedAt = try values.decodeIfPresent(Date.self, forKey: .lastConnectedAt)
         desktop = try values.decode(DesktopSize.self, forKey: .desktop)
         clipboardEnabled = try values.decode(Bool.self, forKey: .clipboardEnabled)
+        clipboardSyncsAutomatically = try values.decodeIfPresent(Bool.self, forKey: .clipboardSyncsAutomatically) ?? true
         audioEnabled = try values.decode(Bool.self, forKey: .audioEnabled)
         certificateSHA256 = try values.decodeIfPresent(String.self, forKey: .certificateSHA256)
         `protocol` = try values.decodeIfPresent(DesktopProtocol.self, forKey: .protocol) ?? .rdp

@@ -1155,4 +1155,48 @@ struct DesktopClipboardWaitTests {
         #expect(model.errorMessage == nil || model.errorMessage != DesktopSessionModel.clipboardWaitingMessage(fixture.connection.name))
         model.close()
     }
+
+    // MARK: Sync Automatically (the owner, 2026-10-14: "an auto clipboard toggle somewhere?")
+
+    @Test func clipboardSyncsAutomaticallyUntilTurnedOffAndAnOlderRecordReadsAsOn() throws {
+        let fresh = DesktopConnection(name: "Server", host: "server.example")
+        #expect(fresh.clipboardSyncsAutomatically)
+        var object = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(fresh)) as? [String: Any])
+        object.removeValue(forKey: "clipboardSyncsAutomatically")
+        let older = try JSONDecoder().decode(DesktopConnection.self, from: JSONSerialization.data(withJSONObject: object))
+        #expect(older.clipboardSyncsAutomatically, "a record saved before the setting syncs, as it did")
+        var off = fresh
+        off.clipboardSyncsAutomatically = false
+        #expect(try JSONDecoder().decode(DesktopConnection.self, from: JSONEncoder().encode(off)).clipboardSyncsAutomatically == false)
+    }
+
+    @Test func clipboardMenuToggleTakesEffectAtOnceAndIsSavedForTheDesktop() async throws {
+        let fixture = try SessionFixture()
+        defer { fixture.clean() }
+        try await fixture.prepare()
+        let model = fixture.model()
+        try await fixture.ready(model)
+        #expect(model.clipboardSyncs)
+
+        await model.setClipboardSyncsAutomatically(false)
+        #expect(!model.clipboardSyncs)
+        #expect(fixture.app.connections.first?.clipboardSyncsAutomatically == false, "saved for the desktop")
+        #expect(fixture.app.connections.first?.clipboardEnabled == true, "sharing itself stays on")
+        model.close()
+    }
+
+    @Test func clipboardToggleThatCannotBeSavedIsPutBack() async throws {
+        let fixture = try SessionFixture()
+        defer { fixture.clean() }
+        try await fixture.prepare()
+        var operations = fixture.operations
+        operations.saveClipboardSync = { _, _, _ in throw DesktopError.missingConnection }
+        let model = fixture.model(operations)
+        try await fixture.ready(model)
+
+        await model.setClipboardSyncsAutomatically(false)
+        #expect(model.clipboardSyncs, "put back")
+        #expect(model.errorMessage?.contains("clipboard setting") == true)
+        model.close()
+    }
 }

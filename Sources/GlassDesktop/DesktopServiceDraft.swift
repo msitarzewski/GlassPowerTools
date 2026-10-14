@@ -56,6 +56,7 @@ final class DesktopServiceDraft: GlassServiceDraft {
     var desktopWidthText: String
     var desktopHeightText: String
     var clipboardEnabled: Bool
+    var clipboardSyncsAutomatically: Bool
     var audioEnabled: Bool
     var graphicsMode: DesktopGraphicsMode
     var mobility: SecretMobilityPolicy
@@ -78,6 +79,7 @@ final class DesktopServiceDraft: GlassServiceDraft {
         desktopWidthText = String(DesktopSize.standard.width)
         desktopHeightText = String(DesktopSize.standard.height)
         clipboardEnabled = false
+        clipboardSyncsAutomatically = true
         audioEnabled = false
         graphicsMode = .automatic
         // D18: this project's credentials synchronize by default. glassDT defaulted a desktop to
@@ -98,6 +100,7 @@ final class DesktopServiceDraft: GlassServiceDraft {
         desktopWidthText = String(connection.desktop.width)
         desktopHeightText = String(connection.desktop.height)
         clipboardEnabled = connection.clipboardEnabled
+        clipboardSyncsAutomatically = connection.clipboardSyncsAutomatically
         audioEnabled = connection.audioEnabled
         graphicsMode = connection.graphicsMode
         mobility = connection.mobility
@@ -234,6 +237,7 @@ final class DesktopServiceDraft: GlassServiceDraft {
         connection.authentication = authentication
         connection.desktop = typedDesktopSize() ?? .standard
         connection.clipboardEnabled = clipboardEnabled
+        connection.clipboardSyncsAutomatically = clipboardSyncsAutomatically
         connection.audioEnabled = audioEnabled
         connection.graphicsMode = graphicsMode
         connection.mobility = mobility

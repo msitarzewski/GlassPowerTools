@@ -75,6 +75,9 @@ struct DesktopSessionOperations {
     var approve: @MainActor (DesktopAppModel, String, EndpointID, DesktopConnection) async throws -> DesktopConnection = {
         try await $0.approveCertificate($1, for: $2, expectedConnection: $3)
     }
+    var saveClipboardSync: @MainActor (DesktopAppModel, Bool, EndpointID) async throws -> DesktopConnection = {
+        try await $0.setClipboardSyncsAutomatically($1, for: $2)
+    }
 }
 
 @MainActor @Observable
@@ -771,6 +774,25 @@ public final class DesktopSessionModel {
                                 domain: submitted.domain?.isEmpty == false ? submitted.domain : nil,
                                 password: submitted.password, attempt: attempt)
         } catch { await failedToStart(error, attempt: attempt, prompt: true) }
+    }
+
+    /// Sync Automatically, from the Clipboard menu: in effect at once, and saved for the desktop.
+    /// A save that fails puts it back and says so.
+    public func setClipboardSyncsAutomatically(_ syncs: Bool) async {
+        guard connection.clipboardSyncsAutomatically != syncs else { return }
+        connection.clipboardSyncsAutomatically = syncs
+        do {
+            let saved = try await operations.saveClipboardSync(app, syncs, connection.id)
+            connection.clipboardSyncsAutomatically = saved.clipboardSyncsAutomatically
+        } catch {
+            connection.clipboardSyncsAutomatically = !syncs
+            errorMessage = "The clipboard setting couldn't be saved. \(error.localizedDescription)"
+        }
+    }
+
+    /// Whether copies cross by themselves now: the clipboard shared, and Sync Automatically on.
+    public var clipboardSyncs: Bool {
+        connection.clipboardEnabled && connection.clipboardSyncsAutomatically
     }
 
     public func approveCertificate(_ request: DesktopTrustRequest) async {

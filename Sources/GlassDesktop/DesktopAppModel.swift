@@ -306,6 +306,19 @@ public final class DesktopAppModel {
         return value
     }
 
+    /// The Clipboard menu's Sync Automatically, saved for the desktop at once: that one setting,
+    /// whatever else a session holds of the record.
+    public func setClipboardSyncsAutomatically(_ syncs: Bool, for id: EndpointID) async throws -> DesktopConnection {
+        await acquireMutation()
+        defer { releaseMutation() }
+        guard var value = try await requireRepository().load().first(where: { $0.id == id }) else { throw DesktopError.missingConnection }
+        let previous = value
+        value.clipboardSyncsAutomatically = syncs
+        value = try value.validated()
+        connections = try await requireRepository().save(value, replacing: previous)
+        return value
+    }
+
     // The pairing surface, the dual local/shared catalog, its availability probe and the
     // publication journal all lived here. They existed so three separate processes could agree
     // on one library; there is one process now, and the shell owns the catalog.

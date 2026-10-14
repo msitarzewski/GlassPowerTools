@@ -508,6 +508,13 @@ public struct DesktopSessionView: View {
                         // clipboard sync is failing with <a desktop> … Not sure if I was supposed to do something").
                         Text("Clipboard sharing is off for this desktop. Turn on Share clipboard in its service settings, then reconnect.")
                     }
+                    if session.connection.clipboardEnabled {
+                        // Copies crossing by themselves, or only when asked (the owner, 2026-10-14).
+                        Toggle("Sync Automatically", isOn: Binding(
+                            get: { session.connection.clipboardSyncsAutomatically },
+                            set: { syncs in Task { await session.setClipboardSyncsAutomatically(syncs) } }))
+                        Divider()
+                    }
                     Button(session.connection.clipboardEnabled ? "Send Clipboard" : "Type Clipboard Text") { sendClipboard() }
                         .disabled(!session.isConnected)
                     Button("Copy Remote Clipboard") { copyRemoteClipboard() }.disabled(!session.isConnected || session.remoteClipboard == nil)

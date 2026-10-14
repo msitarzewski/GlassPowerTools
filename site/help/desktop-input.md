@@ -51,6 +51,7 @@ Turn on **Share clipboard** in the service's **Advanced** settings to share the 
 - **Over RDP**, a copy carries its text, formatting (HTML and rich text) and images, both ways. Something copied on the remote computer is on this device's clipboard straight away.
 - **On Mac**, something you copy here reaches the remote computer when its window becomes active, and whenever you copy again while it is. **On iPhone, iPad and Vision Pro**, choose **Send Clipboard** in the **Clipboard** menu, because the system asks before an app reads another app's copy.
 - **Copy Remote Clipboard** in the **Clipboard** menu puts the remote computer's latest copy on this device's clipboard again.
+- **Sync Automatically**, at the top of the **Clipboard** menu, is on unless you turn it off. Off, copies no longer cross by themselves, in either direction: **Send Clipboard** and **Copy Remote Clipboard** still move one when you choose them. It takes effect at once and is remembered for the desktop; the service's settings have it too, as **Sync clipboard automatically**.
 
 With **Share clipboard** off, the menu offers **Type Clipboard Text** instead, which types this device's clipboard text into the remote computer as keystrokes.
 

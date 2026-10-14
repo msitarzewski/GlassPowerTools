@@ -69,7 +69,8 @@ enum DesktopPasteboard {
     #endif
 }
 
-/// Keeps the two clipboards in step while a desktop is open, when clipboard sharing is on:
+/// Keeps the two clipboards in step while a desktop is open, when clipboard sharing and Sync
+/// Automatically are on (`DesktopSessionModel.clipboardSyncs`):
 /// a copy made on the remote machine lands on this device's clipboard, on every platform; and on a
 /// Mac, a copy made here reaches the remote machine when its window becomes active and whenever the
 /// clipboard changes while it is. iPhone, iPad and Vision Pro send with Send Clipboard, because
@@ -86,15 +87,15 @@ struct DesktopClipboardBridge: ViewModifier {
     func body(content: Content) -> some View {
         content
             .onChange(of: session.remoteClipboard) { _, copy in
-                guard let copy, session.connection.clipboardEnabled else { return }
+                guard let copy, session.clipboardSyncs else { return }
                 DesktopPasteboard.write(copy)
                 #if os(macOS)
                 settledChangeCount = DesktopPasteboard.changeCount
                 #endif
             }
             #if os(macOS)
-            .task(id: appearsActive && session.isConnected && session.connection.clipboardEnabled) {
-                guard appearsActive, session.isConnected, session.connection.clipboardEnabled else { return }
+            .task(id: appearsActive && session.isConnected && session.clipboardSyncs) {
+                guard appearsActive, session.isConnected, session.clipboardSyncs else { return }
                 while !Task.isCancelled {
                     let count = DesktopPasteboard.changeCount
                     if count != settledChangeCount {

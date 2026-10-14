@@ -161,6 +161,10 @@ struct DesktopAdvancedFields: View {
             // VNC has no audio channel, so the toggle is not offered for it.
             Toggle("Share clipboard", isOn: $draft.clipboardEnabled)
                 .accessibilityIdentifier("\(identifierPrefix)-clipboard")
+            // Also in the desktop's Clipboard menu, where it can be turned off for a moment.
+            Toggle("Sync clipboard automatically", isOn: $draft.clipboardSyncsAutomatically)
+                .disabled(!draft.clipboardEnabled)
+                .accessibilityIdentifier("\(identifierPrefix)-clipboard-sync")
             if draft.showsRDPOnlyFields {
                 Toggle("Remote audio", isOn: $draft.audioEnabled)
                     .accessibilityIdentifier("\(identifierPrefix)-audio")
