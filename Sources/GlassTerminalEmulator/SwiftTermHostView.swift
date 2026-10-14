@@ -2092,6 +2092,8 @@ private final class UIKitAlternateScreenScrollWatcher: NSObject, UIGestureRecogn
 
 @MainActor
 private final class SwiftTermEngine: TerminalEngine {
+    /// Black backgrounds show the glass (`TerminalClearBlacks`).
+    private var clearBlacks = TerminalClearBlacks()
     var isBracketedPasteMode: Bool { terminalView.getTerminal().bracketedPasteMode }
 
     let terminalView: ReviewingTerminalView
@@ -2178,7 +2180,7 @@ private final class SwiftTermEngine: TerminalEngine {
     func receive(_ data: Data) {
         let start = performanceClock.now
         let kept = SwiftTermSelectionKeeper.take(from: terminalView)
-        terminalView.feed(byteArray: ArraySlice(data))
+        terminalView.feed(byteArray: clearBlacks.filter(ArraySlice(data)))
         // Find's hit first: it knows where its own selection went. Any other selection after.
         reapplyFindHit()
         SwiftTermSelectionKeeper.restore(kept, in: terminalView)
@@ -2398,6 +2400,7 @@ private final class SwiftTermEngine: TerminalEngine {
     }
 
     private func applyTheme(_ theme: SwiftTermTheme) {
+        clearBlacks.configure(theme)
         let fontSize = max(10, theme.fontSize)
         if theme.fontName == "SF Mono" {
             terminalView.font = UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
@@ -2966,6 +2969,8 @@ extension ReviewingMacTerminalView: @preconcurrency NSServicesMenuRequestor {
 
 @MainActor
 private final class MacSwiftTermEngine: TerminalEngine {
+    /// Black backgrounds show the glass (`TerminalClearBlacks`).
+    private var clearBlacks = TerminalClearBlacks()
     var isBracketedPasteMode: Bool { terminalView.getTerminal().bracketedPasteMode }
 
     let terminalView: ReviewingMacTerminalView
@@ -3029,7 +3034,7 @@ private final class MacSwiftTermEngine: TerminalEngine {
     func receive(_ data: Data) {
         let start = performanceClock.now
         let kept = SwiftTermSelectionKeeper.take(from: terminalView)
-        terminalView.feed(byteArray: ArraySlice(data))
+        terminalView.feed(byteArray: clearBlacks.filter(ArraySlice(data)))
         // Find's hit first: it knows where its own selection went. Any other selection after.
         reapplyFindHit()
         SwiftTermSelectionKeeper.restore(kept, in: terminalView)
@@ -3089,6 +3094,7 @@ private final class MacSwiftTermEngine: TerminalEngine {
     }
 
     private func applyTheme(_ theme: SwiftTermTheme) {
+        clearBlacks.configure(theme)
         let fontSize = max(10, theme.fontSize)
         terminalView.font = theme.fontName == "SF Mono"
             ? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
@@ -3582,6 +3588,9 @@ private final class ReviewingMacLocalProcessTerminalView: LocalProcessTerminalVi
     var onPasteRequest: ((String, Bool) -> Void)?
     var onWindowAttachmentChanged: (() -> Void)?
     var onProcessOutput: ((ArraySlice<UInt8>, Duration) -> Void)?
+    /// Black backgrounds show the glass (`TerminalClearBlacks`): the shell's output and the
+    /// engine's own notices go through one filter, because they are one stream to the screen.
+    var clearBlacks = TerminalClearBlacks()
 
     // Select All over a program's history (`MacTerminalContextMenu.selectAll`).
     var heldSelection: String?
@@ -3639,7 +3648,7 @@ private final class ReviewingMacLocalProcessTerminalView: LocalProcessTerminalVi
         let clock = ContinuousClock()
         let start = clock.now
         let kept = SwiftTermSelectionKeeper.take(from: self)
-        super.dataReceived(slice: slice)
+        super.dataReceived(slice: clearBlacks.filter(slice))
         // After Find's hit, which `onProcessOutput` puts back.
         onProcessOutput?(slice, start.duration(to: clock.now))
         SwiftTermSelectionKeeper.restore(kept, in: self)
@@ -3993,7 +4002,7 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
         let clock = ContinuousClock()
         let start = clock.now
         let kept = SwiftTermSelectionKeeper.take(from: terminalView)
-        terminalView.feed(byteArray: ArraySlice(data))
+        terminalView.feed(byteArray: terminalView.clearBlacks.filter(ArraySlice(data)))
         // Find's hit first: it knows where its own selection went. Any other selection after.
         reapplyFindHit()
         SwiftTermSelectionKeeper.restore(kept, in: terminalView)
@@ -4237,6 +4246,7 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
     }
 
     private func applyTheme(_ theme: SwiftTermTheme) {
+        terminalView.clearBlacks.configure(theme)
         let fontSize = max(10, theme.fontSize)
         terminalView.font = theme.fontName == "SF Mono"
             ? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)

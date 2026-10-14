@@ -32,8 +32,8 @@ use the disposable test VM only).
 
 ## 2026-10-13 (~23:00) — RESUME HERE
 
-**State:** 0.4.413 on the Mac. The iPhone and Vision Pro are on 0.4.409: both were unreachable (CoreDevice 4016) at
-the 0.4.410–413 installs. A retry loop installs the newest build when each can be reached (`$SP/device-retry.zsh`). No new crash reports. The owner is out; his
+**State:** 0.4.414 on all three (23:17). The owner is back
+(23:10). No new crash reports. The owner is out; his
 test list is unchanged (below, at 19:35). The Mac's screen is locked, which accounts for B-X27's test failures
 (the wallpaper test included).
 
@@ -42,6 +42,9 @@ test list is unchanged (below, at 19:35). The Mac's screen is locked, which acco
 - **B-X22's second half** (9f2532a): a project on a saved machine that is this Mac opens from the disk.
 - **B-F32** (0.4.412): Settings ▸ a Desktop service ▸ Graphics: Automatic, H.264 (4:2:0) or Without H.264. Live on
   the Windows 11 VM. **For the owner:** try H.264 (4:2:0) on the GNOME host where colours smeared (B-X6).
+- **Black backgrounds show the glass** (0.4.414, his ask on return): btop's black, and any background that is pure
+  black under a dark theme or the theme's own colour, is drawn as the terminal's empty background; other colours
+  stay solid (`TerminalClearBlacks`).
 - **Saved queries for Siri and Shortcuts** (0.4.413): "Open the ‹query› query in Glass Power Tools" opens it in a new
   SQL tab on its database, connecting first, never running it.
 - The database's sidebar toggle was looked at again: no dead end, no change.
