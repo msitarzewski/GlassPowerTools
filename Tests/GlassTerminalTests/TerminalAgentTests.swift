@@ -58,6 +58,23 @@ struct TerminalAgentTests {
         #expect(TerminalAgent.identify(program: nil, arguments: nil, title: "build") == nil)
     }
 
+    /// The owner (2026-10-14): "we need to detect hermes, openclaw, and as many as we can".
+    @Test("the agents the agency-agents installer lists, and others, by their commands and packages")
+    func moreAgents() {
+        #expect(TerminalAgent.identify(program: "hermes", arguments: nil) == .hermes)
+        #expect(TerminalAgent.identify(program: "node", arguments: "node /opt/homebrew/lib/node_modules/openclaw/dist/index.js") == .openClaw)
+        #expect(TerminalAgent.identify(program: "python3.12", arguments: "python3.12 /Users/a/.local/bin/vibe") == .mistralVibe)
+        #expect(TerminalAgent.identify(program: "zcode", arguments: nil) == .zCode)
+        #expect(TerminalAgent.identify(program: "aider", arguments: nil) == .aider)
+        #expect(TerminalAgent.identify(program: "kiro-cli", arguments: nil) == .kiro)
+        #expect(TerminalAgent.identify(program: "node", arguments: "node /usr/lib/node_modules/@kilocode/cli/dist/index.js") == .kiloCode)
+        // DeepSeek Harness by its package; `dsh` alone is the distributed shell.
+        #expect(TerminalAgent.identify(program: "node", arguments: "node /x/node_modules/@deepseek-ai/dsh/bin/dsh.js") == .deepSeekHarness)
+        #expect(TerminalAgent.identify(program: "dsh", arguments: nil) == nil)
+        // A scope alone says nothing: `@kilocode/other` is not Kilo Code's CLI.
+        #expect(TerminalAgent.identify(program: "node", arguments: "node /x/node_modules/@kilocode/other/index.js") == nil)
+    }
+
     @Test("only an interpreter's script is kept from a command line: a program's arguments can hold a secret")
     func identifyingWords() {
         #expect(TerminalAgent.identifyingWords("node /x/codex.js --api-key sk-1") == "node /x/codex.js")
@@ -71,7 +88,8 @@ struct TerminalAgentTests {
         for agent in TerminalAgent.allCases {
             let logo = try #require(agent.logo, "\(agent) did not draw")
             #expect(logo.isTemplate)
-            #expect(logo.representations.contains { String(describing: type(of: $0)).contains("SVG") })
+            // Its own SVG where Lobe Icons has one; the quiet fallback symbol where it has none.
+            #expect(logo.representations.contains { String(describing: type(of: $0)).contains("SVG") } == (agent.logoSVG != nil))
         }
     }
 
@@ -83,8 +101,9 @@ struct TerminalAgentTests {
     @MainActor func logosDrawTheirWholePath() throws {
         let pathData = try Regex(#"d="([^"]*)""#)
         for agent in TerminalAgent.allCases {
-            let shipped = try Self.coverage(agent.logoSVG)
-            let spaced = try Self.coverage(agent.logoSVG.replacing(pathData) { match in
+            guard let svg = agent.logoSVG else { continue }
+            let shipped = try Self.coverage(svg)
+            let spaced = try Self.coverage(svg.replacing(pathData) { match in
                 "d=\"\(Self.writtenOut(match.output[1].substring.map(String.init) ?? ""))\""
             })
             #expect(shipped.contains { $0 > 128 }, "\(agent) drew nothing")
@@ -102,6 +121,7 @@ struct TerminalAgentTests {
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Sources/GlassTerminal/Resources/AgentMarks.xcassets")
         for agent in TerminalAgent.allCases {
+            guard agent.logoSVG != nil else { continue }
             let file = catalog.appendingPathComponent("\(agent.markName).imageset/\(agent.markName).svg")
             #expect(try String(contentsOf: file, encoding: .utf8) == agent.logoSVG, "\(agent): the asset differs from logoSVG")
             #expect(TerminalAgent.markBundle.image(forResource: agent.markName) != nil, "\(agent): not in the compiled catalog")
