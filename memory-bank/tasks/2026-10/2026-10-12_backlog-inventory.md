@@ -67,7 +67,9 @@ owner may reorder; the sections below keep the detail. Within a tier, earlier is
     is locked: recordings, SFTP downloads, desktop captures made while away may fail.
 19. B-X4 — drag-select cannot reach tmux history on the Mac.
 20. B-X10, B-X11 — the database breadcrumb; Query commands dead on table tabs.
-21. B-X2 with B-Q11 — the editor notices an outside change only at save; then retire the legacy sheet.
+21. ~~B-X2~~ (2026-10-13, 0.4.410) — the editor looks again as its window comes forward and as a tab is chosen,
+    and asks once per change (`GlassEditorWorkspace.checkForOutsideChange`). **B-Q11 is now unblocked** — the
+    owner's: delete the legacy sheet, which only opens when nothing else can take the file.
 22. B-X6 with B-F32 — RDP colour distortion in motion, and the graphics-mode escape.
 23. B-X7 — RDP on Vision Pro asks for twice the pixels; whole-frame copies.
 24. ~~B-X13~~ 461dc59 (2026-10-13) — the terminal's Local Network guidance follows the error (measured: a denial is
@@ -127,7 +129,7 @@ owner may reorder; the sections below keep the detail. Within a tier, earlier is
 | B-Q8 | Desktop canvas corners rounded or square; desktop default Glass 25% or 100% | 10-10 | 10-08 plan note |
 | B-Q9 | Database split view or own glass; the no-split treatment for Connections, editor and Files | 10-10 | activeContext |
 | B-Q10 | Editor on the headset: ⌘S for Save off the Mac (the database owns it); 13 pt default size; text at Opacity 0 loses syntax colour | 10-09 | 10-08 plan note |
-| B-Q11 | Delete the legacy `SFTPRemoteEditorView` sheet (recommended — but see B-X2 first) | 09-17 | activeContext |
+| B-Q11 | Delete the legacy `SFTPRemoteEditorView` sheet (recommended; B-X2 done 2026-10-13, so nothing is lost) | 09-17 | activeContext |
 | B-Q12 | Local editor projects listed on devices that cannot open them: hide or keep | 09-27 | help audit |
 | B-Q13 | Headset tab bars expand together across windows: a segmented control for the database table tabs; file the Feedback | 09-29 | activeContext |
 | B-Q14 | Undescribed: "desktops in Active a little wonky" (09-28); remote desktop slow on the headset — connecting or live (09-29) | 09-28 | activeContext |
@@ -168,8 +170,11 @@ owner may reorder; the sections below keep the detail. Within a tier, earlier is
   (`Sources/GlassEditor/GlassEditorFileAccess.swift:90`): no non-regular-file refusal, no 8 MB ceiling. A FIFO
   in a project hangs the app; a link to `/dev/zero` reads until memory runs out. (Remote reads are capped at
   64 MB, `GlassTerminalCapability.swift:914`.) The kit's `DocumentLoader` fix (M-4) is used only by the legacy sheet.
-- **B-X2** The new editor checks for an outside change only when saving, not when its window comes forward;
-  only the legacy sheet does (deleting it, B-Q11, would lose the behaviour).
+- **B-X2** ~~The new editor checks for an outside change only when saving~~ (2026-10-13, 0.4.410): it checks as
+  its window comes forward (the Mac's key window; the scene becoming active elsewhere) and as a tab is chosen.
+  A real change asks, with `ConflictPrompt`'s answers (a copy without edits is not offered Save Anyway);
+  a touch, an unanswering machine or an unchanged file asks nothing; one question per change; a check
+  overlapping the editor's own save stands down. Tests: `GlassEditorOutsideChangeTests` (both guards proven).
 - **B-X3** A deleted SSH key quietly becomes the library's first key when the server's form opens, and a key
   added from the form is not selected (`ServerFormViews.swift:437`, `:597`).
 - **B-X4** Drag-select stops at the screen in tmux history on the Mac (Select All takes the history, ec226f9).

@@ -492,6 +492,7 @@ public final class GlassEditorWorkspace {
         guard let index = documents.firstIndex(where: { $0.id == id }) else { return true }
         if documents[index].isDirty, !force { return false }
         documentAccess[id] = nil
+        seenOnReturn[id] = nil
         previewModes[id] = nil
         if let scoped = securityScopedURLs.removeValue(forKey: id) { securityScope.stop(scoped) }
         if previewDocumentID == id { previewDocumentID = nil }
@@ -538,6 +539,7 @@ public final class GlassEditorWorkspace {
     }
 
     private func saveChecking(_ document: GlassEditorDocument) async {
+        writing.insert(document.id); defer { writing.remove(document.id) }
         let access = access(for: document)
         let check = await document.checkBeforeSaving(through: access)
         switch check.state {
@@ -548,8 +550,52 @@ public final class GlassEditorWorkspace {
                                                   name: document.displayName,
                                                   machine: document.machine,
                                                   state: check.state,
-                                                  observed: check.observed)
+                                                  observed: check.observed,
+                                                  origin: document.model.snapshot.origin)
         }
+    }
+
+    // MARK: Coming forward
+
+    /// Documents being saved or re-read. A check that overlaps one would see the editor's own write
+    /// as somebody else's, so it stands down.
+    private var writing: Set<GlassEditorDocument.ID> = []
+
+    /// The file as it was last looked at on coming forward, per document: proven unchanged, or
+    /// already asked about. Switching between windows asks a question once, not every time; a
+    /// further change asks again, and a save always checks for itself.
+    private var seenOnReturn: [GlassEditorDocument.ID: RemoteStat] = [:]
+
+    /// Looks again at a document's file when its window comes forward, or when it is chosen in the
+    /// window (B-X2), and asks — as a save would — if the file changed underneath it. The legacy
+    /// SFTP sheet did this on becoming active; the editor that replaced it checked only at save, by
+    /// which time the edits were made on a stale copy.
+    ///
+    /// Asks only on evidence. A file that could not be looked at (the machine not answering, the file
+    /// gone) raises nothing here: an interruption every time the window comes forward over a dropped
+    /// connection helps nobody, and the save still reports it as `.indeterminate`. A modification time
+    /// that moved over the same bytes is not a change, as at save.
+    public func checkForOutsideChange(_ id: GlassEditorDocument.ID) async {
+        guard pendingConflict == nil, !writing.contains(id),
+              let document = documents.first(where: { $0.id == id }),
+              document.viewer == nil, let baseline = document.session, let path = document.path
+        else { return }
+        let access = access(for: document)
+        guard let now = try? await access.stat(path), now != seenOnReturn[id] else { return }
+        let check = await document.check(currentStat: now, through: access)
+        // A save or a reload that ran while this looked has moved the baseline, and what this saw
+        // may be the editor's own write.
+        guard documents.contains(where: { $0.id == id }), !writing.contains(id),
+              document.session == baseline, pendingConflict == nil else { return }
+        seenOnReturn[id] = now
+        guard check.state != .noConflict else { return }
+        pendingConflict = GlassEditorConflict(documentID: document.id,
+                                              name: document.displayName,
+                                              machine: document.machine,
+                                              state: check.state,
+                                              observed: check.observed,
+                                              cause: .cameForward,
+                                              origin: document.model.snapshot.origin)
     }
 
     /// Goes ahead with a save the user was asked about.
@@ -562,6 +608,7 @@ public final class GlassEditorWorkspace {
         let access = access(for: document)
         let authorized = conflict.observed
         pendingConflict = nil
+        writing.insert(document.id); defer { writing.remove(document.id) }
         switch resolution {
         case .overwriteRemote:
             // Replacing what was on screen when the question was asked, not whatever is there by
@@ -603,6 +650,7 @@ public final class GlassEditorWorkspace {
         for document in documents where document.isDirty {
             guard document.url != nil else { continue }
             let access = access(for: document)
+            writing.insert(document.id); defer { writing.remove(document.id) }
             do { try await document.save(through: access) } catch {
                 failures.append(document.displayName)
             }

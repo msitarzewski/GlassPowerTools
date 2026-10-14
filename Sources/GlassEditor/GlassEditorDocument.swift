@@ -234,10 +234,18 @@ public final class GlassEditorDocument: Identifiable {
     /// because the timestamp moved. The observation the decision was made against is the one the
     /// decision authorises.
     public func checkBeforeSaving(through access: any GlassEditorFileAccess) async -> GlassEditorSaveCheck {
+        guard session != nil, let path = url?.path(percentEncoded: false) else {
+            return GlassEditorSaveCheck(state: .noConflict, observed: nil)
+        }
+        return await check(currentStat: try? await access.stat(path), through: access)
+    }
+
+    /// The same two tiers against a stat already taken — the check made when the window comes
+    /// forward (`GlassEditorWorkspace.checkForOutsideChange`) has looked before it decides to ask.
+    func check(currentStat: RemoteStat?, through access: any GlassEditorFileAccess) async -> GlassEditorSaveCheck {
         guard let session, let path = url?.path(percentEncoded: false) else {
             return GlassEditorSaveCheck(state: .noConflict, observed: nil)
         }
-        let currentStat = try? await access.stat(path)
         let cheap = ConflictDetector.classify(session: session,
                                               currentStat: currentStat,
                                               currentDigest: nil,

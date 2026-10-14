@@ -35,28 +35,38 @@ struct GlassEditorLocalReadTests {
 
     private actor Box {
         var outcome: Outcome?
+        var started: ContinuousClock.Instant?
         func set(_ value: Outcome) { outcome = value }
+        func start() { started = .now }
     }
 
-    /// Reads on the main actor, as the editor does, and gives up after `seconds`: a read that blocks
-    /// fails the test rather than hanging the run.
+    /// Asks from the main actor, as the editor does, and gives up `seconds` after the read begins: a
+    /// read that blocks fails the test rather than hanging the run. Timed from the start of the read,
+    /// not from the request, and nothing after the start waits for the main actor: the editor's suites
+    /// share it, and waiting behind them is not the read blocking (six more of them pushed these past
+    /// a deadline counted from the request).
     private func read(_ path: String, within seconds: Double = 3) async -> Outcome? {
         let box = Box()
-        Task { @MainActor in
-            let outcome: Outcome
-            do {
-                outcome = .data(try await GlassEditorLocalFileAccess().read(path))
-            } catch {
-                outcome = .failed(error as? GlassEditorReadRefusal, (error as? CocoaError)?.code, error.localizedDescription)
-            }
-            await box.set(outcome)
-        }
-        let deadline = ContinuousClock.now + .seconds(seconds)
-        while ContinuousClock.now < deadline {
+        Task { @MainActor in await Self.read(path, into: box) }
+        // The main actor is given a generous while to reach the read at all.
+        let queued = ContinuousClock.now + .seconds(60)
+        while ContinuousClock.now < queued {
             if let outcome = await box.outcome { return outcome }
+            if let started = await box.started, ContinuousClock.now > started + .seconds(seconds) { return nil }
             try? await Task.sleep(for: .milliseconds(20))
         }
         return nil
+    }
+
+    private nonisolated static func read(_ path: String, into box: Box) async {
+        await box.start()
+        let outcome: Outcome
+        do {
+            outcome = .data(try await GlassEditorLocalFileAccess().read(path))
+        } catch {
+            outcome = .failed(error as? GlassEditorReadRefusal, (error as? CocoaError)?.code, error.localizedDescription)
+        }
+        await box.set(outcome)
     }
 
     @Test("a named pipe is refused at once, and the message says what it is")

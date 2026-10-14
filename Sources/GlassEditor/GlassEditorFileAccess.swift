@@ -275,8 +275,18 @@ public struct GlassEditorSaveCheck: Sendable {
     }
 }
 
-/// A save that stopped to ask. Carries what the window needs to say and nothing else.
+/// A save that stopped to ask, or a window that came forward onto a file changed underneath it.
+/// Carries what the window needs to say and nothing else.
 public struct GlassEditorConflict: Identifiable, Sendable {
+    /// What raised the question.
+    public enum Cause: Sendable, Equatable {
+        /// ⌘S found the file changed.
+        case saving
+        /// The window came forward and found it changed (B-X2): asked before any edit is made on a
+        /// stale copy, not only when it is too late to avoid one.
+        case cameForward
+    }
+
     public let id = UUID()
     public let documentID: UUID
     public let name: String
@@ -288,14 +298,22 @@ public struct GlassEditorConflict: Identifiable, Sendable {
     /// *that* — if it changes again while the question is on screen, the write refuses rather than
     /// silently landing on a third version.
     public let observed: RemoteStat?
+    public let cause: Cause
+    /// The answers offered, in `ConflictPrompt`'s order: a clean copy is never offered "Save
+    /// Anyway", which would replace a newer file with an older one for nothing. "Save a copy" is
+    /// left out — it needs a file panel, which this question cannot raise.
+    public let resolutions: [ConflictResolution]
 
     public init(documentID: UUID, name: String, machine: String?, state: ConflictState,
-                observed: RemoteStat?) {
+                observed: RemoteStat?, cause: Cause = .saving, origin: DocumentOrigin) {
         self.documentID = documentID
         self.name = name
         self.machine = machine
         self.state = state
         self.observed = observed
+        self.cause = cause
+        self.resolutions = ConflictPrompt.availableResolutions(for: state, origin: origin)
+            .filter { $0 != .saveLocalCopy }
     }
 
     /// What happened, in the words a person would use.

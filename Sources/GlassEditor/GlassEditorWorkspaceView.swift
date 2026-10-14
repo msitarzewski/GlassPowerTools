@@ -1081,20 +1081,31 @@ private struct GlassEditorDialogs: ViewModifier {
             } message: {
             Text(workspace.message ?? "")
             }
-            // A save that stopped to ask. The choices are `ConflictResolution`'s, which is the
-            // same set the SFTP editor offers — one vocabulary for "the file changed underneath
-            // you", wherever the file is.
+            // A save that stopped to ask, or a window that came forward onto a changed file
+            // (B-X2). The choices are `ConflictPrompt`'s, which is the same set the SFTP editor
+            // offers — one vocabulary for "the file changed underneath you", wherever the file is.
             .confirmationDialog("The file has changed", isPresented: Binding(
             get: { workspace.pendingConflict != nil },
             set: { if !$0 { Task { await workspace.resolveConflict(.keepEditing) } } }),
             titleVisibility: .visible, presenting: workspace.pendingConflict) { conflict in
+            ForEach(conflict.resolutions, id: \.self) { resolution in
+            switch resolution {
+            case .overwriteRemote:
             Button("Save Anyway", role: .destructive) {
             Task { await workspace.resolveConflict(.overwriteRemote) }
             }
-            Button("Discard My Changes and Reload", role: .destructive) {
+            case .discardLocalAndReload:
+            // Nothing is thrown away when the copy here has no edits: it is just older.
+            Button(conflict.state == .remoteChangedLocalClean ? "Reload" : "Discard My Changes and Reload",
+            role: conflict.state == .remoteChangedLocalClean ? nil : .destructive) {
             Task { await workspace.resolveConflict(.discardLocalAndReload) }
             }
+            case .keepEditing:
             Button("Keep Editing", role: .cancel) { Task { await workspace.resolveConflict(.keepEditing) } }
+            case .saveLocalCopy:
+            EmptyView()
+            }
+            }
             } message: { conflict in
             Text(conflict.explanation)
             }
@@ -1167,6 +1178,8 @@ private struct GlassEditorWindowLifecycle: ViewModifier {
     // which is true on those platforms anyway.
     #if os(macOS)
     @Environment(\.controlActiveState) private var activeState
+    #else
+    @Environment(\.scenePhase) private var scenePhase
     #endif
     #if os(visionOS)
     @Environment(\.glassLayers) private var layers
@@ -1187,6 +1200,11 @@ private struct GlassEditorWindowLifecycle: ViewModifier {
     }
     #endif
 
+    private func checkForOutsideChange(_ id: GlassEditorDocument.ID?) {
+        guard let id else { return }
+        Task { await workspace.checkForOutsideChange(id) }
+    }
+
     func body(content: Content) -> some View {
         content
             #if os(visionOS)
@@ -1196,9 +1214,18 @@ private struct GlassEditorWindowLifecycle: ViewModifier {
             .onAppear { runtime?.noteFrontmost(windowID) }
             #if os(macOS)
             .onChange(of: activeState) { _, state in
-                if state == .key { runtime?.noteFrontmost(windowID) }
+                guard state == .key else { return }
+                runtime?.noteFrontmost(windowID)
+                checkForOutsideChange(workspace.selection)
+            }
+            #else
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { checkForOutsideChange(workspace.selection) }
             }
             #endif
+            // B-X2: the file in front is looked at again as its window comes forward and as it is
+            // chosen, so a change made elsewhere is found before the edits, not at the save.
+            .onChange(of: workspace.selection) { _, id in checkForOutsideChange(id) }
             .onDisappear { runtime?.forget(windowID) }
             // **The text follows the system's appearance.** `GlassEditorModel` defaults to the dark
             // theme; nothing ever changed it, so in Light mode the chrome went light and the text
