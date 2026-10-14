@@ -105,8 +105,14 @@ all of the platforms that support them. App intents, all of the modern stuff …
     workgroup.
   - Handoff for the terminal, database or desktop in front. The activity carries only the endpoint, and the Mac
     takes it in the app delegate.
-  - **Not built, the owner's call:** a native share extension. iOS share extensions cannot wake the app, so the
-    upload would run in the extension with the SSH stack and Keychain credentials, which the plan ruled out.
+  - **Share extension, the Mac only (the owner chose "1 mac only"), 0.4.407:** Share ▸ Send to a Machine. The
+    extension copies the files into the App Group and opens the app, which sends them and shows an alert. No
+    credentials ever enter the extension.
+  - **Handoff fixed (0.4.407).** The owner, continuing an iPhone terminal on the Mac: "it opened a new terminal
+    window, with tmux, in my home directory … left a detached tmux session in Active". Now the activity names
+    the tmux session. The receiving device brings forward the tab showing that session, even a background tab,
+    or attaches to it by name, never a new session. The owner's leftover detached session is his to End in
+    Active.
 - **Phase 4 built (0.4.406):**
   - Controls on the Mac 26, iPhone and iPad: Open Terminal on a chosen machine, Active Connections, and New
     Terminal Window on the Mac.
