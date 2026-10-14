@@ -334,6 +334,12 @@ public struct GlassShellLibraryView: View {
                 }
                 ForEach(host.services) { service in
                     serviceRow(service, host: host)
+                        // **The menu answers anywhere on the row** (the owner, 2026-10-14: "allow the
+                        // right click … as a context on the whole row instead of just the text").
+                        // The row is the name, a spacer and the buttons, and a spacer is not hit:
+                        // only the name and icon took a right-click.
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
                         .contextMenu {
                             // A service of its own in Favorites (2026-10-13), beside its machine.
                             let favorite = GlassFavorite.service(service.endpointID)
@@ -436,6 +442,9 @@ public struct GlassShellLibraryView: View {
                 .help("Open \(tool.title)")
                 .accessibilityIdentifier("host-tool-open-\(tool.id)")
         }
+        // The whole row, as a service's: a press anywhere on it is the row's.
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
         .accessibilityIdentifier("host-tool-\(tool.id)")
     }
 
