@@ -2035,11 +2035,13 @@ private enum MockGraphicsFrameHandlerError: Error, CustomStringConvertible {
     #expect(report.rdpClipboardMessages?.map(\.typeName).contains("clipboard-format-list") == true)
     #expect(report.rdpClipboardMessages?.map(\.typeName).contains("clipboard-format-data-response") == true)
     #expect(report.rdpClipboardMessages?.map(\.typeName).contains("clipboard-file-contents-response") == true)
-    // Monitor Ready is answered with the client's clipboard too, empty here: "the client MUST send
-    // a Format List PDU" (MS-RDPECLIP 3.2.5.1.2), or a server that waits for it never syncs.
-    #expect(report.rdpClipboardSentMessages?.prefix(3).map(\.typeName) == [
-        "clipboard-capabilities", "clipboard-temporary-directory", "clipboard-format-list",
+    // Monitor Ready is answered with capabilities and the temporary directory, and not yet with
+    // the Format List MS-RDPECLIP 3.2.5.1.2 asks for: GNOME Remote Desktop dropped every session
+    // that had one (2026-10-14, `answerMonitorReady`).
+    #expect(report.rdpClipboardSentMessages?.prefix(2).map(\.typeName) == [
+        "clipboard-capabilities", "clipboard-temporary-directory",
     ])
+    #expect(report.rdpClipboardSentMessages?.dropFirst(2).first?.typeName != "clipboard-format-list")
     #expect(report.rdpClipboardSentMessages?.map(\.typeName).contains("clipboard-format-list-response") == true)
     #expect(report.rdpClipboardSentMessages?.map(\.typeName).contains("clipboard-format-data-request") == true)
     #expect(report.rdpClipboardSentMessages?.map(\.typeName).contains("clipboard-file-contents-request") == true)

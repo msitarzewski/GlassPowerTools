@@ -182,7 +182,8 @@ public actor GlassRDPSession {
     private func finished(id: UUID, error: String?) {
         guard activeID == id else { return }
         let cancelled = stopRequested
-        Self.logger.notice("event=finished attempt=\(id.uuidString, privacy: .public) cancelled=\(cancelled) failed=\(error != nil)")
+        // What ended it, in RDPKit's words: "failed=true" alone left a dropped desktop unexplained.
+        Self.logger.notice("event=finished attempt=\(id.uuidString, privacy: .public) cancelled=\(cancelled) failed=\(error != nil) error=\(error ?? "none", privacy: .public)")
         worker = nil; activeID = nil; controls = nil; cancellation = nil
         inputState = RDPInputStateTracker()
         if !cancelled, let error { eventContinuation.yield(.state(.failed(error))) }
