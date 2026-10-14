@@ -32,20 +32,28 @@ use the disposable test VM only).
 
 ## 2026-10-14 (~11:30) — RESUME HERE
 
-**State:** 0.4.426 on the Mac and iPhone (11:20); the Vision Pro has been locked (CoreDevice 4016)
+**State:** 0.4.427 on the Mac and iPhone (11:43); the Vision Pro has been locked (CoreDevice 4016)
 since 0.4.423 — retry `devicectl device install app` with `$SP/dd-vision` when it is worn. No crash reports since
 2026-10-13 18:47. Everything committed, nothing pushed. The owner said he was packing up (~11:10). **Mac installs go when
 ready, never held on our judgement** (the owner: "No need to hold on quitting right now. All tmux all day."); devices too.
 
 **Waiting on the owner:**
-- **Desktop clipboard, second fix (26d5778, 0.4.425).** He reported "Clipboard didn't transfer" on the GNOME desktop.
-  The log showed Monitor Ready arriving (`event=clipboard-ready`) and then nothing either way. Cause: after Monitor Ready
-  "the client MUST send a Format List PDU" (MS-RDPECLIP 3.2.5.1.2); RDPKit sent only capabilities and the temporary
-  directory. Now it sends the clipboard as it stands (empty when nothing). The session's closing line now lists every
-  clipboard message both ways by type (`received=… sent=…`, `:fail` on a refused response, never content). He copies both
-  ways, disconnects, says so; read `/usr/bin/log show --last 1h --predicate 'subsystem == "app.glassdt.rdp" AND
-  eventMessage CONTAINS "clipboard"'`. Odd in the old log: two Monitor Readies in one session and no server
-  capabilities counted — the new line will show whether GNOME re-sends Monitor Ready.
+- **Desktop clipboard vs GNOME — open, and the reason for 0.4.427.** 26d5778 (0.4.425) answered Monitor Ready with the
+  Format List MS-RDPECLIP 3.2.5.1.2 requires. The clipboard then synced (server answered our list, offered its own, we
+  asked for its text) — and GNOME dropped every session: at once, or ~4–5 s later with a *second* redirect (hop 1 → hop
+  2, which fails at once). GNOME runs FreeRDP's cliprdr server; `grd-clipboard-rdp.c` has `MAX_WAIT_TIME_MS 4000`
+  timeouts around list responses and data requests. On 0.4.423 a copy announced right at Monitor Ready (10:18:34) ended
+  that session too; sessions that sent no list lasted minutes. The owner: "Desktop instantly quits now on [his GNOME
+  desktop]". 4346ef8 stops the Monitor Ready list (back to 0.4.424) and logs RDPKit's error text at `event=finished`.
+  Workaround told to him: Share clipboard off for that desktop. **Next:** his GNOME journal for 11:31–11:33 (user and
+  system `gnome-remote-desktop` units) to see why its session ends; then the real fix. Not reproduced on Windows (VM
+  session sits at sign-in).
+- **Command Palette (cf237ab, 0.4.427):** every library service as "Connect: Desktop on alpha", connected as Connect
+  does; the terminal's and database's own lists removed (the database's set `paletteConnectionRequest`, which nothing
+  read — its entries connected nothing). The three capabilities now drain queued requests when a Connections window
+  appears (`onChange(initial: true)`). He asked what else needs updating in the command lists — answer given: the
+  library window's own entries (New Connection, local terminals, Files and plain-shell per machine, workgroups) appear
+  only while a Connections window is in front; saved queries, projects and Favorites' other kinds are in none.
 - **Show All Windows on iPhone and Vision Pro — a proposal, his to decide** (he asked "consider what expose looks like
   on both"). iPhone: Active becomes the overview, a Safari-like two-column grid of cards by machine (`GlassSessionCard`
   survived the 2026-09-21 gallery removal, `f2ed368`, whose point was one place), reached from ⚡ and a pinch; no second
