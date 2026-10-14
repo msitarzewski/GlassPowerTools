@@ -27,6 +27,29 @@ struct GlassEditorPreviewTests {
         #expect(GlassEditorPreviewMode.previewOnly.next(roomBeside: false) == .text)
     }
 
+    /// The owner, 2026-10-14: a "Blocked Plug-in" pill in the preview of notes that mentioned an
+    /// HTML tag in backticks. swift-markdown's formatter escaped nothing, so the code became a tag.
+    @Test("text is text: tags in code, in code blocks, in prose and in links are shown, never made")
+    func escapesText() {
+        func body(_ markdown: String) -> String { GlassEditorMarkdownHTML.format(markdown) }
+        #expect(body("Use `<embed src=x>` or `<object>` here.")
+                == "<p>Use <code>&lt;embed src=x&gt;</code> or <code>&lt;object&gt;</code> here.</p>\n")
+        #expect(body("```html\n<script>alert(1)</script>\n```")
+                == "<pre><code class=\"language-html\">&lt;script&gt;alert(1)&lt;/script&gt;\n</code></pre>\n")
+        #expect(body("An escaped &lt;object&gt; stays text, and so does a & b.")
+                == "<p>An escaped &lt;object&gt; stays text, and so does a &amp; b.</p>\n")
+        #expect(body("[x](<a\"b>)").contains("href=\"a&quot;b\""), "a quote ended the href")
+        #expect(body("![Q&A chart](chart.png \"Q3 <draft>\")")
+                == "<p><img src=\"chart.png\" alt=\"Q&amp;A chart\" title=\"Q3 &lt;draft&gt;\" /></p>\n")
+        #expect(body("## The `<embed>` *tag*") == "<h2>The <code>&lt;embed&gt;</code> <em>tag</em></h2>\n",
+                "a heading keeps its inline markup, escaped")
+        // A Mermaid fence is escaped too; the script reads it back with `textContent`.
+        #expect(body("```mermaid\nA-->B\n```") == "<pre><code class=\"language-mermaid\">A--&gt;B\n</code></pre>\n")
+        // Raw HTML is Markdown's own, and passes through; the page's policy keeps scripts out.
+        #expect(body("<details><summary>More</summary>\n\nHidden\n\n</details>").contains("<details><summary>More</summary>"))
+        #expect(!GlassEditorPreviewPage.markdown("`<embed src=x>`").contains("<embed"))
+    }
+
     @Test("Markdown renders tables, task lists and Mermaid fences, and only the app's scripts may run")
     func markdownPage() {
         let page = GlassEditorPreviewPage.markdown("""

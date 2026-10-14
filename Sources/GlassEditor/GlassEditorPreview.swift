@@ -80,10 +80,11 @@ public enum GlassEditorPreviewPage {
     }
 
     /// GitHub-flavoured Markdown, with ` ```mermaid ` fences drawn by the bundled Mermaid.
-    /// Raw HTML in the Markdown passes through the formatter, which is why the policy — not the
-    /// formatter — is what keeps its scripts from running: `script-src` names only the app's own.
+    /// Text is escaped as text (`GlassEditorMarkdownHTML`); raw HTML in the Markdown passes through,
+    /// which is why the policy is what keeps its scripts from running: `script-src` names only the
+    /// app's own.
     public static func markdown(_ text: String) -> String {
-        let body = HTMLFormatter.format(text)
+        let body = GlassEditorMarkdownHTML.format(text)
         let scripts = """
         <script src="\(scheme)://\(appHost)/mermaid.min.js"></script>
         <script src="\(scheme)://\(appHost)/glass-mermaid.js"></script>
