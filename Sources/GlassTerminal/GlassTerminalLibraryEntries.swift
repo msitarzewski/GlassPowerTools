@@ -10,6 +10,7 @@
 
 import SwiftUI
 import GlassConnectionKit
+import GlassConnectionUI
 import GlassShell
 import GlassLayers
 
@@ -75,46 +76,73 @@ public struct GlassTerminalServiceActions: View {
 }
 
 #if os(macOS)
-/// glas.sh's command palette entries for the library window (moved from ConnectionManagerView).
-/// "Show saved connection" is gone: selection belongs to the shell's library now.
+/// The terminal's commands in the Command Palette, from any window (2026-10-14). They were the
+/// Connections window's own, so with a terminal window in front — most of the time — New
+/// Connection, the local terminals, Files and the workgroups were not there. Connecting a machine's
+/// terminal is the library's entry now (`GlassShellModel.paletteConnections`); what is left is
+/// what the terminal adds: a terminal without tmux, Files, and its own windows and panels.
 @MainActor
 enum GlassTerminalCommandCenter {
-    static func entries(runtime: GlassTerminalRuntime) -> [MacCommandCenterEntry] {
+    /// The windows the entries open, as closures a test can stand in for.
+    struct Windows {
+        var connectionsOpen: @MainActor () -> Bool
+        var openConnections: @MainActor () -> Void
+        var openWorkspace: @MainActor (MacWorkspaceLaunchRequest) -> Void
+        var showWorkgroups: @MainActor () -> Void
+        var openTailscale: @MainActor () -> Void
+    }
+
+    static func entries(runtime: GlassTerminalRuntime, openWindow: OpenWindowAction) -> [MacCommandCenterEntry] {
+        entries(runtime: runtime, windows: Windows(
+            connectionsOpen: { GlassLibraryWindows.isOpen },
+            openConnections: { openWindow.openConnections() },
+            openWorkspace: { openWindow(id: "workspace", value: $0) },
+            showWorkgroups: { runtime.showWorkgroups(openWindow: openWindow) },
+            openTailscale: { openWindow(id: "terminal-tailscale") }))
+    }
+
+    static func entries(runtime: GlassTerminalRuntime, windows: Windows) -> [MacCommandCenterEntry] {
+        // What only a Connections window carries out — a sheet there, a connection's password
+        // prompt: one is opened when none is, and picks the request up as it appears.
+        func viaLibrary(_ request: @escaping @MainActor () -> Void) -> () -> Void {
+            {
+                if !windows.connectionsOpen() { windows.openConnections() }
+                request()
+            }
+        }
         var entries = [MacCommandCenterEntry(id: "connection.new", title: "New Connection",
-                                            detail: "Connections") { runtime.requestAddServer() },
-                       MacCommandCenterEntry(id: "terminal.local", title: "Open Local Terminal",
-                                            detail: "Terminal") { runtime.requestLocalTerminal() },
+                                            detail: "Connections", action: viaLibrary { runtime.requestAddServer() }),
+                       MacCommandCenterEntry(id: "terminal.local", title: "Open Local Terminal", detail: "Terminal") {
+                           windows.openWorkspace(MacWorkspaceLaunchRequest())
+                       },
                        MacCommandCenterEntry(id: "terminal.local.plain", title: "Open Basic Local Terminal",
                                             detail: "Terminal without tmux", shortcut: "⌃⌘T") {
-                           runtime.requestLocalTerminal(withoutTmux: true)
+                           windows.openWorkspace(MacWorkspaceLaunchRequest(
+                               initialPaneIntent: MacWorkspacePaneIntent.local.startingWithoutTmux()))
                        },
-                       MacCommandCenterEntry(id: "library.workgroups", title: "Workgroups",
-                                            detail: "Library") { runtime.requestShowWorkgroups() }]
+                       MacCommandCenterEntry(id: "library.workgroups", title: "Workgroups", detail: "Library") {
+                           windows.showWorkgroups()
+                       }]
         if runtime.tailscaleIsConfigured {
-            entries.append(MacCommandCenterEntry(id: "library.tailscale", title: "Tailscale Devices",
-                                                 detail: "Library") { runtime.requestShowTailscale() })
+            entries.append(MacCommandCenterEntry(id: "library.tailscale", title: "Tailscale Devices", detail: "Library") {
+                windows.openTailscale()
+            })
         }
-        // By machine: "Connect to alpha", not "Connect to Terminal on alpha" (2026-10-12).
+        // By machine: "… alpha", not "… Terminal on alpha" (2026-10-12).
         let titled = GlassTerminalRuntime.distinguished(runtime.sessionManager.serverManager.servers.map { ($0, runtime.machineTitle(of: $0)) })
         for (server, machine) in titled {
-            entries.append(MacCommandCenterEntry(id: "connection.connect.\(server.id)",
-                title: "Connect to \(machine)", detail: "Open SSH terminal") {
-                runtime.requestConnect(serverID: server.id)
-            })
             if server.keepsSessionsInTmux {
                 entries.append(MacCommandCenterEntry(id: "connection.plain.\(server.id)",
-                    title: "Connect to \(machine) without tmux", detail: "Open a basic SSH terminal") {
-                    runtime.requestConnect(serverID: server.id, withoutTmux: true)
-                })
+                    title: "Connect to \(machine) without tmux", detail: "A basic SSH terminal",
+                    action: viaLibrary { runtime.requestConnect(serverID: server.id, withoutTmux: true) }))
             }
             entries.append(MacCommandCenterEntry(id: "connection.sftp.\(server.id)",
-                title: "Open SFTP · \(machine)", detail: "Files") {
-                runtime.requestConnect(serverID: server.id, purpose: .sftp)
-            })
+                title: "Open Files on \(machine)", detail: "Files (SFTP)",
+                action: viaLibrary { runtime.requestConnect(serverID: server.id, purpose: .sftp) }))
         }
         entries += runtime.settingsManager.layoutPresets.map { preset in
-            MacCommandCenterEntry(id: "workgroup.\(preset.id)", title: "Open \(preset.name)",
-                                  detail: "Workgroups") { runtime.requestOpenWorkgroup(preset.id) }
+            MacCommandCenterEntry(id: "workgroup.\(preset.id)", title: "Open \(preset.name)", detail: "Workgroups",
+                                  action: viaLibrary { runtime.requestOpenWorkgroup(preset.id) })
         }
         return entries
     }

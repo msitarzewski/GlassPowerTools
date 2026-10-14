@@ -194,7 +194,12 @@ public final class GlassTerminalRuntime {
         }
         // ⇧⌘\ is Show All Windows' from the start, before any window could press it.
         MacTerminalExposeShortcut.install()
-        // The Command Palette's terminals are the library's (`registerPaletteConnections`).
+        // The Command Palette's terminal commands, from any window; its terminals are the
+        // library's (`registerPaletteConnections`).
+        GlassCommandPaletteSources.register(id: "terminal") { [weak self] openWindow in
+            guard let self else { return [] }
+            return GlassTerminalCommandCenter.entries(runtime: self, openWindow: openWindow)
+        }
         #endif
     }
 
@@ -974,9 +979,6 @@ public struct GlassTerminalBootstrap<Content: View>: View {
             .sheet(isPresented: Binding(get: { router.showsTailscale }, set: { router.showsTailscale = $0 })) {
                 TerminalTailscaleView()
             }
-            #endif
-            #if os(macOS)
-            .focusedSceneValue(\.macCommandCenterEntries, GlassTerminalCommandCenter.entries(runtime: runtime))
             #endif
             .task { await runtime.refreshTailscaleConfiguration() }
             .onReceive(NotificationCenter.default.publisher(for: .tailscaleCredentialsDidChange)) { _ in
