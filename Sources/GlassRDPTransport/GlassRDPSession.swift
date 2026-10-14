@@ -267,8 +267,9 @@ public actor GlassRDPSession {
         }
         // Whether the server gave the clipboard a channel at all, and whether anything crossed it:
         // "never offered" and "offered late" are different fixes.
+        // Each message's type in both directions, never its content: where a copy stopped.
         if configuration.clipboardEnabled {
-            logger.notice("event=clipboard channel=\(report.rdpClipboardChannelID.map(String.init) ?? "none", privacy: .public) ready=\(controls.snapshot.clipboard != nil) messages=\(report.rdpClipboardMessages?.count ?? 0)")
+            logger.notice("event=clipboard channel=\(report.rdpClipboardChannelID.map(String.init) ?? "none", privacy: .public) ready=\(controls.snapshot.clipboard != nil) messages=\(report.rdpClipboardMessages?.count ?? 0) received=\(Self.clipboardTypes(report.rdpClipboardMessages), privacy: .public) sent=\(Self.clipboardTypes(report.rdpClipboardSentMessages), privacy: .public)")
         }
         if let failure = controls.snapshot.failure { return failure }
         if report.status == "failure" {
@@ -290,6 +291,17 @@ public actor GlassRDPSession {
     /// message and still raise the recovery panel with its Reconnect button. MS-RDPBCGR error info
     /// and disconnect reasons:
     /// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/6c74b3b9-1c1f-4a89-9b1e-0f3b0b0a1e2c
+    /// "capabilities,monitor-ready,format-list-response:fail": a session's clipboard messages by
+    /// type, in order, a failed response marked (CB_RESPONSE_FAIL, MS-RDPECLIP 2.2.1); the first 40.
+    nonisolated static func clipboardTypes(_ messages: [RDPClipboardMessageSummary]?) -> String {
+        guard let messages, !messages.isEmpty else { return "none" }
+        let names = messages.prefix(40).map { message in
+            let name = message.typeName.hasPrefix("clipboard-") ? String(message.typeName.dropFirst(10)) : message.typeName
+            return message.messageFlags & 0x0002 != 0 ? name + ":fail" : name
+        }
+        return names.joined(separator: ",") + (messages.count > 40 ? ",+\(messages.count - 40)" : "")
+    }
+
     private nonisolated static func endedNormally(_ report: RDPPreflightReport) -> Bool {
         let announcedSignOut: Set<String> = [
             "ERRINFO_RPC_INITIATED_DISCONNECT", "ERRINFO_RPC_INITIATED_LOGOFF",

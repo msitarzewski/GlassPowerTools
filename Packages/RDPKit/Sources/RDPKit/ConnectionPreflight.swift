@@ -5690,7 +5690,7 @@ private func handleClipboardPacket(
     }
 
     if clipboardPDU.header.messageType == RDPClipboardMessageType.monitorReady {
-        session.sendClientCapabilities()
+        session.answerMonitorReady()
         onClipboardReady?(session)
         return true
     }

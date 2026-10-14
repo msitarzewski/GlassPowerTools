@@ -86,3 +86,17 @@ import Testing
         #expect(try GlassRDPSession.engineConfiguration(configuration).graphicsCapabilityProfile == expected[mode])
     }
 }
+
+/// The clipboard's log line names each message by type, in order, and marks a refusal — "it never
+/// opened" and "it refused our list" are different fixes — and never carries the clipboard itself.
+@Test func clipboardLogNamesEachMessageWithoutItsContent() {
+    let messages = [
+        RDPClipboardMessageSummary(typeName: "clipboard-capabilities", messageFlags: 0, dataLength: 16),
+        RDPClipboardMessageSummary(typeName: "clipboard-monitor-ready", messageFlags: 0, dataLength: 0),
+        RDPClipboardMessageSummary(typeName: "clipboard-format-list-response", messageFlags: 0x0002, dataLength: 0),
+    ]
+    #expect(GlassRDPSession.clipboardTypes(messages) == "capabilities,monitor-ready,format-list-response:fail")
+    #expect(GlassRDPSession.clipboardTypes(nil) == "none")
+    let many = Array(repeating: messages[1], count: 43)
+    #expect(GlassRDPSession.clipboardTypes(many).hasSuffix("monitor-ready,+3"))
+}

@@ -2035,8 +2035,11 @@ private enum MockGraphicsFrameHandlerError: Error, CustomStringConvertible {
     #expect(report.rdpClipboardMessages?.map(\.typeName).contains("clipboard-format-list") == true)
     #expect(report.rdpClipboardMessages?.map(\.typeName).contains("clipboard-format-data-response") == true)
     #expect(report.rdpClipboardMessages?.map(\.typeName).contains("clipboard-file-contents-response") == true)
-    #expect(report.rdpClipboardSentMessages?.map(\.typeName).contains("clipboard-capabilities") == true)
-    #expect(report.rdpClipboardSentMessages?.map(\.typeName).contains("clipboard-temporary-directory") == true)
+    // Monitor Ready is answered with the client's clipboard too, empty here: "the client MUST send
+    // a Format List PDU" (MS-RDPECLIP 3.2.5.1.2), or a server that waits for it never syncs.
+    #expect(report.rdpClipboardSentMessages?.prefix(3).map(\.typeName) == [
+        "clipboard-capabilities", "clipboard-temporary-directory", "clipboard-format-list",
+    ])
     #expect(report.rdpClipboardSentMessages?.map(\.typeName).contains("clipboard-format-list-response") == true)
     #expect(report.rdpClipboardSentMessages?.map(\.typeName).contains("clipboard-format-data-request") == true)
     #expect(report.rdpClipboardSentMessages?.map(\.typeName).contains("clipboard-file-contents-request") == true)

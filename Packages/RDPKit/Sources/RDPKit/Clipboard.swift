@@ -1126,11 +1126,7 @@ public final class RDPClipboardSession: @unchecked Sendable {
         }
         lock.unlock()
 
-        if text == nil {
-            send(RDPClipboardFormatListPDU(formatIDs: []).encoded(useLongFormatNames: usesLongFormatNames))
-        } else {
-            send(RDPClipboardFormatListPDU.unicodeText().encoded(useLongFormatNames: usesLongFormatNames))
-        }
+        sendFormatList()
     }
 
     /// Receives the server's clipboard in every format it offers that maps to rich content. Once set,
@@ -1150,17 +1146,43 @@ public final class RDPClipboardSession: @unchecked Sendable {
         lock.lock()
         localContent = .rich(content)
         lock.unlock()
+        sendFormatList()
+    }
 
-        var entries: [RDPClipboardFormatListEntry] = []
-        if content.text != nil { entries.append(.init(formatID: RDPClipboardFormatID.unicodeText)) }
-        if content.html != nil {
-            entries.append(.init(formatID: RDPClipboardRichFormat.localHTMLFormatID, formatName: RDPClipboardRichFormat.htmlName))
+    /// The Format List that announces `content`: what the server may ask this client for.
+    private static func formatList(for content: RDPClipboardLocalContent) -> RDPClipboardFormatListPDU {
+        switch content {
+        case .empty:
+            return RDPClipboardFormatListPDU(formatIDs: [])
+        case .unicodeText:
+            return .unicodeText()
+        case let .rich(content):
+            var entries: [RDPClipboardFormatListEntry] = []
+            if content.text != nil { entries.append(.init(formatID: RDPClipboardFormatID.unicodeText)) }
+            if content.html != nil {
+                entries.append(.init(formatID: RDPClipboardRichFormat.localHTMLFormatID, formatName: RDPClipboardRichFormat.htmlName))
+            }
+            if content.rtf != nil {
+                entries.append(.init(formatID: RDPClipboardRichFormat.localRTFFormatID, formatName: RDPClipboardRichFormat.rtfName))
+            }
+            if content.png != nil { entries.append(.init(formatID: RDPClipboardRichFormat.dibFormatID)) }
+            return RDPClipboardFormatListPDU(entries: entries)
+        case .files:
+            return RDPClipboardFormatListPDU(entries: [
+                RDPClipboardFormatListEntry(
+                    formatID: RDPClipboardLocalFormatID.fileGroupDescriptorW,
+                    formatName: RDPClipboardRegisteredFormatName.fileGroupDescriptorW
+                ),
+                RDPClipboardFormatListEntry(
+                    formatID: RDPClipboardLocalFormatID.fileContents,
+                    formatName: RDPClipboardRegisteredFormatName.fileContents
+                ),
+            ])
         }
-        if content.rtf != nil {
-            entries.append(.init(formatID: RDPClipboardRichFormat.localRTFFormatID, formatName: RDPClipboardRichFormat.rtfName))
-        }
-        if content.png != nil { entries.append(.init(formatID: RDPClipboardRichFormat.dibFormatID)) }
-        send(RDPClipboardFormatListPDU(entries: entries).encoded(useLongFormatNames: usesLongFormatNames))
+    }
+
+    private func sendFormatList() {
+        send(Self.formatList(for: currentContent()).encoded(useLongFormatNames: usesLongFormatNames))
     }
 
     /// The server announced a new clipboard. With a rich handler set, queues each wanted format and
@@ -1226,17 +1248,7 @@ public final class RDPClipboardSession: @unchecked Sendable {
         lock.lock()
         localContent = .files(files)
         lock.unlock()
-
-        send(RDPClipboardFormatListPDU(entries: [
-            RDPClipboardFormatListEntry(
-                formatID: RDPClipboardLocalFormatID.fileGroupDescriptorW,
-                formatName: RDPClipboardRegisteredFormatName.fileGroupDescriptorW
-            ),
-            RDPClipboardFormatListEntry(
-                formatID: RDPClipboardLocalFormatID.fileContents,
-                formatName: RDPClipboardRegisteredFormatName.fileContents
-            ),
-        ]).encoded(useLongFormatNames: usesLongFormatNames))
+        sendFormatList()
     }
 
     func updateServerCapabilities(_ capabilities: RDPClipboardCapabilitiesPDU) {
@@ -1251,9 +1263,15 @@ public final class RDPClipboardSession: @unchecked Sendable {
         return serverGeneralFlags & RDPClipboardCapabilityFlags.useLongFormatNames != 0
     }
 
-    func sendClientCapabilities() {
+    /// Monitor Ready's answer: this client's capabilities, its temporary directory, then the
+    /// clipboard as it stands — an empty list when it holds nothing. The list is not optional:
+    /// "the client MUST send a Format List PDU … This ensures that the peer system clipboards are
+    /// in sync" (MS-RDPECLIP 3.2.5.1.2). Without it, GNOME Remote Desktop opened its clipboard and
+    /// then neither took a copy nor offered one (the owner, 2026-10-14: "Clipboard didn't transfer").
+    func answerMonitorReady() {
         send(RDPClipboardCapabilitiesPDU(generalFlags: clientGeneralFlags).encoded())
         send(RDPClipboardTemporaryDirectoryPDU().encoded())
+        sendFormatList()
     }
 
     var clientGeneralFlags: UInt32 {
