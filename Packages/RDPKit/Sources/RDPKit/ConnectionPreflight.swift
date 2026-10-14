@@ -4568,6 +4568,15 @@ private func performRDPGraphicsDynamicChannelHandshake(
 
     do {
         var packetsRead = 0
+        // The clipboard, sound and redirected devices talk while the graphics are negotiated, and
+        // none of that brings the first frame nearer, so it does not use up the 16 packets the
+        // negotiation is given. It did: GNOME Remote Desktop answers a client's clipboard at once
+        // (list response, its own list, a data request), and with ours announced at Monitor Ready
+        // the budget ran out before the server confirmed RDPGFX — "server did not confirm RDPGFX
+        // capabilities", every connection (2026-10-14). Their own bound keeps a server that only
+        // chatters from holding the connection open.
+        var sideChannelPackets = 0
+        let maximumSideChannelPackets = 4_096
         while packetsRead < 16 || result.firstGraphicsFrame != nil {
             defer {
                 if result.dynamicChannelRequestData.count > 16 {
@@ -4681,6 +4690,9 @@ private func performRDPGraphicsDynamicChannelHandshake(
                        messages: &result.clipboardMessages
                    )
                 {
+                    packetsRead -= 1
+                    sideChannelPackets += 1
+                    guard sideChannelPackets <= maximumSideChannelPackets else { break }
                     continue
                 }
                 if let audioSession,
@@ -4692,6 +4704,9 @@ private func performRDPGraphicsDynamicChannelHandshake(
                        messages: &result.audioMessages
                    )
                 {
+                    packetsRead -= 1
+                    sideChannelPackets += 1
+                    guard sideChannelPackets <= maximumSideChannelPackets else { break }
                     continue
                 }
                 if let deviceRedirectionSession,
@@ -4700,6 +4715,9 @@ private func performRDPGraphicsDynamicChannelHandshake(
                        session: deviceRedirectionSession
                    )
                 {
+                    packetsRead -= 1
+                    sideChannelPackets += 1
+                    guard sideChannelPackets <= maximumSideChannelPackets else { break }
                     continue
                 }
                 continue

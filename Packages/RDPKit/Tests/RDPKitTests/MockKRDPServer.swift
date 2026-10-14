@@ -47,7 +47,8 @@ final class MockKRDPServer {
         audioEnabled: Bool = false,
         waitForCompatibilityTraffic: Bool = false,
         requireBitmapCodecsCapability: Bool = false,
-        skipChannelJoinSupported: Bool = false
+        skipChannelJoinSupported: Bool = false,
+        clipboardChatter: Int = 0
     ) throws -> MockKRDPServer {
         let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         let transcript = MockKRDPServerTranscript()
@@ -74,6 +75,7 @@ final class MockKRDPServer {
                         waitForCompatibilityTraffic: waitForCompatibilityTraffic,
                         requireBitmapCodecsCapability: requireBitmapCodecsCapability,
                         skipChannelJoinSupported: skipChannelJoinSupported,
+                        clipboardChatter: clipboardChatter,
                         transcript: transcript,
                         connectionLog: connectionLog
                     ))
@@ -986,6 +988,9 @@ private final class MockKRDPServerHandler: ChannelInboundHandler {
     private let waitForCompatibilityTraffic: Bool
     private let requireBitmapCodecsCapability: Bool
     private let skipChannelJoinSupported: Bool
+    /// Clipboard messages sent after the clipboard opens and before the graphics, as GNOME
+    /// Remote Desktop answers a client's clipboard while the graphics are still negotiated.
+    private let clipboardChatter: Int
     private let transcript: MockKRDPServerTranscript
     private let connectionLog: MockKRDPConnectionLog
     private var connectionIndex = 0
@@ -1013,6 +1018,7 @@ private final class MockKRDPServerHandler: ChannelInboundHandler {
         waitForCompatibilityTraffic: Bool,
         requireBitmapCodecsCapability: Bool,
         skipChannelJoinSupported: Bool,
+        clipboardChatter: Int,
         transcript: MockKRDPServerTranscript,
         connectionLog: MockKRDPConnectionLog
     ) {
@@ -1032,6 +1038,7 @@ private final class MockKRDPServerHandler: ChannelInboundHandler {
         self.waitForCompatibilityTraffic = waitForCompatibilityTraffic
         self.requireBitmapCodecsCapability = requireBitmapCodecsCapability
         self.skipChannelJoinSupported = skipChannelJoinSupported
+        self.clipboardChatter = clipboardChatter
         self.transcript = transcript
         self.connectionLog = connectionLog
     }
@@ -1601,7 +1608,7 @@ private final class MockKRDPServerHandler: ChannelInboundHandler {
     }
 
     private var clipboardEnabled: Bool {
-        clipboardFiles.isEmpty == false || remoteClipboardText != nil
+        clipboardFiles.isEmpty == false || remoteClipboardText != nil || clipboardChatter > 0
     }
 
     private var usesRDSTLS: Bool {
@@ -1890,6 +1897,9 @@ private final class MockKRDPServerHandler: ChannelInboundHandler {
                 ),
                 context: context
             )
+            for _ in 0..<clipboardChatter {
+                writePacket(MockKRDPFixtures.clipboardFormatListResponse(), context: context)
+            }
         }
         if audioEnabled {
             writePacket(MockKRDPFixtures.deviceRedirectionServerAnnounce(), context: context)

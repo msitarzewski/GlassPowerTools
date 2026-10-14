@@ -1955,6 +1955,35 @@ private enum MockGraphicsFrameHandlerError: Error, CustomStringConvertible {
     #expect(report.error == nil)
 }
 
+/// GNOME Remote Desktop answers a client's clipboard while the graphics are still negotiated.
+/// That talk used up the 16 packets the negotiation was given, and every connection ended
+/// "server did not confirm RDPGFX capabilities" (the owner, 2026-10-14: "Desktop instantly quits
+/// now"). Clipboard packets no longer count against it.
+@Test func clipboardTalkWhileTheGraphicsAreNegotiatedDoesNotEndTheConnection() throws {
+    let server = try MockKRDPServer.start(clipboardChatter: 24)
+    defer { server.stop() }
+
+    let report = RDPPreflightClient().run(
+        configuration: RDPConnectionConfiguration(
+            host: "127.0.0.1",
+            port: server.port,
+            credentials: RDPCredentials(username: "rdp-user", password: "secret"),
+            timeoutSeconds: 5,
+            hideCertificateWarnings: true,
+            graphicsFrameCaptureLimit: 1,
+            desktopWidth: 1280,
+            desktopHeight: 720,
+            clipboardEnabled: true
+        ).trustFixtureCertificate(),
+        onClipboardReady: { _ in }
+    )
+
+    #expect(report.error == nil, "\(report.stage ?? "") \(report.error ?? "")")
+    #expect(report.status == "success")
+    #expect(report.rdpGraphicsResponseType == "rdpgfx-caps-confirm")
+    #expect((report.rdpClipboardMessages?.count ?? 0) > 24, "the chatter arrived, and was read")
+}
+
 @Test func preflightTransfersRemoteClipboardFileFromMockKRDPServer() throws {
     let remoteFile = RDPClipboardLocalFile(
         fileName: "notes.txt",
@@ -2035,13 +2064,11 @@ private enum MockGraphicsFrameHandlerError: Error, CustomStringConvertible {
     #expect(report.rdpClipboardMessages?.map(\.typeName).contains("clipboard-format-list") == true)
     #expect(report.rdpClipboardMessages?.map(\.typeName).contains("clipboard-format-data-response") == true)
     #expect(report.rdpClipboardMessages?.map(\.typeName).contains("clipboard-file-contents-response") == true)
-    // Monitor Ready is answered with capabilities and the temporary directory, and not yet with
-    // the Format List MS-RDPECLIP 3.2.5.1.2 asks for: GNOME Remote Desktop dropped every session
-    // that had one (2026-10-14, `answerMonitorReady`).
-    #expect(report.rdpClipboardSentMessages?.prefix(2).map(\.typeName) == [
-        "clipboard-capabilities", "clipboard-temporary-directory",
+    // Monitor Ready is answered with the client's clipboard too, empty here: "the client MUST send
+    // a Format List PDU" (MS-RDPECLIP 3.2.5.1.2), or a server that waits for it never syncs.
+    #expect(report.rdpClipboardSentMessages?.prefix(3).map(\.typeName) == [
+        "clipboard-capabilities", "clipboard-temporary-directory", "clipboard-format-list",
     ])
-    #expect(report.rdpClipboardSentMessages?.dropFirst(2).first?.typeName != "clipboard-format-list")
     #expect(report.rdpClipboardSentMessages?.map(\.typeName).contains("clipboard-format-list-response") == true)
     #expect(report.rdpClipboardSentMessages?.map(\.typeName).contains("clipboard-format-data-request") == true)
     #expect(report.rdpClipboardSentMessages?.map(\.typeName).contains("clipboard-file-contents-request") == true)

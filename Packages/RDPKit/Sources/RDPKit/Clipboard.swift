@@ -1263,18 +1263,21 @@ public final class RDPClipboardSession: @unchecked Sendable {
         return serverGeneralFlags & RDPClipboardCapabilityFlags.useLongFormatNames != 0
     }
 
-    /// Monitor Ready's answer: this client's capabilities and its temporary directory.
+    /// Monitor Ready's answer: this client's capabilities, its temporary directory, then the
+    /// clipboard as it stands — an empty list when it holds nothing, as FreeRDP's client sends.
+    /// The list is not optional: "the client MUST send a Format List PDU … This ensures that the
+    /// peer system clipboards are in sync" (MS-RDPECLIP 3.2.5.1.2). Without it GNOME Remote
+    /// Desktop opened its clipboard and then neither took a copy nor offered one (the owner,
+    /// 2026-10-14: "Clipboard didn't transfer").
     ///
-    /// **Not yet the Format List the specification asks for next** ("the client MUST send a Format
-    /// List PDU … This ensures that the peer system clipboards are in sync", MS-RDPECLIP
-    /// 3.2.5.1.2). 0.4.425 sent it, and GNOME Remote Desktop then dropped the session — at once, or
-    /// about four seconds later with a second redirect — on every connection (the owner,
-    /// 2026-10-14: "Desktop instantly quits now"). A copy announced right after Monitor Ready did
-    /// the same on 0.4.423. Until the server's side is understood, the list goes only when there
-    /// is a copy to announce, as before.
+    /// With it, GNOME answers at once, while the graphics are still being negotiated — and that
+    /// talk used up the packets the negotiation was given, so every connection ended "server did
+    /// not confirm RDPGFX capabilities" (0.4.425, "Desktop instantly quits now"). The negotiation
+    /// no longer counts the clipboard's packets (`performRDPGraphicsDynamicChannelHandshake`).
     func answerMonitorReady() {
         send(RDPClipboardCapabilitiesPDU(generalFlags: clientGeneralFlags).encoded())
         send(RDPClipboardTemporaryDirectoryPDU().encoded())
+        sendFormatList()
     }
 
     var clientGeneralFlags: UInt32 {
