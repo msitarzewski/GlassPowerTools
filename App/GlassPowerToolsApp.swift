@@ -91,6 +91,10 @@ struct GlassPowerToolsApp: App {
         if isolatedDirectory == nil {
             model.enableCatalogSync(GlassCloudKitCatalogBackend())
         }
+        #if os(macOS)
+        // The Command Palette's connections: every service in the library, desktops among them.
+        model.registerPaletteConnections()
+        #endif
         // Stage 2: the SSH capability. glas.sh's managers live for the process in the runtime; the
         // shell routes Connect for `.ssh` services through the capability.
         let windowRecovery = GlassWindowRecoveryManager()

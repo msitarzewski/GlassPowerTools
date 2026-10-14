@@ -15,7 +15,6 @@ import GlassTerminalEmulator
 @MainActor
 @Observable
 class SessionManager {
-    var paletteConnectionRequest: UUID?
     struct ReconnectContext {
         let server: ServerConfiguration
         let password: String?

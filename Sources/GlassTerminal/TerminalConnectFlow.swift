@@ -260,7 +260,9 @@ struct TerminalConnectFlow: ViewModifier {
             }
         }
         #endif
-        .onChange(of: runtime.requestSerial) { _, _ in
+        // `initial`: a connection asked for while no Connections window was open — from the
+        // Command Palette over a terminal window, or Siri — is carried out by the one that opens.
+        .onChange(of: runtime.requestSerial, initial: true) { _, _ in
             for request in runtime.takeRequests() { handle(request) }
         }
         #if os(visionOS) || os(iOS)
@@ -277,15 +279,6 @@ struct TerminalConnectFlow: ViewModifier {
             TerminalStressHarness.start(configuration, sessionManager: sessionManager,
                                         settingsManager: settingsManager, openWindow: openWindow,
                                         dismissWindow: dismissWindow)
-        }
-        #endif
-        #if os(macOS)
-        // glas.sh's command palette posts a saved-server id and reopens the library window.
-        .onChange(of: sessionManager.paletteConnectionRequest, initial: true) { _, request in
-            guard let request, sessionManager.paletteConnectionRequest == request,
-                  let server = serverManager.server(for: request) else { return }
-            sessionManager.paletteConnectionRequest = nil
-            connectToServer(server)
         }
         #endif
     }

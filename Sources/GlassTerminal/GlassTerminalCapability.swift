@@ -194,17 +194,7 @@ public final class GlassTerminalRuntime {
         }
         // ⇧⌘\ is Show All Windows' from the start, before any window could press it.
         MacTerminalExposeShortcut.install()
-        // The one Command Palette's terminal entries: a terminal on each saved machine.
-        let sessionManager = self.sessionManager
-        GlassCommandPaletteSources.register(id: "terminal") { openWindow in
-            sessionManager.serverManager.servers.map { server in
-                MacCommandCenterEntry(id: "connection.connect.\(server.id)", title: "connect: \(server.name)",
-                                      detail: "Open an SSH terminal window") {
-                    sessionManager.paletteConnectionRequest = server.id
-                    openWindow(id: "main")
-                }
-            }
-        }
+        // The Command Palette's terminals are the library's (`registerPaletteConnections`).
         #endif
     }
 

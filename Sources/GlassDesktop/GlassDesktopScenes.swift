@@ -258,7 +258,9 @@ public struct GlassDesktopBootstrap<Content: View>: View {
     public var body: some View {
         base
             .task { await runtime.loadIfNeeded() }
-            .onChange(of: runtime.requestSerial) { _, _ in drain() }
+            // `initial`: a connection asked for while no Connections window was open — from the
+            // Command Palette over a terminal window, or Siri — is carried out by the one that opens.
+            .onChange(of: runtime.requestSerial, initial: true) { _, _ in drain() }
             .alert("Desktop", isPresented: Binding(get: { failure != nil },
                                                    set: { if !$0 { failure = nil } })) {
                 Button("OK", role: .cancel) { failure = nil }

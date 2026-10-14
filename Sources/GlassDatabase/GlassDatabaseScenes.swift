@@ -139,8 +139,9 @@ public struct GlassDatabaseBootstrap<Content: View>: View {
                 runtime.settingsManager.loadIfNeeded()
             }
             // One drain per enqueue. `requestSerial` rather than the array so a request that
-            // arrives while another is in flight is still seen.
-            .onChange(of: runtime.requestSerial) { _, _ in
+            // arrives while another is in flight is still seen; `initial`, so one made while no
+            // Connections window was open is carried out by the one that opens.
+            .onChange(of: runtime.requestSerial, initial: true) { _, _ in
                 for request in runtime.takeRequests() { handle(request) }
             }
             .alert("Database", isPresented: Binding(

@@ -17,7 +17,6 @@ import GlassShell
 @Observable
 class DatabaseSessionManager {
     var sessions: [UUID: DatabaseSession] = [:]
-    var paletteConnectionRequest: UUID?
     /// Saved queries waiting for their connection's workspace (D72: Shortcuts and Siri), by
     /// connection: the workspace showing that connection opens each in a new SQL tab, unrun.
     private(set) var pendingQueries: [UUID: [PendingQuery]] = [:]

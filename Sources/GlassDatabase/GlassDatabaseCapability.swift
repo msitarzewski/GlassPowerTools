@@ -90,18 +90,10 @@ public final class GlassDatabaseRuntime {
         // and a terminal canvas.
         settingsManager = SettingsManager(loadImmediately: false, defaults: settingsDefaults, layers: resolvedLayers)
         #if os(macOS)
-        // The one Command Palette's database entries: a connection window for each saved
-        // connection, and a search that reaches into their schemas and tables (2026-10-13).
-        let connectionManager = self.connectionManager, sessionManager = self.sessionManager
-        GlassCommandPaletteSources.register(id: "database", entries: { openWindow in
-            connectionManager.connections.map { config in
-                MacCommandCenterEntry(id: "connection.connect.\(config.id)", title: "connect: \(config.name)",
-                                      detail: "Open a database connection window") {
-                    sessionManager.paletteConnectionRequest = config.id
-                    openWindow.openConnections()
-                }
-            }
-        }, destinations: { openWindow in
+        // The one Command Palette's search into the open connections' schemas and tables
+        // (2026-10-13). Its connections are the library's (`registerPaletteConnections`).
+        let sessionManager = self.sessionManager
+        GlassCommandPaletteSources.register(id: "database", entries: { _ in [] }, destinations: { openWindow in
             let catalog = MacDatabasePaletteCatalog(sessionManager: sessionManager) { id, selection in
                 let request = DatabaseWorkspaceWindowRequest.additional(sessionID: id, initialSelection: selection)
                 openWindow(id: "database-workspace", value: sessionManager.registerWorkspace(request))
