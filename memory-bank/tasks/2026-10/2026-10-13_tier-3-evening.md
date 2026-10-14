@@ -12,7 +12,9 @@ The owner was out ("I'll test when get back"); phase 5's spike stopped where it 
 | (found on the way) | 7a47183 | The local-read tests timed a read from its request, so six more main-actor tests queued them past their 3 s deadline. They now time from the read's start | A 5 s read still fails them; the full editor target passes twice |
 | B-X22, second half | 9f2532a | A project on a saved machine that is this Mac by its pinned host key opens from the disk (Projects panel, Files ▸ Open in Editor), not over SSH to itself | Fingerprint test fails on raw key blobs. Not yet seen with the owner's own library |
 | `databaseSidebarChrome()` | 9f2532a (notes) | Looked at again under D24's amendment. There is no dead end: on a regular width the database places the editor's `GlassSidebarToggle` (W32), a compact width is a stack, and the headset has its own toggle | No change |
-| B-F32 | (this commit) | Settings ▸ a Desktop service ▸ **Graphics**: Automatic, H.264 (4:2:0) or Without H.264, saved per service. It maps to RDPKit's capability profiles (`.automatic`, `.avc420` = RDPGFX 8.1, `.legacy` = 8.0). A record from before reads as Automatic, and so does an unknown value. Screen Sharing carries none. The session logs the version the server chose (`event=graphics`) | 3 tests, each failing without its piece. **Live, Windows 11 VM:** see below |
+| B-F32 | 3ca4660 | Settings ▸ a Desktop service ▸ **Graphics**: Automatic, H.264 (4:2:0) or Without H.264, saved per service. It maps to RDPKit's capability profiles (`.automatic`, `.avc420` = RDPGFX 8.1, `.legacy` = 8.0). A record from before reads as Automatic, and so does an unknown value. Screen Sharing carries none. The session logs the version the server chose (`event=graphics`) | 3 tests, each failing without its piece. **Live, Windows 11 VM:** see below |
+
+| B-F48's tail: saved queries | 0.4.413 | Saved queries as Siri and Shortcuts entities: "Open the ‹query› query in Glass Power Tools" opens it in a new SQL tab on its database, titled with its name, unrun. A live workspace comes forward; otherwise the shell connects as the library does and the query waits for the workspace (two minutes at most). Only queries whose database is still saved are offered, by name and "‹service› on ‹machine›", never their SQL. Tables are not entities (schema names would go into the App Group) | 5 database tests and 2 widget-data tests; each database test fails without its piece. Siri and Shortcuts not tried: the owner's |
 
 ## B-F32 against the Windows 11 VM
 
@@ -34,4 +36,3 @@ NLA, with the certificate pinned.
 - B-X6: needs the owner's GNOME host. Glassdt's plan was expected-pixel tests.
 - B-X7: Vision Pro asks for twice the pixels; whole-frame copies. Needs the headset to measure and to judge.
 - B-Q11: delete the legacy sheet. The owner's call, now unblocked by B-X2.
-- B-F48's tail: saved queries and tables as entities.

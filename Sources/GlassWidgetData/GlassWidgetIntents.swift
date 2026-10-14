@@ -22,6 +22,8 @@ public enum GlassWidgetRequest: Sendable, Equatable, Codable {
     case showMachine(UUID)
     case showActive
     case openWorkgroup(UUID)
+    /// A database's saved query, in a new SQL tab on its database — connected first when it is not.
+    case openSavedQuery(UUID)
     /// The Mac: a terminal window here, in `folder` when there is one.
     case newLocalTerminal(folder: URL?)
     /// The Mac: a tab in the terminal window in front, in `folder` — a window when there is none.

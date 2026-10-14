@@ -79,14 +79,16 @@ public final class GlassDatabaseRuntime {
         connectionManager.attach(store: .catalog(store))
     }
 
-    public init(layers: GlassLayerStore? = nil) {
+    /// `settingsDefaults` is where the database's own settings and saved queries live: the person's
+    /// store, or a test's own suite.
+    public init(layers: GlassLayerStore? = nil, settingsDefaults: UserDefaults = GlassUITestRun.settingsDefaults) {
         let resolvedLayers = layers ?? GlassLayerStore()
         self.layers = resolvedLayers
         connectionManager = ConnectionManager(loadImmediately: false)
         sessionManager = DatabaseSessionManager(loadImmediately: false)
         // The same store the shell uses, so appearance cannot drift between a database canvas
         // and a terminal canvas.
-        settingsManager = SettingsManager(loadImmediately: false, layers: resolvedLayers)
+        settingsManager = SettingsManager(loadImmediately: false, defaults: settingsDefaults, layers: resolvedLayers)
         #if os(macOS)
         // The one Command Palette's database entries: a connection window for each saved
         // connection, and a search that reaches into their schemas and tables (2026-10-13).
@@ -177,6 +179,47 @@ public final class GlassDatabaseRuntime {
     func liveSessionID(for connectionID: UUID) -> UUID? {
         sessionManager.sessions.first { $0.value.connectionConfig.id == connectionID }?.key
     }
+
+    // MARK: Saved queries for Shortcuts and Siri (D72)
+
+    /// The saved queries Shortcuts and Siri can open: each one whose database is still saved, by name.
+    /// Never the SQL — this goes into the App Group for the system to read.
+    public var savedQueryEntries: [GlassDatabaseSavedQueryEntry] {
+        settingsManager.loadIfNeeded()
+        return settingsManager.savedQueries.compactMap { query in
+            guard let connectionID = query.connectionID, hasConnection(id: connectionID) else { return nil }
+            return GlassDatabaseSavedQueryEntry(id: query.id, name: query.name, connectionID: connectionID)
+        }
+    }
+
+    /// Opens a saved query in a new SQL tab on its database, unrun. Returns the connection the shell
+    /// should connect, the way the library's Connect does, when none is live; nil when the live
+    /// workspace was brought forward, or when there is nothing to open — which the failure alert says.
+    public func openSavedQuery(_ id: UUID) -> UUID? {
+        settingsManager.loadIfNeeded()
+        guard let query = settingsManager.savedQueries.first(where: { $0.id == id }) else {
+            enqueue(.showFailure("That saved query is no longer saved on this device."))
+            return nil
+        }
+        guard let connectionID = query.connectionID, hasConnection(id: connectionID) else {
+            enqueue(.showFailure("The database this query was saved for is no longer in your library. Open “\(query.name)” from another database's Saved Queries."))
+            return nil
+        }
+        sessionManager.queueQuery(name: query.name, sql: query.sql, for: connectionID)
+        settingsManager.useSavedQuery(id)
+        if let sessionID = liveSessionID(for: connectionID) {
+            enqueue(.openQueryEditor(sessionID: sessionID))
+            return nil
+        }
+        return connectionID
+    }
+}
+
+/// A saved query as the system sees it: its name and the database it belongs to.
+public struct GlassDatabaseSavedQueryEntry: Sendable, Equatable {
+    public let id: UUID
+    public let name: String
+    public let connectionID: UUID
 }
 
 /// The shell's database capability. A service is created complete through the shell's host

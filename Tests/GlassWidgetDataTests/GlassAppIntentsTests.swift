@@ -9,7 +9,7 @@ import Testing
 @MainActor
 struct GlassAppIntentsTests {
     private let alpha = UUID(), bravo = UUID(), alphaTerminal = UUID(), alphaOrders = UUID(), bravoDesktop = UUID()
-    private let deploy = UUID()
+    private let deploy = UUID(), lateOrders = UUID(), signups = UUID()
 
     private var library: GlassWidgetSnapshot {
         GlassWidgetSnapshot(
@@ -20,7 +20,9 @@ struct GlassAppIntentsTests {
                 ]),
                 .init(id: bravo, name: "bravo web", services: [.init(id: bravoDesktop, kind: .desktop, name: "Desktop")]),
             ],
-            workgroups: [.init(id: deploy, name: "Deploy", terminals: 3)])
+            workgroups: [.init(id: deploy, name: "Deploy", terminals: 3)],
+            savedQueries: [.init(id: signups, name: "Signups this week", database: "Orders"),
+                           .init(id: lateOrders, name: "Late orders", database: "Orders")])
     }
 
     /// Runs `body` with the library above, catching what the intents ask for.
@@ -75,6 +77,32 @@ struct GlassAppIntentsTests {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         #expect(try decoder.decode(GlassWidgetSnapshot.self, from: Data(before.utf8)).workgroups.isEmpty)
+    }
+
+    @Test("saved queries come from the snapshot by name, with their database; one written before them reads as none")
+    func savedQueries() async throws {
+        _ = try await withLibrary {
+            let query = GlassSavedQueryQuery()
+            let byName = try await query.entities(matching: "late")
+            let byID = try await query.entities(for: [signups, UUID()])
+            let suggested = try await query.suggestedEntities()
+            #expect(byName.map(\.id) == [lateOrders])
+            #expect(byID.map(\.database) == ["Orders"])
+            #expect(suggested.map(\.name) == ["Late orders", "Signups this week"])
+        }
+        let before = #"{"schema":1,"writtenAt":"2026-10-12T10:00:00Z","machines":[],"active":[],"workgroups":[]}"#
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        #expect(try decoder.decode(GlassWidgetSnapshot.self, from: Data(before.utf8)).savedQueries.isEmpty)
+    }
+
+    @Test("Open Saved Query asks for the query it names")
+    func openSavedQuery() async throws {
+        let asked = try await withLibrary {
+            let late = try #require(try await GlassSavedQueryQuery().entities(for: [lateOrders]).first)
+            _ = try await GlassOpenSavedQueryIntent(target: late).perform()
+        }
+        #expect(asked == [.openSavedQuery(lateOrders)])
     }
 
     @Test("Open Terminal and Open Desktop open the machine's service of that kind, or say it has none")

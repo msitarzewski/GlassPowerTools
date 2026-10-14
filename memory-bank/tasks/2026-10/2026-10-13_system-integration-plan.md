@@ -53,7 +53,10 @@ on Shortcuts and Spotlight; Apple's [What's new in Shortcuts … visionOS 26](ht
   - `MachineEntity`: a library host, by its name and the symbols of its services.
   - `ServiceEntity`: a terminal, database or desktop service.
   - `WorkgroupEntity`.
-  - Later, B-F48's saved queries and tables.
+  - Later, B-F48's saved queries and tables. **Saved queries built 2026-10-13 (0.4.413):** "Open the ‹query› query"
+    opens it in a new SQL tab on its database, connecting first, never running it. Tables are not entities: the app
+    knows a database's tables only while connected, and listing them for the system would copy schema names into
+    the App Group.
   - Queries answer from the shell's library in the app, and from the widget snapshot in extensions. Metadata only:
     no secrets, no credentials (D18).
 - **Intents.** Each opens what it names the way the library's Connect does, so host trust is asked as usual and

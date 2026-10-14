@@ -145,6 +145,24 @@ public struct GlassOpenWorkgroupIntent: OpenIntent {
     }
 }
 
+/// A saved query, opened in a new SQL tab on its database (D72). Not run: what it does to the data
+/// is decided at the keyboard.
+public struct GlassOpenSavedQueryIntent: OpenIntent {
+    public static let title: LocalizedStringResource = "Open Saved Query"
+    public static let description = IntentDescription("Opens a saved query in a new SQL tab on its database, connecting first if needed. It is not run.")
+
+    @Parameter(title: "Saved Query") public var target: GlassSavedQueryEntity
+
+    public init() {}
+    public init(target: GlassSavedQueryEntity) { self.target = target }
+
+    @MainActor
+    public func perform() async throws -> some IntentResult {
+        GlassWidgetRequests.shared.post(.openSavedQuery(target.id))
+        return .result()
+    }
+}
+
 // MARK: - Files
 
 /// Files and folders into the editor; a folder opens as a project.

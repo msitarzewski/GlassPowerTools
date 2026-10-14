@@ -170,3 +170,7 @@ test fails without the push.
   and open the app, which takes it as it comes forward. A request expires after a minute.
 - **A dragged `NSUserActivity` makes a window where it is dropped** (`GlassServiceDrag`; `Transferable` cannot). The
   window group claims the activity with `handlesExternalEvents`.
+- **What the system can name lives in the widget snapshot, as names only:** machines, services, workgroups and the
+  database's saved queries (with their database's name, never their SQL). Something that must reach a window not
+  yet open waits on its owner, briefly: a saved query waits in `DatabaseSessionManager.pendingQueries` for its
+  connection's workspace, and expires after two minutes so a failed connect cannot surface it later.

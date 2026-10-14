@@ -411,7 +411,18 @@ struct GlassPowerToolsApp: App {
                 },
                 workgroups: {
                     terminal.workgroups.map { GlassWidgetSnapshot.Workgroup(id: $0.id, name: $0.name, terminals: $0.terminals) }
-                }))
+                },
+                savedQueries: {
+                    // Named with their database as the library names it, so two "Orders" queries differ.
+                    database.savedQueryEntries.compactMap { entry in
+                        let endpoint = EndpointID(rawValue: entry.connectionID)
+                        guard let host = model.host(owningEndpoint: endpoint),
+                              let service = host.services.first(where: { $0.endpointID == endpoint }) else { return nil }
+                        return GlassWidgetSnapshot.SavedQuery(id: entry.id, name: entry.name,
+                                                              database: "\(service.displayName) on \(host.displayName)")
+                    }
+                },
+                openSavedQuery: { database.openSavedQuery($0) }))
         }
         #if os(macOS)
         // D38: Sparkle's scheduled checks, in a build that names a feed and a signing key — and

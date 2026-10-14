@@ -32,8 +32,8 @@ use the disposable test VM only).
 
 ## 2026-10-13 (~23:00) — RESUME HERE
 
-**State:** 0.4.412 on the Mac. The iPhone and Vision Pro are on 0.4.409: both were unreachable (CoreDevice 4016) at
-the 0.4.410–412 installs, so install them first when they are back. No new crash reports. The owner is out; his
+**State:** 0.4.413 on the Mac. The iPhone and Vision Pro are on 0.4.409: both were unreachable (CoreDevice 4016) at
+the 0.4.410–413 installs. A retry loop installs the newest build when each can be reached (`$SP/device-retry.zsh`). No new crash reports. The owner is out; his
 test list is unchanged (below, at 19:35). The Mac's screen is locked, which accounts for B-X27's test failures
 (the wallpaper test included).
 
@@ -42,6 +42,8 @@ test list is unchanged (below, at 19:35). The Mac's screen is locked, which acco
 - **B-X22's second half** (9f2532a): a project on a saved machine that is this Mac opens from the disk.
 - **B-F32** (0.4.412): Settings ▸ a Desktop service ▸ Graphics: Automatic, H.264 (4:2:0) or Without H.264. Live on
   the Windows 11 VM. **For the owner:** try H.264 (4:2:0) on the GNOME host where colours smeared (B-X6).
+- **Saved queries for Siri and Shortcuts** (0.4.413): "Open the ‹query› query in Glass Power Tools" opens it in a new
+  SQL tab on its database, connecting first, never running it.
 - The database's sidebar toggle was looked at again: no dead end, no change.
 - **0.4.410 onwards embeds the inert File Provider extension** (`GlassPowerToolsFiles.appex`, no domain), so it is
   now installed on the Mac, as the spike left it in the project.
@@ -49,8 +51,9 @@ test list is unchanged (below, at 19:35). The Mac's screen is locked, which acco
 **Add to his test list:**
 - Edit a file in the editor, change it elsewhere, and come back to the window: it asks.
 - A Desktop service's Graphics setting.
+- "Open the ‹saved query› query in Glass Power Tools", connected and not.
 
-**Next for an agent:** B-X7 (needs the headset); B-F48's tail (saved queries and tables as entities).
+**Next for an agent:** B-X7 (needs the headset).
 
 ## 2026-10-13 (~19:35) — the owner's test list
 

@@ -47,6 +47,15 @@ struct GlassPowerToolsShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Open Workgroup",
             systemImageName: "rectangle.3.group")
+        // Opened in a new SQL tab, never run.
+        AppShortcut(
+            intent: GlassOpenSavedQueryIntent(),
+            phrases: [
+                "Open the \(\.$target) query in \(.applicationName)",
+                "Open saved query \(\.$target) in \(.applicationName)",
+            ],
+            shortTitle: "Open Saved Query",
+            systemImageName: "doc.text.magnifyingglass")
         AppShortcut(
             intent: GlassOpenMachineIntent(),
             phrases: [

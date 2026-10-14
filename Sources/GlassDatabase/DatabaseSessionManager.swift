@@ -18,6 +18,9 @@ import GlassShell
 class DatabaseSessionManager {
     var sessions: [UUID: DatabaseSession] = [:]
     var paletteConnectionRequest: UUID?
+    /// Saved queries waiting for their connection's workspace (D72: Shortcuts and Siri), by
+    /// connection: the workspace showing that connection opens each in a new SQL tab, unrun.
+    private(set) var pendingQueries: [UUID: [PendingQuery]] = [:]
     private(set) var workspaceRequests: [UUID: DatabaseWorkspaceWindowRequest] = [:]
     private(set) var persistentQueryHistory: [QueryHistoryEntry] = []
 
@@ -33,6 +36,25 @@ class DatabaseSessionManager {
     /// **as the host's machine sees it**, which is the whole of D7. A later maintainer
     /// "correcting" the forward to use a remembered remote host would silently break every
     /// database bound only to the server's own loopback.
+    /// A saved query on its way to a workspace. It waits only so long: one whose connection failed
+    /// must not appear in a workspace opened much later for some other reason.
+    struct PendingQuery: Equatable {
+        static let lifetime: TimeInterval = 120
+        let name: String
+        let sql: String
+        let queuedAt: Date
+    }
+
+    func queueQuery(name: String, sql: String, for connectionID: UUID, at now: Date = Date()) {
+        pendingQueries[connectionID, default: []].append(PendingQuery(name: name, sql: sql, queuedAt: now))
+    }
+
+    /// The queries waiting for `connectionID` that are still fresh; all of them are taken.
+    func takePendingQueries(for connectionID: UUID, at now: Date = Date()) -> [PendingQuery] {
+        guard let waiting = pendingQueries.removeValue(forKey: connectionID) else { return [] }
+        return waiting.filter { now.timeIntervalSince($0.queuedAt) <= PendingQuery.lifetime }
+    }
+
     struct TransportPlan: Equatable, Sendable {
         let databaseHost: String
         let databasePort: Int

@@ -51,6 +51,10 @@ enum GlassWidgetBridge {
         var attachLocalTerminal: @MainActor (_ tmux: String, OpenWindowAction) -> Void
         /// The saved workgroups, for the snapshot (Shortcuts and Siri name them).
         var workgroups: @MainActor () -> [GlassWidgetSnapshot.Workgroup]
+        /// The database's saved queries, for the snapshot: names and databases, never SQL.
+        var savedQueries: @MainActor () -> [GlassWidgetSnapshot.SavedQuery]
+        /// A saved query into a new SQL tab: the connection to connect when none is live, else nil.
+        var openSavedQuery: @MainActor (UUID) -> UUID?
     }
 
     private static var started = false
@@ -144,6 +148,15 @@ enum GlassWidgetBridge {
         case .openWorkgroup(let workgroup):
             ensureLibrary()
             actions?.openWorkgroup(workgroup)
+        case .openSavedQuery(let query):
+            // The database asks for passwords and says what failed from the library's window.
+            ensureLibrary()
+            if let connection = actions?.openSavedQuery(query) {
+                let endpoint = EndpointID(rawValue: connection)
+                if let host = model.host(owningEndpoint: endpoint) {
+                    model.connect(hostID: host.id, endpointID: endpoint)
+                }
+            }
         case .newLocalTerminal(let folder):
             GlassWindowOpener.shared.perform { actions?.newLocalTerminal(folder, $0) }
         case .newLocalTerminalTab(let folder):
@@ -213,11 +226,12 @@ enum GlassWidgetBridge {
         #endif
     }
 
-    /// What the widgets, Shortcuts and Siri read: the library's machines and Active, and the
-    /// terminal's workgroups.
+    /// What the widgets, Shortcuts and Siri read: the library's machines and Active, the
+    /// terminal's workgroups and the database's saved queries.
     private static func snapshot(model: GlassShellModel) -> GlassWidgetSnapshot {
         var snapshot = model.widgetSnapshot()
         snapshot.workgroups = actions?.workgroups() ?? []
+        snapshot.savedQueries = actions?.savedQueries() ?? []
         return snapshot
     }
 

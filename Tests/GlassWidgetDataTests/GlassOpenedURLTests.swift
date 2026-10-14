@@ -58,7 +58,7 @@ struct GlassOpenedURLTests {
     func codable() throws {
         let url = URL(fileURLWithPath: "/tmp/a b", isDirectory: true)
         let all: [GlassWidgetRequest] = [
-            .connect(machine: UUID(), service: UUID()), .showMachine(UUID()), .showActive, .openWorkgroup(UUID()),
+            .connect(machine: UUID(), service: UUID()), .showMachine(UUID()), .showActive, .openWorkgroup(UUID()), .openSavedQuery(UUID()),
             .newLocalTerminal(folder: nil), .newLocalTerminal(folder: url), .newLocalTerminalTab(folder: url),
             .runInTerminal(url), .openInEditor([url, url]), .openSSHLink(try #require(URL(string: "ssh://alpha"))),
             .continueSession(endpoint: UUID(), tmux: nil), .continueSession(endpoint: UUID(), tmux: "glass-3"),

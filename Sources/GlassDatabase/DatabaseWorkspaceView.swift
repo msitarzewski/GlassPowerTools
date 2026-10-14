@@ -418,6 +418,8 @@ struct DatabaseWorkspaceView: View {
         .onChange(of: session?.connectionConfig.id, initial: true) { _, _ in
             restoreDraftsIfNeeded()
         }
+        // D72: a saved query Shortcuts or Siri asked for, in a new tab, unrun.
+        .onChange(of: pendingQueryCount, initial: true) { _, _ in openPendingQueries() }
         // Where this workspace is, for Active's row (`DatabaseSession.workspaceFocus`).
         .onChange(of: tabState.displayed, initial: true) { _, displayed in
             session?.workspaceFocus = Self.focus(for: displayed) { queryDocuments[$0]?.title }
@@ -458,6 +460,25 @@ struct DatabaseWorkspaceView: View {
     /// What this window draws and behaves with: its own settings over All Databases'.
     private var windowProfile: DatabaseWindowProfile {
         DatabaseWindowProfile.resolved(windowSettings, settings: settingsManager)
+    }
+
+    // MARK: - Saved queries from Shortcuts and Siri
+
+    private var pendingQueryCount: Int {
+        session.map { sessionManager.pendingQueries[$0.connectionConfig.id]?.count ?? 0 } ?? 0
+    }
+
+    /// Each saved query waiting for this connection, in a tab of its own named for it — never run:
+    /// what a query does to the data is decided here, at the keyboard. Its text is what was saved,
+    /// so closing the tab unchanged asks nothing.
+    private func openPendingQueries() {
+        guard let connectionID = session?.connectionConfig.id else { return }
+        for pending in sessionManager.takePendingQueries(for: connectionID) {
+            var document = QueryDocumentTab(text: pending.sql, isSaved: true,
+                                            selectedRange: NSRange(location: (pending.sql as NSString).length, length: 0))
+            document.applyGeneratedTitle(pending.name, for: pending.sql)
+            openQueryDocument(document)
+        }
     }
 
     // MARK: - Durable Drafts

@@ -190,3 +190,53 @@ public struct GlassWorkgroupQuery: EntityStringQuery {
         workgroups.map(GlassWorkgroupEntity.init)
     }
 }
+
+// MARK: - Saved queries
+
+/// A database's saved query (D72): Siri and Shortcuts open it in a new SQL tab on its database. It is
+/// never run from here — a query can change data, and that is decided at the keyboard.
+public struct GlassSavedQueryEntity: AppEntity, Identifiable, Sendable {
+    public static let typeDisplayRepresentation: TypeDisplayRepresentation = "Saved Query"
+    public static let defaultQuery = GlassSavedQueryQuery()
+
+    public let id: UUID
+    public let name: String
+    public let database: String
+
+    public init(id: UUID, name: String, database: String) {
+        self.id = id
+        self.name = name
+        self.database = database
+    }
+
+    init(_ query: GlassWidgetSnapshot.SavedQuery) {
+        self.init(id: query.id, name: query.name, database: query.database)
+    }
+
+    public var displayRepresentation: DisplayRepresentation {
+        DisplayRepresentation(title: "\(name)", subtitle: "\(database)",
+                              image: .init(systemName: "doc.text.magnifyingglass"))
+    }
+}
+
+public struct GlassSavedQueryQuery: EntityStringQuery {
+    public init() {}
+
+    private var queries: [GlassWidgetSnapshot.SavedQuery] {
+        (GlassEntitySource.snapshot()?.savedQueries ?? [])
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    public func entities(for identifiers: [UUID]) async throws -> [GlassSavedQueryEntity] {
+        let all = queries
+        return identifiers.compactMap { id in all.first { $0.id == id }.map(GlassSavedQueryEntity.init) }
+    }
+
+    public func entities(matching string: String) async throws -> [GlassSavedQueryEntity] {
+        queries.filter { GlassEntitySource.matches($0.name, string) }.map(GlassSavedQueryEntity.init)
+    }
+
+    public func suggestedEntities() async throws -> [GlassSavedQueryEntity] {
+        queries.map(GlassSavedQueryEntity.init)
+    }
+}

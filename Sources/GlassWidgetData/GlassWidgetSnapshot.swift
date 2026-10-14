@@ -31,17 +31,21 @@ public struct GlassWidgetSnapshot: Codable, Sendable, Equatable {
     /// The saved workgroups, by name: what Shortcuts and Siri can open (D72, 2026-10-13). Absent
     /// from snapshots written before, which read as none.
     public var workgroups: [Workgroup]
+    /// The database's saved queries, by name and database (D72's B-F48 tail): what Shortcuts and Siri
+    /// can open. Never their SQL. Absent from snapshots written before, which read as none.
+    public var savedQueries: [SavedQuery]
 
     public init(writtenAt: Date = Date(), machines: [Machine] = [], active: [ActiveMachine] = [],
-                workgroups: [Workgroup] = []) {
+                workgroups: [Workgroup] = [], savedQueries: [SavedQuery] = []) {
         self.schema = Self.currentSchema
         self.writtenAt = writtenAt
         self.machines = machines
         self.active = active
         self.workgroups = workgroups
+        self.savedQueries = savedQueries
     }
 
-    private enum CodingKeys: String, CodingKey { case schema, writtenAt, machines, active, workgroups }
+    private enum CodingKeys: String, CodingKey { case schema, writtenAt, machines, active, workgroups, savedQueries }
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -50,6 +54,21 @@ public struct GlassWidgetSnapshot: Codable, Sendable, Equatable {
         machines = try container.decode([Machine].self, forKey: .machines)
         active = try container.decode([ActiveMachine].self, forKey: .active)
         workgroups = try container.decodeIfPresent([Workgroup].self, forKey: .workgroups) ?? []
+        savedQueries = try container.decodeIfPresent([SavedQuery].self, forKey: .savedQueries) ?? []
+    }
+
+    /// A saved query: opened in a new SQL tab on its database, not run.
+    public struct SavedQuery: Codable, Sendable, Equatable, Identifiable {
+        public var id: UUID
+        public var name: String
+        /// The database service it belongs to, by name, so two queries called "Orders" can be told apart.
+        public var database: String
+
+        public init(id: UUID, name: String, database: String) {
+            self.id = id
+            self.name = name
+            self.database = database
+        }
     }
 
     /// A saved workgroup: its terminals open together.
