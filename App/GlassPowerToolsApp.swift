@@ -95,8 +95,12 @@ struct GlassPowerToolsApp: App {
         // The Command Palette's connections: every service in the library, desktops among them.
         model.registerPaletteConnections()
         #endif
-        // All Windows off the Mac draws the library's open sessions (2026-10-14).
+        // All Windows off the Mac draws the library's open sessions (2026-10-14); on iPhone and
+        // iPad a pull down on any top bar brings it.
         GlassShowAllWindows.model = model
+        #if os(iOS)
+        GlassShowAllWindows.installPullDown()
+        #endif
         // Stage 2: the SSH capability. glas.sh's managers live for the process in the runtime; the
         // shell routes Connect for `.ssh` services through the capability.
         let windowRecovery = GlassWindowRecoveryManager()

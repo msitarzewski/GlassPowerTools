@@ -3,13 +3,17 @@
 //  Glass Power Tools — GlassShell
 //
 //  Show All Windows off the Mac (the owner, 2026-10-14: "everything other than Mac can still use
-//  the lightning bolt hold pattern"; on iPhone and iPad a pinch too, "index and middle, with a
-//  thumb"). Everything open, as cards by machine: Active's own list (`activeMachines`) with the
-//  pictures the sessions can draw (`GlassOpenSession.snapshot`), and the sessions running on the
-//  machines with no window here. The Mac keeps its own overlay (`MacTerminalExpose`).
+//  the lightning bolt hold pattern"; "drag down from an empty space in the toolbar … slide in like
+//  a separate transparent pane"; "the card view should only show connected services, like Mac.
+//  transparent previews, the whole 9"). What is open, as cards by machine — Active's own list
+//  (`activeMachines`) — each drawn straight onto the pane's glass the way the Mac's tiles are:
+//  the session's own picture where it can draw one (`GlassOpenSession.snapshot`), softened when
+//  Settings ▸ Appearance ▸ Show All Windows ▸ Blur previews is on. Sessions running on a machine
+//  with no window here are Active's, not this.
 //
 //  A card opens its session the way the ⚡ goes to Active: the screen the overview was opened
-//  from is left first (`dismissCurrent`), then the session is brought back.
+//  from is left first (`dismissCurrent`), then the session is brought back. On iPhone and iPad it
+//  slides down from the top as a pane (`GlassAllWindowsPane`).
 //
 
 import SwiftUI
@@ -20,7 +24,7 @@ public extension GlassShowAllWindows {
     static weak var model: GlassShellModel?
 }
 
-/// Everything open, by machine, as cards.
+/// What is open, by machine, as cards.
 struct GlassShowAllWindowsOverview: View {
     let model: GlassShellModel
     let done: @MainActor () -> Void
@@ -46,16 +50,11 @@ struct GlassShowAllWindowsOverview: View {
                             Text(machine.name)
                                 .font(.headline)
                                 .accessibilityAddTraits(.isHeader)
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 14)], spacing: 16) {
                                 ForEach(machine.sessions) { session in
-                                    GlassSessionCard(session: session,
-                                                     activate: { open(session.activate) },
-                                                     close: { session.close() })
-                                }
-                                ForEach(machine.running.filter { !$0.isOpenHere }) { running in
-                                    GlassRunningSessionCard(session: running) {
-                                        open { [weak model] in model?.open(running) }
-                                    }
+                                    GlassAllWindowsCard(session: session,
+                                                        activate: { open(session.activate) },
+                                                        close: { session.close() })
                                 }
                             }
                         }
@@ -63,9 +62,11 @@ struct GlassShowAllWindowsOverview: View {
                 }
                 .padding()
             }
+            .scrollContentBackground(.hidden)
             .navigationTitle("All Windows")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
             #endif
             .searchable(text: $search, prompt: "Machines and sessions")
             .toolbar {
@@ -74,107 +75,85 @@ struct GlassShowAllWindowsOverview: View {
                         .accessibilityIdentifier("all-windows-done")
                 }
             }
-            .task { await model.refreshRunningSessionsIfDue() }
         }
         .accessibilityIdentifier("all-windows")
     }
 
-    /// The machines with what matches `search` — a machine's name keeps all of it, a session's
-    /// title or subtitle keeps that session — and machines left with nothing dropped.
+    /// The machines with something open that matches `search` — a machine's name keeps all of it,
+    /// a session's title or subtitle keeps that session — and machines left with nothing dropped.
     static func filtered(_ machines: [GlassActiveMachine], by search: String) -> [GlassActiveMachine] {
+        let open = machines.filter { !$0.sessions.isEmpty }
+            .map { GlassActiveMachine(id: $0.id, name: $0.name, sessions: $0.sessions) }
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
-        let notOpenHere = machines.map { machine -> GlassActiveMachine in
-            var machine = machine
-            machine.running = machine.running.filter { !$0.isOpenHere }
-            return machine
-        }
-        guard !query.isEmpty else {
-            return notOpenHere.filter { !$0.sessions.isEmpty || !$0.running.isEmpty }
-        }
+        guard !query.isEmpty else { return open }
         func matches(_ text: String?) -> Bool { text?.localizedCaseInsensitiveContains(query) == true }
-        return notOpenHere.compactMap { machine in
-            if matches(machine.name) { return machine.sessions.isEmpty && machine.running.isEmpty ? nil : machine }
-            var kept = GlassActiveMachine(id: machine.id, name: machine.name,
-                                          sessions: machine.sessions.filter { matches($0.title) || matches($0.subtitle) })
-            kept.running = machine.running.filter { matches($0.title) || matches($0.subtitle) }
-            return kept.sessions.isEmpty && kept.running.isEmpty ? nil : kept
+        return open.compactMap { machine in
+            if matches(machine.name) { return machine }
+            let sessions = machine.sessions.filter { matches($0.title) || matches($0.subtitle) }
+            return sessions.isEmpty ? nil : GlassActiveMachine(id: machine.id, name: machine.name, sessions: sessions)
         }
     }
 }
 
-/// A session running on its machine with no window here — a tmux session — as a card: no picture
-/// to show, so its symbol, quieter than an open one's, and Attach as what a tap does.
-struct GlassRunningSessionCard: View {
-    let session: GlassRunningSession
-    let attach: () -> Void
+/// One open session on the pane's glass, as the Mac's tiles are drawn: its own picture with no
+/// plate behind it, so what is transparent in it stays transparent; its symbol, large and quiet,
+/// where it has no picture; its name under it; and a way to close it.
+struct GlassAllWindowsCard: View {
+    let session: GlassOpenSession
+    let activate: () -> Void
+    let close: () -> Void
+    @AppStorage(GlassShowAllWindows.blursPreviewsKey) private var blursPreviews = false
 
     var body: some View {
-        Button(action: attach) {
+        Button(action: activate) {
             VStack(alignment: .leading, spacing: 8) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 10)
-                        .strokeBorder(.quaternary, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-                    Image(systemName: session.symbolName)
-                        .font(.system(size: 30))
-                        .foregroundStyle(.tertiary)
+                    if let snapshot = session.snapshot?() {
+                        snapshot
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .blur(radius: blursPreviews ? GlassShowAllWindows.previewBlurRadius : 0)
+                    } else {
+                        Image(systemName: session.symbolName)
+                            .font(.system(size: 34))
+                            .foregroundStyle(.tertiary)
+                    }
                 }
+                .frame(maxWidth: .infinity)
                 .aspectRatio(GlassGalleryLayout.aspectRatio, contentMode: .fit)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12).strokeBorder(.white.opacity(0.16), lineWidth: 1)
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
                 VStack(alignment: .leading, spacing: 1) {
                     Text(session.title)
                         .font(.subheadline.weight(.medium))
                         .lineLimit(1)
-                    Text(session.isAttachedElsewhere ? "Open elsewhere · Attach" : "Running · Attach")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    if let subtitle = session.subtitle {
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
             }
-            .padding(10)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .accessibilityIdentifier("running-card-\(session.id)")
+        .accessibilityIdentifier("all-windows-card-\(session.id)")
         .accessibilityLabel(session.title)
-        .accessibilityHint("Attaches to this running session")
-    }
-}
-
-#if os(iOS)
-import UIKit
-
-public extension GlassShowAllWindows {
-    /// Opens the overview over whatever is on screen — the library, a terminal, a desktop, an
-    /// editor. `dismissCurrent` leaves the screen it was opened from before a card opens another,
-    /// as the ⚡'s own tap does; nil from the library, which nothing covers.
-    static func presentOverview(dismissCurrent: (@MainActor () -> Void)?) {
-        guard let model, presentedOverview == nil, let top = topViewController() else { return }
-        let host = UIHostingController(rootView: AnyView(EmptyView()))
-        host.modalPresentationStyle = .fullScreen
-        func close(then chosen: (@MainActor () -> Void)?) {
-            host.dismiss(animated: true) {
-                MainActor.assumeIsolated {
-                    presentedOverview = nil
-                    guard let chosen else { return }
-                    dismissCurrent?()
-                    chosen()
-                }
+        .accessibilityValue(session.subtitle ?? "")
+        .overlay(alignment: .topTrailing) {
+            Button(role: .destructive, action: close) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title3)
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(.white, .black.opacity(0.45))
             }
+            .buttonStyle(.plain)
+            .padding(6)
+            .accessibilityLabel("\(session.closeTitle) \(session.title)")
         }
-        host.rootView = AnyView(GlassShowAllWindowsOverview(model: model, done: { close(then: nil) },
-                                                            open: { close(then: $0) }))
-        presentedOverview = host
-        top.present(host, animated: true)
-    }
-
-    private static weak var presentedOverview: UIViewController?
-
-    /// The view controller showing now, in the scene in front: what a presentation goes over.
-    private static func topViewController() -> UIViewController? {
-        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        let scene = scenes.first { $0.activationState == .foregroundActive } ?? scenes.first
-        var top = scene?.keyWindow?.rootViewController
-        while let next = top?.presentedViewController, !next.isBeingDismissed { top = next }
-        return top
     }
 }
-#endif

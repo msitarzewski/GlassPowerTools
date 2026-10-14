@@ -936,8 +936,32 @@ public struct GlassActiveConnectionsToolbarModifier: ViewModifier {
 
     public func body(content: Content) -> some View {
         content.toolbar { GlassActiveConnectionsToolbarContent(show: show, dismissCurrent: dismissCurrent) }
+            #if os(iOS)
+            .modifier(GlassScreenExit(dismissCurrent: GlassWindowPresentation.canOpenWindows ? nil : dismissCurrent))
+            #endif
     }
 }
+
+#if os(iOS)
+/// While a screen is shown, how All Windows leaves it before opening another session — the pull
+/// from its top bar has no ⚡ to ask (`GlassShowAllWindows.noteScreen`).
+private struct GlassScreenExit: ViewModifier {
+    let dismissCurrent: (@MainActor () -> Void)?
+    @State private var token: UUID?
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear {
+                guard token == nil, let dismissCurrent else { return }
+                token = GlassShowAllWindows.noteScreen(leaving: dismissCurrent)
+            }
+            .onDisappear {
+                if let token { GlassShowAllWindows.forgetScreen(token) }
+                token = nil
+            }
+    }
+}
+#endif
 
 /// The bolt itself, so the library's own toolbar can draw the same control without the
 /// window-or-dismiss decision — it is already where the bolt goes.

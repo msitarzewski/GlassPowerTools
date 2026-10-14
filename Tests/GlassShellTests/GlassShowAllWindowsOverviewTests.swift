@@ -3,8 +3,8 @@ import Testing
 import GlassConnectionKit
 @testable import GlassShell
 
-/// All Windows off the Mac (2026-10-14): Active's machines as cards, searchable, with the
-/// sessions running elsewhere and none a window here already shows.
+/// All Windows off the Mac (2026-10-14): what is open, by machine, searchable. Only what is open
+/// here, as on the Mac: "the card view should only show connected services, like Mac."
 @MainActor
 @Suite("All Windows off the Mac")
 struct GlassShowAllWindowsOverviewTests {
@@ -12,33 +12,28 @@ struct GlassShowAllWindowsOverviewTests {
         GlassOpenSession(id: id, title: title, subtitle: subtitle, symbolName: "terminal", activate: {}, close: {})
     }
 
-    private func running(_ id: String, _ title: String, openHere: Bool = false) -> GlassRunningSession {
-        GlassRunningSession(id: id, title: title, symbolName: "terminal", endpointID: EndpointID(),
-                            isAttachedElsewhere: false, isOpenHere: openHere, open: {}, takeOver: {}, end: {})
-    }
-
     private var machines: [GlassActiveMachine] {
         var alpha = GlassActiveMachine(id: "a", name: "alpha", sessions: [session("terminal:1", "build", "Terminal")])
-        alpha.running = [running("tmux:1", "logs"), running("tmux:2", "shown", openHere: true)]
+        alpha.running = [GlassRunningSession(id: "tmux:1", title: "logs", symbolName: "terminal", endpointID: EndpointID(),
+                                             isAttachedElsewhere: false, open: {}, takeOver: {}, end: {})]
         let bravo = GlassActiveMachine(id: "b", name: "bravo", sessions: [session("database:1", "orders", "MySQL")])
-        let quiet = GlassActiveMachine(id: "c", name: "charlie", sessions: [])
-        return [alpha, bravo, quiet]
+        var charlie = GlassActiveMachine(id: "c", name: "charlie", sessions: [])
+        charlie.running = alpha.running
+        return [alpha, bravo, charlie]
     }
 
-    @Test("every machine with something open or running, without what a window here shows")
-    func everything() {
+    @Test("every machine with something open here; what only runs on a machine is Active's")
+    func onlyWhatIsOpen() {
         let shown = GlassShowAllWindowsOverview.filtered(machines, by: "")
         #expect(shown.map(\.name) == ["alpha", "bravo"])
-        #expect(shown[0].running.map(\.title) == ["logs"])
+        #expect(shown.allSatisfy { $0.running.isEmpty })
+        #expect(GlassShowAllWindowsOverview.filtered(machines, by: "logs").isEmpty)
     }
 
     @Test("a search keeps a whole machine by its name, or the sessions whose title or kind match")
     func search() {
-        #expect(GlassShowAllWindowsOverview.filtered(machines, by: "alpha").map { $0.sessions.count + $0.running.count } == [2])
-        let byKind = GlassShowAllWindowsOverview.filtered(machines, by: "mysql")
-        #expect(byKind.map(\.name) == ["bravo"])
-        let byTitle = GlassShowAllWindowsOverview.filtered(machines, by: "LOGS")
-        #expect(byTitle.map(\.name) == ["alpha"] && byTitle[0].sessions.isEmpty && byTitle[0].running.map(\.title) == ["logs"])
-        #expect(GlassShowAllWindowsOverview.filtered(machines, by: "shown").isEmpty, "a window here shows it")
+        #expect(GlassShowAllWindowsOverview.filtered(machines, by: "alpha").map(\.sessions.count) == [1])
+        #expect(GlassShowAllWindowsOverview.filtered(machines, by: "mysql").map(\.name) == ["bravo"])
+        #expect(GlassShowAllWindowsOverview.filtered(machines, by: "BUILD").map(\.name) == ["alpha"])
     }
 }
