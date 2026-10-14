@@ -85,12 +85,21 @@ extension GlassEditorFileKind {
 /// **Never given a second file.** Setting `previewItem` on a view already showing one aborted the
 /// app inside Quick Look (`-[QLPreviewView setPreviewItem:…]` → `_QLRaiseAssert`, 0.4.393, the
 /// owner's Mac, 2026-10-13 05:58). A new file is a new view.
-private struct GlassQuickLookView: NSViewRepresentable {
+///
+/// **Closed once, by this view alone.** By default a Quick Look view closes itself as it leaves its
+/// window, and closing it again — the dismantle below — aborted the app inside Quick Look
+/// (`-[QLPreviewView deactivate]` → `_QLRaiseAssert`, 0.4.406, the owner's Mac, 2026-10-13 18:47).
+/// Reproduced in a separate process: a view removed from its window, or whose window closed, and then
+/// closed aborts (SIGABRT) by default and survives with `shouldCloseWithWindow` off.
+struct GlassQuickLookView: NSViewRepresentable {
     let url: URL
 
-    func makeNSView(context: Context) -> QLPreviewView {
+    func makeNSView(context: Context) -> QLPreviewView { Self.makeView(url) }
+
+    static func makeView(_ url: URL) -> QLPreviewView {
         let view = QLPreviewView(frame: .zero, style: .normal)!
         view.autostarts = false
+        view.shouldCloseWithWindow = false
         view.previewItem = url as NSURL
         return view
     }
