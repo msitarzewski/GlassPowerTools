@@ -64,6 +64,14 @@ struct GlassPowerToolsShortcuts: AppShortcutsProvider {
             shortTitle: "Show Machine",
             systemImageName: "server.rack")
         AppShortcut(
+            intent: GlassShowAllWindowsIntent(),
+            phrases: [
+                "Show all windows in \(.applicationName)",
+                "Show all \(.applicationName) windows",
+            ],
+            shortTitle: "Show All Windows",
+            systemImageName: "rectangle.3.group")
+        AppShortcut(
             intent: GlassShowActiveIntent(),
             phrases: [
                 "Show my active connections in \(.applicationName)",

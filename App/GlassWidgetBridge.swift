@@ -145,6 +145,14 @@ enum GlassWidgetBridge {
         case .showActive:
             showLibrary()
             model.showActiveConnections()
+        case .showAllWindows:
+            #if os(macOS)
+            GlassWindowOpener.shared.perform { GlassShowAllWindows.toggle?($0) }
+            #elseif os(visionOS)
+            GlassWindowOpener.shared.perform { GlassShowAllWindows.presentOverview(openWindow: $0) }
+            #else
+            GlassShowAllWindows.presentOverview()
+            #endif
         case .openWorkgroup(let workgroup):
             ensureLibrary()
             actions?.openWorkgroup(workgroup)

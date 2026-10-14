@@ -32,7 +32,7 @@ use the disposable test VM only).
 
 ## 2026-10-14 (~11:30) — RESUME HERE
 
-**State:** 0.4.431 on the Mac and iPhone (13:18); the Vision Pro has been locked (CoreDevice 4016)
+**State:** 0.4.433 on the Mac and iPhone (14:03), 0.4.434 building; the Vision Pro has been locked (CoreDevice 4016)
 since 0.4.423 — retry `devicectl device install app` with `$SP/dd-vision` when it is worn. No crash reports since
 2026-10-13 18:47. Everything committed, nothing pushed. The owner said he was packing up (~11:10). **Mac installs go when
 ready, never held on our judgement** (the owner: "No need to hold on quitting right now. All tmux all day."); devices too.
@@ -58,13 +58,23 @@ ready, never held on our judgement** (the owner: "No need to hold on quitting ri
   folders, saved queries ("Open Query: …", via Siri's request) and tmux sessions running with no window ("Attach: …").
   The three capabilities drain queued requests when a Connections window appears (`onChange(initial: true)`). Not yet
   seen by him.
-- **Show All Windows off the Mac — partly decided (13:15).** Proposal given in full (hold ⚡ as the trigger; iPhone/iPad
-  card overview; Vision Pro cards in the Connections window; agent marks as assets). His answers: keep the Mac's own
-  Show All Windows button; **no hold-⚡ trigger** ("that lightning icon doesn't show reliably everywhere. So keep the
-  current system on mac" — ⚡ is not in the Mac's terminal windows by design, which draw their own Show All Windows
-  button). Still his to say: the iPhone and Vision Pro entry and whether the cards live inside Active (the original
-  proposal) or apart. The pinch that turned on Select was the iPhone's Active list: 389b7ce (0.4.431) gives the list a
-  selection only in Select mode off the Mac and lets the system end edit mode but not begin it; device-only, he checks.
+- **All Windows off the Mac — decided and in progress (13:15–14:00).** The owner's answers, in order: Mac unchanged
+  (keeps its own Show All Windows button, ⇧⌘\\, pinch on terminal/desktop windows); **iPhone, iPad and Vision Pro hold
+  the ⚡** ("everything other than Mac can still use the lightning bolt hold pattern"); Vision Pro also **a Siri
+  action**; on iPhone/iPad a gesture too — two-finger pinch conflicts with desktop/image/diagram zoom; three-finger
+  pinch (his "index and middle, with a thumb") rejected because iOS's three-finger text gestures (copy/cut/paste/undo)
+  matter to people who use them ("less about me and more about people who do"); **pull down from the empty part of
+  any top bar**, the pane sliding in "like a separate transparent pane". Cards: "only show connected services, like
+  Mac. transparent previews, the whole 9" — open sessions only (running tmux is Active's), previews on the glass with
+  no plate, Blur previews honoured, agent marks (still to do: SVGs as assets, `GlassOpenSession` gains a mark).
+  Done: 45de160 (hold ⚡ → overview, 0.4.432); e6f998d (pull-down pane, 0.4.433: window-level pan judged by the
+  bars' frames — on iOS 26 a touch in a bar's empty part can pass to the list underneath, so a hit-test check
+  failed on the simulator — and the list waits for the pull; 3 iPhone-simulator UI tests: pull, hold, ⚡ tap still
+  Active); 77c6506 (agent marks: the 8 SVGs in `Resources/AgentMarks.xcassets`, byte-equal to `logoSVG` by test;
+  `GlassOpenSession.mark`). In 0.4.434 (building, uncommitted until it compiles for all three): Vision Pro — hold
+  ⚡ (pinch held) brings Connections forward with All Windows as a sheet (`GlassAllWindowsSheet`); Siri/Shortcuts
+  "Show all windows in Glass Power Tools" (`GlassShowAllWindowsIntent`, `.showAllWindows`) on every platform.
+  iPhone's Select-by-pinch fixed (389b7ce).
 - **Links and paths in the terminal's right-click menu; Watch Log File (af433a3, 0.4.426).** Not yet seen by him.
 - **Agent marks (0.4.424):** "Codex looks great." Whether the softer look is quiet enough is still open.
 

@@ -1003,9 +1003,10 @@ public struct GlassActiveConnectionsButton: View {
         #if !os(visionOS)
         .labelStyle(.iconOnly)
         #endif
-        #if os(iOS)
+        #if os(iOS) || os(visionOS)
         // Holding it opens All Windows (the owner, 2026-10-14: "everything other than Mac can
-        // still use the lightning bolt hold pattern"). The tap is still Active.
+        // still use the lightning bolt hold pattern"); on the headset a pinch held. The tap is
+        // still Active.
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.45).onEnded { _ in
             held = true
             showAllWindows()
@@ -1024,6 +1025,10 @@ public struct GlassActiveConnectionsButton: View {
     #if os(iOS)
     private func showAllWindows() {
         if let hold { hold() } else { GlassShowAllWindows.presentOverview(dismissCurrent: route?.dismissCurrent) }
+    }
+    #elseif os(visionOS)
+    private func showAllWindows() {
+        GlassShowAllWindows.presentOverview(openWindow: openWindow)
     }
     #endif
 }

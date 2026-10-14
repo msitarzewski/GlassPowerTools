@@ -21,6 +21,9 @@ public enum GlassWidgetRequest: Sendable, Equatable, Codable {
     case connect(machine: UUID, service: UUID)
     case showMachine(UUID)
     case showActive
+    /// All Windows: the Mac's Show All Windows, the pane on iPhone and iPad, the sheet on Vision
+    /// Pro (the owner, 2026-10-14: "A Siri action on visionOS").
+    case showAllWindows
     case openWorkgroup(UUID)
     /// A database's saved query, in a new SQL tab on its database — connected first when it is not.
     case openSavedQuery(UUID)
@@ -142,6 +145,21 @@ public struct GlassShowActiveIntent: AppIntent {
     @MainActor
     public func perform() async throws -> some IntentResult {
         GlassWidgetRequests.shared.post(.showActive)
+        return .result()
+    }
+}
+
+/// Show All Windows: what is open, as pictures.
+public struct GlassShowAllWindowsIntent: AppIntent {
+    public static let title: LocalizedStringResource = "Show All Windows"
+    public static let description = IntentDescription("Shows everything open in Glass Power Tools, as pictures.")
+    public static let openAppWhenRun = true
+
+    public init() {}
+
+    @MainActor
+    public func perform() async throws -> some IntentResult {
+        GlassWidgetRequests.shared.post(.showAllWindows)
         return .result()
     }
 }
