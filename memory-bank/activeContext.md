@@ -32,7 +32,7 @@ use the disposable test VM only).
 
 ## 2026-10-14 (~11:30) — RESUME HERE
 
-**State:** 0.4.428 on the Mac and iPhone (11:56); the Vision Pro has been locked (CoreDevice 4016)
+**State:** 0.4.430 on the Mac and iPhone (12:08); the Vision Pro has been locked (CoreDevice 4016)
 since 0.4.423 — retry `devicectl device install app` with `$SP/dd-vision` when it is worn. No crash reports since
 2026-10-13 18:47. Everything committed, nothing pushed. The owner said he was packing up (~11:10). **Mac installs go when
 ready, never held on our judgement** (the owner: "No need to hold on quitting right now. All tmux all day."); devices too.
@@ -47,12 +47,17 @@ ready, never held on our judgement** (the owner: "No need to hold on quitting ri
   via a copy's list). **Next:** on 0.4.428, GNOME → Mac (needs the Monitor Ready list) and that sessions stay up.
   The ~4 s second redirects on 0.4.425 are explained by the same failure only if hop 1 also ran out — watch for a
   `redirect-accepted` on hop 1 in the new logs. Workaround no longer needed.
-- **Command Palette (cf237ab, 0.4.427):** every library service as "Connect: Desktop on alpha", connected as Connect
-  does; the terminal's and database's own lists removed (the database's set `paletteConnectionRequest`, which nothing
-  read — its entries connected nothing). The three capabilities now drain queued requests when a Connections window
-  appears (`onChange(initial: true)`). He asked what else needs updating in the command lists — answer given: the
-  library window's own entries (New Connection, local terminals, Files and plain-shell per machine, workgroups) appear
-  only while a Connections window is in front; saved queries, projects and Favorites' other kinds are in none.
+- **GNOME clipboard works both ways on 0.4.428** (the owner: "sending worked! :)", then "this is magic"). He asked for
+  "an auto clipboard toggle somewhere": **Sync Automatically** (2998d20, 0.4.429) at the top of the desktop's
+  Clipboard menu, saved per desktop (`DesktopConnection.clipboardSyncsAutomatically`, default on, old records on), also
+  "Sync clipboard automatically" in the service's settings; off, Send Clipboard / Copy Remote Clipboard still work.
+  Not yet seen by him.
+- **Command Palette, done this round** (cf237ab, fdc871c, 4690038; 0.4.430): every library service as "Connect: …"
+  (desktops included; the database's old entries connected nothing); the terminal's commands from any window (New
+  Connection, local terminals, a machine's Files and no-tmux terminal, saved workgroups); every project, Favorites'
+  folders, saved queries ("Open Query: …", via Siri's request) and tmux sessions running with no window ("Attach: …").
+  The three capabilities drain queued requests when a Connections window appears (`onChange(initial: true)`). Not yet
+  seen by him.
 - **Show All Windows on iPhone and Vision Pro — a proposal, his to decide** (he asked "consider what expose looks like
   on both"). iPhone: Active becomes the overview, a Safari-like two-column grid of cards by machine (`GlassSessionCard`
   survived the 2026-09-21 gallery removal, `f2ed368`, whose point was one place), reached from ⚡ and a pinch; no second
