@@ -75,6 +75,30 @@ struct TerminalAgentTests {
         #expect(TerminalAgent.identify(program: "node", arguments: "node /x/node_modules/@kilocode/other/index.js") == nil)
     }
 
+    /// Hermes Agent, on another machine, went unmarked (the owner, 2026-10-14, with a picture):
+    /// a Python agent can be launched by a shell script, as a module, or by a runner.
+    @Test("an agent launched as a Python module, by a runner, or by a shell script is told, and inline code never kept")
+    func launchers() {
+        func told(_ line: String, program: String? = nil) -> TerminalAgent? {
+            TerminalAgent.identify(program: program ?? String(line.split(separator: " ")[0]),
+                                   arguments: TerminalAgent.identifyingWords(line))
+        }
+        #expect(told("python3.12 -I -B -m hermes_cli.main --token x") == .hermes)
+        #expect(told("bash /home/u/.local/bin/hermes --resume") == .hermes)
+        #expect(told("uv run hermes --key s") == .hermes)
+        #expect(told("uv tool run --from aider-chat aider") == .aider)
+        #expect(told("uvx aider-chat --api-key k") == .aider)
+        #expect(told("npx -y @deepseek-ai/dsh@0.1.0 web") == .deepSeekHarness)
+        #expect(told("pnpm dlx @kilocode/cli") == .kiloCode)
+        #expect(told("node --no-warnings /x/node_modules/openclaw/dist/index.js") == .openClaw)
+        #expect(TerminalAgent.identifyingWords("python3 -m hermes_cli.main --token x") == "python3 -m hermes_cli.main")
+        #expect(TerminalAgent.identifyingWords("uvx aider-chat --api-key k") == "uvx aider-chat")
+        #expect(TerminalAgent.identifyingWords("bash -c 'curl -H \"Authorization: x\" …'") == "bash")
+        #expect(TerminalAgent.identifyingWords("python3 -c 'import os'") == "python3")
+        #expect(told("bash -c hermes") == nil, "inline code is not a script")
+        #expect(TerminalAgent.needsCommandLine("uv") && TerminalAgent.needsCommandLine("bash"))
+    }
+
     @Test("only an interpreter's script is kept from a command line: a program's arguments can hold a secret")
     func identifyingWords() {
         #expect(TerminalAgent.identifyingWords("node /x/codex.js --api-key sk-1") == "node /x/codex.js")

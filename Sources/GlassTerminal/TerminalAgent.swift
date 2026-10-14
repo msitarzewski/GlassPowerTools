@@ -77,7 +77,7 @@ nonisolated enum TerminalAgent: String, CaseIterable, Sendable {
         "qwen": .qwen, "qwen-code": .qwen,
         "kimi": .kimi, "kimi-cli": .kimi,
         "openclaw": .openClaw,
-        "hermes": .hermes, "hermes-agent": .hermes,
+        "hermes": .hermes, "hermes-agent": .hermes, "hermes_cli": .hermes, "hermes_agent": .hermes,
         "vibe": .mistralVibe, "mistral-vibe": .mistralVibe,
         "zcode": .zCode,
         "amp": .amp,
@@ -121,10 +121,7 @@ nonisolated enum TerminalAgent: String, CaseIterable, Sendable {
         // command line says `claude`.
         let first = words.first.map { ($0 as NSString).lastPathComponent.lowercased() }
         if let first, let agent = byName[first] { return agent }
-        if let runner = name ?? first, isInterpreter(runner),
-           let script = words.dropFirst().first, let agent = agent(forScript: script) {
-            return agent
-        }
+        if let target = launched(words)?.target, let agent = agent(for: target) { return agent }
         // Claude Code names itself in its title; nothing else here does so plainly. Only where the
         // program is not known by a name of its own.
         if name.map(needsCommandLine) ?? true,
@@ -137,7 +134,8 @@ nonisolated enum TerminalAgent: String, CaseIterable, Sendable {
     /// Whether `program` says too little by its name alone: an interpreter, or a file named for its
     /// version. Its command line is read then, and only then.
     static func needsCommandLine(_ program: String) -> Bool {
-        isInterpreter(program) || looksLikeVersion((program as NSString).lastPathComponent)
+        let name = (program as NSString).lastPathComponent.lowercased()
+        return isInterpreter(program) || shells.contains(name) || runners.contains(name) || looksLikeVersion(name)
     }
 
     /// `2.1.296`: digits and dots.
@@ -172,9 +170,98 @@ nonisolated enum TerminalAgent: String, CaseIterable, Sendable {
     /// rest, which can hold a password or a token (`mysql -p…`): only an interpreter's next word is
     /// kept, and that is its script. Bounded; nil for nothing.
     static func identifyingWords(_ commandLine: String) -> String? {
-        let words = commandLine.split(whereSeparator: \.isWhitespace).prefix(2).map { String($0.prefix(1_024)) }
+        let words = commandLine.split(whereSeparator: \.isWhitespace).prefix(8).map { String($0.prefix(1_024)) }
         guard let program = words.first else { return nil }
-        return isInterpreter(program) && words.count > 1 ? program + " " + words[1] : program
+        guard let kept = launched(words)?.kept else { return program }
+        return words.prefix(kept).joined(separator: " ")
+    }
+
+    /// What a command line launches, as far as an agent can be told by it.
+    enum Launched: Equatable {
+        /// A script an interpreter or a shell runs: `node /x/codex.js`, `bash ~/.local/bin/hermes`.
+        case script(String)
+        /// A Python module: `python3 -m hermes_cli.main`.
+        case module(String)
+        /// A tool a runner fetches or finds: `uvx aider-chat`, `npx -y @deepseek-ai/dsh`, `uv run hermes`.
+        case tool(String)
+    }
+
+    /// Shells, which run a script as an interpreter does: a launcher is often one
+    /// (2026-10-14, Hermes Agent, whose command was not told).
+    private static let shells: Set<String> = ["sh", "bash", "zsh", "dash", "ksh", "fish"]
+    /// Programs that fetch or find a tool and run it.
+    private static let runners: Set<String> = ["uv", "uvx", "pipx", "npx", "pnpx", "bunx", "pnpm", "yarn"]
+
+    /// What `words` launch and how many of them say so — the program up to its script, module or
+    /// tool, and none after: the rest can hold a secret. Inline code (`-c`, `-e`) is never kept.
+    static func launched(_ words: [String]) -> (kept: Int, target: Launched)? {
+        guard let program = words.first.map({ ($0 as NSString).lastPathComponent.lowercased() }) else { return nil }
+        /// The first word from `start` that is not an option, skipping an option's value where it takes one.
+        func operand(from start: Int, valued: Set<String> = [], code: Set<String> = []) -> Int? {
+            var index = start
+            while index < words.count {
+                let word = words[index]
+                if code.contains(word) { return nil }
+                if valued.contains(word) { index += 2; continue }
+                if word.hasPrefix("-") { index += 1; continue }
+                return index
+            }
+            return nil
+        }
+        if program.hasPrefix("python") {
+            var index = 1
+            while index < words.count {
+                let word = words[index]
+                if word == "-m" { return index + 1 < words.count ? (index + 2, .module(words[index + 1])) : nil }
+                if word == "-c" { return nil }
+                if ["-X", "-W", "-Q"].contains(word) { index += 2; continue }
+                if word.hasPrefix("-") { index += 1; continue }
+                return (index + 1, .script(word))
+            }
+            return nil
+        }
+        if isInterpreter(program) {
+            let start = program == "deno" && words.count > 1 && words[1] == "run" ? 2 : 1
+            guard let index = operand(from: start, valued: ["-r", "--require", "--import", "--loader"],
+                                      code: ["-e", "--eval", "-p", "--print"]) else { return nil }
+            return (index + 1, .script(words[index]))
+        }
+        if shells.contains(program) {
+            guard let index = operand(from: 1, code: ["-c"]) else { return nil }
+            return (index + 1, .script(words[index]))
+        }
+        guard runners.contains(program) else { return nil }
+        var start = 1
+        switch program {
+        case "uv":
+            if words.count > 2, words[1] == "tool", words[2] == "run" { start = 3 }
+            else if words.count > 1, words[1] == "run" { start = 2 }
+            else { return nil }
+        case "pipx", "pnpm", "yarn":
+            guard words.count > 1, ["run", "dlx", "exec"].contains(words[1]) else { return nil }
+            start = 2
+        default:
+            break
+        }
+        guard let index = operand(from: start, valued: ["--from", "--with", "-p", "--package", "--python"]) else { return nil }
+        return (index + 1, .tool(words[index]))
+    }
+
+    /// The agent a launched script, module or tool is.
+    static func agent(for launched: Launched) -> TerminalAgent? {
+        switch launched {
+        case .script(let script):
+            return agent(forScript: script)
+        case .module(let module):
+            let root = String(module.lowercased().split(separator: ".").first ?? "")
+            return byName[root] ?? byName[root.replacingOccurrences(of: "_", with: "-")]
+        case .tool(let spec):
+            // `@scope/name@1.2`, `name@1.2`, `name==1.2`: the package, without its version.
+            var name = spec.lowercased()
+            if let at = name.dropFirst().firstIndex(of: "@") { name = String(name[..<at]) }
+            if let pin = name.range(of: "==") { name = String(name[..<pin.lowerBound]) }
+            return byPackage[name] ?? byName[(name as NSString).lastPathComponent]
+        }
     }
 
     /// Whether `program` runs another program's script: `node`, `bun`, `deno`, a `python`.
