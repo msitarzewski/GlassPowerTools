@@ -875,6 +875,16 @@ public struct GlassActiveConnectionsToolbarContent: ToolbarContent {
     }
 
     private var show: GlassShowActiveConnections? { explicitShow ?? route?.show }
+
+    /// Holding the bolt: All Windows, leaving this screen first when a card is chosen. iPhone and
+    /// iPad only so far.
+    private static func allWindows(dismissCurrent: (@MainActor () -> Void)?) -> (@MainActor () -> Void)? {
+        #if os(iOS)
+        { GlassShowAllWindows.presentOverview(dismissCurrent: dismissCurrent) }
+        #else
+        nil
+        #endif
+    }
     private var dismissCurrent: (@MainActor () -> Void)? { explicitDismiss ?? route?.dismissCurrent }
 
     public var body: some ToolbarContent {
@@ -889,14 +899,14 @@ public struct GlassActiveConnectionsToolbarContent: ToolbarContent {
         #endif
         if let show {
             ToolbarItem(placement: GlassActiveConnectionsToolbarModifier.placement) {
-                GlassActiveConnectionsButton {
+                GlassActiveConnectionsButton(action: {
                     if GlassWindowPresentation.canOpenWindows {
                         openWindow.openConnections()
                     } else {
                         dismissCurrent?()
                     }
                     show()
-                }
+                }, hold: Self.allWindows(dismissCurrent: GlassWindowPresentation.canOpenWindows ? nil : dismissCurrent))
             }
         }
     }
@@ -933,12 +943,25 @@ public struct GlassActiveConnectionsToolbarModifier: ViewModifier {
 /// window-or-dismiss decision — it is already where the bolt goes.
 public struct GlassActiveConnectionsButton: View {
     private let action: () -> Void
+    private let hold: (@MainActor () -> Void)?
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.glassActiveConnectionsRoute) private var route
+    /// The hold opened All Windows, so the release that ends it is not also a tap.
+    @State private var held = false
 
-    public init(action: @escaping () -> Void) { self.action = action }
+    /// - Parameter hold: what holding the bolt does, on iPhone and iPad: All Windows, by default
+    ///   leaving the screen through the environment's route when a card is chosen.
+    public init(action: @escaping () -> Void, hold: (@MainActor () -> Void)? = nil) {
+        self.action = action
+        self.hold = hold
+    }
 
     public var body: some View {
         Button {
+            if held {
+                held = false
+                return
+            }
             #if os(visionOS)
             // Every bolt on the headset brings the one Connections window forward (a `Window`
             // scene there, so this reuses it) and opens Active in it. The desktop's control-bar
@@ -956,9 +979,29 @@ public struct GlassActiveConnectionsButton: View {
         #if !os(visionOS)
         .labelStyle(.iconOnly)
         #endif
+        #if os(iOS)
+        // Holding it opens All Windows (the owner, 2026-10-14: "everything other than Mac can
+        // still use the lightning bolt hold pattern"). The tap is still Active.
+        .simultaneousGesture(LongPressGesture(minimumDuration: 0.45).onEnded { _ in
+            held = true
+            showAllWindows()
+            // The release usually follows within a second; if the presentation cancelled it, the
+            // next tap is a tap again.
+            Task { try? await Task.sleep(for: .seconds(1.5)); held = false }
+        })
+        .accessibilityAction(named: "Show All Windows") { showAllWindows() }
+        .help("Active connections. Hold for All Windows.")
+        #else
         .help("Active connections")
+        #endif
         .accessibilityIdentifier("active-connections-bolt")
     }
+
+    #if os(iOS)
+    private func showAllWindows() {
+        if let hold { hold() } else { GlassShowAllWindows.presentOverview(dismissCurrent: route?.dismissCurrent) }
+    }
+    #endif
 }
 
 public extension View {
