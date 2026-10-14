@@ -36,3 +36,15 @@ machine's saved credential and pinned host key?
 ## Log
 
 - 19:40: plan written. Next: an extension target (Mac) linking `GlassSSHTransport`; measure step 1.
+- 22:01 **step 1 measured:** a macOS File Provider extension target, `GlassPowerToolsFiles` (`FileProvider/`), links
+  `GlassSSHTransport` (swift-nio, swift-nio-ssh, Citadel). The binary is **31 MB**. It builds and signs with the
+  sandbox, `network.client`, the team App Group and `keychain-access-groups`. It is a separate derived-data build
+  (`$SP/dd-spike`) and has not been installed.
+- 22:02 **step 2, on paper:** the extension carries the team's wildcard profile, "Mac Team Provisioning Profile: *".
+  That profile grants `keychain-access-groups` `<TEAM>.*`, so the app's team-prefixed credential group is allowed.
+  This differs from the widget, where a `group.` App Group was refused. **Still to prove at run time:** the
+  extension reading a credential. That needs a registered domain, which adds a Finder sidebar entry, and so waits
+  for the owner's word.
+- **Next without the owner:** steps 3–4 as library code testable from the test runner against the scratch VM
+  (pinned-key-only trust, listing the home folder, fetching a file), then a written recommendation. Registering
+  a domain waits for him.
