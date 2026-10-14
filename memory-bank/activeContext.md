@@ -113,6 +113,12 @@ all of the platforms that support them. App intents, all of the modern stuff …
     the tmux session. The receiving device brings forward the tab showing that session, even a background tab,
     or attaches to it by name, never a new session. The owner's leftover detached session is his to End in
     Active.
+  - **Handoff of this Mac's own session (0.4.409).** The owner, on 0.4.407: "It found the right tmux session,
+    but created a new window and tab when the tab with that session was already open". The phone was SSH'd into
+    this Mac; the log showed a new SSH route at the hand-off. Now, when the machine named is this Mac (a pinned
+    host key matches this Mac's own, via `SSHHostKeyIdentity` in GlasSecretStore, shared with the editor), its
+    local tab comes forward, or a local terminal attaches. This relies on the iPhone's pin of the Mac's key
+    having synced by iCloud Keychain; without it, it falls back to SSH.
   - **A second Quick Look crash (0.4.406, 18:47), fixed in 0.4.408:** SwiftUI's dismantle closed a `QLPreviewView`
     that had already closed itself on leaving its window, and Quick Look aborted on the second close.
     Reproduced in a separate process: both teardown orders abort by default and survive with
