@@ -963,6 +963,14 @@ final class MacWorkspaceController {
         persist()
     }
 
+    /// The SSH pane here showing `server`'s tmux session `name`: one connected to it, or else one
+    /// that keeps it as its session (a pane still connecting, or reconnecting). Nil when none does.
+    func pane(showingServer server: UUID, sshTmuxSession name: String) -> UUID? {
+        let panes = (state.root?.panes ?? []).filter { $0.intent.kind == .ssh && $0.intent.serverID == server }
+        if let live = panes.first(where: { sessionsByPaneID[$0.id]?.tmuxSessionName == name }) { return live.id }
+        return panes.first { $0.intent.sshTmuxSession == name }?.id
+    }
+
     /// The pane's last attempt found no saved server by its id.
     func failedForMissingServer(_ paneID: UUID) -> Bool {
         if case .savedServerNotFound = pendingCredentialErrorsByPaneID[paneID] { return true }

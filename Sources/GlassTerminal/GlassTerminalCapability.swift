@@ -239,6 +239,41 @@ public final class GlassTerminalRuntime {
     /// glas.sh's server form, empty or pre-filled (Tailscale import, shell service link).
     public func requestAddServer() { enqueue(.addServer(draft: nil)) }
 
+    /// A terminal continued from another device (Handoff, D72). In tmux, it continues in that session:
+    /// the tab already showing it comes forward, even in the background, or a new terminal attaches to
+    /// it — never a new session (the owner, 2026-10-13: a Handoff "opened a new terminal window, with
+    /// tmux, in my home directory … and it left a detached tmux session in Active"). Without tmux there
+    /// is no shell to share, so it connects as the library does.
+    /// Returns true when a tab already showing it was brought forward, so nothing connects.
+    @discardableResult
+    public func requestContinue(serverID: UUID, tmuxSession: String?) -> Bool {
+        guard let name = tmuxSession, TerminalTmux.isValidSessionName(name) else {
+            requestConnect(serverID: serverID)
+            return false
+        }
+        if revealOpenTerminal(serverID: serverID, tmuxSession: name) { return true }
+        enqueue(.connect(serverID: serverID, purpose: .terminal, report: nil, tmux: TerminalTmuxAttachment(name: name)))
+        return false
+    }
+
+    /// Brings forward the terminal here showing `serverID`'s tmux session `name`; false with none.
+    func revealOpenTerminal(serverID: UUID, tmuxSession name: String) -> Bool {
+        #if os(macOS)
+        return MacWorkspacePreviewRegistry.shared.reveal(server: serverID, sshTmuxSession: name)
+        #else
+        let manager = sessionManager
+        guard let session = manager.sessions.first(where: {
+                  $0.server.id == serverID && $0.purpose == .terminal && $0.state != .disconnected
+                      && $0.tmuxSessionName == name
+              }),
+              let workgroup = manager.workgroups.first(where: { $0.sessionIDs.contains(session.id) })
+        else { return false }
+        _ = manager.selectSession(session.id, inWorkgroup: workgroup.id)
+        enqueue(.showWorkgroup(workgroupID: workgroup.id))
+        return true
+        #endif
+    }
+
     /// An `ssh://` link opened with the app (D72): a machine in the library connects as saved; one
     /// that is not opens the new-server form filled in from the link (`TerminalSSHLink`).
     public func requestOpen(sshLink url: URL) {

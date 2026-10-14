@@ -244,6 +244,26 @@ final class MacWorkspacePreviewRegistry {
         return named
     }
 
+    /// Brings forward the tab showing `server`'s tmux session `name`, on its pane — a terminal
+    /// continued from another device (Handoff, D72), which attaching again would mirror. False when
+    /// no tab here shows it.
+    @discardableResult
+    func reveal(server: UUID, sshTmuxSession name: String,
+                present: (NSWindow) -> Void = { NSApp.activate(); $0.makeKeyAndOrderFront(nil) }) -> Bool {
+        for id in entries.keys.sorted(by: { $0.uuidString < $1.uuidString }) {
+            guard let entry = entries[id], let controller = entry.controller, let window = entry.window else { continue }
+            for tab in controller.tabs where !tab.isClosed {
+                guard let paneID = tab.pane(showingServer: server, sshTmuxSession: name) else { continue }
+                controller.select(tab.workspaceID)
+                tab.focus(paneID)
+                if window.isMiniaturized { window.deminiaturize(nil) }
+                present(window)
+                return true
+            }
+        }
+        return false
+    }
+
     /// Brings forward the tab showing this Mac's tmux session `name`, on its pane: Active's Open
     /// for a session open here, which attaching again would mirror (W6).
     @discardableResult

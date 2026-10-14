@@ -61,7 +61,7 @@ struct GlassOpenedURLTests {
             .connect(machine: UUID(), service: UUID()), .showMachine(UUID()), .showActive, .openWorkgroup(UUID()),
             .newLocalTerminal(folder: nil), .newLocalTerminal(folder: url), .newLocalTerminalTab(folder: url),
             .runInTerminal(url), .openInEditor([url, url]), .openSSHLink(try #require(URL(string: "ssh://alpha"))),
-            .continueSession(endpoint: UUID()),
+            .continueSession(endpoint: UUID(), tmux: nil), .continueSession(endpoint: UUID(), tmux: "glass-3"),
         ]
         for request in all {
             #expect(try JSONDecoder().decode(GlassWidgetRequest.self, from: JSONEncoder().encode(request)) == request)

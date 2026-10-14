@@ -353,7 +353,7 @@ struct GlassPowerToolsApp: App {
         // Handoff: a terminal, database or desktop continued from another device (D72).
         MacTerminalAppDelegate.continueActivity = { activity in
             guard let endpoint = GlassHandoff.endpoint(from: activity) else { return false }
-            GlassWidgetRequests.shared.post(.continueSession(endpoint: endpoint))
+            GlassWidgetRequests.shared.post(.continueSession(endpoint: endpoint, tmux: GlassHandoff.tmuxSession(from: activity)))
             return true
         }
         if GlassUITestRun.defaults == nil {
@@ -393,6 +393,7 @@ struct GlassPowerToolsApp: App {
                     }
                     return try await terminalCapability.sendFiles(files, toHost: member, folder: folder).summary
                 },
+                continueTerminal: { server, tmux in terminal.requestContinue(serverID: server, tmuxSession: tmux) },
                 workgroups: {
                     terminal.workgroups.map { GlassWidgetSnapshot.Workgroup(id: $0.id, name: $0.name, terminals: $0.terminals) }
                 }))
@@ -496,7 +497,7 @@ struct GlassPowerToolsApp: App {
         // Handoff: a terminal, database or desktop continued from another device (D72).
         .onContinueUserActivity(GlassHandoff.activityType) { activity in
             if let endpoint = GlassHandoff.endpoint(from: activity) {
-                GlassWidgetRequests.shared.post(.continueSession(endpoint: endpoint))
+                GlassWidgetRequests.shared.post(.continueSession(endpoint: endpoint, tmux: GlassHandoff.tmuxSession(from: activity)))
             }
         }
         // Something opened with the app (D72): a file handed over by another app into the editor;

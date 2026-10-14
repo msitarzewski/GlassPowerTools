@@ -2689,6 +2689,30 @@ private func waitForCondition(
     }
     return condition()
 }
+
+/// Handoff of a terminal in tmux (D72): the tab already showing the session is found.
+@Suite("A tab showing a continued tmux session")
+@MainActor
+struct MacWorkspaceHandoffTests {
+    @Test("a tab finds the pane showing a server's tmux session, and not another server's")
+    func paneShowingSession() throws {
+        let fixture = try WorkspaceDefaultsFixture()
+        defer { fixture.cleanup() }
+        let controller = MacWorkspaceController(workspaceID: fixture.workspaceID, defaults: fixture.defaults)
+        let alpha = UUID(), bravo = UUID()
+        var onAlpha = MacWorkspacePaneIntent.ssh(serverID: alpha)
+        onAlpha.sshTmuxSession = "glass-3"
+        var onBravo = MacWorkspacePaneIntent.ssh(serverID: bravo)
+        onBravo.sshTmuxSession = "glass-3"
+        controller.addPane(intent: onBravo, axis: .horizontal)
+        controller.addPane(intent: onAlpha, axis: .horizontal)
+        let alphaPane = try #require(controller.state.root?.panes.first { $0.intent.serverID == alpha })
+
+        #expect(controller.pane(showingServer: alpha, sshTmuxSession: "glass-3") == alphaPane.id)
+        #expect(controller.pane(showingServer: alpha, sshTmuxSession: "glass-4") == nil)
+        #expect(controller.pane(showingServer: UUID(), sshTmuxSession: "glass-3") == nil)
+    }
+}
 #endif
 
 #endif

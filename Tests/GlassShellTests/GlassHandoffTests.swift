@@ -20,4 +20,16 @@ struct GlassHandoffTests {
         other.userInfo = ["endpoint": endpoint.uuidString]
         #expect(GlassHandoff.endpoint(from: other) == nil)
     }
+
+    @Test("a terminal in tmux names its session; one outside tmux names none")
+    func tmux() {
+        let inTmux = NSUserActivity(activityType: GlassHandoff.activityType)
+        GlassHandoff.describe(inTmux, endpoint: UUID(), title: "alpha", tmuxSession: "glass-3")
+        #expect(GlassHandoff.tmuxSession(from: inTmux) == "glass-3")
+
+        let plain = NSUserActivity(activityType: GlassHandoff.activityType)
+        GlassHandoff.describe(plain, endpoint: UUID(), title: "alpha", tmuxSession: nil)
+        #expect(GlassHandoff.tmuxSession(from: plain) == nil)
+        #expect((plain.userInfo ?? [:]).count == 1)
+    }
 }

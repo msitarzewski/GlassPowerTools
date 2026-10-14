@@ -44,6 +44,9 @@ enum GlassWidgetBridge {
         var openSSHLink: @MainActor (URL) -> Void
         /// Files to a machine's folder; what happened, in a sentence.
         var sendFiles: GlassAppServices.SendFiles
+        /// A terminal continued from another device in its tmux session: true when a tab here
+        /// already showing it came forward.
+        var continueTerminal: @MainActor (_ server: UUID, _ tmux: String) -> Bool
         /// The saved workgroups, for the snapshot (Shortcuts and Siri name them).
         var workgroups: @MainActor () -> [GlassWidgetSnapshot.Workgroup]
     }
@@ -126,10 +129,15 @@ enum GlassWidgetBridge {
         case .openSSHLink(let link):
             ensureLibrary()
             actions?.openSSHLink(link)
-        case .continueSession(let endpoint):
+        case let .continueSession(endpoint, tmux):
             // Handoff names the service; this device's library knows its machine (D26).
             guard let host = model.host(owningEndpoint: EndpointID(rawValue: endpoint)) else {
                 GlassWidgetBridgeLog.logger.notice("A continued session names a service this library does not have")
+                return
+            }
+            // A terminal in tmux continues in that session: the tab showing it, or one attached.
+            if let tmux, host.services.contains(where: { $0.endpointID.rawValue == endpoint && $0.kind == .ssh }) {
+                if actions?.continueTerminal(endpoint, tmux) != true { ensureLibrary() }
                 return
             }
             ensureLibrary()

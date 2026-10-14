@@ -104,3 +104,31 @@ struct DroppedTerminalWindowTests {
         #expect(runtime.takeReservedWindow(forServer: bravo) == nil)
     }
 }
+
+/// Handoff of a terminal in tmux (the owner, 2026-10-13: it "opened a new terminal window, with
+/// tmux, in my home directory … and it left a detached tmux session in Active").
+@Suite("A terminal continued from another device")
+@MainActor
+struct TerminalHandoffTests {
+    @Test("in tmux, it attaches to that session by name — never a new one; outside tmux, it connects")
+    func attachesByName() {
+        let runtime = GlassTerminalRuntime()
+        let server = UUID()
+        #expect(runtime.requestContinue(serverID: server, tmuxSession: "glass-3") == false)
+        let attached = runtime.takeRequests().contains { request in
+            if case let .connect(id, _, _, tmux, _) = request { return id == server && tmux?.name == "glass-3" && tmux?.takeOver == false }
+            return false
+        }
+        #expect(attached, "a continued tmux session attached by name")
+
+        // A name tmux would not accept (it rejects ":") is not passed on: a plain connection, as the
+        // library makes.
+        runtime.requestContinue(serverID: server, tmuxSession: "glass:3")
+        let plain = runtime.takeRequests().contains { request in
+            if case let .connect(id, _, _, tmux, _) = request { return id == server && tmux == nil }
+            return false
+        }
+        #expect(plain)
+    }
+
+}
