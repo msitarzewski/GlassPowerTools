@@ -65,7 +65,14 @@ tree clean; everything committed, nothing pushed. The owner is out and will test
 5. Vision Pro: drag a Terminal or Desktop row out of a host's detail into the room.
 6. The opt-in search setting.
 
-**Phase 5 (now):** a spike, read-only. Present a machine's SFTP home as a location in the Finder and Files
+**Phase 5 spike, done as far as it can go unattended (22:10; `tasks/2026-10/2026-10-13_file-provider-spike.md`):**
+- A macOS File Provider extension (`GlassPowerToolsFiles`) links the SSH stack (31 MB) and signs with the Keychain
+  group through the team profile. Pinned-only trust and SFTP reading already exist.
+- **The owner's call:** register one scratch-VM domain with him present, to prove it at run time, then decide on
+  read-only browsing per machine.
+- The target is inert (no domain) and embedded in Mac builds. Nothing from the spike has been installed.
+
+**Phase 5 (original plan):** a spike, read-only. Present a machine's SFTP home as a location in the Finder and Files
 sidebars with an `NSFileProviderReplicatedExtension` (macOS 11, iOS 16, visionOS 1; a visionOS App Store block
 is reported, forum 802442).
 - **Measure first:** can a sandboxed File Provider extension reach the SSH stack and the Keychain access group,

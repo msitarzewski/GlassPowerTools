@@ -48,3 +48,38 @@ machine's saved credential and pinned host key?
 - **Next without the owner:** steps 3–4 as library code testable from the test runner against the scratch VM
   (pinned-key-only trust, listing the home folder, fetching a file), then a written recommendation. Registering
   a domain waits for him.
+
+## Findings and recommendation (22:10)
+
+**Proven or settled by existing code:**
+- **Links and signs on the Mac:** see steps 1 and 2 above. The team profile grants the Keychain group the
+  credentials live in.
+- **Pinned keys only:** an `SSHTransport` with no trust decider refuses an unpinned or changed key
+  (`SSHHostTrustRequiredError`, `SSHHostTrust.swift`). An extension that cannot prompt therefore connects only to
+  a machine trusted in the app first, and says so. Nothing new is needed.
+- **Listing and reading files:** the editor's project path (`openSFTPConnection`, `GlassTerminalDirectoryLister`)
+  already lists folders and reads files with bounds, with live tests against the scratch VM.
+
+**Unproven until a domain is registered on a real Mac:**
+- The Keychain read from inside the extension's sandbox.
+- Sockets and NIO inside a File Provider process.
+- The extension's memory under the system's limit.
+- How the Finder shows the location.
+
+Registering a domain adds a sidebar entry to the owner's Finder, so it waits for him.
+
+**Recommendation:**
+1. **With the owner present:** register one domain, for the scratch VM, from a debug-only command. Browse it in the
+   Finder, measure memory, then remove the domain.
+2. If that holds, build read-only browsing for real: a domain per machine with a Terminal service, switched on
+   per machine by the owner (never automatically), metadata for the extension in the App Group, and a message
+   when the host key is not yet trusted.
+3. **Writes later, as their own decision:** conflicts, offline edits, eviction and the verified upload's
+   no-replace rule all need designing.
+4. **iPhone and iPad after the Mac:** the same extension point, with automatic signing for the App ID. Vision Pro
+   waits on the reported App Store block (forum 802442).
+
+**State left:**
+- The `GlassPowerToolsFiles` target is in the project and embedded in Mac builds, inert: no domain, an empty
+  root. Remove it if the owner declines.
+- Nothing has been installed from the spike build.
