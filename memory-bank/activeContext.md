@@ -32,22 +32,21 @@ use the disposable test VM only).
 
 ## 2026-10-14 (~11:30) — RESUME HERE
 
-**State:** 0.4.427 on the Mac and iPhone (11:43); the Vision Pro has been locked (CoreDevice 4016)
+**State:** 0.4.428 building (0.4.427 on the Mac and iPhone since 11:43); the Vision Pro has been locked (CoreDevice 4016)
 since 0.4.423 — retry `devicectl device install app` with `$SP/dd-vision` when it is worn. No crash reports since
 2026-10-13 18:47. Everything committed, nothing pushed. The owner said he was packing up (~11:10). **Mac installs go when
 ready, never held on our judgement** (the owner: "No need to hold on quitting right now. All tmux all day."); devices too.
 
 **Waiting on the owner:**
-- **Desktop clipboard vs GNOME — open, and the reason for 0.4.427.** 26d5778 (0.4.425) answered Monitor Ready with the
-  Format List MS-RDPECLIP 3.2.5.1.2 requires. The clipboard then synced (server answered our list, offered its own, we
-  asked for its text) — and GNOME dropped every session: at once, or ~4–5 s later with a *second* redirect (hop 1 → hop
-  2, which fails at once). GNOME runs FreeRDP's cliprdr server; `grd-clipboard-rdp.c` has `MAX_WAIT_TIME_MS 4000`
-  timeouts around list responses and data requests. On 0.4.423 a copy announced right at Monitor Ready (10:18:34) ended
-  that session too; sessions that sent no list lasted minutes. The owner: "Desktop instantly quits now on [his GNOME
-  desktop]". 4346ef8 stops the Monitor Ready list (back to 0.4.424) and logs RDPKit's error text at `event=finished`.
-  Workaround told to him: Share clipboard off for that desktop. **Next:** his GNOME journal for 11:31–11:33 (user and
-  system `gnome-remote-desktop` units) to see why its session ends; then the real fix. Not reproduced on Windows (VM
-  session sits at sign-in).
+- **Desktop clipboard vs GNOME — cause found (4499937, 0.4.428).** The 0.4.425 drops were ours: 4346ef8's logging
+  named them "server did not confirm RDPGFX capabilities". Before the first frame RDPKit read at most 16 packets
+  waiting for RDPGFX's caps confirm, and clipboard/sound/device packets counted; with our Format List at Monitor Ready
+  (MS-RDPECLIP 3.2.5.1.2; FreeRDP's client sends one too, empty included) GNOME answers at once and the 16 ran out.
+  Now those packets don't count (own bound 4,096) and the Monitor Ready list is back. Mock test with 24 clipboard
+  messages reproduces the owner's exact error without the fix. On 0.4.427 the owner: "sending worked!" (Mac → GNOME,
+  via a copy's list). **Next:** on 0.4.428, GNOME → Mac (needs the Monitor Ready list) and that sessions stay up.
+  The ~4 s second redirects on 0.4.425 are explained by the same failure only if hop 1 also ran out — watch for a
+  `redirect-accepted` on hop 1 in the new logs. Workaround no longer needed.
 - **Command Palette (cf237ab, 0.4.427):** every library service as "Connect: Desktop on alpha", connected as Connect
   does; the terminal's and database's own lists removed (the database's set `paletteConnectionRequest`, which nothing
   read — its entries connected nothing). The three capabilities now drain queued requests when a Connections window
