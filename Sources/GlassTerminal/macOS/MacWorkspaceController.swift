@@ -1,5 +1,6 @@
 #if os(macOS)
 #if os(macOS)
+import AppKit
 import Foundation
 import Observation
 import GlassLayers
@@ -280,6 +281,45 @@ final class MacWorkspaceController {
         return captured.map(TerminalTmux.historyText)
     }
 
+    // MARK: Watch Log File (2026-10-14)
+
+    /// Watch Log File on a path a pane printed: a tab beside this one, in this tab's window, on the
+    /// same machine — this Mac, or the pane's host over a connection of its own — whose shell
+    /// follows the file (`TerminalWatchFile`). A plain shell, never tmux: a watch ends with its tab.
+    /// A beep when it cannot: a relative path from a folder unknown, or no window to put it in.
+    func watchFile(_ path: String, from paneID: UUID) async {
+        guard let request = await watchFileRequest(path, from: paneID),
+              MacWorkspacePreviewRegistry.shared.tabAdder(holding: self)?(request) == true else {
+            NSSound.beep()
+            return
+        }
+    }
+
+    /// The tab Watch Log File asks for, its command held by the startup broker; nil when it cannot.
+    func watchFileRequest(_ path: String, from paneID: UUID,
+                          broker: MacStartupCommandBroker = .shared) async -> MacWorkspaceTabRequest? {
+        guard let pane = state.root?.pane(id: paneID) else { return nil }
+        let intent: MacWorkspacePaneIntent
+        var directory: String?
+        switch pane.intent.kind {
+        case .local:
+            directory = localDirectory(for: paneID) ?? pane.intent.localDirectory
+            intent = MacWorkspacePaneIntent.local(shell: pane.intent.localShell, directory: directory).startingWithoutTmux()
+        case .ssh:
+            guard let serverID = pane.intent.serverID else { return nil }
+            // A relative path is the shell's folder's: tmux says which, where the pane runs in it.
+            if TerminalWatchFile.isRelative(path), let session = sessionsByPaneID[paneID] {
+                directory = TerminalRepository.path(
+                    fromReported: await session.workingDirectory(reported: session.terminalHostModel.currentDirectory))
+            }
+            intent = MacWorkspacePaneIntent.ssh(serverID: serverID).startingWithoutTmux()
+        }
+        guard let command = TerminalWatchFile.command(for: path, in: directory),
+              let ticket = broker.issue(command: command) else { return nil }
+        return MacWorkspaceTabRequest(initialPaneIntent: intent, tabLabel: TerminalWatchFile.tabLabel(for: path),
+                                      startupTicketID: ticket)
+    }
+
     /// Where a local pane's shell is. In tmux the process Glass started is the tmux client, whose
     /// directory never moves, so the answer is the one tmux gave.
     func localDirectory(for paneID: UUID) -> String? {
@@ -465,6 +505,7 @@ final class MacWorkspaceController {
     /// do (W19). Its own title and folder reports stop at tmux, so they are the session's.
     private func watch(_ terminal: TerminalSession, for paneID: UUID) {
         terminal.readsTmuxPane = true
+        terminal.terminalHostModel.onWatchFile = { [weak self] path in Task { await self?.watchFile(path, from: paneID) } }
         terminal.tmuxPaneObserved = { [weak self, weak terminal] pane, firstSinceAttach in
             guard let self, let terminal else { return }
             terminalRead(pane, firstSinceAttach: firstSinceAttach, of: terminal, for: paneID)
@@ -742,6 +783,7 @@ final class MacWorkspaceController {
         let runtime = SwiftTermLocalProcessRuntime()
         localRuntimesByPaneID[paneID] = runtime
         observeOutput(of: runtime.model)
+        runtime.model.onWatchFile = { [weak self] path in Task { await self?.watchFile(path, from: paneID) } }
         if tmuxSession != nil {
             runtime.model.onAlternateScreenScroll = { [weak self] deltaY, precise in
                 self?.scrollLocalTmux(paneID, deltaY: deltaY, precise: precise) ?? false

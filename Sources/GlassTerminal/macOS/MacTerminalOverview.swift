@@ -64,6 +64,16 @@ final class MacWorkspacePreviewRegistry {
         return nil
     }
 
+    /// How to add a tab to the window that holds `tab` now — tabs move between windows — for
+    /// what a pane asks for beside it: Watch Log File (2026-10-14). Nil when it is in none on screen.
+    func tabAdder(holding tab: MacWorkspaceController) -> (@MainActor (MacWorkspaceTabRequest) -> Bool)? {
+        for (id, entry) in entries where entry.window != nil {
+            guard entry.controller?.tabs.contains(where: { $0 === tab }) == true, let adder = tabAdders[id] else { continue }
+            return adder
+        }
+        return nil
+    }
+
     func register(_ controller: MacWorkspaceWindowController, window: NSWindow) {
         guard !MacTerminalWindowReader.hasClosed(window),
               entries[controller.windowID]?.window !== window else { return }

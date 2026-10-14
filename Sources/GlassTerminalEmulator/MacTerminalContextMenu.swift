@@ -13,6 +13,11 @@
 //  Paste goes through the view's own `paste(_:)`, which the app reviews before anything reaches
 //  the shell, exactly as ⌘V does.
 //
+//  On a link (2026-10-14, `TerminalLinkTarget`), the menu starts with what it can do there, as
+//  Terminal's Open URL does: an address opens (after the same question a ⌘-click asks) or is
+//  copied; a path is copied or watched — Watch Log File, a tab of its own following the file,
+//  where the host can make one (`SwiftTermHostModel.onWatchFile`).
+//
 
 #if !canImport(UIKit) && canImport(AppKit)
 import AppKit
@@ -27,6 +32,10 @@ enum MacTerminalContextMenu {
         let menu = NSMenu(title: "Terminal")
         // Each item's state is set here; SwiftTerm's own validation knows only its selectors.
         menu.autoenablesItems = false
+        if let target = link(in: view, at: event.locationInWindow) {
+            addItems(for: target, model: (view as? MacTerminalModelHolding)?.hostModel, to: menu)
+            menu.addItem(.separator())
+        }
         if let selected, let phrase = lookUpPhrase(selected) {
             let point = view.convert(event.locationInWindow, from: nil)
             menu.addItem(item("Look Up “\(phrase)”", symbol: "info.circle") {
@@ -45,6 +54,43 @@ enum MacTerminalContextMenu {
         menu.addItem(item("Paste", enabled: pasteboardHasText()) { view.paste(view) })
         menu.addItem(item("Select All") { selectAll(in: view) })
         return menu
+    }
+
+    // MARK: A link under the pointer
+
+    /// What the link under `windowPoint` points at: SwiftTerm's link there — a hyperlink, or text
+    /// its rules recognise, across a soft-wrapped line too — or else an address Apple's detector
+    /// finds on that row.
+    static func link(in view: TerminalView, at windowPoint: NSPoint) -> TerminalLinkTarget? {
+        guard let position = position(in: view, at: windowPoint) else { return nil }
+        let terminal = view.getTerminal()
+        if let text = terminal.link(at: .buffer(position), mode: .explicitAndImplicit) {
+            return TerminalLinkTarget(link: text)
+        }
+        let screenRow = position.row - terminal.buffer.yDisp
+        guard let line = terminal.getLine(row: screenRow)?.translateToString(trimRight: true),
+              let url = TerminalLinkTarget.address(in: line, at: position.col) else { return nil }
+        return .url(url)
+    }
+
+    /// Open Link and Copy Link on an address; Watch Log File and Copy Path on a path.
+    static func addItems(for target: TerminalLinkTarget, model: SwiftTermHostModel?, to menu: NSMenu) {
+        switch target {
+        case .url(let url):
+            let link = url.absoluteString
+            // Only what a ⌘-click may open, a web address with no account in it, and after the
+            // same question.
+            menu.addItem(item("Open Link", symbol: "safari",
+                              enabled: model != nil && SwiftTermExternalLinkPolicy.validatedRequest(for: link) != nil) {
+                model?.requestExternalLink(link)
+            })
+            menu.addItem(item("Copy Link", symbol: "link") { copy(link, to: copyPasteboard) })
+        case .path(let path):
+            if let watch = model?.onWatchFile, !path.hasSuffix("/") {
+                menu.addItem(item("Watch Log File", symbol: "doc.text.magnifyingglass") { watch(path) })
+            }
+            menu.addItem(item("Copy Path", symbol: "doc.on.doc") { copy(path, to: copyPasteboard) })
+        }
     }
 
     // MARK: Select All over tmux's history
@@ -167,6 +213,11 @@ enum MacTerminalContextMenu {
         return item
     }
 
+}
+
+/// A Mac terminal view that knows the model it draws, for what a link's menu items ask of it.
+@MainActor protocol MacTerminalModelHolding: AnyObject {
+    var hostModel: SwiftTermHostModel? { get }
 }
 
 /// A Mac terminal view whose Select All can take a program's whole history

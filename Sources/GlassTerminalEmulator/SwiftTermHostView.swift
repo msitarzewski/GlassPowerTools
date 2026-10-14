@@ -377,6 +377,11 @@ public final class SwiftTermHostModel: ObservableObject {
     /// session's history and screen, which never reach the terminal because tmux draws on the
     /// alternate screen. Select All on the Mac takes it, so Copy copies all of it (2026-10-11).
     public var onFullHistory: (@MainActor () async -> String?)?
+    /// Watch Log File, on a path the terminal shows (`MacTerminalContextMenu`, 2026-10-14): the
+    /// path as written — absolute, `~/…`, `$VAR/…` or relative to the shell's folder — for the
+    /// host to follow in a tab of its own, on the same machine. Nil where the host cannot, and the
+    /// menu leaves it out.
+    public var onWatchFile: (@MainActor (String) -> Void)?
     @Published public private(set) var scrollPosition: Double = 1
     @Published public private(set) var pendingPasteReview: SwiftTermPasteReview?
     @Published public private(set) var pendingExternalLink: SwiftTermExternalLinkRequest?
@@ -721,7 +726,7 @@ public final class SwiftTermHostModel: ObservableObject {
         }
     }
 
-    fileprivate func requestExternalLink(_ link: String) {
+    func requestExternalLink(_ link: String) {
         guard pendingExternalLink == nil,
               let request = SwiftTermExternalLinkPolicy.validatedRequest(for: link) else {
             return
@@ -2901,7 +2906,7 @@ private func fitMacTerminalHostWindow(
 }
 
 @MainActor
-private final class ReviewingMacTerminalView: TerminalView, MacTerminalHistoryHolding {
+private final class ReviewingMacTerminalView: TerminalView, MacTerminalHistoryHolding, MacTerminalModelHolding {
     var onPasteRequest: ((String, Bool) -> Void)?
     var onWindowAttachmentChanged: (() -> Void)?
 
@@ -2910,6 +2915,9 @@ private final class ReviewingMacTerminalView: TerminalView, MacTerminalHistoryHo
     var historyRead: Task<Void, Never>?
     var fullHistoryProvider: () -> (@MainActor () async -> String?)? = { nil }
     var fullHistory: (@MainActor () async -> String?)? { fullHistoryProvider() }
+    // A link's actions in the menu (`MacTerminalContextMenu`): the model the view draws.
+    var hostModelProvider: () -> SwiftTermHostModel? = { nil }
+    var hostModel: SwiftTermHostModel? { hostModelProvider() }
 
     // ⌘A: SwiftTerm's Select All can't be overridden from here, so its key is taken first.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
@@ -2989,11 +2997,13 @@ private final class MacSwiftTermEngine: TerminalEngine {
         onRendererDiagnostics: @escaping (SwiftTermRendererDiagnostics) -> Void,
         onOSC52Decision: @escaping (SwiftTermOSC52Decision) -> Void,
         alternateScreenScroll: @escaping () -> (@MainActor (CGFloat, Bool) -> Bool)? = { nil },
-        fullHistory: @escaping () -> (@MainActor () async -> String?)? = { nil }
+        fullHistory: @escaping () -> (@MainActor () async -> String?)? = { nil },
+        hostModel: @escaping () -> SwiftTermHostModel? = { nil }
     ) {
         terminalView = ReviewingMacTerminalView(frame: .zero)
         scrollWatcher = MacAlternateScreenScrollWatcher(view: terminalView, handler: alternateScreenScroll)
         terminalView.fullHistoryProvider = fullHistory
+        terminalView.hostModelProvider = hostModel
         self.onPasteData = onPasteData
         self.onRendererDiagnostics = onRendererDiagnostics
         self.onOSC52Decision = onOSC52Decision
@@ -3270,7 +3280,8 @@ public struct SwiftTermHostView: NSViewRepresentable {
                 model?.recordOSC52Decision(decision)
             },
             alternateScreenScroll: { [weak model] in model?.onAlternateScreenScroll },
-            fullHistory: { [weak model] in model?.onFullHistory }
+            fullHistory: { [weak model] in model?.onFullHistory },
+            hostModel: { [weak model] in model }
         )
     }
 
@@ -3584,7 +3595,7 @@ public final class SwiftTermLocalProcessState: ObservableObject {
 }
 
 @MainActor
-private final class ReviewingMacLocalProcessTerminalView: LocalProcessTerminalView, MacTerminalHistoryHolding {
+private final class ReviewingMacLocalProcessTerminalView: LocalProcessTerminalView, MacTerminalHistoryHolding, MacTerminalModelHolding {
     var onPasteRequest: ((String, Bool) -> Void)?
     var onWindowAttachmentChanged: (() -> Void)?
     var onProcessOutput: ((ArraySlice<UInt8>, Duration) -> Void)?
@@ -3597,6 +3608,9 @@ private final class ReviewingMacLocalProcessTerminalView: LocalProcessTerminalVi
     var historyRead: Task<Void, Never>?
     var fullHistoryProvider: () -> (@MainActor () async -> String?)? = { nil }
     var fullHistory: (@MainActor () async -> String?)? { fullHistoryProvider() }
+    // A link's actions in the menu (`MacTerminalContextMenu`): the model the view draws.
+    var hostModelProvider: () -> SwiftTermHostModel? = { nil }
+    var hostModel: SwiftTermHostModel? { hostModelProvider() }
 
     // ⌘A: SwiftTerm's Select All can't be overridden from here, so its key is taken first.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
@@ -3888,6 +3902,7 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
             self?.delegateProxy.hostModel?.onAlternateScreenScroll
         }
         terminalView.fullHistoryProvider = { [weak self] in self?.delegateProxy.hostModel?.onFullHistory }
+        terminalView.hostModelProvider = { [weak self] in self?.delegateProxy.hostModel }
         terminalView.onWindowAttachmentChanged = { [weak self] in
             self?.publishRendererDiagnostics()
         }

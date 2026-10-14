@@ -203,5 +203,73 @@ struct MacTerminalContextMenuTests {
         #expect(MacTerminalContextMenu.lookUpPhrase(String(repeating: "a", count: 40)) == String(repeating: "a", count: 30) + "…")
         #expect(MacTerminalContextMenu.lookUpPhrase(" \n ") == nil)
     }
+
+    // MARK: A link under the pointer (2026-10-14)
+
+    /// The owner: "detect a local path to a log … and offer a right click > watch log file".
+    @Test("a right-click on a path offers Watch Log File and Copy Path; Watch hands the host the path")
+    func rightClickOnAPath() async throws {
+        let host = await HostedTerminal()
+        defer { host.close() }
+        var watched: [String] = []
+        host.model.onWatchFile = { watched.append($0) }
+        await host.feed("/var/log/glass-test.log:42 rotated\r\n")
+        let view = try terminalView(host)
+
+        let menu = try #require(view.menu(for: try rightClick(view)))
+        #expect(Array(titles(menu).prefix(3)) == ["Watch Log File", "Copy Path", "—"])
+        menu.performActionForItem(at: try #require(menu.items.firstIndex { $0.title == "Watch Log File" }))
+        #expect(watched == ["/var/log/glass-test.log"], "the file, without the line the log named")
+    }
+
+    @Test("with no host that can watch, a path offers Copy Path alone, and it copies the path")
+    func pathWithoutAWatcher() async throws {
+        let host = await HostedTerminal()
+        defer { host.close() }
+        await host.feed("/var/log/glass-test.log rotated\r\n")
+        let view = try terminalView(host)
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name("MacTerminalContextMenuTests.path.\(UUID())"))
+        defer { pasteboard.releaseGlobally() }
+        let general = MacTerminalContextMenu.copyPasteboard
+        MacTerminalContextMenu.copyPasteboard = pasteboard
+        defer { MacTerminalContextMenu.copyPasteboard = general }
+
+        let menu = try #require(view.menu(for: try rightClick(view)))
+        #expect(!titles(menu).contains("Watch Log File"))
+        #expect(titles(menu).first == "Copy Path")
+        menu.performActionForItem(at: try #require(menu.items.firstIndex { $0.title == "Copy Path" }))
+        #expect(pasteboard.string(forType: .string) == "/var/log/glass-test.log")
+    }
+
+    @Test("a right-click on an address offers Open Link, which asks first as a ⌘-click does, and Copy Link")
+    func rightClickOnAnAddress() async throws {
+        let host = await HostedTerminal()
+        defer { host.close() }
+        await host.feed("https://example.com/docs is up\r\n")
+        let view = try terminalView(host)
+        let pasteboard = NSPasteboard(name: NSPasteboard.Name("MacTerminalContextMenuTests.link.\(UUID())"))
+        defer { pasteboard.releaseGlobally() }
+        let general = MacTerminalContextMenu.copyPasteboard
+        MacTerminalContextMenu.copyPasteboard = pasteboard
+        defer { MacTerminalContextMenu.copyPasteboard = general }
+
+        let menu = try #require(view.menu(for: try rightClick(view)))
+        #expect(Array(titles(menu).prefix(3)) == ["Open Link", "Copy Link", "—"])
+        #expect(try item(menu, "Open Link").isEnabled)
+        menu.performActionForItem(at: try #require(menu.items.firstIndex { $0.title == "Copy Link" }))
+        #expect(pasteboard.string(forType: .string) == "https://example.com/docs")
+        menu.performActionForItem(at: try #require(menu.items.firstIndex { $0.title == "Open Link" }))
+        #expect(host.model.pendingExternalLink != nil, "the same question a ⌘-click asks")
+    }
+
+    @Test("a bare domain, which SwiftTerm's rules leave alone, is found by Apple's detector")
+    func bareDomain() async throws {
+        let host = await HostedTerminal()
+        defer { host.close() }
+        await host.feed("example.com is up\r\n")
+        let view = try terminalView(host)
+        let menu = try #require(view.menu(for: try rightClick(view)))
+        #expect(titles(menu).first == "Open Link")
+    }
 }
 #endif
