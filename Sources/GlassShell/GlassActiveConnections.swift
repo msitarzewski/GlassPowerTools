@@ -348,7 +348,7 @@ struct GlassActiveConnectionsList: View {
     var body: some View {
         let machines = model.activeMachines()
         let chosen = selection.chosen(in: machines)
-        List(selection: listSelection(machines)) {
+        List(selection: offersSelection ? listSelection(machines) : nil) {
             if machines.isEmpty {
                 let launcher = launcherInList
                 ContentUnavailableView("Nothing Is Open",
@@ -476,6 +476,18 @@ struct GlassActiveConnectionsList: View {
         #endif
     }
 
+    /// Whether the list takes a selection at all. On a Mac always: a click chooses. Elsewhere only in
+    /// selection mode: a list that can choose several also answers iOS's two-finger drag, which
+    /// started choosing — and turned Select on — when the owner meant a pinch (2026-10-14: "pinch
+    /// enables select mode in the actives right now", on the iPhone). Select is the way in.
+    private var offersSelection: Bool {
+        #if os(macOS)
+        true
+        #else
+        selection.isSelecting
+        #endif
+    }
+
     /// The list's own selection, as W8's tab sidebar uses it. On a Mac a plain click with nothing
     /// held opens the row at once and leaves nothing chosen; ⌘-click and ⇧-click choose. On the
     /// others it chooses only in selection mode: a tap otherwise reaches the row's button.
@@ -508,10 +520,11 @@ struct GlassActiveConnectionsList: View {
         }
     }
     #else
-    /// Selection mode is the system's edit mode, so the list draws its own checkmarks.
+    /// Selection mode is the system's edit mode, so the list draws its own checkmarks. The system
+    /// may end it; only Select begins it (`offersSelection`).
     private var editMode: Binding<EditMode> {
         Binding(get: { selection.isSelecting ? .active : .inactive },
-                set: { selection.isSelecting = $0.isEditing })
+                set: { if !$0.isEditing { selection.isSelecting = false } })
     }
     #endif
 
