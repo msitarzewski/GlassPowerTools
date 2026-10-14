@@ -65,6 +65,14 @@ struct GeneralSettingsView: View {
                 Text("Scrollback stays in memory and is cleared when the terminal session ends.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                Toggle("Suggest fixes for errors", isOn: $settings.errorSuggestions)
+                    .onChange(of: settings.errorSuggestions) { _, _ in
+                        settings.saveSettings()
+                    }
+                Text("When a terminal's output shows an error, Apple Intelligence on this device explains it and offers a fix to review. Pause it in one terminal from the suggestion itself.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 
                 Stepper("Max scrollback lines: \(settings.maxScrollbackLines)",
                        value: $settings.maxScrollbackLines,

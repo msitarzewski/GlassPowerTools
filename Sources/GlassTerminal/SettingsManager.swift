@@ -165,6 +165,10 @@ class SettingsManager {
     private(set) var sshKeyDeletionRecoveryError: String?
     var cursorStyle: String = "Block"
     var blinkingCursor: Bool = true
+    /// Apple Intelligence explaining an error the output shows, with a fix to review (2026-10-04).
+    /// On by default; off here, or from the card itself (the owner, 2026-10-14: "a need to pause on
+    /// device AI suggestions … it's monitoring the output of an eval").
+    var errorSuggestions: Bool = true
     /// The one layering state (Stage 1's `GlassLayerStore`). glas.sh's three appearance settings
     /// are views over it so the terminal canvas, the shell's windows and Settings → Appearance all
     /// read and write the same values; nothing here persists a second copy.
@@ -323,6 +327,9 @@ class SettingsManager {
         if settingsDefaults.object(forKey: UserDefaultsKeys.blinkingCursor) != nil {
             blinkingCursor = settingsDefaults.bool(forKey: UserDefaultsKeys.blinkingCursor)
         }
+        if settingsDefaults.object(forKey: UserDefaultsKeys.errorSuggestions) != nil {
+            errorSuggestions = settingsDefaults.bool(forKey: UserDefaultsKeys.errorSuggestions)
+        }
         migrateLegacyAppearanceIfNeeded()
         if settingsDefaults.object(forKey: UserDefaultsKeys.interactiveGlass) != nil {
             interactiveGlass = settingsDefaults.bool(forKey: UserDefaultsKeys.interactiveGlass)
@@ -385,6 +392,7 @@ class SettingsManager {
         settingsDefaults.set(hostKeyVerificationMode, forKey: UserDefaultsKeys.hostKeyVerificationMode)
         settingsDefaults.set(cursorStyle, forKey: UserDefaultsKeys.cursorStyle)
         settingsDefaults.set(blinkingCursor, forKey: UserDefaultsKeys.blinkingCursor)
+        settingsDefaults.set(errorSuggestions, forKey: UserDefaultsKeys.errorSuggestions)
         settingsDefaults.set(interactiveGlass, forKey: UserDefaultsKeys.interactiveGlass)
         settingsDefaults.set(glassTint, forKey: UserDefaultsKeys.glassTint)
         settingsDefaults.set(tailscaleTailnet, forKey: UserDefaultsKeys.tailscaleTailnet)

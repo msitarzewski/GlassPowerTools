@@ -8823,3 +8823,34 @@ struct glas_shTests {
         )
     }
 }
+
+/// The owner, 2026-10-14: "a need to pause on device AI suggestions … it's monitoring the output of
+/// an eval". On unless turned off; off stays off; a pause belongs to one terminal.
+@Suite("Error suggestions can be paused or turned off")
+@MainActor
+struct ErrorSuggestionSettingTests {
+    @Test("on by default; turned off, it stays off after a relaunch")
+    func persists() {
+        let suiteName = "sh.glas.test.error-suggestions.\(UUID().uuidString)"
+        let defaults = UserDefaults.forTest(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = SettingsManager(loadImmediately: false, settingsDefaults: defaults)
+        settings.loadPersistentStateIfNeeded()
+        #expect(settings.errorSuggestions)
+        settings.errorSuggestions = false
+        settings.saveSettings()
+
+        let relaunched = SettingsManager(loadImmediately: false, settingsDefaults: defaults)
+        relaunched.loadPersistentStateIfNeeded()
+        #expect(!relaunched.errorSuggestions)
+    }
+
+    @Test("a pause is one terminal's: a new terminal is not paused")
+    func pauseIsPerTerminal() {
+        let server = ServerConfiguration(name: "alpha", host: "alpha.example", username: "ann")
+        let paused = TerminalSession(server: server, terminalWriteSink: { _ in }, terminalResizeSink: { _, _ in })
+        paused.errorSuggestionsPaused = true
+        let other = TerminalSession(server: server, terminalWriteSink: { _ in }, terminalResizeSink: { _, _ in })
+        #expect(!other.errorSuggestionsPaused)
+    }
+}

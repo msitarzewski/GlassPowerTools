@@ -32,7 +32,7 @@ use the disposable test VM only).
 
 ## 2026-10-13 (~23:00) — RESUME HERE
 
-**State:** 0.4.418 on the iPhone and Vision Pro; **the Mac waits on 0.4.417** while the owner tests the clipboard (0.4.418 built in `$SP/dd-mac`; install with `$SP/install-mac2.zsh`). The owner is back
+**State:** 0.4.419 on the iPhone and Vision Pro; **the Mac waits on 0.4.417** for the owner's word (0.4.419 built in `$SP/dd-mac`; install with `$SP/install-mac2.zsh`). The owner is back
 (23:10). No new crash reports. The owner is out; his
 test list is unchanged (below, at 19:35). The Mac's screen is locked, which accounts for B-X27's test failures
 (the wallpaper test included).
@@ -42,6 +42,9 @@ test list is unchanged (below, at 19:35). The Mac's screen is locked, which acco
 - **B-X22's second half** (9f2532a): a project on a saved machine that is this Mac opens from the disk.
 - **B-F32** (0.4.412): Settings ▸ a Desktop service ▸ Graphics: Automatic, H.264 (4:2:0) or Without H.264. Live on
   the Windows 11 VM. **For the owner:** try H.264 (4:2:0) on the GNOME host where colours smeared (B-X6).
+- **Error suggestions can be paused** (0.4.419, the owner: "a need to pause on device AI suggestions … Maybe a
+  pause/disable in the suggestion modal?"): the card's pause menu — Pause in This Terminal (until it closes), Turn Off
+  Error Suggestions — and Settings ▸ Terminal ▸ Suggest fixes for errors. Device-local, not synced.
 - **Markdown preview escapes text** (0.4.418, 2026-10-14, the owner: a "Blocked Plug-in" pill previewing a project's
   notes): swift-markdown's `HTMLFormatter` escaped nothing, so `<embed>` in backticks became an element.
   `GlassEditorMarkdownHTML` escapes text, code, headings and attributes; raw HTML passes as Markdown means.

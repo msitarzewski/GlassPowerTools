@@ -357,6 +357,9 @@ class TerminalSession: Identifiable, Hashable {
 
     let id: UUID
     var server: ServerConfiguration
+    /// Error suggestions paused in this terminal from their card, until it closes (2026-10-14): an
+    /// eval or a test run prints "failed" by design, and the card kept asking about it.
+    var errorSuggestionsPaused = false
     #if DEBUG
     /// Screenshots only (App/GlassDemoMode.swift): Settings ▸ This Window opens over this
     /// terminal's window as it first appears, once.

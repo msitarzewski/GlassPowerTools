@@ -680,17 +680,26 @@ struct AIErrorCard: View {
     let error: (problem: String, suggestedFix: String, reasoning: String)
     let onRunFix: (String) -> Void
     let onDismiss: () -> Void
+    /// No more suggestions in this terminal until it closes (the owner, 2026-10-14: "a need to
+    /// pause on device AI suggestions … Maybe a pause/disable in the suggestion modal?").
+    let onPause: () -> Void
+    /// No more suggestions anywhere; Settings ▸ Terminal turns them back on.
+    let onTurnOff: () -> Void
     @State private var composedFix: String
     @State private var pendingConfirmation: GeneratedCommandConfirmation?
 
     init(
         error: (problem: String, suggestedFix: String, reasoning: String),
         onRunFix: @escaping (String) -> Void,
-        onDismiss: @escaping () -> Void
+        onDismiss: @escaping () -> Void,
+        onPause: @escaping () -> Void = {},
+        onTurnOff: @escaping () -> Void = {}
     ) {
         self.error = error
         self.onRunFix = onRunFix
         self.onDismiss = onDismiss
+        self.onPause = onPause
+        self.onTurnOff = onTurnOff
         _composedFix = State(initialValue: error.suggestedFix)
     }
 
@@ -703,6 +712,21 @@ struct AIErrorCard: View {
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(2)
                 Spacer()
+                // Beside Close, where a card that keeps coming back is shut: stop it here, or
+                // everywhere.
+                Menu {
+                    Button("Pause in This Terminal", systemImage: "pause.circle") { onPause() }
+                    Button("Turn Off Error Suggestions", systemImage: "lightbulb.slash") { onTurnOff() }
+                } label: {
+                    Image(systemName: "pause.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("Pause suggestions in this terminal, or turn them off")
+                .accessibilityLabel("Pause or Turn Off Suggestions")
                 Button {
                     onDismiss()
                 } label: {
@@ -710,6 +734,7 @@ struct AIErrorCard: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
+                .help("Close")
             }
 
             if !error.suggestedFix.isEmpty, !AIResponseParser.isRunnableCommand(error.suggestedFix) {

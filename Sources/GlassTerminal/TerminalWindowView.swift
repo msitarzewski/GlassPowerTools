@@ -814,7 +814,8 @@ struct TerminalWindowView: View {
         // Error detection for the AI explainer, once output has come to rest. Not per chunk of
         // output: this whole view was rebuilt for each one (W10).
         .onChange(of: session.outputSettledNonce) { _, _ in
-            if aiAssistant.isAvailable {
+            // Not while turned off in Settings, nor in a terminal paused from the card.
+            if aiAssistant.isAvailable, settingsManager.errorSuggestions, !session.errorSuggestionsPaused {
                 errorCheckTask?.cancel()
                 errorCheckTask = Task { @MainActor in
                     let lines = terminalHostModel.getVisibleText(lastNLines: 10)
@@ -854,6 +855,17 @@ struct TerminalWindowView: View {
                         session.sendCommand(fix)
                     },
                     onDismiss: {
+                        withAnimation { showingErrorCard = false }
+                    },
+                    onPause: {
+                        session.errorSuggestionsPaused = true
+                        errorCheckTask?.cancel()
+                        withAnimation { showingErrorCard = false }
+                    },
+                    onTurnOff: {
+                        settingsManager.errorSuggestions = false
+                        settingsManager.saveSettings()
+                        errorCheckTask?.cancel()
                         withAnimation { showingErrorCard = false }
                     }
                 )
