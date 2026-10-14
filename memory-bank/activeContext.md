@@ -32,7 +32,7 @@ use the disposable test VM only).
 
 ## 2026-10-13 (~23:00) — RESUME HERE
 
-**State:** 0.4.419 on the iPhone and Vision Pro; **the Mac waits on 0.4.417** for the owner's word (0.4.419 built in `$SP/dd-mac`; install with `$SP/install-mac2.zsh`). The owner is back
+**State:** 0.4.419 on all three (09:11). Mac installs go when ready: the owner, "No need to hold on quitting right now. All tmux all day." The owner is back
 (23:10). No new crash reports. The owner is out; his
 test list is unchanged (below, at 19:35). The Mac's screen is locked, which accounts for B-X27's test failures
 (the wallpaper test included).
