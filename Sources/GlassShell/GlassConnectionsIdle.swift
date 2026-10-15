@@ -171,11 +171,12 @@ public struct GlassConnectionsIdleClock: Sendable, Equatable {
 /// window it should have hidden on the owner's headset after a relaunch (2026-10-11: "The orb
 /// always appears as it should. The All Connections window never minimizes").
 public enum GlassConnectionsWindowSize {
-    /// The library's first size (W29): a quarter narrower than the system's 1280, the 360-point
-    /// list column beside a 600-point detail, which holds a host's grouped form at a comfortable
-    /// width (the overview's four tiles wrap to two rows). Tall enough that a host with two
-    /// services shows every row and Edit without scrolling; 620 cut it off.
-    public static let width: CGFloat = 960
+    /// The library's first size: the Mac's Connections width, the 360-point list column beside an
+    /// 820-point detail. W29 had made it 960, a quarter narrower than the system's 1280 (the
+    /// owner, 2026-10-10: "pretty large"); at 960 the detail was 600, and the owner
+    /// asked for it wider (2026-10-14: "it should be wider by default"). Tall enough that a host
+    /// with two services shows every row and Edit without scrolling; 620 cut it off.
+    public static let width: CGFloat = 1180
     public static let height: CGFloat = 700
     public static var standard: CGSize { CGSize(width: width, height: height) }
 
@@ -206,7 +207,7 @@ public enum GlassConnectionsWindowSize {
 
     /// The library's size as the window's scene keeps it (`SceneStorage` keeps strings), so a
     /// launch that restores the window at the orb's size can bring the library back at its own:
-    /// "960x700", or empty for none.
+    /// "1180x700", or empty for none.
     public static func stored(_ size: CGSize?) -> String {
         guard let size, usable(size) else { return "" }
         return "\(Int(size.width.rounded()))x\(Int(size.height.rounded()))"

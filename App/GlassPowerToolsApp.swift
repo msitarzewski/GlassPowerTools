@@ -539,11 +539,10 @@ struct GlassPowerToolsApp: App {
         // 320 × 184, so idle it can become its own orb rather than push a second window over
         // itself (`glassConnectionsIdleShrink`).
         .windowResizability(.contentSize)
-        // **Smaller than the system's 1280 × 720** (W29; the owner, on the headset, 2026-10-10:
-        // "The connections window on vision pro is pretty large"). The list column keeps its
-        // 360 and the detail its grouped forms; what goes is empty space. It is the size a new
-        // window opens at; the window can still be resized, and comes back from its orb at
-        // whatever size it had.
+        // **The Mac's width, 1180 × 700** (the owner, on the headset, 2026-10-14: "it should be
+        // wider by default"). W29 had made it 960, a 600-point detail beside the list; the
+        // system's 1280 × 720 was "pretty large" (2026-10-10). It is the size a new window opens
+        // at; the window can still be resized, and comes back from its orb at whatever size it had.
         .defaultSize(width: GlassConnectionsWindowSize.width, height: GlassConnectionsWindowSize.height)
         #else
         let group = WindowGroup("Connections", id: "main") { mainContent }

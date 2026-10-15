@@ -16,8 +16,9 @@ import Testing
 struct GlassConnectionsWindowSizeTests {
     // MARK: The sizes
 
-    @Test func theLibraryOpensAt960By700() {
-        #expect(GlassConnectionsWindowSize.standard == CGSize(width: 960, height: 700))
+    /// The Mac's Connections width (the owner, 2026-10-14: "it should be wider by default").
+    @Test func theLibraryOpensAt1180By700() {
+        #expect(GlassConnectionsWindowSize.standard == CGSize(width: 1180, height: 700))
     }
 
     /// The orb is 184 points square; its window is as narrow as visionOS makes one, 320 points
