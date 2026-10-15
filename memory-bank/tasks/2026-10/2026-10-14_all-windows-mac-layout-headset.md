@@ -90,3 +90,24 @@ fails when an open-here terminal is listed; the headset's 3 bar UI tests pass wi
 tmux unchanged. The held menu itself is not driven by a test (no saved servers in the demo); the owner checks it.
 
 0.4.447 (01:04) is on the Mac, iPhone and Vision Pro; each reads 0.4.447; no new crash reports.
+
+## 2026-10-15 (~01:30): the Mac's + lists running terminals; headset selection and link menu
+
+The owner: "yes, add running terminals to the Mac + menu too. But also look at vision pro text selection and context
+data detectors. It's not working as I'd expect (I have to triple pinch or click with the trackpad) to get it to select
+at all." Then: "Mac works great the vision pro needs the data detector and selection work."
+
+- **2facec6 (0.4.448):** the Mac's + menu: Running on This Mac ▸, and a host with running terminals is a submenu (New
+  Terminal, Running). Confirmed by the owner.
+- **Headset selection (research by a read-only helper, then verified in source):** SwiftTerm's iOS view is a scroll
+  view; its double/triple taps go to the program when it has the mouse (tmux `mouse on`: tmux's double-click copies
+  into its own buffer and clears), and its Copy menu (`UIMenuController`) never shows on visionOS. Our hold allowed
+  UIKit's default 10 points, so a drifting hand became a scroll; after a triple tap the selection mode stayed `.row`.
+  Links open on a pinch only when hover highlighted them, and visionOS gives apps no gaze hover.
+- **Changes:** `ReviewingTerminalView` (visionOS): hold allows 40 points and every pan waits for it; a hold resets the
+  mode to characters; our own double and triple pinch replace SwiftTerm's (local word / row, Copy menu); a hold that
+  lets go without moving on a link offers its actions through `UIEditMenuInteraction`'s delegate. Shared
+  `TerminalLinkLookup` (lookup + actions; the Mac's menu now uses it). Off the Mac, each terminal in a workgroup window
+  gets Open in Editor, Show in Files (`TerminalSession.locate`, moved from the Mac's `locatePath`) and Watch Log File (a
+  plain-shell `tail -F` tab of that window). Demo `--demo-open terminal-links`; `GlassTerminalSelectionUITests`.
+

@@ -8,9 +8,10 @@
 import SwiftUI
 import GlassShell
 import GlassLayers
+// Every platform this view is built for: Watch Log File reads a terminal's folder (2026-10-15).
+import GlassTerminalEmulator
 #if os(visionOS)
 import GlassConnectionUI
-import GlassTerminalEmulator
 import UIKit
 
 typealias VisionTerminalPresentation = LayoutPreset.OpeningView
