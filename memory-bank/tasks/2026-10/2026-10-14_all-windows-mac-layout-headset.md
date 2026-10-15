@@ -179,3 +179,22 @@ more option for the view menu in terminal mode?"
   --demo-orb-names` shows ten names level with their dots.
 
 0.4.452 (04:44) is on the Mac, iPhone and Vision Pro; each reads 0.4.452; no new crash reports.
+
+## 2026-10-15 (~05:00): a name stays while it is read (6b8deb3)
+
+The owner, with a headset capture of a ten-dot ring: "The labels disappear when you try to read them becuuse the dot
+lose focus". A tab's name showed only while its dot was looked at, so moving the eyes onto the name hid it.
+
+- Each name beside a dot is now a `Button` in its dot's `HoverEffectGroup` with its own capsule hover shape: a look at
+  the name keeps the group active, and a pinch on it grows the window back on that tab, as the dot does. The orb's own
+  name is a button in the orb's group. `GlassOrbName` is hit-testable (it was `.allowsHitTesting(false)`).
+- Checked: visionOS simulator Debug build; `GlassSessionOrbUITests` both pass. The look itself can't be driven on the
+  simulator: the owner's eyes are the test.
+
+0.4.453 (05:01) is on the Mac, iPhone and Vision Pro; each reads 0.4.453; no new crash reports.
+
+**Help and site (3b62177):** an agent working only in `site/` added Show All Windows on every device (replacing the stale
+Show All Terminals), Shrink to Orb, the layout toggle, selection, links and paths, Open as Tab In, the held +,
+the palette's lists, ⌘↩, the editor's saves, and a new `library-siri-and-system` article for D72. Reviewed by the
+coordinator: specific claims checked against the code (12 dots, state tints, `tail -F`, ⌘K, the beep), a scan for
+private names, and `build_site.py`: 7 pages and 39 help pages, no broken links. Not deployed.

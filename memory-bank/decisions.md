@@ -1476,3 +1476,22 @@ Workgroups, Folders), over one list by last use or one ordered by hand.
 - Stars: the machine row (as before), a service's menu in a machine's details, a project's and a saved workgroup's
   menu, and Files' toolbar (Add This Folder to Favorites). A favourite row opens on one click or tap, as a Finder
   sidebar favourite does.
+
+## D74 — Vision Pro session windows shrink into an orb — Implemented 2026-10-15
+**Owner:** "a persistent system level session/service icon that shrinks a window into a small preview. When activity
+is enabled, the preview/orb should pulse." Asked to choose, he picked: a face that is a live picture of the session;
+the pulse switched by the window's Auto-focus on activity; the control first in the bottom bar; every kind of session
+window (terminal, desktop, database, editor). Then, on the headset: "redraw the tabs around the orb evenly distributed
+with a preview in the orb on hover"; names "only … when focused"; the orb as "one more option for the view menu".
+**Decision:**
+- The window itself becomes the orb, as the Connections window does (W39): no second window. Its content stays laid
+  out at its size, out of sight and out of reach; its ornaments go; visionOS is asked for the orb's size
+  (`GlassWindowSizer`), and a pinch on the orb grows it back to the size it had.
+- A glass sphere showing the session's picture once a second; the window's tabs as dots evenly on a ring. Looking
+  at a dot shows that tab's picture in the orb and its name beside the dot; the name is part of the dot's hover group,
+  so it stays while read. A pinch on a dot or name grows the window back on that tab.
+- The app is never told where a person looks, so every look effect is a system hover effect in a shared
+  `HoverEffectGroup`; pictures and names follow their group and never start one.
+- Terminal windows with two or more terminals offer it as Orb in the view menu (with Tabs, Grid and Carousel);
+  otherwise Shrink to Orb is first in the bottom bar.
+- Vision Pro only. Evidence: `GlassSessionOrbUITests`; `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`.

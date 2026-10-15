@@ -80,3 +80,8 @@
 - 2026-10-14 (23:55): [All Windows as the Mac lays it out; the headset's window](2026-10-14_all-windows-mac-layout-headset.md)
   — a card per tab grouped by machine with the Mac's layout and live pictures; All Windows a window of its own on Vision
   Pro; Connections 1180 wide there; the editor's square corners. 0.4.445.
+- 2026-10-15 (overnight, to ~05:00): [the same note, continued](2026-10-14_all-windows-mac-layout-headset.md) — a new
+  file's save to a project on a server (live on scratch), ⌘S off the Mac, Active's Open as Tab In and Open N as Tabs
+  In, the + of a terminal window held and the Mac's + listing running terminals; on Vision Pro, selection and a held
+  link's or path's actions, one Tabs/Grid/Carousel toggle, Auto-focus on activity, and session windows that shrink
+  into an orb (D74) with the window's tabs on a ring and names that stay while read. 0.4.453.

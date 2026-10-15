@@ -30,19 +30,36 @@ use the disposable test VM only).
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
-## 2026-10-14 (~23:55) — RESUME HERE
+## 2026-10-15 (~05:15) — RESUME HERE
 
-After the close the owner put on the headset and asked for more: All Windows as the Mac lays it out (a group per
-machine, a card per tab, cards sized to fit, live pictures off the iPhone), a window of its own on Vision Pro instead of
-the sheet, Connections wider, and the editor's square bottom corners. All done and committed (ca3f897…1558bd6; see
-`tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`). Then, after midnight: a new file's save to a project on
-a server (it failed for every new file; fixed, live-tested on scratch), ⌘S off the Mac asking where on a new document,
-and Active's Open as Tab In for a running session; then Open N as Tabs In for several, and the + of a terminal
-window held listing servers ▸ their running terminals; the Mac's + lists running terminals; on the headset, selection
-and a held link's actions, a tabs/grid/carousel toggle, a session window that shrinks into an orb, and Auto-focus on
-activity in This Window; then the orb as a sphere with the window's tabs on a ring, names on a look beside their
-dots, the orb in the terminal view menu. 0.4.452 is on the Mac, iPhone and Vision Pro (04:44, each read back); no new
-crash reports. The section below is the day's close and still holds.
+Welcome back. The owner kept going after the 22:15 close, on the headset through the night, and each request was
+built, committed and installed as it came in. He closed at about 05:00 with the memory bank and the site brought up to
+date, and this note to pick up from. Everything is committed and nothing is pushed.
+
+**What the night built** (evidence: `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`; the orb is D74):
+- **All Windows** as the Mac lays it out, everywhere: a group per machine, a card per tab, live pictures. On Vision
+  Pro it is a window of its own. Connections opens 1180 wide there, and the editor's corners are round.
+- **Editor:** a new file's save into a project on a server works (it failed for every new file; live-tested on
+  scratch). ⌘S off the Mac asks where for a new document.
+- **Active:** Open as Tab In for one running session, and Open N as Tabs In for several. Holding a terminal window's +
+  lists servers ▸ New Terminal and their running terminals; the Mac's + lists them too ("Mac works great").
+- **Vision Pro terminal:** selection by a hold that tolerates drift, and double or triple pinch. A held link or path
+  offers its actions. One Tabs/Grid/Carousel toggle (a hold lists Orb as well), and Auto-focus on activity in This
+  Window.
+- **Vision Pro session orb:** terminal, desktop, database and editor windows shrink into a glass sphere with a live
+  picture, with the window's tabs as dots on a ring. His last note, "The labels disappear when you try to read them",
+  is fixed in 6b8deb3: a name now stays while it is looked at.
+
+**State:** 0.4.453 on the Mac, iPhone and Vision Pro (see the task note for the read-back). The help and site pages
+describe all of the above, plus a new article on Siri, Shortcuts and the Finder (3b62177; built with no broken
+links; not deployed, which needs his word).
+
+**For him to try on the headset:** names staying while read; the pulse with Auto-focus on activity; the held + and
+the toggle's held menu; a hold on a path. **Known open:** a desktop's orb loses its display-shape hold after a round
+trip; database and editor orbs show a symbol rather than a picture; the Files window's bottom-bar corners are unchecked.
+
+**How we work** is unchanged from the section below. For builds:
+`sed 's/453/454/g' $SP/build-install-453.zsh > $SP/build-install-454.zsh` (and `build-453.zsh`).
 
 ## 2026-10-14 (~22:15) — the day closed
 

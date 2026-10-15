@@ -61,6 +61,14 @@ All four capabilities and the shell are built and in daily use on the owner's Ma
 | Database connect errors (2026-10-13): one measured Local Network rule (`GlassLocalNetworkAccess`); PostgreSQL in the server's words; unknown hosts named | built | unit with the drivers' own errors; server (test VM: wrong password); the denial measured from a runner without Local Network access |
 | Desktops on phones and iPad (2026-10-13): the system's unavailable view, sessions in place on phones, a bar and a working Close in iPad windows | built | iPhone, iPad and iPhone Duo simulators; desktop and library UI tests |
 | Quick Look: a view per file (the 05:58 crash on 0.4.393) | built | not reproduced; the fix removes the only call that crashed; no crash since |
+| All Windows off the Mac (2026-10-14): iPhone/iPad pull-down pane or hold ⚡, a window of its own on Vision Pro, Siri "Show all windows"; the Mac's layout everywhere: a group per machine, a card per tab, live pictures each second (the iPhone's only the terminal under the pane) | built | UI (`GlassAllWindowsPaneUITests` on the iOS 27.2 simulator; visionOS window); device (owner on iPhone and headset) |
+| 28 AI agents marked on cards and tabs (`TerminalAgent`) | built | unit; device (owner's Mac: Hermes "nice!") |
+| Desktop clipboard both ways with GNOME; Sync Automatically (4499937) | built | server (GNOME Remote Desktop); device (owner: "this is magic") |
+| Command Palette lists services, terminal commands, projects, folders, saved queries, running tmux; terminal link/path menu (Mac right-click; Vision Pro hold); ⌘↩ sends a reviewed paste | built | unit; device (Mac); the headset's hold-on-path menu not yet seen by the owner |
+| Editor: a new file's first save into a project on a server (8825846), ⌘S off the Mac asking where for a new document (e3ee5d7); SFTP errors in plain words | built | server (live SFTP tests on scratch, failing without the fix); iOS simulator UI test |
+| Active: Open as Tab In ▸ for a running session, Open N as Tabs In for several; the + of a terminal window held off the Mac lists servers ▸ New Terminal and their running terminals; the Mac's + lists them (e9e38d7, 4a1cd6f, 2900dc9, 2facec6) | built | unit; device (owner, Mac: "Mac works great") |
+| Vision Pro terminal (2026-10-15): selection by a hold that allows drift, double/triple pinch, Copy; one Tabs/Grid/Carousel toggle (hold lists Orb too); Auto-focus on activity in This Window (2a49a43, 1d63c66, 1011982) | built | unit; visionOS simulator UI tests; device install (the owner testing) |
+| Vision Pro session orb (D74): terminal, desktop, database and editor windows shrink into a glass sphere with a live picture, the window's tabs as dots on a ring, a name on a look that stays while read (1011982, b72244d, f46f283, 6b8deb3) | built | `GlassSessionOrbUITests` (shrink and grow; two tabs on the ring, a dot grows the window back); device (owner on the headset, three rounds of his notes); the pulse not yet seen on a device |
 | Database Local Network and tunnel limits closed: tunnels keep their own connections (D69) | decided | sshd_config(5); OpenSSH reports of multiplexing lag |
 
 Suites run 2026-10-13 with the screen unlocked: terminal 781, shell 280, database 321, DBKit 28, all passing
@@ -157,3 +165,7 @@ profile, notarization, deploying the site), the behaviour findings listed in `ac
   fixtures; Windows, the Finder's Open With and the headset not yet.
 - Desktop glass on the Mac (2026-09-30): Opacity and Background Frost as on the headset; seen by the
   owner on 0.4.266. Settings on the Mac sizes itself to its ten tabs.
+- **Vision Pro session orb (2026-10-15):** the pulse with Auto-focus on activity is not yet seen on a device; a
+  desktop's orb loses its display-shape hold after a round trip; database and editor orbs show a symbol, not a
+  picture; the Files window's bottom-bar corners are unchecked. The held + and the toggle's held menu are for the
+  owner to try (the simulator's runner turns a held menu into a tap).
