@@ -986,6 +986,9 @@ public struct GlassActiveConnectionsButton: View {
                 held = false
                 return
             }
+            #if os(iOS)
+            if GlassAllWindowsPull.shared.tapEndsHold() { return }
+            #endif
             #if os(visionOS)
             // Every bolt on the headset brings the one Connections window forward (a `Window`
             // scene there, so this reuses it) and opens Active in it. The desktop's control-bar
@@ -1003,10 +1006,14 @@ public struct GlassActiveConnectionsButton: View {
         #if !os(visionOS)
         .labelStyle(.iconOnly)
         #endif
-        #if os(iOS) || os(visionOS)
+        #if os(iOS)
         // Holding it opens All Windows (the owner, 2026-10-14: "everything other than Mac can
-        // still use the lightning bolt hold pattern"); on the headset a pinch held. The tap is
-        // still Active.
+        // still use the lightning bolt hold pattern"). The tap is still Active. The hold is the
+        // window's (`GlassAllWindowsPull`), which knows a bolt by its accessibility identifier.
+        .accessibilityAction(named: "Show All Windows") { showAllWindows() }
+        .help("Active connections. Hold for All Windows.")
+        #elseif os(visionOS)
+        // On the headset a pinch held.
         .simultaneousGesture(LongPressGesture(minimumDuration: 0.45).onEnded { _ in
             held = true
             showAllWindows()

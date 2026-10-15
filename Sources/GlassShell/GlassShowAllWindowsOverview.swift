@@ -109,10 +109,14 @@ struct GlassAllWindowsCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 ZStack {
                     if let snapshot = session.snapshot?() {
-                        snapshot
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .blur(radius: blursPreviews ? GlassShowAllWindows.previewBlurRadius : 0)
+                        // The card's width filled, its newest part kept: a phone's terminal is
+                        // tall, and fitted whole it was a sliver (2026-10-14, the simulator).
+                        Color.clear.overlay(alignment: .bottom) {
+                            snapshot
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .blur(radius: blursPreviews ? GlassShowAllWindows.previewBlurRadius : 0)
+                        }
                     } else {
                         Image(systemName: session.symbolName)
                             .font(.system(size: 34))

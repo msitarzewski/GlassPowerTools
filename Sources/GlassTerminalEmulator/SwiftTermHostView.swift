@@ -669,11 +669,16 @@ public final class SwiftTermHostModel: ObservableObject {
         format.opaque = false
         view.layoutIfNeeded()
         view.layer.displayIfNeeded()
-        let image = UIGraphicsImageRenderer(size: CGSize(width: view.bounds.width * scale,
-                                                          height: view.bounds.height * scale),
-                                            format: format).image { context in
-            context.cgContext.scaleBy(x: scale, y: scale)
-            view.layer.render(in: context.cgContext)
+        let size = CGSize(width: view.bounds.width * scale, height: view.bounds.height * scale)
+        let image = UIGraphicsImageRenderer(size: size, format: format).image { context in
+            // What is on screen, as it is composited: on iPhone and iPad the terminal draws with
+            // Metal, which `layer.render` cannot see — its pictures were empty (the owner,
+            // 2026-10-14: "i didnt see a preview"). Vision Pro's Core Graphics drawing renders
+            // either way; the layer is the fallback when a snapshot cannot be had.
+            if !view.drawHierarchy(in: CGRect(origin: .zero, size: size), afterScreenUpdates: false) {
+                context.cgContext.scaleBy(x: scale, y: scale)
+                view.layer.render(in: context.cgContext)
+            }
         }
         rememberedPreview = image
         return image

@@ -68,4 +68,34 @@ final class GlassAllWindowsPaneUITests: XCTestCase {
         XCTAssertFalse(pane(app).exists, "a tap is not a hold")
         shoot(app, "tap-01-active")
     }
+
+    /// The owner (2026-10-14): "i didnt see a preview". A terminal left for the library keeps a
+    /// picture, and All Windows shows it. Judged by the screenshot; the card must at least be there.
+    func testATerminalLeftShowsItsPicture() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["--ui-testing", UUID().uuidString, "--demo-open", "terminal"]
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+        let bolt = app.buttons["active-connections-bolt"].firstMatch
+        XCTAssertTrue(bolt.waitForExistence(timeout: 30), "the demo terminal did not open")
+        sleep(2)
+        shoot(app, "left-01-terminal")
+        // On screen first: All Windows over the terminal itself.
+        bolt.press(forDuration: 1.0)
+        XCTAssertTrue(pane(app).waitForExistence(timeout: 5))
+        shoot(app, "left-02-over-terminal")
+        app.buttons["all-windows-done"].firstMatch.tap()
+        XCTAssertTrue(pane(app).waitForNonExistence(timeout: 5))
+        // Then left: the ⚡'s tap goes to Active, and All Windows is pulled down from its top bar.
+        bolt.tap()
+        sleep(2)
+        let bar = app.navigationBars.firstMatch
+        XCTAssertTrue(bar.waitForExistence(timeout: 10))
+        let start = bar.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: 420)))
+        XCTAssertTrue(pane(app).waitForExistence(timeout: 5), "a pull over Active did not open All Windows")
+        let card = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'all-windows-card-'")).firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 5), "the terminal left has no card")
+        shoot(app, "left-03-card-from-library")
+    }
 }

@@ -62,6 +62,13 @@ public extension GlassShowAllWindows {
 final class GlassAllWindowsPull: NSObject, UIGestureRecognizerDelegate {
     static let shared = GlassAllWindowsPull()
     static let gestureName = "glass.allWindows.pull"
+    static let holdName = "glass.allWindows.hold"
+
+    /// The hold is UIKit's, on the window, not SwiftUI's on the button: a SwiftUI gesture on a
+    /// terminal's ⚡ never began (2026-10-14, measured on the simulator), because iOS 26 draws a
+    /// toolbar's plain button as a native bar button, without the SwiftUI view's gestures or
+    /// backgrounds. A ⚡ is told by its accessibility identifier, which the native button keeps.
+    private var heldBolt = false
 
     private var installed = false
 
@@ -89,6 +96,52 @@ final class GlassAllWindowsPull: NSObject, UIGestureRecognizerDelegate {
         pan.delegate = self
         pan.maximumNumberOfTouches = 1
         window.addGestureRecognizer(pan)
+        let hold = UILongPressGestureRecognizer(target: self, action: #selector(held(_:)))
+        hold.name = Self.holdName
+        hold.minimumPressDuration = 0.45
+        hold.delegate = self
+        window.addGestureRecognizer(hold)
+    }
+
+    /// A finger rested on a ⚡: All Windows. UIKit cancels the touch for the button, so the
+    /// release is not also a tap.
+    @objc private func held(_ hold: UILongPressGestureRecognizer) {
+        guard hold.state == .began, heldBolt else { return }
+        heldAt = .now
+        // The screen the ⚡ is on leaves the way its own ⚡ would (`GlassScreenExit`).
+        GlassShowAllWindows.presentOverview()
+    }
+
+    static let boltIdentifier = "active-connections-bolt"
+
+    /// Whether `view` is a ⚡, or inside one.
+    static func isBolt(_ view: UIView?) -> Bool {
+        var view = view
+        while let current = view {
+            if current.accessibilityIdentifier == boltIdentifier { return true }
+            if current is UINavigationBar || current is UIWindow { return false }
+            view = current.superview
+        }
+        return false
+    }
+
+    /// When a hold last opened All Windows: the button's own gesture runs alongside the hold and
+    /// sees a tap on release, which must not also go to Active.
+    private var heldAt: ContinuousClock.Instant?
+
+    /// Whether the tap a ⚡ just saw ended a hold, which then counts for nothing.
+    func tapEndsHold() -> Bool {
+        defer { heldAt = nil }
+        guard let heldAt else { return false }
+        return ContinuousClock.now - heldAt < .seconds(3)
+    }
+
+    /// The hold runs alongside the button's own gesture, which begins at the touch and would
+    /// otherwise keep any other from beginning (measured on the simulator, 2026-10-14: the hold
+    /// was given the touch, inside the bolt, and never began).
+    func gestureRecognizer(_ gesture: UIGestureRecognizer,
+                           shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+        gesture.name == Self.holdName
     }
 
     /// The window in front, for the ⚡'s hold.
@@ -125,6 +178,10 @@ final class GlassAllWindowsPull: NSObject, UIGestureRecognizerDelegate {
     func gestureRecognizer(_ gesture: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         guard let window = gesture.view as? UIWindow else { return false }
         let point = touch.location(in: window)
+        if gesture.name == Self.holdName {
+            heldBolt = Self.isBolt(window.hitTest(point, with: nil))
+            return heldBolt && GlassShowAllWindows.model != nil
+        }
         startedOnTopBar = point.y > window.safeAreaInsets.top
             && Self.topBars(in: window).contains { $0.contains(point) }
             && !Self.isControl(window.hitTest(point, with: nil))
@@ -133,17 +190,21 @@ final class GlassAllWindowsPull: NSObject, UIGestureRecognizerDelegate {
 
     // A pull, and only one that starts on a top bar's empty space.
     func gestureRecognizerShouldBegin(_ gesture: UIGestureRecognizer) -> Bool {
+        if gesture.name == Self.holdName { return heldBolt && !GlassAllWindowsPaneController.shared.isShowing }
         guard startedOnTopBar, GlassShowAllWindows.model != nil, !GlassAllWindowsPaneController.shared.isShowing,
               let pan = gesture as? UIPanGestureRecognizer, let window = pan.view as? UIWindow else { return false }
         let velocity = pan.velocity(in: window)
         return velocity.y > 0 && velocity.y > abs(velocity.x) * 1.5
     }
 
-    /// A drag that starts on a top bar is the pull's to decide first: the list under a large
-    /// title waits for it, and has the touch the moment the pull declines (sideways, or upward).
+    /// A drag that starts on a top bar is the pull's to decide first: a list's scrolling under a
+    /// large title waits for it, and has the touch the moment the pull declines (sideways, or
+    /// upward). Only scrolling: a tap or a hold on the bar's buttons goes at once — when every
+    /// gesture waited, a finger held still on a terminal's ⚡ was only released when it lifted,
+    /// as a tap, and All Windows never opened (found on the iPhone simulator, 2026-10-14).
     func gestureRecognizer(_ gesture: UIGestureRecognizer,
                            shouldBeRequiredToFailBy other: UIGestureRecognizer) -> Bool {
-        startedOnTopBar && other.view !== gesture.view
+        gesture.name == Self.gestureName && startedOnTopBar && other is UIPanGestureRecognizer && other.view !== gesture.view
     }
 
     /// The window's top bars, in its coordinates. Not inside scrolling content, a web page or a
