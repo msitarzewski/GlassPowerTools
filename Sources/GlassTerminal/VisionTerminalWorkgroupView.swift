@@ -44,17 +44,48 @@ extension EnvironmentValues {
     }
 }
 
+/// The window's layout — tabs, grid, carousel — as one control, as the editor's preview is (the
+/// owner, 2026-10-15: "I'd like the tabs/grid/carousel selector to be a toggle like we have for the
+/// markdown preview in the text editor"). Its glyph is the layout the window is in — an eye says
+/// show or hide, and nothing here is hidden — a pinch moves to the next, and a pinch held lists the
+/// three. It was a 290-point segmented picker in the bar.
 struct VisionTerminalPresentationPicker: View {
     @Binding var selection: VisionTerminalPresentation
     var body: some View {
-        Picker("Terminal View", selection: $selection) {
-            ForEach(VisionTerminalPresentation.allCases, id: \.self) { mode in
-                Text(mode.title).tag(mode)
+        Menu {
+            Picker("Terminal View", selection: $selection) {
+                ForEach(VisionTerminalPresentation.allCases, id: \.self) { mode in
+                    Label(mode.title, systemImage: mode.symbolName).tag(mode)
+                }
             }
+        } label: {
+            Label("Terminal View", systemImage: selection.symbolName)
+        } primaryAction: {
+            selection = selection.next
         }
-        .pickerStyle(.segmented)
-        .frame(width: 290)
+        .help("\(selection.title). Pinch for \(selection.next.title); hold to choose.")
+        .accessibilityValue(selection.title)
         .accessibilityIdentifier("vision-terminal-presentation")
+    }
+}
+
+extension LayoutPreset.OpeningView {
+    /// The layout's glyph: a window with its tab strip, a grid of cards, a stack of cards.
+    var symbolName: String {
+        switch self {
+        case .tabs: "rectangle.topthird.inset.filled"
+        case .grid: "square.grid.2x2"
+        case .carousel: "rectangle.stack"
+        }
+    }
+
+    /// The layout a pinch moves to: tabs, grid, carousel, and round again.
+    var next: Self {
+        switch self {
+        case .tabs: .grid
+        case .grid: .carousel
+        case .carousel: .tabs
+        }
     }
 }
 
