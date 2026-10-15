@@ -282,3 +282,25 @@ The owner, on the headset in a tmux terminal on this Mac: "I just can't select t
   mouse taken (`mouse=buttonEventTracking`); 18 pinch-drags went to tmux as drags (`pan(-) began`, tmux's yellow
   selection, no scroll); 5 selections were made by double or triple pinch and a hold, 4 of them later dropped when the
   text under them changed (`selection cleared by output`). No new crash reports.
+
+## 2026-10-15 (evening): iPhone tabs — the hidden switcher, and All Windows' one card (ce2dbf6, 3e101b8, 0.4.456)
+
+The owner: "theres nonway to switch tabs on iphone. in the expose it show one card for all tabs. should be a tab group
+like the other platforms."
+
+- **Switcher (ce2dbf6):** the iPhone's only tab switcher is the title's `Menu` (`compactSessionSwitcher`); it sits over
+  the terminal, and in light mode its text was black on a dark theme's black — present, invisible. It now takes the
+  terminal theme's `colorScheme` (as `TerminalWindowView`'s bottom bar does). Captured on iOS 27.2: invisible in light
+  mode before, shown after; dark mode showed it either way. The iPhone keeps its title switcher (the tab bar was hidden
+  on purpose, 2026-10-04); a visible strip or swipe would be a new design to agree with him first.
+- **All Windows (3e101b8):** iPhone windows open their other tabs as slots that connect when shown, and the 2026-10-14
+  live-only filter dropped them, so a window showed one card. `GlassOpenSession.waitsToBeShown` (a slot, `.disconnected`,
+  `connectsWhenShown`) counts as live; its card says "Connects when opened"; choosing it shows the window on that tab and
+  connects it. A dropped tab stays off. Unit tests in shell and terminal, each failing without its half; iOS 27.2
+  capture with `--demo-open all-windows --demo-slots` (three cards); `GlassAllWindowsPaneUITests` 5 pass; shell 300,
+  terminal 847, tmux unchanged.
+- Demo: `--demo-open terminal-tabs` now builds a window of tabs on iOS too (`--demo-slots` leaves all but the first as
+  slots).
+- Grouping stays by machine off the Mac (his 2026-10-14 choice); the Mac groups by window.
+- 0.4.456 (18:26) is on the Vision Pro and iPhone (both read 0.4.456); the Mac's quit went unanswered again, so the Mac
+  stays on 0.4.453. No new crash reports.

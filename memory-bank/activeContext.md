@@ -41,6 +41,9 @@ Evidence: `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`, section 
 0.4.453 (nothing in 0.4.454 changes the Mac's behaviour). No new crash reports.
 
 **Done:**
+- **Evening — iPhone tabs** (ce2dbf6, 3e101b8, 0.4.456): the title's tab switcher was invisible in light mode (black
+  on the terminal's black) and now reads; All Windows shows every tab of a window, those waiting to connect too.
+  0.4.456 on the Vision Pro and iPhone; the Mac is still 0.4.453 (its quit question unanswered twice).
 - **Later — tmux 3.8 has the mouse on by default** (2975ace, 0.4.455): that was his "immediately unselects" (tmux's
   yellow selection, cleared on letting go) and his "can't scroll at all". On Vision Pro a pinch-drag now scrolls
   whatever tmux's mouse setting. iPhone/iPad likely need the same; not yet looked at. Detail: the task note's
