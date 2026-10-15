@@ -310,9 +310,16 @@ struct TerminalConnectFlow: ViewModifier {
             // No SSHConnection is ever started: the sinks swallow typing and resizes, and the
             // transcript goes straight to the emulator, queued until the window's view attaches.
             let server = ServerConfiguration(name: name, host: "192.0.2.10", username: "ann")
+            // A redrawing demo (tmux's stand-in) answers the mouse wheel as a program would, on
+            // its status line, so a test can see a scroll reach it (2026-10-15).
+            let answering = DemoWheelAnswer()
             let session = TerminalSession(server: server,
-                                          terminalWriteSink: { _ in },
+                                          terminalWriteSink: { data in
+                                              guard tick != nil, let reply = DemoWheelAnswer.reply(to: data) else { return }
+                                              answering.session?.feedTerminalData(reply)
+                                          },
                                           terminalResizeSink: { _, _ in })
+            answering.session = session
             sessionManager.registerSession(session)
             session.state = .connected
             session.demoOpensSettings = opensSettings
@@ -1194,3 +1201,20 @@ struct TerminalConnectFlow: ViewModifier {
     }
 
 }
+
+#if DEBUG
+/// The demo terminal's answer to the mouse wheel (screenshots and UI tests only): the SGR wheel
+/// reports a program with the mouse is sent, shown on the status line as tmux shows its scroll.
+@MainActor
+final class DemoWheelAnswer {
+    weak var session: TerminalSession?
+
+    nonisolated static func reply(to data: Data) -> Data? {
+        let text = String(decoding: data, as: UTF8.self)
+        let up = text.components(separatedBy: "\u{1B}[<64;").count - 1
+        let down = text.components(separatedBy: "\u{1B}[<65;").count - 1
+        guard up + down > 0 else { return nil }
+        return Data("\u{1B}7\u{1B}[999;30H\u{1B}[7m[wheel \(up > 0 ? "up" : "down")]\u{1B}[0m\u{1B}8".utf8)
+    }
+}
+#endif

@@ -105,6 +105,20 @@ final class GlassTerminalSelectionUITests: XCTestCase {
         XCTAssertTrue(selected.waitForNonExistence(timeout: 5), "a pinch left the selection, sent to tmux as a click")
     }
 
+    /// The owner, 2026-10-15: "Now I can't scroll at all in visionpro". tmux 3.8 turns its mouse on
+    /// with no config, and a pinch-drag went to it as a drag, which selects in tmux's copy mode.
+    /// The demo answers the mouse wheel on its status line, as a program with the mouse would see it.
+    func testAPinchDragScrollsAProgramThatHasTheMouse() {
+        launch("terminal-tmux")
+        middle.press(forDuration: 0.05, thenDragTo: middle.withOffset(CGVector(dx: 0, dy: 180)))
+        let answered = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "value CONTAINS %@", "[wheel up]")).firstMatch
+        let reached = answered.waitForExistence(timeout: 5)
+        if !reached { attachTree("after a pinch-drag in tmux") }
+        XCTAssertTrue(reached, "the drag didn't reach the program as its wheel")
+        XCTAssertFalse(selected.exists, "the drag selected")
+    }
+
     /// A hold whose hand moves a little before it counts: the drag tmux is sent when it has the mouse
     /// waits for the hold, as scrolling does, rather than taking the pinch into tmux's copy mode.
     func testAHoldThatDriftsSelectsInTmux() {

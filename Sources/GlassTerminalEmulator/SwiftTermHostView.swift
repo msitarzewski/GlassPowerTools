@@ -1985,10 +1985,9 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
     }
 
     /// Scrolling — the view's own pan, and tmux's on the alternate screen — waits for the hold, and
-    /// so does the drag SwiftTerm sends to a program that asks for the mouse. That one is made only
-    /// when the program asks (`mouseModeChanged`), after the rest: left out, a hold whose hand
-    /// drifted became a drag in tmux, which selected in its own copy mode and cleared on letting go.
-    /// Asking again of a pan already waiting changes nothing.
+    /// so does any pan made later, when a program asks for the mouse (`mouseModeChanged`): left
+    /// out, a hold whose hand drifted became a drag in tmux, which selected in its own copy mode
+    /// and cleared on letting go. Asking again of a pan already waiting changes nothing.
     private func pansWaitForTheHold() {
         guard holdToSelect.view != nil else { return }
         for case let pan as UIPanGestureRecognizer in gestureRecognizers ?? [] {
@@ -1997,7 +1996,15 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
     }
 
     override func mouseModeChanged(source: Terminal) {
+        let before = Set((gestureRecognizers ?? []).map(ObjectIdentifier.init))
         super.mouseModeChanged(source: source)
+        // SwiftTerm's drag for a program that asks for the mouse, made just now: off. On Vision Pro
+        // a pinch-and-drag scrolls (`UIKitAlternateScreenScrollWatcher`); sent as a drag, tmux
+        // selected in its own copy mode with it (yellow) and nothing scrolled. A pinch still clicks.
+        for case let pan as UIPanGestureRecognizer in gestureRecognizers ?? []
+            where !before.contains(ObjectIdentifier(pan)) && pan.delegate == nil {
+            pan.isEnabled = false
+        }
         pansWaitForTheHold()
         watchRecognizers()
         note("mouse mode \(source.mouseMode)")
@@ -2336,10 +2343,20 @@ private final class UIKitAlternateScreenScrollWatcher: NSObject, UIGestureRecogn
     }
 
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        guard let view, handler() != nil,
-              let pan = gestureRecognizer as? UIPanGestureRecognizer else { return false }
+        guard let view, let pan = gestureRecognizer as? UIPanGestureRecognizer else { return false }
         let terminal = view.getTerminal()
-        guard terminal.isCurrentBufferAlternate, terminal.mouseMode == .off else { return false }
+        guard terminal.isCurrentBufferAlternate else { return false }
+        #if os(visionOS)
+        // **On Vision Pro a pinch-and-drag scrolls whoever has the mouse** (the owner, 2026-10-15:
+        // "Now I can't scroll at all in visionpro"). tmux 3.8 turns its mouse on with no config,
+        // and SwiftTerm then sent the drag to tmux, which selected in its own copy mode (the
+        // yellow selection) instead of scrolling; this stood aside. Its drag is off here
+        // (`ReviewingTerminalView.mouseModeChanged`), so this scrolls: tmux's history through the
+        // session, or the program's own wheel where the session has no tmux to scroll.
+        guard handler() != nil || terminal.mouseMode != .off else { return false }
+        #else
+        guard handler() != nil, terminal.mouseMode == .off else { return false }
+        #endif
         // Up and down only: a sideways drag stays the terminal's own.
         let velocity = pan.velocity(in: view)
         return abs(velocity.y) >= abs(velocity.x)
@@ -2360,11 +2377,41 @@ private final class UIKitAlternateScreenScrollWatcher: NSObject, UIGestureRecogn
             let translation = pan.translation(in: view).y
             let delta = translation - lastTranslation
             lastTranslation = translation
-            if delta != 0 { _ = handler()?(delta, true) }
+            guard delta != 0 else { return }
+            if handler()?(delta, true) == true { return }
+            #if os(visionOS)
+            if view.getTerminal().mouseMode != .off { sendWheel(delta, at: pan.location(in: view), in: view) }
+            #endif
         default:
             lastTranslation = 0
+            wheelSteps = 0
         }
     }
+
+    #if os(visionOS)
+    /// Drag gathered toward the next wheel step.
+    private var wheelSteps: CGFloat = 0
+
+    /// A program that has the mouse and no tmux session to scroll — vim, htop, a tmux the app
+    /// didn't start — is sent the mouse wheel, as a scroll wheel over a desktop terminal sends it:
+    /// a step for every three rows of drag, about what one wheel step scrolls in most of them.
+    private func sendWheel(_ delta: CGFloat, at point: CGPoint, in view: TerminalView) {
+        let terminal = view.getTerminal()
+        let size = view.getOptimalFrameSize()
+        guard terminal.rows > 0, terminal.cols > 0, size.height > 0, size.width > 0 else { return }
+        let rowHeight = size.height / CGFloat(terminal.rows)
+        wheelSteps += delta / (rowHeight * 3)
+        let steps = Int(wheelSteps.rounded(.towardZero))
+        guard steps != 0 else { return }
+        wheelSteps -= CGFloat(steps)
+        let column = min(max(0, Int(point.x / (size.width / CGFloat(terminal.cols)))), terminal.cols - 1)
+        let row = min(max(0, Int((point.y - view.contentOffset.y) / rowHeight)), terminal.rows - 1)
+        // Fingers moving down bring earlier output into view: the wheel turned up, button 4.
+        let flags = terminal.encodeButton(button: steps > 0 ? 4 : 5, release: false, shift: false, meta: false, control: false)
+        for _ in 0..<abs(steps) { terminal.sendEvent(buttonFlags: flags, x: column, y: row) }
+        TerminalSelectionDiagnostics.record?("wheel \(steps > 0 ? "up" : "down") x\(abs(steps)) mouse=\(terminal.mouseMode)")
+    }
+    #endif
 }
 
 @MainActor
