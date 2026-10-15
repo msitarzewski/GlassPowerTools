@@ -44,9 +44,9 @@ Evidence: `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`, section 
 - **Later — tmux 3.8 has the mouse on by default** (2975ace, 0.4.455): that was his "immediately unselects" (tmux's
   yellow selection, cleared on letting go) and his "can't scroll at all". On Vision Pro a pinch-drag now scrolls
   whatever tmux's mouse setting. iPhone/iPad likely need the same; not yet looked at. Detail: the task note's
-  "afternoon" section. **0.4.455 is built (16:05) but installed nowhere:** the headset and iPhone can't be reached
-  from the Mac (it has no Wi-Fi network joined), and the Mac's quit question went unanswered. Once they're on one
-  network: `~/Software/glass/tmp/install-devices.zsh 455`, then copy the headset log (headset-diagnostics memory).
+  "afternoon" section. **0.4.455 is on the Vision Pro and iPhone**; the Mac stays on 0.4.453 (its quit went unanswered).
+  The headset's log confirmed the cause (tmux had the mouse; pinch-drags went to it as drags). `~/.tmux.conf` on this
+  Mac now turns the mouse off.
   With this Mac's tmux mouse turned off (at his word; until tmux restarts), he confirmed selection works.
 - **Selection with tmux:** the owner (later, 0.4.454): "I don't [use mouse mode]. I just can't select text. It
   immediately unselects." The simulator can't reproduce it: with the terminal focused as a real session's is (the

@@ -276,3 +276,9 @@ The owner, on the headset in a tmux terminal on this Mac: "I just can't select t
 - **Confirmed by the owner:** with this Mac's tmux mouse turned off (`tmux set -g mouse off`, run at his word; sessions
   unchanged), "Can confirm, selection works on mac as expected!" on 0.4.454: the cause was tmux 3.8's mouse. 0.4.455
   makes the headset independent of it (not yet installed: devices unreachable).
+- **0.4.455 on the Vision Pro and iPhone** (both read 0.4.455) once the headset was back on the network; the Mac stays
+  on 0.4.453 (its quit went unanswered). `~/.tmux.conf` on this Mac now holds `set -g mouse off` (at his word).
+- **The headset's log** (1,866 `terminal-selection` lines, 15:26–16:30 local, on 0.4.454) agrees: his terminal had the
+  mouse taken (`mouse=buttonEventTracking`); 18 pinch-drags went to tmux as drags (`pan(-) began`, tmux's yellow
+  selection, no scroll); 5 selections were made by double or triple pinch and a hold, 4 of them later dropped when the
+  text under them changed (`selection cleared by output`). No new crash reports.
