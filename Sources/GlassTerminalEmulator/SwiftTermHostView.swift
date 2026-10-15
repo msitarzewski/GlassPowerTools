@@ -496,6 +496,9 @@ public final class SwiftTermHostModel: ObservableObject {
     /// established explicit local-process teardown remains authoritative.
     fileprivate func attach(_ engine: any TerminalEngine) {
         terminalEngine = engine
+        #if canImport(UIKit)
+        engine.onLeavingWindow = { [weak self] in self?.rememberPreview() }
+        #endif
         let viewID = engine.identity
         guard attachedViewID != viewID else { return }
         attachedViewID = viewID
@@ -654,8 +657,11 @@ public final class SwiftTermHostModel: ObservableObject {
     /// overview), so a terminal could not draw itself on a phone and the session gallery had
     /// nothing to show there. Rule 52: fence the API, not the capability.
     public func previewImage(maxPixelWidth: Int = 640) -> UIImage? {
-        guard let view = terminalEngine?.hostView,
-              view.bounds.width > 0, view.bounds.height > 0 else { return nil }
+        // Off the screen — a terminal the person has left, on an iPhone — the view may draw
+        // nothing current, so it gives the picture it last drew there (2026-10-14: All Windows'
+        // cards; Blur previews softens it like every other).
+        guard let view = terminalEngine?.hostView, view.window != nil,
+              view.bounds.width > 0, view.bounds.height > 0 else { return rememberedPreview }
         let scale = min(1, CGFloat(max(1, min(maxPixelWidth, 1024))) / view.bounds.width,
                         640 / view.bounds.height)
         let format = UIGraphicsImageRendererFormat()
@@ -663,12 +669,22 @@ public final class SwiftTermHostModel: ObservableObject {
         format.opaque = false
         view.layoutIfNeeded()
         view.layer.displayIfNeeded()
-        return UIGraphicsImageRenderer(size: CGSize(width: view.bounds.width * scale,
-                                                     height: view.bounds.height * scale),
-                                       format: format).image { context in
+        let image = UIGraphicsImageRenderer(size: CGSize(width: view.bounds.width * scale,
+                                                          height: view.bounds.height * scale),
+                                            format: format).image { context in
             context.cgContext.scaleBy(x: scale, y: scale)
             view.layer.render(in: context.cgContext)
         }
+        rememberedPreview = image
+        return image
+    }
+
+    /// The picture the terminal last drew on screen, for while it is not.
+    private var rememberedPreview: UIImage?
+
+    /// Takes the picture as the view leaves the screen, while it can still draw itself.
+    fileprivate func rememberPreview() {
+        _ = previewImage(maxPixelWidth: 800)
     }
     #endif
 
@@ -1220,6 +1236,8 @@ private protocol TerminalEngine: AnyObject {
     func commitPaste(_ text: String, bracketed: Bool)
     /// Whether the program in the terminal asked for bracketed paste.
     var isBracketedPasteMode: Bool { get }
+    /// Called as the view is about to leave the screen, while it can still draw itself.
+    var onLeavingWindow: (@MainActor () -> Void)? { get set }
 }
 
 public enum SwiftTermHardwareKeyPolicy {
@@ -1800,6 +1818,12 @@ private final class MinimalTerminalAccessoryView: UIToolbar {
 private final class ReviewingTerminalView: TerminalView {
     var onPasteRequest: ((String, Bool) -> Void)?
     var onWindowAttachmentChanged: (() -> Void)?
+    var onLeavingWindow: (() -> Void)?
+
+    override func willMove(toWindow newWindow: UIWindow?) {
+        if newWindow == nil, window != nil { onLeavingWindow?() }
+        super.willMove(toWindow: newWindow)
+    }
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
@@ -2097,6 +2121,7 @@ private final class UIKitAlternateScreenScrollWatcher: NSObject, UIGestureRecogn
 
 @MainActor
 private final class SwiftTermEngine: TerminalEngine {
+    var onLeavingWindow: (@MainActor () -> Void)?
     /// Black backgrounds show the glass (`TerminalClearBlacks`).
     private var clearBlacks = TerminalClearBlacks()
     var isBracketedPasteMode: Bool { terminalView.getTerminal().bracketedPasteMode }
@@ -2155,6 +2180,7 @@ private final class SwiftTermEngine: TerminalEngine {
         terminalView.onWindowAttachmentChanged = { [weak self] in
             self?.activateRendererIfAttached()
         }
+        terminalView.onLeavingWindow = { [weak self] in self?.onLeavingWindow?() }
         terminalView.getTerminal().parser.oscHandlers[52] = { [weak self] request in
             guard let self else { return }
             self.onOSC52Decision(SwiftTermOSC52Policy.evaluate(request))
