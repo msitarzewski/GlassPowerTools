@@ -198,3 +198,55 @@ Show All Terminals), Shrink to Orb, the layout toggle, selection, links and path
 the palette's lists, ⌘↩, the editor's saves, and a new `library-siri-and-system` article for D72. Reviewed by the
 coordinator: specific claims checked against the code (12 dots, state tints, `tail -F`, ⌘K, the beep), a scan for
 private names, and `build_site.py`: 7 pages and 39 help pages, no broken links. Not deployed.
+
+## 2026-10-15 (~06:50): selection with tmux, the orb's names and pictures, a desktop's shape, Files' corners (0.4.454)
+
+The owner, on the headset (0.4.453): "selecting text is still broken wholly in the terminal in visionOS with tmux for
+sure, how do I see the orb on desktop? Fix all of the things! BTW, the small names still don't align correctly around
+the orb."
+
+**Selection (532a9d8).** First suspect, SwiftTerm dropping the selection at every write (`feedPrepare`), was already
+handled by `SwiftTermSelectionKeeper` (ef88118); a proof run showed the new redraw test passing without any change. Two
+real defects, each shown with `--demo-open terminal-tmux` (alternate screen, mouse mode 1000/1002/1006, a status line
+fed every 0.4 s through the demo's new `tick`):
+- SwiftTerm makes its mouse-drag pan only when a program asks for the mouse (`mouseModeChanged`), after
+  `installHoldToSelect` ran, so it never waited for the hold: a drifting hold became tmux's drag (`pan(-) began` in the
+  log). `pansWaitForTheHold()` now runs on install and on every mouse-mode change.
+- With the mouse taken, SwiftTerm's single tap went to tmux as a click and left the selection. `selectionChanged` now
+  sets `allowMouseReporting = !selection.active`, so a pinch clears it. Since output then no longer clears a selection,
+  the keeper's `restore` also checks one left in place (text changed → gone; trimmed rows → moved).
+- **Not proven to be his failure:** this Mac's tmux has `mouse off` (default config), so his headset failure may be
+  something else. Each hold, double/triple pinch, every other recognizer's start and end (`tap1`, `scroll`, `pan(-)`,
+  `pan(UIKitAlternateScreenScrollWatcher)`), mouse-mode changes and selection made/cleared (with `alt`, `mouse`,
+  `selection`, `first` state, never text) now go to the system log and, through `glassTerminalRecordSelection`, to
+  `VNCDiagnostics`' file as `terminal-selection` lines. Copy `screen-sharing.log` off the headset after he tries.
+- Tests: `GlassTerminalSelectionUITests` +3 (drifting hold selects; word stays through redraws; pinch clears); the
+  drift and pinch tests fail without their change (proof runs B, C). `TerminalSelectionTests` +1 on the Mac (mouse
+  reporting off, rewritten text drops the selection), failing with the old restore. All 5 selection UI tests pass
+  (the two link tests had failed once when the runner never reached the terminal — nothing logged — and pass on
+  rerun). Terminal suite 846; tmux md5 unchanged.
+
+**Orbs (30d6ca6).**
+- Names: `GlassOrbName` had `.fixedSize().frame(maxWidth: 150)` under a 150 proposal, so every name's frame was 150
+  wide with its capsule centred: a short name sat up to ~60 pt off its dot. `GlassOrbRingLayout.place` proposes
+  `min(ideal, widest)`. Captured on the simulator with ten names (`terminal-ring --demo-session-orb --demo-orb-names`):
+  each starts 8 pt from its dot.
+- Pictures: `GlassWindowSizer.picture()` draws the window (`drawHierarchy`) at the moment of shrinking, for a face
+  with no picture of its own (`lastLook`). Captured: the demo editor's code and the demo database's table in their orbs.
+- Desktop shape: `GlassSessionOrbControl.isWindow` (not orb, not growing back; growing ends in the sizer's `afterward`,
+  which now also runs when no window is found); `DesktopWindowAspectLock` pauses while it's false and asks again
+  after. `testADesktopShrinksIntoItsOrbAndGrowsBack` drives it; the log shows `aspect-lock` again right after
+  `session-window-geometry`. The simulator reports `uniform=false` even on a desktop's first open.
+- "How do I see the orb on a desktop": **Shrink to Orb** is the first button in a desktop window's bottom bar (the
+  new test finds it there); Vision Pro only, as he chose.
+
+**Files (0c07f12).** The Files window's contents are clipped to the 46-point window corner, as the editor's (7538a54):
+its bottom shelf is a square `.bar`. The demo window keeps its corners; the shelf itself needs a live selection, so its
+corners are the headset's to confirm.
+
+Help: `terminal-sessions.md` (both ways of selecting work with tmux's mouse on; a pinch clears), `library-connect.md`
+(database and editor orbs show the window).
+
+0.4.454 (07:06) is on the iPhone and Vision Pro (`devicectl` reads 0.4.454). The Mac's quit was cancelled at the app's
+question, so the Mac stays on 0.4.453 until he's ready; today's changes are the headset's (the keeper's change leaves
+the Mac's behaviour as it was). No new crash reports.

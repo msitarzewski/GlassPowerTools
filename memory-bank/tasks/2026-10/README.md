@@ -85,3 +85,6 @@
   In, the + of a terminal window held and the Mac's + listing running terminals; on Vision Pro, selection and a held
   link's or path's actions, one Tabs/Grid/Carousel toggle, Auto-focus on activity, and session windows that shrink
   into an orb (D74) with the window's tabs on a ring and names that stay while read. 0.4.453.
+- 2026-10-15 (~06:50): [the same note, continued](2026-10-14_all-windows-mac-layout-headset.md) — selection with
+  tmux's mouse on and on-device selection diagnostics, orb names against their dots, database and editor orbs showing
+  their window, a desktop's shape held again after its orb, the Files window's corners. 0.4.454.

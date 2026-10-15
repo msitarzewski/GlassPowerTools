@@ -30,36 +30,37 @@ use the disposable test VM only).
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
-## 2026-10-15 (~05:15) — RESUME HERE
+## 2026-10-15 (~07:10) — RESUME HERE
 
-Welcome back. The owner kept going after the 22:15 close, on the headset through the night, and each request was
-built, committed and installed as it came in. He closed at about 05:00 with the memory bank and the site brought up to
-date, and this note to pick up from. Everything is committed and nothing is pushed.
+The owner, back on the headset at 0.4.453: "selecting text is still broken wholly in the terminal in visionOS with
+tmux for sure, how do I see the orb on desktop? Fix all of the things! BTW, the small names still don't align
+correctly around the orb." All built, committed (532a9d8, 30d6ca6, 0c07f12) and on the headset; nothing pushed.
+Evidence: `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`, section "~06:50".
 
-**What the night built** (evidence: `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`; the orb is D74):
-- **All Windows** as the Mac lays it out, everywhere: a group per machine, a card per tab, live pictures. On Vision
-  Pro it is a window of its own. Connections opens 1180 wide there, and the editor's corners are round.
-- **Editor:** a new file's save into a project on a server works (it failed for every new file; live-tested on
-  scratch). ⌘S off the Mac asks where for a new document.
-- **Active:** Open as Tab In for one running session, and Open N as Tabs In for several. Holding a terminal window's +
-  lists servers ▸ New Terminal and their running terminals; the Mac's + lists them too ("Mac works great").
-- **Vision Pro terminal:** selection by a hold that tolerates drift, and double or triple pinch. A held link or path
-  offers its actions. One Tabs/Grid/Carousel toggle (a hold lists Orb as well), and Auto-focus on activity in This
-  Window.
-- **Vision Pro session orb:** terminal, desktop, database and editor windows shrink into a glass sphere with a live
-  picture, with the window's tabs as dots on a ring. His last note, "The labels disappear when you try to read them",
-  is fixed in 6b8deb3: a name now stays while it is looked at.
+**State:** 0.4.454 on the Vision Pro and iPhone. The Mac's quit was cancelled at the app's question, so the Mac is on
+0.4.453 (nothing in 0.4.454 changes the Mac's behaviour). No new crash reports.
 
-**State:** 0.4.453 on the Mac, iPhone and Vision Pro (see the task note for the read-back). The help and site pages
-describe all of the above, plus a new article on Siri, Shortcuts and the Finder (3b62177; built with no broken
-links; not deployed, which needs his word).
+**Done:**
+- **Selection with tmux:** a drifting hold no longer turns into tmux's drag when tmux has the mouse, and a pinch
+  clears a selection. Both are shown and proven on the simulator. **But** this Mac's tmux has the mouse off, so his
+  failure may be something else. **Next:** once he has tried a hold and a double pinch in a tmux terminal, copy
+  `Library/Caches/com.glasspowertools/Diagnostics/screen-sharing.log` off the headset (headset-diagnostics memory)
+  and read its `terminal-selection` lines: every hold, pinch, recognizer and selection change, with no text.
+- **Orb names** are as wide as their words and sit against their dots (captured with ten).
+- **Database and editor orbs** show the window as it looked when it shrank.
+- **A desktop's shape** is asked for again once it grows back from its orb (the simulator can't show the hold
+  itself).
+- **Files' corners** are clipped to the window.
+- **Desktop orb, his question:** Shrink to Orb is the first button in a desktop window's bottom bar (Vision Pro only).
 
-**For him to try on the headset:** names staying while read; the pulse with Auto-focus on activity; the held + and
-the toggle's held menu; a hold on a path. **Known open:** a desktop's orb loses its display-shape hold after a round
-trip; database and editor orbs show a symbol rather than a picture; the Files window's bottom-bar corners are unchecked.
+**For him to try:** select in a tmux terminal (then the log copy above); names around a ring; a database or editor
+orb; a desktop's orb, then resize it after it grows back (should keep the display's shape); the pulse; the held +
+and the toggle's held menu; a hold on a path.
 
-**How we work** is unchanged from the section below. For builds:
-`sed 's/453/454/g' $SP/build-install-453.zsh > $SP/build-install-454.zsh` (and `build-453.zsh`).
+**How we work** is unchanged (see below). For builds: `sed 's/454/455/g' $SP/build-install-454.zsh >
+$SP/build-install-455.zsh` (and `build-454.zsh`). New helpers in `$SP`: `vision-test.zsh <log> <tests…>` (visionOS
+UI tests), `proof.zsh <name> <old> <new> <tests…>` (swaps a snippet out of the terminal view, runs, restores),
+`capture-on.zsh <log text> <png>`.
 
 ## 2026-10-14 (~22:15) — the day closed
 

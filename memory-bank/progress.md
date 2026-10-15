@@ -69,6 +69,7 @@ All four capabilities and the shell are built and in daily use on the owner's Ma
 | Active: Open as Tab In ▸ for a running session, Open N as Tabs In for several; the + of a terminal window held off the Mac lists servers ▸ New Terminal and their running terminals; the Mac's + lists them (e9e38d7, 4a1cd6f, 2900dc9, 2facec6) | built | unit; device (owner, Mac: "Mac works great") |
 | Vision Pro terminal (2026-10-15): selection by a hold that allows drift, double/triple pinch, Copy; one Tabs/Grid/Carousel toggle (hold lists Orb too); Auto-focus on activity in This Window (2a49a43, 1d63c66, 1011982) | built | unit; visionOS simulator UI tests; device install (the owner testing) |
 | Vision Pro session orb (D74): terminal, desktop, database and editor windows shrink into a glass sphere with a live picture, the window's tabs as dots on a ring, a name on a look that stays while read (1011982, b72244d, f46f283, 6b8deb3) | built | `GlassSessionOrbUITests` (shrink and grow; two tabs on the ring, a dot grows the window back); device (owner on the headset, three rounds of his notes); the pulse not yet seen on a device |
+| Vision Pro, 2026-10-15 (0.4.454): selection with tmux's mouse on (a drifting hold waits out tmux's drag; a pinch clears a selection; the keeper checks a selection output left in place) and on-device selection diagnostics (532a9d8); orb names as wide as their words against their dots, database and editor orbs showing the window, a desktop's shape re-held after its orb (30d6ca6); the Files window clipped to its corner (0c07f12) | built | 8 visionOS simulator UI tests (3 new for tmux, 1 for the desktop round trip; the tmux ones fail without their change); Mac keeper test fails with the old restore; terminal suite 846; captures of the ring, editor and database orbs |
 | Database Local Network and tunnel limits closed: tunnels keep their own connections (D69) | decided | sshd_config(5); OpenSSH reports of multiplexing lag |
 
 Suites run 2026-10-13 with the screen unlocked: terminal 781, shell 280, database 321, DBKit 28, all passing
@@ -165,7 +166,14 @@ profile, notarization, deploying the site), the behaviour findings listed in `ac
   fixtures; Windows, the Finder's Open With and the headset not yet.
 - Desktop glass on the Mac (2026-09-30): Opacity and Background Frost as on the headset; seen by the
   owner on 0.4.266. Settings on the Mac sizes itself to its ten tabs.
-- **Vision Pro session orb (2026-10-15):** the pulse with Auto-focus on activity is not yet seen on a device; a
-  desktop's orb loses its display-shape hold after a round trip; database and editor orbs show a symbol, not a
-  picture; the Files window's bottom-bar corners are unchecked. The held + and the toggle's held menu are for the
-  owner to try (the simulator's runner turns a held menu into a tap).
+- **Vision Pro session orb (2026-10-15):** the pulse with Auto-focus on activity is not yet seen on a device. A
+  desktop's shape hold after a round trip is re-asked (logged on the simulator), but the simulator never reports the
+  hold itself, so it is the headset's to show. The Files shelf's corners are clipped but the demo can't show the
+  shelf. The held + and the toggle's held menu are for the owner to try (the simulator's runner turns a held menu
+  into a tap).
+- **Vision Pro terminal selection (2026-10-15, 0.4.454):** the owner reported it "still broken wholly … with tmux"
+  after 0.4.449's fix passed the simulator. Two defects found and fixed (a drifting hold became tmux's drag when tmux
+  has the mouse; a pinch never cleared a selection then), but this Mac's tmux has the mouse off, so his failure may
+  have another cause. Each hold, pinch and selection change is now written to the app's diagnostics file
+  (`terminal-selection` lines in `screen-sharing.log`): copy it off the headset after he tries (see the
+  headset-diagnostics memory) before changing anything else.
