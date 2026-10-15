@@ -105,6 +105,11 @@ enum GlassDemoMode {
                 if day % 5 == 0 { connections.append(("build", day, .ssh)) }
             }
             shell.demoRecordConnections(connections)
+        case "terminal-ring":
+            // 2026-10-15: ten terminals in one window, for its orb's ring (`--demo-session-orb`, and
+            // `--demo-orb-names` to see where every name sits).
+            terminal.requestDemoTabs(names: ["build", "logs", "api", "web", "db", "cache", "jobs", "deploy", "docs", "tests"],
+                                     output: Data(terminalTranscript.utf8), grid: false)
         case "terminal-tabs", "terminal-grid":
             // W31: one window with two terminals as its tabs, shown in tabs and in the grid, for
             // checking that one bottom bar shows. The shell reports its folder (OSC 7), so Open

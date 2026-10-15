@@ -73,12 +73,19 @@ extension EnvironmentValues {
 /// three. It was a 290-point segmented picker in the bar.
 struct VisionTerminalPresentationPicker: View {
     @Binding var selection: VisionTerminalPresentation
+    /// The window's orb, the fourth way to see it (the owner, 2026-10-15: "is the orb view just one
+    /// more option for the view menu in terminal mode?").
+    @Environment(\.glassSessionOrb) private var orb
     var body: some View {
         Menu {
-            Picker("Terminal View", selection: $selection) {
-                ForEach(VisionTerminalPresentation.allCases, id: \.self) { mode in
-                    Label(mode.title, systemImage: mode.symbolName).tag(mode)
+            ForEach(VisionTerminalPresentation.allCases, id: \.self) { mode in
+                Toggle(isOn: Binding(get: { selection == mode }, set: { if $0 { selection = mode } })) {
+                    Label(mode.title, systemImage: mode.symbolName)
                 }
+            }
+            if let orb, !orb.isOrb {
+                Button("Orb", systemImage: "circle.circle") { orb.shrink() }
+                    .accessibilityIdentifier("vision-terminal-presentation-orb")
             }
         } label: {
             Label("Terminal View", systemImage: selection.symbolName)
@@ -325,6 +332,7 @@ struct VisionTerminalWorkgroupView: View {
         let tabs = workgroup.map { liveSessions(in: $0) } ?? []
         return GlassSessionOrbFace(
             title: title, symbolName: "terminal", pulses: followsActivity && activity.isBusy,
+            // With two or more terminals the view menu offers the orb; alone, the bar's button does.
             tabs: tabs.map { session in
                 GlassSessionOrbTab(
                     id: session.id.uuidString,
@@ -335,7 +343,8 @@ struct VisionTerminalWorkgroupView: View {
                         session?.terminalHostModel.previewImage(maxPixelWidth: 400).map(Image.init(uiImage:))
                     },
                     select: { _ = sessionManager.selectSession(session.id, inWorkgroup: workgroupID) })
-            }
+            },
+            showsButton: tabs.count < 2
         ) {
             let front = shown.flatMap { sessionManager.session(for: $0) } ?? sessionManager.selectedSession(inWorkgroup: workgroupID)
             return front?.terminalHostModel.previewImage(maxPixelWidth: 400).map(Image.init(uiImage:))

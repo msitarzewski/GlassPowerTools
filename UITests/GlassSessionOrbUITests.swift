@@ -54,14 +54,15 @@ final class GlassSessionOrbUITests: XCTestCase {
     /// orb on hover", and a pinch on one grows the window back on it.
     func testAWindowsTabsRingItsOrbAndOneGrowsItBack() {
         app = XCUIApplication()
-        app.launchArguments += ["--ui-testing", UUID().uuidString, "--demo-open", "terminal-tabs"]
+        // Shrunk by the demo a few seconds in: with two terminals the orb is in the view menu, whose
+        // hold the simulator's runner turns into a tap.
+        app.launchArguments += ["--ui-testing", UUID().uuidString, "--demo-open", "terminal-tabs", "--demo-session-orb"]
         app.launch()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
 
-        let shrink = element("session-orb-shrink")
-        XCTAssertTrue(shrink.waitForExistence(timeout: 40), "no Shrink to Orb in the terminal's bar")
-        shrink.tap()
-        XCTAssertTrue(element("session-orb").waitForExistence(timeout: 10), "the window did not become its orb")
+        XCTAssertTrue(element("vision-terminal-presentation").waitForExistence(timeout: 40), "no view menu in the bar")
+        XCTAssertEqual(element("session-orb-shrink").exists, false, "Shrink to Orb beside a view menu that offers the orb")
+        XCTAssertTrue(element("session-orb").waitForExistence(timeout: 20), "the window did not become its orb")
         let dots = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "session-orb-tab-"))
         let both = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == 2"), object: dots)
         XCTAssertEqual(XCTWaiter().wait(for: [both], timeout: 10), .completed, "the window's two tabs are not on the ring")

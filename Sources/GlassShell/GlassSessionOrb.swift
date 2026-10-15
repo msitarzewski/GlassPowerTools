@@ -55,13 +55,18 @@ public struct GlassSessionOrbFace {
     public var pulses: Bool
     /// The window's tabs, on a ring around the orb when there are two or more.
     public var tabs: [GlassSessionOrbTab]
+    /// Whether the window's bar shows Shrink to Orb. A terminal window with a view menu offers the
+    /// orb there instead (the owner, 2026-10-15: "is the orb view just one more option for the view
+    /// menu in terminal mode?").
+    public var showsButton: Bool
 
     public init(title: String, symbolName: String, pulses: Bool = false, tabs: [GlassSessionOrbTab] = [],
-                picture: @escaping @MainActor () -> Image?) {
+                showsButton: Bool = true, picture: @escaping @MainActor () -> Image?) {
         self.title = title
         self.symbolName = symbolName
         self.pulses = pulses
         self.tabs = tabs
+        self.showsButton = showsButton
         self.picture = picture
     }
 
@@ -73,7 +78,7 @@ public struct GlassSessionOrbFace {
 /// need room beyond it.
 enum GlassSessionOrbSize {
     static func window(ringed: Bool) -> CGSize {
-        ringed ? CGSize(width: 480, height: 340) : GlassConnectionsWindowSize.orb
+        ringed ? CGSize(width: 560, height: 380) : GlassConnectionsWindowSize.orb
     }
 }
 
@@ -141,7 +146,9 @@ private struct GlassSessionOrbModifier: ViewModifier {
             content
                 // First in the window's bottom bar, in every kind of session window.
                 .toolbar {
-                    ToolbarItem(placement: .bottomOrnament) { GlassSessionOrbButton() }
+                    if face.showsButton {
+                        ToolbarItem(placement: .bottomOrnament) { GlassSessionOrbButton() }
+                    }
                 }
                 .environment(\.glassSessionOrb, GlassSessionOrbControl(shrink: shrink, isOrb: isOrb))
                 .environment(\.glassWindowOutOfSight, isOrb)
@@ -185,6 +192,13 @@ enum GlassSessionOrbDemo {
         let arguments = ProcessInfo.processInfo.arguments
         return arguments.contains("--ui-testing") && arguments.contains("--demo-session-orb")
     }
+
+    /// `--demo-orb-names`: every name drawn as it is for a look, to check where each sits — the
+    /// simulator cannot be looked at.
+    static var showsNames: Bool {
+        let arguments = ProcessInfo.processInfo.arguments
+        return arguments.contains("--ui-testing") && arguments.contains("--demo-orb-names")
+    }
 }
 #endif
 
@@ -200,8 +214,23 @@ private struct GlassSessionOrbView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Namespace private var looks
 
+    /// What looking at the orb, or at a tab's dot, shows. Only the orb and the dots set their group
+    /// going; what they show follows (`.followsGroup`). Left to the default, every tab's picture —
+    /// each inside the orb — set its own group going when the orb was looked at, and every tab's name
+    /// showed at once (the owner, on the headset: "all of them at once is a lot").
     private var orbLook: HoverEffectGroup { HoverEffectGroup(id: "orb", in: looks) }
     private func look(_ tab: GlassSessionOrbTab) -> HoverEffectGroup { HoverEffectGroup(id: "tab-" + tab.id, in: looks) }
+    private var shownByOrb: HoverEffectGroup { orbLook.behavior(.followsGroup) }
+
+    /// Nil, so a look alone shows a name — except in the screenshots' demo.
+    private static var namesOverride: HoverEffectPhaseOverride? {
+        #if DEBUG
+        GlassSessionOrbDemo.showsNames ? .active : nil
+        #else
+        nil
+        #endif
+    }
+    private func shown(by tab: GlassSessionOrbTab) -> HoverEffectGroup { look(tab).behavior(.followsGroup) }
 
     var body: some View {
         let tabs = face.ringTabs
@@ -210,10 +239,10 @@ private struct GlassSessionOrbView: View {
             ForEach(tabs) { tab in dot(tab) }
             ForEach(tabs) { tab in
                 GlassOrbName(title: tab.title)
-                    .hoverEffect(GlassOrbRevealEffect(), in: look(tab))
+                    .hoverEffect(GlassOrbRevealEffect().hoverEffectPhaseOverride(Self.namesOverride), in: shown(by: tab))
             }
             GlassOrbName(title: face.title, prominent: true)
-                .hoverEffect(GlassOrbRevealEffect(), in: orbLook)
+                .hoverEffect(GlassOrbRevealEffect(), in: shownByOrb)
         }
     }
 
@@ -229,7 +258,7 @@ private struct GlassSessionOrbView: View {
                     ForEach(tabs) { tab in
                         picture(tab.picture(), symbolName: tab.symbolName)
                             .clipShape(.circle)
-                            .hoverEffect(GlassOrbRevealEffect(), in: look(tab))
+                            .hoverEffect(GlassOrbRevealEffect(), in: shown(by: tab))
                     }
                 }
             }
@@ -351,7 +380,8 @@ struct GlassOrbRingLayout: Layout {
     let count: Int
     static let maximumTabs = 12
     static let dotDiameter: CGFloat = 30
-    static let gap: CGFloat = 12
+    /// Between the orb's rim and a dot's (the owner: "move the dots away from the orb a few more pixels").
+    static let gap: CGFloat = 22
     static let nameWidth: CGFloat = 150
     static var ringRadius: CGFloat { GlassConnectionsOrb.diameter / 2 + gap + dotDiameter / 2 }
 
@@ -372,11 +402,23 @@ struct GlassOrbRingLayout: Layout {
             subviews[1 + index].place(at: CGPoint(x: center.x + radius * dx, y: center.y + radius * dy),
                                       anchor: .center,
                                       proposal: ProposedViewSize(width: Self.dotDiameter, height: Self.dotDiameter))
-            let reach = radius + Self.dotDiameter / 2 + 6
-            subviews[1 + count + index].place(
-                at: CGPoint(x: center.x + reach * dx, y: center.y + reach * dy),
-                anchor: UnitPoint(x: 0.5 - 0.5 * dx, y: 0.5 - 0.5 * dy),
-                proposal: ProposedViewSize(width: Self.nameWidth, height: nil))
+            // The name beside its own dot, growing away from the orb: on either side, level with
+            // the dot and leading away from it; at the top and bottom, centred above or below it.
+            // It was anchored by the angle's fraction of its own size, which drew a long name
+            // well off its dot (the owner: "the titles are aligned incorrectly to the dots").
+            let dot = CGPoint(x: center.x + radius * dx, y: center.y + radius * dy)
+            let clearance = Self.dotDiameter / 2 + 8
+            let point: CGPoint
+            let anchor: UnitPoint
+            if abs(dx) >= 0.35 {
+                point = CGPoint(x: dot.x + (dx > 0 ? clearance : -clearance), y: dot.y)
+                anchor = dx > 0 ? .leading : .trailing
+            } else {
+                point = CGPoint(x: dot.x, y: dot.y + (dy > 0 ? clearance : -clearance))
+                anchor = dy > 0 ? .top : .bottom
+            }
+            subviews[1 + count + index].place(at: point, anchor: anchor,
+                                              proposal: ProposedViewSize(width: Self.nameWidth, height: nil))
         }
         subviews[subviews.count - 1].place(at: CGPoint(x: center.x, y: center.y + outer + 10), anchor: .top,
                                            proposal: ProposedViewSize(width: Self.nameWidth + 40, height: nil))
