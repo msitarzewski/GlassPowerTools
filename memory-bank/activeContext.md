@@ -37,7 +37,8 @@ machine, a card per tab, cards sized to fit, live pictures off the iPhone), a wi
 the sheet, Connections wider, and the editor's square bottom corners. All done and committed (ca3f897…1558bd6; see
 `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`). Then, after midnight: a new file's save to a project on
 a server (it failed for every new file; fixed, live-tested on scratch), ⌘S off the Mac asking where on a new document,
-and Active's Open as Tab In for a running session. 0.4.446 is on the Mac, iPhone and Vision Pro (00:29, each read
+and Active's Open as Tab In for a running session; then Open N as Tabs In for several, and the + of a terminal
+window held listing servers ▸ their running terminals. 0.4.447 is on the Mac, iPhone and Vision Pro (01:04, each read
 back); no new crash reports. The section below is the day's close and still holds.
 
 ## 2026-10-14 (~22:15) — the day closed

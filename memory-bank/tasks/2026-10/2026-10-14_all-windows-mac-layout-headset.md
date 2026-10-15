@@ -74,3 +74,19 @@ OpenSSH (`LiveRemoteEditingTests`, 11 pass): a new file is created and described
 file that went is reported changed; without the fix the real server answers "no such file", the owner's error. The SFTP Files window's own bottom-bar corners are still unchecked.
 
 0.4.446 (00:29) is on the Mac, iPhone and Vision Pro; each reads 0.4.446; no new crash reports.
+
+## 2026-10-15 (~00:50): Open N as Tabs In; the + held
+
+The owner: "add Open as Tab In for multiple selected sessions too and the plus in the toolbar should all[ow] a pinch
+and hold > servers > terminals list to open in the current window."
+
+| Commit | Change |
+|---|---|
+| 4a1cd6f | Several running sessions chosen in Active: a chosen row's menu and the selection toolbar offer **Open N as Tabs In ▸** (`GlassShellModel.open(_:inTabGroup:)` for many, `GlassActiveSelection.openChosen(in:inTabGroup:)`), one request in Active's order; open-here ones stay. |
+| 2900dc9 | The + of a terminal window off the Mac (`TerminalNewTabMenu`: the headset's bar, the iPhone/iPad toolbar) is a menu with the picker as its tap; held, every saved server ▸ New Terminal and its running terminals (Active's cached list, via `GlassTerminalRuntime.runningSessions` / `refreshRunningSessionsIfDue` from the composition root), opened in this window by the window's own add with a tmux attachment — no Connections window needed. |
+
+**Validation:** the batch test (one request, order, open-here kept) fails when sent one by one; the menu's entries test
+fails when an open-here terminal is listed; the headset's 3 bar UI tests pass with the + once; shell 299, terminal 841;
+tmux unchanged. The held menu itself is not driven by a test (no saved servers in the demo); the owner checks it.
+
+0.4.447 (01:04) is on the Mac, iPhone and Vision Pro; each reads 0.4.447; no new crash reports.
