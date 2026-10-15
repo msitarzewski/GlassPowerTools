@@ -143,3 +143,22 @@ workgroup or live output in the demo); the terminal's own tab ornament stays bes
 too); a database or document orb shows a symbol, not a picture.
 
 0.4.450 (03:31) is on the Mac, iPhone and Vision Pro; each reads 0.4.450; no new crash reports.
+
+## 2026-10-15 (~04:20): the orb as a sphere with its tabs on a ring (b72244d)
+
+The owner: "redraw the tabs around the orb evenly distributed with a preview in the orb on hover? The name should never
+cover the orb, it should grow away from the orb. Make the orb shaped more like an orb, and have it grow slightly when
+interacted with." Choices: small glass dots; a pinch on a dot grows the window back on that tab; the orb shows "front
+tab, or whichever is active".
+
+- `GlassSessionOrbTab` / `GlassSessionOrbFace.tabs`; `GlassOrbRingLayout` (dots evenly from the top, names anchored
+  toward the orb so they grow outward, the orb's name below); `GlassOrbSphereShading` (cut to the circle itself — the
+  orb's clip let its gradients' square show); press grows (1.06). Previews on a look via shared `HoverEffectGroup`s
+  (the app is never told where a person looks). `glassHiddenWhileOrb` removes the terminal's tab ornament while orb.
+  `GlassConnectionsWindowLayout(library:orb:orbContent:)`: 480×340 with a ring.
+- Verified on the visionOS 27.2 simulator: the ring with two tabs, a dot pinch grows the window back (UI test), the
+  sphere captured clean with `--demo-session-orb`. Looks (names, previews) can't be driven there. Simulator notes: a
+  restart leaves Home in front of app windows for `simctl io` captures (launch the app directly to bring it forward);
+  another app's window (a markup tool) can cover the scene; the bar's grid test flaked once in sequence, passed alone.
+
+0.4.451 (04:21) is on the iPhone and Vision Pro; the Mac's quit was cancelled at the app's question, so it stays on 0.4.450 until he's ready.

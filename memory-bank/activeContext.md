@@ -40,7 +40,9 @@ a server (it failed for every new file; fixed, live-tested on scratch), ⌘S off
 and Active's Open as Tab In for a running session; then Open N as Tabs In for several, and the + of a terminal
 window held listing servers ▸ their running terminals; the Mac's + lists running terminals; on the headset, selection
 and a held link's actions, a tabs/grid/carousel toggle, a session window that shrinks into an orb, and Auto-focus on
-activity in This Window. 0.4.450 is on the Mac, iPhone and Vision Pro (03:31, each read back); no new crash reports. The section below is the day's close and still holds.
+activity in This Window; then the orb as a sphere with the window's tabs on a ring. 0.4.451 is on the iPhone and
+Vision Pro (04:21); the Mac stayed on 0.4.450 — its quit for the install was cancelled at the app's question (live
+sessions), so install it when he's ready. No new crash reports. The section below is the day's close and still holds.
 
 ## 2026-10-14 (~22:15) — the day closed
 
