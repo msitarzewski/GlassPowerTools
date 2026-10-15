@@ -178,10 +178,6 @@ public struct GlassShellLibraryView: View {
         // So Window ▸ Workgroups can bring this window forward rather than open another.
         .background { GlassLibraryWindowRegistration() }
         #endif
-        #if os(visionOS)
-        // All Windows on the headset: a sheet on this window (`GlassShowAllWindows.presentOverview`).
-        .modifier(GlassAllWindowsSheet(model: model))
-        #endif
     }
 
     /// The library's actions: the ⚡, each capability's, and Add Host and Settings.

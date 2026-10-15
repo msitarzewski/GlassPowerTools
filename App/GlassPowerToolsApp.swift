@@ -662,6 +662,34 @@ struct GlassPowerToolsApp: App {
             GlassShellSettingsView(model: model)
                 .glassLayers(layers)
         }
+        // All Windows (the ⚡ held, or Siri): a window of its own, which can be made as large as
+        // the work needs (the owner, 2026-10-14, of the sheet it was: "will that work for larger
+        // workloads?"). A place to go from, not to come back to: never reopened at launch.
+        Window("All Windows", id: GlassShowAllWindows.windowID) {
+            allWindowsContent
+        }
+        .defaultSize(width: 1280, height: 800)
+        .restorationBehavior(.disabled)
         #endif
     }
+
+    #if os(visionOS)
+    /// All Windows inside every capability's bootstrap, as Connections is: what a card asks for — a
+    /// terminal's window, a desktop's — is carried out by a window's bootstrap, and Connections may
+    /// not be open.
+    private var allWindowsContent: some View {
+        GlassTerminalBootstrap(runtime: terminal) {
+            GlassDatabaseBootstrap(runtime: database) {
+                GlassDesktopBootstrap(runtime: desktop) {
+                    GlassEditorBootstrap(runtime: editor) {
+                        GlassAllWindowsWindow(model: model)
+                    }
+                }
+            }
+        }
+        .glassLayers(layers)
+        .environment(model.registry)
+        .glassRegistersWindowOpener()
+    }
+    #endif
 }
