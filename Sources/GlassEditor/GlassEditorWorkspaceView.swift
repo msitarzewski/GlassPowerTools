@@ -849,8 +849,17 @@ public struct GlassEditorWorkspaceView: View {
                 .accessibilityIdentifier("editor-settings")
         }
         ToolbarItem(placement: .editorTrailing) {
+            // Enabled for a document never saved, edited or not, as the Mac's ⌘S is: choosing where
+            // a new file lives is a reason to save on its own.
             Button("Save", systemImage: "arrow.down.document") { saveSelected() }
-                .disabled(workspace.selectedDocument?.isDirty != true)
+                .disabled(!(workspace.selectedDocument.map { $0.hasNeverBeenSaved || $0.isDirty } ?? false))
+                #if !os(macOS)
+                // ⌘S with a keyboard, here where there is no File menu: on a never-saved document
+                // it asks where (the owner, on the headset, 2026-10-15: "I'd like to just hit
+                // command s on an unsaved text file to get the location prompt"). The Mac's ⌘S is
+                // File ▸ Save's, its one owner (`GlassShellFileCommands`).
+                .keyboardShortcut("s", modifiers: .command)
+                #endif
                 .accessibilityIdentifier("editor-save")
         }
         #if !os(macOS)
