@@ -102,4 +102,37 @@ struct TerminalActiveListingTests {
         capability.openSessions().first?.close()
         #expect(manager.sessions.isEmpty)
     }
+
+    /// All Windows off the Mac (the owner, 2026-10-14): "Grouped by machine, but show each tab as a card."
+    @Test("A workgroup's terminals are its tabs: named as their tabs are, each on its server; chosen, a tab comes back selected")
+    func workgroupTabsAreCards() throws {
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+        let capability = GlassTerminalCapability(runtime: runtime)
+        let manager = runtime.sessionManager
+        let group = manager.createWorkgroup(name: "Backend", colorTag: .blue)
+        let api = session(named: "alpha"), logs = session(named: "bravo")
+        for terminal in [api, logs] {
+            manager.registerSession(terminal)
+            terminal.state = .connected
+            #expect(manager.appendSession(terminal, toWorkgroup: group))
+        }
+        api.rename(to: "api")
+
+        let window = try #require(capability.openSessions().first { $0.id == GlassTerminalCapability.sessionID(workgroupID: group) })
+        #expect(window.tabs.map(\.title) == ["api", "bravo"], "named as each tab is")
+        #expect(window.tabs.map(\.endpointIDs) == [[EndpointID(rawValue: api.server.id)], [EndpointID(rawValue: logs.server.id)]],
+                "each on its own machine")
+        #expect(window.tabs.map(\.id) == [api.id, logs.id].map(GlassTerminalCapability.tabID(sessionID:)))
+        _ = runtime.takeRequests()
+
+        window.tabs[0].activate()
+        #expect(manager.workgroup(for: group)?.selectedSessionID == api.id, "the window comes back on the tab chosen")
+        let requests = runtime.takeRequests()
+        #expect(requests.count == 1)
+        if case .showWorkgroup(let shown)? = requests.first { #expect(shown == group) } else { Issue.record("not shown: \(requests)") }
+
+        window.tabs[1].close()
+        #expect(manager.workgroup(for: group)?.sessionIDs == [api.id], "closing a tab's card closes that tab")
+        manager.closeWorkgroup(group)
+    }
 }

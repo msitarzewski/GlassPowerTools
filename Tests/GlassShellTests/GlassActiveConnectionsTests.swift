@@ -197,6 +197,33 @@ struct GlassActiveConnectionsTests {
         #expect(model.runningSessions.map(\.id) == ["tmux:glass-3"], "and stays listed, open here")
     }
 
+    /// All Windows off the Mac (the owner, 2026-10-14): "Grouped by machine, but show each tab as a card."
+    @Test("All Windows: a window's tabs are cards of their own under their machines; Active keeps the window as one row")
+    func allWindowsShowsEachTab() async throws {
+        let (model, root, store) = try makeModel()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let alpha = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on alpha")
+        let bravo = HostServiceLink(endpointID: EndpointID(), kind: .ssh, displayName: "Terminal on bravo")
+        try await store.upsert(try HostProfile(displayName: "alpha", address: "192.0.2.1", services: [alpha]))
+        try await store.upsert(try HostProfile(displayName: "bravo", address: "192.0.2.2", services: [bravo]))
+        let terminal = StubCapability(kind: .ssh, displayName: "Terminal")
+        let window = GlassOpenSession(id: "terminal:backend", title: "Backend", symbolName: "circle",
+                                      endpointIDs: [alpha.endpointID, bravo.endpointID], activate: {}, close: {},
+                                      tabs: [session("terminal-tab:api", title: "api", endpoints: [alpha.endpointID]),
+                                             session("terminal-tab:logs", title: "logs", endpoints: [bravo.endpointID]),
+                                             session("terminal-tab:build", title: "build", endpoints: [alpha.endpointID])])
+        terminal.sessions = [window, session("terminal:lone", title: "alpha", endpoints: [alpha.endpointID])]
+        model.registry.register(terminal)
+        await model.load()
+
+        let cards = model.allWindowsMachines()
+        #expect(cards.map(\.name) == ["alpha", "bravo"])
+        #expect(cards.first?.sessions.map(\.id) == ["terminal-tab:api", "terminal-tab:build", "terminal:lone"])
+        #expect(cards.last?.sessions.map(\.id) == ["terminal-tab:logs"])
+        #expect(model.activeMachines().flatMap(\.sessions).map(\.id) == ["terminal:backend", "terminal:lone"],
+                "Active still lists the window once")
+    }
+
     private func makeModel() throws -> (GlassShellModel, URL, HostCatalogStore) {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("GlassActive-\(UUID().uuidString)", isDirectory: true)

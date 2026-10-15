@@ -171,6 +171,8 @@ enum TerminalWorkgroupOpening {
         case connectionOrnament
         /// Active's row for a workgroup Connect made for one terminal.
         case active
+        /// A tab's card in All Windows off the Mac.
+        case allWindows
     }
 
     /// What a terminal is called on `surface`: one answer for all of them, by the rule the Mac's

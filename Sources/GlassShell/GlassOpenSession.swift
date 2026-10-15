@@ -65,6 +65,11 @@ public struct GlassOpenSession: Identifiable {
     /// like DBeaver's connected marker (2026-10-03). A session still connecting, reconnecting or
     /// failed is open but not connected; a workgroup is connected only through its live terminals.
     public let connectedEndpointIDs: [EndpointID]
+    /// The window's tabs, each a card of its own in All Windows off the Mac, grouped by the machine
+    /// each is on, as the Mac's Show All Windows draws a tile per tab (the owner, 2026-10-14:
+    /// "Grouped by machine, but show each tab as a card"). Empty for a session that is one thing;
+    /// Active still lists the window as one row.
+    public let tabs: [GlassOpenSession]
 
     public init(id: String, title: String, subtitle: String? = nil, symbolName: String,
                 endpointIDs: [EndpointID] = [], hostID: HostID? = nil,
@@ -72,7 +77,8 @@ public struct GlassOpenSession: Identifiable {
                 close: @escaping @MainActor @Sendable () -> Void,
                 closeTitle: String = "Close", closeSymbolName: String = "xmark",
                 isConnected: Bool = true, connectedEndpointIDs: [EndpointID]? = nil,
-                snapshot: (@MainActor () -> Image?)? = nil, mark: (@MainActor () -> Image?)? = nil) {
+                snapshot: (@MainActor () -> Image?)? = nil, mark: (@MainActor () -> Image?)? = nil,
+                tabs: [GlassOpenSession] = []) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
@@ -86,6 +92,7 @@ public struct GlassOpenSession: Identifiable {
         self.closeSymbolName = closeSymbolName
         self.snapshot = snapshot
         self.mark = mark
+        self.tabs = tabs
     }
 }
 

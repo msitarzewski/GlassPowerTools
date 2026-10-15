@@ -694,9 +694,39 @@ public final class GlassTerminalCapability: GlassCapability {
                 mark: {
                     let shown = workgroup.selectedSessionID.flatMap { manager.session(for: $0) } ?? live[0]
                     return Self.agent(of: shown)?.markImage
-                }
+                },
+                tabs: live.map { tab(of: $0, in: workgroup.id, manager: manager) }
             )
         }
+    }
+
+    /// One of a workgroup's terminals as All Windows shows it off the Mac: a card of its own,
+    /// named as its tab is, under the machine it is on (the owner, 2026-10-14: "Grouped by
+    /// machine, but show each tab as a card"). Choosing it brings the window forward on that tab;
+    /// closing it closes that tab, and the window with its last.
+    private func tab(of session: TerminalSession, in workgroupID: UUID, manager: SessionManager) -> GlassOpenSession {
+        GlassOpenSession(
+            id: Self.tabID(sessionID: session.id),
+            title: TerminalWorkgroupOpening.label(session, on: .allWindows),
+            subtitle: Self.subtitle(for: [session]),
+            symbolName: symbolName,
+            endpointIDs: [EndpointID(rawValue: session.server.id)],
+            activate: { [runtime] in
+                _ = manager.selectSession(session.id, inWorkgroup: workgroupID)
+                runtime.enqueue(.showWorkgroup(workgroupID: workgroupID))
+            },
+            close: { _ = manager.closeSession(session.id, inWorkgroup: workgroupID) },
+            closeTitle: Self.closeTitle(for: [session]),
+            closeSymbolName: Self.closeSymbolName(for: [session]),
+            isConnected: session.state == .connected,
+            snapshot: { Self.preview(of: session) },
+            mark: { Self.agent(of: session)?.markImage }
+        )
+    }
+
+    /// The id this capability gives one terminal of a workgroup, as a tab's card.
+    public static func tabID(sessionID: UUID) -> String {
+        "terminal-tab:\(sessionID.uuidString)"
     }
 
     /// A workgroup Connect made for one terminal is named after its server ("Terminal on alpha"),

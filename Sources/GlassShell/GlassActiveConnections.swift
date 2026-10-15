@@ -53,17 +53,7 @@ public extension GlassShellModel {
     /// Read in a view body: it walks `openSessions()`, which is answered from each capability's
     /// live state, so the sidebar count and the list follow what is actually open.
     func activeMachines() -> [GlassActiveMachine] {
-        var order: [String] = []
-        var grouped: [String: (name: String, sessions: [GlassOpenSession])] = [:]
-        for session in registry.openSessions() {
-            let owner = session.endpointIDs.lazy.compactMap { self.host(owningEndpoint: $0) }.first
-                ?? session.hostID.flatMap { self.host($0) }
-            let key = owner?.id.rawValue.uuidString ?? "elsewhere"
-            let name = owner?.displayName ?? "Elsewhere"
-            if grouped[key] == nil { order.append(key); grouped[key] = (name, []) }
-            grouped[key]?.sessions.append(session)
-        }
-        var machines = order.map { GlassActiveMachine(id: $0, name: grouped[$0]!.name, sessions: grouped[$0]!.sessions) }
+        var machines = machines(of: registry.openSessions())
         func machineIndex(owning endpoint: EndpointID) -> Int? {
             guard let owner = host(owningEndpoint: endpoint) else { return nil }
             let key = owner.id.rawValue.uuidString
@@ -80,6 +70,29 @@ public extension GlassShellModel {
             machines[index].notChecked = unchecked.reason
         }
         return machines
+    }
+
+    /// What All Windows off the Mac shows: every open session, a window's tabs each on its own,
+    /// grouped by the machine each is on — the Mac's tile per tab (the owner, 2026-10-14: "Grouped
+    /// by machine, but show each tab as a card"). Nothing that only runs on a machine: that is
+    /// Active's.
+    func allWindowsMachines() -> [GlassActiveMachine] {
+        machines(of: registry.openSessions().flatMap { $0.tabs.isEmpty ? [$0] : $0.tabs })
+    }
+
+    /// Sessions grouped by the machine they are on, machines in the order their first session came.
+    private func machines(of sessions: [GlassOpenSession]) -> [GlassActiveMachine] {
+        var order: [String] = []
+        var grouped: [String: (name: String, sessions: [GlassOpenSession])] = [:]
+        for session in sessions {
+            let owner = session.endpointIDs.lazy.compactMap { self.host(owningEndpoint: $0) }.first
+                ?? session.hostID.flatMap { self.host($0) }
+            let key = owner?.id.rawValue.uuidString ?? "elsewhere"
+            let name = owner?.displayName ?? "Elsewhere"
+            if grouped[key] == nil { order.append(key); grouped[key] = (name, []) }
+            grouped[key]?.sessions.append(session)
+        }
+        return order.map { GlassActiveMachine(id: $0, name: grouped[$0]!.name, sessions: grouped[$0]!.sessions) }
     }
 
     /// Opens a running session here, or takes it over. It leaves the list at once — it is about
