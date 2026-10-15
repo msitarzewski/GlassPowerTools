@@ -84,6 +84,15 @@ enum GlassDemoMode {
                 : "/var/log/shop/" + String(repeating: "jobs-worker-", count: 6) + "out.log"
             let rows = Array(repeating: "", count: 14) + Array(repeating: link, count: 12)
             terminal.requestDemoReplay(name: "alpha", output: Data(rows.joined(separator: "\r\n").utf8))
+        case "terminal-tmux":
+            // 2026-10-15: tmux as SwiftTerm sees it — the alternate screen, the mouse asked for, and
+            // a status line redrawn every 0.4 s — over words to select (the owner: "selecting text is
+            // still broken wholly in the terminal in visionOS with tmux").
+            let words = String(repeating: "select these words on the screen ", count: 4)
+            let screen = "\u{1B}[?1049h\u{1B}[?1000h\u{1B}[?1002h\u{1B}[?1006h\u{1B}[H\u{1B}[2J"
+                + Array(repeating: words, count: 60).joined(separator: "\r\n")
+            let status = "\u{1B}7\u{1B}[999;1H\u{1B}[7m[0] 0:zsh*  \u{1B}[0m\u{1B}8"
+            terminal.requestDemoReplay(name: "alpha", output: Data(screen.utf8), tick: Data(status.utf8))
         case "terminal-window", "terminal-settings":
             // A window with settings of its own (W22), and This Window open over it.
             terminal.requestDemoReplay(name: "alpha", output: Data(terminalTranscript.utf8),

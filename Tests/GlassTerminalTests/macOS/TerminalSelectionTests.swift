@@ -60,6 +60,25 @@ struct TerminalSelectionTests {
         #expect(!view.selection.active, "what was selected is gone")
     }
 
+    /// A Vision Pro terminal turns mouse reporting off while it has a selection (2026-10-15), so
+    /// SwiftTerm leaves the selection in place through output instead of dropping it: it is checked
+    /// all the same.
+    @Test("with mouse reporting off, output that rewrites the selected text still takes the selection")
+    func rewrittenTextWithoutMouseReporting() async throws {
+        let host = await HostedTerminal()
+        defer { host.close() }
+        await host.feed("hello world\r\n")
+        let view = try terminalView(host)
+        view.allowMouseReporting = false
+        selectWord(view, row: 0, column: 1)
+        try #require(view.selection.active)
+
+        await host.feed("more output\r\n")
+        #expect(view.selection.active && view.selection.getSelectedText() == "hello", "a new line below")
+        await host.feed("\u{1B}[1;1HHOWDY")
+        #expect(!view.selection.active, "what was selected is gone")
+    }
+
     @Test("lines trimmed from the scrollback move the selection with its text, and take it when it goes")
     func trimmedScrollback() async throws {
         let host = await HostedTerminal(scrollback: 20, height: 300)

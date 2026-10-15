@@ -57,6 +57,10 @@ struct GlassPowerToolsApp: App {
         // off a headset with devicectl when a session goes wrong (VNCDiagnostics). Not in UI tests.
         if GlassUITestRun.defaults == nil {
             VNCDiagnostics.enable()
+            #if os(visionOS)
+            // And a terminal's holds and pinches, in the same file (places only, never text).
+            glassTerminalRecordSelection { VNCDiagnostics.record(category: "terminal-selection", $0) }
+            #endif
             // Whether this device decodes a Mac's High Performance picture, found once in the
             // background and written to that file: a 3 KB sample, a few milliseconds.
             Task.detached(priority: .background) { _ = RFBAppleVideoDecoder.decodesHighPerformance }

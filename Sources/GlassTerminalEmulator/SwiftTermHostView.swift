@@ -1010,15 +1010,23 @@ enum SwiftTermSelectionKeeper {
                     buffer: ObjectIdentifier(buffer), text: selection.getSelectedText())
     }
 
+    /// Puts the selection back where its text went, or lets it go where its text did. Output
+    /// leaves it in place where it doesn't take it — with mouse reporting off, as a Vision Pro
+    /// terminal turns it while it has a selection — and it is checked the same.
     static func restore(_ kept: Kept?, in view: TerminalView) {
-        guard let kept, let selection = view.selection, !selection.active else { return }
+        guard let kept, let selection = view.selection else { return }
         let buffer = view.getTerminal().buffer
         // The other screen is showing, or the selected lines were trimmed away.
         let shift = buffer.totalLinesTrimmed - kept.trimmed
         guard ObjectIdentifier(buffer) == kept.buffer, shift >= 0,
-              min(kept.start.row, kept.end.row) - shift >= 0 else { return }
-        selection.setSelection(start: Position(col: kept.start.col, row: kept.start.row - shift),
-                               end: Position(col: kept.end.col, row: kept.end.row - shift))
+              min(kept.start.row, kept.end.row) - shift >= 0 else {
+            selection.selectNone()
+            return
+        }
+        if !selection.active || shift != 0 {
+            selection.setSelection(start: Position(col: kept.start.col, row: kept.start.row - shift),
+                                   end: Position(col: kept.end.col, row: kept.end.row - shift))
+        }
         if selection.getSelectedText() != kept.text { selection.selectNone() }
     }
 }
@@ -1827,6 +1835,15 @@ private final class MinimalTerminalAccessoryView: UIToolbar {
     }
 }
 
+#if os(visionOS)
+/// Where a Vision Pro terminal's holds and pinches are also written: the app points it at its
+/// diagnostics file at launch (`VNCDiagnostics`), which can be copied off a headset.
+@MainActor
+public enum TerminalSelectionDiagnostics {
+    public static var record: ((String) -> Void)?
+}
+#endif
+
 @MainActor
 private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditMenuInteractionDelegate {
     var onPasteRequest: ((String, Bool) -> Void)?
@@ -1847,6 +1864,46 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
         #endif
         onWindowAttachmentChanged?()
     }
+
+    /// **While there is a selection, the program does not get the mouse** (the owner on the
+    /// headset, 2026-10-15: "selecting text is still broken wholly in the terminal in visionOS with
+    /// tmux"). With tmux's `mouse on`, SwiftTerm sent a pinch to tmux as a click and left the
+    /// selection where it was, so nothing but new text under it ever cleared one; now a pinch
+    /// clears it, as it does where no program has the mouse, and a drag can't start tmux's own
+    /// selection over it. Cleared, the program has the mouse again. (Output taking a selection away
+    /// is `SwiftTermSelectionKeeper`'s, which gives it back while its text is unchanged.)
+    override func selectionChanged(source: Terminal) {
+        super.selectionChanged(source: source)
+        allowMouseReporting = !selection.active
+        #if os(visionOS)
+        // Output takes the selection away and `SwiftTermSelectionKeeper` gives it back: only what
+        // happens outside that is worth a line.
+        if !isFeeding, selection.active != noted {
+            noted = selection.active
+            note("selection \(selection.active ? "made" : "cleared")")
+        }
+        #endif
+        #if DEBUG
+        // For `GlassTerminalSelectionUITests`, which cannot see the highlight.
+        if ProcessInfo.processInfo.arguments.contains("--ui-testing") {
+            accessibilityIdentifier = selection.active ? "terminal-selection-active" : "terminal-selection-none"
+        }
+        #endif
+    }
+
+    #if os(visionOS)
+    /// Set by the engine while it feeds output in, around `SwiftTermSelectionKeeper`.
+    var isFeeding = false
+    /// The selection as last written to the diagnostics.
+    private var noted = false
+
+    /// A selection that output took away for good (its text changed, or the other screen showed).
+    func noteFeedDropped(_ kept: Bool) {
+        guard kept, !selection.active else { return }
+        noted = false
+        note("selection cleared by output \(state)")
+    }
+    #endif
 
     /// The height of one row, or 0 before the font is measured.
     var rowHeight: CGFloat {
@@ -1922,19 +1979,36 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
             if let tap = recognizer as? UITapGestureRecognizer, tap.numberOfTapsRequired == 1, tap.isEnabled {
                 tap.require(toFail: doublePinch)
             }
-            // Scrolling — the view's own pan, and tmux's on the alternate screen — waits for the hold.
-            if let pan = recognizer as? UIPanGestureRecognizer {
-                pan.require(toFail: holdToSelect)
-            }
         }
+        pansWaitForTheHold()
+        watchRecognizers()
+    }
+
+    /// Scrolling — the view's own pan, and tmux's on the alternate screen — waits for the hold, and
+    /// so does the drag SwiftTerm sends to a program that asks for the mouse. That one is made only
+    /// when the program asks (`mouseModeChanged`), after the rest: left out, a hold whose hand
+    /// drifted became a drag in tmux, which selected in its own copy mode and cleared on letting go.
+    /// Asking again of a pan already waiting changes nothing.
+    private func pansWaitForTheHold() {
+        guard holdToSelect.view != nil else { return }
+        for case let pan as UIPanGestureRecognizer in gestureRecognizers ?? [] {
+            pan.require(toFail: holdToSelect)
+        }
+    }
+
+    override func mouseModeChanged(source: Terminal) {
+        super.mouseModeChanged(source: source)
+        pansWaitForTheHold()
+        watchRecognizers()
+        note("mouse mode \(source.mouseMode)")
     }
 
     @objc private func doublePinched(_ gesture: UITapGestureRecognizer) {
         guard gesture.state == .ended, let cell = bufferCell(at: gesture.location(in: self)) else { return }
-        os.Logger(subsystem: "sh.glas", category: "terminal-selection").notice("double pinch row=\(cell.row) col=\(cell.col)")
         _ = becomeFirstResponder()
         selection.selectWordOrExpression(at: cell, in: getTerminal().buffer)
         selection.selectionMode = .character
+        note("double pinch row=\(cell.row) col=\(cell.col) \(state)")
         showCopyMenu()
     }
 
@@ -1942,7 +2016,67 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
         guard gesture.state == .ended, let cell = bufferCell(at: gesture.location(in: self)) else { return }
         _ = becomeFirstResponder()
         selection.select(row: cell.row)
+        note("triple pinch row=\(cell.row) col=\(cell.col) \(state)")
         showCopyMenu()
+    }
+
+    /// **What a hand did, kept where it can be read** (the owner, 2026-10-15: "selecting text is
+    /// still broken wholly in the terminal in visionOS with tmux", after the simulator's runner
+    /// passed every selection test). Into the system log and the app's diagnostics file
+    /// (`TerminalSelectionDiagnostics`), which `devicectl` can copy off a headset when its system log
+    /// can't be collected. Places and states only, never the text.
+    private func note(_ message: String) {
+        os.Logger(subsystem: "sh.glas", category: "terminal-selection").notice("\(message, privacy: .public)")
+        TerminalSelectionDiagnostics.record?(message)
+    }
+
+    /// The terminal's state beside each line: the screen, whether a program has the mouse, and the
+    /// selection.
+    private var state: String {
+        let terminal = getTerminal()
+        return "alt=\(terminal.isCurrentBufferAlternate) mouse=\(terminal.mouseMode) selection=\(selection.active) first=\(isFirstResponder)"
+    }
+
+    /// Every other recognizer on the terminal — SwiftTerm's tap, the scroll view's pan, the drag sent
+    /// to a program with the mouse, the scroll handed to tmux — as it starts and ends, so a hold that
+    /// became something else says what it became.
+    private let watched = NSHashTable<UIGestureRecognizer>.weakObjects()
+
+    private func watchRecognizers() {
+        for recognizer in gestureRecognizers ?? [] where !watched.contains(recognizer)
+            && recognizer !== holdToSelect && recognizer !== doublePinch && recognizer !== triplePinch
+            && !(recognizer is UIHoverGestureRecognizer) {
+            watched.add(recognizer)
+            recognizer.addTarget(self, action: #selector(watchedRecognizerChanged(_:)))
+        }
+    }
+
+    @objc private func watchedRecognizerChanged(_ recognizer: UIGestureRecognizer) {
+        guard recognizer.state != .changed else { return }
+        // A pan with no delegate is SwiftTerm's: the drag sent to a program with the mouse.
+        let kind = if let tap = recognizer as? UITapGestureRecognizer {
+            "tap\(tap.numberOfTapsRequired)"
+        } else if recognizer === panGestureRecognizer {
+            "scroll"
+        } else if recognizer is UIPanGestureRecognizer {
+            "pan(\(recognizer.delegate.map { String(describing: type(of: $0)) } ?? "-"))"
+        } else {
+            String(describing: type(of: recognizer))
+        }
+        let cell = bufferCell(at: recognizer.location(in: self)).map { "\($0.row),\($0.col)" } ?? "-"
+        note("\(kind) \(Self.name(of: recognizer.state)) at=\(cell) \(state)")
+    }
+
+    private static func name(of state: UIGestureRecognizer.State) -> String {
+        switch state {
+        case .began: "began"
+        case .ended: "ended"
+        case .cancelled: "cancelled"
+        case .failed: "failed"
+        case .changed: "changed"
+        case .possible: "possible"
+        @unknown default: "other"
+        }
     }
 
     /// The buffer cell under `point` (the view scrolls over the whole buffer, so rows count from
@@ -1962,7 +2096,7 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
         guard let cell = bufferCell(at: gesture.location(in: self)) else { return }
         switch gesture.state {
         case .began:
-            os.Logger(subsystem: "sh.glas", category: "terminal-selection").notice("hold began row=\(cell.row) col=\(cell.col)")
+            note("hold began row=\(cell.row) col=\(cell.col) \(state)")
             _ = becomeFirstResponder()
             selectionMenu.dismissMenu()
             heldLink = nil
@@ -1984,8 +2118,7 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
             selection.pivotExtend(bufferPosition: cell)
             let link = TerminalLinkLookup.target(at: cell, in: getTerminal())
             // Where the hold landed and what was there, never the text: for the next "it doesn't select".
-            os.Logger(subsystem: "sh.glas", category: "terminal-selection").notice(
-                "hold ended row=\(cell.row) col=\(cell.col) began=\(self.holdBegan.map { "\($0.row),\($0.col)" } ?? "-", privacy: .public) link=\(link != nil) yDisp=\(self.getTerminal().buffer.yDisp) rows=\(self.getTerminal().rows) y=\(gesture.location(in: self).y) offset=\(self.contentOffset.y)")
+            note("hold ended row=\(cell.row) col=\(cell.col) began=\(holdBegan.map { "\($0.row),\($0.col)" } ?? "-") link=\(link != nil) yDisp=\(getTerminal().buffer.yDisp) rows=\(getTerminal().rows) y=\(gesture.location(in: self).y) offset=\(contentOffset.y) \(state)")
             // Held on a link without moving: its actions, as the Mac's right-click offers them.
             if let began = holdBegan, began.col == cell.col, began.row == cell.row, let link {
                 selection.selectNone()
@@ -1996,6 +2129,7 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
             }
             holdBegan = nil
         default:
+            note("hold \(Self.name(of: gesture.state)) row=\(cell.row) col=\(cell.col) \(state)")
             holdBegan = nil
         }
     }
@@ -2327,10 +2461,17 @@ private final class SwiftTermEngine: TerminalEngine {
     func receive(_ data: Data) {
         let start = performanceClock.now
         let kept = SwiftTermSelectionKeeper.take(from: terminalView)
+        #if os(visionOS)
+        terminalView.isFeeding = true
+        #endif
         terminalView.feed(byteArray: clearBlacks.filter(ArraySlice(data)))
         // Find's hit first: it knows where its own selection went. Any other selection after.
         reapplyFindHit()
         SwiftTermSelectionKeeper.restore(kept, in: terminalView)
+        #if os(visionOS)
+        terminalView.isFeeding = false
+        terminalView.noteFeedDropped(kept != nil)
+        #endif
         performanceDiagnostics.recordFeed(
             byteCount: data.count,
             duration: start.duration(to: performanceClock.now)

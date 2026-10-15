@@ -18,6 +18,15 @@ import GlassLayers
 import GlassSSHTransport
 import GlassTerminalEmulator
 
+#if os(visionOS)
+/// A Vision Pro terminal's holds and pinches, also written by `write` — the app's diagnostics file,
+/// which can be copied off a headset (`TerminalSelectionDiagnostics`).
+@MainActor
+public func glassTerminalRecordSelection(to write: @escaping (String) -> Void) {
+    TerminalSelectionDiagnostics.record = write
+}
+#endif
+
 /// What the shell asked the terminal to open.
 public enum GlassTerminalOpenPurpose: Sendable { case terminal, sftp }
 
@@ -98,8 +107,9 @@ public final class GlassTerminalRuntime {
         #if DEBUG
         /// Screenshots (App/GlassDemoMode.swift): a session that connects to nothing, showing a
         /// recorded transcript in the real terminal window. Typing goes nowhere.
-        /// `windowSettings` for its window (W22), and This Window opened over it when asked.
-        case demoReplay(name: String, output: Data, windowSettings: GlassWindowOverrides, opensSettings: Bool)
+        /// `windowSettings` for its window (W22), and This Window opened over it when asked; `tick`,
+        /// when given, arrives again and again after it, as a program's redraws do.
+        case demoReplay(name: String, output: Data, windowSettings: GlassWindowOverrides, opensSettings: Bool, tick: Data?)
         /// Screenshots: one window holding a demo terminal on each of `names`, the first in front;
         /// on Vision Pro, shown in the grid when `grid` (W31: one bottom bar in tabs and in grid).
         case demoTabs(names: [String], output: Data, grid: Bool)
@@ -493,11 +503,13 @@ public final class GlassTerminalRuntime {
     #if DEBUG
     /// Screenshots only: a terminal window on `name` showing `output`, with no connection behind it,
     /// keeping `windowSettings` as its own (W22); with `opensSettings`, Settings ▸ This Window opens
-    /// over it.
+    /// over it. `tick`, when given, is fed again every 0.4 s after `output`, as tmux redraws its
+    /// status line.
     public func requestDemoReplay(name: String, output: Data,
                                   windowSettings: GlassWindowOverrides = GlassWindowOverrides(),
-                                  opensSettings: Bool = false) {
-        enqueue(.demoReplay(name: name, output: output, windowSettings: windowSettings, opensSettings: opensSettings))
+                                  opensSettings: Bool = false, tick: Data? = nil) {
+        enqueue(.demoReplay(name: name, output: output, windowSettings: windowSettings, opensSettings: opensSettings,
+                            tick: tick))
     }
     /// Screenshots only: one window with a demo terminal on each of `names` as its tabs, each
     /// showing `output`; on Vision Pro in the grid when `grid`.

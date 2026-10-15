@@ -96,7 +96,9 @@ A path is read on the machine that printed it: from the shell's current folder w
 ## Select text on Vision Pro
 
 - Pinch and hold on the terminal, then drag to select. A hand that drifts a little while holding still selects; a drag that moves at once scrolls instead. Hold on either end of a selection to move that end. Letting go offers **Copy**.
-- Pinch twice quickly to select a word, or three times to select a line, with **Copy** offered. This works even when the program in the terminal takes the mouse, as tmux does with its mouse mode on. A single pinch still goes to the program.
+- Pinch twice quickly to select a word, or three times to select a line, with **Copy** offered.
+- Both work even when the program in the terminal takes the mouse, as tmux does with its mouse mode on. A selection stays while the program redraws around it.
+- A single pinch clears a selection. With nothing selected, a single pinch goes to the program.
 - Pinch and hold on a link or a path, and let go without moving, for its actions (see [Links and paths](#links-and-paths)).
 
 ## Drop files on a terminal

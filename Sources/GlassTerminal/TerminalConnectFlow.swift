@@ -306,7 +306,7 @@ struct TerminalConnectFlow: ViewModifier {
         case .openWorkgroup(let preset):
             openWorkgroup(preset)
         #if DEBUG
-        case .demoReplay(let name, let output, let windowSettings, let opensSettings):
+        case .demoReplay(let name, let output, let windowSettings, let opensSettings, let tick):
             // No SSHConnection is ever started: the sinks swallow typing and resizes, and the
             // transcript goes straight to the emulator, queued until the window's view attaches.
             let server = ServerConfiguration(name: name, host: "192.0.2.10", username: "ann")
@@ -318,6 +318,15 @@ struct TerminalConnectFlow: ViewModifier {
             session.demoOpensSettings = opensSettings
             session.feedTerminalData(output)
             presentTerminalWindow(for: session, windowSettings: windowSettings)
+            if let tick {
+                // Held weakly, and never across the wait: the redraws stop when the terminal goes.
+                Task { @MainActor [weak session] in
+                    while session != nil {
+                        session?.feedTerminalData(tick)
+                        try? await Task.sleep(for: .milliseconds(400))
+                    }
+                }
+            }
         case .demoTabs(let names, let output, let grid):
             // The same connectionless sessions, as the tabs of one window.
             let sessions = names.map { name in

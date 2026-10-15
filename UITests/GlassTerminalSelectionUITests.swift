@@ -45,6 +45,11 @@ final class GlassTerminalSelectionUITests: XCTestCase {
         app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Terminal")).firstMatch
     }
 
+    /// The terminal while it has a selection (set in UI-testing runs only, as the highlight can't be read).
+    private var selected: XCUIElement {
+        app.descendants(matching: .any).matching(identifier: "terminal-selection-active").firstMatch
+    }
+
     /// The terminal's middle: the visionOS simulator's runner holds and taps an element there,
     /// whatever point within it is asked for (the hold's own log: row 19 of 41, column 64).
     private var middle: XCUICoordinate {
@@ -77,6 +82,38 @@ final class GlassTerminalSelectionUITests: XCTestCase {
         let found = menuItem("Copy Link").waitForExistence(timeout: 5)
         if !found { attachTree("after holding the address") }
         XCTAssertTrue(found, "holding an address offered no Copy Link")
+    }
+
+    /// The owner, 2026-10-15: "selecting text is still broken wholly in the terminal in visionOS with
+    /// tmux". SwiftTerm dropped a selection at every write while a program had the mouse, and tmux
+    /// writes all the time. `terminal-tmux` redraws a status line every 0.4 s with the mouse asked for.
+    func testAWordSelectedInTmuxStaysThroughItsRedraws() {
+        launch("terminal-tmux")
+        middle.doubleTap()
+        XCTAssertTrue(menuItem("Copy").waitForExistence(timeout: 5), "a double pinch offered no Copy")
+        sleep(2)
+        XCTAssertTrue(selected.exists, "the word's selection went at tmux's next redraw")
+    }
+
+    /// With tmux's mouse on, a pinch went to tmux as a click and the selection stayed; it clears it.
+    func testAPinchClearsASelectionInTmux() {
+        launch("terminal-tmux")
+        middle.doubleTap()
+        XCTAssertTrue(selected.waitForExistence(timeout: 5), "a double pinch selected nothing")
+        sleep(2)
+        middle.tap()
+        XCTAssertTrue(selected.waitForNonExistence(timeout: 5), "a pinch left the selection, sent to tmux as a click")
+    }
+
+    /// A hold whose hand moves a little before it counts: the drag tmux is sent when it has the mouse
+    /// waits for the hold, as scrolling does, rather than taking the pinch into tmux's copy mode.
+    func testAHoldThatDriftsSelectsInTmux() {
+        launch("terminal-tmux")
+        middle.press(forDuration: 0.15, thenDragTo: middle.withOffset(CGVector(dx: 24, dy: 0)),
+                     withVelocity: 40, thenHoldForDuration: 1.0)
+        sleep(2)
+        if !selected.exists { attachTree("after a drifting hold in tmux") }
+        XCTAssertTrue(selected.exists, "a hold that drifted selected nothing")
     }
 
     func testAPinchTwiceSelectsAWordAndOffersCopy() {
