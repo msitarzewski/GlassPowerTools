@@ -115,6 +115,11 @@ public struct GlassEditorWorkspaceView: View {
             #endif
         }
         #if os(visionOS)
+        // **In the window's shape.** A plain window gives its content none, so the status line's
+        // bar, square, filled the window's bottom corners outside its rounded glass (the owner, on
+        // the headset, 2026-10-14: "The Editor window's bottom corners show a square background").
+        // The toolbar below the window is an ornament, outside this.
+        .clipShape(RoundedRectangle(cornerRadius: GlassWindowShape.spatialWindowCornerRadius, style: .continuous))
         // Behind the paint, out to the window's edges: as much of Apple's glass as the window's
         // Glass asks for, none at 0 (`GlassSpatialWindowGlass`).
         .glassSpatialWindowGlass()
