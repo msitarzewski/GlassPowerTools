@@ -151,16 +151,25 @@ struct MenuBarPlacementTests {
     /// ⌘S beeped while the editor's own Save sat on ⌥⌘S (2026-09-25). The two other declarations
     /// are not menu owners on a Mac: the database's item is compiled only for iPad and headset
     /// (`#if !os(macOS)`, where the shell's item does not exist), and the SFTP editor's is a
-    /// toolbar button in its own window, which the key window answers before the menu bar.
+    /// toolbar button in its own window, which the key window answers before the menu bar. The
+    /// editor window's toolbar Save carries ⌘S for an iPad or headset keyboard (the owner,
+    /// 2026-10-15), and only there: inside `#if !os(macOS)`, as its ⌘O is.
     @Test func commandSHasASingleMenuOwnerOnTheMac() throws {
+        let marker = #"keyboardShortcut("s", modifiers: .command)"#
         var files: [String] = []
+        var editorOnTheMac = false
         for file in try swiftSources() {
             let text = try String(contentsOf: file, encoding: .utf8)
-            guard text.contains(#"keyboardShortcut("s", modifiers: .command)"#) else { continue }
+            guard text.contains(marker) else { continue }
             files.append(file.lastPathComponent)
+            if file.lastPathComponent == "GlassEditorWorkspaceView.swift" {
+                editorOnTheMac = declarations(of: marker, in: text).contains { !excludesTheMac($0) }
+            }
         }
-        #expect(files.sorted() == ["Constants.swift", "GlassShellFileCommands.swift", "SFTPRemoteEditorView.swift"],
+        #expect(files.sorted() == ["Constants.swift", "GlassEditorWorkspaceView.swift", "GlassShellFileCommands.swift",
+                                   "SFTPRemoteEditorView.swift"],
                 "⌘S is declared in \(files.sorted()). On a Mac it belongs to the shell's File ▸ Save; a window says what it saves by publishing \\.glassSaveItem.")
+        #expect(!editorOnTheMac, "the editor's toolbar ⌘S reaches the Mac; it belongs inside #if !os(macOS)")
     }
 
     /// ⇧⌘E is New Editor Window, alone. Explain Plan shared it, and read out of the running app
