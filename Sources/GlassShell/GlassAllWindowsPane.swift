@@ -67,8 +67,22 @@ final class GlassAllWindowsPull: NSObject, UIGestureRecognizerDelegate {
     /// The hold is UIKit's, on the window, not SwiftUI's on the button: a SwiftUI gesture on a
     /// terminal's ⚡ never began (2026-10-14, measured on the simulator), because iOS 26 draws a
     /// toolbar's plain button as a native bar button, without the SwiftUI view's gestures or
-    /// backgrounds. A ⚡ is told by its accessibility identifier, which the native button keeps.
+    /// backgrounds. A ⚡ is told two ways, because it is drawn two ways: a native bar button by
+    /// its accessibility identifier, which it keeps; one SwiftUI keeps drawing — the library's,
+    /// among other items — by a view of its own behind it (`GlassBoltProbe`), since on iOS 27.2
+    /// the view a touch lands on there does not carry the identifier (the owner's iPhone: "nothing
+    /// on hold"; reproduced on the 27.2 simulator).
     private var heldBolt = false
+    private let probes = NSHashTable<UIView>.weakObjects()
+
+    func noteProbe(_ view: UIView) { probes.add(view) }
+    func forgetProbe(_ view: UIView) { probes.remove(view) }
+
+    private func isOnProbe(_ point: CGPoint, in window: UIWindow) -> Bool {
+        probes.allObjects.contains { view in
+            view.window === window && view.convert(view.bounds, to: window).contains(point)
+        }
+    }
 
     private var installed = false
 
@@ -179,7 +193,7 @@ final class GlassAllWindowsPull: NSObject, UIGestureRecognizerDelegate {
         guard let window = gesture.view as? UIWindow else { return false }
         let point = touch.location(in: window)
         if gesture.name == Self.holdName {
-            heldBolt = Self.isBolt(window.hitTest(point, with: nil))
+            heldBolt = Self.isBolt(window.hitTest(point, with: nil)) || isOnProbe(point, in: window)
             return heldBolt && GlassShowAllWindows.model != nil
         }
         startedOnTopBar = point.y > window.safeAreaInsets.top
@@ -386,6 +400,22 @@ struct GlassAllWindowsPaneView: View {
             .ignoresSafeArea(edges: .top)
         }
         .accessibilityAction(.escape) { close(nil) }
+    }
+}
+/// The view behind a ⚡ SwiftUI draws itself, by which the window's hold knows it is there.
+struct GlassBoltProbe: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.isUserInteractionEnabled = false
+        view.backgroundColor = .clear
+        GlassAllWindowsPull.shared.noteProbe(view)
+        return view
+    }
+
+    func updateUIView(_ view: UIView, context: Context) {}
+
+    static func dismantleUIView(_ view: UIView, coordinator: ()) {
+        GlassAllWindowsPull.shared.forgetProbe(view)
     }
 }
 #endif

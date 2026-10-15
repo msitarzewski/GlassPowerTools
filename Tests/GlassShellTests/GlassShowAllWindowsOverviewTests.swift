@@ -30,6 +30,22 @@ struct GlassShowAllWindowsOverviewTests {
         #expect(GlassShowAllWindowsOverview.filtered(machines, by: "logs").isEmpty)
     }
 
+    /// The owner (2026-10-14): disconnected sessions were on the cards; "Should only be connected".
+    @Test("only what is live: a session through services while connected through one; an editor's while open")
+    func onlyWhatIsLive() {
+        let endpoint = EndpointID()
+        let live = GlassOpenSession(id: "terminal:live", title: "live", symbolName: "terminal",
+                                    endpointIDs: [endpoint], activate: {}, close: {})
+        let dropped = GlassOpenSession(id: "terminal:dropped", title: "dropped", symbolName: "terminal",
+                                       endpointIDs: [endpoint], activate: {}, close: {}, isConnected: false)
+        let editor = GlassOpenSession(id: "editor:1", title: "notes", symbolName: "doc", activate: {}, close: {})
+        let quiet = GlassActiveMachine(id: "q", name: "quiet", sessions: [dropped])
+        let shown = GlassShowAllWindowsOverview.filtered(
+            [GlassActiveMachine(id: "a", name: "alpha", sessions: [live, dropped, editor]), quiet], by: "")
+        #expect(shown.map(\.name) == ["alpha"], "a machine with nothing live is not listed")
+        #expect(shown.first?.sessions.map(\.title) == ["live", "notes"])
+    }
+
     @Test("a search keeps a whole machine by its name, or the sessions whose title or kind match")
     func search() {
         #expect(GlassShowAllWindowsOverview.filtered(machines, by: "alpha").map(\.sessions.count) == [1])

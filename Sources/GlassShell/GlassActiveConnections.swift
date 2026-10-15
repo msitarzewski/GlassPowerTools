@@ -1009,7 +1009,9 @@ public struct GlassActiveConnectionsButton: View {
         #if os(iOS)
         // Holding it opens All Windows (the owner, 2026-10-14: "everything other than Mac can
         // still use the lightning bolt hold pattern"). The tap is still Active. The hold is the
-        // window's (`GlassAllWindowsPull`), which knows a bolt by its accessibility identifier.
+        // window's (`GlassAllWindowsPull`), which knows a bolt by its accessibility identifier,
+        // or, where SwiftUI draws the button itself, by the view behind it.
+        .background { GlassBoltProbe() }
         .accessibilityAction(named: "Show All Windows") { showAllWindows() }
         .help("Active connections. Hold for All Windows.")
         #elseif os(visionOS)

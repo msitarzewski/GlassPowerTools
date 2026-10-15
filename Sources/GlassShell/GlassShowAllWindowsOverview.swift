@@ -79,11 +79,16 @@ struct GlassShowAllWindowsOverview: View {
         .accessibilityIdentifier("all-windows")
     }
 
-    /// The machines with something open that matches `search` — a machine's name keeps all of it,
+    /// The machines with something live that matches `search` — a machine's name keeps all of it,
     /// a session's title or subtitle keeps that session — and machines left with nothing dropped.
+    /// Live only: All Windows is for going to what is working now (the owner, 2026-10-14: "Should
+    /// only be connected as it's a shortcut to switching active/live sessions/services"). A session
+    /// through services is live while it is connected through one; one through none — an editor's
+    /// documents — is live while it is open.
     static func filtered(_ machines: [GlassActiveMachine], by search: String) -> [GlassActiveMachine] {
-        let open = machines.filter { !$0.sessions.isEmpty }
-            .map { GlassActiveMachine(id: $0.id, name: $0.name, sessions: $0.sessions) }
+        let open = machines
+            .map { GlassActiveMachine(id: $0.id, name: $0.name, sessions: $0.sessions.filter(isLive)) }
+            .filter { !$0.sessions.isEmpty }
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return open }
         func matches(_ text: String?) -> Bool { text?.localizedCaseInsensitiveContains(query) == true }
@@ -92,6 +97,10 @@ struct GlassShowAllWindowsOverview: View {
             let sessions = machine.sessions.filter { matches($0.title) || matches($0.subtitle) }
             return sessions.isEmpty ? nil : GlassActiveMachine(id: machine.id, name: machine.name, sessions: sessions)
         }
+    }
+
+    static func isLive(_ session: GlassOpenSession) -> Bool {
+        session.endpointIDs.isEmpty || !session.connectedEndpointIDs.isEmpty
     }
 }
 
