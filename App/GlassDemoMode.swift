@@ -174,6 +174,24 @@ enum GlassDemoMode {
                 name: "bravo", host: "192.0.2.20", picture: picture,
                 windowSettings: windowSettings,
                 opensSettings: surface == "desktop-settings")
+        case "all-windows":
+            // All Windows (2026-10-14): a window of three terminals as tabs, a desktop and an
+            // editor, then All Windows over them, laid out as the Mac's, a card per tab.
+            terminal.requestDemoTabs(names: ["alpha", "bravo", "charlie"],
+                                     output: Data(terminalTranscript.utf8), grid: false)
+            let renderer = ImageRenderer(content: DemoRemoteScreen())
+            renderer.scale = 1
+            if let picture = renderer.cgImage {
+                await desktop.requestDemoDesktop(name: "bravo", host: "192.0.2.20", picture: picture,
+                                                 windowSettings: GlassWindowOverrides(), opensSettings: false)
+            }
+            await openEditor(editor, preview: false)
+            try? await Task.sleep(for: .seconds(3))
+            #if os(visionOS)
+            GlassWindowOpener.shared.perform { GlassShowAllWindows.presentOverview(openWindow: $0) }
+            #elseif os(iOS)
+            GlassShowAllWindows.presentOverview()
+            #endif
         case "desktop-disconnected":
             await desktop.requestDemoDisconnectedDesktop(name: "bravo", host: "192.0.2.20")
         case "desktop-displays", "desktop-quality":
