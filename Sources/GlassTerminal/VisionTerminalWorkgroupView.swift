@@ -174,6 +174,7 @@ struct VisionTerminalWorkgroupView: View {
     @Environment(\.openWindow) private var openWindow
     #if os(iOS)
     @Environment(IOSAppRouter.self) private var iOSRouter
+    @Environment(\.colorScheme) private var systemColorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// iPad: **Move Tab to New Window** opens another window; an iPhone has one.
     @Environment(\.supportsMultipleWindows) private var supportsMultipleWindows
@@ -989,9 +990,20 @@ struct VisionTerminalWorkgroupView: View {
             }
             .lineLimit(1)
         }
+        // **In the terminal's own light or dark** (the owner, 2026-10-15: "theres no way to switch
+        // tabs on iphone"). The title sits over the terminal, not over a bar, and in light mode its
+        // text was drawn black on a dark theme's black: the switcher was there and could not be
+        // seen. A theme that follows the system leaves it to the system.
+        .environment(\.colorScheme, themeColorScheme ?? systemColorScheme)
         .accessibilityLabel("Terminal Sessions")
         .accessibilityValue(selectedSessionName(in: sessions))
         .accessibilityIdentifier("terminal-workgroup-session-switcher")
+    }
+
+    /// This window's terminal theme's light or dark; nil for a theme that follows the system.
+    private var themeColorScheme: ColorScheme? {
+        TerminalWindowProfile.resolved(sessionManager.workgroup(for: workgroupID)?.windowSettings ?? GlassWindowOverrides(),
+                                       settings: settingsManager).theme.resolvedAppearance.colorScheme
     }
 
     private func selectedSessionName(in sessions: [TerminalSession]) -> String {
