@@ -135,4 +135,32 @@ struct TerminalActiveListingTests {
         #expect(manager.workgroup(for: group)?.sessionIDs == [api.id], "closing a tab's card closes that tab")
         manager.closeWorkgroup(group)
     }
+
+    /// The owner (2026-10-15): "in the expose it show one card for all tabs". The iPhone opens a
+    /// window's other tabs as slots that connect when shown; All Windows dropped them as
+    /// disconnected.
+    @Test("A tab that connects when it is shown waits, and says so; one that dropped does not")
+    func slotTabsWaitToBeShown() throws {
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+        let capability = GlassTerminalCapability(runtime: runtime)
+        let manager = runtime.sessionManager
+        let group = manager.createWorkgroup(name: "Backend", colorTag: .blue)
+        let api = session(named: "alpha"), logs = session(named: "bravo"), jobs = session(named: "charlie")
+        for terminal in [api, logs, jobs] {
+            manager.registerSession(terminal)
+            #expect(manager.appendSession(terminal, toWorkgroup: group))
+        }
+        api.state = .connected
+        logs.isWorkgroupSlot = true
+        logs.connectsWhenShown = true
+        logs.state = .disconnected
+        jobs.state = .disconnected
+
+        let window = try #require(capability.openSessions().first { $0.id == GlassTerminalCapability.sessionID(workgroupID: group) })
+        #expect(window.tabs.map(\.waitsToBeShown) == [false, true, false])
+        #expect(window.tabs[1].subtitle == "Connects when opened")
+        #expect(window.tabs.map(\.connectedEndpointIDs.isEmpty) == [false, true, true],
+                "waiting is not connected: All Windows lists it by `waitsToBeShown` (GlassShell's tests)")
+        manager.closeWorkgroup(group)
+    }
 }

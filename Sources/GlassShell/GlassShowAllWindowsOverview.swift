@@ -81,7 +81,8 @@ struct GlassShowAllWindowsOverview: View {
     /// Live only: All Windows is for going to what is working now (the owner, 2026-10-14: "Should
     /// only be connected as it's a shortcut to switching active/live sessions/services"). A session
     /// through services is live while it is connected through one; one through none — an editor's
-    /// documents — is live while it is open.
+    /// documents — is live while it is open; a tab waiting to connect when it is shown is live, as
+    /// its window is (2026-10-15: the iPhone's window of tabs was one card).
     static func filtered(_ machines: [GlassActiveMachine], by search: String) -> [GlassActiveMachine] {
         let open = machines
             .map { GlassActiveMachine(id: $0.id, name: $0.name, sessions: $0.sessions.filter(isLive)) }
@@ -97,7 +98,7 @@ struct GlassShowAllWindowsOverview: View {
     }
 
     static func isLive(_ session: GlassOpenSession) -> Bool {
-        session.endpointIDs.isEmpty || !session.connectedEndpointIDs.isEmpty
+        session.endpointIDs.isEmpty || !session.connectedEndpointIDs.isEmpty || session.waitsToBeShown
     }
 }
 

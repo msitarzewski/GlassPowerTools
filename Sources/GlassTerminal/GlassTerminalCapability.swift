@@ -728,10 +728,13 @@ public final class GlassTerminalCapability: GlassCapability {
     /// machine, but show each tab as a card"). Choosing it brings the window forward on that tab;
     /// closing it closes that tab, and the window with its last.
     private func tab(of session: TerminalSession, in workgroupID: UUID, manager: SessionManager) -> GlassOpenSession {
-        GlassOpenSession(
+        // A tab the iPhone connects only when it is shown: a card of its own, saying so, rather than
+        // left off as disconnected (2026-10-15: "in the expose it show one card for all tabs").
+        let waits = session.connectsWhenShown && session.state == .disconnected
+        return GlassOpenSession(
             id: Self.tabID(sessionID: session.id),
             title: TerminalWorkgroupOpening.label(session, on: .allWindows),
-            subtitle: Self.subtitle(for: [session]),
+            subtitle: waits ? Self.waitingSubtitle(for: session) : Self.subtitle(for: [session]),
             symbolName: symbolName,
             endpointIDs: [EndpointID(rawValue: session.server.id)],
             activate: { [runtime] in
@@ -743,8 +746,16 @@ public final class GlassTerminalCapability: GlassCapability {
             closeSymbolName: Self.closeSymbolName(for: [session]),
             isConnected: session.state == .connected,
             snapshot: { Self.preview(of: session) },
-            mark: { Self.agent(of: session)?.markImage }
+            mark: { Self.agent(of: session)?.markImage },
+            waitsToBeShown: waits
         )
+    }
+
+    /// A waiting tab's state, in its card: it connects when chosen.
+    static func waitingSubtitle(for session: TerminalSession) -> String {
+        guard session.survivesClose, let name = session.tmuxSessionName else { return "Connects when opened" }
+        let label = TerminalTmux.glassNumber(name).map { "Terminal \($0)" } ?? name
+        return "Connects when opened · in tmux (\(label))"
     }
 
     /// The id this capability gives one terminal of a workgroup, as a tab's card.

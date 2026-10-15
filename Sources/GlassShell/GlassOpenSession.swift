@@ -70,6 +70,11 @@ public struct GlassOpenSession: Identifiable {
     /// "Grouped by machine, but show each tab as a card"). Empty for a session that is one thing;
     /// Active still lists the window as one row.
     public let tabs: [GlassOpenSession]
+    /// A tab of an open window that connects when it is shown — the iPhone opens a window's other
+    /// tabs that way, and leaves them so after the app was away. Not connected, but live: All
+    /// Windows shows it, and choosing it connects it (the owner, 2026-10-15: "in the expose it show
+    /// one card for all tabs").
+    public let waitsToBeShown: Bool
 
     public init(id: String, title: String, subtitle: String? = nil, symbolName: String,
                 endpointIDs: [EndpointID] = [], hostID: HostID? = nil,
@@ -78,7 +83,7 @@ public struct GlassOpenSession: Identifiable {
                 closeTitle: String = "Close", closeSymbolName: String = "xmark",
                 isConnected: Bool = true, connectedEndpointIDs: [EndpointID]? = nil,
                 snapshot: (@MainActor () -> Image?)? = nil, mark: (@MainActor () -> Image?)? = nil,
-                tabs: [GlassOpenSession] = []) {
+                tabs: [GlassOpenSession] = [], waitsToBeShown: Bool = false) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
@@ -93,6 +98,7 @@ public struct GlassOpenSession: Identifiable {
         self.snapshot = snapshot
         self.mark = mark
         self.tabs = tabs
+        self.waitsToBeShown = waitsToBeShown
     }
 }
 

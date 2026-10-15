@@ -46,6 +46,23 @@ struct GlassShowAllWindowsOverviewTests {
         #expect(shown.first?.sessions.map(\.title) == ["live", "notes"])
     }
 
+    /// The owner (2026-10-15): "in the expose it show one card for all tabs". The iPhone connects a
+    /// window's other tabs only when they are shown; they are its tabs all the same.
+    @Test("a tab waiting to connect when it is shown is live; one that dropped is not")
+    func waitingTabsAreLive() {
+        let endpoint = EndpointID()
+        let shown = GlassOpenSession(id: "terminal-tab:shown", title: "api", symbolName: "terminal",
+                                     endpointIDs: [endpoint], activate: {}, close: {})
+        let waiting = GlassOpenSession(id: "terminal-tab:waiting", title: "logs", symbolName: "terminal",
+                                       endpointIDs: [endpoint], activate: {}, close: {}, isConnected: false,
+                                       waitsToBeShown: true)
+        let dropped = GlassOpenSession(id: "terminal-tab:dropped", title: "jobs", symbolName: "terminal",
+                                       endpointIDs: [endpoint], activate: {}, close: {}, isConnected: false)
+        let shownTabs = GlassShowAllWindowsOverview.filtered(
+            [GlassActiveMachine(id: "a", name: "alpha", sessions: [shown, waiting, dropped])], by: "")
+        #expect(shownTabs.first?.sessions.map(\.title) == ["api", "logs"])
+    }
+
     @Test("a search keeps a whole machine by its name, or the sessions whose title or kind match")
     func search() {
         #expect(GlassShowAllWindowsOverview.filtered(machines, by: "alpha").map(\.sessions.count) == [1])
