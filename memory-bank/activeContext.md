@@ -47,6 +47,7 @@ Evidence: `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`, section 
   "afternoon" section. **0.4.455 is built (16:05) but installed nowhere:** the headset and iPhone can't be reached
   from the Mac (it has no Wi-Fi network joined), and the Mac's quit question went unanswered. Once they're on one
   network: `~/Software/glass/tmp/install-devices.zsh 455`, then copy the headset log (headset-diagnostics memory).
+  With this Mac's tmux mouse turned off (at his word; until tmux restarts), he confirmed selection works.
 - **Selection with tmux:** the owner (later, 0.4.454): "I don't [use mouse mode]. I just can't select text. It
   immediately unselects." The simulator can't reproduce it: with the terminal focused as a real session's is (the
   visionOS keyboard up), a double-pinched word in the tmux demo stays highlighted through redraws (captured). His

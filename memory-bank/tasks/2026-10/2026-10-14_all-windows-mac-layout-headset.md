@@ -273,3 +273,6 @@ The owner, on the headset in a tmux terminal on this Mac: "I just can't select t
   highlighted (captured), so the simulator never showed his failure: the mouse was the difference.
 - The headset log couldn't be copied: the Mac (no Wi-Fi joined, a new address) and the headset can't see each other.
 - Working files moved to `~/Software/glass/tmp` after a /tmp cleanup wiped the scratchpad.
+- **Confirmed by the owner:** with this Mac's tmux mouse turned off (`tmux set -g mouse off`, run at his word; sessions
+  unchanged), "Can confirm, selection works on mac as expected!" on 0.4.454: the cause was tmux 3.8's mouse. 0.4.455
+  makes the headset independent of it (not yet installed: devices unreachable).
