@@ -32,7 +32,7 @@ use the disposable test VM only).
 
 ## 2026-10-14 (~11:30) — RESUME HERE
 
-**State:** 0.4.438 on the Mac and iPhone (15:25); the Vision Pro has been locked (CoreDevice 4016)
+**State:** 0.4.439 on the Mac and iPhone (19:06); the Vision Pro has been locked (CoreDevice 4016)
 since 0.4.423 — retry `devicectl device install app` with `$SP/dd-vision` when it is worn. No crash reports since
 2026-10-13 18:47. Everything committed, nothing pushed. The owner said he was packing up (~11:10). **Mac installs go when
 ready, never held on our judgement** (the owner: "No need to hold on quitting right now. All tmux all day."); devices too.
@@ -62,7 +62,8 @@ ready, never held on our judgement** (the owner: "No need to hold on quitting ri
   hidden install folder is that agent (`.hermes` → Hermes; a project folder `hermes` is not). If still bare, asked
   for `ps -o args= -p $(ps -o tpgid= -p $(tmux display -p -t glass-1 '#{pane_pid}') | tr -d ' ')` on that host.
   Also 91b5b2b (0.4.436): ⌘↩ sends a reviewed paste.
-  Offered, unanswered: All Windows cards refreshing about once a second, and a left terminal keeping its last picture.
+  All Windows' cards off the Mac: he chose "just blur it like the others" — no live refresh; a terminal left on the
+  iPhone keeps the picture it took leaving the screen (0.4.439), Blur previews as every card. Unseen on a device.
 - **Command Palette, done this round** (cf237ab, fdc871c, 4690038; 0.4.430): every library service as "Connect: …"
   (desktops included; the database's old entries connected nothing); the terminal's commands from any window (New
   Connection, local terminals, a machine's Files and no-tmux terminal, saved workgroups); every project, Favorites'
