@@ -50,6 +50,34 @@ final class GlassSessionOrbUITests: XCTestCase {
         XCTAssertFalse(orb.exists, "the orb stayed")
     }
 
+    /// A desktop's window is held to its display's shape (W38). As its orb it is freed to take the
+    /// orb's size; grown back, it is held again — it stayed free after a round trip. The hold itself
+    /// is visionOS's and can't be read here: the run logs it (`app.glassdt` / `window-aspect`,
+    /// `event=aspect-geometry uniform=…`), read from outside after the grow.
+    func testADesktopShrinksIntoItsOrbAndGrowsBack() {
+        app = XCUIApplication()
+        app.launchArguments += ["--ui-testing", UUID().uuidString, "--demo-open", "desktop"]
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+
+        let shrink = element("session-orb-shrink")
+        XCTAssertTrue(shrink.waitForExistence(timeout: 40), "no Shrink to Orb in the desktop's bar")
+        XCTAssertTrue(element("session.display").exists, "the bar is not the desktop's")
+        // The shape held first, as a desktop opens.
+        sleep(3)
+        shrink.tap()
+
+        let orb = element("session-orb")
+        XCTAssertTrue(orb.waitForExistence(timeout: 10), "the desktop did not become its orb")
+        // For the capture from outside.
+        sleep(8)
+
+        orb.tap()
+        XCTAssertTrue(element("session.display").waitForExistence(timeout: 10), "the desktop did not grow back")
+        // For the shape to be held again, and logged.
+        sleep(4)
+    }
+
     /// The owner, 2026-10-15: "redraw the tabs around the orb evenly distributed with a preview in the
     /// orb on hover", and a pinch on one grows the window back on it.
     func testAWindowsTabsRingItsOrbAndOneGrowsItBack() {

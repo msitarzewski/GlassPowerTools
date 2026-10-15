@@ -40,6 +40,7 @@ import AppKit
 #elseif os(visionOS)
 import UIKit
 import OSLog
+import GlassShell
 #endif
 
 /// The window size that gives the picture a shape, kept to rules a test can read.
@@ -87,12 +88,25 @@ struct DesktopWindowAspectLock: UIViewRepresentable {
     let aspect: Double?
 
     func makeUIView(context: Context) -> LockView { LockView() }
-    func updateUIView(_ view: LockView, context: Context) { view.aspect = aspect }
+    func updateUIView(_ view: LockView, context: Context) {
+        view.aspect = aspect
+        view.paused = context.environment.glassSessionOrb.map { !$0.isWindow } ?? false
+    }
 
     final class LockView: UIView {
         private static let logger = Logger(subsystem: "app.glassdt", category: "window-aspect")
         var aspect: Double? {
             didSet { if aspect != oldValue { schedule() } }
+        }
+        /// While the window is its orb, or growing back from it: the orb frees the window to take
+        /// the orb's size, and its shape is held again once the window is back at its own — it
+        /// stayed free after a round trip (2026-10-15).
+        var paused = false {
+            didSet {
+                guard paused != oldValue, !paused else { return }
+                asked = nil
+                schedule()
+            }
         }
         /// What was last asked of the scene: a shape, or `.some(nil)` for none.
         private var asked: Double??
@@ -116,7 +130,7 @@ struct DesktopWindowAspectLock: UIViewRepresentable {
         }
 
         private func apply() {
-            guard let window, let scene = window.windowScene else { return }
+            guard !paused, let window, let scene = window.windowScene else { return }
             switch (aspect, asked) {
             case (nil, .some(.none)):
                 return

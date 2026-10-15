@@ -102,6 +102,9 @@ private struct GlassHiddenWhileOrb: ViewModifier {
 public struct GlassSessionOrbControl {
     public let shrink: @MainActor () -> Void
     public let isOrb: Bool
+    /// The window at its own size: not its orb, and not still growing back from one. What holds a
+    /// window to a shape (a desktop's, W38) waits for this before holding it again.
+    public let isWindow: Bool
 }
 
 public extension EnvironmentValues {
@@ -137,6 +140,11 @@ private struct GlassSessionOrbModifier: ViewModifier {
     let face: GlassSessionOrbFace
     /// The window's size while it is its orb, to grow back to; nil while it is the window.
     @State private var keptSize: CGSize?
+    /// Growing back from the orb, until visionOS has had a moment to give the window its size.
+    @State private var growing = false
+    /// The window as it looked as it shrank, for a window with no picture of its own (a database,
+    /// a document): out of sight it cannot draw itself again.
+    @State private var lastLook: Image?
     @State private var sizer = GlassWindowSizer()
 
     func body(content: Content) -> some View {
@@ -150,7 +158,8 @@ private struct GlassSessionOrbModifier: ViewModifier {
                         ToolbarItem(placement: .bottomOrnament) { GlassSessionOrbButton() }
                     }
                 }
-                .environment(\.glassSessionOrb, GlassSessionOrbControl(shrink: shrink, isOrb: isOrb))
+                .environment(\.glassSessionOrb, GlassSessionOrbControl(shrink: shrink, isOrb: isOrb,
+                                                                       isWindow: !isOrb && !growing))
                 .environment(\.glassWindowOutOfSight, isOrb)
                 // Its ornaments go with it, as the library's do (`VisionTabOutOfSight`).
                 .toolbarVisibility(isOrb ? .hidden : .automatic, for: .bottomOrnament, .tabBar)
@@ -158,7 +167,7 @@ private struct GlassSessionOrbModifier: ViewModifier {
                 .allowsHitTesting(!isOrb)
                 .accessibilityHidden(isOrb)
             if isOrb {
-                GlassSessionOrbView(face: face, grow: grow)
+                GlassSessionOrbView(face: faceWithLook, grow: grow)
             }
         }
         .background { GlassWindowSizerView(sizer: sizer).accessibilityHidden(true) }
@@ -173,8 +182,18 @@ private struct GlassSessionOrbModifier: ViewModifier {
         #endif
     }
 
+    /// The face, with the window's last look where the session has no picture of its own.
+    private var faceWithLook: GlassSessionOrbFace {
+        var withLook = face
+        let own = face.picture, look = lastLook
+        withLook.picture = { own() ?? look }
+        return withLook
+    }
+
     private func shrink() {
         guard keptSize == nil else { return }
+        // Taken while the window is still in sight: a database's tables, a document's text.
+        lastLook = face.picture() == nil ? sizer.picture() : nil
         keptSize = GlassConnectionsWindowSize.returning(to: sizer.windowSize)
         sizer.resize(to: GlassSessionOrbSize.window(ringed: !face.ringTabs.isEmpty), event: "session-orb", freeform: true)
     }
@@ -182,7 +201,8 @@ private struct GlassSessionOrbModifier: ViewModifier {
     private func grow() {
         guard let size = keptSize else { return }
         keptSize = nil
-        sizer.resize(to: size, event: "session-window")
+        growing = true
+        sizer.resize(to: size, event: "session-window") { growing = false }
     }
 }
 
@@ -363,7 +383,8 @@ private struct GlassOrbSphereShading: View {
     }
 }
 
-/// A name on glass, shown while what it names is looked at.
+/// A name on glass, shown while what it names is looked at: as wide as its words, up to the width
+/// `GlassOrbRingLayout` gives it, then shortened in the middle.
 private struct GlassOrbName: View {
     let title: String
     var prominent = false
@@ -376,8 +397,6 @@ private struct GlassOrbName: View {
             .padding(.horizontal, prominent ? 14 : 10)
             .padding(.vertical, prominent ? 7 : 5)
             .glassBackgroundEffect(in: .capsule)
-            .fixedSize()
-            .frame(maxWidth: GlassOrbRingLayout.nameWidth)
             .contentShape(.capsule)
             .accessibilityHidden(true)
     }
@@ -436,11 +455,19 @@ struct GlassOrbRingLayout: Layout {
                 point = CGPoint(x: dot.x, y: dot.y + (dy > 0 ? clearance : -clearance))
                 anchor = dy > 0 ? .top : .bottom
             }
-            subviews[1 + count + index].place(at: point, anchor: anchor,
-                                              proposal: ProposedViewSize(width: Self.nameWidth, height: nil))
+            Self.place(subviews[1 + count + index], at: point, anchor: anchor, widest: Self.nameWidth)
         }
-        subviews[subviews.count - 1].place(at: CGPoint(x: center.x, y: center.y + outer + 10), anchor: .top,
-                                           proposal: ProposedViewSize(width: Self.nameWidth + 40, height: nil))
+        Self.place(subviews[subviews.count - 1], at: CGPoint(x: center.x, y: center.y + outer + 10), anchor: .top,
+                   widest: Self.nameWidth + 40)
+    }
+
+    /// A name at its own width, never wider than `widest`. Offered the widest width, a name drew
+    /// its capsule centred in all of it, so a short one sat well away from its dot on either side
+    /// (the owner, on the headset, 2026-10-15: "the small names still don't align correctly around
+    /// the orb").
+    private static func place(_ name: LayoutSubview, at point: CGPoint, anchor: UnitPoint, widest: CGFloat) {
+        let ideal = name.sizeThatFits(.unspecified)
+        name.place(at: point, anchor: anchor, proposal: ProposedViewSize(width: min(ideal.width, widest), height: ideal.height))
     }
 }
 

@@ -49,6 +49,7 @@ final class GlassWindowSizer {
         guard let scene, admitted || attempt >= 20 else {
             guard attempt < 20 else {
                 Logger.idle.error("event=\(event, privacy: .public) no-window")
+                afterward?()
                 return
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
@@ -70,6 +71,24 @@ final class GlassWindowSizer {
             Logger.idle.notice("event=\(event, privacy: .public)-geometry width=\(bounds.width) height=\(bounds.height) min=\(geometry.minimumSize.width)x\(geometry.minimumSize.height) max=\(geometry.maximumSize.width)x\(geometry.maximumSize.height)")
             afterward?()
         }
+    }
+}
+
+extension GlassWindowSizer {
+    /// The window as it looks now, drawn as it is composited — the system's glass is drawn outside
+    /// the window, so what is in it, on clear — at most `maxPixelWidth` wide; nil outside a window.
+    func picture(maxPixelWidth: CGFloat = 640) -> Image? {
+        guard let window, window.bounds.width > 0, window.bounds.height > 0 else { return nil }
+        let scale = min(1, maxPixelWidth / window.bounds.width)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = false
+        let size = CGSize(width: window.bounds.width * scale, height: window.bounds.height * scale)
+        var drawn = false
+        let image = UIGraphicsImageRenderer(size: size, format: format).image { _ in
+            drawn = window.drawHierarchy(in: CGRect(origin: .zero, size: size), afterScreenUpdates: false)
+        }
+        return drawn ? Image(uiImage: image) : nil
     }
 }
 

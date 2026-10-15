@@ -141,7 +141,7 @@ If you close the library window while nothing else is open, the orb takes its pl
 A terminal, remote desktop, database or editor window can shrink into a small glass orb where it stands, and grow back when you want it, the way the library window does. Its session keeps running while it is an orb: terminals stay connected, and so does a desktop.
 
 - Choose **Shrink to Orb**, first in the window's bottom bar. A terminal window with two or more terminals has it in its **Terminal View** menu instead: pinch and hold the layout button and choose **Orb**.
-- The orb is a glass sphere with the session's live picture in it: the terminal in front, or the desktop's screen. A database or editor window shows its symbol.
+- The orb is a glass sphere with the session's live picture in it: the terminal in front, or the desktop's screen. A database or editor window shows itself as it looked when it shrank.
 - Look at the orb: it grows a little and shows the window's name below it.
 - Pinch the orb, or its name, to bring the window back where it was, at the size it was.
 
