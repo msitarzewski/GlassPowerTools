@@ -162,3 +162,20 @@ tab, or whichever is active".
   another app's window (a markup tool) can cover the scene; the bar's grid test flaked once in sequence, passed alone.
 
 0.4.451 (04:21) is on the iPhone and Vision Pro; the Mac's quit was cancelled at the app's question, so it stays on 0.4.450 until he's ready.
+
+## 2026-10-15 (~04:50): names on a look, beside their dots; the orb in the view menu (f46f283)
+
+The owner, on the headset with ten terminals in one window: dots a little further out; "only show the label when
+focused.... all of them at once is a lot"; "the titles are aligned incorrectly to the dots"; "is the orb view just one
+more option for the view menu in terminal mode?"
+
+- Cause of all names at once: each tab's picture inside the orb was in its tab's `HoverEffectGroup` with the default
+  `.activatesGroup`, so a look at the orb started every group. Pictures and names now `.followsGroup`.
+- Names: placed beside their own dot (level on the sides, centred above/below at top and bottom), not by the angle's
+  fraction of their size. Dots 22 pt from the rim; ringed window 560×380.
+- Orb is the 4th item in the terminal view menu (Toggles for Tabs/Grid/Carousel + Orb); the terminal bar shows Shrink to
+  Orb only with one terminal (`GlassSessionOrbFace.showsButton`).
+- Simulator checks: orb tests pass (ring test shrunk by `--demo-session-orb`); `--demo-open terminal-ring
+  --demo-orb-names` shows ten names level with their dots.
+
+0.4.452 (04:44) is on the Mac, iPhone and Vision Pro; each reads 0.4.452; no new crash reports.
