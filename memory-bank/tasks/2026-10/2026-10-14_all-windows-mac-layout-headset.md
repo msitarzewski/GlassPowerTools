@@ -111,3 +111,35 @@ at all." Then: "Mac works great the vision pro needs the data detector and selec
   gets Open in Editor, Show in Files (`TerminalSession.locate`, moved from the Mac's `locatePath`) and Watch Log File (a
   plain-shell `tail -F` tab of that window). Demo `--demo-open terminal-links`; `GlassTerminalSelectionUITests`.
 
+**Selection results (2a49a43, 0.4.449):** on the visionOS 27.2 simulator a double pinch offers Copy and a hold on an
+address offers Copy Link (`GlassTerminalSelectionUITests`). The runner presses at an element's middle whatever point it
+is given, reached a hold on the path demo once in three, and turns a held SwiftUI menu (the +, the layout toggle) into a
+tap — those are the owner's to check. Each hold and double pinch logs where it landed (`sh.glas` / `terminal-selection`).
+b1935a9 fixed the iOS build (the workgroup view imports GlassTerminalEmulator everywhere).
+
+## 2026-10-15 (~03:30): the layout toggle, the session orb, Auto-focus on activity (Vision Pro only)
+
+The owner: the tabs/grid/carousel selector "a toggle like we have for the markdown preview … Is an eyeball appropriate
+there or is there something better?"; "a persistent system level session/service icon that shrinks a window into a small
+preview. When activity is enabled, the preview/orb should pulse"; "Both of these requests a vision pro only"; his
+choices: an orb with a tiny live picture, pulse switched by Auto-focus on activity, the control first in the bottom bar,
+every session window; then "add Auto-focus on activity to This Window".
+
+- **1d63c66:** `VisionTerminalPresentationPicker` is a Menu with a primary action: the glyph is the current layout
+  (`rectangle.topthird.inset.filled`, `square.grid.2x2`, `rectangle.stack`), a pinch cycles, a hold lists the three.
+- **1011982:** `glassSessionOrb` (GlassShell): the window keeps its content out of sight and asks for the orb's size
+  (`GlassConnectionsWindowLayout`, now shared; `GlassWindowSizer`, moved out of the Connections probe); the orb is a glass
+  circle with the session's picture each second, name on a look, a pulse ring while busy. `GlassSessionOrbButton` first
+  in the bottom ornament (added by the modifier). `glassWindowOutOfSight` hides `GlassNativeWindowFrame`'s title and
+  controls. Wired: terminal (front terminal's picture, `TerminalWindowActivity` from `onOutputActivity`), desktop (remote
+  screen; freeform resize, so the W38 hold lapses after a round trip), database and editor (symbols). Auto-focus on
+  activity: `TerminalWindowSettings.autoFocusOnActivity` in This Window (visionOS), unset following the saved Workgroup;
+  drives the pulse and brings the printing terminal forward in grid/carousel.
+- **f278bf9:** two Connections orb tests found the desktop by an Input button the bar no longer has; now by Settings.
+
+**Validation:** `GlassSessionOrbUITests` (shrink, bar and title gone, pinch grows back) and Connections' 9 orb tests pass
+on the visionOS 27.2 simulator; shell 299, terminal 845, connection UI 49. **Open:** the pulse is unchecked (no saved
+workgroup or live output in the demo); the terminal's own tab ornament stays beside the orb (it shows beside the window
+too); a database or document orb shows a symbol, not a picture.
+
+0.4.450 (03:31) is on the Mac, iPhone and Vision Pro; each reads 0.4.450; no new crash reports.
