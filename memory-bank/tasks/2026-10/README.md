@@ -73,3 +73,7 @@
 - 2026-10-13 (22:30): [Tier 3, the evening](2026-10-13_tier-3-evening.md) — B-X2 (the editor looks again when its
   window comes forward), B-X22's second half (this Mac's projects from the disk), B-F32 (a Graphics choice per
   Desktop service, live on the Windows 11 VM). 0.4.412 on the Mac; devices unreachable.
+- 2026-10-14 (22:15): [The owner testing: All Windows everywhere, agents, clipboard, the palette](2026-10-14_all-windows-agents-clipboard.md)
+  — All Windows on iPhone, iPad and Vision Pro (pull down, hold ⚡, Siri), 28 AI agents marked, the desktop clipboard
+  both ways with GNOME and Sync Automatically, the Command Palette's services and lists, the terminal's link and path
+  menu. 0.4.444 on the Mac and iPhone; the headset locked since 0.4.423.
