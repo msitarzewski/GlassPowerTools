@@ -2384,7 +2384,9 @@ private final class UIKitAlternateScreenScrollWatcher: NSObject, UIGestureRecogn
             #endif
         default:
             lastTranslation = 0
+            #if os(visionOS)
             wheelSteps = 0
+            #endif
         }
     }
 
