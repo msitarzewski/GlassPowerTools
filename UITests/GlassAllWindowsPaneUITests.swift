@@ -98,4 +98,31 @@ final class GlassAllWindowsPaneUITests: XCTestCase {
         XCTAssertTrue(card.waitForExistence(timeout: 5), "the terminal left has no card")
         shoot(app, "left-03-card-from-library")
     }
+
+    /// The owner (2026-10-14): "It should also take a 'toss' to close it… a quick flip". A short,
+    /// fast flick up on the pane's bottom edge closes it; a slow push far enough does too.
+    func testTossingOrPushingThePaneUpClosesIt() throws {
+        let app = launch()
+        let bolt = app.buttons["active-connections-bolt"].firstMatch
+        XCTAssertTrue(bolt.waitForExistence(timeout: 20))
+        let grabber = app.descendants(matching: .any).matching(identifier: "all-windows-grabber").firstMatch
+
+        bolt.press(forDuration: 1.0)
+        XCTAssertTrue(pane(app).waitForExistence(timeout: 5))
+        sleep(1)
+        XCTAssertTrue(grabber.waitForExistence(timeout: 5))
+        let edge = grabber.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        edge.press(forDuration: 0.02, thenDragTo: edge.withOffset(CGVector(dx: 0, dy: -70)),
+                   withVelocity: 1600, thenHoldForDuration: 0)
+        XCTAssertTrue(pane(app).waitForNonExistence(timeout: 5), "a toss did not close it")
+
+        bolt.press(forDuration: 1.0)
+        XCTAssertTrue(pane(app).waitForExistence(timeout: 5))
+        sleep(1)
+        shoot(app, "push-01-open")
+        let edge2 = grabber.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        edge2.press(forDuration: 0.05, thenDragTo: edge2.withOffset(CGVector(dx: 0, dy: -500)),
+                    withVelocity: 250, thenHoldForDuration: 0.3)
+        XCTAssertTrue(pane(app).waitForNonExistence(timeout: 5), "a push far enough did not close it")
+    }
 }

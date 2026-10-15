@@ -257,6 +257,10 @@ final class GlassAllWindowsPull: NSObject, UIGestureRecognizerDelegate {
 final class GlassAllWindowsPaneState {
     var progress: CGFloat = 0
     var height: CGFloat = 600
+    /// The pane has come all the way once: from then the cards travel with the glass rather than
+    /// fading with it, so pushing it away does not leave an empty sheet in the hand (the owner,
+    /// 2026-10-14: "picks up a clear acrylic copy").
+    var hasArrived = false
 }
 
 /// The pane's own window, above the app's.
@@ -326,7 +330,7 @@ final class GlassAllWindowsPaneController {
         let pane = GlassAllWindowsPaneView(state: state, model: model,
                                            close: { [weak self] chosen in self?.close(then: chosen) },
                                            drag: { [weak self] in self?.dragPane(by: $0) },
-                                           endDrag: { [weak self] in self?.endPaneDrag(by: $0) })
+                                           endDrag: { [weak self] in self?.endPaneDrag(by: $0, velocity: $1) })
             .glassLayers(model.layers)
         let host = UIHostingController(rootView: pane)
         host.view.backgroundColor = .clear
@@ -346,7 +350,12 @@ final class GlassAllWindowsPaneController {
             state.progress = open ? 1 : 0
         } completion: { [weak self] in
             guard let self else { return }
-            if open { window?.makeKey() } else { tearDown() }
+            if open {
+                state.hasArrived = true
+                window?.makeKey()
+            } else {
+                tearDown()
+            }
         }
     }
 
@@ -361,10 +370,13 @@ final class GlassAllWindowsPaneController {
 
     /// Up and away; then, when a card was chosen, the screen underneath is left and the card's
     /// session brought back.
-    private func close(then chosen: (@MainActor () -> Void)?) {
+    private func close(then chosen: (@MainActor () -> Void)?, velocity: CGFloat = 0) {
         guard window != nil else { return }
         let leave = dismissCurrent
-        withAnimation(.smooth(duration: 0.28)) {
+        let away: Animation = velocity < 0
+            ? Self.settling(open: false, from: state.progress, velocity: velocity, height: state.height)
+            : .smooth(duration: 0.28)
+        withAnimation(away) {
             state.progress = 0
         } completion: { [weak self] in
             self?.tearDown()
@@ -379,11 +391,19 @@ final class GlassAllWindowsPaneController {
         state.progress = raw <= 1 ? max(0, raw) : 1 + Self.stretch(raw - 1)
     }
 
-    private func endPaneDrag(by predicted: CGFloat) {
-        if predicted < -state.height * 0.2 { close(then: nil) } else { settle(open: true) }
+    /// Let go: away when pushed far enough, or tossed — a quick flick up, however short ("It
+    /// should also take a 'toss' to close it… a quick flip"); back otherwise. Either way carrying
+    /// the hand's speed.
+    private func endPaneDrag(by predicted: CGFloat, velocity: CGFloat) {
+        if predicted < -state.height * 0.2 || velocity < -650 {
+            close(then: nil, velocity: velocity)
+        } else {
+            settle(open: true, velocity: velocity)
+        }
     }
 
     private func tearDown() {
+        state.hasArrived = false
         window?.isHidden = true
         window = nil
         dismissCurrent = nil
@@ -398,14 +418,15 @@ struct GlassAllWindowsPaneView: View {
     let model: GlassShellModel
     let close: (_ chosen: (@MainActor () -> Void)?) -> Void
     let drag: (CGFloat) -> Void
-    let endDrag: (CGFloat) -> Void
+    let endDrag: (_ predicted: CGFloat, _ velocity: CGFloat) -> Void
 
     var body: some View {
         GeometryReader { proxy in
             let top = proxy.safeAreaInsets.top
             let shown = min(1, state.progress)
-            // The cards arrive after the glass: they fade and settle in over the last of the way.
-            let content = min(1, max(0, (shown - 0.3) / 0.6))
+            // The cards arrive after the glass: they fade and settle in over the last of the way —
+            // once; after that they travel with it.
+            let content = state.hasArrived ? 1 : min(1, max(0, (shown - 0.3) / 0.6))
             ZStack(alignment: .top) {
                 // What is behind frosts as the pane comes, as behind Notification Center.
                 ZStack {
@@ -424,15 +445,19 @@ struct GlassAllWindowsPaneView: View {
                             .opacity(content)
                             .offset(y: -18 * (1 - content))
                             .scaleEffect(0.97 + 0.03 * content, anchor: .top)
+                        // The pane's bottom edge, the whole width of it, to push or toss it away.
+                        // Measured on the screen, not on the pane: the pane moves with the finger,
+                        // so a drag measured on it fed back on itself and the pane shook.
                         Capsule()
                             .fill(.secondary)
                             .frame(width: 44, height: 5)
-                            .frame(maxWidth: .infinity, minHeight: 28)
+                            .frame(maxWidth: .infinity, minHeight: 44)
                             .contentShape(.rect)
-                            .gesture(DragGesture(minimumDistance: 4)
+                            .gesture(DragGesture(minimumDistance: 3, coordinateSpace: .global)
                                 .onChanged { drag($0.translation.height) }
-                                .onEnded { endDrag($0.predictedEndTranslation.height) })
+                                .onEnded { endDrag($0.predictedEndTranslation.height, $0.velocity.height) })
                             .accessibilityLabel("Close All Windows")
+                            .accessibilityIdentifier("all-windows-grabber")
                             .accessibilityAddTraits(.isButton)
                             .accessibilityAction { close(nil) }
                     }
