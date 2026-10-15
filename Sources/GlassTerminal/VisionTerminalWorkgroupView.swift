@@ -191,6 +191,15 @@ struct VisionTerminalWorkgroupView: View {
             if Self.demoOpensGrid.remove(workgroupID) != nil { presentation = .grid }
             #endif
         }
+        // A link held on a path (2026-10-15): Open in Editor, Show in Files and Watch Log File for
+        // each terminal here, again as terminals come and go.
+        .task(id: sessionManager.workgroup(for: workgroupID)?.sessionIDs ?? []) {
+            for session in sessionManager.sessions(inWorkgroup: workgroupID) {
+                TerminalPathActions.install(on: session) { [weak session] path in
+                    if let session { watchFile(path, printedBy: session) }
+                }
+            }
+        }
         .onChange(of: liveSelectedSessionID) { _, newSelection in
             if selectedSessionID != newSelection {
                 selectedSessionID = newSelection
@@ -903,7 +912,10 @@ struct VisionTerminalWorkgroupView: View {
     }
 
     /// `tmux`: attached to a session already running there, from the + menu (2026-10-15).
-    private func openSavedHost(_ server: ServerConfiguration, tmux: TerminalTmuxAttachment? = nil) {
+    /// `startupCommand` and `configure`: a terminal made for something, as Watch Log File's is.
+    private func openSavedHost(_ server: ServerConfiguration, tmux: TerminalTmuxAttachment? = nil,
+                               startupCommand: String? = nil,
+                               configure: (@MainActor (TerminalSession) -> Void)? = nil) {
         guard openingServerID == nil else { return }
         openingServerID = server.id
 
@@ -913,7 +925,9 @@ struct VisionTerminalWorkgroupView: View {
                 let launch = try await sessionManager.createAuthorizedSessionByServerID(
                     server.id,
                     settingsManager: settingsManager,
+                    startupCommand: startupCommand,
                     tmux: tmux,
+                    configure: configure,
                     initialTerminalPresentation: { pendingSession in
                         guard sessionManager.appendSession(
                             pendingSession,
@@ -945,6 +959,25 @@ struct VisionTerminalWorkgroupView: View {
                 showingSavedHostPicker = false
             } catch {
                 connectionFailureMessage = error.localizedDescription
+            }
+        }
+    }
+
+    /// Watch Log File, held on a path a terminal here printed (2026-10-15, as the Mac's of
+    /// 2026-10-14): a tab of this window on the same host, following the file (`tail -F`) in a
+    /// plain shell, named after it.
+    private func watchFile(_ path: String, printedBy session: TerminalSession) {
+        Task { @MainActor in
+            var directory: String?
+            if TerminalWatchFile.isRelative(path) {
+                directory = TerminalRepository.path(
+                    fromReported: await session.workingDirectory(reported: session.terminalHostModel.currentDirectory))
+            }
+            guard let command = TerminalWatchFile.command(for: path, in: directory) else { return }
+            let label = TerminalWatchFile.tabLabel(for: path)
+            openSavedHost(session.server, startupCommand: command) { watching in
+                watching.withoutTmux = true
+                watching.workgroupLabel = label
             }
         }
     }

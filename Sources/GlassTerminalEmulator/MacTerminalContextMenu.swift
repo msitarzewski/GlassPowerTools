@@ -63,40 +63,18 @@ enum MacTerminalContextMenu {
     /// finds on that row.
     static func link(in view: TerminalView, at windowPoint: NSPoint) -> TerminalLinkTarget? {
         guard let position = position(in: view, at: windowPoint) else { return nil }
-        let terminal = view.getTerminal()
-        if let text = terminal.link(at: .buffer(position), mode: .explicitAndImplicit) {
-            return TerminalLinkTarget(link: text)
-        }
-        let screenRow = position.row - terminal.buffer.yDisp
-        guard let line = terminal.getLine(row: screenRow)?.translateToString(trimRight: true),
-              let url = TerminalLinkTarget.address(in: line, at: position.col) else { return nil }
-        return .url(url)
+        return TerminalLinkLookup.target(at: position, in: view.getTerminal())
     }
 
     /// Open Link and Copy Link on an address; Open in Editor, Show in Finder or Files, Watch Log
     /// File and Copy Path on a path.
     static func addItems(for target: TerminalLinkTarget, model: SwiftTermHostModel?, to menu: NSMenu) {
-        switch target {
-        case .url(let url):
-            let link = url.absoluteString
-            // Only what a ⌘-click may open, a web address with no account in it, and after the
-            // same question.
-            menu.addItem(item("Open Link", symbol: "safari",
-                              enabled: model != nil && SwiftTermExternalLinkPolicy.validatedRequest(for: link) != nil) {
-                model?.requestExternalLink(link)
-            })
-            menu.addItem(item("Copy Link", symbol: "link") { copy(link, to: copyPasteboard) })
-        case .path(let path):
-            if let open = model?.onOpenPath {
-                menu.addItem(item("Open in Editor", symbol: "pencil.and.list.clipboard") { open(path) })
-            }
-            if let reveal = model?.onRevealPath, let title = model?.revealPathTitle {
-                menu.addItem(item(title, symbol: "folder") { reveal(path) })
-            }
-            if let watch = model?.onWatchFile, !path.hasSuffix("/") {
-                menu.addItem(item("Watch Log File", symbol: "doc.text.magnifyingglass") { watch(path) })
-            }
-            menu.addItem(item("Copy Path", symbol: "doc.on.doc") { copy(path, to: copyPasteboard) })
+        // An address Open Link may not open is shown, dimmed, as it always was here.
+        if case .url(let url) = target, model == nil || SwiftTermExternalLinkPolicy.validatedRequest(for: url.absoluteString) == nil {
+            menu.addItem(item("Open Link", symbol: "safari", enabled: false) {})
+        }
+        for action in TerminalLinkLookup.actions(for: target, model: model, copy: { copy($0, to: copyPasteboard) }) {
+            menu.addItem(item(action.title, symbol: action.symbol) { action.perform() })
         }
     }
 

@@ -3,6 +3,7 @@ import Combine
 import SwiftTerm
 #if canImport(UIKit)
 import UIKit
+import os
 #if canImport(MetalKit)
 import MetalKit
 #endif
@@ -1827,8 +1828,10 @@ private final class MinimalTerminalAccessoryView: UIToolbar {
 }
 
 @MainActor
-private final class ReviewingTerminalView: TerminalView {
+private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditMenuInteractionDelegate {
     var onPasteRequest: ((String, Bool) -> Void)?
+    /// The model whose link actions a held link offers (`TerminalLinkLookup`).
+    var hostModel: () -> SwiftTermHostModel? = { nil }
     var onWindowAttachmentChanged: (() -> Void)?
     var onLeavingWindow: (() -> Void)?
 
@@ -1860,25 +1863,86 @@ private final class ReviewingTerminalView: TerminalView {
     /// selection starts at the character looked at — or, held on either end of the selection there
     /// is, moves that end; dragging while held extends it; letting go offers Copy. A plain
     /// pinch-drag still scrolls, and a double or triple tap still selects a word or a line.
+    ///
+    /// **A hand is not still** (the owner, 2026-10-15: "I have to triple pinch or click with the
+    /// trackpad to get it to select at all"). With UIKit's 10 points of allowed movement, a hold
+    /// whose hand drifted became a scroll; it allows 40 now, and the scrolling waits for the hold
+    /// to fail — a drag that moves at once still scrolls.
     private lazy var holdToSelect: UILongPressGestureRecognizer = {
         let recognizer = UILongPressGestureRecognizer(target: self, action: #selector(holdToSelectChanged(_:)))
         recognizer.minimumPressDuration = 0.5
+        recognizer.allowableMovement = 40
         return recognizer
     }()
 
-    /// The Copy menu after a hold: `UIMenuController`, which SwiftTerm uses, is deprecated on
-    /// visionOS since 1.0.
-    private lazy var selectionMenu = UIEditMenuInteraction(delegate: nil)
+    /// A double pinch selects the word, a triple the line, and Copy is offered — always here, on
+    /// the terminal's own selection. SwiftTerm's sent both to a program that had the mouse (tmux
+    /// with `mouse on`, whose double-click copies into tmux's own buffer and clears at once, so
+    /// nothing seemed to happen), and its Copy menu (`UIMenuController`) never shows on visionOS.
+    /// A single pinch is still the program's when it has the mouse.
+    private lazy var doublePinch: UITapGestureRecognizer = {
+        let recognizer = UITapGestureRecognizer(target: self, action: #selector(doublePinched(_:)))
+        recognizer.numberOfTapsRequired = 2
+        return recognizer
+    }()
+
+    private lazy var triplePinch: UITapGestureRecognizer = {
+        let recognizer = UITapGestureRecognizer(target: self, action: #selector(triplePinched(_:)))
+        recognizer.numberOfTapsRequired = 3
+        return recognizer
+    }()
+
+    /// The Copy menu, and a held link's actions: `UIMenuController`, which SwiftTerm uses, is
+    /// deprecated on visionOS since 1.0.
+    private lazy var selectionMenu = UIEditMenuInteraction(delegate: self)
+
+    /// Where the hold began, and the link there, if any: a hold that lets go without moving on a
+    /// link offers its actions rather than a one-character selection.
+    private var holdBegan: Position?
+    private var heldLink: TerminalLinkTarget?
 
     private func installHoldToSelect() {
         guard holdToSelect.view == nil else { return }
         addInteraction(selectionMenu)
         // SwiftTerm's own long press (`setupGestures`, 0.7 s) shows a menu and would answer the
-        // same hold; it is the only long press on this view.
-        for recognizer in gestureRecognizers ?? [] where recognizer is UILongPressGestureRecognizer {
-            recognizer.isEnabled = false
+        // same hold; its double and triple taps are ours now. Its single tap is left, waiting for
+        // ours to fail as it waited for its own.
+        for recognizer in gestureRecognizers ?? [] {
+            if recognizer is UILongPressGestureRecognizer {
+                recognizer.isEnabled = false
+            } else if let tap = recognizer as? UITapGestureRecognizer, tap.numberOfTapsRequired > 1 {
+                tap.isEnabled = false
+            }
         }
         addGestureRecognizer(holdToSelect)
+        addGestureRecognizer(doublePinch)
+        addGestureRecognizer(triplePinch)
+        doublePinch.require(toFail: triplePinch)
+        for recognizer in gestureRecognizers ?? [] {
+            if let tap = recognizer as? UITapGestureRecognizer, tap.numberOfTapsRequired == 1, tap.isEnabled {
+                tap.require(toFail: doublePinch)
+            }
+            // Scrolling — the view's own pan, and tmux's on the alternate screen — waits for the hold.
+            if let pan = recognizer as? UIPanGestureRecognizer {
+                pan.require(toFail: holdToSelect)
+            }
+        }
+    }
+
+    @objc private func doublePinched(_ gesture: UITapGestureRecognizer) {
+        guard gesture.state == .ended, let cell = bufferCell(at: gesture.location(in: self)) else { return }
+        os.Logger(subsystem: "sh.glas", category: "terminal-selection").notice("double pinch row=\(cell.row) col=\(cell.col)")
+        _ = becomeFirstResponder()
+        selection.selectWordOrExpression(at: cell, in: getTerminal().buffer)
+        selection.selectionMode = .character
+        showCopyMenu()
+    }
+
+    @objc private func triplePinched(_ gesture: UITapGestureRecognizer) {
+        guard gesture.state == .ended, let cell = bufferCell(at: gesture.location(in: self)) else { return }
+        _ = becomeFirstResponder()
+        selection.select(row: cell.row)
+        showCopyMenu()
     }
 
     /// The buffer cell under `point` (the view scrolls over the whole buffer, so rows count from
@@ -1898,8 +1962,13 @@ private final class ReviewingTerminalView: TerminalView {
         guard let cell = bufferCell(at: gesture.location(in: self)) else { return }
         switch gesture.state {
         case .began:
+            os.Logger(subsystem: "sh.glas", category: "terminal-selection").notice("hold began row=\(cell.row) col=\(cell.col)")
             _ = becomeFirstResponder()
             selectionMenu.dismissMenu()
+            heldLink = nil
+            holdBegan = cell
+            // A triple pinch left whole rows as the unit; a hold selects characters.
+            selection.selectionMode = .character
             if selection.active, Self.isNear(cell, selection.end) {
                 selection.pivot = selection.start
             } else if selection.active, Self.isNear(cell, selection.start) {
@@ -1913,10 +1982,32 @@ private final class ReviewingTerminalView: TerminalView {
             selection.pivotExtend(bufferPosition: cell)
         case .ended:
             selection.pivotExtend(bufferPosition: cell)
-            showCopyMenu()
+            let link = TerminalLinkLookup.target(at: cell, in: getTerminal())
+            // Where the hold landed and what was there, never the text: for the next "it doesn't select".
+            os.Logger(subsystem: "sh.glas", category: "terminal-selection").notice(
+                "hold ended row=\(cell.row) col=\(cell.col) began=\(self.holdBegan.map { "\($0.row),\($0.col)" } ?? "-", privacy: .public) link=\(link != nil) yDisp=\(self.getTerminal().buffer.yDisp) rows=\(self.getTerminal().rows) y=\(gesture.location(in: self).y) offset=\(self.contentOffset.y)")
+            // Held on a link without moving: its actions, as the Mac's right-click offers them.
+            if let began = holdBegan, began.col == cell.col, began.row == cell.row, let link {
+                selection.selectNone()
+                heldLink = link
+                presentMenu(at: cell)
+            } else {
+                showCopyMenu()
+            }
+            holdBegan = nil
         default:
-            break
+            holdBegan = nil
         }
+    }
+
+    /// The menu at a cell, for a held link.
+    private func presentMenu(at cell: Position) {
+        let terminal = getTerminal()
+        guard terminal.cols > 0, terminal.rows > 0 else { return }
+        let size = getOptimalFrameSize()
+        let width = size.width / CGFloat(terminal.cols), height = size.height / CGFloat(terminal.rows)
+        selectionMenu.presentEditMenu(with: UIEditMenuConfiguration(
+            identifier: nil, sourcePoint: CGPoint(x: (CGFloat(cell.col) + 0.5) * width, y: CGFloat(cell.row) * height)))
     }
 
     /// Within reach of a selection's end for a hold aimed by the eyes: SwiftTerm's own drag asks
@@ -1926,6 +2017,7 @@ private final class ReviewingTerminalView: TerminalView {
     }
 
     private func showCopyMenu() {
+        heldLink = nil
         let terminal = getTerminal()
         guard selection.active, terminal.cols > 0, terminal.rows > 0 else { return }
         let size = getOptimalFrameSize()
@@ -1944,6 +2036,16 @@ private final class ReviewingTerminalView: TerminalView {
         guard let text = UIPasteboard.general.string, !text.isEmpty else { return }
         onPasteRequest?(text, getTerminal().bracketedPasteMode)
     }
+
+    #if os(visionOS)
+    /// Fills a held link's menu with its actions, as the Mac's right-click does; else the system's
+    /// own (Copy, for a selection).
+    func editMenuInteraction(_ interaction: UIEditMenuInteraction, menuFor configuration: UIEditMenuConfiguration,
+                             suggestedActions: [UIMenuElement]) -> UIMenu? {
+        guard let heldLink else { return UIMenu(children: suggestedActions) }
+        return UIMenu(children: TerminalLinkLookup.menuElements(for: heldLink, model: hostModel()))
+    }
+    #endif
 
     override var keyCommands: [UIKeyCommand]? {
         var commands = super.keyCommands ?? []
@@ -2158,9 +2260,11 @@ private final class SwiftTermEngine: TerminalEngine {
         onOSC52Decision: @escaping (SwiftTermOSC52Decision) -> Void,
         onDismissKeyboard: @escaping @MainActor () -> Void,
         onKeyboardAccessoryShown: @escaping @MainActor (Bool) -> Void,
-        alternateScreenScroll: @escaping () -> (@MainActor (CGFloat, Bool) -> Bool)? = { nil }
+        alternateScreenScroll: @escaping () -> (@MainActor (CGFloat, Bool) -> Bool)? = { nil },
+        hostModel: @escaping () -> SwiftTermHostModel? = { nil }
     ) {
         let terminalView = ReviewingTerminalView(frame: .zero)
+        terminalView.hostModel = hostModel
         let containerView = TerminalHardwareKeyContainerView(frame: .zero)
         terminalView.terminalDelegate = delegate
         terminalView.onPasteRequest = onPasteRequest
@@ -2729,7 +2833,8 @@ public struct SwiftTermHostView: UIViewRepresentable {
             onKeyboardAccessoryShown: { [weak model] shown in
                 model?.keyboardAccessoryMoved(shown: shown)
             },
-            alternateScreenScroll: { [weak model] in model?.onAlternateScreenScroll }
+            alternateScreenScroll: { [weak model] in model?.onAlternateScreenScroll },
+            hostModel: { [weak model] in model }
         )
         // Dismiss an active edit menu on any tap. The eye+hand input model can
         // otherwise leave it visible after the selection interaction ends.

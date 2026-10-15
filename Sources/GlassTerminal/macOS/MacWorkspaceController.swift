@@ -342,26 +342,10 @@ final class MacWorkspaceController {
             guard FileManager.default.fileExists(atPath: absolute, isDirectory: &isDirectory) else { return nil }
             return (absolute, nil, isDirectory.boolValue)
         case .ssh:
-            guard let serverID = pane.intent.serverID, let session = sessionsByPaneID[paneID] else { return nil }
-            var directory: String?
-            if TerminalWatchFile.isRelative(path) {
-                directory = TerminalRepository.path(
-                    fromReported: await session.workingDirectory(reported: session.terminalHostModel.currentDirectory))
-            }
-            // The host's home, for `~/…`: tmux's answer where the pane runs in it, else the host's.
-            var home = session.tmuxPane?.home
-            if path.hasPrefix("~"), home == nil {
-                home = (try? await session.runTmuxCommand("printf '%s' \"$HOME\""))?
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-            guard let absolute = TerminalPathResolution.absolute(path, directory: directory, home: home) else { return nil }
-            let kind = try? await session.runTmuxCommand(
-                "if [ -d \(TerminalDroppedPaths.escaped(absolute)) ]; then echo d; elif [ -e \(TerminalDroppedPaths.escaped(absolute)) ]; then echo f; fi")
-            switch kind?.trimmingCharacters(in: .whitespacesAndNewlines) {
-            case "d": return (absolute, serverID, true)
-            case "f": return (absolute, serverID, false)
-            default: return nil
-            }
+            // On the host, as every platform finds one (`TerminalSession.locate`).
+            guard let serverID = pane.intent.serverID, let session = sessionsByPaneID[paneID],
+                  let found = await session.locate(path) else { return nil }
+            return (found.path, serverID, found.isDirectory)
         }
     }
 

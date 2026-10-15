@@ -74,6 +74,16 @@ enum GlassDemoMode {
                              opensSettings: surface == "editor-settings")
         case "terminal":
             terminal.requestDemoReplay(name: "alpha", output: Data(terminalTranscript.utf8))
+        case "terminal-links", "terminal-paths":
+            // 2026-10-15: one long address, or one long log path, on the rows around the screen's
+            // middle — the visionOS simulator's test runner holds an element at its middle,
+            // whatever point it is given — and less than a screen in all: on a terminal that
+            // scrolls, the runner's pinches reached none of its gestures.
+            let link = surface == "terminal-links"
+                ? "https://example.com/docs/" + String(repeating: "getting-started-", count: 5)
+                : "/var/log/shop/" + String(repeating: "jobs-worker-", count: 6) + "out.log"
+            let rows = Array(repeating: "", count: 14) + Array(repeating: link, count: 12)
+            terminal.requestDemoReplay(name: "alpha", output: Data(rows.joined(separator: "\r\n").utf8))
         case "terminal-window", "terminal-settings":
             // A window with settings of its own (W22), and This Window open over it.
             terminal.requestDemoReplay(name: "alpha", output: Data(terminalTranscript.utf8),
