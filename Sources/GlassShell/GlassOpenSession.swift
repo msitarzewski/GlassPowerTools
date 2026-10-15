@@ -150,6 +150,21 @@ public struct GlassRunningAttachment: Hashable, Sendable {
     }
 }
 
+/// A window here that a running session can join as one more tab (the owner, 2026-10-15: "The
+/// context menu for active but detached terminals should show existing tab groups. So I can open a
+/// new session into a group"). Each capability lists its own (`GlassCapability.tabGroups`).
+public struct GlassTabGroup: Identifiable, Hashable, Sendable {
+    /// The capability's own id for the window.
+    public let id: String
+    /// What the window is called, as Active calls it.
+    public let title: String
+
+    public init(id: String, title: String) {
+        self.id = id
+        self.title = title
+    }
+}
+
 /// A machine Active could not ask what runs there, and why, in plain words (W6) — "Not checked:
 /// signing in would need your password." Without it, a machine that was skipped looked like one
 /// with nothing running.
@@ -196,6 +211,12 @@ public extension GlassCapability {
     /// Opens running sessions together, in one new window, in the order given (W13). Default:
     /// nothing, for a capability whose rows carry no attachment.
     func openRunningSessions(_ attachments: [GlassRunningAttachment]) {}
+
+    /// The windows a running session can join as a tab. Default: none.
+    func tabGroups() -> [GlassTabGroup] { [] }
+
+    /// Opens running sessions as more tabs of a window. Default: nothing.
+    func openRunningSessions(_ attachments: [GlassRunningAttachment], inTabGroup group: GlassTabGroup.ID) {}
 }
 
 public extension GlassCapabilityRegistry {
@@ -230,6 +251,17 @@ public extension GlassCapabilityRegistry {
         for kind in kinds {
             capability(for: kind)?.openRunningSessions(attachments.filter { $0.kind == kind })
         }
+    }
+
+    /// The windows here that a running session of `kind` can join as a tab (Open as Tab In).
+    func tabGroups(for kind: HostServiceKind) -> [GlassTabGroup] {
+        capability(for: kind)?.tabGroups() ?? []
+    }
+
+    /// Opens running sessions as more tabs of `group`, a window their capability listed.
+    func openRunningSessions(_ attachments: [GlassRunningAttachment], inTabGroup group: GlassTabGroup.ID) {
+        guard let kind = attachments.first?.kind else { return }
+        capability(for: kind)?.openRunningSessions(attachments.filter { $0.kind == kind }, inTabGroup: group)
     }
 
     /// The rows to offer from inside `currentSessionID`: everything open except the session

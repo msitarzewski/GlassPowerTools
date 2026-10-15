@@ -50,6 +50,47 @@ extension GlassTerminalCapability {
         guard !targets.isEmpty else { return }
         runtime.enqueue(.openTmuxSessions(targets))
     }
+
+    /// Active's Open as Tab In (the owner, 2026-10-15: "show existing tab groups. So I can open a
+    /// new session into a group"): the terminal windows here with room for another tab, named
+    /// as Active and Show All Windows name them.
+    public func tabGroups() -> [GlassTabGroup] {
+        #if os(macOS)
+        Self.macTabGroups(servers: runtime.sessionManager.serverManager.servers)
+        #else
+        Self.workgroupTabGroups(runtime.sessionManager)
+        #endif
+    }
+
+    /// iPhone, iPad and Vision Pro: each workgroup with a live terminal and room for another, in
+    /// Active's order (newest first), by Active's name for it.
+    static func workgroupTabGroups(_ manager: SessionManager) -> [GlassTabGroup] {
+        manager.workgroups.reversed().compactMap { workgroup in
+            let live = workgroup.sessionIDs.compactMap { manager.session(for: $0) }
+            guard !live.isEmpty, workgroup.sessionIDs.count < LayoutPreset.maximumSessionCount else { return nil }
+            return GlassTabGroup(id: workgroup.id.uuidString, title: title(of: workgroup, live: live))
+        }
+    }
+
+    #if os(macOS)
+    /// The Mac: each terminal window on screen with room for another tab, by the name Show All
+    /// Windows gives it.
+    static func macTabGroups(servers: [ServerConfiguration]) -> [GlassTabGroup] {
+        MacWorkspacePreviewRegistry.shared.shownWindows.compactMap { shown in
+            guard shown.controller.canAddTab,
+                  let title = MacTerminalExposeModel.groups(windows: [shown.controller], servers: servers).first?.title
+            else { return nil }
+            return GlassTabGroup(id: shown.controller.windowID.uuidString, title: title)
+        }
+    }
+    #endif
+
+    /// Running sessions as more tabs of a window here, in order (Open as Tab In).
+    public func openRunningSessions(_ attachments: [GlassRunningAttachment], inTabGroup group: GlassTabGroup.ID) {
+        let targets = attachments.compactMap(TerminalTmuxTarget.init(attachment:))
+        guard !targets.isEmpty, let windowID = UUID(uuidString: group) else { return }
+        runtime.enqueue(.addTmuxSessions(targets, toWindow: windowID))
+    }
 }
 
 /// Which chosen sessions open together, and as what, on each platform. Pure, so the window's
@@ -65,7 +106,9 @@ enum TerminalOpenTogether {
     /// server allowing legacy algorithms needs its own confirmation each time, which a window of
     /// several never asks — the workgroups' rule (`workgroupNeedsLegacyConsent`) — so its sessions
     /// open only alone. Where there is no local shell, this Mac's sessions can't open.
-    static func plan(_ targets: [TerminalTmuxTarget], servers: [ServerConfiguration]) -> Plan {
+    /// - Parameter room: how many more terminals the window they join can hold (Open as Tab In);
+    ///   nil for a new window.
+    static func plan(_ targets: [TerminalTmuxTarget], servers: [ServerConfiguration], room: Int? = nil) -> Plan {
         var plan = Plan()
         for target in targets {
             guard let serverID = target.serverID else {
@@ -85,6 +128,16 @@ enum TerminalOpenTogether {
                 continue
             }
             plan.opening.append(target)
+        }
+        if let room {
+            // A window already open: what it has room for.
+            if plan.opening.count > room {
+                plan.notOpened.append(room == 0
+                    ? "That window is full, so \(plan.opening.count == 1 ? "it" : "they") didn't open."
+                    : "That window has room for \(room) more, so the other \(plan.opening.count - room) didn't open.")
+                plan.opening = Array(plan.opening.prefix(max(0, room)))
+            }
+            return plan
         }
         #if !os(macOS)
         // A workgroup holds as many terminals as a saved one may.

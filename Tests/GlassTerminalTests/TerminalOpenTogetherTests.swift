@@ -66,6 +66,59 @@ struct TerminalOpenTogetherTests {
         #expect(runtime.takeRequests().isEmpty)
     }
 
+    /// Active's Open as Tab In (the owner, 2026-10-15): "show existing tab groups. So I can open a
+    /// new session into a group."
+    @Test("Open as Tab In: the windows with room, by Active's names, newest first; one request for the window chosen")
+    func openAsTabIn() throws {
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+        let capability = GlassTerminalCapability(runtime: runtime)
+        let manager = runtime.sessionManager
+        let alpha = server("alpha")
+        manager.serverManager.servers = [alpha]
+        func window(_ name: String, terminals: Int) -> UUID {
+            let group = manager.createWorkgroup(name: name, colorTag: .blue)
+            for _ in 0..<terminals {
+                let session = TerminalSession(server: alpha)
+                manager.registerSession(session)
+                session.state = .connected
+                _ = manager.appendSession(session, toWorkgroup: group)
+            }
+            return group
+        }
+        let backend = window("Backend", terminals: 1)
+        let full = window("Full", terminals: LayoutPreset.maximumSessionCount)
+        let empty = manager.createWorkgroup(name: "Empty", colorTag: .blue)
+        let logs = window("Logs", terminals: 2)
+
+        let groups = GlassTerminalCapability.workgroupTabGroups(manager)
+        #expect(groups.map(\.title) == ["Logs", "Backend"], "newest first; a full window and one with nothing live are left out")
+        #expect(groups.map(\.id) == [logs, backend].map(\.uuidString))
+
+        _ = runtime.takeRequests()
+        let attachment = GlassTerminalCapability.attachment(serverID: alpha.id, name: "glass-2")
+        capability.openRunningSessions([attachment], inTabGroup: backend.uuidString)
+        let requests = runtime.takeRequests()
+        #expect(requests.count == 1)
+        guard case .addTmuxSessions(let targets, let windowID)? = requests.first else {
+            Issue.record("Open as Tab In asks for the window: \(requests)")
+            return
+        }
+        #expect(targets == [TerminalTmuxTarget(serverID: alpha.id, name: "glass-2")])
+        #expect(windowID == backend)
+        for group in [backend, full, empty, logs] { manager.closeWorkgroup(group) }
+    }
+
+    @Test("Open as Tab In: a window takes what it has room for and says what didn't open")
+    func roomInTheWindow() {
+        let alpha = server("alpha")
+        let targets = ["one", "two", "three"].map { TerminalTmuxTarget(serverID: alpha.id, name: $0) }
+        let plan = TerminalOpenTogether.plan(targets, servers: [alpha], room: 1)
+        #expect(plan.opening == [targets[0]])
+        #expect(plan.notOpened == ["That window has room for 1 more, so the other 2 didn't open."])
+        #expect(TerminalOpenTogether.plan(targets, servers: [alpha], room: 0).notOpened == ["That window is full, so they didn't open."])
+        #expect(TerminalOpenTogether.plan(targets, servers: [alpha], room: 5).opening == targets)
+    }
+
     @Test("on iPad and Vision Pro: one workgroup, a terminal per session in order, each claiming its own; never saved")
     func oneWorkgroupForThree() async throws {
         try await withSettings { settings, _ in

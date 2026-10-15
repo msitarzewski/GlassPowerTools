@@ -21,6 +21,7 @@ struct GlassActiveSelectionTests {
         var opened: [String] = []
         var ended: [String] = []
         var together: [[GlassRunningAttachment]] = []
+        var intoWindow: [(attachments: [GlassRunningAttachment], window: String)] = []
     }
 
     private final class TerminalStub: GlassCapability {
@@ -34,6 +35,11 @@ struct GlassActiveSelectionTests {
                   report: @escaping @MainActor (GlassCapabilityOutcome) -> Void) { report(.dismissed) }
         func runningSessions() async -> [GlassRunningSession] { running }
         func openRunningSessions(_ attachments: [GlassRunningAttachment]) { log.together.append(attachments) }
+        var windows: [GlassTabGroup] = []
+        func tabGroups() -> [GlassTabGroup] { windows }
+        func openRunningSessions(_ attachments: [GlassRunningAttachment], inTabGroup group: GlassTabGroup.ID) {
+            log.intoWindow.append((attachments, group))
+        }
     }
 
     /// A row as the terminal makes one: opening, ending and its attachment are recorded.
@@ -78,6 +84,26 @@ struct GlassActiveSelectionTests {
         model.registry.register(terminal)
         await model.load()
         return Fixture(model: model, root: root, alpha: alpha.endpointID, bravo: bravo.endpointID, terminal: terminal, log: log)
+    }
+
+    /// Open as Tab In (the owner, 2026-10-15): "show existing tab groups. So I can open a new
+    /// session into a group."
+    @Test("Open as Tab In: a row's capability offers its windows; choosing one sends the row there and it leaves the list")
+    func openAsTabIn() async throws {
+        let f = try await fixture()
+        defer { try? FileManager.default.removeItem(at: f.root) }
+        f.terminal.windows = [GlassTabGroup(id: "backend", title: "Backend"), GlassTabGroup(id: "logs", title: "Logs")]
+        f.terminal.running = [row("glass-2", on: f.alpha, log: f.log), row("logs", on: f.bravo, log: f.log)]
+        await f.model.refreshRunningSessions()
+        #expect(f.model.registry.tabGroups(for: .ssh).map(\.title) == ["Backend", "Logs"])
+        #expect(f.model.registry.tabGroups(for: .database).isEmpty, "a kind with no capability offers none")
+
+        let chosen = try #require(f.model.runningSessions.first { $0.title == "glass-2" })
+        f.model.open(chosen, inTabGroup: f.terminal.windows[0])
+        #expect(f.log.intoWindow.map(\.window) == ["backend"])
+        #expect(f.log.intoWindow.first?.attachments == [GlassRunningAttachment(kind: .ssh, endpointID: f.alpha, name: "glass-2")])
+        #expect(f.model.runningSessions.map(\.title) == ["logs"], "it leaves the list at once, as one opened alone does")
+        #expect(f.log.opened.isEmpty && f.log.together.isEmpty, "not a window of its own")
     }
 
     @Test("three sessions on two machines open as one request, in Active's order; the choice clears")

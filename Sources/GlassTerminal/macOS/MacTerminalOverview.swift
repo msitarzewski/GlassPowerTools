@@ -64,6 +64,14 @@ final class MacWorkspacePreviewRegistry {
         return nil
     }
 
+    /// The window with this id, how to add a tab to it, and how many more it holds: Active's Open as
+    /// Tab In (2026-10-15). Nil when it is not on screen.
+    func tabAdder(windowID: UUID) -> (window: NSWindow, room: Int, add: @MainActor (MacWorkspaceTabRequest) -> Bool)? {
+        guard let entry = entries[windowID], let window = entry.window, let controller = entry.controller,
+              !controller.closesAfterLastTabLeft, let adder = tabAdders[windowID] else { return nil }
+        return (window, max(0, MacWorkspaceWindowRestorationState.maximumTabCount - controller.tabs.count), adder)
+    }
+
     /// How to add a tab to the window that holds `tab` now — tabs move between windows — for
     /// what a pane asks for beside it: Watch Log File (2026-10-14). Nil when it is in none on screen.
     func tabAdder(holding tab: MacWorkspaceController) -> (@MainActor (MacWorkspaceTabRequest) -> Bool)? {

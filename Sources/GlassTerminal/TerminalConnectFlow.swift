@@ -381,6 +381,8 @@ struct TerminalConnectFlow: ViewModifier {
             #endif
         case .openTmuxSessions(let targets):
             openTmuxSessionsTogether(targets)
+        case .addTmuxSessions(let targets, let windowID):
+            addTmuxSessions(targets, toWindow: windowID)
         case .showWorkgroups:
             // The library's Workgroups panel — there is no Workgroups window (2026-10-08).
             #if os(iOS)
@@ -536,48 +538,9 @@ struct TerminalConnectFlow: ViewModifier {
                 return
             }
 
-            var appendedSessionIDs: [UUID] = []
-            for target in plan.targets {
-                guard target.intent.kind == .ssh,
-                      let server = target.server,
-                      let serverID = target.intent.serverID else {
-                    failures.append("\(target.displayName): local terminals are available on macOS.")
-                    continue
-                }
-                do {
-                    let launch = try await sessionManager.createAuthorizedSessionByServerID(
-                        serverID,
-                        settingsManager: settingsManager,
-                        startupCommand: target.intent.startupCommand,
-                        configure: { session in
-                            TerminalWorkgroupOpening.prepare(session, for: target, workgroupID: workgroupID,
-                                                             settingsManager: settingsManager)
-                        }
-                    )
-                    let session = launch.session
-                    if session.state == .connected
-                        || (interactiveHostKeyTrustIsAllowed && session.pendingHostKeyChallenge != nil) {
-                        if sessionManager.appendSession(session, toWorkgroup: workgroupID) {
-                            appendedSessionIDs.append(session.id)
-                        } else {
-                            failures.append("\(target.displayName): the terminal could not be added to the workgroup.")
-                            sessionManager.closeSession(session)
-                        }
-                    } else if let challenge = session.pendingHostKeyChallenge {
-                        let reason = challenge.reason == .changed
-                            ? "presented a changed host key"
-                            : "presented an unknown host key"
-                        failures.append("\(server.name): Strict host-key verification blocked the connection because it \(reason).")
-                        session.pendingHostKeyChallenge = nil
-                        sessionManager.closeSession(session)
-                    } else if case .error(let message) = session.state {
-                        failures.append("\(server.name): \(message)")
-                        sessionManager.closeSession(session)
-                    }
-                } catch {
-                    failures.append("\(server.name): \(error.localizedDescription)")
-                }
-            }
+            let launched = await launchTerminals(of: plan, into: workgroupID)
+            let appendedSessionIDs = launched.appended
+            failures += launched.failures
 
             if let firstSessionID = appendedSessionIDs.first {
                 sessionManager.selectSession(firstSessionID, inWorkgroup: workgroupID)
@@ -593,6 +556,57 @@ struct TerminalConnectFlow: ViewModifier {
                 connectionFailureMessage = failures.joined(separator: "\n")
             }
         }
+    }
+
+    /// iPad and Vision Pro: each of the plan's terminals connected and added to `workgroupID`, in
+    /// order. Returns those added and what could not be, in words. Moved out of
+    /// `openVisionWorkgroup` (2026-10-15) so Open as Tab In adds to a window already open the same way.
+    private func launchTerminals(of plan: LayoutRestorationPlan,
+                                 into workgroupID: UUID) async -> (appended: [UUID], failures: [String]) {
+        var appendedSessionIDs: [UUID] = []
+        var failures: [String] = []
+        for target in plan.targets {
+            guard target.intent.kind == .ssh,
+                  let server = target.server,
+                  let serverID = target.intent.serverID else {
+                failures.append("\(target.displayName): local terminals are available on macOS.")
+                continue
+            }
+            do {
+                let launch = try await sessionManager.createAuthorizedSessionByServerID(
+                    serverID,
+                    settingsManager: settingsManager,
+                    startupCommand: target.intent.startupCommand,
+                    configure: { session in
+                        TerminalWorkgroupOpening.prepare(session, for: target, workgroupID: workgroupID,
+                                                         settingsManager: settingsManager)
+                    }
+                )
+                let session = launch.session
+                if session.state == .connected
+                    || (interactiveHostKeyTrustIsAllowed && session.pendingHostKeyChallenge != nil) {
+                    if sessionManager.appendSession(session, toWorkgroup: workgroupID) {
+                        appendedSessionIDs.append(session.id)
+                    } else {
+                        failures.append("\(target.displayName): the terminal could not be added to the workgroup.")
+                        sessionManager.closeSession(session)
+                    }
+                } else if let challenge = session.pendingHostKeyChallenge {
+                    let reason = challenge.reason == .changed
+                        ? "presented a changed host key"
+                        : "presented an unknown host key"
+                    failures.append("\(server.name): Strict host-key verification blocked the connection because it \(reason).")
+                    session.pendingHostKeyChallenge = nil
+                    sessionManager.closeSession(session)
+                } else if case .error(let message) = session.state {
+                    failures.append("\(server.name): \(message)")
+                    sessionManager.closeSession(session)
+                }
+            } catch {
+                failures.append("\(server.name): \(error.localizedDescription)")
+            }
+        }
+        return (appendedSessionIDs, failures)
     }
     #else
     private func openMacWorkgroup(_ preset: LayoutPreset) {
@@ -690,6 +704,66 @@ struct TerminalConnectFlow: ViewModifier {
     }
 
 
+
+    /// Active's Open as Tab In: running sessions as more tabs of a window already open, which
+    /// comes forward on the first of them (the owner, 2026-10-15). A window that has closed since
+    /// the menu showed it gets a new window instead, as Open N in New Window makes.
+    private func addTmuxSessions(_ targets: [TerminalTmuxTarget], toWindow windowID: UUID) {
+        #if os(macOS)
+        guard let window = MacWorkspacePreviewRegistry.shared.tabAdder(windowID: windowID) else {
+            openTmuxSessionsTogether(targets)
+            return
+        }
+        let plan = TerminalOpenTogether.plan(targets, servers: serverManager.servers, room: window.room)
+        var failures = plan.notOpened
+        for (target, tab) in zip(plan.opening, TerminalOpenTogether.macLaunchRequests(for: plan.opening).flatMap(\.tabs))
+            where !window.add(tab) {
+            failures.append("\(target.name) didn't open: the window has no room for another tab.")
+        }
+        NSApp.activate()
+        window.window.makeKeyAndOrderFront(nil)
+        if !failures.isEmpty { connectionFailureMessage = failures.joined(separator: "\n") }
+        #else
+        guard let workgroup = sessionManager.workgroup(for: windowID),
+              TerminalWorkgroupOpening.isOpen(windowID, in: sessionManager) else {
+            openTmuxSessionsTogether(targets)
+            return
+        }
+        let servers = serverManager.servers
+        let plan = TerminalOpenTogether.plan(targets, servers: servers,
+                                             room: LayoutPreset.maximumSessionCount - workgroup.sessionIDs.count)
+        guard let preset = TerminalOpenTogether.workgroup(for: plan.opening, servers: servers) else {
+            if !plan.notOpened.isEmpty { connectionFailureMessage = plan.notOpened.joined(separator: "\n") }
+            return
+        }
+        let restoration = LayoutRestorationPlan(preset: preset, availableServers: servers, substitutions: nil)
+        let before = Set(workgroup.sessionIDs)
+        Task { @MainActor in
+            var failures = plan.notOpened + restoration.failures
+            if opensWorkgroupSlotsLazily {
+                // The phone: slots, connected as they are shown (W4b).
+                failures += TerminalWorkgroupOpening.makeSlots(for: restoration, workgroupID: windowID,
+                                                              sessionManager: sessionManager, settingsManager: settingsManager)
+            } else {
+                failures += await launchTerminals(of: restoration, into: windowID).failures
+            }
+            // Shown on the first that joined; `makeSlots` selects the workgroup's first.
+            if let first = sessionManager.workgroup(for: windowID)?.sessionIDs.first(where: { !before.contains($0) }) {
+                sessionManager.selectSession(first, inWorkgroup: windowID)
+                showOpenWorkgroup(windowID)
+                if opensWorkgroupSlotsLazily {
+                    do {
+                        try await TerminalWorkgroupOpening.connectShownSlot(in: windowID, sessionManager: sessionManager,
+                                                                            settingsManager: settingsManager)
+                    } catch {
+                        failures.append(error.localizedDescription)
+                    }
+                }
+            }
+            if !failures.isEmpty { connectionFailureMessage = failures.joined(separator: "\n") }
+        }
+        #endif
+    }
 
     /// A new window for `session`, keeping `windowSettings` as its own (a demo's; Connect gives none).
     private func presentTerminalWindow(for session: TerminalSession,

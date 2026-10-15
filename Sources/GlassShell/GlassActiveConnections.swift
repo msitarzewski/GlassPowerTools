@@ -212,6 +212,19 @@ struct GlassActiveNotice: Equatable {
 }
 
 extension GlassShellModel {
+    /// Opens a running session as one more tab of a window here (Open as Tab In; the owner,
+    /// 2026-10-15: "So I can open a new session into a group"). It leaves the list at once, as one
+    /// opened alone does.
+    func open(_ session: GlassRunningSession, inTabGroup group: GlassTabGroup) {
+        guard !session.isOpenHere, let attachment = session.attachment else { return }
+        runningSessions.removeAll { $0.id == session.id }
+        registry.openRunningSessions([attachment], inTabGroup: group.id)
+        Task {
+            try? await Task.sleep(for: .seconds(3))
+            await refreshRunningSessions()
+        }
+    }
+
     /// Opens running sessions together: one new window holding them, a tab each, in the order
     /// given (W13). Each capability is asked once, with all of its own — never each row's `open`,
     /// which makes a window apiece. Those opened leave the list at once, as one opened alone does;
@@ -451,7 +464,9 @@ struct GlassActiveConnectionsList: View {
                 GlassRunningSessionRow(session: session,
                                        opensOnTap: opensOnTap,
                                        batch: batchActions(for: session, chosen: chosen),
+                                       tabGroups: session.attachment.map { model.registry.tabGroups(for: $0.kind) } ?? [],
                                        open: { model.open(session, takingOver: $0) },
+                                       openInTabGroup: { model.open(session, inTabGroup: $0) },
                                        didEnd: { await model.refreshRunningSessions() })
                     .tag(GlassActiveRowTag(sessionID: session.id))
             }
@@ -663,8 +678,12 @@ struct GlassRunningSessionRow: View {
     var opensOnTap = true
     /// The chosen rows' actions, when this row is one of several chosen (W13).
     var batch: GlassActiveBatchActions? = nil
+    /// The windows here it can join as a tab (Open as Tab In).
+    var tabGroups: [GlassTabGroup] = []
     /// Opens it here; `true` takes it over.
     let open: @MainActor (Bool) -> Void
+    /// Opens it as one more tab of a window here.
+    var openInTabGroup: @MainActor (GlassTabGroup) -> Void = { _ in }
     let didEnd: @MainActor () async -> Void
     @State private var confirmingEnd = false
     @State private var endFailure: String?
@@ -719,6 +738,16 @@ struct GlassRunningSessionRow: View {
                     Button("Switch To", systemImage: openSymbol) { open(false) }
                 } else {
                     Button("Open Here", systemImage: openSymbol) { open(false) }
+                    // Into a window already open, as one more tab (the owner, 2026-10-15: "show
+                    // existing tab groups. So I can open a new session into a group").
+                    if session.attachment != nil, !tabGroups.isEmpty {
+                        Menu("Open as Tab In", systemImage: "rectangle.stack.badge.plus") {
+                            ForEach(tabGroups) { group in
+                                Button(group.title) { openInTabGroup(group) }
+                            }
+                        }
+                        .accessibilityIdentifier("active-running-open-in-\(session.id)")
+                    }
                 }
                 // Taking over a session open here would detach this app's own window from it.
                 if session.isAttachedElsewhere && !session.isOpenHere {

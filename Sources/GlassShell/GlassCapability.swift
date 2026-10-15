@@ -394,6 +394,15 @@ public protocol GlassCapability: AnyObject {
     /// put on its row. Default: nothing. A requirement for the same reason as `openSessions()`.
     func openRunningSessions(_ attachments: [GlassRunningAttachment])
 
+    /// The windows here that this capability's running sessions can join as tabs, for Active's
+    /// Open as Tab In (the owner, 2026-10-15). Read in a view body. Default: none. A requirement
+    /// for the same reason as `openSessions()`.
+    func tabGroups() -> [GlassTabGroup]
+
+    /// Opens running sessions this capability listed as more tabs of `group`, one of its
+    /// `tabGroups()`, in the order given, and brings that window forward. Default: nothing.
+    func openRunningSessions(_ attachments: [GlassRunningAttachment], inTabGroup group: GlassTabGroup.ID)
+
     /// Surfaces the capability contributes to the library's sidebar, beside Collections.
     ///
     /// For things that span the whole fleet rather than belonging to one machine — Workgroups,

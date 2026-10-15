@@ -83,6 +83,9 @@ public final class GlassTerminalRuntime {
         /// Running tmux sessions, on this Mac and on saved servers, opened together in one new
         /// window in this order — Active's "Open N in New Window" (W13).
         case openTmuxSessions([TerminalTmuxTarget])
+        /// The same, as more tabs of a window already open — a Mac window by its id, or a
+        /// workgroup elsewhere — and that window brought forward: Active's Open as Tab In.
+        case addTmuxSessions([TerminalTmuxTarget], toWindow: UUID)
         case showWorkgroups
         // (`localTerminal` carries no report: the outcome is claimed by the pane that actually
         // starts a shell — see `expectLocalShell`.)
