@@ -41,7 +41,10 @@ Evidence: `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`, section 
 0.4.453 (nothing in 0.4.454 changes the Mac's behaviour). No new crash reports.
 
 **Done:**
-- **Selection with tmux:** a drifting hold no longer turns into tmux's drag when tmux has the mouse, and a pinch
+- **Selection with tmux:** the owner (later, 0.4.454): "I don't [use mouse mode]. I just can't select text. It
+  immediately unselects." The simulator can't reproduce it: with the terminal focused as a real session's is (the
+  visionOS keyboard up), a double-pinched word in the tmux demo stays highlighted through redraws (captured). His
+  headset log is the next evidence. A drifting hold no longer turns into tmux's drag when tmux has the mouse, and a pinch
   clears a selection. Both are shown and proven on the simulator. **But** this Mac's tmux has the mouse off, so his
   failure may be something else. **Next:** once he has tried a hold and a double pinch in a tmux terminal, copy
   `Library/Caches/com.glasspowertools/Diagnostics/screen-sharing.log` off the headset (headset-diagnostics memory)
@@ -57,10 +60,10 @@ Evidence: `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`, section 
 orb; a desktop's orb, then resize it after it grows back (should keep the display's shape); the pulse; the held +
 and the toggle's held menu; a hold on a path.
 
-**How we work** is unchanged (see below). For builds: `sed 's/454/455/g' $SP/build-install-454.zsh >
-$SP/build-install-455.zsh` (and `build-454.zsh`). New helpers in `$SP`: `vision-test.zsh <log> <tests…>` (visionOS
-UI tests), `proof.zsh <name> <old> <new> <tests…>` (swaps a snippet out of the terminal view, runs, restores),
-`capture-on.zsh <log text> <png>`.
+**How we work** is unchanged (see below). **Working files now live in `~/Software/glass/tmp`** (the owner's choice,
+after a /tmp cleanup took the scratchpad): `build-install.zsh 455` builds and installs the next version;
+`vision-test.zsh <log> <Class/test…>` runs visionOS UI tests; `capture-on.zsh "<log text>" <png>`; its `README.md`
+lists them. Derived data and package checkouts are there too.
 
 ## 2026-10-14 (~22:15) — the day closed
 
