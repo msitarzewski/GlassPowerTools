@@ -237,12 +237,31 @@ private struct GlassSessionOrbView: View {
         GlassOrbRingLayout(count: tabs.count) {
             orb(tabs)
             ForEach(tabs) { tab in dot(tab) }
+            // A name is somewhere to look as well as something shown: looked at, it keeps its group
+            // going, so it stays while it is read. It vanished as the eyes moved to it from its dot
+            // (the owner, on the headset: "The labels disappear when you try to read them because
+            // the dot lose focus"). A pinch on it does what a pinch on its dot does.
             ForEach(tabs) { tab in
-                GlassOrbName(title: tab.title)
-                    .hoverEffect(GlassOrbRevealEffect().hoverEffectPhaseOverride(Self.namesOverride), in: shown(by: tab))
+                Button {
+                    tab.select()
+                    grow()
+                } label: {
+                    GlassOrbName(title: tab.title)
+                        .hoverEffect(GlassOrbRevealEffect().hoverEffectPhaseOverride(Self.namesOverride), in: shown(by: tab))
+                }
+                .buttonStyle(GlassSessionOrbPressStyle())
+                .contentShape(.hoverEffect, .capsule)
+                .hoverEffectGroup(look(tab))
+                .accessibilityHidden(true)
             }
-            GlassOrbName(title: face.title, prominent: true)
-                .hoverEffect(GlassOrbRevealEffect(), in: shownByOrb)
+            Button(action: grow) {
+                GlassOrbName(title: face.title, prominent: true)
+                    .hoverEffect(GlassOrbRevealEffect(), in: shownByOrb)
+            }
+            .buttonStyle(GlassSessionOrbPressStyle())
+            .contentShape(.hoverEffect, .capsule)
+            .hoverEffectGroup(orbLook)
+            .accessibilityHidden(true)
         }
     }
 
@@ -359,7 +378,7 @@ private struct GlassOrbName: View {
             .glassBackgroundEffect(in: .capsule)
             .fixedSize()
             .frame(maxWidth: GlassOrbRingLayout.nameWidth)
-            .allowsHitTesting(false)
+            .contentShape(.capsule)
             .accessibilityHidden(true)
     }
 }
