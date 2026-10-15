@@ -302,4 +302,39 @@ struct LiveRemoteEditingTests {
             #expect(names == ["tidy.txt"], "the save left something behind: \(names)")
         }
     }
+
+    /// The owner, on the headset (2026-10-15): a never-saved document's first save to a server
+    /// said "Citadel.SFTPMessage.Status error 1"; so did New File. A real OpenSSH server, through
+    /// the real commit.
+    @Test("a file that isn't there yet is created on a real server, described, and leaves nothing behind")
+    func creatingANewFile() async throws {
+        try await withLiveServer { lister, root, transport in
+            let path = "\(root)/new.md"
+            let committed = try await lister.write(Data("# New\n".utf8), to: path, expecting: nil)
+            #expect(try await transport.execute("cat \(path)") == "# New\n", "the new file did not reach the machine")
+            #expect(committed?.size == 6, "the editor was not told what landed")
+            #expect(try await transport.execute("ls -A \(root)").split(separator: "\n").map(String.init) == ["new.md"],
+                    "the save left something behind")
+        }
+    }
+
+    @Test("a file the editor saw that has gone is not made again; a missing one says so in words")
+    func aFileThatWentIsReported() async throws {
+        try await withLiveServer { lister, root, transport in
+            let path = "\(root)/gone.md"
+            await #expect(throws: GlassPortForwardError.self) {
+                try await lister.write(Data("x".utf8), to: path,
+                                       expecting: GlassHostFileStamp(size: 3, modifiedAt: Date(timeIntervalSince1970: 1)))
+            }
+            let left = try await transport.execute("ls -A \(root)")
+            #expect(left.isEmpty, "something was made: \(left)")
+            do {
+                _ = try await lister.read(path)
+                Issue.record("a missing file read as something")
+            } catch {
+                #expect(SFTPSessionError.isMissingPath(error), "\(error)")
+                #expect(!error.localizedDescription.contains("Citadel"), "\(error.localizedDescription)")
+            }
+        }
+    }
 }
