@@ -36,9 +36,9 @@ Welcome back. It was a long, good day with the owner at the Mac and his iPhone, 
 ended on "Really nice. The open is ssmoooooth." He asked to compact here. Everything is committed (the last code
 commit is d580ee0), nothing is pushed, the tree is clean.
 
-**State:** 0.4.444 on the Mac and iPhone (22:10). The Vision Pro has been locked (CoreDevice 4016) since 0.4.423 —
-install `$SP/dd-vision`'s build with `devicectl device install app` when he wears it; today's headset work (the ⚡ hold
-sheet, Siri's Show All Windows) is compiled but has never run there. No crash reports since 2026-10-13 18:47.
+**State:** 0.4.444 on the Mac, iPhone (22:10) and Vision Pro (installed when he put it on, after the close;
+`devicectl device info apps` reads 0.4.444). Today's headset work (the ⚡ hold sheet, Siri's Show All Windows) is on
+the headset now but not yet seen by him. No crash reports since 2026-10-13 18:47.
 
 **What today built** (detail and evidence: `tasks/2026-10/2026-10-14_all-windows-agents-clipboard.md`; commits say why):
 - **All Windows off the Mac.** iPhone/iPad: pull down from any top bar's empty space, or hold ⚡ — a glass pane of
