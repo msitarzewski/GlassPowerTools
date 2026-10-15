@@ -35,8 +35,10 @@ use the disposable test VM only).
 After the close the owner put on the headset and asked for more: All Windows as the Mac lays it out (a group per
 machine, a card per tab, cards sized to fit, live pictures off the iPhone), a window of its own on Vision Pro instead of
 the sheet, Connections wider, and the editor's square bottom corners. All done and committed (ca3f897…1558bd6; see
-`tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`). 0.4.445 is on the Mac, iPhone and Vision Pro (23:59,
-each read back); no new crash reports. The section below is the day's close and still holds.
+`tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`). Then, after midnight: a new file's save to a project on
+a server (it failed for every new file; fixed, live-tested on scratch), ⌘S off the Mac asking where on a new document,
+and Active's Open as Tab In for a running session. 0.4.446 is on the Mac, iPhone and Vision Pro (00:29, each read
+back); no new crash reports. The section below is the day's close and still holds.
 
 ## 2026-10-14 (~22:15) — the day closed
 

@@ -50,3 +50,27 @@ editor's bottom corners.
 
 Other headset windows draw square `.bar` backgrounds at their bottom (Files' bar, `SFTPBrowserView`) and may show the
 same corners; not looked at yet.
+
+## 2026-10-15 (after midnight): a new file's save over SFTP, ⌘S off the Mac, Open as Tab In
+
+The owner, on the headset (0.4.445):
+- "a new file can't be saved" — a never-saved document saved into a project on a server said "The operation
+  couldn't be completed. (Citadel.SFTPMessage.Status error 1.)"; "I'd like to just hit command s on an unsaved text
+  file to get the location prompt."
+- "The context menu for active but detached terminals should show existing tab groups. So I can open a new session
+  into a group."
+
+| Commit | Change |
+|---|---|
+| 8825846 | The editor's SFTP write (`GlassTerminalDirectoryLister.write`) read the destination first and failed for a file not there, so every first save and New File on a server failed. Missing + nothing expected → created through the verified upload with a new `createFromEditor` policy (no-clobber hard link, no resume record, committed stat from the verified handle); missing + expected → "changed while saved". `GlassSSHTransport` now turns Citadel's `SFTPMessage.Status` into `SFTPSessionError.refused(SFTPRefusal, …)` with plain words (editor and Files browser alike). |
+| e3ee5d7, 05b1dab | Off the Mac the editor's toolbar Save takes ⌘S (inside `#if !os(macOS)`; the Mac's owner stays File ▸ Save) and is enabled for a never-saved document. The single-owner test now expects it and checks it stays off the Mac. |
+| e9e38d7 | Active's running-session menu: **Open as Tab In ▸** the terminal windows here with room (`GlassTabGroup`, `GlassCapability.tabGroups`, `openRunningSessions(_:inTabGroup:)`). Off the Mac a workgroup (iPad/headset connect each through `launchTerminals`, moved out of `openVisionWorkgroup`; iPhone adds slots); on the Mac the window's tab adder. A closed window → a new window; too little room → what fits, and says the rest. |
+
+**Validation:** an in-memory OpenSSH-like `SFTPSession` drives the real commit (new file created, nothing left behind;
+a file that went reported changed; an existing file replaced as before; refusals in words), the first two failing
+without the fix; Open as Tab In's windows, room rule and Active routing tested, each failing without its change.
+Transport 86, editor 164, shell 298, terminal 838 pass; tmux unchanged by the runs. Live, against the scratch VM's
+OpenSSH (`LiveRemoteEditingTests`, 11 pass): a new file is created and described with nothing left behind, and a
+file that went is reported changed; without the fix the real server answers "no such file", the owner's error. The SFTP Files window's own bottom-bar corners are still unchecked.
+
+0.4.446 (00:29) is on the Mac, iPhone and Vision Pro; each reads 0.4.446; no new crash reports.
