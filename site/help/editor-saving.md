@@ -4,9 +4,11 @@ This page covers saving a document, choosing where a new document goes the first
 
 ## Save a document
 
-Choose **Save** (the save button in the toolbar). It is available when the document has unsaved changes. The bar at the bottom of the window shows **Edited** until you save.
+Choose **Save** (the save button in the toolbar). It is available when the document has unsaved changes, and for a document that has never been saved, even before you type anything. The bar at the bottom of the window shows **Edited** until you save.
 
-**On Mac:** choose File ▸ **Save**, or press ⌘S. For a document that has never been saved, the menu item reads **Save…** and is available even before you type anything.
+**On Mac:** choose File ▸ **Save**, or press ⌘S. For a document that has never been saved, the menu item reads **Save…**.
+
+**On Vision Pro, iPad and iPhone**, with a keyboard, ⌘S does what **Save** does: a document that has never been saved asks where to save it.
 
 A save keeps the file's text encoding and its line endings as they were when you opened it, so saving an unchanged file leaves it byte for byte the same. A file on this device is written through a temporary file and then moved into place, so an interrupted save does not leave a half-written file, and a file that was executable stays executable.
 
@@ -20,7 +22,7 @@ What you see depends on whether the window has a project open.
 2. **Folder** — the project's top folder or any folder you have already opened in its file list. A folder on a server shows the machine's name after it.
 3. Choose **Save**.
 
-The file is written to that folder, on this device or on the server, and the tab takes its name. Its language is chosen from the new extension. If a file with that name is already in the folder, nothing is written and the sheet asks you to choose another name.
+The file is written to that folder, on this device or on the server, and the tab takes its name. Its language is chosen from the new extension. If a file with that name is already in the folder, nothing is written and the sheet asks you to choose another name. On a server, the new file is uploaded under a hidden name and checked, then given its name only if that name is still free, so a half-written file never appears under it. If the server refuses, the message says why in plain words, for example that the account isn't allowed to write to that folder, and what to check.
 
 To save somewhere outside the project, choose **On This Device…** in the sheet. **On Mac** the button reads **On This Mac…**.
 

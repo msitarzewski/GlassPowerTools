@@ -8,11 +8,12 @@ Each desktop opens in its own window with the service's name at the top and a ro
 
 | Control | What it does |
 |---|---|
+| **Shrink to Orb** | Shrinks the window into a small glass orb with the desktop's live picture; pinch the orb to bring the window back. The desktop stays connected. See [Shrink a session window to an orb on Vision Pro](library-connect.md#shrink-a-session-window-to-an-orb-on-vision-pro). |
 | **Settings** (gear) | Opens **Desktop Settings**, which also holds the display this window shows and, for Screen Sharing (VNC), **Quality**. See [Give a desktop window its own settings](desktop-sessions.md#give-a-desktop-window-its-own-settings). |
 | **Clipboard** | Sends this device's clipboard, or copies the remote computer's, and sends Control–Alt–Delete. With **Share clipboard** off, it types the clipboard's text instead. See [Keyboard, pointer, clipboard and audio](desktop-input.md#share-the-clipboard). |
 | **Keys** | **Type Text…**, where you type text and choose **Send** to type it on the remote computer; **Escape** and **Tab**; **Control**, **Option**, **Command** and **Shift** for the next key; navigation keys; and F1–F12. See [Keys that are hard to type](desktop-input.md#keys-that-are-hard-to-type). |
 | **Arrows** | Drag on it to send arrow keys. |
-| ⚡ | Brings the library forward on **Active**. |
+| ⚡ | Brings the library forward on **Active**. Pinch and hold it for **All Windows**; see [See everything open with Show All Windows](library-connect.md#see-everything-open-with-show-all-windows). |
 
 The window is at least 800 × 440 points. It keeps the shape of the display it shows as you resize it, so the picture fills it with no bars (**Keep Display Proportions**, in **Desktop Settings** > **This Window**). While **Match Window Size** is changing the remote computer's resolution to match the window, the window can take any shape instead. See [Resolution, scaling and zoom](desktop-display-and-scaling.md) and [Keep a window in its display's shape](desktop-display-and-scaling.md#keep-a-window-in-its-displays-shape).
 

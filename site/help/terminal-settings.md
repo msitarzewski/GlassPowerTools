@@ -7,6 +7,7 @@ The terminal adds three pages to Settings: **Connections**, **Terminal** and **S
 - **Auto-reconnect on disconnect**: try again after a dropped connection. On by default.
 - **Confirm before closing active sessions**: ask before disconnecting a connected session. On by default.
 - **Keep scrollback during session** and **Max scrollback lines** (1,000 to 100,000; default 10,000). Scrollback stays in memory and is cleared when the session ends.
+- **Suggest fixes for errors**: when a terminal's output shows an error, Apple Intelligence on this device explains it and offers a fix to review. On by default, and kept on this device. To stop it in one terminal only, use the menu on the suggestion itself; see [The session's tools menu](terminal-sessions.md#the-sessions-tools-menu).
 - **On Mac**, **Local Terminal**: the **Shell** and **Working directory** for new local terminals. Leave them empty for your login shell and home folder. A Workgroup's tab can override them. Whether they run in tmux is on the **Terminal** page, under **tmux**.
 - **Session Recording**: how many recordings you have and the space they use.
 - **Bell enabled** plays a sound when a program rings the bell. It is off by default. **Visual bell** also flashes the terminal, and works only while **Bell enabled** is on.
@@ -42,6 +43,7 @@ Anything about how a terminal window looks and behaves can be set for that windo
 - **Theme**: any theme from your theme library, its **Font Family** and its **Font Size**.
 - **Cursor**: **Cursor Style** and **Blinking cursor**.
 - **Bell and Scrollback**: **Bell enabled**, **Visual bell**, **Keep scrollback during session** and **Max scrollback lines**.
+- **Activity** (**on Vision Pro**): **Auto-focus on activity**. While a terminal in this window prints, **Grid** and **Carousel** bring it forward, and the window's orb pulses (see [Shrink a session window to an orb on Vision Pro](library-connect.md#shrink-a-session-window-to-an-orb-on-vision-pro)). Until you change it here, it follows the saved Workgroup the window was opened from, and is otherwise off.
 
 Each setting follows **All Terminals** (or **Appearance**, or **Settings**) until you change it here. Once you do, a small ↺ appears beside its name; choose it to follow again. Its tooltip says what it returns to: hold the pointer over it, or on Vision Pro look at it. **Reset This Window**, at the end, returns every one. Every tab in the window changes at once.
 

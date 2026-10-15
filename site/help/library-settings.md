@@ -9,6 +9,10 @@ Settings for the whole app are in one place. This page covers opening Settings, 
 - **On iPad:** choose **Settings** (gear) in the library's toolbar. Choose a page from the control at the top, and choose **Done** when you finish.
 - **On iPhone:** choose **Settings** (gear) in the library's toolbar, then choose a page from the list. Every page has **Done**.
 
+## Light or Dark
+
+**On Mac, iPad and iPhone**, **Appearance** starts with **Appearance**: **System**, **Light** or **Dark**, for the whole app: every window, and on the Mac its sheets, menus and Command Palette too. **System** follows this device's own Light or Dark setting. A terminal theme keeps its own colors. It is kept on this device. Vision Pro has no such choice.
+
 ## Change how transparent windows are
 
 Choose **Appearance**. The **Windows** section has:
@@ -37,6 +41,8 @@ Each follows **Appearance** until you change it there, and only that window chan
 > [!NOTE]
 > When **Reduce Transparency** is on in the system's Accessibility settings, every window is opaque, and these controls are unavailable until you turn it off.
 
+**On Mac**, **Appearance** ends with **Show All Windows** ▸ **Blur previews**, which softens the pictures in Show All Windows so a screenshot of it can be shared; see [AI agents and private pictures](library-connect.md#ai-agents-and-private-pictures).
+
 ## General
 
 Under **Library**, **Show service availability** (off by default) puts a dot beside each service in the library: green when it answers, orange when it answers slowly, red when it does not. While the library is on screen, this device opens a connection to each service's port about once a minute and closes it at once; it never signs in. A Screen Sharing (VNC) service is checked every ten minutes instead, because each connection makes a Mac start its screen sharing for a while. A service you're connected to isn't checked: it always shows a green dot, with this setting on or off, and is checked again on its usual schedule after you disconnect. A database reached through its machine's SSH connection, and this Mac's own terminal, have no dot.
@@ -50,6 +56,8 @@ Under **Library**, **Show service availability** (off by default) puts a dot bes
 **Credentials** shows where passwords and keys are kept and their **Default mobility**. With **iCloud Keychain**, a credential you save is available on your other devices. Nothing on this page shows or reads a secret.
 
 **On your other devices** shows the **Host library** sync status and explains which secrets travel with you. See "Your library on all your devices".
+
+**Show Machines in Search**, off by default, puts your machines' and Workgroups' names in Spotlight and Siri on this device, to open them from there. Names only: addresses and credentials are never indexed. See [Find your machines in Spotlight](library-siri-and-system.md#find-your-machines-in-spotlight).
 
 ## About
 

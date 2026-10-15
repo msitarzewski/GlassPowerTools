@@ -1,6 +1,6 @@
 # Widgets
 
-Glass Power Tools has two widgets: **Machines**, to connect to a machine's service in one step, and **Active**, to see what's open and what's running on your machines. This page covers where you can place them, what each one shows, and what choosing it does.
+Glass Power Tools has three widgets: **Machines**, to connect to a machine's service in one step; **Machine**, for one machine you choose; and **Active**, to see what's open and what's running on your machines. This page covers where you can place them, what each one shows, and what choosing it does.
 
 ## Where they go
 
@@ -20,6 +20,16 @@ Add them the way you add any widget, and look for Glass Power Tools in the list.
 The small size shows three machines with one service each. The medium and large sizes show four and nine machines, with up to three services each and how long ago each machine last connected. The device you're using, such as **This Mac**, isn't listed, nor is a machine with no services.
 
 **On the Lock Screen**, **Machines** lists the names of up to three machines or, in the line above the time, the first one and how many more there are. Choosing it opens the app.
+
+## Machine
+
+**Machine** shows one machine: its name, a button for each of its services, and what is open or running on it, for example **1 open · 2 running**. To choose the machine, edit the widget (touch and hold it, or right-click it on Mac) and pick one under **Machine**. Until you do, it shows your first favorite, or your most recent machine.
+
+- Choose a service's button to connect to it, as **Connect** on that service in the library does.
+- Choose the machine's name to open the library with that machine selected.
+- **On Vision Pro**, it can stand in the room beside that machine's own windows.
+
+It comes in small and medium sizes, and on the Lock Screen on iPhone and iPad. If the machine you chose is removed from the library, the widget says so; edit it to choose another.
 
 ## Active
 

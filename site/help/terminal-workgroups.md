@@ -25,7 +25,7 @@ With **Sync terminal settings** on (Settings ▸ **Terminal**, under **iCloud Sy
 In **New Workgroup**:
 
 1. Enter a **Name** and choose a color.
-2. **On Mac:** choose how it opens with **Open in**: **Tabs**, **Grid** or **Carousel**. **Auto-focus on activity** follows new output while you view Grid or Carousel; it does not switch tabs.
+2. **On Mac:** choose how it opens with **Open in**: **Tabs**, **Grid** or **Carousel**. **Auto-focus on activity** follows new output while you view Grid or Carousel; it does not switch tabs. On Vision Pro, a window opened from the Workgroup follows its **Auto-focus on activity** too, until you change the window's own (see [Give a terminal window its own settings](terminal-settings.md#give-a-terminal-window-its-own-settings)).
 3. Choose **Add Tab** for each terminal. In **Add Tab**:
    - **Type**: **SSH** or, on Mac, **Local**.
    - **Connection**: the saved connection to open, for an SSH tab.

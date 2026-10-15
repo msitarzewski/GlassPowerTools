@@ -25,7 +25,7 @@ Tabs appear once more than one is open, and a trail above the content shows wher
 
 **Connections**, at the leading edge of the toolbar, returns to the host in the library.
 
-**On Vision Pro:** **Connections** is at the top left of the workspace, beside the sidebar button, which hides and shows the schema browser (⌃⌘S with a keyboard). ⚡ is at the top right. Running a table's SQL and the on-device assistant are in the bar below the window, with the other commands.
+**On Vision Pro:** **Connections** is at the top left of the workspace, beside the sidebar button, which hides and shows the schema browser (⌃⌘S with a keyboard). ⚡ is at the top right. Running a table's SQL and the on-device assistant are in the bar below the window, with the other commands. **Shrink to Orb**, first in that bar, shrinks the window into a small orb while the session stays connected; pinch the orb to bring it back (see [Shrink a session window to an orb on Vision Pro](library-connect.md#shrink-a-session-window-to-an-orb-on-vision-pro)).
 
 ## Read the overview
 

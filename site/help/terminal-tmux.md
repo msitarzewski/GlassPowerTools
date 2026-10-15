@@ -60,6 +60,8 @@ A terminal this device has open over SSH is listed with the open sessions instea
 
 Choose a session to open it here. To use it here and disconnect everyone else, right-click it (touch and hold on touch devices) and choose **Take Over**.
 
+To add a session to a terminal window you already have open, right-click it (touch and hold on touch devices, pinch and hold on Vision Pro) and choose **Open as Tab In**, then the window. It joins that window as one more tab, and the window comes forward on it. The menu lists the terminal windows open here that have room for another tab, by the names **Active** and **Show All Windows** give them. If the window closed before you chose, the session opens in a new window instead.
+
 **Active** checks your machines when it appears. To check again, choose **Check Machines** in its toolbar, or pull down the list on iPhone and iPad. Only machines with the setting on are checked, and only those that can sign in without asking. A machine that wasn't checked says why under its name, for example **Not checked: signing in would need your password.** Save the password, or connect to the machine once (to trust its host key), and check again.
 
 ## Open several together
@@ -69,6 +71,8 @@ To open several running sessions at once, choose them in **Active** and open the
 - **On Mac:** ⌘-click the sessions, or ⇧-click to choose a range. Then choose **Open 3 in New Window** in the toolbar (with however many you chose), or right-click one of them and choose it there. They open in one new window, a tab for each. A click with neither key held still opens one session at once.
 - **On Vision Pro:** choose **Select** at the top of **Active**, tap each session you want, then choose **Open 3 in New Window** at the bottom. They open as one workgroup window with a terminal for each. **Done** leaves without opening anything.
 - **On iPad and iPhone:** the same, with **Open 3 Together**. They open as one workgroup, in place of the library as a terminal does. On iPhone only the terminal on screen connects, and each of the others connects when you switch to it.
+
+To add them to a terminal window you already have open instead, choose **Open 3 as Tabs In**, beside the button that opens them or in a chosen session's menu, then the window. They join it as tabs, in order.
 
 They open in the order **Active** lists them, each on its own session, joining whoever is already there. A session that says **Open here** stays where it is and isn't counted. A machine that allows legacy SSH algorithms is left out, because it asks before each connection: open its sessions one at a time. Nothing is saved as a workgroup.
 
