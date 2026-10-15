@@ -243,9 +243,19 @@ private struct GlassConnectionsIdleShrinkModifier: ViewModifier {
 struct GlassConnectionsWindowLayout: Layout {
     /// The library's size while the window is its orb; nil while it is the library.
     let library: CGSize?
+    /// The window as its orb: Connections' orb's; a session window's with its ring of tabs is larger.
+    var orb: CGSize = GlassConnectionsWindowSize.orb
+    /// The room the orb is given: the orb's square for Connections, the whole window for a ring.
+    var orbContent: CGSize? = nil
+
+    init(library: CGSize?, orb: CGSize = GlassConnectionsWindowSize.orb, orbContent: CGSize? = nil) {
+        self.library = library
+        self.orb = orb
+        self.orbContent = orbContent
+    }
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        if library != nil { return GlassConnectionsWindowSize.orb }
+        if library != nil { return orb }
         return subviews.first?.sizeThatFits(proposal) ?? .zero
     }
 
@@ -254,7 +264,8 @@ struct GlassConnectionsWindowLayout: Layout {
         let orbSide = GlassConnectionsWindowSize.orbSide
         for (index, subview) in subviews.enumerated() {
             if index > 0 {
-                subview.place(at: center, anchor: .center, proposal: ProposedViewSize(width: orbSide, height: orbSide))
+                subview.place(at: center, anchor: .center,
+                              proposal: ProposedViewSize(orbContent ?? CGSize(width: orbSide, height: orbSide)))
             } else if let library {
                 subview.place(at: center, anchor: .center, proposal: ProposedViewSize(library))
             } else {

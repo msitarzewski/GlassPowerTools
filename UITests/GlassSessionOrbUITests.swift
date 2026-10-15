@@ -49,5 +49,28 @@ final class GlassSessionOrbUITests: XCTestCase {
         XCTAssertTrue(element("terminal-footer-new-tab").waitForExistence(timeout: 10), "the window did not grow back")
         XCTAssertFalse(orb.exists, "the orb stayed")
     }
+
+    /// The owner, 2026-10-15: "redraw the tabs around the orb evenly distributed with a preview in the
+    /// orb on hover", and a pinch on one grows the window back on it.
+    func testAWindowsTabsRingItsOrbAndOneGrowsItBack() {
+        app = XCUIApplication()
+        app.launchArguments += ["--ui-testing", UUID().uuidString, "--demo-open", "terminal-tabs"]
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+
+        let shrink = element("session-orb-shrink")
+        XCTAssertTrue(shrink.waitForExistence(timeout: 40), "no Shrink to Orb in the terminal's bar")
+        shrink.tap()
+        XCTAssertTrue(element("session-orb").waitForExistence(timeout: 10), "the window did not become its orb")
+        let dots = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "session-orb-tab-"))
+        let both = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == 2"), object: dots)
+        XCTAssertEqual(XCTWaiter().wait(for: [both], timeout: 10), .completed, "the window's two tabs are not on the ring")
+        // For the capture from outside.
+        sleep(8)
+
+        dots.element(boundBy: 1).tap()
+        XCTAssertTrue(element("terminal-footer-new-tab").waitForExistence(timeout: 10), "a tab's dot did not grow the window back")
+        XCTAssertEqual(dots.count, 0, "the ring stayed")
+    }
 }
 #endif

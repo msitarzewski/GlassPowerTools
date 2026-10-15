@@ -319,9 +319,26 @@ struct VisionTerminalWorkgroupView: View {
         let workgroup = sessionManager.workgroup(for: workgroupID)
         let title = workgroup.map { GlassTerminalCapability.title(of: $0, live: liveSessions(in: $0)) } ?? "Terminal"
         let sessionManager = sessionManager, workgroupID = workgroupID
-        return GlassSessionOrbFace(title: title, symbolName: "terminal", pulses: followsActivity && activity.isBusy) {
-            sessionManager.selectedSession(inWorkgroup: workgroupID)?.terminalHostModel
-                .previewImage(maxPixelWidth: 400).map(Image.init(uiImage:))
+        // The terminal in front, or the one printing where the window follows activity (the owner:
+        // "front tab, or whichever is active").
+        let shown = (followsActivity ? activity.lastSessionID : nil) ?? selectedSessionID
+        let tabs = workgroup.map { liveSessions(in: $0) } ?? []
+        return GlassSessionOrbFace(
+            title: title, symbolName: "terminal", pulses: followsActivity && activity.isBusy,
+            tabs: tabs.map { session in
+                GlassSessionOrbTab(
+                    id: session.id.uuidString,
+                    title: TerminalWorkgroupOpening.label(session, on: .tabOrnament),
+                    symbolName: "terminal",
+                    tint: VisionTerminalStatus.color(for: session.state),
+                    picture: { [weak session] in
+                        session?.terminalHostModel.previewImage(maxPixelWidth: 400).map(Image.init(uiImage:))
+                    },
+                    select: { _ = sessionManager.selectSession(session.id, inWorkgroup: workgroupID) })
+            }
+        ) {
+            let front = shown.flatMap { sessionManager.session(for: $0) } ?? sessionManager.selectedSession(inWorkgroup: workgroupID)
+            return front?.terminalHostModel.previewImage(maxPixelWidth: 400).map(Image.init(uiImage:))
         }
     }
     #endif
@@ -628,6 +645,8 @@ struct VisionTerminalWorkgroupView: View {
                 }
             }
             .toolbarVisibility(presentation == .tabs && sessions.count > 1 ? .visible : .hidden, for: .tabBar)
+            // As its orb, the window's tabs are the ring around it (2026-10-15), not this ornament.
+            .glassHiddenWhileOrb()
             ForEach(sessions) { session in
                 let active = presentation == .tabs && selectedSessionID == session.id
                 TerminalWindowView(
