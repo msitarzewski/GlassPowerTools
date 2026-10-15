@@ -273,26 +273,48 @@ final class GlassAllWindowsPaneController {
 
     var isShowing: Bool { window != nil }
 
+    /// Where a pull stays open once let go, as a fraction of the way down.
+    private static let openingPoint: CGFloat = 0.35
+    private let tick = UIImpactFeedbackGenerator(style: .light)
+    private var passedOpeningPoint = false
+
     /// The ⚡'s hold: in, all the way.
     func show(over host: UIWindow, dismissCurrent: (@MainActor () -> Void)?) {
         guard window == nil else { return }
         guard prepare(over: host, dismissCurrent: dismissCurrent) else { return }
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         settle(open: true)
     }
 
     func beginPull(over host: UIWindow) {
         guard window == nil else { return }
         _ = prepare(over: host, dismissCurrent: nil)
+        passedOpeningPoint = false
+        tick.prepare()
     }
 
+    /// Follows the finger, and past fully open gives a little with resistance, as a scroll view's
+    /// edge does, rather than stopping dead.
     func pull(to translation: CGFloat) {
         guard window != nil else { return }
-        state.progress = min(1, max(0, translation / state.height))
+        let raw = max(0, translation / state.height)
+        state.progress = raw <= 1 ? raw : 1 + Self.stretch(raw - 1)
+        // One tick where letting go would leave it open, and none back and forth after.
+        if !passedOpeningPoint, state.progress > Self.openingPoint {
+            passedOpeningPoint = true
+            tick.impactOccurred()
+        }
+    }
+
+    /// How far past open the pane gives for `beyond` of a full pull: less and less, at most 6%.
+    static func stretch(_ beyond: CGFloat) -> CGFloat {
+        0.06 * (1 - exp(-beyond * 2.5))
     }
 
     func endPull(velocity: CGFloat) {
         guard window != nil else { return }
-        settle(open: velocity > 500 || (velocity > -200 && state.progress > 0.35))
+        let open = velocity > 500 || (velocity > -200 && state.progress > Self.openingPoint)
+        settle(open: open, velocity: velocity)
     }
 
     private func prepare(over host: UIWindow, dismissCurrent: (@MainActor () -> Void)?) -> Bool {
@@ -317,8 +339,10 @@ final class GlassAllWindowsPaneController {
         return true
     }
 
-    private func settle(open: Bool) {
-        withAnimation(.spring(duration: 0.35, bounce: open ? 0.12 : 0)) {
+    /// To open or closed, carrying the finger's speed (`velocity`, points a second) so a flick
+    /// lands softly rather than snapping: open with a little give, closed without.
+    private func settle(open: Bool, velocity: CGFloat = 0) {
+        withAnimation(Self.settling(open: open, from: state.progress, velocity: velocity, height: state.height)) {
             state.progress = open ? 1 : 0
         } completion: { [weak self] in
             guard let self else { return }
@@ -326,12 +350,21 @@ final class GlassAllWindowsPaneController {
         }
     }
 
+    /// The spring that settles the pane, its starting speed given as a share of the distance left
+    /// a second, as SwiftUI measures it.
+    static func settling(open: Bool, from progress: CGFloat, velocity: CGFloat, height: CGFloat) -> Animation {
+        let distance = (open ? 1 : 0) - progress
+        let speed = abs(distance) > 0.01 && height > 0 ? (velocity / height) / distance : 0
+        let spring = open ? Spring(duration: 0.42, bounce: 0.14) : Spring(duration: 0.3, bounce: 0)
+        return .interpolatingSpring(spring, initialVelocity: min(8, max(0, speed)))
+    }
+
     /// Up and away; then, when a card was chosen, the screen underneath is left and the card's
     /// session brought back.
     private func close(then chosen: (@MainActor () -> Void)?) {
         guard window != nil else { return }
         let leave = dismissCurrent
-        withAnimation(.spring(duration: 0.3, bounce: 0)) {
+        withAnimation(.smooth(duration: 0.28)) {
             state.progress = 0
         } completion: { [weak self] in
             self?.tearDown()
@@ -342,11 +375,12 @@ final class GlassAllWindowsPaneController {
     }
 
     private func dragPane(by translation: CGFloat) {
-        state.progress = min(1, max(0, 1 + translation / state.height))
+        let raw = 1 + translation / state.height
+        state.progress = raw <= 1 ? max(0, raw) : 1 + Self.stretch(raw - 1)
     }
 
-    private func endPaneDrag(by translation: CGFloat) {
-        if translation < -state.height * 0.2 { close(then: nil) } else { settle(open: true) }
+    private func endPaneDrag(by predicted: CGFloat) {
+        if predicted < -state.height * 0.2 { close(then: nil) } else { settle(open: true) }
     }
 
     private func tearDown() {
@@ -369,17 +403,27 @@ struct GlassAllWindowsPaneView: View {
     var body: some View {
         GeometryReader { proxy in
             let top = proxy.safeAreaInsets.top
+            let shown = min(1, state.progress)
+            // The cards arrive after the glass: they fade and settle in over the last of the way.
+            let content = min(1, max(0, (shown - 0.3) / 0.6))
             ZStack(alignment: .top) {
-                Color.black.opacity(0.28 * state.progress)
-                    .ignoresSafeArea()
-                    .contentShape(.rect)
-                    .onTapGesture { close(nil) }
-                    .accessibilityHidden(true)
+                // What is behind frosts as the pane comes, as behind Notification Center.
+                ZStack {
+                    Rectangle().fill(.ultraThinMaterial).opacity(0.85 * shown)
+                    Color.black.opacity(0.18 * shown)
+                }
+                .ignoresSafeArea()
+                .contentShape(.rect)
+                .onTapGesture { close(nil) }
+                .accessibilityHidden(true)
                 GlassLayeredPanel(cornerRadius: 30) {
                     VStack(spacing: 0) {
                         GlassShowAllWindowsOverview(model: model, done: { close(nil) }, open: { close($0) })
                             .containerBackground(.clear, for: .navigation)
                             .padding(.top, top)
+                            .opacity(content)
+                            .offset(y: -18 * (1 - content))
+                            .scaleEffect(0.97 + 0.03 * content, anchor: .top)
                         Capsule()
                             .fill(.secondary)
                             .frame(width: 44, height: 5)
@@ -393,9 +437,10 @@ struct GlassAllWindowsPaneView: View {
                             .accessibilityAction { close(nil) }
                     }
                 }
-                .frame(height: state.height + top)
-                .offset(y: -(state.height + top + 24) * (1 - state.progress))
-                .shadow(color: .black.opacity(0.25 * state.progress), radius: 24, y: 8)
+                // Past open the glass stretches from the top; short of it, it is still coming down.
+                .frame(height: state.height + top + state.height * max(0, state.progress - 1))
+                .offset(y: -(state.height + top + 24) * (1 - shown))
+                .shadow(color: .black.opacity(0.25 * shown), radius: 24, y: 8)
             }
             .ignoresSafeArea(edges: .top)
         }
