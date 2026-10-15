@@ -240,9 +240,9 @@ final class GlassConnectionsOrbUITests: XCTestCase {
     /// "The icon shows as expected, but the connections window remains, too").
     func testADisplayWindowsBoltLeavesNoSecondWindowBesideTheOrb() {
         launch(idleSeconds: 30, surface: "desktop-displays")
-        // The desktop's own window and its second display's, each with ⚡ beside its Input button.
-        let desktops = app.windows.containing(NSPredicate(format: "elementType == %d AND label == %@",
-                                                          XCUIElement.ElementType.button.rawValue, "Input"))
+        // The desktop's own window and its second display's, each with ⚡ beside its Settings button
+        // (the bar's Input button became Settings, Clipboard, Keys and the arrow pad).
+        let desktops = app.windows.containing(NSPredicate(format: "identifier == %@", "session.display"))
         let bolts = desktops.buttons.matching(identifier: "active-connections-bolt")
         let both = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == 2"), object: bolts)
         XCTAssertEqual(XCTWaiter().wait(for: [both], timeout: 40), .completed, "the demo's two display windows did not open")
@@ -327,9 +327,8 @@ final class GlassConnectionsOrbUITests: XCTestCase {
     /// The same for a desktop's ⚡: one window, on Active.
     func testTheBoltNeverOpensASecondWindow() {
         launch(idleSeconds: 600, surface: "orb-later-desktop")
-        // The desktop's ⚡, in the control bar beside its Input button — not the library's own.
-        let desktopBar = app.windows.containing(NSPredicate(format: "elementType == %d AND label == %@",
-                                                            XCUIElement.ElementType.button.rawValue, "Input"))
+        // The desktop's ⚡, in the control bar beside its Settings button — not the library's own.
+        let desktopBar = app.windows.containing(NSPredicate(format: "identifier == %@", "session.display"))
         let bolt = desktopBar.buttons.matching(identifier: "active-connections-bolt").firstMatch
         XCTAssertTrue(bolt.waitForExistence(timeout: 40), "the demo desktop did not open")
         for press in 1...2 {
