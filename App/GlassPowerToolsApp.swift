@@ -288,6 +288,9 @@ struct GlassPowerToolsApp: App {
         terminal.openSessions = { [registry = model.registry] in registry.openSessions() }
         // "New Terminal on ▸ alpha", not "Terminal on alpha": the machine's name, from the catalog.
         terminal.hostName = { [weak model] serverID in model?.host(owningEndpoint: EndpointID(rawValue: serverID))?.displayName }
+        // The + menu's running terminals (2026-10-15): Active's list, and its refresh when old.
+        terminal.runningSessions = { [weak model] in model?.runningSessions ?? [] }
+        terminal.refreshRunningSessionsIfDue = { [weak model] in await model?.refreshRunningSessionsIfDue() }
         // The ⚡ in every toolbar means one thing — the library's Active panel — so all four
         // runtimes get the same closure.
         let showActive: GlassShowActiveConnections = { [weak model] in model?.showActiveConnections() }

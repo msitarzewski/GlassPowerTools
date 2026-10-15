@@ -536,6 +536,7 @@ struct VisionTerminalWorkgroupView: View {
                     showsConnectionOrnament: true,
                     isTerminalActive: active,
                     onNewTerminalTab: { showingSavedHostPicker = true },
+                    onOpenTerminal: { openSavedHost($0, tmux: $1) },
                     onSessionRequestedClose: { closeSessionTab(session) }
                 )
                 .environment(\.visionTerminalPresentation, sessions.count > 1 ? presentationBinding : nil)
@@ -741,6 +742,7 @@ struct VisionTerminalWorkgroupView: View {
                     showsConnectionOrnament: false,
                     isTerminalActive: active,
                     onNewTerminalTab: { showingSavedHostPicker = true },
+                    onOpenTerminal: { openSavedHost($0, tmux: $1) },
                     onSessionRequestedClose: { closeSessionTab(session) }
                 )
                 .opacity(active ? 1 : 0)
@@ -765,6 +767,7 @@ struct VisionTerminalWorkgroupView: View {
                 onNewTerminalTab: {
                     showingSavedHostPicker = true
                 },
+                onOpenTerminal: { openSavedHost($0, tmux: $1) },
                 onSessionRequestedClose: {
                     closeSessionTab(session)
                 }
@@ -823,9 +826,9 @@ struct VisionTerminalWorkgroupView: View {
         }
 
         ToolbarItem(placement: .topBarTrailing) {
-            Button {
-                showingSavedHostPicker = true
-            } label: {
+            // A tap is the picker; held, servers ▸ their terminals, opened here (2026-10-15).
+            TerminalNewTabMenu(pickServer: { showingSavedHostPicker = true },
+                               open: { openSavedHost($0, tmux: $1) }) {
                 Label("New Terminal Tab", systemImage: "plus")
             }
             .accessibilityIdentifier("terminal-workgroup-new-tab")
@@ -899,7 +902,8 @@ struct VisionTerminalWorkgroupView: View {
         selectedSessionID = sessionManager.selectedSession(inWorkgroup: workgroupID)?.id
     }
 
-    private func openSavedHost(_ server: ServerConfiguration) {
+    /// `tmux`: attached to a session already running there, from the + menu (2026-10-15).
+    private func openSavedHost(_ server: ServerConfiguration, tmux: TerminalTmuxAttachment? = nil) {
         guard openingServerID == nil else { return }
         openingServerID = server.id
 
@@ -909,6 +913,7 @@ struct VisionTerminalWorkgroupView: View {
                 let launch = try await sessionManager.createAuthorizedSessionByServerID(
                     server.id,
                     settingsManager: settingsManager,
+                    tmux: tmux,
                     initialTerminalPresentation: { pendingSession in
                         guard sessionManager.appendSession(
                             pendingSession,

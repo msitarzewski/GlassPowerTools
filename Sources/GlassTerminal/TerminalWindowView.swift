@@ -85,6 +85,9 @@ struct TerminalWindowView: View {
     /// Embedded workspaces provide their own tab launcher. Standalone windows
     /// use their platform's default terminal-launch route.
     var onNewTerminalTab: (() -> Void)? = nil
+    /// The + held: a terminal on a saved server opened in this window, new or attached to a running
+    /// tmux session (`TerminalNewTabMenu`). Nil leaves the + a button.
+    var onOpenTerminal: (@MainActor (ServerConfiguration, TerminalTmuxAttachment?) -> Void)? = nil
     /// Embedded workspaces retain their own window and pane topology when an
     /// SSH session ends. The owner removes the live session and presents retry
     /// state instead of allowing this view to dismiss the workspace window.
@@ -165,6 +168,7 @@ struct TerminalWindowView: View {
         showsMacPaneChrome: Bool = false,
         externalFindRequest: TerminalFindRequest = .none,
         onNewTerminalTab: (() -> Void)? = nil,
+        onOpenTerminal: (@MainActor (ServerConfiguration, TerminalTmuxAttachment?) -> Void)? = nil,
         onSessionRequestedClose: (() -> Void)? = nil,
         onSessionEndedCleanly: (() -> Void)? = nil,
         onTerminalContextChange: ((_ title: String?, _ directory: String?) -> Void)? = nil
@@ -176,6 +180,7 @@ struct TerminalWindowView: View {
         self.showsMacPaneChrome = showsMacPaneChrome
         self.externalFindRequest = externalFindRequest
         self.onNewTerminalTab = onNewTerminalTab
+        self.onOpenTerminal = onOpenTerminal
         self.onSessionRequestedClose = onSessionRequestedClose
         self.onSessionEndedCleanly = onSessionEndedCleanly
         self.onTerminalContextChange = onTerminalContextChange
@@ -1355,6 +1360,20 @@ struct TerminalWindowView: View {
         showingTerminalSettings = true
     }
 
+    private var footerNewTerminalButton: some View {
+        Button {
+            openNewTerminalFromFooter()
+        } label: {
+            Image(systemName: "plus")
+        }
+        #if os(iOS)
+        .buttonStyle(.borderless)
+        #endif
+        .accessibilityIdentifier("terminal-footer-new-tab")
+        .accessibilityLabel(newTerminalAccessibilityLabel)
+        .help(newTerminalAccessibilityLabel)
+    }
+
     private func openNewTerminalFromFooter() {
         if let onNewTerminalTab {
             onNewTerminalTab()
@@ -1593,17 +1612,21 @@ struct TerminalWindowView: View {
             #endif
 
             if showsFooterNewTerminalAction {
-                Button {
-                    openNewTerminalFromFooter()
-                } label: {
-                    Image(systemName: "plus")
+                #if !os(macOS)
+                if let onOpenTerminal {
+                    // Held: servers ▸ their terminals, opened in this window (2026-10-15).
+                    TerminalNewTabMenu(pickServer: { openNewTerminalFromFooter() }, open: onOpenTerminal) {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityIdentifier("terminal-footer-new-tab")
+                    .accessibilityLabel(newTerminalAccessibilityLabel)
+                    .help("New Terminal Tab. Hold for a server's running terminals.")
+                } else {
+                    footerNewTerminalButton
                 }
-#if os(iOS)
-                .buttonStyle(.borderless)
-#endif
-                .accessibilityIdentifier("terminal-footer-new-tab")
-                .accessibilityLabel(newTerminalAccessibilityLabel)
-                .help(newTerminalAccessibilityLabel)
+                #else
+                footerNewTerminalButton
+                #endif
             }
 
             Menu {

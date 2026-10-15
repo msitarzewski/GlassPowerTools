@@ -175,6 +175,14 @@ public final class GlassTerminalRuntime {
         Self.machineTitle(serverName: server.name, hostName: hostName?(server.id))
     }
 
+    /// The sessions running on the machines, as Active last listed them (D44), for the + menu's
+    /// terminals (`TerminalNewTabMenu`). Supplied by the composition root, by the same seam; nil
+    /// lists none.
+    public var runningSessions: (@MainActor () -> [GlassRunningSession])?
+
+    /// Asks the machines again when Active's list is old (`refreshRunningSessionsIfDue`).
+    public var refreshRunningSessionsIfDue: (@MainActor () async -> Void)?
+
     /// "Take me to the live connections" — the ⚡ in every toolbar. Supplied by the composition
     /// root, since the library is the shell's; nil means the bolt is not offered.
     public var showActiveConnections: GlassShowActiveConnections?
