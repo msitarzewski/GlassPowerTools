@@ -123,6 +123,8 @@ public struct GlassEditorWorkspaceView: View {
         // Behind the paint, out to the window's edges: as much of Apple's glass as the window's
         // Glass asks for, none at 0 (`GlassSpatialWindowGlass`).
         .glassSpatialWindowGlass()
+        // Shrinks into an orb (2026-10-15); a document has no picture yet, so its symbol.
+        .glassSessionOrb(GlassSessionOrbFace(title: detailTitle, symbolName: "doc.text") { nil })
         #endif
         // **The text follows the system's appearance.** `GlassEditorModel` defaults to the dark
         // theme and nothing ever changed it, so in Light mode the window's chrome went light and the

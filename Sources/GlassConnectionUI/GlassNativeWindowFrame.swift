@@ -7,6 +7,7 @@ import SwiftUI
 public struct GlassNativeWindowFrame<Content: View, Title: View, Controls: View>: View {
     private let showTitle: Bool
     private let showControls: Bool
+    @Environment(\.glassWindowOutOfSight) private var outOfSight
     private let content: Content
     private let title: Title
     private let controls: Controls
@@ -29,6 +30,9 @@ public struct GlassNativeWindowFrame<Content: View, Title: View, Controls: View>
     }
 
     public var body: some View {
+        // As its orb, the window's title and controls go with it; the inset stays, so the content
+        // kept out of sight is laid out as it was.
+        let titleShown = showTitle && !outOfSight
         content
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             // The inset exists to keep content clear of the title and control ornaments, so it
@@ -43,7 +47,7 @@ public struct GlassNativeWindowFrame<Content: View, Title: View, Controls: View>
             .padding(.bottom, showControls ? GlassWindowShape.spatialControlsInset : 0)
             // Visibility changes must not replace the live canvas host.
             .ornament(
-                visibility: showTitle ? .visible : .hidden,
+                visibility: titleShown ? .visible : .hidden,
                 attachmentAnchor: .scene(.top)
             ) {
                 title.glassBackgroundEffect(in: .capsule)
@@ -60,7 +64,7 @@ public struct GlassNativeWindowFrame<Content: View, Title: View, Controls: View>
             // the hidden ones transparent), so only the one in front may contribute any. The
             // `.toolbar` modifier itself stays, so the canvas host is never replaced.
             .toolbar {
-                if showControls {
+                if showControls && !outOfSight {
                     ToolbarItemGroup(placement: .bottomOrnament) { controls }
                 }
             }

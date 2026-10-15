@@ -67,6 +67,10 @@ nonisolated enum TerminalWindowSettings {
     static let scrollbackLines = GlassWindowSetting<Int>("terminal.scrollbackLines", title: "Scrollback Lines") {
         min(100_000, max(1_000, $0))
     }
+    /// Vision Pro (the owner, 2026-10-15: "add Auto-focus on activity to This Window"): while a
+    /// terminal in the window prints, the grid and carousel bring it forward and the window's orb
+    /// pulses. Unset, the window follows the saved Workgroup it was opened from, else is off.
+    static let autoFocusOnActivity = GlassWindowSetting<Bool>("terminal.autoFocusOnActivity", title: "Auto-focus on Activity")
 
     /// The settings W20's look carried, which records keep under `look` in its format.
     static var lookKeys: Set<String> {

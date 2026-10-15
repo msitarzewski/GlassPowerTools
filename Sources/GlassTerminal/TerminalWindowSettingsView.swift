@@ -21,6 +21,8 @@ import GlassConnectionUI
 struct TerminalOverridesSettingsView: View {
     @Binding var settings: GlassWindowOverrides
     @Environment(SettingsManager.self) private var settingsManager
+    /// The window's workgroup, whose saved Workgroup's Auto-focus on activity it follows (visionOS).
+    @Environment(\.terminalWorkgroupID) private var workgroupID
 
     /// Where each kind of setting lives for every window, as This Window names it.
     enum Source {
@@ -32,6 +34,11 @@ struct TerminalOverridesSettingsView: View {
 
     init(settings: Binding<GlassWindowOverrides>) {
         _settings = settings
+    }
+
+    /// What the window follows until it sets Auto-focus on activity: its saved Workgroup's.
+    private var workgroupFollowsActivity: Bool {
+        settingsManager.layoutPresets.first { $0.id == workgroupID }?.autoFocusOnActivity ?? false
     }
 
     var body: some View {
@@ -184,6 +191,22 @@ struct TerminalOverridesSettingsView: View {
             } footer: {
                 Text("For every terminal, these are in Settings ▸ Connections.")
             }
+
+            #if os(visionOS)
+            Section {
+                GlassWindowSettingRow(TerminalWindowSettings.autoFocusOnActivity, overrides: $settings,
+                                      global: workgroupFollowsActivity, inheritsFrom: "Workgroup") { value in
+                    GlassSettingLabeled("Auto-focus on activity") {
+                        Toggle("Auto-focus on activity", isOn: value)
+                            .accessibilityIdentifier("terminal-window-auto-focus")
+                    }
+                }
+            } header: {
+                Text("Activity")
+            } footer: {
+                Text("While a terminal in this window prints, the grid and carousel bring it forward, and the window's orb pulses.")
+            }
+            #endif
 
             Section {
                 GlassWindowResetButton(overrides: $settings)

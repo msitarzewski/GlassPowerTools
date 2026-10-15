@@ -29,6 +29,27 @@ enum VisionTerminalStatus {
     }
 }
 
+/// Whether a terminal in a window printed something in the last moment, for its orb's pulse
+/// (2026-10-15), as a Mac tab tells it (`MacWorkspaceController.isProducingOutput`).
+@MainActor @Observable
+final class TerminalWindowActivity {
+    private(set) var isBusy = false
+    /// The terminal that printed last, for Auto-focus on activity in the grid and carousel.
+    private(set) var lastSessionID: UUID?
+    @ObservationIgnored private var quiet: Task<Void, Never>?
+
+    func note(_ sessionID: UUID) {
+        if !isBusy { isBusy = true }
+        if lastSessionID != sessionID { lastSessionID = sessionID }
+        quiet?.cancel()
+        quiet = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(1_200))
+            guard !Task.isCancelled else { return }
+            self?.isBusy = false
+        }
+    }
+}
+
 @Observable
 final class VisionTerminalPresentationState {
     var mode: VisionTerminalPresentation = .tabs
@@ -167,6 +188,8 @@ struct VisionTerminalWorkgroupView: View {
     #if os(visionOS)
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State var spatialPresentation = VisionTerminalPresentationState()
+    /// Output in this window's terminals, for its orb's pulse.
+    @State private var activity = TerminalWindowActivity()
     @FocusState private var overviewFocused: Bool
     /// The grid card a dragged tab is over (W15).
     @State private var dropTargetSessionID: UUID?
@@ -230,8 +253,20 @@ struct VisionTerminalWorkgroupView: View {
                 TerminalPathActions.install(on: session) { [weak session] path in
                     if let session { watchFile(path, printedBy: session) }
                 }
+                #if os(visionOS)
+                // Its output, for the orb's pulse.
+                let id = session.id
+                session.terminalHostModel.onOutputActivity = { [weak activity] in activity?.note(id) }
+                #endif
             }
         }
+        #if os(visionOS)
+        // Auto-focus on activity: in the grid and carousel, the terminal printing comes forward.
+        .onChange(of: activity.lastSessionID) { _, printing in
+            guard let printing, followsActivity, presentation != .tabs, selectedSessionID != printing else { return }
+            selectedSessionID = printing
+        }
+        #endif
         .onChange(of: liveSelectedSessionID) { _, newSelection in
             if selectedSessionID != newSelection {
                 selectedSessionID = newSelection
@@ -264,8 +299,32 @@ struct VisionTerminalWorkgroupView: View {
         // plain, and this is as much of Apple's glass as its Blur asks for (2026-10-10). The same
         // glass every plain Glass window draws (`GlassSpatialWindowGlass`, W28).
         .glassSpatialWindowGlass(strength: windowLook.windowGlass(reduceTransparency: reduceTransparency))
+        // Shrinks into an orb with the terminal in front live on its face (2026-10-15).
+        .glassSessionOrb(orbFace)
         #endif
     }
+
+    #if os(visionOS)
+    /// Auto-focus on activity (the owner, 2026-10-15): the window's own, in This Window, else the
+    /// saved Workgroup's it was opened from, else off.
+    private var followsActivity: Bool {
+        sessionManager.workgroup(for: workgroupID)?.windowSettings[TerminalWindowSettings.autoFocusOnActivity]
+            ?? settingsManager.layoutPresets.first { $0.id == workgroupID }?.autoFocusOnActivity
+            ?? false
+    }
+
+    /// This window as its orb: the terminal in front, live; pulsing while a terminal here prints, when
+    /// the window has Auto-focus on activity (the owner's choice of switch).
+    private var orbFace: GlassSessionOrbFace {
+        let workgroup = sessionManager.workgroup(for: workgroupID)
+        let title = workgroup.map { GlassTerminalCapability.title(of: $0, live: liveSessions(in: $0)) } ?? "Terminal"
+        let sessionManager = sessionManager, workgroupID = workgroupID
+        return GlassSessionOrbFace(title: title, symbolName: "terminal", pulses: followsActivity && activity.isBusy) {
+            sessionManager.selectedSession(inWorkgroup: workgroupID)?.terminalHostModel
+                .previewImage(maxPixelWidth: 400).map(Image.init(uiImage:))
+        }
+    }
+    #endif
 
     #if os(visionOS)
     /// The canvas look of this window: its own settings over the terminal settings.

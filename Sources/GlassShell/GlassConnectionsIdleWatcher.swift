@@ -239,7 +239,8 @@ private struct GlassConnectionsIdleShrinkModifier: ViewModifier {
 /// first view, in the same place in the tree whichever the window is; as the orb it is laid out
 /// at the size it had, centred behind the orb and out of sight, so nothing in it is rebuilt or
 /// squeezed.
-private struct GlassConnectionsWindowLayout: Layout {
+/// Also a session window's while it is its orb (`glassSessionOrb`, 2026-10-15).
+struct GlassConnectionsWindowLayout: Layout {
     /// The library's size while the window is its orb; nil while it is the library.
     let library: CGSize?
 
@@ -269,6 +270,8 @@ private struct GlassConnectionsWindowLayout: Layout {
 final class GlassConnectionsWindowProbe: NSObject {
     var clock = GlassConnectionsIdleClock()
     private weak var window: UIWindow?
+    /// Asks visionOS for the window's sizes (`GlassWindowSizer`, which a session window's orb uses too).
+    private let sizer = GlassWindowSizer()
     private var recognizers: [UIGestureRecognizer] = []
     private var dropInteraction: UIDropInteraction?
     private var observers: [NSObjectProtocol] = []
@@ -283,6 +286,7 @@ final class GlassConnectionsWindowProbe: NSObject {
         detach()
         guard let window else { return }
         self.window = window
+        sizer.window = window
 
         let touches = InteractionRecognizer { [weak self] down, used in
             self?.touchesDown = down
@@ -332,56 +336,19 @@ final class GlassConnectionsWindowProbe: NSObject {
         touchesDown = 0
         dragsOver = 0
         window = nil
+        sizer.window = nil
     }
 
     // MARK: The window's size (W39)
 
     /// The window's size now, from its scene; nil until the probe is in a window.
-    var windowSize: CGSize? {
-        guard let scene = window?.windowScene else { return nil }
-        return scene.effectiveGeometry.coordinateSpace.bounds.size
-    }
+    var windowSize: CGSize? { sizer.windowSize }
 
-    /// Bumped by every resize asked for, so an older one still waiting gives way to the newest.
-    private var resizeGeneration = 0
-
-    /// Asks visionOS to give the window `size`, once its scene's limits allow it. The limits come
-    /// from the content (`.windowResizability(.contentSize)`), and SwiftUI hands them to the scene
-    /// a moment after the content changes: a size asked for before then is held to the old ones.
-    /// So the limits are looked at every tenth of a second for two seconds, and the size asked
-    /// for once they allow it, or then anyway; what visionOS made of it is logged.
+    /// Asks visionOS to give the window `size`, once its scene's limits allow it
+    /// (`GlassWindowSizer`). And the library's host once more, now the window has its new size: a
+    /// window opened as its orb had no tab view to hide at first.
     func resize(to size: CGSize, event: String) {
-        resizeGeneration &+= 1
-        request(size, event: event, generation: resizeGeneration, attempt: 0)
-    }
-
-    private func request(_ size: CGSize, event: String, generation: Int, attempt: Int) {
-        guard generation == resizeGeneration else { return }
-        let scene = window?.windowScene
-        let admitted = scene.map {
-            GlassConnectionsWindowSize.admits(size, minimum: $0.effectiveGeometry.minimumSize,
-                                              maximum: $0.effectiveGeometry.maximumSize)
-        } ?? false
-        guard let scene, admitted || attempt >= 20 else {
-            guard attempt < 20 else {
-                Logger.idle.error("event=\(event, privacy: .public) no-window")
-                return
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                self?.request(size, event: event, generation: generation, attempt: attempt + 1)
-            }
-            return
-        }
-        Logger.idle.notice("event=\(event, privacy: .public) width=\(size.width) height=\(size.height) waited=\(attempt)")
-        scene.requestGeometryUpdate(.Vision(size: size)) { error in
-            Logger.idle.error("event=\(event, privacy: .public) error=\(error.localizedDescription, privacy: .public)")
-        }
-        // What visionOS made of it, for the log. And the library's host once more, now the
-        // window has its new size: a window opened as its orb had no tab view to hide at first.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
-            let geometry = scene.effectiveGeometry
-            let bounds = geometry.coordinateSpace.bounds.size
-            Logger.idle.notice("event=\(event, privacy: .public)-geometry width=\(bounds.width) height=\(bounds.height) min=\(geometry.minimumSize.width)x\(geometry.minimumSize.height) max=\(geometry.maximumSize.width)x\(geometry.maximumSize.height)")
+        sizer.resize(to: size, event: event) { [weak self] in
             if self?.libraryAway == true { self?.applyLibraryAway() }
         }
     }

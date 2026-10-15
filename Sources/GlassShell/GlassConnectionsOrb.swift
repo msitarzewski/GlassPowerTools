@@ -108,7 +108,7 @@ public struct GlassConnectionsOrb: View {
 }
 
 /// Grows the orb a little while it is looked at. Drawn by the system, out of the app's process.
-private struct GlassOrbGrowEffect: CustomHoverEffect {
+struct GlassOrbGrowEffect: CustomHoverEffect {
     func body(content: Content) -> some CustomHoverEffect {
         content.hoverEffect { effect, isActive, _ in
             effect.scaleEffect(isActive ? 1.08 : 1)
@@ -117,7 +117,7 @@ private struct GlassOrbGrowEffect: CustomHoverEffect {
 }
 
 /// Fades the name in while the orb is looked at.
-private struct GlassOrbRevealEffect: CustomHoverEffect {
+struct GlassOrbRevealEffect: CustomHoverEffect {
     func body(content: Content) -> some CustomHoverEffect {
         content.hoverEffect { effect, isActive, _ in
             effect.opacity(isActive ? 1 : 0)
@@ -165,7 +165,7 @@ private struct GlassConnectionsOrbBadge: View {
 }
 
 /// Pressed, the orb gives a little; looked at, its own hover effects answer.
-private struct GlassOrbButtonStyle: ButtonStyle {
+struct GlassOrbButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.95 : 1)

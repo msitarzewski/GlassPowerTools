@@ -178,6 +178,10 @@ public struct DesktopSessionView: View {
                                                                      reduceTransparency: reduceTransparency))
         // W38: the window resizes only in its display's shape.
         .background { DesktopWindowAspectLock(aspect: session.pictureAspect(for: viewport)) }
+        // Shrinks into an orb with the remote screen live on its face (2026-10-15).
+        .glassSessionOrb(GlassSessionOrbFace(title: windowTitle, symbolName: "display") { [session] in
+            session.frame.flatMap(GlassDesktopCapability.picture(of:))
+        })
         #else
         sessionContent
             .modifier(DesktopClipboardBridge(session: session))
