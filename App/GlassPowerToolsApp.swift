@@ -354,6 +354,11 @@ struct GlassPowerToolsApp: App {
                     ])
             }
         }
+        // Open in Editor on a path a terminal on this Mac shows (2026-10-14): a file as a tab, a
+        // folder as a project, as the Finder's Open in Editor.
+        terminal.openLocalInEditor = { urls in
+            GlassWindowOpener.shared.perform { editor.show(editor.open(urls: urls), with: $0) }
+        }
         // "Edit" on a file in the Files browser opens it in the editor, as a tab, and saves back
         // over the same connection through the verified commit.
         terminal.openFileInEditor = { @MainActor serverID, path in

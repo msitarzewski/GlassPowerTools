@@ -51,3 +51,30 @@ enum TerminalWatchFile {
         return String(path[...slash])
     }
 }
+
+/// A path a terminal printed, made absolute on the machine it was printed on (the owner,
+/// 2026-10-14: "open a path with a context menu"): `~/…` against that machine's home, a relative
+/// path against the folder its shell was in. What only a shell can expand — `$VAR/…` — is not
+/// guessed at: Copy Path and Watch Log File, which hand it to a shell, still take it.
+enum TerminalPathResolution {
+    static func absolute(_ path: String, directory: String?, home: String?) -> String? {
+        guard !path.isEmpty, !path.hasPrefix("$") else { return nil }
+        let joined: String
+        if path.hasPrefix("/") {
+            joined = path
+        } else if path == "~" || path.hasPrefix("~/") {
+            guard let home, home.hasPrefix("/") else { return nil }
+            joined = (home as NSString).appendingPathComponent(String(path.dropFirst(path == "~" ? 1 : 2)))
+        } else {
+            guard let directory, directory.hasPrefix("/") else { return nil }
+            joined = (directory as NSString).appendingPathComponent(path)
+        }
+        let standardized = NSString(string: joined).standardizingPath
+        return standardized.isEmpty ? "/" : standardized
+    }
+
+    /// The folder Files or the Finder shows for `path`: the folder itself, or the one a file is in.
+    static func folder(of path: String, isDirectory: Bool) -> String {
+        isDirectory ? path : (path as NSString).deletingLastPathComponent
+    }
+}

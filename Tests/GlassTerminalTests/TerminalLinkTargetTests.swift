@@ -77,4 +77,19 @@ struct TerminalLinkTargetTests {
         let words = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
         #expect(words == path + "\n")
     }
+
+    /// The owner (2026-10-14): "open a path with a context menu".
+    @Test("a path is made absolute on its machine: ~ against its home, a relative one against the shell's folder")
+    func pathResolution() {
+        #expect(TerminalPathResolution.absolute("/var/log/app.log", directory: nil, home: nil) == "/var/log/app.log")
+        #expect(TerminalPathResolution.absolute("~/notes.md", directory: nil, home: "/home/ann") == "/home/ann/notes.md")
+        #expect(TerminalPathResolution.absolute("~", directory: nil, home: "/home/ann") == "/home/ann")
+        #expect(TerminalPathResolution.absolute("logs/a.log", directory: "/srv/app", home: nil) == "/srv/app/logs/a.log")
+        #expect(TerminalPathResolution.absolute("../x", directory: "/srv/app", home: nil) == "/srv/x")
+        #expect(TerminalPathResolution.absolute("~/x", directory: nil, home: nil) == nil, "no home known")
+        #expect(TerminalPathResolution.absolute("logs/a.log", directory: nil, home: nil) == nil, "no folder known")
+        #expect(TerminalPathResolution.absolute("$HOME/x", directory: "/a", home: "/b") == nil, "only a shell expands that")
+        #expect(TerminalPathResolution.folder(of: "/srv/app/a.log", isDirectory: false) == "/srv/app")
+        #expect(TerminalPathResolution.folder(of: "/srv/app", isDirectory: true) == "/srv/app")
+    }
 }

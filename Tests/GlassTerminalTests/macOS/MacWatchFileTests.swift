@@ -25,6 +25,20 @@ struct MacWatchFileTests {
         #expect(broker.claim(ticket)?.command == #"tail -F /srv/app/logs/a\ b.log"#)
     }
 
+    @Test("a path on this Mac is found beside its shell's folder, a folder told from a file, a missing one not at all")
+    func locateALocalPath() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MacOpenPath-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("logs"), withIntermediateDirectories: true)
+        try Data("x".utf8).write(to: root.appendingPathComponent("logs/a.log"))
+        defer { try? FileManager.default.removeItem(at: root) }
+        let folder = root.resolvingSymlinksInPath().path
+        let (controller, pane) = try tab(.local(shell: "/bin/zsh", directory: folder))
+        let file = try #require(await controller.locatePath("logs/a.log", from: pane))
+        #expect(file.path == folder + "/logs/a.log" && !file.isDirectory && file.serverID == nil)
+        #expect(try #require(await controller.locatePath("logs", from: pane)).isDirectory)
+        #expect(await controller.locatePath("logs/missing.log", from: pane) == nil)
+    }
+
     @Test("from an SSH pane: a tab on the same host, without tmux; a relative path with no folder known is refused")
     func fromAnSSHPane() async throws {
         let server = UUID()

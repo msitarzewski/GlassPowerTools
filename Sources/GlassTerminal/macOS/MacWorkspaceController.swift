@@ -320,6 +320,79 @@ final class MacWorkspaceController {
                                       startupTicketID: ticket)
     }
 
+    // MARK: Open a path (2026-10-14)
+
+    /// Open in Editor and Show in Finder / Files on a path the pane printed (the owner, 2026-10-14:
+    /// "Can we datadetector a path and open a path with a context menu?").
+    private func installPathActions(on model: SwiftTermHostModel, for paneID: UUID, local: Bool) {
+        model.onOpenPath = { [weak self] path in Task { await self?.openPath(path, from: paneID) } }
+        model.onRevealPath = { [weak self] path in Task { await self?.revealPath(path, from: paneID) } }
+        model.revealPathTitle = local ? "Show in Finder" : "Show in Files"
+    }
+
+    /// Where a path a pane printed is: absolute, on this Mac or on the pane's host, and whether it
+    /// is a folder. Nil when it cannot be told, or is not there.
+    func locatePath(_ path: String, from paneID: UUID) async -> (path: String, serverID: UUID?, isDirectory: Bool)? {
+        guard let pane = state.root?.pane(id: paneID) else { return nil }
+        switch pane.intent.kind {
+        case .local:
+            let directory = localDirectory(for: paneID) ?? pane.intent.localDirectory
+            guard let absolute = TerminalPathResolution.absolute(path, directory: directory, home: NSHomeDirectory()) else { return nil }
+            var isDirectory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: absolute, isDirectory: &isDirectory) else { return nil }
+            return (absolute, nil, isDirectory.boolValue)
+        case .ssh:
+            guard let serverID = pane.intent.serverID, let session = sessionsByPaneID[paneID] else { return nil }
+            var directory: String?
+            if TerminalWatchFile.isRelative(path) {
+                directory = TerminalRepository.path(
+                    fromReported: await session.workingDirectory(reported: session.terminalHostModel.currentDirectory))
+            }
+            // The host's home, for `~/…`: tmux's answer where the pane runs in it, else the host's.
+            var home = session.tmuxPane?.home
+            if path.hasPrefix("~"), home == nil {
+                home = (try? await session.runTmuxCommand("printf '%s' \"$HOME\""))?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            guard let absolute = TerminalPathResolution.absolute(path, directory: directory, home: home) else { return nil }
+            let kind = try? await session.runTmuxCommand(
+                "if [ -d \(TerminalDroppedPaths.escaped(absolute)) ]; then echo d; elif [ -e \(TerminalDroppedPaths.escaped(absolute)) ]; then echo f; fi")
+            switch kind?.trimmingCharacters(in: .whitespacesAndNewlines) {
+            case "d": return (absolute, serverID, true)
+            case "f": return (absolute, serverID, false)
+            default: return nil
+            }
+        }
+    }
+
+    /// Open in Editor: a file as a tab, a folder as a project. A beep when it is not there.
+    func openPath(_ path: String, from paneID: UUID) async {
+        guard let found = await locatePath(path, from: paneID), let runtime = GlassTerminalRuntime.current else {
+            NSSound.beep()
+            return
+        }
+        if let serverID = found.serverID {
+            let open = found.isDirectory ? runtime.openFolderAsProject : runtime.openFileInEditor
+            open?(serverID, found.path)
+        } else {
+            runtime.openLocalInEditor?([URL(fileURLWithPath: found.path, isDirectory: found.isDirectory)])
+        }
+    }
+
+    /// Show in Finder: the file selected in its folder. Show in Files: Files at its folder.
+    func revealPath(_ path: String, from paneID: UUID) async {
+        guard let found = await locatePath(path, from: paneID) else {
+            NSSound.beep()
+            return
+        }
+        if let serverID = found.serverID {
+            GlassTerminalRuntime.current?.requestFiles(
+                serverID: serverID, at: TerminalPathResolution.folder(of: found.path, isDirectory: found.isDirectory))
+        } else {
+            NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: found.path)])
+        }
+    }
+
     /// Where a local pane's shell is. In tmux the process Glass started is the tmux client, whose
     /// directory never moves, so the answer is the one tmux gave.
     func localDirectory(for paneID: UUID) -> String? {
@@ -506,6 +579,7 @@ final class MacWorkspaceController {
     private func watch(_ terminal: TerminalSession, for paneID: UUID) {
         terminal.readsTmuxPane = true
         terminal.terminalHostModel.onWatchFile = { [weak self] path in Task { await self?.watchFile(path, from: paneID) } }
+        installPathActions(on: terminal.terminalHostModel, for: paneID, local: false)
         terminal.tmuxPaneObserved = { [weak self, weak terminal] pane, firstSinceAttach in
             guard let self, let terminal else { return }
             terminalRead(pane, firstSinceAttach: firstSinceAttach, of: terminal, for: paneID)
@@ -784,6 +858,7 @@ final class MacWorkspaceController {
         localRuntimesByPaneID[paneID] = runtime
         observeOutput(of: runtime.model)
         runtime.model.onWatchFile = { [weak self] path in Task { await self?.watchFile(path, from: paneID) } }
+        installPathActions(on: runtime.model, for: paneID, local: true)
         if tmuxSession != nil {
             runtime.model.onAlternateScreenScroll = { [weak self] deltaY, precise in
                 self?.scrollLocalTmux(paneID, deltaY: deltaY, precise: precise) ?? false

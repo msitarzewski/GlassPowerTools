@@ -125,6 +125,12 @@ public final class GlassTerminalRuntime {
 
     /// What "Edit" does to a file in the Files browser: opens it in the editor, as a tab.
     public var openFileInEditor: GlassOpenFileInEditor?
+    /// Files and folders on this Mac into the editor — a folder as a project — for a path a
+    /// terminal shows (2026-10-14). Set by the composition root.
+    public var openLocalInEditor: (@MainActor ([URL]) -> Void)?
+    /// The app's one runtime, for a terminal's tab to reach the editor and Files from a path's
+    /// menu. Set as it is made.
+    public nonisolated(unsafe) static weak var current: GlassTerminalRuntime?
 
     /// The editor as a view, for a device where the browser has to present it itself.
     public var editorFileScreen: GlassEditorFileScreen?
@@ -185,6 +191,7 @@ public final class GlassTerminalRuntime {
             settingsManager.hostKeyVerificationMode == HostKeyVerificationMode.ask.rawValue
         }
         wakeWatcher = SSHWakeWatcher()
+        Self.current = self
         #if os(macOS)
         // Show All Windows is drawn here, with every terminal window's tabs as live tiles; the
         // shell's button and every window's toolbar reach it through this (GlassShowAllWindows).

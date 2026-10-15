@@ -222,6 +222,26 @@ struct MacTerminalContextMenuTests {
         #expect(watched == ["/var/log/glass-test.log"], "the file, without the line the log named")
     }
 
+    /// The owner (2026-10-14): "open a path with a context menu".
+    @Test("a path offers Open in Editor and its host's Show in Finder or Files, which hand the host the path")
+    func openAndRevealAPath() async throws {
+        let host = await HostedTerminal()
+        defer { host.close() }
+        var opened: [String] = [], revealed: [String] = []
+        host.model.onOpenPath = { opened.append($0) }
+        host.model.onRevealPath = { revealed.append($0) }
+        host.model.revealPathTitle = "Show in Finder"
+        host.model.onWatchFile = { _ in }
+        await host.feed("/var/log/glass-test.log:42 rotated\r\n")
+        let view = try terminalView(host)
+
+        let menu = try #require(view.menu(for: try rightClick(view)))
+        #expect(Array(titles(menu).prefix(5)) == ["Open in Editor", "Show in Finder", "Watch Log File", "Copy Path", "—"])
+        menu.performActionForItem(at: try #require(menu.items.firstIndex { $0.title == "Open in Editor" }))
+        menu.performActionForItem(at: try #require(menu.items.firstIndex { $0.title == "Show in Finder" }))
+        #expect(opened == ["/var/log/glass-test.log"] && revealed == ["/var/log/glass-test.log"])
+    }
+
     @Test("with no host that can watch, a path offers Copy Path alone, and it copies the path")
     func pathWithoutAWatcher() async throws {
         let host = await HostedTerminal()

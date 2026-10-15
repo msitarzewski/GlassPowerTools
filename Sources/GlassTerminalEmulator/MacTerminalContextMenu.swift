@@ -73,7 +73,8 @@ enum MacTerminalContextMenu {
         return .url(url)
     }
 
-    /// Open Link and Copy Link on an address; Watch Log File and Copy Path on a path.
+    /// Open Link and Copy Link on an address; Open in Editor, Show in Finder or Files, Watch Log
+    /// File and Copy Path on a path.
     static func addItems(for target: TerminalLinkTarget, model: SwiftTermHostModel?, to menu: NSMenu) {
         switch target {
         case .url(let url):
@@ -86,6 +87,12 @@ enum MacTerminalContextMenu {
             })
             menu.addItem(item("Copy Link", symbol: "link") { copy(link, to: copyPasteboard) })
         case .path(let path):
+            if let open = model?.onOpenPath {
+                menu.addItem(item("Open in Editor", symbol: "pencil.and.list.clipboard") { open(path) })
+            }
+            if let reveal = model?.onRevealPath, let title = model?.revealPathTitle {
+                menu.addItem(item(title, symbol: "folder") { reveal(path) })
+            }
             if let watch = model?.onWatchFile, !path.hasSuffix("/") {
                 menu.addItem(item("Watch Log File", symbol: "doc.text.magnifyingglass") { watch(path) })
             }

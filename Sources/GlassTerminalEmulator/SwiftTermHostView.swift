@@ -382,6 +382,13 @@ public final class SwiftTermHostModel: ObservableObject {
     /// host to follow in a tab of its own, on the same machine. Nil where the host cannot, and the
     /// menu leaves it out.
     public var onWatchFile: (@MainActor (String) -> Void)?
+    /// Open in Editor on a path the terminal shows: a file as a tab, a folder as a project, on the
+    /// machine it was printed on (2026-10-14). Nil where the host cannot.
+    public var onOpenPath: (@MainActor (String) -> Void)?
+    /// Show in Finder (this Mac) or Show in Files (a host) on a path: its folder. Nil where the
+    /// host cannot. `revealPathTitle` names it.
+    public var onRevealPath: (@MainActor (String) -> Void)?
+    public var revealPathTitle = "Show in Files"
     @Published public private(set) var scrollPosition: Double = 1
     @Published public private(set) var pendingPasteReview: SwiftTermPasteReview?
     @Published public private(set) var pendingExternalLink: SwiftTermExternalLinkRequest?
