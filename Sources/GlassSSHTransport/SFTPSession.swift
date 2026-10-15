@@ -274,6 +274,74 @@ public enum SFTPSessionError: Error, Sendable, Equatable {
     case extensionUnsupported(String)
     /// `SFTPAttributeChanges` carried one time without the other.
     case partialTimes
+    /// The server answered the request with a status other than OK (SSH_FXP_STATUS), and what it
+    /// said with it. Citadel throws its own status type, which reached the person as "Citadel.
+    /// SFTPMessage.Status error 1" (the owner, 2026-10-15, saving a new file on the headset).
+    case refused(SFTPRefusal, serverMessage: String)
+
+    /// Whether `error` is a server saying the path is not there.
+    public static func isMissingPath(_ error: any Error) -> Bool {
+        if case .refused(.noSuchFile, _)? = error as? SFTPSessionError { return true }
+        return false
+    }
+}
+
+/// Why an SFTP server refused a request: the status codes of SFTP version 3
+/// (draft-ietf-secsh-filexfer-02 §7), which OpenSSH speaks.
+public enum SFTPRefusal: Sendable, Equatable {
+    case endOfFile
+    case noSuchFile
+    case permissionDenied
+    case failure
+    case badMessage
+    case noConnection
+    case connectionLost
+    case unsupported
+    case other(UInt32)
+}
+
+/// In words, and what to do (the owner, 2026-09-16: an error "should suggest that, not be so …
+/// technical"). The server's own text goes to the log, not here: OpenSSH says no more than the
+/// status does.
+extension SFTPSessionError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .fileTooLarge(let limit):
+            "The file is larger than \(ByteCountFormatter.string(fromByteCount: Int64(limit), countStyle: .file)), more than can be opened here."
+        case .closed:
+            "The connection to the machine has closed. Try again to open a new one."
+        case .extensionUnsupported:
+            "The machine's SFTP server can't do this. A recent OpenSSH can."
+        case .partialTimes:
+            "A file's times can only be set together."
+        case .refused(let refusal, _):
+            switch refusal {
+            case .noSuchFile: "That file or folder isn't there. It may have been moved, renamed or deleted."
+            case .permissionDenied: "The machine doesn't let this account do that. Check the file's or folder's permissions."
+            case .endOfFile: "The file ended sooner than expected. It may be changing; try again."
+            case .noConnection, .connectionLost: "The connection to the machine was lost. Try again to open a new one."
+            case .unsupported: "The machine's SFTP server can't do this."
+            case .failure, .badMessage, .other: "The machine refused without saying why. Check that there is room on its disk and that the folder can be written to."
+            }
+        }
+    }
+}
+
+extension SFTPRefusal {
+    init(_ code: SFTPStatusCode) {
+        switch code {
+        case .ok: self = .other(0)
+        case .eof: self = .endOfFile
+        case .noSuchFile: self = .noSuchFile
+        case .permissionDenied: self = .permissionDenied
+        case .failure: self = .failure
+        case .badMessage: self = .badMessage
+        case .noConnection: self = .noConnection
+        case .connectionLost: self = .connectionLost
+        case .unsupportedOperation: self = .unsupported
+        case .unknown(let raw): self = .other(raw)
+        }
+    }
 }
 
 // MARK: - Citadel-backed implementation
@@ -295,7 +363,7 @@ final class CitadelSFTPSession: SFTPSession {
 
     func list(_ path: String) async throws -> [SFTPEntry] {
         try Task.checkCancellation()
-        let names = try await client.listDirectory(atPath: path)
+        let names = try await Self.translatingErrors { try await client.listDirectory(atPath: path) }
         let base = path.hasSuffix("/") ? path : path + "/"
         return names.flatMap(\.components)
             .filter { !SFTPEntry.isSelfOrParent($0.filename) }
@@ -311,60 +379,63 @@ final class CitadelSFTPSession: SFTPSession {
 
     func attributes(at path: String, followSymlinks: Bool) async throws -> SFTPAttributes {
         try Task.checkCancellation()
-        let attributes = followSymlinks
-            ? try await client.getAttributes(at: path)
-            : try await client.getLinkAttributes(at: path)
+        let attributes = try await Self.translatingErrors {
+            if followSymlinks { return try await client.getAttributes(at: path) }
+            return try await client.getLinkAttributes(at: path)
+        }
         return SFTPAttributes(attributes)
     }
 
     func realPath(_ path: String) async throws -> String {
         try Task.checkCancellation()
-        return try await client.getRealPath(atPath: path)
+        return try await Self.translatingErrors { try await client.getRealPath(atPath: path) }
     }
 
     func open(_ path: String, mode: SFTPOpenMode, permissions: UInt32?) async throws -> any SFTPFileHandle {
         try Task.checkCancellation()
         var attributes = SFTPFileAttributes.none
         if let permissions { attributes.permissions = permissions }
-        let file = try await client.openFile(filePath: path, flags: mode.citadelFlags, attributes: attributes)
+        let file = try await Self.translatingErrors {
+            try await client.openFile(filePath: path, flags: mode.citadelFlags, attributes: attributes)
+        }
         return CitadelSFTPFileHandle(file: file)
     }
 
     func createDirectory(_ path: String) async throws {
         try Task.checkCancellation()
-        try await client.createDirectory(atPath: path)
+        try await Self.translatingErrors { try await client.createDirectory(atPath: path) }
     }
 
     func removeFile(_ path: String) async throws {
         try Task.checkCancellation()
-        try await client.remove(at: path)
+        try await Self.translatingErrors { try await client.remove(at: path) }
     }
 
     func removeDirectory(_ path: String) async throws {
         try Task.checkCancellation()
-        try await client.rmdir(at: path)
+        try await Self.translatingErrors { try await client.rmdir(at: path) }
     }
 
     func rename(_ path: String, to newPath: String) async throws {
         try Task.checkCancellation()
-        try await client.rename(at: path, to: newPath)
+        try await Self.translatingErrors { try await client.rename(at: path, to: newPath) }
     }
 
     func posixRename(_ path: String, to newPath: String) async throws {
         try Task.checkCancellation()
-        try await Self.mappingExtensionErrors { try await client.posixRename(at: path, to: newPath) }
+        try await Self.translatingErrors { try await client.posixRename(at: path, to: newPath) }
     }
 
     func hardLink(_ path: String, to newPath: String) async throws {
         try Task.checkCancellation()
-        try await Self.mappingExtensionErrors { try await client.hardLink(at: path, to: newPath) }
+        try await Self.translatingErrors { try await client.hardLink(at: path, to: newPath) }
     }
 
     func setAttributes(_ changes: SFTPAttributeChanges, at path: String) async throws {
         try Task.checkCancellation()
         guard !changes.hasPartialTimes else { throw SFTPSessionError.partialTimes }
         guard !changes.isEmpty else { return }
-        try await client.setAttributes(at: path, to: changes.citadelAttributes)
+        try await Self.translatingErrors { try await client.setAttributes(at: path, to: changes.citadelAttributes) }
     }
 
     var serverExtensions: SFTPServerExtensions {
@@ -375,9 +446,14 @@ final class CitadelSFTPSession: SFTPSession {
         try await client.close()
     }
 
-    static func mappingExtensionErrors<T>(_ body: () async throws -> T) async throws -> T {
+    /// Citadel's errors as this module's: a missing extension, and a server's refusal with its
+    /// status, so nothing above sees a Citadel type and every refusal has words.
+    static func translatingErrors<T>(_ body: () async throws -> T) async throws -> T {
         do { return try await body() }
         catch SFTPError.unsupportedExtension(let name) { throw SFTPSessionError.extensionUnsupported(name) }
+        catch let status as SFTPMessage.Status {
+            throw SFTPSessionError.refused(SFTPRefusal(status.errorCode), serverMessage: status.message)
+        }
     }
 }
 
@@ -389,7 +465,7 @@ final class CitadelSFTPFileHandle: SFTPFileHandle, @unchecked Sendable {
 
     func read(from offset: UInt64, length: UInt32) async throws -> Data {
         try Task.checkCancellation()
-        let buffer = try await file.read(from: offset, length: length)
+        let buffer = try await CitadelSFTPSession.translatingErrors { try await file.read(from: offset, length: length) }
         return Data(buffer.readableBytesView)
     }
 
@@ -397,16 +473,16 @@ final class CitadelSFTPFileHandle: SFTPFileHandle, @unchecked Sendable {
         try Task.checkCancellation()
         var buffer = ByteBuffer()
         buffer.writeBytes(data)
-        try await file.write(buffer, at: offset)
+        try await CitadelSFTPSession.translatingErrors { try await file.write(buffer, at: offset) }
     }
 
     func attributes() async throws -> SFTPAttributes {
-        SFTPAttributes(try await file.readAttributes())
+        SFTPAttributes(try await CitadelSFTPSession.translatingErrors { try await file.readAttributes() })
     }
 
     func synchronize() async throws {
         try Task.checkCancellation()
-        try await CitadelSFTPSession.mappingExtensionErrors { try await file.synchronize() }
+        try await CitadelSFTPSession.translatingErrors { try await file.synchronize() }
     }
 
     func close() async throws {

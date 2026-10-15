@@ -100,6 +100,11 @@ nonisolated private struct SFTPUploadWorkerFailure: LocalizedError, Sendable {
 
 nonisolated private enum SFTPUploadCommitPolicy: Sendable {
     case createNoClobber
+    /// A new file from the editor (the owner, 2026-10-15: a never-saved document's first save to a
+    /// project on a server failed). Committed as `createNoClobber` is, so a file that appeared
+    /// under the name meanwhile is never replaced; and like an editor replacement it keeps no
+    /// resume record, because the bytes are the document's and saving again is the retry.
+    case createFromEditor
     case replaceExisting(expectedStat: RemoteStat, expectedDigest: ContentDigest)
 }
 
@@ -4901,6 +4906,53 @@ struct SFTPBrowserView: View {
         }
     }
 
+    /// A never-saved document's first save, or the editor's New File: the bytes staged as
+    /// `uploadRemoteEditorBytes` stages them, uploaded and verified, then exposed under `filename`
+    /// only if nothing is there (`createFromEditor`).
+    @concurrent
+    static func createRemoteEditorFile(
+        _ data: Data,
+        client: SFTPClient,
+        serverID: UUID,
+        remoteDirectory: String,
+        filename: String,
+        targetPath: String,
+        maximumBytes: UInt64
+    ) async throws -> SFTPUploadResult {
+        let stagingDirectoryURL = try uploadMetadataDirectory()
+        let stagingDirectory = try openLocalDirectoryNoFollow(at: stagingDirectoryURL)
+        defer { try? stagingDirectory.directory.close() }
+
+        let stagingName = ".glas-sh-editor-\(UUID().uuidString).source"
+        let staged = try createProtectedTemporaryFile(in: stagingDirectory.directory, name: stagingName)
+        var stagedIdentity = staged.identity
+        do {
+            try staged.file.write(contentsOf: data)
+            try staged.file.synchronize()
+            stagedIdentity = try localFileIdentity(for: staged.file)
+            try setProtection(.complete, for: staged.file, matching: stagedIdentity)
+            try staged.file.close()
+
+            let result = try await performVerifiedUpload(
+                client: client,
+                sourceURL: stagingDirectoryURL.appendingPathComponent(stagingName),
+                serverID: serverID,
+                remoteDirectory: remoteDirectory,
+                sourceName: filename,
+                finalName: filename,
+                targetPath: targetPath,
+                maximumUploadBytes: maximumBytes,
+                commitPolicy: .createFromEditor
+            )
+            try removeLocalFileIfMatching(in: stagingDirectory.directory, name: stagingName, identity: stagedIdentity)
+            return result
+        } catch {
+            try? staged.file.close()
+            try? removeLocalFileIfMatching(in: stagingDirectory.directory, name: stagingName, identity: stagedIdentity)
+            throw error
+        }
+    }
+
     @concurrent
     private static func performUpload(
         client: SFTPClient,
@@ -4970,8 +5022,9 @@ struct SFTPBrowserView: View {
         progress: (@MainActor @Sendable (SFTPTransferProgressUpdate) -> Void)? = nil
     ) async throws -> SFTPUploadResult {
         var replacementCommitMayHaveRun = false
+        var creationCommitMayHaveRun = false
         switch commitPolicy {
-        case .createNoClobber:
+        case .createNoClobber, .createFromEditor:
             guard client.supportsExtension("hardlink@openssh.com", version: "1") else {
                 throw SFTPTransferError.atomicCommitUnavailable
             }
@@ -5192,6 +5245,28 @@ struct SFTPBrowserView: View {
                     )
                 }
 
+            case .createFromEditor:
+                try checkCancellationBeforeCommit()
+                creationCommitMayHaveRun = true
+                try await client.hardLink(at: partialPath, to: targetPath)
+                // Created: from here nothing undoes or doubts it.
+                try? await remoteFile.close()
+                let cleanupWarning: Bool
+                do {
+                    try await client.remove(at: partialPath)
+                    try FileManager.default.removeItem(at: recordURL)
+                    cleanupWarning = false
+                } catch {
+                    cleanupWarning = true
+                }
+                // The link is the inode just verified, and a link does not change its
+                // modification time: what was checked is what is there.
+                return SFTPUploadResult(
+                    cleanupWarning: cleanupWarning,
+                    committedStat: remoteStat(from: verifiedHandleAttributes),
+                    committedDigest: committedDigest
+                )
+
             case .replaceExisting(let expectedStat, let expectedDigest):
                 // The human authorization applies to the remote identity that was
                 // observed before upload. Re-check immediately before the atomic rename
@@ -5261,6 +5336,26 @@ struct SFTPBrowserView: View {
                 throw SFTPUploadWorkerFailure(
                     message: message,
                     kind: error is CancellationError ? .cancelled : .general
+                )
+
+            case .createFromEditor:
+                // As an editor replacement: nothing kept to resume, the document is the retry.
+                try? await client.remove(at: partialPath)
+                try? FileManager.default.removeItem(at: recordURL)
+                // A link the server refused was not made; one whose answer never came may have been.
+                let refused: Bool = if case .refused? = error as? SFTPSessionError { true } else { false }
+                if creationCommitMayHaveRun, !refused {
+                    throw SFTPUploadWorkerFailure(
+                        message: "The machine did not confirm whether \(finalName) was created. Look in its folder before saving again.",
+                        kind: .commitOutcomeUnknown
+                    )
+                }
+                if error is CancellationError {
+                    throw SFTPUploadWorkerFailure(message: "Save cancelled. Nothing was created.", kind: .cancelled)
+                }
+                throw SFTPUploadWorkerFailure(
+                    message: "\(finalName) couldn't be saved. \(error.localizedDescription)",
+                    kind: .general
                 )
 
             case .replaceExisting:

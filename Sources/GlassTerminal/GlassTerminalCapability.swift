@@ -1226,9 +1226,19 @@ final class GlassTerminalDirectoryLister: GlassHostDirectoryLister {
     func write(_ data: Data, to path: String, expecting: GlassHostFileStamp?) async throws -> GlassHostFileStamp? {
         // What the destination is *now*, read the way the commit wants it: attributes and a digest
         // of the bytes, which is what lets it verify rather than hope.
-        let current = try await SFTPBrowserView.readVerifiedRemoteObservation(
-            client: client, path: path, maximumBytes: UInt64(Self.fileByteCeiling)
-        )
+        let current: SFTPRemoteFileObservation
+        do {
+            current = try await SFTPBrowserView.readVerifiedRemoteObservation(
+                client: client, path: path, maximumBytes: UInt64(Self.fileByteCeiling)
+            )
+        } catch where SFTPSessionError.isMissingPath(error) {
+            // Nothing there. The file the editor last saw has gone; or there never was one — a
+            // new document's first save, or New File — and it is created, never over a file that
+            // appears under the name meanwhile. Until 2026-10-15 this read failed for a new file
+            // and the save said "Citadel.SFTPMessage.Status error 1" (the owner, on the headset).
+            guard expecting == nil else { throw GlassPortForwardError.targetChanged((path as NSString).lastPathComponent) }
+            return try await create(data, at: path)
+        }
         if let expecting, !Self.matches(expecting, current.stat) {
             throw GlassPortForwardError.targetChanged((path as NSString).lastPathComponent)
         }
@@ -1252,6 +1262,27 @@ final class GlassTerminalDirectoryLister: GlassHostDirectoryLister {
             modifiedAt: committed.modificationSeconds.map {
                 Date(timeIntervalSince1970: TimeInterval($0))
             }
+        )
+    }
+
+    /// A file that is not there yet, uploaded and verified, then made visible under its name only
+    /// if the name is still free (`SFTPBrowserView.createRemoteEditorFile`).
+    private func create(_ data: Data, at path: String) async throws -> GlassHostFileStamp {
+        let result = try await SFTPBrowserView.createRemoteEditorFile(
+            data,
+            client: client,
+            serverID: serverID,
+            remoteDirectory: (path as NSString).deletingLastPathComponent,
+            filename: (path as NSString).lastPathComponent,
+            targetPath: path,
+            maximumBytes: UInt64(Self.fileByteCeiling)
+        )
+        guard let committed = result.committedStat else {
+            throw GlassPortForwardError.commitOutcomeUnknown((path as NSString).lastPathComponent)
+        }
+        return GlassHostFileStamp(
+            size: committed.size,
+            modifiedAt: committed.modificationSeconds.map { Date(timeIntervalSince1970: TimeInterval($0)) }
         )
     }
 
