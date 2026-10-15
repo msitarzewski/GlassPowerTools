@@ -32,7 +32,7 @@ use the disposable test VM only).
 
 ## 2026-10-14 (~11:30) — RESUME HERE
 
-**State:** 0.4.441 on the Mac and iPhone (21:07); the Vision Pro has been locked (CoreDevice 4016)
+**State:** 0.4.442 on the Mac and iPhone (21:37); the Vision Pro has been locked (CoreDevice 4016)
 since 0.4.423 — retry `devicectl device install app` with `$SP/dd-vision` when it is worn. No crash reports since
 2026-10-13 18:47. Everything committed, nothing pushed. The owner said he was packing up (~11:10). **Mac installs go when
 ready, never held on our judgement** (the owner: "No need to hold on quitting right now. All tmux all day."); devices too.
@@ -74,6 +74,13 @@ ready, never held on our judgement** (the owner: "No need to hold on quitting ri
   a service, or an editor's open documents); the library's SwiftUI-drawn ⚡ carries no identifier on iOS 27.2, so a
   bolt is known by identifier (native bar button) or by `GlassBoltProbe` behind it. Reproduced on my own iOS 27.2
   iPhone 17 Pro Max simulator (7AA5118B…); all 4 UI tests pass on 27.2 and 26.5. **Test on 27.2 from now on.**
+  He: "all windows works now… the show and hide animations could use some buffing. great work today!!" 78118d2
+  (0.4.442): velocity-carrying springs, rubber-band past open, frosted backdrop, cards arriving after the glass,
+  haptics — checked by recording the 27.2 simulator (`simctl io recordVideo`, ffmpeg tiles at 20 fps).
+- **Open a path from the terminal's menu (fa46b64, 0.4.442):** "Can we datadetector a path and open a path with a
+  context menu?" — Open in Editor (file → tab, folder → project; host via SFTP, this Mac via `openLocalInEditor`)
+  and Show in Finder / Show in Files; `TerminalPathResolution` (~ against the machine's home, relative against the
+  shell's folder; `$VAR` not guessed). Mac only (the right-click menu). Not yet seen by him.
 - **Command Palette, done this round** (cf237ab, fdc871c, 4690038; 0.4.430): every library service as "Connect: …"
   (desktops included; the database's old entries connected nothing); the terminal's commands from any window (New
   Connection, local terminals, a machine's Files and no-tmux terminal, saved workgroups); every project, Favorites'
