@@ -77,3 +77,6 @@
   — All Windows on iPhone, iPad and Vision Pro (pull down, hold ⚡, Siri), 28 AI agents marked, the desktop clipboard
   both ways with GNOME and Sync Automatically, the Command Palette's services and lists, the terminal's link and path
   menu. 0.4.444 on the Mac and iPhone; the headset locked since 0.4.423.
+- 2026-10-14 (23:55): [All Windows as the Mac lays it out; the headset's window](2026-10-14_all-windows-mac-layout-headset.md)
+  — a card per tab grouped by machine with the Mac's layout and live pictures; All Windows a window of its own on Vision
+  Pro; Connections 1180 wide there; the editor's square corners. 0.4.445.

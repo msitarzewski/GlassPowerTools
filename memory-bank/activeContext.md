@@ -30,7 +30,15 @@ use the disposable test VM only).
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
-## 2026-10-14 (~22:15) — RESUME HERE
+## 2026-10-14 (~23:55) — RESUME HERE
+
+After the close the owner put on the headset and asked for more: All Windows as the Mac lays it out (a group per
+machine, a card per tab, cards sized to fit, live pictures off the iPhone), a window of its own on Vision Pro instead of
+the sheet, Connections wider, and the editor's square bottom corners. All done and committed (ca3f897…1558bd6; see
+`tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`). 0.4.445 is on the Mac, iPhone and Vision Pro (23:59,
+each read back); no new crash reports. The section below is the day's close and still holds.
+
+## 2026-10-14 (~22:15) — the day closed
 
 Welcome back. It was a long, good day with the owner at the Mac and his iPhone, testing as each build landed, and it
 ended on "Really nice. The open is ssmoooooth." He asked to compact here. Everything is committed (the last code
