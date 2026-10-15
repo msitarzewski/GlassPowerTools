@@ -216,13 +216,29 @@ extension GlassShellModel {
     /// 2026-10-15: "So I can open a new session into a group"). It leaves the list at once, as one
     /// opened alone does.
     func open(_ session: GlassRunningSession, inTabGroup group: GlassTabGroup) {
-        guard !session.isOpenHere, let attachment = session.attachment else { return }
-        runningSessions.removeAll { $0.id == session.id }
-        registry.openRunningSessions([attachment], inTabGroup: group.id)
+        open([session], inTabGroup: group)
+    }
+
+    /// Several, as more tabs of one window, in the order given (the owner, 2026-10-15: "add Open as
+    /// Tab In for multiple selected sessions too"). As Open N in New Window: those open here
+    /// already, and those that open only alone, are left as they are.
+    @discardableResult
+    func open(_ sessions: [GlassRunningSession], inTabGroup group: GlassTabGroup) -> GlassOpenTogetherPlan {
+        let plan = GlassOpenTogetherPlan(sessions)
+        guard !plan.opening.isEmpty else { return plan }
+        let opened = Set(plan.opening.map(\.id))
+        runningSessions.removeAll { opened.contains($0.id) }
+        registry.openRunningSessions(plan.opening.compactMap(\.attachment), inTabGroup: group.id)
         Task {
             try? await Task.sleep(for: .seconds(3))
             await refreshRunningSessions()
         }
+        return plan
+    }
+
+    /// The windows the sessions that would open together can join: their capability's.
+    func tabGroups(for plan: GlassOpenTogetherPlan) -> [GlassTabGroup] {
+        plan.opening.first?.attachment.map { registry.tabGroups(for: $0.kind) } ?? []
     }
 
     /// Opens running sessions together: one new window holding them, a tab each, in the order
@@ -306,6 +322,15 @@ final class GlassActiveSelection {
         return plan
     }
 
+    /// Open N as Tabs In: the chosen sessions join a window here and the choice ends.
+    @discardableResult
+    func openChosen(in model: GlassShellModel, inTabGroup group: GlassTabGroup) -> GlassOpenTogetherPlan {
+        let plan = model.open(chosen(in: model.activeMachines()), inTabGroup: group)
+        finish()
+        notice = plan.note
+        return plan
+    }
+
     /// End N: asks once, for all of them; `endChosen` ends each once it is answered.
     func askToEnd() {
         isConfirmingEnd = !ids.isEmpty
@@ -341,6 +366,11 @@ final class GlassActiveSelection {
     }
 
     static let openHelp = "Opens the chosen sessions in one new window, a tab each. Sessions open here already stay where they are."
+
+    /// Into a window already open, a tab each.
+    static func openInTitle(count: Int) -> String {
+        count > 1 ? "Open \(count) as Tabs In" : "Open as Tab In"
+    }
 
     static func endTitle(count: Int) -> String {
         count > 1 ? "End \(count) Sessions…" : "End Session…"
@@ -567,7 +597,28 @@ struct GlassActiveConnectionsList: View {
             canOpen: !plan.opening.isEmpty,
             endTitle: GlassActiveSelection.endTitle(count: chosen.count),
             open: { selection.openChosen(in: model) },
-            end: { selection.askToEnd() })
+            end: { selection.askToEnd() },
+            openInTitle: GlassActiveSelection.openInTitle(count: plan.opening.count),
+            tabGroups: model.tabGroups(for: plan),
+            openIn: { selection.openChosen(in: model, inTabGroup: $0) })
+    }
+
+    /// Open N as Tabs In, beside Open N in New Window: the windows the chosen sessions can join.
+    @ViewBuilder
+    private func openInMenu(_ plan: GlassOpenTogetherPlan) -> some View {
+        let groups = model.tabGroups(for: plan)
+        if !groups.isEmpty {
+            Menu(GlassActiveSelection.openInTitle(count: plan.opening.count), systemImage: "rectangle.stack.badge.plus") {
+                ForEach(groups) { group in
+                    Button(group.title) { selection.openChosen(in: model, inTabGroup: group) }
+                }
+            }
+            #if !os(macOS)
+            .labelStyle(.titleOnly)
+            #endif
+            .help("Opens the chosen sessions as tabs of a window already open.")
+            .accessibilityIdentifier("active-open-in-together")
+        }
     }
 
     @ToolbarContentBuilder
@@ -582,6 +633,7 @@ struct GlassActiveConnectionsList: View {
                 .disabled(plan.opening.isEmpty)
                 .help(GlassActiveSelection.openHelp)
             }
+            ToolbarItem { openInMenu(plan) }
         }
         #else
         // In the column's header on the headset (`glassSpatialColumn`).
@@ -596,6 +648,7 @@ struct GlassActiveConnectionsList: View {
                 .labelStyle(.titleOnly)
                 .disabled(plan.opening.isEmpty)
                 .accessibilityIdentifier("active-open-together")
+                openInMenu(plan)
                 #if os(iOS)
                 // Mail's bar: one action at each end. An ornament sizes to what it holds.
                 Spacer()
@@ -667,6 +720,10 @@ struct GlassActiveBatchActions {
     let endTitle: String
     let open: @MainActor () -> Void
     let end: @MainActor () -> Void
+    /// Open N as Tabs In: the windows they can join, and joining one.
+    var openInTitle = ""
+    var tabGroups: [GlassTabGroup] = []
+    var openIn: @MainActor (GlassTabGroup) -> Void = { _ in }
 }
 
 /// A session running on the machine (D44). Choosing it opens it here, or goes to it when a
@@ -732,6 +789,13 @@ struct GlassRunningSessionRow: View {
             if let batch {
                 Button(batch.openTitle, systemImage: "macwindow.badge.plus") { batch.open() }
                     .disabled(!batch.canOpen)
+                if batch.canOpen, !batch.tabGroups.isEmpty {
+                    Menu(batch.openInTitle, systemImage: "rectangle.stack.badge.plus") {
+                        ForEach(batch.tabGroups) { group in
+                            Button(group.title) { batch.openIn(group) }
+                        }
+                    }
+                }
                 Button(batch.endTitle, systemImage: "stop.circle", role: .destructive) { batch.end() }
             } else {
                 if session.isOpenHere {

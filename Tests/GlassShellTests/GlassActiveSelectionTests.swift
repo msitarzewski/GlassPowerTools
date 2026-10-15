@@ -106,6 +106,33 @@ struct GlassActiveSelectionTests {
         #expect(f.log.opened.isEmpty && f.log.together.isEmpty, "not a window of its own")
     }
 
+    /// The owner, 2026-10-15: "add Open as Tab In for multiple selected sessions too."
+    @Test("Open N as Tabs In: the chosen join one window in Active's order, one request; one open here stays; the choice clears")
+    func openSeveralAsTabsIn() async throws {
+        let f = try await fixture()
+        defer { try? FileManager.default.removeItem(at: f.root) }
+        f.terminal.windows = [GlassTabGroup(id: "backend", title: "Backend")]
+        f.terminal.running = [row("glass-1", on: f.alpha, log: f.log), row("logs", on: f.bravo, log: f.log),
+                              row("glass-2", on: f.alpha, openHere: true, log: f.log)]
+        await f.model.refreshRunningSessions()
+        let machines = f.model.activeMachines()
+        let selection = GlassActiveSelection()
+        _ = selection.listSelected(Set(machines.flatMap(\.running).map(\.id)), plainClick: false, in: machines)
+        let plan = GlassOpenTogetherPlan(selection.chosen(in: machines))
+        #expect(f.model.tabGroups(for: plan).map(\.title) == ["Backend"])
+        #expect(GlassActiveSelection.openInTitle(count: plan.opening.count) == "Open 2 as Tabs In")
+
+        let opened = selection.openChosen(in: f.model, inTabGroup: f.terminal.windows[0])
+        #expect(opened.opening.map(\.title) == ["glass-1", "logs"])
+        #expect(f.log.intoWindow.count == 1, "one request for all of them")
+        #expect(f.log.intoWindow.first?.window == "backend")
+        #expect(f.log.intoWindow.first?.attachments == [GlassRunningAttachment(kind: .ssh, endpointID: f.alpha, name: "glass-1"),
+                                                        GlassRunningAttachment(kind: .ssh, endpointID: f.bravo, name: "logs")])
+        #expect(f.model.runningSessions.map(\.title) == ["glass-2"], "the one open here stays where it is")
+        #expect(selection.chosen(in: f.model.activeMachines()).isEmpty, "the choice ends")
+        #expect(f.log.opened.isEmpty && f.log.together.isEmpty)
+    }
+
     @Test("three sessions on two machines open as one request, in Active's order; the choice clears")
     func openThreeTogether() async throws {
         let f = try await fixture()
