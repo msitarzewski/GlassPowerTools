@@ -8,6 +8,7 @@
 
 import SwiftUI
 import GlassShell
+import GlassConnectionUI
 import GlassLayers
 
 public struct GlassTerminalScenes: Scene {
@@ -188,6 +189,11 @@ public struct GlassTerminalScenes: Scene {
                         .trackWindowPresence(key: "sftp-missing", recovery: windowRecoveryManager)
                 }
             }
+            // **In the window's shape**, as the editor's is (7538a54): the shelf at the bottom — the
+            // selection's actions, a transfer's progress — is a square `.bar`, and a plain window
+            // gives its content no shape, so it filled the window's bottom corners outside the
+            // rounded glass. Ornaments are outside this.
+            .clipShape(RoundedRectangle(cornerRadius: GlassWindowShape.spatialWindowCornerRadius, style: .continuous))
             .glassSpatialWindowGlass()
             .glassLayers(runtime.layers)
         }
