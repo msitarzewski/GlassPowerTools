@@ -250,3 +250,26 @@ Help: `terminal-sessions.md` (both ways of selecting work with tmux's mouse on; 
 0.4.454 (07:06) is on the iPhone and Vision Pro (`devicectl` reads 0.4.454). The Mac's quit was cancelled at the app's
 question, so the Mac stays on 0.4.453 until he's ready; today's changes are the headset's (the keeper's change leaves
 the Mac's behaviour as it was). No new crash reports.
+
+## 2026-10-15 (afternoon): the yellow selection, and no scrolling — tmux 3.8's mouse (2975ace, 0.4.455)
+
+The owner, on the headset in a tmux terminal on this Mac: "I just can't select text. It immediately unselects", then
+"what's the yellow vs. blue selections?", "Does it set things on its own?", "Now I can't scroll at all in visionpro".
+
+- **Cause:** this Mac's tmux server restarted at 14:36 under tmux 3.8, which turns `mouse` **on** with no configuration
+  (a private server, `tmux -L … -f /dev/null`, reports `mouse on`; the morning's server reported off). The app sets no
+  tmux mouse option (it sets only its own session options: given name, repository, branch). With the mouse taken,
+  SwiftTerm sent a pinch-drag to tmux as a drag: tmux selected in copy mode (`mode-style` bg yellow) and copied to its
+  own buffer and cleared on letting go — the "immediately unselects" — and the app's tmux scroll stood aside, so
+  nothing scrolled. Blue is the app's own selection.
+- **Fix (visionOS):** `mouseModeChanged` switches off SwiftTerm's new drag pan (no delegate) as it is made;
+  `UIKitAlternateScreenScrollWatcher` begins whatever the mouse mode and scrolls tmux's history through the session, or
+  sends the program SGR wheel steps (button 4/5, one per three rows) where there is no tmux session. A pinch still
+  clicks. iPhone and iPad unchanged (they likely have the same trouble with tmux 3.8; not yet looked at).
+- **Test:** `testAPinchDragScrollsAProgramThatHasTheMouse`; the tmux demo answers SGR wheel reports on its status line
+  (`DemoWheelAnswer`). Fails without the change (`pan(-) began` in the log: the drag sent to the program). All six
+  selection tests pass. Help updated.
+- With the terminal focused as a real session's is (`--demo-keyboard`), a double-pinched word in the tmux demo stays
+  highlighted (captured), so the simulator never showed his failure: the mouse was the difference.
+- The headset log couldn't be copied: the Mac (no Wi-Fi joined, a new address) and the headset can't see each other.
+- Working files moved to `~/Software/glass/tmp` after a /tmp cleanup wiped the scratchpad.
