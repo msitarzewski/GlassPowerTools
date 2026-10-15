@@ -33,4 +33,19 @@ struct TerminalNewTabMenuTests {
         #expect(entries[1].running.isEmpty)
         #expect(entries[2].running.map(\.title) == ["logs"])
     }
+
+    /// The Mac's "+" (the owner, 2026-10-15: "add running terminals to the Mac + menu too").
+    @Test("this Mac's running terminals, none a tab here shows, none on a host")
+    func thisMacsTerminals() {
+        let alpha = ServerConfiguration(name: "alpha", host: "alpha.example.com", username: "ann")
+        func local(_ name: String, openHere: Bool = false) -> GlassRunningSession {
+            let endpoint = GlassTerminalCapability.localShellEndpointID
+            return GlassRunningSession(id: "local:\(name)", title: name, symbolName: "terminal", endpointID: endpoint,
+                                       isAttachedElsewhere: false, isOpenHere: openHere, open: {}, takeOver: {}, end: {},
+                                       attachment: GlassRunningAttachment(kind: .ssh, endpointID: endpoint, name: name))
+        }
+        let listed = TerminalNewTabMenuEntry.runningOnThisMac([local("glass-1"), local("glass-2", openHere: true),
+                                                               running("build", on: alpha), local("glass-4")])
+        #expect(listed.map(\.title) == ["glass-1", "glass-4"])
+    }
 }

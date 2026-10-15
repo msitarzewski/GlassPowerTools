@@ -35,6 +35,15 @@ struct TerminalNewTabMenuEntry: Identifiable {
                 })
             }
     }
+
+    /// This Mac's own running terminals (D47), none a tab here shows, for the Mac's "+".
+    static func runningOnThisMac(_ running: [GlassRunningSession]) -> [GlassRunningSession] {
+        running.filter {
+            guard let attachment = $0.attachment, !$0.isOpenHere else { return false }
+            return attachment.kind == .ssh && attachment.endpointID == GlassTerminalCapability.localShellEndpointID
+                && TerminalTmux.isValidSessionName(attachment.name)
+        }
+    }
 }
 
 #if !os(macOS)

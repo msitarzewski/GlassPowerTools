@@ -288,11 +288,33 @@ struct MacWorkspaceView: View {
                     Menu {
                         Button("New Terminal", systemImage: "plus", action: addTab)
                         Button("New Basic Terminal", systemImage: "apple.terminal", action: addPlainTab)
-                        let hosts = terminalHosts
+                        // The terminals running on this Mac and on each host, as Active last listed
+                        // them, opened here as a tab (the owner, 2026-10-15: "add running terminals
+                        // to the Mac + menu too").
+                        let localRunning = runningOnThisMac
+                        if !localRunning.isEmpty {
+                            Menu("Running on This Mac", systemImage: "desktopcomputer") {
+                                ForEach(localRunning) { running in
+                                    runningButton(running) { addTab(runningLocally: $0) }
+                                }
+                            }
+                        }
+                        let hosts = terminalHostEntries
                         if !hosts.isEmpty {
                             Menu("New Terminal on", systemImage: "server.rack") {
-                                ForEach(hosts, id: \.server.id) { host in
-                                    Button(host.title) { addTab(onHost: host.server.id) }
+                                ForEach(hosts) { host in
+                                    if host.running.isEmpty {
+                                        Button(host.title) { addTab(onHost: host.server.id) }
+                                    } else {
+                                        Menu(host.title) {
+                                            Button("New Terminal", systemImage: "plus") { addTab(onHost: host.server.id) }
+                                            Section("Running") {
+                                                ForEach(host.running) { running in
+                                                    runningButton(running) { addTab(onHost: host.server.id, attachingTo: $0) }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                             .accessibilityIdentifier("mac-workspace-new-tab-on-host")
@@ -305,6 +327,8 @@ struct MacWorkspaceView: View {
                     .help("New Terminal Tab")
                     .disabled(!windowController.canAddTab)
                     .accessibilityIdentifier("mac-workspace-new-tab")
+                    // The running terminals are Active's list, asked again when it's old.
+                    .task { await terminalRuntime?.refreshRunningSessionsIfDue?() }
                 }
                 .glassKeepVisibleWhenCompact()
             }
@@ -687,16 +711,46 @@ struct MacWorkspaceView: View {
         }
     }
 
-    /// Saved hosts with a terminal, by their machines' names, for "+" ▸ New Terminal on.
-    private var terminalHosts: [(server: ServerConfiguration, title: String)] {
-        let titled = sessionManager.serverManager.servers.map { ($0, machineTitle(of: $0)) }
-        return GlassTerminalRuntime.distinguished(titled)
-            .sorted { $0.1.localizedStandardCompare($1.1) == .orderedAscending }
-    }
-
     private func machineTitle(of server: ServerConfiguration) -> String {
         terminalRuntime?.machineTitle(of: server)
             ?? GlassTerminalRuntime.machineTitle(serverName: server.name, hostName: nil)
+    }
+
+    /// "+" ▸ New Terminal on, with each host's running terminals (`TerminalNewTabMenuEntry`).
+    private var terminalHostEntries: [TerminalNewTabMenuEntry] {
+        TerminalNewTabMenuEntry.entries(
+            servers: sessionManager.serverManager.servers,
+            title: { machineTitle(of: $0) },
+            running: terminalRuntime?.runningSessions?() ?? [])
+    }
+
+    /// This Mac's tmux sessions no tab here shows, as Active last listed them.
+    private var runningOnThisMac: [GlassRunningSession] {
+        TerminalNewTabMenuEntry.runningOnThisMac(terminalRuntime?.runningSessions?() ?? [])
+    }
+
+    /// A running terminal in the menu: its name, and where it is and when it was used.
+    private func runningButton(_ running: GlassRunningSession, open: @escaping (String) -> Void) -> some View {
+        Button {
+            if let name = running.attachment?.name { open(name) }
+        } label: {
+            Text(running.title)
+            if let subtitle = running.subtitle { Text(subtitle) }
+        }
+    }
+
+    /// A tab attached to a tmux session on a host, as Active's Open as Tab In makes one.
+    private func addTab(onHost serverID: UUID, attachingTo name: String) {
+        var intent = MacWorkspacePaneIntent.ssh(serverID: serverID)
+        intent.sshTmuxSession = name
+        _ = addRequestedTab(MacWorkspaceTabRequest(initialPaneIntent: intent))
+    }
+
+    /// A tab attached to one of this Mac's tmux sessions.
+    private func addTab(runningLocally name: String) {
+        var intent = MacWorkspacePaneIntent.local
+        intent.localTmuxSession = name
+        _ = addRequestedTab(MacWorkspaceTabRequest(initialPaneIntent: intent))
     }
 
     /// "+" ▸ New Terminal on: a tab on that host, in tmux as it says.
