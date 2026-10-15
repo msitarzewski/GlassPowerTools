@@ -439,8 +439,10 @@ struct GlassAllWindowsPaneView: View {
                 }
                 // Past open the glass stretches from the top; short of it, it is still coming down.
                 .frame(height: state.height + top + state.height * max(0, state.progress - 1))
+                // No shadow: on see-through glass it showed through the pane as a dark layer, and
+                // stayed while the pane slid away (the owner, 2026-10-14). The frosted backdrop is
+                // what sets the pane off, as behind Notification Center.
                 .offset(y: -(state.height + top + 24) * (1 - shown))
-                .shadow(color: .black.opacity(0.25 * shown), radius: 24, y: 8)
             }
             .ignoresSafeArea(edges: .top)
         }
