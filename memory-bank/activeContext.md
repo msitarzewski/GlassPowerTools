@@ -41,6 +41,9 @@ Evidence: `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`, section 
 0.4.453 (nothing in 0.4.454 changes the Mac's behaviour). No new crash reports.
 
 **Done:**
+- **2026-10-16 10:25 — 0.4.462 on all three** (the headset caught up from 0.4.454: today's selection gestures,
+  tmux-mouse scrolling, iPhone tabs and desktop bars are all on it now). Next: his headset try of selection, then copy
+  its log (`headset-diagnostics` memory).
 - **2026-10-16 late morning — file previews over a Mac terminal** (d733b3c, 0.4.460 on the Mac and iPhone): Quick
   Look on a path's menu; Show previews Never / Mouseover (default) / Mouseover + Space; local and server files. His to
   try: hovering, Space, Markdown and a server's image.
