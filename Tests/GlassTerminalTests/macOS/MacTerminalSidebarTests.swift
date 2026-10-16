@@ -123,6 +123,69 @@ struct MacTerminalSidebarTests {
         abs(a.minX - b.minX) < 1 && abs(a.width - b.width) < 1 && abs(a.height - b.height) < 1
     }
 
+    /// The terminal window itself, an empty tab in it: what it holds can stop the window growing.
+    /// A minimum held on its whole content did (2026-10-16): AppKit grows the window by raising its
+    /// minimum width, SwiftUI put it back, and the sidebar squeezed the terminal.
+    @Test("the terminal window itself: its sidebar grows and shrinks the window")
+    func terminalWindow() async throws {
+        let sidebarKey = UserDefaultsKeys.macWorkspaceSidebarVisibility + ".terminal"
+        UserDefaults.standard.removeObject(forKey: sidebarKey)
+        let request = MacWorkspaceLaunchRequest(startsEmpty: true)
+        let window = NSWindow(contentRect: NSRect(x: 400, y: 300, width: 1000, height: 600),
+                              styleMask: [.titled, .resizable, .closable, .fullSizeContentView],
+                              backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer {
+            window.close()
+            window.contentView = nil
+            UserDefaults.standard.removeObject(forKey: sidebarKey)
+            let prefix = UserDefaultsKeys.macWorkspaceRestoration
+            for controller in MacWorkspacePreviewRegistry.shared.controllers(windowID: request.windowID) {
+                for tab in controller.tabs {
+                    UserDefaults.standard.removeObject(forKey: "\(prefix).\(tab.workspaceID.uuidString.lowercased())")
+                }
+            }
+            UserDefaults.standard.removeObject(forKey: "\(prefix).window.\(request.windowID.uuidString.lowercased())")
+            MacWorkspacePreviewRegistry.shared.remove(request.windowID)
+        }
+        window.contentView = NSHostingView(rootView: MacWorkspaceSceneRoot(request: request)
+            .environment(SessionManager(loadImmediately: false))
+            .environment(SettingsManager(loadImmediately: false)))
+        window.setFrame(NSRect(x: 400, y: 300, width: 1000, height: 600), display: true)
+        window.alphaValue = 0
+        window.orderFrontRegardless()
+        func settle() async {
+            for _ in 0..<5 { await Task.yield() }
+            try? await Task.sleep(for: .milliseconds(400))
+            window.contentView?.layoutSubtreeIfNeeded()
+        }
+        await settle()
+        let sidebar = try #require(GlassAdditiveSidebars.items(in: window).first { $0.behavior == .sidebar })
+        let split = try #require(sidebar.viewController.parent as? NSSplitViewController)
+        func toggle() async {
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = 0
+                split.toggleSidebar(nil)
+            }, completionHandler: nil)
+            await settle()
+        }
+        #expect(sidebar.isCollapsed, "an empty window opens without its sidebar")
+        let closed = window.frame
+
+        await toggle()
+        #expect(!sidebar.isCollapsed)
+        let width = sidebar.viewController.view.frame.width
+        #expect(width > 150, "the sidebar's width: \(width)")
+        #expect(abs(window.frame.width - (closed.width + width)) < 1,
+                "the window grew by the sidebar, the terminal's column kept its width: \(closed) → \(window.frame)")
+        #expect(abs(window.frame.maxX - closed.maxX) < 1, "toward the sidebar's side: \(window.frame)")
+
+        await toggle()
+        #expect(sidebar.isCollapsed)
+        #expect(abs(window.frame.width - closed.width) < 1 && abs(window.frame.minX - closed.minX) < 1,
+                "closed, the window is as it was: \(window.frame)")
+    }
+
     @Test("opened and closed by its button, the window grows and shrinks and the terminal stays")
     func toggled() async throws {
         let host = await Hosted(opensSidebar: false)

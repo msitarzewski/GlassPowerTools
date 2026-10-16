@@ -253,6 +253,13 @@ struct MacWorkspaceView: View {
                 onNewTab: addTab,
                 onCloseEmptyTab: { closeTab(selected.workspaceID) }
             )
+            // The window's smallest, given to the terminal's column, not to the whole window: AppKit
+            // grows a window for its sidebar by raising the window's minimum width as it goes, and
+            // a minimum SwiftUI holds on the whole window put it back each step — the sidebar then
+            // squeezed the terminal and snapped in (the owner, 2026-10-16: "pops back to the
+            // original size violently"). With the sidebar open the window's smallest is this and
+            // the sidebar's width.
+            .frame(minWidth: 720, minHeight: 460)
             .id(selected.workspaceID)
             // A tab dragged from another window can land anywhere on this one, sidebar open or
             // not; it joins at the end. Panes take only Finder's files, so they pass it on.
@@ -397,7 +404,6 @@ struct MacWorkspaceView: View {
             }
         }
         .accessibilityIdentifier("mac-workspace-tabs")
-        .frame(minWidth: 720, minHeight: 460)
         .containerBackground(.clear, for: .window)
         .background {
             MacTerminalWindowReader(
