@@ -2542,7 +2542,8 @@ private final class TerminalHardwareKeyContainerView: UIView {
         if !enabled { kept = nil }
         #if os(visionOS)
         // Vision Pro's Core Graphics drawing redone at the size it is shown, not scaled as a
-        // picture. iPhone and iPad draw with Metal, which no layer setting reaches.
+        // picture. An iPad's is drawn for its pixels instead (`drawForPixels`), the setting being
+        // visionOS's alone.
         terminalView?.layer.wantsDynamicContentScaling = enabled
         #endif
         setNeedsLayout()
@@ -2571,6 +2572,12 @@ private final class TerminalHardwareKeyContainerView: UIView {
         scaler.center = CGPoint(x: bounds.midX, y: bounds.midY)
         scaler.transform = CGAffineTransform(scaleX: fit.scale, y: fit.scale)
         if terminalView.frame != scaler.bounds { terminalView.frame = scaler.bounds }
+        #if !os(visionOS)
+        drawForPixels(terminalView, shownAt: fit.scale)
+        #endif
+        #if DEBUG && !os(visionOS)
+        markDrawingForUITests(terminalView)
+        #endif
         let reported = SwiftTermScaledGrid(columns: grid.columns, rows: grid.rows, size: content)
         if reported != kept {
             kept = reported
@@ -2638,8 +2645,45 @@ private final class TerminalHardwareKeyContainerView: UIView {
             frame.size.height = (bounds.height / row).rounded(.down) * row
         }
         terminalView.frame = frame
+        #if !os(visionOS)
+        drawForPixels(terminalView, shownAt: 1)
+        #endif
+        #if DEBUG && !os(visionOS)
+        markDrawingForUITests(terminalView)
+        #endif
         if wasScaled, !wantsScaling { onScaledGridChange?(nil) }
     }
+
+    #if !os(visionOS)
+    /// Under Scale an iPad terminal's Core Graphics drawing (`SwiftTermEngine.drawsForScale`) is made
+    /// for the pixels it covers — the screen's scale times the scale it is shown at, rounded up to a
+    /// sixteenth so a window being resized redraws it in steps rather than every frame — not drawn
+    /// at the screen's and scaled as a picture. The caret, which draws its character, with it.
+    /// Left alone under Resize, where UIKit gives a view its screen's scale, until Scale has set it.
+    private func drawForPixels(_ terminalView: UIView, shownAt scale: CGFloat) {
+        guard scale != 1 || drawsAtShownPixels, window != nil else { return }
+        let screen = traitCollection.displayScale
+        let wanted = scale == 1 ? screen : (screen * scale * 16).rounded(.up) / 16
+        guard wanted > 0, wanted.isFinite else { return }
+        drawsAtShownPixels = scale != 1
+        for view in [terminalView] + terminalView.subviews
+        where !(view.layer is CAMetalLayer) && view.contentScaleFactor != wanted {
+            view.contentScaleFactor = wanted
+        }
+    }
+
+    private var drawsAtShownPixels = false
+    #endif
+
+    #if DEBUG && !os(visionOS)
+    /// For `GlassTerminalScaleIPadUITests`, which can't see how sharp the text is: what draws the
+    /// terminal, and for how many pixels a point.
+    private func markDrawingForUITests(_ terminalView: ReviewingTerminalView) {
+        guard ProcessInfo.processInfo.arguments.contains("--ui-testing") else { return }
+        let renderer = terminalView.isUsingMetalRenderer ? "metal" : "coreGraphics"
+        accessibilityIdentifier = "terminal-drawing-\(renderer)-\(terminalView.contentScaleFactor)"
+    }
+    #endif
 
     override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
         var unhandledPresses = presses
@@ -2769,6 +2813,15 @@ private final class SwiftTermEngine: TerminalEngine {
     private let performanceClock = ContinuousClock()
     private let rendererPreference = SwiftTermRendererPreference.platformDefault
     private var metalActivationAttempted = false
+    /// Metal could not be started here; Core Graphics draws from then on.
+    private var metalUnavailable = false
+    #if !os(visionOS)
+    /// Under Scale (D75) an iPad terminal draws with Core Graphics, at the pixels it is
+    /// shown at (`TerminalHardwareKeyContainerView`). SwiftTerm's Metal renderer draws at the
+    /// screen's scale whatever the view's (`backingScaleFactor`, SwiftTerm 1.20.0), so its picture,
+    /// scaled, was soft; Metal comes back when Scale ends.
+    private var drawsForScale = false
+    #endif
     private var configuredTheme: SwiftTermTheme?
     private(set) var rendererDiagnostics = SwiftTermRendererDiagnostics.awaitingWindow
     private(set) var performanceDiagnostics = SwiftTermPerformanceDiagnostics()
@@ -2829,7 +2882,23 @@ private final class SwiftTermEngine: TerminalEngine {
     var identity: ObjectIdentifier { ObjectIdentifier(terminalView) }
     var hostView: UIView { containerView }
 
-    func setScaling(_ enabled: Bool) { containerView.setScaling(enabled) }
+    func setScaling(_ enabled: Bool) {
+        containerView.setScaling(enabled)
+        #if !os(visionOS)
+        guard enabled != drawsForScale else { return }
+        drawsForScale = enabled
+        if !enabled, !metalUnavailable { metalActivationAttempted = false }
+        activateRendererIfAttached()
+        #endif
+    }
+
+    private var effectiveRendererPreference: SwiftTermRendererPreference {
+        #if !os(visionOS)
+        if drawsForScale { return .coreGraphics }
+        #endif
+        return rendererPreference
+    }
+
     func zoomWindow(by factor: CGFloat?) -> Bool { containerView.zoomWindow(by: factor) }
     var currentGrid: (columns: Int, rows: Int) { (terminalView.getTerminal().cols, terminalView.getTerminal().rows) }
     var keptGrid: SwiftTermScaledGrid? { containerView.kept }
@@ -2981,7 +3050,7 @@ private final class SwiftTermEngine: TerminalEngine {
         }
 
         #if canImport(MetalKit)
-        if rendererPreference == .coreGraphics {
+        if effectiveRendererPreference == .coreGraphics {
             if terminalView.isUsingMetalRenderer {
                 do {
                     try terminalView.setUseMetal(false)
@@ -3003,6 +3072,7 @@ private final class SwiftTermEngine: TerminalEngine {
             do {
                 try terminalView.setUseMetal(true)
             } catch {
+                metalUnavailable = true
                 enforceClearBacking()
                 publishRendererDiagnostics(
                     backend: .coreGraphicsFallback,
@@ -3012,6 +3082,7 @@ private final class SwiftTermEngine: TerminalEngine {
             }
         }
 
+        if !terminalView.isUsingMetalRenderer { metalUnavailable = true }
         enforceClearBacking()
         publishRendererDiagnostics(
             backend: terminalView.isUsingMetalRenderer ? .metal : .coreGraphicsFallback,

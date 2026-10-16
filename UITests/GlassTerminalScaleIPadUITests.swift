@@ -3,9 +3,12 @@
 //  GlassPowerToolsUITests
 //
 //  D75 on iPad (2026-10-16). Under Scale a terminal keeps its rows and columns and its text follows
-//  the window. Font Size ▸ Increase (⌘+) grows the window, as it does on the Mac and Vision Pro.
-//  iPadOS has no request that sizes a window; the terminal raises its scene's minimum size for a
-//  moment, which a smaller window grows to. Nothing makes one smaller, so Decrease does nothing there.
+//  the window. Two things an iPad window does there:
+//  - Font Size ▸ Increase (⌘+) grows the window, as it does on the Mac and Vision Pro. iPadOS has no
+//    request that sizes a window; the terminal raises its scene's minimum size for a moment, which
+//    a smaller window grows to. Nothing makes one smaller, so Decrease does nothing there.
+//  - The text is drawn for the pixels it covers (Core Graphics at the scale shown), not Metal's
+//    picture at the screen's scale, scaled.
 //
 //  Driven from `--demo-open terminal-tabs` on an iPad simulator in Windowed Apps (Settings ▸
 //  Multitasking & Gestures); under Full Screen Apps a window can't be resized, and what needs that
@@ -111,6 +114,36 @@ final class GlassTerminalScaleIPadUITests: XCTestCase {
         // The minimum raised to grow it was put back.
         dragWindow(toward: before.size)
         XCTAssertTrue(waitForWindow { $0.width < grown.width - 30 }, "the window can't be made smaller again: \(windowFrame)")
+    }
+
+    /// Scale draws with Core Graphics for the pixels shown — fewer than the screen's as the window
+    /// is made smaller — and Resize goes back to Metal.
+    func testScaledTextIsDrawnForThePixelsShown() throws {
+        try launch()
+        let windowed = sizeWindow(CGSize(width: 560, height: 800))
+        let drawing = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "terminal-drawing-")).firstMatch
+        XCTAssertTrue(drawing.waitForExistence(timeout: 20), "the terminal reports no drawing")
+        let screenScale = UITraitCollection.current.displayScale
+        toggleScale()
+        let scaling = NSPredicate(format: "identifier BEGINSWITH %@", "terminal-drawing-coreGraphics-")
+        wait(for: [expectation(for: scaling, evaluatedWith: drawing)], timeout: 10)
+        if windowed {
+            dragWindow(toward: CGSize(width: 400, height: 570))
+            let fewer = NSPredicate { element, _ in
+                guard let identifier = (element as? XCUIElement)?.identifier,
+                      let pixels = Double(identifier.replacingOccurrences(of: "terminal-drawing-coreGraphics-", with: ""))
+                else { return false }
+                return pixels < Double(screenScale) * 0.85
+            }
+            let smaller = expectation(for: fewer, evaluatedWith: drawing)
+            wait(for: [smaller], timeout: 10)
+            attachScreen("scaled-smaller")
+        }
+        toggleScale()
+        let resizing = NSPredicate(format: "identifier BEGINSWITH %@", "terminal-drawing-metal-")
+        wait(for: [expectation(for: resizing, evaluatedWith: drawing)], timeout: 10)
+        XCTAssertEqual(drawing.identifier, "terminal-drawing-metal-\(screenScale)")
     }
 }
 #endif
