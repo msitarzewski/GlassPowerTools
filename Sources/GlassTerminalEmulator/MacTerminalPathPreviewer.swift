@@ -187,7 +187,7 @@ final class MacTerminalPathPreviewer: NSObject, NSPopoverDelegate {
         generation &+= 1
         let mine = generation
         close()
-        let controller = NSHostingController(rootView: AnyView(ProgressView().frame(width: Self.size.width, height: Self.size.height)))
+        let controller = NSHostingController(rootView: framed(AnyView(ProgressView()), path: path, model: model))
         if explicit { present(controller, at: windowPoint, in: view, path: path, byResting: false) }
 
         let file = await resolve(path)
@@ -216,7 +216,34 @@ final class MacTerminalPathPreviewer: NSObject, NSPopoverDelegate {
             present(controller, at: windowPoint, in: view, path: path, byResting: true)
         }
         shownFile = file
-        controller.rootView = AnyView(content(file.url).frame(width: Self.size.width, height: Self.size.height))
+        controller.rootView = framed(content(file.url), path: path, model: model)
+    }
+
+    /// The preview under a bar with the file's name and what can be done with it: Open in Editor,
+    /// to change it (the owner, 2026-10-16: "allow edit, or preview where appropriate"), and Show in
+    /// Finder or Files — the path menu's own actions, so a file on a server opens there.
+    private func framed(_ content: AnyView, path: String, model: SwiftTermHostModel) -> AnyView {
+        var open: (@MainActor () -> Void)?
+        if let openPath = model.onOpenPath {
+            open = { [weak self] in
+                openPath(path)
+                self?.close()
+            }
+        }
+        var reveal: (@MainActor () -> Void)?
+        if let revealPath = model.onRevealPath {
+            reveal = { [weak self] in
+                revealPath(path)
+                self?.close()
+            }
+        }
+        return AnyView(VStack(spacing: 0) {
+            MacTerminalPreviewBar(name: (path as NSString).lastPathComponent, open: open,
+                                  revealTitle: model.revealPathTitle, reveal: reveal)
+            Divider()
+            content.frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(width: Self.size.width, height: Self.size.height))
     }
 
     private func present(_ controller: NSViewController, at windowPoint: NSPoint, in view: TerminalView,
@@ -293,6 +320,36 @@ final class MacTerminalPathPreviewer: NSObject, NSPopoverDelegate {
         let file = shownFile
         shownFile = nil
         file?.discard?()
+    }
+}
+
+/// The bar over a preview: the file's name, Show in Finder or Files, Open in Editor.
+private struct MacTerminalPreviewBar: View {
+    let name: String
+    let open: (@MainActor () -> Void)?
+    let revealTitle: String
+    let reveal: (@MainActor () -> Void)?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(name)
+                .font(.headline)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer(minLength: 8)
+            if let reveal {
+                Button(revealTitle, systemImage: "folder") { reveal() }
+                    .labelStyle(.iconOnly)
+                    .help(revealTitle)
+            }
+            if let open {
+                Button("Open in Editor", systemImage: "pencil") { open() }
+                    .help("Open in Editor")
+            }
+        }
+        .buttonStyle(.borderless)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 }
 #endif

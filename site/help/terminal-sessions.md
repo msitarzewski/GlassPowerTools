@@ -95,11 +95,17 @@ A path is read on the machine that printed it: from the shell's current folder w
 
 ## Preview a file over the terminal
 
-**On Mac**, the file a path names can show in a popover over the terminal: a picture, a PDF, a video, a document, code, or text. Markdown (with its diagrams), HTML, SVG and CSV show as the editor previews them. A file on a server is copied to this Mac for the preview, up to 32 MB, and the copy is removed when the preview closes. A folder has no preview.
+**On Mac**, the file a path names can show in a popover over the terminal. What it is comes from its contents, not its name, so a log saved as `.output` shows as text:
+
+- Code and other text: in the editor's own view, highlighted as the editor highlights its language, with line numbers, and read-only.
+- Markdown (with its diagrams), HTML, SVG and CSV: as the editor previews them.
+- Pictures, PDFs, video, audio and documents: as Quick Look shows them.
+
+A bar across the top names the file and has **Open in Editor**, to change it, and **Show in Finder**, or **Show in Files** for a file on a server. A file on a server is copied to this Mac for the preview, up to 32 MB, and the copy is removed when the preview closes. A folder has no preview.
 
 - Choose **Quick Look** from a path's right-click menu.
 - Or set **Show previews** in **Settings** ▸ **Terminal**:
-  - **Mouseover**, the starting setting: rest the pointer on a path, and the preview opens after a moment. It closes when the pointer moves off the path and the preview.
+  - **Mouseover**, the starting setting: rest the pointer on a path, and the preview opens after a moment. Move into it to scroll or click; it closes once the pointer has left both the path and the preview.
   - **Mouseover + Space**: put the pointer on a path and press Space; Space again or Escape closes it. On a web address, Space asks whether to open it, as a ⌘-click does. Anywhere else, Space types a space.
   - **Never**: only **Quick Look** shows a preview.
 
