@@ -1,6 +1,7 @@
 # 2026-10-16: a terminal window's sidebar adds to the window (D77)
 
-**State:** built on the Mac (2026-10-16, evening); 0.4.464 tried by the owner, the reopen fixed after (below).
+**State:** built on the Mac (2026-10-16, evening). Tried by the owner on 0.4.464 and 0.4.465 — both snapped on reopen;
+rebuilt a second time (below, "On 0.4.465"), for 0.4.466.
 
 ## What the owner asked
 
@@ -91,4 +92,44 @@ sidebar's width (was 720 whatever the sidebar).
 **Test:** `MacTerminalSidebarTests` "the terminal window itself" hosts the real `MacWorkspaceSceneRoot` (an empty
 tab) and toggles its sidebar: the window grows by the sidebar's width toward it and shrinks back. With the minimum
 back on the whole window it fails as he saw it: 1000 → 1000 opened, 760 closed.
+
+## On 0.4.465: "still fails the same way" — AppKit doesn't move a SwiftUI scene's window (rebuilt)
+
+The owner, with tmux sessions in several tabs: "hmm. still fails the same way." The tests and the first probe put the
+split view in a plain `NSWindow`; his windows are a `WindowGroup`'s (`AppKitWindow`, content an
+`AppKitWindowHostingController`). A probe built as an app with a window scene (`SceneProbe.app`, `LSUIElement`, run with
+`open -g`, in `~/Software/glass/tmp/sidebar-probe/scene.swift`; variants through `options.txt`) showed:
+- with `.preferResizingSplitViewWithFixedSiblings`, closing never shrank the window (the detail widened) and opening
+  grew it to the right only — no minimum, the column's minimum, the whole window's minimum and a full toolbar alike.
+  AppKit grows such a window by raising its minimum width; nothing shrinks it, and SwiftUI's window controller holds
+  its size against the split view's constraints (a detail holding priority of 510, or `.useConstraints`, moved
+  nothing at all);
+- setting the window's frame does work there. Driven by our own animation beside AppKit's sidebar animation, the
+  detail drifted ≤7 points (≤2 started from the sidebar's change); with the detail's width held, 0.
+
+**Now:** `GlassAdditiveSidebars` sets every sidebar and inspector to `.preferResizingSiblingsWithFixedSplitView`
+(AppKit leaves the window alone), watches `isCollapsed` (KVO), and moves the window itself, animated 0.25 s ease in/out,
+by the sidebar's width toward its side (`windowFrame`: a sidebar the left, an inspector the right; opening kept on
+screen, nil when it can't be that wide). Measured on the way:
+- one toolbar click flips `isCollapsed` three times (AppKit opens it, SwiftUI puts its own state back and forth), so
+  changes are gathered and the window follows the net state, from where it is already heading;
+- resizing the window inside the KVO change left the sidebar unfinished (open, laid out at no width) in tests: the
+  window moves from the main queue's next turn;
+- a change while not additive (overview, the sidebar it gives back) is recorded as it happens, so it never moves the
+  window later;
+- the view holds the terminal's column at its width for the animation (`willResizeWindow`), in a frame that fills the
+  column whatever it holds: a plain `.frame(width:)` raised the window's minimum and grew it to the right.
+A collapsed sidebar's view still reports the width it opens to (240), measured, so opening knows the width.
+
+**Tests:** `GlassAdditiveSidebarsTests` 5 (window-frame rules 3; hosted additive and not); `MacTerminalSidebarTests` 4,
+the real window among them. Every hosted one fails with the follower off; the real window's fails with the held
+width allowed to raise the minimum. Both suites `.serialized`: run in parallel, their windows interleaved and a test
+failed on another's account. Sidebar animations don't run inside `swift test` (no running app); tests set
+`animationDuration` to 0. Not covered: the animation itself, which the probe measures.
+
+Mac suites (screen unlocked): terminal 866, shell 307; tmux unchanged. Locked, the same run failed the
+file-protection tests and these window tests — rerun unlocked before trusting a red suite. 0.4.466 on the Mac and
+iPhone for the owner to try.
+
+**Known:** collapsing the sidebar by dragging its divider shrinks the window by the sidebar's width at that moment.
 

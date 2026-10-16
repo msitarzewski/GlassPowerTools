@@ -32,18 +32,21 @@ use the disposable test VM only).
 
 ## 2026-10-16 (evening) — RESUME HERE
 
-**D77 built: a Mac terminal window's sidebar adds to the window.** The owner: "make the left (and eventually right)
-sidebars additive and not resize my terminal window to make room." Opening or closing the sidebar grows or shrinks the
-window and the terminal keeps its size and place (AppKit's split-item collapse behaviour, `GlassAdditiveSidebars`);
-not for the sidebar a window opens with, the overview, or full screen. On 0.4.464 he found reopening snapped ("pops
-back to the original size violently"): the window's 720 × 460 minimum, held by SwiftUI on the whole window, fought
-AppKit's growing; it is now the terminal column's (675cac1). Note: `tasks/2026-10/2026-10-16_additive-sidebars.md`.
-**His to try on 0.4.465.**
+**D77: a Mac terminal window's sidebar adds to the window — rebuilt twice.** The owner: "make the left (and eventually
+right) sidebars additive and not resize my terminal window to make room." 0.4.464 (AppKit's fixed-siblings collapse
+behaviour) and 0.4.465 (the window's minimum moved to the terminal column) both snapped on reopen for him ("pops back
+to the original size violently"; "still fails the same way"). Cause: AppKit doesn't move a SwiftUI `WindowGroup`
+window for a sidebar (it grows it rightward, never shrinks it) — tests had used a plain `NSWindow`. Now
+`GlassAdditiveSidebars` moves the window itself, following the sidebar's net state, and the terminal column holds its
+width meanwhile. Measured with a window-scene probe app (`~/Software/glass/tmp/sidebar-probe`). Note:
+`tasks/2026-10/2026-10-16_additive-sidebars.md`, "On 0.4.465". Committed; suites green unlocked. **His to try on
+0.4.466** (Mac): open and close the sidebar in a tab running tmux.
 
 **D75 on iPad** (his "Sure… let users let us know if that doesn't work"): ⌘+ grows a scaled iPad window, ⌘− can't
 shrink one, scaled text is sharp (Core Graphics for the pixels shown). Simulator-measured only; D75 note, "iPad".
 
-**Installs:** 0.4.465 on the Mac. The iPhone (0.4.464) and the headset (0.4.462) were unreachable; `install-devices-when-awake.zsh 465` (new, in `~/Software/glass/tmp`) puts it on each as it wakes, up to an hour.
+**Installs:** 0.4.466 on the Mac and iPhone. The headset (0.4.462) has been unreachable since the morning;
+`install-headset-when-awake.zsh 466` waits for it (an hour). `install-devices-when-awake.zsh <n>` does both devices.
 
 ## 2026-10-16 (afternoon)
 

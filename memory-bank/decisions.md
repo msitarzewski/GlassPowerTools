@@ -1526,11 +1526,13 @@ A bar offers Open in Editor and Show in Finder/Files. Mac only. Evidence: `MacTe
 
 ## D77 — A terminal window's sidebar adds to the window — Implemented 2026-10-16
 **Owner:** "make the left (and eventually right) sidebars additive and not resize my terminal window to make room."
-**Decision:** On the Mac, opening or closing a terminal window's sidebar grows or shrinks the window; the terminal keeps
-its size and place, so its rows and columns (or its scaled text) don't change. AppKit's own
-`NSSplitViewItem.collapseBehavior` (`.preferResizingSplitViewWithFixedSiblings`), set on SwiftUI's split items by
-`GlassAdditiveSidebars` (GlassShell). The window keeps its size for the sidebar it opens with (its saved frame holds it),
-for the overview, and where AppKit must (full screen, the screen's edge). Only the Mac terminal window has a sidebar.
-The window's minimum belongs to the terminal's column, not the whole window: AppKit grows the window by raising its
-minimum width, and one SwiftUI held on the whole content stopped it (the reopen snapped, 0.4.464).
-Evidence: `GlassAdditiveSidebarsTests`, `MacTerminalSidebarTests`; `tasks/2026-10/2026-10-16_additive-sidebars.md`.
+**Decision:** On the Mac, opening or closing a terminal window's sidebar grows or shrinks the window by its width toward
+its side; the terminal keeps its size and place, so its rows and columns (or its scaled text) don't change. The app
+moves the window itself (`GlassAdditiveSidebars`, GlassShell): AppKit's `.preferResizingSplitViewWithFixedSiblings`
+does this only for a split view in a plain window — in a SwiftUI `WindowGroup` window it grew the window rightward and
+never shrank it (two builds snapped on reopen for the owner). AppKit keeps the window's size; the window follows the
+sidebar's net state, animated with it, and the terminal's column holds its width meanwhile. The window keeps its size
+for the sidebar it opens with (its saved frame holds it), for the overview, in full screen, and where it can't be
+that wide. The window's minimum belongs to the terminal's column. Only the Mac terminal window has a sidebar.
+Evidence: `GlassAdditiveSidebarsTests`, `MacTerminalSidebarTests`, the window-scene probe;
+`tasks/2026-10/2026-10-16_additive-sidebars.md`.
