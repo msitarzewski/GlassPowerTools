@@ -509,6 +509,27 @@ struct TerminalSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            // D75 (2026-10-16): "I may want a 120 x 40 terminal, but with a much smaller window."
+            if TerminalResizeBehavior.isOffered {
+                Section {
+                    Picker("When a window is resized", selection: $settings.whenResized) {
+                        ForEach(TerminalResizeBehavior.allCases, id: \.self) { behavior in
+                            Text(behavior.title).tag(behavior)
+                        }
+                    }
+                    .onChange(of: settings.whenResized) { _, _ in
+                        settings.saveSettings()
+                    }
+                    .accessibilityIdentifier("terminal-settings-when-resized")
+                } header: {
+                    Text("Resizing")
+                } footer: {
+                    Text("Change Rows and Columns: a smaller window holds fewer, and the program redraws to fit. Scale the Text: the terminal keeps the rows and columns it has, and its text grows and shrinks with the window, which keeps their shape. Scale Text in a window's bar switches that window.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
             
             Section("Cursor") {
                 Picker("Cursor Style", selection: $settings.cursorStyle) {

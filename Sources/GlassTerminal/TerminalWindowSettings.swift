@@ -63,6 +63,11 @@ nonisolated enum TerminalWindowSettings {
     static let pathPreviews = GlassWindowSetting<String>("terminal.pathPreviews", title: "Show Previews") {
         TerminalPathPreviews(rawValue: $0) == nil ? nil : $0
     }
+    /// When the window is resized (D75, 2026-10-16): `TerminalResizeBehavior`, by its raw value.
+    /// The window's bar switches it for the window.
+    static let whenResized = GlassWindowSetting<String>("terminal.whenResized", title: "When Resized") {
+        TerminalResizeBehavior(rawValue: $0) == nil ? nil : $0
+    }
 
     // Behaviour.
     static let bell = GlassWindowSetting<Bool>("terminal.bell", title: "Bell")
@@ -149,6 +154,8 @@ struct TerminalWindowProfile: Equatable {
     let bellEnabled: Bool
     let visualBell: Bool
     let pathPreviews: TerminalPathPreviews
+    /// Under `.scale` the terminal keeps its rows and columns and its text follows the window (D75).
+    let whenResized: TerminalResizeBehavior
 
     var runtimeSettings: SwiftTermRuntimeSettings {
         SwiftTermRuntimeSettings(cursorStyle: cursorStyle, blinkingCursor: blinkingCursor,
@@ -157,7 +164,8 @@ struct TerminalWindowProfile: Equatable {
 
     init(window: GlassWindowOverrides, look: TerminalLook, theme global: TerminalTheme, library: TerminalThemeLibrary,
          cursorStyle: String, blinkingCursor: Bool, keepsScrollback: Bool, scrollbackLines: Int,
-         bellEnabled: Bool, visualBell: Bool, pathPreviews: TerminalPathPreviews = .mouseover) {
+         bellEnabled: Bool, visualBell: Bool, pathPreviews: TerminalPathPreviews = .mouseover,
+         whenResized: TerminalResizeBehavior = .changeGrid) {
         self.look = look
         self.theme = Self.theme(window, over: global, library: library)
         self.cursorStyle = window.value(of: TerminalWindowSettings.cursorStyle, over: cursorStyle)
@@ -168,6 +176,8 @@ struct TerminalWindowProfile: Equatable {
         self.visualBell = window.value(of: TerminalWindowSettings.visualBell, over: visualBell)
         self.pathPreviews = TerminalPathPreviews(rawValue: window.value(of: TerminalWindowSettings.pathPreviews,
                                                                         over: pathPreviews.rawValue)) ?? pathPreviews
+        self.whenResized = TerminalResizeBehavior(rawValue: window.value(of: TerminalWindowSettings.whenResized,
+                                                                         over: whenResized.rawValue)) ?? whenResized
     }
 
     /// A terminal in a window with `window`'s settings. Read in a view's body, it follows both:
@@ -178,7 +188,7 @@ struct TerminalWindowProfile: Equatable {
                               cursorStyle: settings.cursorStyle, blinkingCursor: settings.blinkingCursor,
                               keepsScrollback: settings.saveScrollback, scrollbackLines: settings.maxScrollbackLines,
                               bellEnabled: settings.bellEnabled, visualBell: settings.visualBell,
-                              pathPreviews: settings.pathPreviews)
+                              pathPreviews: settings.pathPreviews, whenResized: settings.whenResized)
     }
 
     /// The window's theme — one from the library, while the library has it — else `global`, with

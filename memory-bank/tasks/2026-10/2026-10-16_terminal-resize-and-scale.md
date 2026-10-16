@@ -1,6 +1,44 @@
 # 2026-10-16: a terminal window that resizes, and one that scales — NEXT PRIORITY (D75, proposed)
 
-**State:** not started. The owner set it as the first thing to do on returning (2026-10-16, ~10:30).
+**State:** BUILD (2026-10-16, after ~10:30). Questions settled with the owner; plan below.
+
+## Settled with the owner (2026-10-16, after the compaction)
+
+1. **Platforms:** Vision Pro, Mac and iPad windows ("vision mac and ipad multi-window"). Not iPhone.
+2. **How it's chosen:** a setting (all windows, or This Window) **and** a button in the window's bar.
+3. **Which grid:** the one the terminal has when Scale turns on — "If I've resized to 200 x 100, and choose to
+   scale, keep that setting, do not override my terminal's current state."
+4. **Shape:** held to the grid's shape, as a desktop window is held to its display's.
+5–6 (not asked; recommendations): see the plan.
+
+## Plan (decided in BUILD; evidence from SwiftTerm 1.20.0)
+
+**Scale draws the kept grid at the terminal's own font and scales the drawing; it never changes the font.**
+SwiftTerm's font setter calls `resetFont()`, which calls `resize(cols:rows:)` from the view's frame
+(`AppleTerminalView.swift:297–316`), and `resize` always ends in `terminal.softReset()` (`:2827`). Cell metrics are
+quantized too: height `ceil(ascent + descent + leading)` points, width snapped to the pixel (`:410–438`), so a font
+that fits a window leaves a band up to `rows` points tall. A font change per frame of a drag would soft-reset and
+re-grid the terminal continuously. A scaled drawing has none of that and fills exactly.
+
+- **Emulator (`GlassTerminalEmulator`):** the engine's view sits inside a scaling view. Under Scale the terminal's
+  frame is its grid at its own cell size (`getOptimalFrameSize()`), so SwiftTerm's grid sums give the kept grid, and
+  the scaling view fits that into the space (uniform scale, centred). iOS/visionOS: an always-present scaler view
+  (transform), so the terminal's own `frame` stays untransformed (`resetFont` reads `frame`). Mac: a container whose
+  bounds are scaled (AppKit converts events and drawing). Crisp text: the Core Graphics drawing (Mac remote,
+  Vision Pro) asks for `wantsDynamicContentScaling` under Scale; iPad's Metal drawing is scaled — measure.
+- **The host only ever hears the kept grid under Scale** (a font change re-grids for a moment; the coordinator
+  doesn't pass it on, and the layout restores the grid).
+- **Setting:** `TerminalWindowSettings.whenResized` ("terminal.whenResized": grid / scale), global in
+  `SettingsManager`, synced like Show Previews, This Window override; reaches the engine through
+  `SwiftTermRuntimeSettings`.
+- **Bar button:** toggles This Window's override.
+- **Shape:** the desktop's `DesktopWindowAspectLock` moves to GlassShell (shared), the terminal window passes its
+  grid's shape and its measured canvas. Mac: only while the window shows one pane. iPad: no API holds a scene's
+  shape or sizes it (`UIWindowSceneGeometryPreferencesIOS.h` has only orientations), so iPad centres the text.
+- **⌘+ / ⌘− under Scale** (recommendation 6): the font can't change without re-gridding, so they size the window
+  (Mac, Vision Pro); on iPad they are unavailable under Scale.
+- **Limits** (recommendation 5): none beyond the window's own minimum; the drawing scales as far as the window goes.
+- **Later:** remembering the kept grid with the window across relaunches.
 
 ## What the owner asked
 

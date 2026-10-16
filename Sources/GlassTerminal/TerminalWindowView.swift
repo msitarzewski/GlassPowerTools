@@ -270,6 +270,10 @@ struct TerminalWindowView: View {
             .onChange(of: session.closeWindowNonce) { _, _ in
                 closeTerminalAfterCleanExit()
             }
+            // Scale (D75): the grid it keeps is the one the terminal has as it turns on.
+            .onChange(of: wantsScaling, initial: true) { _, scales in
+                terminalHostModel.setScaling(scales)
+            }
             .onDisappear {
                 handleTerminalDisappear()
             }
@@ -1137,6 +1141,30 @@ struct TerminalWindowView: View {
         #endif
     }
 
+    /// Whether this terminal keeps its rows and columns and scales its text to the window (D75).
+    /// On a Mac, only once the window has been fitted to Settings' initial size, so that is the
+    /// grid a terminal opened under Scale keeps.
+    private var wantsScaling: Bool {
+        guard TerminalResizeBehavior.isOffered, profile.whenResized == .scale else { return false }
+        #if os(macOS)
+        return session.hasMeasuredTerminalGeometry
+        #else
+        return true
+        #endif
+    }
+
+    /// The window's bar's Scale Text, which sets This Window's When Resized; nil where this
+    /// terminal is in no window that keeps settings.
+    private var scalesBinding: Binding<Bool>? {
+        guard TerminalResizeBehavior.isOffered, let windowSettingsBinding else { return nil }
+        return Binding(
+            get: { profile.whenResized == .scale },
+            set: { scales in
+                windowSettingsBinding.wrappedValue[TerminalWindowSettings.whenResized] =
+                    (scales ? TerminalResizeBehavior.scale : .changeGrid).rawValue
+            })
+    }
+
     /// What this terminal draws and behaves with: its window's settings over the terminal
     /// settings (`\.glassWindowOverrides`, set at the window's root).
     private var profile: TerminalWindowProfile {
@@ -1610,6 +1638,11 @@ struct TerminalWindowView: View {
             fontSizeMenu
             }
             #endif
+
+            if let scalesBinding {
+                TerminalScaleToggle(scales: scalesBinding, inMenu: inMenu)
+                    .disabled(!isTerminalActive)
+            }
 
             if showsFooterNewTerminalAction {
                 #if !os(macOS)

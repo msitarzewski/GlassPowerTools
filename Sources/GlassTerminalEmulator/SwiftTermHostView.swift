@@ -340,6 +340,37 @@ public final class SwiftTermHostModel: ObservableObject {
         fontSizeOverride = nil
     }
 
+    /// D75 — **Scale**: while set, the terminal keeps the rows and columns it had when Scale was
+    /// turned on, whatever its window's size, and its drawing is scaled to fit the window. Nil
+    /// under **Resize**, where the window's size sets the grid. Told a moment after the terminal
+    /// takes its grid (never inside a layout pass), so a window can take the grid's shape.
+    @Published public private(set) var scaledGrid: SwiftTermScaledGrid?
+    private var wantsScaling = false
+
+    /// Turns Scale on or off. On, the terminal keeps the grid it has now — or, before it has been
+    /// laid out in a window, the one it takes there first.
+    public func setScaling(_ enabled: Bool) {
+        guard wantsScaling != enabled else { return }
+        wantsScaling = enabled
+        terminalEngine?.setScaling(enabled)
+    }
+
+    /// The grid kept under Scale, as SwiftTerm reports a size: any other is a font change passing,
+    /// which the layout puts back, and the host never hears of it.
+    fileprivate var keptGrid: SwiftTermScaledGrid? { terminalEngine?.keptGrid }
+    /// The rows and columns the renderer has now; nil before there is one. For tests.
+    var rendererGrid: (columns: Int, rows: Int)? { terminalEngine?.currentGrid }
+
+    private func connectScaling(_ engine: any TerminalEngine) {
+        engine.onScaledGridChange = { [weak self] grid in
+            DispatchQueue.main.async {
+                guard let self, self.scaledGrid != grid else { return }
+                self.scaledGrid = grid
+            }
+        }
+        engine.setScaling(wantsScaling)
+    }
+
     public static let semanticEventHistoryLimit = 256
     /// Remote output can arrive before SwiftUI installs the first platform
     /// renderer. Bound that short bootstrap window so an untrusted host cannot
@@ -500,6 +531,7 @@ public final class SwiftTermHostModel: ObservableObject {
             return
         }
         attachedViewID = viewID
+        connectScaling(engine)
         publishRendererDiagnosticsIfChanged(engine.rendererDiagnostics)
         schedulePendingFlush()
         focus()
@@ -516,6 +548,7 @@ public final class SwiftTermHostModel: ObservableObject {
         let viewID = engine.identity
         guard attachedViewID != viewID else { return }
         attachedViewID = viewID
+        connectScaling(engine)
         publishRendererDiagnosticsIfChanged(engine.rendererDiagnostics)
         schedulePendingFlush()
         focus()
@@ -1269,6 +1302,12 @@ private protocol TerminalEngine: AnyObject {
     var isBracketedPasteMode: Bool { get }
     /// Called as the view is about to leave the screen, while it can still draw itself.
     var onLeavingWindow: (@MainActor () -> Void)? { get set }
+    /// D75: Scale on or off (`SwiftTermHostModel.setScaling`), and the grid it keeps.
+    func setScaling(_ enabled: Bool)
+    var keptGrid: SwiftTermScaledGrid? { get }
+    /// The rows and columns SwiftTerm has now.
+    var currentGrid: (columns: Int, rows: Int) { get }
+    var onScaledGridChange: ((SwiftTermScaledGrid?) -> Void)? { get set }
 }
 
 public enum SwiftTermHardwareKeyPolicy {
@@ -1923,6 +1962,15 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
         return getOptimalFrameSize().height / CGFloat(rows)
     }
 
+    /// One cell at the terminal's font, from its grid's frame over its grid; nil before it is measured.
+    var cellSize: CGSize? {
+        let terminal = getTerminal()
+        guard terminal.cols > 0, terminal.rows > 0 else { return nil }
+        let optimal = getOptimalFrameSize().size
+        let cell = CGSize(width: optimal.width / CGFloat(terminal.cols), height: optimal.height / CGFloat(terminal.rows))
+        return cell.width > 0 && cell.height > 0 ? cell : nil
+    }
+
     #if os(visionOS)
     /// **Pinch and hold, then drag, selects** — the way visionOS selects text (the owner on the
     /// headset, 2026-10-13: "the pinch drag select method doesn't work … I can triple click and get
@@ -2450,23 +2498,92 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
 /// consumes just those events after SwiftTerm has declined them.
 @MainActor
 private final class TerminalHardwareKeyContainerView: UIView {
-    weak var terminalView: ReviewingTerminalView?
+    private(set) weak var terminalView: ReviewingTerminalView?
+    /// Holds the terminal; under Scale (D75) it is what is scaled, never the terminal itself, whose
+    /// `frame` SwiftTerm reads for its grid whenever its font is set (`resetFont`). Unscaled under
+    /// Resize, so the terminal's place in the responder chain is the same either way.
+    private let scaler = UIView()
+    /// Scale was asked for; the grid is taken once the terminal has been laid out in a window.
+    private var wantsScaling = false
+    private(set) var kept: SwiftTermScaledGrid?
+    /// Told when the kept grid, or its size at the terminal's font, changes; nil when Scale ends.
+    var onScaledGridChange: ((SwiftTermScaledGrid?) -> Void)?
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        scaler.isOpaque = false
+        scaler.backgroundColor = .clear
+        addSubview(scaler)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { nil }
+
+    func install(_ terminalView: ReviewingTerminalView) {
+        self.terminalView = terminalView
+        scaler.addSubview(terminalView)
+    }
+
+    func setScaling(_ enabled: Bool) {
+        guard enabled != wantsScaling else { return }
+        wantsScaling = enabled
+        if !enabled { kept = nil }
+        #if os(visionOS)
+        // Vision Pro's Core Graphics drawing redone at the size it is shown, not scaled as a
+        // picture. iPhone and iPad draw with Metal, which no layer setting reaches.
+        terminalView?.layer.wantsDynamicContentScaling = enabled
+        #endif
+        setNeedsLayout()
+    }
 
     override func layoutSubviews() {
         super.layoutSubviews()
         guard let terminalView else { return }
+        if wantsScaling, kept == nil, terminalView.window != nil, bounds.width > 0, bounds.height > 0 {
+            // Laid out as Resize lays it out first, so the grid taken is the window's own.
+            fill(terminalView)
+            terminalView.layoutIfNeeded()
+            let terminal = terminalView.getTerminal()
+            if terminal.cols > 0, terminal.rows > 0 {
+                kept = SwiftTermScaledGrid(columns: terminal.cols, rows: terminal.rows, size: .zero)
+            }
+        }
+        guard let grid = kept, let cell = terminalView.cellSize,
+              case let content = SwiftTermScaleLayout.contentSize(cell: cell, columns: grid.columns, rows: grid.rows),
+              let fit = SwiftTermScaleLayout.fit(content, in: bounds.size) else {
+            fill(terminalView)
+            return
+        }
+        scaler.transform = .identity
+        scaler.bounds = CGRect(origin: .zero, size: content)
+        scaler.center = CGPoint(x: bounds.midX, y: bounds.midY)
+        scaler.transform = CGAffineTransform(scaleX: fit.scale, y: fit.scale)
+        if terminalView.frame != scaler.bounds { terminalView.frame = scaler.bounds }
+        let reported = SwiftTermScaledGrid(columns: grid.columns, rows: grid.rows, size: content)
+        if reported != kept {
+            kept = reported
+            onScaledGridChange?(reported)
+        }
+    }
+
+    /// Resize: the terminal fills the container, unscaled.
+    private func fill(_ terminalView: ReviewingTerminalView) {
+        let wasScaled = !scaler.transform.isIdentity
+        scaler.transform = .identity
+        scaler.frame = bounds
         // **A whole number of rows, top-aligned.** SwiftTerm fits `floor(height / row)` rows and
         // then pins its scroll offset to the content's bottom edge, but draws from the first
         // visible row's top — so the spare fraction of a row pushed every line down by that much
         // and the last one, the prompt, went under the keyboard's accessory bar, out of reach of
         // scrolling (2026-09-27, on the phone with the keyboard up: 370pt, 21 rows of 17pt, the
         // prompt 13pt low). Sized to whole rows the two agree; the spare points stay blank below.
-        var frame = bounds
+        var frame = scaler.bounds
         let row = terminalView.rowHeight
         if row > 0, bounds.height >= row {
             frame.size.height = (bounds.height / row).rounded(.down) * row
         }
         terminalView.frame = frame
+        if wasScaled, !wantsScaling { onScaledGridChange?(nil) }
     }
 
     override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
@@ -2635,8 +2752,7 @@ private final class SwiftTermEngine: TerminalEngine {
         )
         containerView.isOpaque = false
         containerView.backgroundColor = .clear
-        containerView.terminalView = terminalView
-        containerView.addSubview(terminalView)
+        containerView.install(terminalView)
         self.terminalView = terminalView
         self.containerView = containerView
         self.onPasteData = onPasteData
@@ -2657,6 +2773,14 @@ private final class SwiftTermEngine: TerminalEngine {
 
     var identity: ObjectIdentifier { ObjectIdentifier(terminalView) }
     var hostView: UIView { containerView }
+
+    func setScaling(_ enabled: Bool) { containerView.setScaling(enabled) }
+    var currentGrid: (columns: Int, rows: Int) { (terminalView.getTerminal().cols, terminalView.getTerminal().rows) }
+    var keptGrid: SwiftTermScaledGrid? { containerView.kept }
+    var onScaledGridChange: ((SwiftTermScaledGrid?) -> Void)? {
+        get { containerView.onScaledGridChange }
+        set { containerView.onScaledGridChange = newValue }
+    }
     var isLikelyRunningInteractiveProgram: Bool {
         terminalView.getTerminal().isCurrentBufferAlternate
     }
@@ -2911,6 +3035,8 @@ private final class SwiftTermEngine: TerminalEngine {
             terminalView.font = UIFont(name: theme.fontName, size: fontSize)
                 ?? UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
         }
+        // Under Scale the grid's size at the font is what is scaled; it may have changed.
+        containerView.setNeedsLayout()
         terminalView.nativeForegroundColor = UIColor(
             red: theme.foreground.red,
             green: theme.foreground.green,
@@ -3256,6 +3382,8 @@ public struct SwiftTermHostView: UIViewRepresentable {
         }
 
         public func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {
+            // Under Scale (D75) the host hears only the kept grid.
+            if let kept = model?.keptGrid, !kept.keeps(columns: newCols, rows: newRows) { return }
             onResize(newCols, newRows)
         }
 
@@ -3334,6 +3462,12 @@ private protocol TerminalEngine: AnyObject {
     func fitHostWindow(columns: Int, rows: Int) -> Bool
     /// Whether the program in the terminal asked for bracketed paste.
     var isBracketedPasteMode: Bool { get }
+    /// D75: Scale on or off (`SwiftTermHostModel.setScaling`), and the grid it keeps.
+    func setScaling(_ enabled: Bool)
+    var keptGrid: SwiftTermScaledGrid? { get }
+    /// The rows and columns SwiftTerm has now.
+    var currentGrid: (columns: Int, rows: Int) { get }
+    var onScaledGridChange: ((SwiftTermScaledGrid?) -> Void)? { get set }
 }
 
 @MainActor
@@ -3529,11 +3663,21 @@ private final class MacSwiftTermEngine: TerminalEngine {
     }
 
     var identity: ObjectIdentifier { ObjectIdentifier(terminalView) }
-    var hostView: NSView { terminalView }
+    var hostView: NSView { scaleView }
     var isLikelyRunningInteractiveProgram: Bool {
         terminalView.getTerminal().isCurrentBufferAlternate
     }
     var isComposingText: Bool { terminalView.hasMarkedText() }
+
+    /// The terminal's place in its pane: filled under Resize, scaled under Scale (D75).
+    private lazy var scaleView = MacTerminalScaleView(terminalView: terminalView)
+    func setScaling(_ enabled: Bool) { scaleView.setScaling(enabled) }
+    var currentGrid: (columns: Int, rows: Int) { (terminalView.getTerminal().cols, terminalView.getTerminal().rows) }
+    var keptGrid: SwiftTermScaledGrid? { scaleView.kept }
+    var onScaledGridChange: ((SwiftTermScaledGrid?) -> Void)? {
+        get { scaleView.onScaledGridChange }
+        set { scaleView.onScaledGridChange = newValue }
+    }
 
     func configure(theme: SwiftTermTheme, runtimeSettings: SwiftTermRuntimeSettings) {
         applyTheme(theme)
@@ -3614,6 +3758,8 @@ private final class MacSwiftTermEngine: TerminalEngine {
             ? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
             : NSFont(name: theme.fontName, size: fontSize)
                 ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        // Under Scale the grid's size at the font is what is scaled; it may have changed.
+        scaleView.cellsChanged()
         terminalView.nativeForegroundColor = NSColor(
             srgbRed: theme.foreground.red,
             green: theme.foreground.green,
@@ -3861,6 +4007,8 @@ public struct SwiftTermHostView: NSViewRepresentable {
         }
 
         public func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {
+            // Under Scale (D75) the host hears only the kept grid.
+            if let kept = model?.keptGrid, !kept.keeps(columns: newCols, rows: newRows) { return }
             onResize(newCols, newRows)
         }
 
@@ -4219,6 +4367,8 @@ private final class MacLocalProcessDelegateProxy:
     }
 
     func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {
+        // Under Scale (D75) the shell hears only the kept grid.
+        if let kept = engine?.keptGrid, !kept.keeps(columns: newCols, rows: newRows) { return }
         // Preserve LocalProcessTerminalView's ioctl-backed resize behavior after
         // replacing its delegate with this policy proxy.
         terminalView?.sizeChanged(source: source, newCols: newCols, newRows: newRows)
@@ -4430,11 +4580,21 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
     }
 
     var identity: ObjectIdentifier { ObjectIdentifier(terminalView) }
-    var hostView: NSView { terminalView }
+    var hostView: NSView { scaleView }
     var isLikelyRunningInteractiveProgram: Bool {
         terminalView.getTerminal().isCurrentBufferAlternate
     }
     var isComposingText: Bool { terminalView.hasMarkedText() }
+
+    /// The terminal's place in its pane: filled under Resize, scaled under Scale (D75).
+    private lazy var scaleView = MacTerminalScaleView(terminalView: terminalView)
+    func setScaling(_ enabled: Bool) { scaleView.setScaling(enabled) }
+    var currentGrid: (columns: Int, rows: Int) { (terminalView.getTerminal().cols, terminalView.getTerminal().rows) }
+    var keptGrid: SwiftTermScaledGrid? { scaleView.kept }
+    var onScaledGridChange: ((SwiftTermScaledGrid?) -> Void)? {
+        get { scaleView.onScaledGridChange }
+        set { scaleView.onScaledGridChange = newValue }
+    }
 
     /// Local PTY input must continue through its ioctl/process delegate proxy.
     /// Remote hosts use this protocol hook to refresh presentation callbacks;
@@ -4783,6 +4943,8 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
             ? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
             : NSFont(name: theme.fontName, size: fontSize)
                 ?? NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        // Under Scale the grid's size at the font is what is scaled; it may have changed.
+        scaleView.cellsChanged()
         terminalView.nativeForegroundColor = NSColor(
             srgbRed: theme.foreground.red,
             green: theme.foreground.green,

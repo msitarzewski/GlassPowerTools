@@ -227,6 +227,33 @@ struct TerminalWindowSettingsTests {
         #expect(profile(nonsense).pathPreviews == .mouseover)
     }
 
+    /// When resized (D75, 2026-10-16): the rows and columns follow the window unless the setting or
+    /// the window says Scale; the window's bar sets the window's.
+    @Test("When resized: the terminal setting, the window's over it, and nothing the setting can't be")
+    func whenResized() {
+        #expect(profile(GlassWindowOverrides()).whenResized == .changeGrid, "the default: as it always was")
+        let look = TerminalLook(window: GlassWindowOverrides(), frost: "regular", opacity: 0, blur: 1,
+                                interactiveGlass: true, tint: "None")
+        let scaling = TerminalWindowProfile(window: GlassWindowOverrides(), look: look, theme: .default, library: library,
+                                            cursorStyle: "Block", blinkingCursor: true, keepsScrollback: true,
+                                            scrollbackLines: 10_000, bellEnabled: false, visualBell: true,
+                                            whenResized: .scale)
+        #expect(scaling.whenResized == .scale, "every window, from the setting")
+        var grid = GlassWindowOverrides()
+        grid[TerminalWindowSettings.whenResized] = TerminalResizeBehavior.changeGrid.rawValue
+        let overridden = TerminalWindowProfile(window: grid, look: look, theme: .default, library: library,
+                                               cursorStyle: "Block", blinkingCursor: true, keepsScrollback: true,
+                                               scrollbackLines: 10_000, bellEnabled: false, visualBell: true,
+                                               whenResized: .scale)
+        #expect(overridden.whenResized == .changeGrid, "this window's over the setting")
+        var scale = GlassWindowOverrides()
+        scale[TerminalWindowSettings.whenResized] = TerminalResizeBehavior.scale.rawValue
+        #expect(profile(scale).whenResized == .scale)
+        var nonsense = GlassWindowOverrides()
+        nonsense[TerminalWindowSettings.whenResized] = "stretch"
+        #expect(nonsense[TerminalWindowSettings.whenResized] == nil, "not one of its choices: not kept")
+    }
+
     @Test("each setting the window sets wins: theme, font, cursor, bell and scrollback")
     func windowSettingsWin() {
         let own = profile(everything)

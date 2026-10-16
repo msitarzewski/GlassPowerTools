@@ -154,6 +154,23 @@ struct TerminalOverridesSettingsView: View {
                 }
             }
 
+            if TerminalResizeBehavior.isOffered {
+                Section {
+                    // D75: the window's rows and columns follow its size, or stay while its text scales.
+                    GlassWindowSettingRow(TerminalWindowSettings.whenResized, overrides: $settings,
+                                          global: global.whenResized.rawValue, inheritsFrom: Source.allTerminals) { value in
+                        GlassSettingLabeled("When resized") {
+                            Picker("When resized", selection: value) {
+                                ForEach(TerminalResizeBehavior.allCases, id: \.self) { behavior in
+                                    Text(behavior.title).tag(behavior.rawValue)
+                                }
+                            }
+                            .accessibilityIdentifier("terminal-window-when-resized")
+                        }
+                    }
+                }
+            }
+
             #if os(macOS)
             Section {
                 // A printed path's file over the terminal (2026-10-16), this window's way.

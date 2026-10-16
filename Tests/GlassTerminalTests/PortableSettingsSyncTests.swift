@@ -179,4 +179,35 @@ struct PortableSettingsSyncTests {
             TerminalThemeLibrary.self, from: try #require(defaults.data(forKey: UserDefaultsKeys.themeLibrary)))
         #expect(persisted.records.filter(\.isBuiltIn).map(\.id) == [TerminalTheme.defaultID])
     }
+
+    /// When resized (D75, 2026-10-16): kept on this device, carried with the rest, and a payload
+    /// from a build before it leaves it alone.
+    @Test("When resized is kept on this device and travels with the settings")
+    func whenResizedPersistsAndTravels() throws {
+        let suite = "WhenResized.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults.forTest(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = SettingsManager(
+            loadImmediately: false, settingsDefaults: defaults, sshKeyDefaults: defaults,
+            iCloudSettingsSyncService: ICloudSettingsSyncService(store: Store(), writerID: UUID()),
+            workgroupsSyncService: GlassSettingsSyncService(workgroupsStore: Store()))
+        #expect(settings.whenResized == .changeGrid, "as it always was")
+        settings.whenResized = .scale
+        settings.saveSettings()
+        #expect(defaults.string(forKey: UserDefaultsKeys.whenResized) == "scale")
+        let reopened = SettingsManager(
+            settingsDefaults: defaults, sshKeyDefaults: defaults,
+            iCloudSettingsSyncService: ICloudSettingsSyncService(store: Store(), writerID: UUID()),
+            workgroupsSyncService: GlassSettingsSyncService(workgroupsStore: Store()))
+        #expect(reopened.whenResized == .scale)
+
+        var carried = preferences(cursorStyle: "Block")
+        carried.whenResized = TerminalResizeBehavior.scale.rawValue
+        let data = try JSONEncoder().encode(carried)
+        #expect(try JSONDecoder().decode(ICloudPortableTerminalPreferences.self, from: data).whenResized == "scale")
+        var older = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        older.removeValue(forKey: "whenResized")
+        let olderData = try JSONSerialization.data(withJSONObject: older)
+        #expect(try JSONDecoder().decode(ICloudPortableTerminalPreferences.self, from: olderData).whenResized == nil)
+    }
 }

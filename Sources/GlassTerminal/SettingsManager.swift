@@ -169,6 +169,10 @@ class SettingsManager {
     /// When a printed path's file shows over a Mac terminal by itself (2026-10-16): the pointer
     /// resting on it by default; This Window can say otherwise.
     var pathPreviews: TerminalPathPreviews = .mouseover
+    /// What resizing a terminal's window does (D75, 2026-10-16): its rows and columns follow it
+    /// (as always, the default), or they stay and its text scales. This Window and the window's bar
+    /// can say otherwise for one window.
+    var whenResized: TerminalResizeBehavior = .changeGrid
     /// Apple Intelligence explaining an error the output shows, with a fix to review (2026-10-04).
     /// On by default; off here, or from the card itself (the owner, 2026-10-14: "a need to pause on
     /// device AI suggestions … it's monitoring the output of an eval").
@@ -335,6 +339,10 @@ class SettingsManager {
            let saved = TerminalPathPreviews(rawValue: raw) {
             pathPreviews = saved
         }
+        if let raw = settingsDefaults.string(forKey: UserDefaultsKeys.whenResized),
+           let saved = TerminalResizeBehavior(rawValue: raw) {
+            whenResized = saved
+        }
         if settingsDefaults.object(forKey: UserDefaultsKeys.errorSuggestions) != nil {
             errorSuggestions = settingsDefaults.bool(forKey: UserDefaultsKeys.errorSuggestions)
         }
@@ -401,6 +409,7 @@ class SettingsManager {
         settingsDefaults.set(cursorStyle, forKey: UserDefaultsKeys.cursorStyle)
         settingsDefaults.set(blinkingCursor, forKey: UserDefaultsKeys.blinkingCursor)
         settingsDefaults.set(pathPreviews.rawValue, forKey: UserDefaultsKeys.pathPreviews)
+        settingsDefaults.set(whenResized.rawValue, forKey: UserDefaultsKeys.whenResized)
         settingsDefaults.set(errorSuggestions, forKey: UserDefaultsKeys.errorSuggestions)
         settingsDefaults.set(interactiveGlass, forKey: UserDefaultsKeys.interactiveGlass)
         settingsDefaults.set(glassTint, forKey: UserDefaultsKeys.glassTint)
@@ -1443,6 +1452,9 @@ class SettingsManager {
         if let raw = preferences.pathPreviews, let synced = TerminalPathPreviews(rawValue: raw) {
             pathPreviews = synced
         }
+        if let raw = preferences.whenResized, let synced = TerminalResizeBehavior(rawValue: raw) {
+            whenResized = synced
+        }
         // `glassFrost`, `windowOpacity` and `blurBackground` are the shell's layer state
         // (Settings → Appearance), still carried in the payload for glas.sh's readers but not
         // applied here: the store is shared with glas.sh (D3) and applying its payload at launch
@@ -1475,7 +1487,8 @@ class SettingsManager {
                 blurBackground: blurBackground,
                 interactiveGlass: interactiveGlass,
                 glassTint: glassTint,
-                pathPreviews: pathPreviews.rawValue
+                pathPreviews: pathPreviews.rawValue,
+                whenResized: whenResized.rawValue
             )
         )
     }
