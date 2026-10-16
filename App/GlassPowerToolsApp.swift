@@ -366,6 +366,10 @@ struct GlassPowerToolsApp: App {
         terminal.openLocalInEditor = { urls in
             GlassWindowOpener.shared.perform { editor.show(editor.open(urls: urls), with: $0) }
         }
+        #if os(macOS)
+        // A path a Mac terminal printed, previewed over it as the editor previews files (2026-10-16).
+        terminal.filePreview = { url in AnyView(GlassEditorQuickPreview(url: url)) }
+        #endif
         // "Edit" on a file in the Files browser opens it in the editor, as a tab, and saves back
         // over the same connection through the verified commit.
         terminal.openFileInEditor = { @MainActor serverID, path in

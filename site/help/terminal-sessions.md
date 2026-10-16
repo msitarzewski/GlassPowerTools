@@ -87,11 +87,23 @@ Right-click, or Control-click, in a terminal for **Look Up**, **Copy**, **Paste*
 **On Mac**, right-click a web address or a path the terminal shows, and the menu starts with what can be done with it. **On Vision Pro**, pinch and hold on it and let go without moving for the same actions.
 
 - On a web address: **Open Link**, which asks before opening it in your browser, and **Copy Link**. **Open Link** is offered only for an `http` or `https` address with no user name or password in it.
-- On a path: **Open in Editor**, which opens a file as a tab or a folder as a project, on the machine the path is on; **Show in Finder** for a path on this Mac, or **Show in Files** for a path on a server, which opens the file browser at its folder; **Watch Log File**; and **Copy Path**.
+- On a path: **Quick Look** on Mac (see [Preview a file over the terminal](#preview-a-file-over-the-terminal)); **Open in Editor**, which opens a file as a tab or a folder as a project, on the machine the path is on; **Show in Finder** for a path on this Mac, or **Show in Files** for a path on a server, which opens the file browser at its folder; **Watch Log File**; and **Copy Path**.
 
 A path is read on the machine that printed it: from the shell's current folder when it is relative, and `~` as that machine's home folder. A `:line:column` after it is left off. A path that isn't there beeps.
 
 **Watch Log File** opens a new tab in the same window, on the same machine, that follows the file with `tail -F`: new lines appear as they are written, and it keeps following when the log is rotated, or waits for a file that isn't there yet. The tab is named after the file. It runs outside tmux, so closing the tab ends it.
+
+## Preview a file over the terminal
+
+**On Mac**, the file a path names can show in a popover over the terminal: a picture, a PDF, a video, a document, code, or text. Markdown (with its diagrams), HTML, SVG and CSV show as the editor previews them. A file on a server is copied to this Mac for the preview, up to 32 MB, and the copy is removed when the preview closes. A folder has no preview.
+
+- Choose **Quick Look** from a path's right-click menu.
+- Or set **Show previews** in **Settings** ▸ **Terminal**:
+  - **Mouseover**, the starting setting: rest the pointer on a path, and the preview opens after a moment. It closes when the pointer moves off the path and the preview.
+  - **Mouseover + Space**: put the pointer on a path and press Space; Space again or Escape closes it. On a web address, Space asks whether to open it, as a ⌘-click does. Anywhere else, Space types a space.
+  - **Never**: only **Quick Look** shows a preview.
+
+A window can have its own **Show previews** in its settings, under **This Window**. A click, scrolling or typing in the terminal closes the preview.
 
 ## Select text on Vision Pro
 

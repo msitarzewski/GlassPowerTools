@@ -328,6 +328,18 @@ final class MacWorkspaceController {
         model.onOpenPath = { [weak self] path in Task { await self?.openPath(path, from: paneID) } }
         model.onRevealPath = { [weak self] path in Task { await self?.revealPath(path, from: paneID) } }
         model.revealPathTitle = local ? "Show in Finder" : "Show in Files"
+        // Quick Look over the terminal (2026-10-16): the file here, or a copy from the host.
+        model.previewFile = { [weak self] path in await self?.previewFile(path, from: paneID) }
+        model.previewContent = GlassTerminalRuntime.current?.filePreview
+    }
+
+    /// The file a pane printed the path of, on this Mac for its preview: the file itself here, or a
+    /// copy of the host's (`TerminalRemotePreview`). Nil for a folder, or what isn't there.
+    func previewFile(_ path: String, from paneID: UUID) async -> TerminalPreviewFile? {
+        guard let found = await locatePath(path, from: paneID), !found.isDirectory else { return nil }
+        guard found.serverID != nil else { return TerminalPreviewFile(url: URL(fileURLWithPath: found.path)) }
+        guard let session = sessionsByPaneID[paneID] else { return nil }
+        return await TerminalRemotePreview.fetch(found.path, from: session)
     }
 
     /// Where a path a pane printed is: absolute, on this Mac or on the pane's host, and whether it

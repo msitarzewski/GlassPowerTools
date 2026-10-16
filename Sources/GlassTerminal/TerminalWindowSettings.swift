@@ -59,6 +59,10 @@ nonisolated enum TerminalWindowSettings {
         cursorStyles.contains($0) ? $0 : nil
     }
     static let blinkingCursor = GlassWindowSetting<Bool>("terminal.blinkingCursor", title: "Blinking Cursor")
+    /// Show previews (the Mac's, 2026-10-16): `TerminalPathPreviews`, by its raw value.
+    static let pathPreviews = GlassWindowSetting<String>("terminal.pathPreviews", title: "Show Previews") {
+        TerminalPathPreviews(rawValue: $0) == nil ? nil : $0
+    }
 
     // Behaviour.
     static let bell = GlassWindowSetting<Bool>("terminal.bell", title: "Bell")
@@ -144,15 +148,16 @@ struct TerminalWindowProfile: Equatable {
     let scrollbackLines: Int
     let bellEnabled: Bool
     let visualBell: Bool
+    let pathPreviews: TerminalPathPreviews
 
     var runtimeSettings: SwiftTermRuntimeSettings {
         SwiftTermRuntimeSettings(cursorStyle: cursorStyle, blinkingCursor: blinkingCursor,
-                                 scrollbackLines: scrollbackLines)
+                                 scrollbackLines: scrollbackLines, pathPreviews: pathPreviews)
     }
 
     init(window: GlassWindowOverrides, look: TerminalLook, theme global: TerminalTheme, library: TerminalThemeLibrary,
          cursorStyle: String, blinkingCursor: Bool, keepsScrollback: Bool, scrollbackLines: Int,
-         bellEnabled: Bool, visualBell: Bool) {
+         bellEnabled: Bool, visualBell: Bool, pathPreviews: TerminalPathPreviews = .mouseover) {
         self.look = look
         self.theme = Self.theme(window, over: global, library: library)
         self.cursorStyle = window.value(of: TerminalWindowSettings.cursorStyle, over: cursorStyle)
@@ -161,6 +166,8 @@ struct TerminalWindowProfile: Equatable {
             ? window.value(of: TerminalWindowSettings.scrollbackLines, over: scrollbackLines) : 0
         self.bellEnabled = window.value(of: TerminalWindowSettings.bell, over: bellEnabled)
         self.visualBell = window.value(of: TerminalWindowSettings.visualBell, over: visualBell)
+        self.pathPreviews = TerminalPathPreviews(rawValue: window.value(of: TerminalWindowSettings.pathPreviews,
+                                                                        over: pathPreviews.rawValue)) ?? pathPreviews
     }
 
     /// A terminal in a window with `window`'s settings. Read in a view's body, it follows both:
@@ -170,7 +177,8 @@ struct TerminalWindowProfile: Equatable {
                               theme: settings.currentTheme, library: settings.themeLibrary,
                               cursorStyle: settings.cursorStyle, blinkingCursor: settings.blinkingCursor,
                               keepsScrollback: settings.saveScrollback, scrollbackLines: settings.maxScrollbackLines,
-                              bellEnabled: settings.bellEnabled, visualBell: settings.visualBell)
+                              bellEnabled: settings.bellEnabled, visualBell: settings.visualBell,
+                              pathPreviews: settings.pathPreviews)
     }
 
     /// The window's theme — one from the library, while the library has it — else `global`, with

@@ -143,6 +143,8 @@ nonisolated struct ICloudPortableTerminalPreferences: Codable, Equatable, Sendab
     var blurBackground: Double
     var interactiveGlass: Bool
     var glassTint: String
+    /// Show previews (2026-10-16), optional so a payload from before it still decodes.
+    var pathPreviews: String? = nil
 
     func validate() throws {
         guard (0...100_000).contains(maximumScrollbackLines) else {

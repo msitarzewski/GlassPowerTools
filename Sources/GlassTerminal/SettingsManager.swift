@@ -7,6 +7,7 @@
 
 import SwiftUI
 import GlassShell
+import GlassTerminalEmulator
 import Foundation
 import GlassLayers
 import Observation
@@ -165,6 +166,9 @@ class SettingsManager {
     private(set) var sshKeyDeletionRecoveryError: String?
     var cursorStyle: String = "Block"
     var blinkingCursor: Bool = true
+    /// When a printed path's file shows over a Mac terminal by itself (2026-10-16): the pointer
+    /// resting on it by default; This Window can say otherwise.
+    var pathPreviews: TerminalPathPreviews = .mouseover
     /// Apple Intelligence explaining an error the output shows, with a fix to review (2026-10-04).
     /// On by default; off here, or from the card itself (the owner, 2026-10-14: "a need to pause on
     /// device AI suggestions … it's monitoring the output of an eval").
@@ -327,6 +331,10 @@ class SettingsManager {
         if settingsDefaults.object(forKey: UserDefaultsKeys.blinkingCursor) != nil {
             blinkingCursor = settingsDefaults.bool(forKey: UserDefaultsKeys.blinkingCursor)
         }
+        if let raw = settingsDefaults.string(forKey: UserDefaultsKeys.pathPreviews),
+           let saved = TerminalPathPreviews(rawValue: raw) {
+            pathPreviews = saved
+        }
         if settingsDefaults.object(forKey: UserDefaultsKeys.errorSuggestions) != nil {
             errorSuggestions = settingsDefaults.bool(forKey: UserDefaultsKeys.errorSuggestions)
         }
@@ -392,6 +400,7 @@ class SettingsManager {
         settingsDefaults.set(hostKeyVerificationMode, forKey: UserDefaultsKeys.hostKeyVerificationMode)
         settingsDefaults.set(cursorStyle, forKey: UserDefaultsKeys.cursorStyle)
         settingsDefaults.set(blinkingCursor, forKey: UserDefaultsKeys.blinkingCursor)
+        settingsDefaults.set(pathPreviews.rawValue, forKey: UserDefaultsKeys.pathPreviews)
         settingsDefaults.set(errorSuggestions, forKey: UserDefaultsKeys.errorSuggestions)
         settingsDefaults.set(interactiveGlass, forKey: UserDefaultsKeys.interactiveGlass)
         settingsDefaults.set(glassTint, forKey: UserDefaultsKeys.glassTint)
@@ -1431,6 +1440,9 @@ class SettingsManager {
         visualBell = preferences.visualBell
         cursorStyle = preferences.cursorStyle
         blinkingCursor = preferences.blinkingCursor
+        if let raw = preferences.pathPreviews, let synced = TerminalPathPreviews(rawValue: raw) {
+            pathPreviews = synced
+        }
         // `glassFrost`, `windowOpacity` and `blurBackground` are the shell's layer state
         // (Settings → Appearance), still carried in the payload for glas.sh's readers but not
         // applied here: the store is shared with glas.sh (D3) and applying its payload at launch
@@ -1462,7 +1474,8 @@ class SettingsManager {
                 windowOpacity: windowOpacity,
                 blurBackground: blurBackground,
                 interactiveGlass: interactiveGlass,
-                glassTint: glassTint
+                glassTint: glassTint,
+                pathPreviews: pathPreviews.rawValue
             )
         )
     }

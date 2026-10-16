@@ -390,6 +390,12 @@ public final class SwiftTermHostModel: ObservableObject {
     /// host cannot. `revealPathTitle` names it.
     public var onRevealPath: (@MainActor (String) -> Void)?
     public var revealPathTitle = "Show in Files"
+    /// The file a printed path names, ready to show on this Mac — the file, or a copy fetched from
+    /// the terminal's machine — for Quick Look over the terminal (`TerminalPreviewFile`); nil when
+    /// there is none to show. Set by the window for each of its panes; Mac only.
+    public var previewFile: (@MainActor (String) async -> TerminalPreviewFile?)?
+    /// What a file looks like in that preview: the editor's preview, from the composition root.
+    public var previewContent: (@MainActor (URL) -> AnyView)?
     @Published public private(set) var scrollPosition: Double = 1
     @Published public private(set) var pendingPasteReview: SwiftTermPasteReview?
     @Published public private(set) var pendingExternalLink: SwiftTermExternalLinkRequest?
@@ -1216,17 +1222,21 @@ public struct SwiftTermRuntimeSettings: Equatable {
     public var blinkingCursor: Bool
     public var scrollbackLines: Int
     public var optionAsMetaKey: Bool
+    /// When a printed path's file shows by itself under the pointer (the Mac's, 2026-10-16).
+    public var pathPreviews: TerminalPathPreviews
 
     public init(
         cursorStyle: String,
         blinkingCursor: Bool,
         scrollbackLines: Int,
-        optionAsMetaKey: Bool = false
+        optionAsMetaKey: Bool = false,
+        pathPreviews: TerminalPathPreviews = .mouseover
     ) {
         self.cursorStyle = cursorStyle
         self.blinkingCursor = blinkingCursor
         self.scrollbackLines = min(100_000, max(0, scrollbackLines))
         self.optionAsMetaKey = optionAsMetaKey
+        self.pathPreviews = pathPreviews
     }
 }
 
@@ -3395,7 +3405,7 @@ private func fitMacTerminalHostWindow(
 }
 
 @MainActor
-private final class ReviewingMacTerminalView: TerminalView, MacTerminalHistoryHolding, MacTerminalModelHolding {
+private final class ReviewingMacTerminalView: TerminalView, MacTerminalHistoryHolding, MacTerminalModelHolding, MacTerminalPreviewHolding {
     var onPasteRequest: ((String, Bool) -> Void)?
     var onWindowAttachmentChanged: (() -> Void)?
 
@@ -3407,6 +3417,8 @@ private final class ReviewingMacTerminalView: TerminalView, MacTerminalHistoryHo
     // A link's actions in the menu (`MacTerminalContextMenu`): the model the view draws.
     var hostModelProvider: () -> SwiftTermHostModel? = { nil }
     var hostModel: SwiftTermHostModel? { hostModelProvider() }
+    // Quick Look on a path (`MacTerminalPathPreviewer`), owned by the engine.
+    weak var pathPreviewer: MacTerminalPathPreviewer?
 
     // ⌘A: SwiftTerm's Select All can't be overridden from here, so its key is taken first.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
@@ -3478,6 +3490,7 @@ private final class MacSwiftTermEngine: TerminalEngine {
     private(set) var rendererDiagnostics = SwiftTermRendererDiagnostics.awaitingWindow
     private(set) var performanceDiagnostics = SwiftTermPerformanceDiagnostics()
     private var scrollWatcher: MacAlternateScreenScrollWatcher?
+    private var pathPreviewer: MacTerminalPathPreviewer?
 
     init(
         delegate: TerminalViewDelegate,
@@ -3493,6 +3506,8 @@ private final class MacSwiftTermEngine: TerminalEngine {
         scrollWatcher = MacAlternateScreenScrollWatcher(view: terminalView, handler: alternateScreenScroll)
         terminalView.fullHistoryProvider = fullHistory
         terminalView.hostModelProvider = hostModel
+        pathPreviewer = MacTerminalPathPreviewer(view: terminalView, model: hostModel)
+        terminalView.pathPreviewer = pathPreviewer
         self.onPasteData = onPasteData
         self.onRendererDiagnostics = onRendererDiagnostics
         self.onOSC52Decision = onOSC52Decision
@@ -3649,6 +3664,7 @@ private final class MacSwiftTermEngine: TerminalEngine {
         terminalView.getTerminal().setCursorStyle(cursorStyle)
         terminalView.changeScrollback(settings.scrollbackLines)
         terminalView.optionAsMetaKey = settings.optionAsMetaKey
+        pathPreviewer?.mode = settings.pathPreviews
     }
 
     private func publishRendererDiagnostics() {
@@ -4084,7 +4100,7 @@ public final class SwiftTermLocalProcessState: ObservableObject {
 }
 
 @MainActor
-private final class ReviewingMacLocalProcessTerminalView: LocalProcessTerminalView, MacTerminalHistoryHolding, MacTerminalModelHolding {
+private final class ReviewingMacLocalProcessTerminalView: LocalProcessTerminalView, MacTerminalHistoryHolding, MacTerminalModelHolding, MacTerminalPreviewHolding {
     var onPasteRequest: ((String, Bool) -> Void)?
     var onWindowAttachmentChanged: (() -> Void)?
     var onProcessOutput: ((ArraySlice<UInt8>, Duration) -> Void)?
@@ -4100,6 +4116,8 @@ private final class ReviewingMacLocalProcessTerminalView: LocalProcessTerminalVi
     // A link's actions in the menu (`MacTerminalContextMenu`): the model the view draws.
     var hostModelProvider: () -> SwiftTermHostModel? = { nil }
     var hostModel: SwiftTermHostModel? { hostModelProvider() }
+    // Quick Look on a path (`MacTerminalPathPreviewer`), owned by the engine.
+    weak var pathPreviewer: MacTerminalPathPreviewer?
 
     // ⌘A: SwiftTerm's Select All can't be overridden from here, so its key is taken first.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
@@ -4340,6 +4358,7 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
     private(set) var rendererDiagnostics = SwiftTermRendererDiagnostics.awaitingWindow
     private(set) var performanceDiagnostics = SwiftTermPerformanceDiagnostics()
     private var scrollWatcher: MacAlternateScreenScrollWatcher?
+    private var pathPreviewer: MacTerminalPathPreviewer?
 
     init(
         hostModel: SwiftTermHostModel,
@@ -4392,6 +4411,8 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
         }
         terminalView.fullHistoryProvider = { [weak self] in self?.delegateProxy.hostModel?.onFullHistory }
         terminalView.hostModelProvider = { [weak self] in self?.delegateProxy.hostModel }
+        pathPreviewer = MacTerminalPathPreviewer(view: terminalView) { [weak self] in self?.delegateProxy.hostModel }
+        terminalView.pathPreviewer = pathPreviewer
         terminalView.onWindowAttachmentChanged = { [weak self] in
             self?.publishRendererDiagnostics()
         }
@@ -4812,6 +4833,7 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
         terminalView.getTerminal().setCursorStyle(cursorStyle)
         terminalView.changeScrollback(settings.scrollbackLines)
         terminalView.optionAsMetaKey = settings.optionAsMetaKey
+        pathPreviewer?.mode = settings.pathPreviews
     }
 
     private func publishRendererDiagnostics() {

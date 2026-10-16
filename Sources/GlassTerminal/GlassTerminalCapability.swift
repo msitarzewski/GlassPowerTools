@@ -141,6 +141,9 @@ public final class GlassTerminalRuntime {
     /// Files and folders on this Mac into the editor — a folder as a project — for a path a
     /// terminal shows (2026-10-14). Set by the composition root.
     public var openLocalInEditor: (@MainActor ([URL]) -> Void)?
+    /// A file on this device as its preview over a terminal shows it (2026-10-16): the editor's
+    /// preview, Quick Look's for most. Set by the composition root; the Mac's terminals use it.
+    public var filePreview: (@MainActor (URL) -> AnyView)?
     /// The app's one runtime, for a terminal's tab to reach the editor and Files from a path's
     /// menu. Set as it is made.
     public nonisolated(unsafe) static weak var current: GlassTerminalRuntime?

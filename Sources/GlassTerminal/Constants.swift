@@ -31,6 +31,7 @@ nonisolated enum UserDefaultsKeys {
     static let hostKeyVerificationMode = "hostKeyVerificationMode"
     static let cursorStyle = "cursorStyle"
     static let blinkingCursor = "blinkingCursor"
+    static let pathPreviews = "pathPreviews"
     static let errorSuggestions = "errorSuggestions"
     static let windowOpacity = "windowOpacity"
     static let blurBackground = "blurBackground"

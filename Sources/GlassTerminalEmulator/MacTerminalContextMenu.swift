@@ -33,6 +33,15 @@ enum MacTerminalContextMenu {
         // Each item's state is set here; SwiftTerm's own validation knows only its selectors.
         menu.autoenablesItems = false
         if let target = link(in: view, at: event.locationInWindow) {
+            // Quick Look first on a path, as Finder's menu has it (2026-10-16): the file, over the
+            // terminal, whatever the window's Show previews says.
+            if case .path(let path) = target, let previewer = (view as? MacTerminalPreviewHolding)?.pathPreviewer,
+               previewer.canPreview {
+                let point = event.locationInWindow
+                menu.addItem(item("Quick Look", symbol: "eye") {
+                    Task { await previewer.show(path: path, at: point, explicit: true) }
+                })
+            }
             addItems(for: target, model: (view as? MacTerminalModelHolding)?.hostModel, to: menu)
             menu.addItem(.separator())
         }

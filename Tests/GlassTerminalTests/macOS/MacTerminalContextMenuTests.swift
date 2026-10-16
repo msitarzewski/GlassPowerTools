@@ -242,6 +242,58 @@ struct MacTerminalContextMenuTests {
         #expect(opened == ["/var/log/glass-test.log"] && revealed == ["/var/log/glass-test.log"])
     }
 
+    /// The owner (2026-10-16): Quick Look on a path's menu, its file over the terminal.
+    @Test("a path offers Quick Look first, where the window can preview, and choosing it asks for that path's file")
+    func quickLookAPath() async throws {
+        let host = await HostedTerminal()
+        defer { host.close() }
+        var asked: [String] = []
+        host.model.previewFile = { path in
+            asked.append(path)
+            return nil
+        }
+        host.model.previewContent = { _ in AnyView(EmptyView()) }
+        host.model.onOpenPath = { _ in }
+        await host.feed("/var/log/glass-test.log:42 rotated\r\n")
+        let view = try terminalView(host)
+
+        let menu = try #require(view.menu(for: try rightClick(view)))
+        #expect(Array(titles(menu).prefix(2)) == ["Quick Look", "Open in Editor"])
+        menu.performActionForItem(at: try #require(menu.items.firstIndex { $0.title == "Quick Look" }))
+        for _ in 0..<50 where asked.isEmpty { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(asked == ["/var/log/glass-test.log"], "the file, without the line the log named")
+    }
+
+    @Test("a window that can't preview offers no Quick Look; an address never does")
+    func noQuickLookWithoutAPreview() async throws {
+        let host = await HostedTerminal()
+        defer { host.close() }
+        host.model.onOpenPath = { _ in }
+        await host.feed("/var/log/glass-test.log rotated\r\nhttps://example.com/docs\r\n")
+        let view = try terminalView(host)
+        #expect(!titles(try #require(view.menu(for: try rightClick(view)))).contains("Quick Look"))
+
+        host.model.previewFile = { _ in nil }
+        host.model.previewContent = { _ in AnyView(EmptyView()) }
+        #expect(titles(try #require(view.menu(for: try rightClick(view)))).first == "Quick Look")
+        #expect(!titles(try #require(view.menu(for: try rightClick(view, row: 1)))).contains("Quick Look"))
+    }
+
+    /// Mouseover + Space (2026-10-16): Space alone, never held or with a modifier, and never a repeat.
+    @Test("only a plain Space press is the preview's")
+    func plainSpace() throws {
+        func key(_ characters: String, _ flags: NSEvent.ModifierFlags = [], repeated: Bool = false) throws -> NSEvent {
+            try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0,
+                                          windowNumber: 0, context: nil, characters: characters,
+                                          charactersIgnoringModifiers: characters, isARepeat: repeated, keyCode: 49))
+        }
+        #expect(MacTerminalPathPreviewer.isPlainSpace(try key(" ")))
+        #expect(!MacTerminalPathPreviewer.isPlainSpace(try key(" ", .shift)))
+        #expect(!MacTerminalPathPreviewer.isPlainSpace(try key(" ", .control)))
+        #expect(!MacTerminalPathPreviewer.isPlainSpace(try key(" ", repeated: true)))
+        #expect(!MacTerminalPathPreviewer.isPlainSpace(try key("a")))
+    }
+
     @Test("with no host that can watch, a path offers Copy Path alone, and it copies the path")
     func pathWithoutAWatcher() async throws {
         let host = await HostedTerminal()

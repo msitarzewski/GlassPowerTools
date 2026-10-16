@@ -210,6 +210,23 @@ struct TerminalWindowSettingsTests {
                                                                   scrollbackLines: 10_000))
     }
 
+    /// Show previews (2026-10-16): Mouseover unless a window says otherwise; nothing it could not mean.
+    @Test("Show previews: the terminal setting, the window's over it, and nothing the setting can't be")
+    func showPreviews() {
+        #expect(profile(GlassWindowOverrides()).pathPreviews == .mouseover, "the default")
+        var never = GlassWindowOverrides()
+        never[TerminalWindowSettings.pathPreviews] = TerminalPathPreviews.never.rawValue
+        #expect(profile(never).pathPreviews == .never)
+        #expect(profile(never).runtimeSettings.pathPreviews == .never, "and the terminal is told")
+        var space = GlassWindowOverrides()
+        space[TerminalWindowSettings.pathPreviews] = TerminalPathPreviews.mouseoverAndSpace.rawValue
+        #expect(profile(space).pathPreviews == .mouseoverAndSpace)
+        var nonsense = GlassWindowOverrides()
+        nonsense[TerminalWindowSettings.pathPreviews] = "sometimes"
+        #expect(nonsense[TerminalWindowSettings.pathPreviews] == nil, "not one of its choices: not kept")
+        #expect(profile(nonsense).pathPreviews == .mouseover)
+    }
+
     @Test("each setting the window sets wins: theme, font, cursor, bell and scrollback")
     func windowSettingsWin() {
         let own = profile(everything)

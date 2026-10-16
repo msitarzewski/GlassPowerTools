@@ -16,6 +16,7 @@
 import SwiftUI
 import GlassLayers
 import GlassConnectionUI
+import GlassTerminalEmulator
 
 /// This Window: the window's own settings, each over the setting it follows.
 struct TerminalOverridesSettingsView: View {
@@ -152,6 +153,23 @@ struct TerminalOverridesSettingsView: View {
                     GlassSettingLabeled("Blinking cursor") { Toggle("Blinking cursor", isOn: value) }
                 }
             }
+
+            #if os(macOS)
+            Section {
+                // A printed path's file over the terminal (2026-10-16), this window's way.
+                GlassWindowSettingRow(TerminalWindowSettings.pathPreviews, overrides: $settings,
+                                      global: global.pathPreviews.rawValue, inheritsFrom: Source.allTerminals) { value in
+                    GlassSettingLabeled("Show previews") {
+                        Picker("Show previews", selection: value) {
+                            ForEach(TerminalPathPreviews.allCases, id: \.self) { choice in
+                                Text(choice.title).tag(choice.rawValue)
+                            }
+                        }
+                        .accessibilityIdentifier("terminal-window-path-previews")
+                    }
+                }
+            }
+            #endif
 
             Section {
                 GlassWindowSettingRow(TerminalWindowSettings.bell, overrides: $settings,

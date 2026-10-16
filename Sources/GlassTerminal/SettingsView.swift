@@ -11,6 +11,7 @@ import GlassShell
 import GlassSSHTransport
 import UniformTypeIdentifiers
 import GlasSecretStore
+import GlassTerminalEmulator
 #if os(macOS)
 import UniformTypeIdentifiers
 #endif
@@ -526,6 +527,28 @@ struct TerminalSettingsView: View {
             }
 
             #if os(macOS)
+            // The file a printed path names, over the terminal (2026-10-16: "Show previews:
+            // ( ) Never (•) Mouseover ( ) Mouseover + space"). Quick Look on a path's right-click
+            // menu shows it whatever this says.
+            Section {
+                Picker("Show previews", selection: $settings.pathPreviews) {
+                    ForEach(TerminalPathPreviews.allCases, id: \.self) { choice in
+                        Text(choice.title).tag(choice)
+                    }
+                }
+                .pickerStyle(.radioGroup)
+                .onChange(of: settings.pathPreviews) { _, _ in
+                    settings.saveSettings()
+                }
+                .accessibilityIdentifier("terminal-settings-path-previews")
+            } header: {
+                Text("Previews")
+            } footer: {
+                Text("A file whose path a terminal printed — a picture, a PDF, Markdown, code — shown over the terminal, from this Mac or the server. Mouseover shows it when the pointer rests on the path. With Mouseover + Space, Space shows it instead, and on a web address asks to open it. Quick Look in a path's right-click menu shows it either way.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             MacLocalTerminalServerSection(settings: settingsManager)
             #endif
         }
