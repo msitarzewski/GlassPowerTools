@@ -144,6 +144,14 @@ public struct DesktopSessionView: View {
         session.resize(width: size.width, height: size.height, displayScale: displayScale)
     }
 
+    #if os(iOS)
+    /// Black behind the picture, out to every edge: before the first picture, and around one shown as
+    /// it is. A presentation that fades or keys out a colour shows the page instead.
+    private var drawsBlackBackdrop: Bool {
+        session.frame == nil || viewport.presentation.mode == .original
+    }
+    #endif
+
     private var compactScreen: Bool {
         #if os(iOS)
         horizontalSizeClass == .compact
@@ -252,7 +260,7 @@ public struct DesktopSessionView: View {
                 #elseif !os(visionOS)
                 // Into every edge: on a phone on its side the system's controls keep a margin, and
                 // it showed white beside the black (the unfolded Duo, 2026-10-13).
-                if session.frame == nil || viewport.presentation.mode == .original { Color.black.ignoresSafeArea() }
+                if drawsBlackBackdrop { Color.black.ignoresSafeArea() }
                 #endif
             }
             // Over a live picture only: without one, the status view says it (`connectionStatus`).
@@ -280,6 +288,10 @@ public struct DesktopSessionView: View {
         // The name belongs in the bar beside the controls, not in a large title that costs the
         // desktop a band of screen on a phone.
         .navigationBarTitleDisplayMode(.inline)
+        // The title sits over the desktop's black, not over a bar: in light mode it was black on
+        // black (2026-10-15, as the terminal's tab switcher was). Light over the black; the system's
+        // own where the page shows instead.
+        .toolbarColorScheme(drawsBlackBackdrop ? .dark : nil, for: .navigationBar)
         #endif
         #if os(macOS)
         // A pinch in opens Show All Windows, as on a terminal (the desktop does not pinch to zoom).
