@@ -355,6 +355,15 @@ public final class SwiftTermHostModel: ObservableObject {
         terminalEngine?.setScaling(enabled)
     }
 
+    /// ⌘+, ⌘− and ⌘0 while the terminal scales: its font can't change without re-gridding it, so
+    /// the window grows or shrinks by `factor` instead, or goes to the size where the text is at
+    /// its font's own (nil). False where a window can't be sized from here (iPad, full screen).
+    @discardableResult
+    public func zoomScaledWindow(by factor: CGFloat?) -> Bool {
+        guard scaledGrid != nil else { return false }
+        return terminalEngine?.zoomWindow(by: factor) ?? false
+    }
+
     /// The grid kept under Scale, as SwiftTerm reports a size: any other is a font change passing,
     /// which the layout puts back, and the host never hears of it.
     fileprivate var keptGrid: SwiftTermScaledGrid? { terminalEngine?.keptGrid }
@@ -1307,6 +1316,8 @@ private protocol TerminalEngine: AnyObject {
     var keptGrid: SwiftTermScaledGrid? { get }
     /// The rows and columns SwiftTerm has now.
     var currentGrid: (columns: Int, rows: Int) { get }
+    /// Under Scale, the window resized by `factor`, or to the font's own size for nil.
+    func zoomWindow(by factor: CGFloat?) -> Bool
     var onScaledGridChange: ((SwiftTermScaledGrid?) -> Void)? { get set }
 }
 
@@ -2566,6 +2577,23 @@ private final class TerminalHardwareKeyContainerView: UIView {
         }
     }
 
+    /// ⌘+, ⌘− and ⌘0 under Scale (`SwiftTermScaleLayout.zoomedWindow`): the window asked for its new
+    /// size. Vision Pro only — an iPad window's size is the person's, with nothing to ask it by.
+    func zoomWindow(by factor: CGFloat?) -> Bool {
+        #if os(visionOS)
+        guard let kept, kept.size != .zero, let window, let scene = window.windowScene,
+              let target = SwiftTermScaleLayout.zoomedWindow(window: window.bounds.size, space: bounds.size,
+                                                             content: kept.size, factor: factor) else { return false }
+        scene.requestGeometryUpdate(.Vision(size: target)) { error in
+            Logger(subsystem: "com.glasspowertools", category: "terminal-scale")
+                .error("event=zoom error=\(error.localizedDescription, privacy: .public)")
+        }
+        return true
+        #else
+        return false
+        #endif
+    }
+
     /// Resize: the terminal fills the container, unscaled.
     private func fill(_ terminalView: ReviewingTerminalView) {
         let wasScaled = !scaler.transform.isIdentity
@@ -2775,6 +2803,7 @@ private final class SwiftTermEngine: TerminalEngine {
     var hostView: UIView { containerView }
 
     func setScaling(_ enabled: Bool) { containerView.setScaling(enabled) }
+    func zoomWindow(by factor: CGFloat?) -> Bool { containerView.zoomWindow(by: factor) }
     var currentGrid: (columns: Int, rows: Int) { (terminalView.getTerminal().cols, terminalView.getTerminal().rows) }
     var keptGrid: SwiftTermScaledGrid? { containerView.kept }
     var onScaledGridChange: ((SwiftTermScaledGrid?) -> Void)? {
@@ -3467,6 +3496,8 @@ private protocol TerminalEngine: AnyObject {
     var keptGrid: SwiftTermScaledGrid? { get }
     /// The rows and columns SwiftTerm has now.
     var currentGrid: (columns: Int, rows: Int) { get }
+    /// Under Scale, the window resized by `factor`, or to the font's own size for nil.
+    func zoomWindow(by factor: CGFloat?) -> Bool
     var onScaledGridChange: ((SwiftTermScaledGrid?) -> Void)? { get set }
 }
 
@@ -3672,6 +3703,7 @@ private final class MacSwiftTermEngine: TerminalEngine {
     /// The terminal's place in its pane: filled under Resize, scaled under Scale (D75).
     private lazy var scaleView = MacTerminalScaleView(terminalView: terminalView)
     func setScaling(_ enabled: Bool) { scaleView.setScaling(enabled) }
+    func zoomWindow(by factor: CGFloat?) -> Bool { scaleView.zoomWindow(by: factor) }
     var currentGrid: (columns: Int, rows: Int) { (terminalView.getTerminal().cols, terminalView.getTerminal().rows) }
     var keptGrid: SwiftTermScaledGrid? { scaleView.kept }
     var onScaledGridChange: ((SwiftTermScaledGrid?) -> Void)? {
@@ -4589,6 +4621,7 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
     /// The terminal's place in its pane: filled under Resize, scaled under Scale (D75).
     private lazy var scaleView = MacTerminalScaleView(terminalView: terminalView)
     func setScaling(_ enabled: Bool) { scaleView.setScaling(enabled) }
+    func zoomWindow(by factor: CGFloat?) -> Bool { scaleView.zoomWindow(by: factor) }
     var currentGrid: (columns: Int, rows: Int) { (terminalView.getTerminal().cols, terminalView.getTerminal().rows) }
     var keptGrid: SwiftTermScaledGrid? { scaleView.kept }
     var onScaledGridChange: ((SwiftTermScaledGrid?) -> Void)? {

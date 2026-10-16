@@ -44,6 +44,19 @@ struct TerminalScaleTests {
         #expect(SwiftTermScaleLayout.fit(.zero, in: CGSize(width: 10, height: 10)) == nil)
     }
 
+    @Test("⌘+ and ⌘− size the window around the text by a step; ⌘0 to the font's own size")
+    func zoomedWindow() throws {
+        // A pane 800 × 600 under 40 points of the window's own, drawing 1600 × 1200 at half size.
+        let window = CGSize(width: 800, height: 640), space = CGSize(width: 800, height: 600)
+        let content = CGSize(width: 1600, height: 1200)
+        #expect(SwiftTermScaleLayout.zoomedWindow(window: window, space: space, content: content, factor: 1.1)
+                == CGSize(width: 880, height: 700), "a tenth larger, the window's own 40 points kept")
+        #expect(SwiftTermScaleLayout.zoomedWindow(window: window, space: space, content: content, factor: nil)
+                == CGSize(width: 1600, height: 1240), "the text at its font's own size")
+        #expect(SwiftTermScaleLayout.zoomedWindow(window: window, space: space, content: content, factor: 100) == nil,
+                "nothing so far from now that it can't be meant")
+    }
+
     // MARK: A terminal in a window
 
     #if os(macOS)
@@ -158,6 +171,32 @@ struct TerminalScaleTests {
         #expect(after.size.width > before.size.width, "the same grid at a larger font is larger before it is scaled")
         let heard = Array(host.told.dropFirst(toldBefore.count))
         #expect(heard.allSatisfy { $0 == opened }, "the host heard only the kept grid: \(heard)")
+    }
+
+    @Test("⌘− under Scale makes the window smaller, not the grid; ⌘0 brings the text to its font's size")
+    func zoomUnderScale() async throws {
+        let host = await Hosted()
+        defer { host.close() }
+        let opened = try #require(host.grid)
+        #expect(!host.model.zoomScaledWindow(by: 0.5), "under Resize the font's size is the font's")
+        host.model.setScaling(true)
+        await host.settle()
+        let kept = try #require(host.model.scaledGrid)
+        let before = try #require(host.window.contentView?.frame.size)
+
+        #expect(host.model.zoomScaledWindow(by: 0.5))
+        await host.settle()
+        let smaller = try #require(host.window.contentView?.frame.size)
+        #expect(abs(smaller.width - before.width / 2) < 2 && abs(smaller.height - before.height / 2) < 2,
+                "half the window: \(before) → \(smaller)")
+        #expect(host.grid == opened, "the same rows and columns")
+
+        #expect(host.model.zoomScaledWindow(by: nil))
+        await host.settle()
+        let actual = try #require(host.window.contentView?.frame.size)
+        #expect(abs(actual.width - kept.size.width) < 2 && abs(actual.height - kept.size.height) < 2,
+                "the window the grid's size at its font: \(actual) for \(kept.size)")
+        #expect(host.grid == opened)
     }
 
     @Test("back to Resize, the window sets the grid again")

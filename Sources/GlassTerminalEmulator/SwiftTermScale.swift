@@ -55,6 +55,19 @@ enum SwiftTermScaleLayout {
                height: cell.height * CGFloat(rows) + 0.5)
     }
 
+    /// Under Scale, ⌘+, ⌘− and ⌘0 size the window rather than the font, which can't change without
+    /// re-gridding the terminal: the terminal's part of the window becomes `content` at the scale
+    /// asked for — `factor` times the scale it has now, or its font's own size (1) for nil — and the
+    /// window around it keeps the rest. Nil for a scale too far from now to be meant (> 20 times).
+    static func zoomedWindow(window: CGSize, space: CGSize, content: CGSize, factor: CGFloat?) -> CGSize? {
+        guard let now = fit(content, in: space)?.scale else { return nil }
+        let scale = factor.map { now * $0 } ?? 1
+        guard scale.isFinite, scale > 0, scale / now < 20, now / scale < 20 else { return nil }
+        let chrome = CGSize(width: max(0, window.width - space.width), height: max(0, window.height - space.height))
+        return CGSize(width: (content.width * scale + chrome.width).rounded(),
+                      height: (content.height * scale + chrome.height).rounded())
+    }
+
     /// The scale that fits all of `content` in `space` keeping its shape, and where its top-left
     /// corner goes there: centred, so the space over is shared equally either side.
     static func fit(_ content: CGSize, in space: CGSize) -> (scale: CGFloat, origin: CGPoint)? {
@@ -114,6 +127,30 @@ final class MacTerminalScaleView: NSView {
 
     /// After the terminal's font changes: its cells did, so what the grid comes to did.
     func cellsChanged() { layoutTerminal() }
+
+    /// ⌘+, ⌘− and ⌘0 under Scale (`SwiftTermScaleLayout.zoomedWindow`): the window resized, its
+    /// top-left kept, within its screen. False when not scaling or in full screen.
+    func zoomWindow(by factor: CGFloat?) -> Bool {
+        guard let kept, kept.size != .zero, let window, let content = window.contentView,
+              !window.styleMask.contains(.fullScreen),
+              let target = SwiftTermScaleLayout.zoomedWindow(window: content.frame.size, space: frame.size,
+                                                             content: kept.size, factor: factor) else { return false }
+        var size = NSSize(width: max(target.width, window.contentMinSize.width),
+                          height: max(target.height, window.contentMinSize.height))
+        if let visible = (window.screen ?? NSScreen.main)?.visibleFrame {
+            let chrome = window.frameRect(forContentRect: .zero).size
+            size.width = min(size.width, visible.width - chrome.width)
+            size.height = min(size.height, visible.height - chrome.height)
+        }
+        var frame = window.frameRect(forContentRect: NSRect(origin: .zero, size: size))
+        frame.origin = NSPoint(x: window.frame.minX, y: window.frame.maxY - frame.height)
+        if let visible = (window.screen ?? NSScreen.main)?.visibleFrame {
+            frame.origin.x = min(max(frame.minX, visible.minX), visible.maxX - frame.width)
+            frame.origin.y = min(max(frame.minY, visible.minY), visible.maxY - frame.height)
+        }
+        window.setFrame(frame, display: true, animate: true)
+        return true
+    }
 
     private func layoutTerminal() {
         if wantsScaling, kept == nil, window != nil, frame.width > 0, frame.height > 0 {

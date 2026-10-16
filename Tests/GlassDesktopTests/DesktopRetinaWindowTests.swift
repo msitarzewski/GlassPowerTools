@@ -286,21 +286,21 @@ struct DesktopRetinaWindowTests {
 
         // The window: the picture's shape plus 34 points of chrome on each side on Vision Pro.
         #expect(DesktopWindowAspect.spatialChrome == CGSize(width: 68, height: 68))
-        #expect(DesktopWindowAspect.windowSize(current: CGSize(width: 1280, height: 800), aspect: 16.0 / 9.0,
-                                               chrome: DesktopWindowAspect.spatialChrome,
-                                               minimum: DesktopWindowAspect.spatialMinimum) == CGSize(width: 1280, height: 750))
+        #expect(GlassWindowAspect.windowSize(current: CGSize(width: 1280, height: 800), aspect: 16.0 / 9.0,
+                                             chrome: DesktopWindowAspect.spatialChrome,
+                                             minimum: DesktopWindowAspect.spatialMinimum) == CGSize(width: 1280, height: 750))
         // A portrait display keeps the window's height, and grows to the minimum width keeping its shape.
-        #expect(DesktopWindowAspect.windowSize(current: CGSize(width: 1280, height: 800), aspect: 0.5,
-                                               chrome: DesktopWindowAspect.spatialChrome,
-                                               minimum: DesktopWindowAspect.spatialMinimum) == CGSize(width: 800, height: 1532))
+        #expect(GlassWindowAspect.windowSize(current: CGSize(width: 1280, height: 800), aspect: 0.5,
+                                             chrome: DesktopWindowAspect.spatialChrome,
+                                             minimum: DesktopWindowAspect.spatialMinimum) == CGSize(width: 800, height: 1532))
         // A very wide picture: below the minimum height, grown keeping its shape.
-        #expect(DesktopWindowAspect.windowSize(current: CGSize(width: 900, height: 500), aspect: 4,
-                                               chrome: DesktopWindowAspect.spatialChrome,
-                                               minimum: DesktopWindowAspect.spatialMinimum) == CGSize(width: 1556, height: 440))
+        #expect(GlassWindowAspect.windowSize(current: CGSize(width: 900, height: 500), aspect: 4,
+                                             chrome: DesktopWindowAspect.spatialChrome,
+                                             minimum: DesktopWindowAspect.spatialMinimum) == CGSize(width: 1556, height: 440))
         // No chrome (a Mac window whose status bar is measured as none): the picture is the window.
-        #expect(DesktopWindowAspect.windowSize(current: CGSize(width: 1000, height: 1000), aspect: 2, chrome: .zero,
-                                               minimum: .zero) == CGSize(width: 1000, height: 500))
-        #expect(DesktopWindowAspect.sameAspect(1.6, 1.603) && !DesktopWindowAspect.sameAspect(1.6, 1.7))
+        #expect(GlassWindowAspect.windowSize(current: CGSize(width: 1000, height: 1000), aspect: 2, chrome: .zero,
+                                             minimum: .zero) == CGSize(width: 1000, height: 500))
+        #expect(GlassWindowAspect.sameAspect(1.6, 1.603) && !GlassWindowAspect.sameAspect(1.6, 1.7))
     }
 
     @Test("Retina Displays is the connection's, from the desktop's window; Keep Display Proportions is each window's")

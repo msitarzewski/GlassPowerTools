@@ -12,6 +12,8 @@
 //
 
 import SwiftUI
+import GlassShell
+import GlassTerminalEmulator
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -63,5 +65,39 @@ struct TerminalScaleToggle: View {
         .help(scales
               ? "Scale Text: the rows and columns stay as they are, and the text grows and shrinks with the window. Turn off to have resizing change the rows and columns."
               : "Scale Text: keep these rows and columns, and have the text grow and shrink with the window instead.")
+    }
+}
+
+/// Scale's part in a terminal's window: the terminal told to keep its grid or not, and the window
+/// held to the kept grid's shape, as a desktop's is to its display's. The window's shown terminal
+/// holds it; one that isn't scaling lets it go.
+struct TerminalScaling: ViewModifier {
+    let model: SwiftTermHostModel
+    /// Scale is on for this terminal now: the grid it keeps is the one it has as it turns on.
+    let scales: Bool
+    /// This terminal is the one its window shows.
+    let holdsWindow: Bool
+    /// The shape to hold the window to; nil lets it be any.
+    let aspect: Double?
+    /// The terminal's own area, now.
+    let canvas: CGSize
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: scales, initial: true) { _, scales in model.setScaling(scales) }
+            .background {
+                if holdsWindow, TerminalResizeBehavior.isOffered {
+                    GlassWindowAspectLock(aspect: aspect, canvas: canvas, minimum: Self.minimum)
+                }
+            }
+    }
+
+    /// The smallest a window held to a terminal's shape is made, keeping the shape.
+    private static var minimum: CGSize {
+        #if os(visionOS)
+        CGSize(width: 480, height: 300)
+        #else
+        CGSize(width: 320, height: 200)
+        #endif
     }
 }

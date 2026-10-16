@@ -148,6 +148,8 @@ struct TerminalWindowView: View {
     @State private var isMacFullScreen = false
     @State private var macInitialGeometryFitAttempts = 0
     #endif
+    /// The terminal's own area, which under Scale keeps the grid's shape (D75).
+    @State private var terminalCanvasSize = CGSize.zero
     @Environment(\.openWindow) private var openWindow
     #if os(visionOS)
     @Environment(\.openImmersiveSpace) private var openImmersiveSpace
@@ -270,10 +272,9 @@ struct TerminalWindowView: View {
             .onChange(of: session.closeWindowNonce) { _, _ in
                 closeTerminalAfterCleanExit()
             }
-            // Scale (D75): the grid it keeps is the one the terminal has as it turns on.
-            .onChange(of: wantsScaling, initial: true) { _, scales in
-                terminalHostModel.setScaling(scales)
-            }
+            .modifier(TerminalScaling(model: terminalHostModel, scales: wantsScaling,
+                                      holdsWindow: isTerminalActive, aspect: windowShapeAspect,
+                                      canvas: terminalCanvasSize))
             .onDisappear {
                 handleTerminalDisappear()
             }
@@ -785,6 +786,7 @@ struct TerminalWindowView: View {
                     }
                 }
             )
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { terminalCanvasSize = $0 }
             .background(Color.clear)
             .overlay(Color.white.opacity(showVisualBell ? 0.3 : 0).allowsHitTesting(false))
             .padding(.horizontal, terminalCanvasHorizontalPadding)
@@ -914,12 +916,37 @@ struct TerminalWindowView: View {
 
     private var fontActions: TerminalFontActions {
         let defaultSize = windowTheme.swiftTermTheme.fontSize
+        let model = terminalHostModel
+        // Under Scale (D75) the text's size is the window's: these size the window, a step at a
+        // time, or back to where the text is at its font's own size. Where a window can't be sized
+        // from here (iPad) they do nothing, as a font change would show nothing.
         return TerminalFontActions(
-            increase: { terminalHostModel.adjustFontSize(by: 1, defaultSize: defaultSize) },
-            decrease: { terminalHostModel.adjustFontSize(by: -1, defaultSize: defaultSize) },
-            reset: { terminalHostModel.resetFontSize() }
+            increase: {
+                if model.scaledGrid != nil {
+                    model.zoomScaledWindow(by: Self.scaledZoomStep)
+                } else {
+                    model.adjustFontSize(by: 1, defaultSize: defaultSize)
+                }
+            },
+            decrease: {
+                if model.scaledGrid != nil {
+                    model.zoomScaledWindow(by: 1 / Self.scaledZoomStep)
+                } else {
+                    model.adjustFontSize(by: -1, defaultSize: defaultSize)
+                }
+            },
+            reset: {
+                if model.scaledGrid != nil {
+                    model.zoomScaledWindow(by: nil)
+                } else {
+                    model.resetFontSize()
+                }
+            }
         )
     }
+
+    /// ⌘+ under Scale: about a point of text at a 10–12 point font.
+    private static let scaledZoomStep: CGFloat = 1.1
 
     #if !os(macOS)
     private var fontSizeMenu: some View {
@@ -1151,6 +1178,15 @@ struct TerminalWindowView: View {
         #else
         return true
         #endif
+    }
+
+    /// The shape the window keeps under Scale: the kept grid's at the terminal's font. Not while a
+    /// Mac window is split, where each pane scales into its own part.
+    private var windowShapeAspect: Double? {
+        #if os(macOS)
+        guard !showsMacPaneChrome else { return nil }
+        #endif
+        return terminalHostModel.scaledGrid?.aspect
     }
 
     /// The window's bar's Scale Text, which sets This Window's When Resized; nil where this

@@ -185,7 +185,10 @@ public struct DesktopSessionView: View {
         .glassSpatialWindowGlass(strength: GlassWindowGlass.strength(frost: profile.frost,
                                                                      reduceTransparency: reduceTransparency))
         // W38: the window resizes only in its display's shape.
-        .background { DesktopWindowAspectLock(aspect: session.pictureAspect(for: viewport)) }
+        .background {
+            GlassWindowAspectLock(aspect: session.pictureAspect(for: viewport), chrome: DesktopWindowAspect.spatialChrome,
+                                  minimum: DesktopWindowAspect.spatialMinimum)
+        }
         // Shrinks into an orb with the remote screen live on its face (2026-10-15).
         .glassSessionOrb(GlassSessionOrbFace(title: windowTitle, symbolName: "display") { [session] in
             session.frame.flatMap(GlassDesktopCapability.picture(of:))
@@ -196,7 +199,10 @@ public struct DesktopSessionView: View {
             #if os(macOS)
             .frame(minWidth: DesktopWindowSizing.floor.width, minHeight: DesktopWindowSizing.floor.height)
             .background { DesktopWindowSizer(desktop: viewport.isPrimary ? session.connection.desktop : session.region(for: viewport).size) }
-            .background { DesktopWindowAspectLock(aspect: session.pictureAspect(for: viewport), canvas: canvasSize) }
+            .background {
+                GlassWindowAspectLock(aspect: session.pictureAspect(for: viewport), canvas: canvasSize,
+                                      minimum: DesktopWindowSizing.floor)
+            }
             #endif
         #endif
     }
