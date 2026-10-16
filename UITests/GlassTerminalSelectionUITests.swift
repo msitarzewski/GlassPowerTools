@@ -45,9 +45,16 @@ final class GlassTerminalSelectionUITests: XCTestCase {
         app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Terminal")).firstMatch
     }
 
-    /// The terminal while it has a selection (set in UI-testing runs only, as the highlight can't be read).
+    /// The terminal while it has a selection (set in UI-testing runs only, as the highlight can't be
+    /// read): `terminal-selection-active-<characters selected>`.
     private var selected: XCUIElement {
-        app.descendants(matching: .any).matching(identifier: "terminal-selection-active").firstMatch
+        app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "terminal-selection-active")).firstMatch
+    }
+
+    /// How many characters are selected now; nil without a selection.
+    private var selectedCount: Int? {
+        guard selected.exists else { return nil }
+        return Int(selected.identifier.split(separator: "-").last ?? "")
     }
 
     /// The terminal's middle: the visionOS simulator's runner holds and taps an element there,
@@ -117,6 +124,31 @@ final class GlassTerminalSelectionUITests: XCTestCase {
         if !reached { attachTree("after a pinch-drag in tmux") }
         XCTAssertTrue(reached, "the drag didn't reach the program as its wheel")
         XCTAssertFalse(selected.exists, "the drag selected")
+    }
+
+    /// Apple's text: pinch and hold, and "the word you tap is highlighted" (Apple Vision Pro User
+    /// Guide). It selected one character, which hardly showed (the owner, 2026-10-16: "text
+    /// selection in vision pro is still not working"). The demo's middle is the word "screen".
+    func testAHoldSelectsTheWordHeld() {
+        launch("terminal-tmux")
+        middle.press(forDuration: 1.0)
+        XCTAssertTrue(selected.waitForExistence(timeout: 5), "a hold selected nothing")
+        XCTAssertEqual(selectedCount, 6, "a hold selects the word held, \"screen\"")
+    }
+
+    /// Apple's text: pinch and drag either end of a selection to change it, with no hold first. It
+    /// scrolled, and the scroll took the selection away.
+    func testDraggingAnEndOfTheSelectionMovesIt() {
+        launch("terminal-tmux")
+        middle.doubleTap()
+        XCTAssertTrue(selected.waitForExistence(timeout: 5), "a double pinch selected nothing")
+        XCTAssertEqual(selectedCount, 6, "the word \"screen\"")
+        sleep(1)
+        middle.press(forDuration: 0.05, thenDragTo: middle.withOffset(CGVector(dx: 160, dy: 0)))
+        sleep(1)
+        let count = selectedCount ?? 0
+        if count <= 6 { attachTree("after dragging the selection's end") }
+        XCTAssertGreaterThan(count, 6, "dragging the selection's end did not move it")
     }
 
     /// A hold whose hand moves a little before it counts: the drag tmux is sent when it has the mouse

@@ -1886,7 +1886,8 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
         #if DEBUG
         // For `GlassTerminalSelectionUITests`, which cannot see the highlight.
         if ProcessInfo.processInfo.arguments.contains("--ui-testing") {
-            accessibilityIdentifier = selection.active ? "terminal-selection-active" : "terminal-selection-none"
+            accessibilityIdentifier = selection.active
+                ? "terminal-selection-active-\(selection.getSelectedText().count)" : "terminal-selection-none"
         }
         #endif
     }
@@ -1923,14 +1924,68 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
     ///
     /// **A hand is not still** (the owner, 2026-10-15: "I have to triple pinch or click with the
     /// trackpad to get it to select at all"). With UIKit's 10 points of allowed movement, a hold
-    /// whose hand drifted became a scroll; it allows 40 now, and the scrolling waits for the hold
-    /// to fail — a drag that moves at once still scrolls.
+    /// whose hand drifted became a scroll; the scrolling waits for the hold to fail — a drag that
+    /// moves at once still scrolls. Still no hold on his headset that evening ("text selection in
+    /// vision pro is still not working"; not one in the log): it allows 60 points and counts at
+    /// 0.4 s now, and the log says how long and how far each gesture went before it began.
+    ///
+    /// **As Apple's text does** (Apple Vision Pro User Guide: pinch and hold text and "the word you
+    /// tap is highlighted"; pinch and drag either end of a selection to change it): a hold selects
+    /// the word it lands on, and dragging while held grows the selection by words.
     private lazy var holdToSelect: UILongPressGestureRecognizer = {
         let recognizer = UILongPressGestureRecognizer(target: self, action: #selector(holdToSelectChanged(_:)))
-        recognizer.minimumPressDuration = 0.5
-        recognizer.allowableMovement = 40
+        recognizer.minimumPressDuration = 0.4
+        recognizer.allowableMovement = 60
         return recognizer
     }()
+
+    /// **An end of the selection, pinched and dragged, moves** — at once, with no hold first, as
+    /// the ends of a selection in Apple's text do. A drag that starts anywhere else scrolls.
+    private lazy var endDrag: UIPanGestureRecognizer = {
+        let recognizer = UIPanGestureRecognizer(target: self, action: #selector(endDragged(_:)))
+        // A trackpad's drag is `pointerDrag`'s, from an end or not.
+        recognizer.allowedTouchTypes = [NSNumber(value: UITouch.TouchType.direct.rawValue),
+                                        NSNumber(value: UITouch.TouchType.indirect.rawValue),
+                                        NSNumber(value: UITouch.TouchType.pencil.rawValue)]
+        return recognizer
+    }()
+
+    /// **A trackpad selects as a Mac's does** (the owner, 2026-10-16: "The mouse interactions
+    /// (trackpad) should work the same way"): a click and drag selects; scrolling is the trackpad's
+    /// two-finger scroll, which arrives as scroll events, not touches. Only the pointer's touches
+    /// (`indirectPointer`; a pinch is a `direct` touch on the headset — the log's `type=0`).
+    private lazy var pointerDrag: UIPanGestureRecognizer = {
+        let recognizer = UIPanGestureRecognizer(target: self, action: #selector(pointerDragged(_:)))
+        recognizer.allowedTouchTypes = [NSNumber(value: UITouch.TouchType.indirectPointer.rawValue)]
+        return recognizer
+    }()
+
+    /// A secondary click: the menu for what is under the pointer — a link's actions, or Copy.
+    private lazy var secondaryClick: UITapGestureRecognizer = {
+        let recognizer = UITapGestureRecognizer(target: self, action: #selector(secondaryClicked(_:)))
+        recognizer.buttonMaskRequired = .secondary
+        recognizer.allowedTouchTypes = [NSNumber(value: UITouch.TouchType.indirectPointer.rawValue)]
+        return recognizer
+    }()
+
+    /// Where and when the last touch went down, and its kind: each gesture's line in the log says
+    /// how long and how far it had gone when it began.
+    private var touchDown: (time: TimeInterval, point: CGPoint, type: Int)?
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if let touch = touches.first {
+            touchDown = (touch.timestamp, touch.location(in: self), touch.type.rawValue)
+        }
+        super.touchesBegan(touches, with: event)
+    }
+
+    /// "after=0.32s moved=12pt type=0" for a gesture now at `point`.
+    private func sinceTouchDown(_ point: CGPoint) -> String {
+        guard let touchDown else { return "after=- moved=- type=-" }
+        let after = ProcessInfo.processInfo.systemUptime - touchDown.time
+        let moved = hypot(point.x - touchDown.point.x, point.y - touchDown.point.y)
+        return String(format: "after=%.2fs moved=%.0fpt type=%d", after, moved, touchDown.type)
+    }
 
     /// A double pinch selects the word, a triple the line, and Copy is offered — always here, on
     /// the terminal's own selection. SwiftTerm's sent both to a program that had the mouse (tmux
@@ -1974,6 +2029,9 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
         addGestureRecognizer(holdToSelect)
         addGestureRecognizer(doublePinch)
         addGestureRecognizer(triplePinch)
+        addGestureRecognizer(endDrag)
+        addGestureRecognizer(pointerDrag)
+        addGestureRecognizer(secondaryClick)
         doublePinch.require(toFail: triplePinch)
         for recognizer in gestureRecognizers ?? [] {
             if let tap = recognizer as? UITapGestureRecognizer, tap.numberOfTapsRequired == 1, tap.isEnabled {
@@ -1990,8 +2048,98 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
     /// and cleared on letting go. Asking again of a pan already waiting changes nothing.
     private func pansWaitForTheHold() {
         guard holdToSelect.view != nil else { return }
-        for case let pan as UIPanGestureRecognizer in gestureRecognizers ?? [] {
+        for case let pan as UIPanGestureRecognizer in gestureRecognizers ?? [] where pan !== endDrag && pan !== pointerDrag {
             pan.require(toFail: holdToSelect)
+            // A drag from an end of the selection moves that end rather than scrolling.
+            pan.require(toFail: endDrag)
+            // A trackpad's click and drag selects; its two-finger scroll still scrolls, as scroll
+            // events these pans take whatever their touches.
+            pan.allowedTouchTypes = [NSNumber(value: UITouch.TouchType.direct.rawValue),
+                                     NSNumber(value: UITouch.TouchType.indirect.rawValue),
+                                     NSNumber(value: UITouch.TouchType.pencil.rawValue)]
+        }
+    }
+
+    /// The end drag only from an end of the selection there is; everything else, as before.
+    override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        if gestureRecognizer === endDrag {
+            guard selection.active, let start = dragStartCell(endDrag) else { return false }
+            return Self.isNear(start, selection.end) || Self.isNear(start, selection.start)
+        }
+        if gestureRecognizer === pointerDrag { return true }
+        return super.gestureRecognizerShouldBegin(gestureRecognizer)
+    }
+
+    /// The cell a drag started on: where it is now, less how far it has gone.
+    private func dragStartCell(_ pan: UIPanGestureRecognizer) -> Position? {
+        let location = pan.location(in: self), translation = pan.translation(in: self)
+        return bufferCell(at: CGPoint(x: location.x - translation.x, y: location.y - translation.y))
+    }
+
+    /// Takes the end of the selection nearer `cell` as the one that moves.
+    private func grabEnd(near cell: Position) {
+        selection.selectionMode = .character
+        if Self.isNear(cell, selection.end) {
+            selection.pivot = selection.start
+        } else {
+            selection.pivot = selection.end
+        }
+    }
+
+    @objc private func endDragged(_ pan: UIPanGestureRecognizer) {
+        guard let cell = bufferCell(at: pan.location(in: self)) else { return }
+        switch pan.state {
+        case .began:
+            note("end drag began row=\(cell.row) col=\(cell.col) \(sinceTouchDown(pan.location(in: self))) \(state)")
+            selectionMenu.dismissMenu()
+            if let start = dragStartCell(pan) { grabEnd(near: start) }
+            selection.pivotExtend(bufferPosition: cell)
+        case .changed:
+            selection.pivotExtend(bufferPosition: cell)
+        case .ended:
+            selection.pivotExtend(bufferPosition: cell)
+            note("end drag ended row=\(cell.row) col=\(cell.col) \(state)")
+            showCopyMenu()
+        default:
+            break
+        }
+    }
+
+    @objc private func pointerDragged(_ pan: UIPanGestureRecognizer) {
+        guard let cell = bufferCell(at: pan.location(in: self)) else { return }
+        switch pan.state {
+        case .began:
+            _ = becomeFirstResponder()
+            selectionMenu.dismissMenu()
+            let start = dragStartCell(pan) ?? cell
+            if selection.active, Self.isNear(start, selection.end) || Self.isNear(start, selection.start) {
+                grabEnd(near: start)
+            } else {
+                selection.selectionMode = .character
+                selection.setSelection(start: start, end: start)
+                selection.pivot = start
+            }
+            selection.pivotExtend(bufferPosition: cell)
+            note("pointer drag began row=\(cell.row) col=\(cell.col) \(state)")
+        case .changed, .ended:
+            selection.pivotExtend(bufferPosition: cell)
+        default:
+            break
+        }
+    }
+
+    @objc private func secondaryClicked(_ click: UITapGestureRecognizer) {
+        guard click.state == .ended, let cell = bufferCell(at: click.location(in: self)) else { return }
+        _ = becomeFirstResponder()
+        note("secondary click row=\(cell.row) col=\(cell.col) \(state)")
+        if let link = TerminalLinkLookup.target(at: cell, in: getTerminal()) {
+            heldLink = link
+            presentMenu(at: cell)
+        } else if selection.active {
+            showCopyMenu()
+        } else {
+            heldLink = nil
+            presentMenu(at: cell)
         }
     }
 
@@ -2052,6 +2200,7 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
     private func watchRecognizers() {
         for recognizer in gestureRecognizers ?? [] where !watched.contains(recognizer)
             && recognizer !== holdToSelect && recognizer !== doublePinch && recognizer !== triplePinch
+            && recognizer !== endDrag && recognizer !== pointerDrag && recognizer !== secondaryClick
             && !(recognizer is UIHoverGestureRecognizer) {
             watched.add(recognizer)
             recognizer.addTarget(self, action: #selector(watchedRecognizerChanged(_:)))
@@ -2071,7 +2220,8 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
             String(describing: type(of: recognizer))
         }
         let cell = bufferCell(at: recognizer.location(in: self)).map { "\($0.row),\($0.col)" } ?? "-"
-        note("\(kind) \(Self.name(of: recognizer.state)) at=\(cell) \(state)")
+        let since = recognizer.state == .began ? " " + sinceTouchDown(recognizer.location(in: self)) : ""
+        note("\(kind) \(Self.name(of: recognizer.state)) at=\(cell)\(since) \(state)")
     }
 
     private static func name(of state: UIGestureRecognizer.State) -> String {
@@ -2103,26 +2253,23 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
         guard let cell = bufferCell(at: gesture.location(in: self)) else { return }
         switch gesture.state {
         case .began:
-            note("hold began row=\(cell.row) col=\(cell.col) \(state)")
+            note("hold began row=\(cell.row) col=\(cell.col) \(sinceTouchDown(gesture.location(in: self))) \(state)")
             _ = becomeFirstResponder()
             selectionMenu.dismissMenu()
             heldLink = nil
             holdBegan = cell
-            // A triple pinch left whole rows as the unit; a hold selects characters.
-            selection.selectionMode = .character
-            if selection.active, Self.isNear(cell, selection.end) {
-                selection.pivot = selection.start
-            } else if selection.active, Self.isNear(cell, selection.start) {
-                selection.pivot = selection.end
+            if selection.active, Self.isNear(cell, selection.end) || Self.isNear(cell, selection.start) {
+                // Held on an end of the selection there is: that end moves, by characters.
+                grabEnd(near: cell)
+                selection.pivotExtend(bufferPosition: cell)
             } else {
-                selection.setSelection(start: cell, end: cell)
-                selection.pivot = cell
+                // The word held, as Apple's text does; dragging on grows it by words.
+                selection.selectWordOrExpression(at: cell, in: getTerminal().buffer)
             }
-            selection.pivotExtend(bufferPosition: cell)
         case .changed:
-            selection.pivotExtend(bufferPosition: cell)
+            extendHeld(to: cell)
         case .ended:
-            selection.pivotExtend(bufferPosition: cell)
+            extendHeld(to: cell)
             let link = TerminalLinkLookup.target(at: cell, in: getTerminal())
             // Where the hold landed and what was there, never the text: for the next "it doesn't select".
             note("hold ended row=\(cell.row) col=\(cell.col) began=\(holdBegan.map { "\($0.row),\($0.col)" } ?? "-") link=\(link != nil) yDisp=\(getTerminal().buffer.yDisp) rows=\(getTerminal().rows) y=\(gesture.location(in: self).y) offset=\(contentOffset.y) \(state)")
@@ -2138,6 +2285,15 @@ private final class ReviewingTerminalView: TerminalView, @preconcurrency UIEditM
         default:
             note("hold \(Self.name(of: gesture.state)) row=\(cell.row) col=\(cell.col) \(state)")
             holdBegan = nil
+        }
+    }
+
+    /// A held selection follows the hand: by words from the word held, else by characters.
+    private func extendHeld(to cell: Position) {
+        if selection.selectionMode == .word {
+            selection.dragExtend(bufferPosition: cell)
+        } else {
+            selection.pivotExtend(bufferPosition: cell)
         }
     }
 

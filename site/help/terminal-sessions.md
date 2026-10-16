@@ -95,9 +95,13 @@ A path is read on the machine that printed it: from the shell's current folder w
 
 ## Select text on Vision Pro
 
-- Pinch and hold on the terminal, then drag to select. A hand that drifts a little while holding still selects; a drag that moves at once scrolls instead. Hold on either end of a selection to move that end. Letting go offers **Copy**.
+These work as selecting text does in Apple's own apps:
+
 - Pinch twice quickly to select a word, or three times to select a line, with **Copy** offered.
-- Both work even when the program in the terminal takes the mouse, as tmux does with its mouse mode on (tmux 3.8 turns it on unless your configuration turns it off). A selection stays while the program redraws around it.
+- Pinch and hold on a word to select it. Keep holding and drag to select more, a word at a time. Letting go offers **Copy**.
+- Pinch and drag either end of a selection to make it longer or shorter. A pinch-and-drag that starts anywhere else scrolls.
+- **With a trackpad:** click and drag to select, as on a Mac; double-click a word or triple-click a line; scroll with two fingers; click with two fingers for a menu with **Copy**, or a link's actions.
+- All of these work even when the program in the terminal takes the mouse, as tmux does with its mouse mode on (tmux 3.8 turns it on unless your configuration turns it off). A selection stays while the program redraws around it.
 - A single pinch clears a selection. With nothing selected, a single pinch goes to the program.
 - A pinch-and-drag up or down scrolls: in tmux, tmux's history; in a program that takes the mouse, such as `vim` or `htop`, as its scroll wheel would. It never starts tmux's own selection, the yellow one, which tmux copies to its own buffer and clears when you let go.
 - Pinch and hold on a link or a path, and let go without moving, for its actions (see [Links and paths](#links-and-paths)).
