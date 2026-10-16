@@ -357,7 +357,8 @@ public final class SwiftTermHostModel: ObservableObject {
 
     /// ⌘+, ⌘− and ⌘0 while the terminal scales: its font can't change without re-gridding it, so
     /// the window grows or shrinks by `factor` instead, or goes to the size where the text is at
-    /// its font's own (nil). False where a window can't be sized from here (iPad, full screen).
+    /// its font's own (nil). False where a window can't be sized from here: full screen, and on
+    /// iPad any size smaller than the window's (only a larger one can be asked for there).
     @discardableResult
     public func zoomScaledWindow(by factor: CGFloat?) -> Bool {
         guard scaledGrid != nil else { return false }
@@ -2578,21 +2579,47 @@ private final class TerminalHardwareKeyContainerView: UIView {
     }
 
     /// ⌘+, ⌘− and ⌘0 under Scale (`SwiftTermScaleLayout.zoomedWindow`): the window asked for its new
-    /// size. Vision Pro only — an iPad window's size is the person's, with nothing to ask it by.
+    /// size. Vision Pro asks for it outright. iPadOS has no request that takes a size (its geometry
+    /// preferences carry orientations only); what it acts on is a scene's minimum size, which a
+    /// smaller window grows to. So an iPad window grows — its minimum raised to the size for a
+    /// moment, then put back, so the person can resize it as before — and never shrinks: iPadOS
+    /// leaves a window larger than its scene's maximum as it is (measured, iPadOS 27.2 simulator,
+    /// Windowed Apps). False then, as under Full Screen Apps, where a window is the screen's size.
     func zoomWindow(by factor: CGFloat?) -> Bool {
-        #if os(visionOS)
         guard let kept, kept.size != .zero, let window, let scene = window.windowScene,
               let target = SwiftTermScaleLayout.zoomedWindow(window: window.bounds.size, space: bounds.size,
                                                              content: kept.size, factor: factor) else { return false }
+        #if os(visionOS)
         scene.requestGeometryUpdate(.Vision(size: target)) { error in
             Logger(subsystem: "com.glasspowertools", category: "terminal-scale")
                 .error("event=zoom error=\(error.localizedDescription, privacy: .public)")
         }
         return true
         #else
-        return false
+        guard let limits = scene.sizeRestrictions else { return false }
+        let screen = scene.screen.bounds.size
+        let size = CGSize(width: min(target.width, screen.width), height: min(target.height, screen.height))
+        guard size.width > window.bounds.width + 0.5 || size.height > window.bounds.height + 0.5 else { return false }
+        if raisedMinimum == nil { raisedMinimum = limits.minimumSize }
+        limits.minimumSize = size
+        raisedGeneration &+= 1
+        // Put back a moment later: iPadOS grows the window as the minimum changes again, and a
+        // minimum left raised would stop the person making the window smaller.
+        let generation = raisedGeneration
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self, self.raisedGeneration == generation, let minimum = self.raisedMinimum else { return }
+            self.raisedMinimum = nil
+            self.window?.windowScene?.sizeRestrictions?.minimumSize = minimum
+        }
+        return true
         #endif
     }
+
+    #if !os(visionOS)
+    /// The scene's own minimum size, while ⌘+ or ⌘0 has it raised to grow an iPad window.
+    private var raisedMinimum: CGSize?
+    private var raisedGeneration = 0
+    #endif
 
     /// Resize: the terminal fills the container, unscaled.
     private func fill(_ terminalView: ReviewingTerminalView) {

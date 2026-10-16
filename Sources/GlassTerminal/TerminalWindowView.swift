@@ -919,7 +919,8 @@ struct TerminalWindowView: View {
         let model = terminalHostModel
         // Under Scale (D75) the text's size is the window's: these size the window, a step at a
         // time, or back to where the text is at its font's own size. Where a window can't be sized
-        // from here (iPad) they do nothing, as a font change would show nothing.
+        // so (full screen; an iPad window made smaller) they do nothing, as a font change would show
+        // nothing.
         return TerminalFontActions(
             increase: {
                 if model.scaledGrid != nil {
