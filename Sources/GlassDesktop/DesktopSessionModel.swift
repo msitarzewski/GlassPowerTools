@@ -241,6 +241,9 @@ public final class DesktopSessionModel {
     /// Whether the software keyboard has been asked for. Neither protocol reports remote text focus,
     /// so this is always the user's explicit choice rather than something detected.
     public var wantsKeyboard = false
+    /// The bar above the software keyboard is on screen (iPhone, iPad): it carries the keys, the
+    /// arrow pad and the tools, so the window's status bar steps aside, as a terminal's does.
+    public var keyboardAccessoryShown = false
     /// How many remote pixels to request per point. RDP only; VNC hosts choose their own resolution.
     public var sourceScale: DesktopSourceScale = .automatic {
         didSet {

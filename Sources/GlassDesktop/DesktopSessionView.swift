@@ -266,7 +266,11 @@ public struct DesktopSessionView: View {
                 .font(.callout).padding(12).background(.regularMaterial)
                 .accessibilityElement(children: .contain).accessibilityLabel("Session error")
             }
-            #if !os(visionOS)
+            #if os(iOS)
+            // One bar of controls at a time: while the keyboard is up its own bar has the keys, the
+            // arrow pad and the tools (`DesktopKeyboardBar`), as a terminal's does.
+            if !session.keyboardAccessoryShown { sessionStatusBar }
+            #elseif os(macOS)
             sessionStatusBar
             #endif
         }
@@ -447,30 +451,40 @@ public struct DesktopSessionView: View {
     private var sessionStatusBar: some View {
         HStack(spacing: 12) {
                 Circle().fill(session.isConnected ? .green : .secondary).frame(width: 6, height: 6)
-                Text(session.status)
-                // What this window is sent (W38): its own connection's picture, or its part of the desktop's.
-                if let sending = session.sending(for: viewport) {
-                    Text(sending).monospacedDigit().accessibilityIdentifier("session.sending")
+                Text(session.status).lineLimit(1)
+                // What this window is sent (W38): its own connection's picture, or its part of the
+                // desktop's. Not on a phone, where it wrapped onto three lines beside the rest.
+                if !compactScreen, let sending = session.sending(for: viewport) {
+                    Text(sending).monospacedDigit().lineLimit(1).accessibilityIdentifier("session.sending")
                 }
                 if session.isConnected,
                    let statistics = session.ownConnection(for: viewport)?.linkStatistics ?? session.linkStatistics {
                     Text(DesktopLinkReadout.line(statistics)).monospacedDigit().lineLimit(1)
                         .accessibilityIdentifier("session.readout")
                 }
-                Spacer()
+                Spacer(minLength: 4)
                 // Escape and Tab are the Keys menu's first two, and on the Mac so is Type Text.
                 #if os(iOS)
-                DesktopKeysMenu(session: session)
+                // Symbols only on a phone, as the keyboard's own bar has them.
+                if compactScreen {
+                    DesktopKeysMenu(session: session).labelStyle(.iconOnly)
+                } else {
+                    DesktopKeysMenu(session: session)
+                }
                 #else
                 DesktopKeysMenu(session: session, typeText: { session.releaseInput(); showTextInput = true })
                 #endif
                 #if os(iOS)
                 DesktopArrowPad(session: session)
-                Button(session.wantsKeyboard ? "Hide Keyboard" : "Keyboard", systemImage: "keyboard") {
-                    session.wantsKeyboard.toggle()
+                // Asked for again, even when it was asked for before and put away since: the keyboard's
+                // own bar hides it, and this bar steps aside while that one is up.
+                Button("Keyboard", systemImage: "keyboard") {
+                    session.wantsKeyboard = false
+                    session.wantsKeyboard = true
                 }
-                .disabled(!session.isConnected)
-                .accessibilityIdentifier("session.keyboard")
+                    .labelStyle(.iconOnly)
+                    .disabled(!session.isConnected)
+                    .accessibilityIdentifier("session.keyboard")
                 #endif
             }
             .font(.caption).padding(10)

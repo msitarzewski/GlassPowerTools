@@ -73,7 +73,23 @@ final class DesktopMTKView: MTKView {
     /// software keyboard hidden until it is explicitly asked for.
     private let suppressedKeyboard = UIView(frame: .zero)
     var wantsSoftwareKeyboard = false {
-        didSet { if wantsSoftwareKeyboard != oldValue { reloadInputViews() } }
+        didSet {
+            guard wantsSoftwareKeyboard != oldValue else { return }
+            reloadInputViews()
+            reportKeyboardBar()
+        }
+    }
+
+    /// The keyboard's bar (`DesktopKeyboardAccessory`) is up exactly while the software keyboard is
+    /// asked for and this view has the keys; the session is told so, a turn later rather than inside
+    /// SwiftUI's update, and the window's status bar steps aside meanwhile (the owner, 2026-10-15,
+    /// two rows of the same controls on the iPhone: "this is kind of a mess").
+    private func reportKeyboardBar() {
+        let shown = wantsSoftwareKeyboard && isFirstResponder
+        DispatchQueue.main.async { [weak self] in
+            guard let session = self?.session, session.keyboardAccessoryShown != shown else { return }
+            session.keyboardAccessoryShown = shown
+        }
     }
     #endif
     /// The window's tools, for the bar above the software keyboard (iPhone and iPad).
@@ -386,9 +402,20 @@ final class DesktopMTKView: MTKView {
         else { super.doCommand(by: selector) }
     }
     #else
+    override func becomeFirstResponder() -> Bool {
+        let accepted = super.becomeFirstResponder()
+        #if os(iOS)
+        reportKeyboardBar()
+        #endif
+        return accepted
+    }
     override func resignFirstResponder() -> Bool {
         releaseFocusState()
-        return super.resignFirstResponder()
+        let resigned = super.resignFirstResponder()
+        #if os(iOS)
+        reportKeyboardBar()
+        #endif
+        return resigned
     }
     override func didMoveToWindow() {
         super.didMoveToWindow()
