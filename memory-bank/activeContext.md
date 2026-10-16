@@ -30,7 +30,20 @@ use the disposable test VM only).
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
-## 2026-10-16 (afternoon) — RESUME HERE
+## 2026-10-16 (evening) — RESUME HERE
+
+**D77 built: a Mac terminal window's sidebar adds to the window.** The owner: "make the left (and eventually right)
+sidebars additive and not resize my terminal window to make room." Opening or closing the sidebar grows or shrinks the
+window and the terminal keeps its size and place (AppKit's split-item collapse behaviour, `GlassAdditiveSidebars`);
+not for the sidebar a window opens with, the overview, or full screen. Only the Mac terminal window has a sidebar.
+Note: `tasks/2026-10/2026-10-16_additive-sidebars.md`. **His to try** on the next build (0.4.464).
+
+**D75 on iPad** — the owner on iPad windows (iPadOS 26 windowing, Stage Manager since 16): keep Scale there, and "let
+users let us know if that doesn't work". In progress separately: sizing an iPad window from ⌘+/⌘−/⌘0 through
+`UIWindowScene.sizeRestrictions`, and sharper scaled text; outcome to the D75 note. The headset never woke for
+0.4.463's install (`install-headset-when-awake.zsh` gave up after an hour).
+
+## 2026-10-16 (afternoon)
 
 **D75 built: a terminal scales as well as resizes.** Settled with the owner first: Vision Pro, Mac and iPad; a setting
 and a bar button; the grid the terminal has when Scale turns on; the window held to its shape. Commits 394fb47 (engine,

@@ -96,3 +96,7 @@
   — D75 built: When Resized (setting, This Window, Scale Text in the bar); the grid kept and the drawing scaled; the
   window held to its shape (the desktop's lock, now GlassShell's); ⌘+/⌘−/⌘0 size the window. Vision Pro, Mac, iPad.
   394fb47, 3feb28a, 2914f3f; 0.4.463. For the owner to try.
+- 2026-10-16 (evening): [A terminal window's sidebar adds to the window (D77)](2026-10-16_additive-sidebars.md)
+  — opening or closing the Mac terminal window's sidebar grows or shrinks the window; the terminal keeps its size
+  and place (AppKit's collapse behaviour on SwiftUI's split items). Not for the sidebar a window opens with, the
+  overview, full screen.

@@ -1522,3 +1522,12 @@ connection (≤32 MB, removed on close), recognised from its bytes, and shown as
 the editor's view, the editor's rendered preview for Markdown/HTML/SVG/CSV, Quick Look for pictures, PDFs and media.
 A bar offers Open in Editor and Show in Finder/Files. Mac only. Evidence: `MacTerminalContextMenuTests`,
 `GlassEditorQuickPreviewTests`, `TerminalRemotePreviewTests`; `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`.
+
+## D77 — A terminal window's sidebar adds to the window — Implemented 2026-10-16
+**Owner:** "make the left (and eventually right) sidebars additive and not resize my terminal window to make room."
+**Decision:** On the Mac, opening or closing a terminal window's sidebar grows or shrinks the window; the terminal keeps
+its size and place, so its rows and columns (or its scaled text) don't change. AppKit's own
+`NSSplitViewItem.collapseBehavior` (`.preferResizingSplitViewWithFixedSiblings`), set on SwiftUI's split items by
+`GlassAdditiveSidebars` (GlassShell). The window keeps its size for the sidebar it opens with (its saved frame holds it),
+for the overview, and where AppKit must (full screen, the screen's edge). Only the Mac terminal window has a sidebar.
+Evidence: `GlassAdditiveSidebarsTests`, `MacTerminalSidebarTests`; `tasks/2026-10/2026-10-16_additive-sidebars.md`.
