@@ -88,3 +88,9 @@
 - 2026-10-15 (~06:50): [the same note, continued](2026-10-14_all-windows-mac-layout-headset.md) — selection with
   tmux's mouse on and on-device selection diagnostics, orb names against their dots, database and editor orbs showing
   their window, a desktop's shape held again after its orb, the Files window's corners. 0.4.454.
+- 2026-10-15 (afternoon) to 2026-10-16 (~10:25): [the same note, continued](2026-10-14_all-windows-mac-layout-headset.md)
+  — tmux 3.8's mouse (the yellow selection, no scroll), selection as Apple's text does, iPhone tabs and All Windows,
+  the iPhone desktop's bars and title, file previews over a Mac terminal (D76), the Mac install that waited on the tmux
+  host. 0.4.462 on all three.
+- 2026-10-16 (~10:30): [A terminal window that resizes, and one that scales](2026-10-16_terminal-resize-and-scale.md)
+  — **next priority** (D75, proposed): keep a 120 × 40 grid in a smaller window. Not started.

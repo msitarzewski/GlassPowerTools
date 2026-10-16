@@ -1495,3 +1495,26 @@ with a preview in the orb on hover"; names "only … when focused"; the orb as "
 - Terminal windows with two or more terminals offer it as Orb in the view menu (with Tabs, Grid and Carousel);
   otherwise Shrink to Orb is first in the bottom bar.
 - Vision Pro only. Evidence: `GlassSessionOrbUITests`; `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`.
+
+## D75 — A terminal window that resizes, and one that scales — Proposed 2026-10-16
+**Owner:** "we need both a resize capability and a scale capability. For example I may want a 120 x 40 terminal, but
+with a much smaller window. Today that resize adjusts the 120 x 40, now just the window." He set it as the first thing
+to do on returning.
+**Proposed (not yet agreed in detail):** keep today's behaviour (the window's size sets the grid) as Resize, and add
+Scale, where the grid stays and the window's size sets the text's size to fit it. Likely a per-window setting with a
+This Window override, as Show previews is; on Vision Pro possibly the grid's aspect held as a desktop holds its
+display's. Platforms, how the choice is made, which grid is kept and the limits are open: see
+`tasks/2026-10/2026-10-16_terminal-resize-and-scale.md`.
+
+## D76 — A printed path's file previews over a Mac terminal — Implemented 2026-10-16
+**Owner:** "resolve, say a path to a local image, and display that image in a popover over the terminal? or markdown,
+or any of the file types supported by our Editor"; "build it with the menu item and space, local and remote"; "Show
+previews: ( ) Never (•) Mouseover ( ) Mouseover + space … with mouseover as the default"; web addresses never on
+mouseover, and Space on one asks to open it as a ⌘-click does; "Keep the hover open so the user can mouse into it";
+"check the .output file type/mime types and allow edit"; "Use our file preview formats".
+**Decision:** Quick Look first in a path's right-click menu; Show previews in Settings ▸ Terminal (Mac, synced, This
+Window override). The file is resolved as Open in Editor resolves it, copied from a server over the pane's own SSH
+connection (≤32 MB, removed on close), recognised from its bytes, and shown as the editor shows it: highlighted text in
+the editor's view, the editor's rendered preview for Markdown/HTML/SVG/CSV, Quick Look for pictures, PDFs and media.
+A bar offers Open in Editor and Show in Finder/Files. Mac only. Evidence: `MacTerminalContextMenuTests`,
+`GlassEditorQuickPreviewTests`, `TerminalRemotePreviewTests`; `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`.

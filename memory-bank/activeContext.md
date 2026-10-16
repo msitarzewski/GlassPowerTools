@@ -30,7 +30,36 @@ use the disposable test VM only).
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
-## 2026-10-15 (~07:10) — RESUME HERE
+## 2026-10-16 (~10:30) — RESUME HERE
+
+Welcome back. Everything is committed; nothing is pushed. **0.4.462 is on the Mac, iPhone and Vision Pro** (all three
+read it; no new crash reports since 2026-10-13).
+
+**First, the owner's priority — D75, a terminal that scales as well as resizes:** "I may want a 120 x 40 terminal, but
+with a much smaller window. Today that resize adjusts the 120 x 40, now just the window." Read
+`tasks/2026-10/2026-10-16_terminal-resize-and-scale.md` (what the code does today, open questions, a likely shape),
+then **restate it and ask** which platforms first and how the choice is made, before building.
+
+**Since the last resume (detail in `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`, from "~06:50"):**
+- **Headset selection:** his "it immediately unselects" was tmux 3.8 turning its mouse on by default (a pinch-drag
+  became tmux's yellow selection; nothing scrolled); his headset log confirmed it. A pinch-drag now scrolls whatever
+  tmux says; `~/.tmux.conf` on his Mac turns the mouse off. Then, to Apple's pattern: a hold selects the word, an end of
+  a selection drags with no hold, a trackpad click-drag selects. **His to try on 0.4.462**; every gesture logs its time
+  and movement — copy the log off the headset after (headset-diagnostics memory).
+- **iPhone:** the tab switcher was invisible in light mode (black on black) — fixed; All Windows lists every tab of a
+  window, waiting ones too. The desktop shows one bar at a time with the keyboard up, one line of status, a readable
+  light-mode title.
+- **Mac:** file previews over a terminal (D76): Quick Look in a path's menu; Show previews Never / Mouseover (default)
+  / Mouseover + Space; local and server files, recognised from their bytes, code highlighted in the editor's view, a
+  bar with Open in Editor. Hover keeps it open while the pointer is in it.
+- **Installs:** the Mac install script had waited on the app's `--tmux-host` process; fixed. Working files live in
+  `~/Software/glass/tmp` (`README.md` there): `build-install.zsh <patch>`, `install-devices.zsh`,
+  `install-headset-when-awake.zsh`, `vision-test.zsh`, `ios-test.zsh`, `capture-on.zsh`. Next build: `build-install.zsh 463`.
+
+**Open:** the orb's pulse not yet seen on a device; a desktop orb's shape hold after a round trip shows only on the
+headset; the Files shelf's corners; the headset's trackpad selection and hover previews are untested by him.
+
+## 2026-10-15 (~07:10) to 2026-10-16 (~10:25)
 
 The owner, back on the headset at 0.4.453: "selecting text is still broken wholly in the terminal in visionOS with
 tmux for sure, how do I see the orb on desktop? Fix all of the things! BTW, the small names still don't align
