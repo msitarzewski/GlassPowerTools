@@ -372,3 +372,7 @@ risk acceptance as we do now and the space can trigger that."
   hover and Space paths are his to try.
 - Help: terminal-sessions "Preview a file over the terminal". 0.4.460 on the Mac and iPhone; the headset unreachable
   (0.4.459/460 wait for it: `install-devices.zsh 460`).
+- **0.4.461 (7780201):** "Keep the hover open so the user can mouse into it and scroll where allowed": a hover preview
+  closed as the pointer left the path's cell, before it reached the popover. Now kept while the pointer is on the path
+  or inside the popover (12 pt margin), closed 0.4 s after it's off both (`watchPointer`, polled — inside the popover
+  the terminal's window gets no pointer events). On the Mac and iPhone; the headset still unreachable.
