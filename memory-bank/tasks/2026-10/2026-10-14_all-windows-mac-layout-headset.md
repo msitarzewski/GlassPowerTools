@@ -350,3 +350,25 @@ user chooses otherwise. The mouse interactions (trackpad) should work the same w
   `~/Software/glass/tmp/install-devices.zsh 459` when it's awake. No new crash reports.
 - His question on Finder-style toolbar controls (icon ⌃⌄ = pop-up `Picker(.menu)`; icon ⌄ = pull-down `Menu`): answered;
   both exist on every platform, but only the Mac's toolbar draws the chevrons for certain.
+
+## 2026-10-16 (late morning): a printed path's file previewed over a Mac terminal (d733b3c, 0.4.460)
+
+The owner: preview a path's file "in a popover over the terminal … markdown, or any of the file types supported by our
+Editor"; "build it with the menu item and space, local and remote"; then "Show previews: ( ) Never (•) Mouseover ( )
+Mouseover + space … with mousover as the default"; "leave URLs out of the mouse over only option. They should require
+risk acceptance as we do now and the space can trigger that."
+
+- **Built:** Quick Look first in a path's right-click menu; Show previews (Settings ▸ Terminal on the Mac, synced
+  as an optional field, This Window override `terminal.pathPreviews`); `MacTerminalPathPreviewer` (local NSEvent monitor
+  for mouseMoved/keyDown/click/scroll — SwiftTerm's `mouseMoved`/`keyDown` are `public`, not `open`; link looked up once
+  a cell; 0.6 s rest; Space only in Mouseover + Space, only with the pointer on a path or address; Space on an address
+  → `requestExternalLink`, the ⌘-click question). Files: local as is; remote via the pane's SSH connection, ≤32 MB, into
+  `Caches/GlassTerminalPreviews/<uuid>/<name>`, removed when the popover closes (`TerminalRemotePreview`). Content:
+  `GlassEditorQuickPreview` (editor preview for Markdown/Mermaid, HTML, SVG, CSV; `GlassQuickLookView` otherwise), wired
+  as `GlassTerminalRuntime.filePreview` in the app.
+- **Tests:** menu leads with Quick Look and asks for the path; none without a preview or on an address; plain-Space
+  rule; setting resolution; remote copy saved and removed. Menu and setting tests fail without their code. Terminal 853,
+  shell 300, editor 164; tmux unchanged. A Mac UI test would take over his pointer and keyboard while he works, so the
+  hover and Space paths are his to try.
+- Help: terminal-sessions "Preview a file over the terminal". 0.4.460 on the Mac and iPhone; the headset unreachable
+  (0.4.459/460 wait for it: `install-devices.zsh 460`).

@@ -41,6 +41,9 @@ Evidence: `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`, section 
 0.4.453 (nothing in 0.4.454 changes the Mac's behaviour). No new crash reports.
 
 **Done:**
+- **2026-10-16 late morning — file previews over a Mac terminal** (d733b3c, 0.4.460 on the Mac and iPhone): Quick
+  Look on a path's menu; Show previews Never / Mouseover (default) / Mouseover + Space; local and server files. His to
+  try: hovering, Space, Markdown and a server's image.
 - **2026-10-16 morning — selection as Apple's text does** (f2fde40, 0.4.459 on the Mac and iPhone; **the headset was
   asleep: install it with `install-devices.zsh 459`**). Hold selects the word; drag an end with no hold; trackpad
   click-drag selects. His headset log had shown no hold at all and every drag a scroll. Next: his try on the headset,
