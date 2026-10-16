@@ -45,6 +45,12 @@ final class MacTerminalPathPreviewer: NSObject, NSPopoverDelegate {
     private var shownByResting = false
     /// Bumped by every preview asked for, so a slower one still fetching gives way to the newest.
     private var generation = 0
+    /// Keeps a preview the pointer opened while the pointer is on its path or inside it.
+    private var watching: Task<Void, Never>?
+    /// How long the pointer may be off both before that preview closes: the way from the path to
+    /// the popover crosses a little of the terminal (the owner, 2026-10-16: "Keep the hover open so
+    /// the user can mouse into it and scroll where allowed").
+    static let leaveGrace: Duration = .milliseconds(400)
 
     init(view: TerminalView, model: @escaping () -> SwiftTermHostModel?) {
         self.view = view
@@ -61,6 +67,7 @@ final class MacTerminalPathPreviewer: NSObject, NSPopoverDelegate {
     isolated deinit {
         if let monitor { NSEvent.removeMonitor(monitor) }
         resting?.cancel()
+        watching?.cancel()
         popover?.close()
         shownFile?.discard?()
     }
@@ -105,7 +112,8 @@ final class MacTerminalPathPreviewer: NSObject, NSPopoverDelegate {
             return path
         }
         if let shownPath, path == shownPath { return }
-        if popover != nil, shownByResting { close() }
+        // Off the path, a preview the pointer opened stays a moment, so the pointer can reach it,
+        // and then as long as it is inside it (`watchPointer`).
         guard let path, view.window?.isKeyWindow == true else {
             cancelPending()
             return
@@ -224,6 +232,42 @@ final class MacTerminalPathPreviewer: NSObject, NSPopoverDelegate {
         self.popover = popover
         shownPath = path
         shownByResting = byResting
+        if byResting { watchPointer(path: path, popover: popover) }
+    }
+
+    /// While the pointer is on `path` or inside `popover` — scrolling it, clicking in it — the
+    /// preview stays; off both for `leaveGrace`, it closes. Looked at a few times a second, because
+    /// inside the popover the terminal's window hears nothing of the pointer.
+    private func watchPointer(path: String, popover: NSPopover) {
+        watching?.cancel()
+        watching = Task { @MainActor [weak self, weak popover] in
+            var awaySince: ContinuousClock.Instant?
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(120))
+                guard !Task.isCancelled, let self, let popover, popover === self.popover else { return }
+                if pointerIsOn(path, or: popover) {
+                    awaySince = nil
+                } else if let since = awaySince {
+                    if since.duration(to: .now) >= Self.leaveGrace {
+                        close()
+                        return
+                    }
+                } else {
+                    awaySince = .now
+                }
+            }
+        }
+    }
+
+    private func pointerIsOn(_ path: String, or popover: NSPopover) -> Bool {
+        let mouse = NSEvent.mouseLocation
+        if let frame = popover.contentViewController?.view.window?.frame, frame.insetBy(dx: -12, dy: -12).contains(mouse) {
+            return true
+        }
+        guard let view, let window = view.window, !view.isHiddenOrHasHiddenAncestor else { return false }
+        let windowPoint = window.convertPoint(fromScreen: mouse)
+        guard view.bounds.contains(view.convert(windowPoint, from: nil)) else { return false }
+        return self.path(in: view, at: windowPoint) == path
     }
 
     func close() {
@@ -241,6 +285,8 @@ final class MacTerminalPathPreviewer: NSObject, NSPopoverDelegate {
     /// Lets go of `closing` and its file, once, whichever way it closed; a newer one is left be.
     private func forget(_ closing: NSPopover) {
         guard closing === popover else { return }
+        watching?.cancel()
+        watching = nil
         popover = nil
         shownPath = nil
         shownByResting = false
