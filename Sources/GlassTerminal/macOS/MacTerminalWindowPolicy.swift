@@ -4,6 +4,7 @@ import AppKit
 import SwiftUI
 import GlassLayers
 import GlassConnectionUI
+import GlassShell
 
 enum MacTerminalToolbarItemID {
     static let tabActions = "sh.glas.toolbar.tab-actions"
@@ -22,6 +23,8 @@ struct MacTerminalWindowReader: NSViewRepresentable {
     var shouldConfirmClose: (_ quitting: Bool) -> String?
     var opensSidebarInitially: Bool
     var overviewPresented: Bool
+    /// Whether the window's view shows its sidebar now; nil when it leaves that to the system.
+    var sidebarShown: Bool?
 
     init(
         tabbingIdentifier: String,
@@ -29,7 +32,8 @@ struct MacTerminalWindowReader: NSViewRepresentable {
         onClose: @escaping () -> Void = {},
         shouldConfirmClose: @escaping (_ quitting: Bool) -> String? = { _ in nil },
         opensSidebarInitially: Bool = false,
-        overviewPresented: Bool = false
+        overviewPresented: Bool = false,
+        sidebarShown: Bool? = nil
     ) {
         self.tabbingIdentifier = tabbingIdentifier
         self.onWindow = onWindow
@@ -37,6 +41,7 @@ struct MacTerminalWindowReader: NSViewRepresentable {
         self.shouldConfirmClose = shouldConfirmClose
         self.opensSidebarInitially = opensSidebarInitially
         self.overviewPresented = overviewPresented
+        self.sidebarShown = sidebarShown
     }
 
     func makeCoordinator() -> Coordinator {
@@ -80,6 +85,7 @@ struct MacTerminalWindowReader: NSViewRepresentable {
         coordinator.observeWindowClose(window, action: onClose)
         coordinator.interceptWindowClose(window, shouldConfirm: shouldConfirmClose)
         coordinator.configureInitialSidebar(in: window, enabled: opensSidebarInitially, overviewPresented: overviewPresented)
+        coordinator.keepSidebarsAdditive(in: window, sidebarShown: sidebarShown)
         onWindow(window)
     }
 
@@ -105,6 +111,49 @@ struct MacTerminalWindowReader: NSViewRepresentable {
         private var didApplyInitialSidebar = false
         private var sidebarDiscoveryAttempts = 0
         private var overviewPresented = false
+        /// What the window's view shows: its sidebar, or not (nil: the system's choice).
+        private var sidebarShown: Bool?
+        /// The overview hid the sidebar and has gone; it isn't back yet.
+        private var sidebarReturningFromOverview = false
+        private weak var splitController: NSSplitViewController?
+
+        /// **Sidebars add to the window** (the owner, 2026-10-16: "make the left (and eventually
+        /// right) sidebars additive and not resize my terminal window to make room"). Opening one
+        /// grows the window by it and closing one shrinks it; the terminal keeps its size and its
+        /// place, so its rows and columns stay (`GlassAdditiveSidebars`). Except where the window
+        /// is not the person's to grow:
+        /// - the sidebar the window opens with: the window's saved frame already holds it, and
+        ///   growing would widen the window at every launch. So this follows
+        ///   `configureInitialSidebar`, which puts it in with AppKit's default (the window's size
+        ///   kept), never before it;
+        /// - while the overview shows, which hides the sidebar to give the terminals the whole
+        ///   window, and until the sidebar it hid is back as the window shows it.
+        /// The overview's start is set by the view itself before it hides the sidebar
+        /// (`MacWorkspaceView.openOverview`), since this hears of it only after SwiftUI's update.
+        func keepSidebarsAdditive(in window: NSWindow, sidebarShown: Bool?) {
+            self.sidebarShown = sidebarShown
+            updateAdditiveSidebars(in: window)
+        }
+
+        private var placingInitialSidebar: Bool {
+            wantsInitialSidebar && !didApplyInitialSidebar && sidebarDiscoveryAttempts < 16
+        }
+
+        private func updateAdditiveSidebars(in window: NSWindow) {
+            if splitController?.view.window !== window {
+                splitController = GlassAdditiveSidebars.items(in: window).first?.viewController.parent
+                    as? NSSplitViewController
+            }
+            guard let splitController else { return }
+            let items = splitController.splitViewItems.filter { $0.behavior == .sidebar || $0.behavior == .inspector }
+            if overviewPresented { sidebarReturningFromOverview = true }
+            if sidebarReturningFromOverview, !overviewPresented,
+               let sidebar = items.first(where: { $0.behavior == .sidebar }),
+               sidebarShown.map({ sidebar.isCollapsed != $0 }) ?? true {
+                sidebarReturningFromOverview = false
+            }
+            GlassAdditiveSidebars.set(additive: !overviewPresented && !sidebarReturningFromOverview, items: items)
+        }
 
         func configureInitialSidebar(in window: NSWindow, enabled: Bool, overviewPresented: Bool = false) {
             wantsInitialSidebar = enabled
@@ -257,7 +306,10 @@ struct MacTerminalWindowReader: NSViewRepresentable {
         @objc private func observedWindowDidUpdate(_ notification: Notification) {
             guard let window = notification.object as? NSWindow,
                   window === observedWindow else { return }
+            // Only while waiting on the sidebar: this comes with every event the window handles.
+            let waitingOnSidebar = sidebarReturningFromOverview || placingInitialSidebar
             applyInitialSidebarIfNeeded(in: window)
+            if waitingOnSidebar { updateAdditiveSidebars(in: window) }
         }
 
         @objc private func observedWindowWillClose(_ notification: Notification) {

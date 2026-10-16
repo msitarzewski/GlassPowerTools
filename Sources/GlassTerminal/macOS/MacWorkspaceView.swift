@@ -430,7 +430,9 @@ struct MacWorkspaceView: View {
                     return quitting ? windowController.quitConfirmationMessage : windowController.closeConfirmationMessage
                 },
                 opensSidebarInitially: !showingOverview && columnVisibility == .all,
-                overviewPresented: showingOverview
+                overviewPresented: showingOverview,
+                sidebarShown: columnVisibility == .detailOnly ? false
+                    : columnVisibility == .all || columnVisibility == .doubleColumn ? true : nil
             )
         }
         // A two-finger pinch in shows every terminal (W9). The monitor keeps every pinch in this
@@ -541,6 +543,10 @@ struct MacWorkspaceView: View {
     }
 
     private func openOverview() {
+        // The overview takes the whole window: hiding the sidebar mustn't shrink it, as hiding it
+        // does otherwise (sidebars add to the window, `MacTerminalWindowReader`). Said here, before
+        // SwiftUI hides it, since the reader hears of the overview only after.
+        if let terminalWindow { GlassAdditiveSidebars.set(additive: false, in: terminalWindow) }
         if !showingOverview { sidebarBeforeOverview = columnVisibility }
         columnVisibility = .detailOnly
         overviewControlsVisible = true
