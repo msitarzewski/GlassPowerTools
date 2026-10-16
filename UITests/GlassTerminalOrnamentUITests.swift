@@ -71,6 +71,24 @@ final class GlassTerminalOrnamentUITests: XCTestCase {
         XCTAssertFalse(app.buttons["Open Terminal"].exists, "the grid's bar shows over a terminal")
     }
 
+    /// Scale Text (D75): in the bar once, for the terminal in front, and it switches the window
+    /// between Scale and Resize. Resizing the window is past the simulator's runner; the headset
+    /// shows the text following it.
+    func testScaleTextIsInTheBarAndSwitchesTheWindow() {
+        launch("terminal-tabs")
+        let scale = elements("terminal-scale-text").firstMatch
+        XCTAssertTrue(scale.waitForExistence(timeout: 40), "Scale Text is not in the bar")
+        attachTree("scale")
+        XCTAssertEqual(elements("terminal-scale-text").count, 1, "the bar holds more than one terminal's Scale Text")
+        XCTAssertEqual(scale.value as? String, "Off", "a window resizes its rows and columns until asked")
+        scale.tap()
+        wait(for: [expectation(for: NSPredicate(format: "value == %@", "Scaling"), evaluatedWith: scale)], timeout: 5)
+        scale.tap()
+        wait(for: [expectation(for: NSPredicate(format: "value == %@", "Off"), evaluatedWith: scale)], timeout: 5)
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Terminal"))
+                        .firstMatch.exists, "the terminal is still there")
+    }
+
     /// Open Folder Here keeps its pinch-and-hold menu in the toolbar: the same folder in Files.
     func testOpenFolderHereStillOffersItsMenu() {
         launch("terminal-tabs")
