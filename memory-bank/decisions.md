@@ -1496,15 +1496,19 @@ with a preview in the orb on hover"; names "only … when focused"; the orb as "
   otherwise Shrink to Orb is first in the bottom bar.
 - Vision Pro only. Evidence: `GlassSessionOrbUITests`; `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`.
 
-## D75 — A terminal window that resizes, and one that scales — Proposed 2026-10-16
+## D75 — A terminal window that resizes, and one that scales — Implemented 2026-10-16
 **Owner:** "we need both a resize capability and a scale capability. For example I may want a 120 x 40 terminal, but
-with a much smaller window. Today that resize adjusts the 120 x 40, now just the window." He set it as the first thing
-to do on returning.
-**Proposed (not yet agreed in detail):** keep today's behaviour (the window's size sets the grid) as Resize, and add
-Scale, where the grid stays and the window's size sets the text's size to fit it. Likely a per-window setting with a
-This Window override, as Show previews is; on Vision Pro possibly the grid's aspect held as a desktop holds its
-display's. Platforms, how the choice is made, which grid is kept and the limits are open: see
-`tasks/2026-10/2026-10-16_terminal-resize-and-scale.md`.
+with a much smaller window." Asked before building: Vision Pro, Mac and iPad windows ("vision mac and ipad
+multi-window"); a setting and a bar button; the grid the terminal has when Scale is chosen ("If I've resized to 200 x
+100, and choose to scale, keep that setting, do not override my terminal's current state"); the window held to the
+grid's shape.
+**Decision:** When Resized — Change Rows and Columns (default, as before) or Scale the Text — in Settings ▸ Terminal
+(synced), This Window, and Scale Text in the window's bar. Under Scale the terminal is drawn at its own font and the
+drawing scaled to fit; the font never changes, because SwiftTerm re-grids and soft-resets on every font set and its
+cells come in whole points of height. The window is held to the grid's shape by the desktop's lock, moved to GlassShell
+(`GlassWindowAspectLock`). ⌘+ / ⌘− / ⌘0 size the window under Scale (Mac, Vision Pro); iPad can't size or shape a
+window, so there the text is centred and they do nothing. Evidence and limits:
+`tasks/2026-10/2026-10-16_terminal-resize-and-scale.md`, "Built".
 
 ## D76 — A printed path's file previews over a Mac terminal — Implemented 2026-10-16
 **Owner:** "resolve, say a path to a local image, and display that image in a popover over the terminal? or markdown,

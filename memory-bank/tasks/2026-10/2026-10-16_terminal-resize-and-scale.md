@@ -1,6 +1,7 @@
 # 2026-10-16: a terminal window that resizes, and one that scales — NEXT PRIORITY (D75, proposed)
 
-**State:** BUILD (2026-10-16, after ~10:30). Questions settled with the owner; plan below.
+**State:** built (2026-10-16): engine, setting and bar button 394fb47; window shape and ⌘+/⌘− 3feb28a; the visionOS
+UI test 2914f3f. 0.4.463 for the devices — for the owner to try. Details under "Built" at the end.
 
 ## Settled with the owner (2026-10-16, after the compaction)
 
@@ -89,3 +90,44 @@ calls the grid resize; the session keeps sending the kept geometry. On Vision Pr
 aspect with `.uniform`, as the desktop is. Tests: a pure "font size for (window size, grid, cell metrics at 1 pt)"
 function, unit-tested; the Mac with an offscreen hosted terminal (`TerminalFindTests.HostedTerminal`) to show the grid
 stays 120 × 40 as the frame shrinks.
+
+## Built (2026-10-16)
+
+**What the owner sees.** Scale Text (an `aspectratio` button) in a terminal window's bar — the Mac's toolbar, the iPad
+bar, the Vision Pro toolbar ornament — switches the window between Resize and Scale (This Window's When Resized).
+Settings ▸ Terminal ▸ Resizing sets every window; Window Settings has When resized with This Window. Under Scale:
+- the terminal keeps the grid it had (a Mac window opened under Scale keeps Settings' initial size, fitted first);
+- the window is held to the grid's shape (Mac: one pane only; a split window's panes each scale into their part);
+- ⌘+ / ⌘− grow or shrink the window by a tenth, ⌘0 sizes it so the text is at its font's own size (Mac, Vision Pro);
+  on iPad they do nothing under Scale (no API sizes an iPad window);
+- the host is sent nothing as the window changes; turning Scale off re-grids to the window and sends that.
+
+**Code.**
+- `GlassTerminalEmulator/SwiftTermScale.swift` — `SwiftTermScaledGrid`, `SwiftTermScaleLayout` (content size, fit,
+  zoomed window), `MacTerminalScaleView` (the Mac engines' `hostView` now; bounds scaled under Scale).
+- `SwiftTermHostView.swift` — `TerminalHardwareKeyContainerView` gains an always-present `scaler` (transform);
+  engines' `setScaling`/`keptGrid`/`currentGrid`/`zoomWindow`; `SwiftTermHostModel.scaledGrid` (published, async),
+  `setScaling`, `zoomScaledWindow`; the coordinators (and the local PTY proxy) pass on only the kept grid.
+- `GlassShell/GlassWindowAspectLock.swift` — the desktop's lock moved and shared (`GlassWindowAspect` math;
+  visionOS chrome fixed or measured around a canvas; Mac one look per turn, and a lock wanting no shape now also
+  releases a ratio another view set). `DesktopWindowAspect` keeps only the desktop's chrome and minimum.
+- `GlassTerminal/TerminalResizeBehavior.swift` — the setting's values, `TerminalScaleToggle`, `TerminalScaling`
+  (the window's modifier). Setting plumbing as Show previews': `TerminalWindowSettings.whenResized`,
+  `SettingsManager.whenResized` (`whenResized` key), the iCloud preferences (optional), both settings views.
+
+**Measured.** AppKit gives a view under scaled bounds the shown scale (`contentsScale` 2 × 0.504 = 1.008), so Mac text
+is drawn for the pixels it covers; `wantsDynamicContentScaling` is visionOS-only (unavailable on macOS and iOS);
+iPad's Metal drawing is scaled as a picture.
+
+**Tests** (each fails without its change): `TerminalScaleTests` 7 (half the window keeps the grid and sends nothing;
+a font change keeps it and the host hears only the kept grid; back to Resize re-grids; ⌘− halves the window and not
+the grid, ⌘0 = the font's own size; layout sums); `GlassWindowAspectLockTests` 2; When Resized profile and sync tests.
+Mac suites: terminal 862, shell 302, desktop 222. visionOS simulator: `GlassTerminalOrnamentUITests`
+`testScaleTextIsInTheBarAndSwitchesTheWindow` (Scale Text once in the bar, Off → Scaling → Off, the terminal stays)
+beside the bar's existing test, both passing. Not covered: the scaler as a window is resized (past the simulator's
+runner) — on the headset and an iPad for the owner. On iPad, Scale Text is an item in the bar's Tools menu.
+
+**Not done / known.** The kept grid is not remembered across relaunches. Under Scale a font change in Settings
+re-grids SwiftTerm's buffer for a moment (the host never hears it) and shows no change, the window setting the text's
+size. SwiftTerm soft-resets the terminal on every font set (`resize(cols:rows:)` → `softReset()`), Resize or Scale —
+noticed here, not changed.

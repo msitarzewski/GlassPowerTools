@@ -30,7 +30,22 @@ use the disposable test VM only).
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
-## 2026-10-16 (~10:30) — RESUME HERE
+## 2026-10-16 (afternoon) — RESUME HERE
+
+**D75 built: a terminal scales as well as resizes.** Settled with the owner first: Vision Pro, Mac and iPad; a setting
+and a bar button; the grid the terminal has when Scale turns on; the window held to its shape. Commits 394fb47 (engine,
+setting, button), 3feb28a (window shape, ⌘+/⌘−), 2914f3f (visionOS UI test). **0.4.463 is on the Mac and iPhone**;
+the headset was asleep at install (CoreDevice 4016), and `install-headset-when-awake.zsh 463` waits for it — check its
+version first. **For him to try on 0.4.463:** Scale Text (`aspectratio`) in a
+terminal window's bar, then resize the window; ⌘+/⌘−/⌘0 under Scale size the window. On the headset this is the first
+run of the UIKit scaler, which no test covers. Detail and limits: `tasks/2026-10/2026-10-16_terminal-resize-and-scale.md`.
+
+**Still his to try from before:** headset selection (copy the headset log after), hover/Space previews on the Mac,
+trackpad selection on the headset.
+
+**Next candidates:** remembering the kept grid with the window across relaunches (D75 "Later").
+
+## 2026-10-16 (~10:30)
 
 Welcome back. Everything is committed; nothing is pushed. **0.4.462 is on the Mac, iPhone and Vision Pro** (all three
 read it; no new crash reports since 2026-10-13).

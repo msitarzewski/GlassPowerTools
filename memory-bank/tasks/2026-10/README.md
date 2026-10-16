@@ -92,5 +92,7 @@
   — tmux 3.8's mouse (the yellow selection, no scroll), selection as Apple's text does, iPhone tabs and All Windows,
   the iPhone desktop's bars and title, file previews over a Mac terminal (D76), the Mac install that waited on the tmux
   host. 0.4.462 on all three.
-- 2026-10-16 (~10:30): [A terminal window that resizes, and one that scales](2026-10-16_terminal-resize-and-scale.md)
-  — **next priority** (D75, proposed): keep a 120 × 40 grid in a smaller window. Not started.
+- 2026-10-16 (~10:30 to afternoon): [A terminal window that resizes, and one that scales](2026-10-16_terminal-resize-and-scale.md)
+  — D75 built: When Resized (setting, This Window, Scale Text in the bar); the grid kept and the drawing scaled; the
+  window held to its shape (the desktop's lock, now GlassShell's); ⌘+/⌘−/⌘0 size the window. Vision Pro, Mac, iPad.
+  394fb47, 3feb28a, 2914f3f; 0.4.463. For the owner to try.
