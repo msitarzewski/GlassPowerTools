@@ -43,7 +43,9 @@ Evidence: `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`, section 
 **Done:**
 - **Night — the iPhone desktop's two bars** (f1ee5ba, 0.4.457): the status bar steps aside while the keyboard's bar is
   up, and fits one line on a phone. 0.4.457 on the Vision Pro and iPhone; the Mac reads 0.4.453. The desktop's
-  light-mode title now reads (d1198cb, 0.4.458 on the Vision Pro and iPhone).
+  light-mode title now reads (d1198cb). **0.4.458 on the Mac, Vision Pro and iPhone.** The Mac installs had all failed
+  since 14:36: the install script's running check matched the app's `--tmux-host` process; fixed in
+  `~/Software/glass/tmp/install-mac2.zsh` (see the working-with-michael-on-builds memory).
 - **Evening — iPhone tabs** (ce2dbf6, 3e101b8, 0.4.456): the title's tab switcher was invisible in light mode (black
   on the terminal's black) and now reads; All Windows shows every tab of a window, those waiting to connect too.
   0.4.456 on the Vision Pro and iPhone; the Mac is still 0.4.453 (its quit question unanswered twice).
