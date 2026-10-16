@@ -320,6 +320,8 @@ lines on a phone.
 - On a phone the status bar is one line: state and readout, Keys/arrow pad/Keyboard as symbols; the picture size only on
   wider screens. Keyboard asks again (false then true) so it works after the system put the keyboard away.
 - `DesktopOnIPhoneUITests` (new; the UITests folder is synchronized) passes on iOS 27.2 and fails without the change.
-- Seen, not changed: in light mode the desktop's inline title is black on its black backdrop, as the terminal's switcher
-  was. For him to decide.
+- Light-mode title (d1198cb, 0.4.458, at his word): the desktop's inline title was black on its black backdrop, as the
+  terminal's switcher was. `.toolbarColorScheme(.dark, for: .navigationBar)` while the black backdrop is drawn
+  (`drawsBlackBackdrop`), the system's own otherwise. Captured on iOS 27.2 in light mode: missing before, shown after;
+  `DesktopOnIPhoneUITests` still passes. 0.4.458 on the Vision Pro and iPhone (both read it); no new crash reports.
 - 0.4.457 on the Vision Pro and iPhone (both read 0.4.457); the Mac reads 0.4.453. No new crash reports.
