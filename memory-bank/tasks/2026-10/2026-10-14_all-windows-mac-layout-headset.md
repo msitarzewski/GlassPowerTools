@@ -304,3 +304,22 @@ like the other platforms."
 - Grouping stays by machine off the Mac (his 2026-10-14 choice); the Mac groups by window.
 - 0.4.456 (18:26) is on the Vision Pro and iPhone (both read 0.4.456); the Mac's quit went unanswered again, so the Mac
   stays on 0.4.453. No new crash reports.
+
+## 2026-10-15 (night): the iPhone desktop's two bars (f1ee5ba, 0.4.457)
+
+The owner, with an iPhone screenshot of a desktop with the keyboard up: "this is kind of a mess. whats heppening?
+remeber the reise dry/kiss plan". The window's status bar (Keys, arrow pad, Hide Keyboard) and the keyboard's bar
+(`DesktopKeyboardBar`: hide, Tools, arrow pad, Keys) both showed — the terminal already hides its bottom bar while the
+keyboard's accessory is up; the desktop never did. And the status bar wrapped its picture size and readout onto three
+lines on a phone.
+
+- The surface reports the keyboard's bar (`wantsSoftwareKeyboard && isFirstResponder`) to
+  `DesktopSessionModel.keyboardAccessoryShown` a turn later (never inside SwiftUI's update); the status bar steps aside
+  while it is up. A first try had the accessory report its own `didMoveToWindow`, which never fired on hiding (the test
+  caught it).
+- On a phone the status bar is one line: state and readout, Keys/arrow pad/Keyboard as symbols; the picture size only on
+  wider screens. Keyboard asks again (false then true) so it works after the system put the keyboard away.
+- `DesktopOnIPhoneUITests` (new; the UITests folder is synchronized) passes on iOS 27.2 and fails without the change.
+- Seen, not changed: in light mode the desktop's inline title is black on its black backdrop, as the terminal's switcher
+  was. For him to decide.
+- 0.4.457 on the Vision Pro and iPhone (both read 0.4.457); the Mac reads 0.4.453. No new crash reports.
