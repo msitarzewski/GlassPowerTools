@@ -325,3 +325,28 @@ lines on a phone.
   (`drawsBlackBackdrop`), the system's own otherwise. Captured on iOS 27.2 in light mode: missing before, shown after;
   `DesktopOnIPhoneUITests` still passes. 0.4.458 on the Vision Pro and iPhone (both read it); no new crash reports.
 - 0.4.457 on the Vision Pro and iPhone (both read 0.4.457); the Mac reads 0.4.453. No new crash reports.
+
+## 2026-10-16 (morning): selection as Apple's text does (f2fde40, 0.4.459)
+
+The owner: "text selection in vision pro is still not working"; "Doesn't work with a regular terminal (not tmux)
+either"; asked how he selects, "all of those... the Apple HIG and UX patterns should work in our software unless the
+user chooses otherwise. The mouse interactions (trackpad) should work the same way."
+
+- **His log (tmux, mouse off, 0.4.458):** two double pinches selected (one held 13 s, cleared by a single pinch); five
+  drags all became scrolls (`pan(UIKitAlternateScreenScrollWatcher)`), one along a row (col 78→90) clearly a selection
+  attempt; not one hold began all evening. Touch types on the headset: a pinch is `direct` (0), the trackpad
+  `indirectPointer` (3) (from the desktop's input lines).
+- **Apple's pattern** (Apple Vision Pro User Guide, Enter text; Live Text): double-tap a word; pinch and hold text and
+  the word is highlighted, with Copy; pinch and drag either end of a selection to change it.
+- **Changes:** hold selects the word (`selectWordOrExpression`; drag while held extends by words with `dragExtend`) —
+  the old hold made a start=end selection, which SwiftTerm draws as nothing (the test read 0 characters); hold 0.4 s /
+  60 pt; `endDrag` moves an end with no hold (begins only within reach of an end; every scroll pan waits for it);
+  `pointerDrag` (indirectPointer only) selects like a Mac, scroll pans no longer take pointer touches; secondary click →
+  link actions or Copy; each gesture logs `after=…s moved=…pt type=…` from its touch-down.
+- **Tests:** `testAHoldSelectsTheWordHeld` (6 = "screen"), `testDraggingAnEndOfTheSelectionMovesIt`; both fail without
+  their change; all 8 selection tests pass (visionOS 27.2 sim). Selection reads its length in UI tests
+  (`terminal-selection-active-<n>`). The trackpad can't be driven in the simulator.
+- 0.4.459 on the Mac and iPhone (both read it); the headset was unreachable (three tries) — install with
+  `~/Software/glass/tmp/install-devices.zsh 459` when it's awake. No new crash reports.
+- His question on Finder-style toolbar controls (icon ⌃⌄ = pop-up `Picker(.menu)`; icon ⌄ = pull-down `Menu`): answered;
+  both exist on every platform, but only the Mac's toolbar draws the chevrons for certain.

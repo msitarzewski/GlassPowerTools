@@ -41,6 +41,10 @@ Evidence: `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`, section 
 0.4.453 (nothing in 0.4.454 changes the Mac's behaviour). No new crash reports.
 
 **Done:**
+- **2026-10-16 morning — selection as Apple's text does** (f2fde40, 0.4.459 on the Mac and iPhone; **the headset was
+  asleep: install it with `install-devices.zsh 459`**). Hold selects the word; drag an end with no hold; trackpad
+  click-drag selects. His headset log had shown no hold at all and every drag a scroll. Next: his try on the headset,
+  then copy the log (each gesture now logs its time and movement from touch-down).
 - **Night — the iPhone desktop's two bars** (f1ee5ba, 0.4.457): the status bar steps aside while the keyboard's bar is
   up, and fits one line on a phone. 0.4.457 on the Vision Pro and iPhone; the Mac reads 0.4.453. The desktop's
   light-mode title now reads (d1198cb). **0.4.458 on the Mac, Vision Pro and iPhone.** The Mac installs had all failed
