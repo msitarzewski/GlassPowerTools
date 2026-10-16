@@ -35,13 +35,15 @@ use the disposable test VM only).
 **D77 built: a Mac terminal window's sidebar adds to the window.** The owner: "make the left (and eventually right)
 sidebars additive and not resize my terminal window to make room." Opening or closing the sidebar grows or shrinks the
 window and the terminal keeps its size and place (AppKit's split-item collapse behaviour, `GlassAdditiveSidebars`);
-not for the sidebar a window opens with, the overview, or full screen. Only the Mac terminal window has a sidebar.
-Note: `tasks/2026-10/2026-10-16_additive-sidebars.md`. **His to try** on the next build (0.4.464).
+not for the sidebar a window opens with, the overview, or full screen. On 0.4.464 he found reopening snapped ("pops
+back to the original size violently"): the window's 720 × 460 minimum, held by SwiftUI on the whole window, fought
+AppKit's growing; it is now the terminal column's (675cac1). Note: `tasks/2026-10/2026-10-16_additive-sidebars.md`.
+**His to try on 0.4.465.**
 
-**D75 on iPad** — the owner on iPad windows (iPadOS 26 windowing, Stage Manager since 16): keep Scale there, and "let
-users let us know if that doesn't work". In progress separately: sizing an iPad window from ⌘+/⌘−/⌘0 through
-`UIWindowScene.sizeRestrictions`, and sharper scaled text; outcome to the D75 note. The headset never woke for
-0.4.463's install (`install-headset-when-awake.zsh` gave up after an hour).
+**D75 on iPad** (his "Sure… let users let us know if that doesn't work"): ⌘+ grows a scaled iPad window, ⌘− can't
+shrink one, scaled text is sharp (Core Graphics for the pixels shown). Simulator-measured only; D75 note, "iPad".
+
+**Installs:** 0.4.465 on the Mac. The iPhone (0.4.464) and the headset (0.4.462) were unreachable; `install-devices-when-awake.zsh 465` (new, in `~/Software/glass/tmp`) puts it on each as it wakes, up to an hour.
 
 ## 2026-10-16 (afternoon)
 

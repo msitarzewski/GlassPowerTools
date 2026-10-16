@@ -1506,8 +1506,9 @@ grid's shape.
 (synced), This Window, and Scale Text in the window's bar. Under Scale the terminal is drawn at its own font and the
 drawing scaled to fit; the font never changes, because SwiftTerm re-grids and soft-resets on every font set and its
 cells come in whole points of height. The window is held to the grid's shape by the desktop's lock, moved to GlassShell
-(`GlassWindowAspectLock`). ⌘+ / ⌘− / ⌘0 size the window under Scale (Mac, Vision Pro); iPad can't size or shape a
-window, so there the text is centred and they do nothing. Evidence and limits:
+(`GlassWindowAspectLock`). ⌘+ / ⌘− / ⌘0 size the window under Scale (Mac, Vision Pro); iPad can't shape a window, so
+there the text is centred, and only grows one (⌘+, through the scene's minimum size), drawing scaled text with Core
+Graphics for the pixels shown (2026-10-16 evening). Evidence and limits:
 `tasks/2026-10/2026-10-16_terminal-resize-and-scale.md`, "Built".
 
 ## D76 — A printed path's file previews over a Mac terminal — Implemented 2026-10-16
@@ -1530,4 +1531,6 @@ its size and place, so its rows and columns (or its scaled text) don't change. A
 `NSSplitViewItem.collapseBehavior` (`.preferResizingSplitViewWithFixedSiblings`), set on SwiftUI's split items by
 `GlassAdditiveSidebars` (GlassShell). The window keeps its size for the sidebar it opens with (its saved frame holds it),
 for the overview, and where AppKit must (full screen, the screen's edge). Only the Mac terminal window has a sidebar.
+The window's minimum belongs to the terminal's column, not the whole window: AppKit grows the window by raising its
+minimum width, and one SwiftUI held on the whole content stopped it (the reopen snapped, 0.4.464).
 Evidence: `GlassAdditiveSidebarsTests`, `MacTerminalSidebarTests`; `tasks/2026-10/2026-10-16_additive-sidebars.md`.

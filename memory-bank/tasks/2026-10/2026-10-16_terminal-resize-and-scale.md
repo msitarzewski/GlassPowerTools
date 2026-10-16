@@ -131,3 +131,30 @@ runner) — on the headset and an iPad for the owner. On iPad, Scale Text is an 
 re-grids SwiftTerm's buffer for a moment (the host never hears it) and shows no change, the window setting the text's
 size. SwiftTerm soft-resets the terminal on every font set (`resize(cols:rows:)` → `softReset()`), Resize or Scale —
 noticed here, not changed.
+
+## iPad, after the owner's "Sure" (2026-10-16, evening)
+
+He pointed out iPad windows are real windows now (iPadOS 26's windowing; Stage Manager since 16), and on trying more
+there: "Sure. I think we can let users let us know if that doesn't work." Measured on an iPadOS 27.2 simulator in
+Windowed Apps (no iPad device):
+- **⌘+ grows the window** (fa7b8b6). iPadOS has no request that sizes a window; it acts on a scene's
+  `sizeRestrictions.minimumSize`, and a smaller window grows to it — when the minimum changes again, not while it is
+  held. So Increase (and Reset, when the font's own size is larger) raises the minimum to the size asked for and puts
+  it back 0.3 s later; the person can still make the window smaller. +10% a step measured (468×716 → 511×758 →
+  558×813), growing about its middle.
+- **⌘− still does nothing on iPad:** a maximum below the window's size never shrank it (held 1, 2.5, 6, 10 s; min = max
+  together; with and without a geometry request). `windowIdealSize`/`windowIdealPlacement`/`defaultWindowPlacement`
+  are unavailable on iOS in the 27.2 SDK.
+- **Sharp text** (6fd8fc2): SwiftTerm's iOS Metal renderer draws at the screen's scale whatever the view's
+  (`backingScaleFactor` = `UIScreen.main.scale`, 1.20.0), so a scaled picture was soft. Under Scale an iPad terminal
+  now draws with SwiftTerm's Core Graphics (as Vision Pro always does), its `contentScaleFactor` the screen's × the
+  scale shown (rounded up to 1/16); Resize brings Metal back unless it had failed. Edge half-tones on a line of text at
+  about 2× fell 3989 → 3202 pixels; Metal had also drawn that scaled terminal a row off.
+- **Tests:** `GlassTerminalScaleIPadUITests` — `testIncreaseGrowsTheScaledWindow` (skips outside Windowed Apps) and
+  `testScaledTextIsDrawnForThePixelsShown` (a DEBUG, `--ui-testing`-only marker of the renderer and pixels per point);
+  each failed with its change reverted. Run with `~/Software/glass/tmp/ipad-test.zsh` on the simulator "Scale iPad
+  27.2" (Windowed Apps on); captures in `~/Software/glass/tmp/ipad-scale/`.
+- **Unverified:** whether a hardware keyboard's ⌘+ reaches the font actions inside the iPad bar's Tools menu (the UI
+  test runner's typed shortcuts didn't, in Resize or Scale; the menu items do). Seen in passing: an item with a folder
+  icon and no title in the iPad Tools menu.
+

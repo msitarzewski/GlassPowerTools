@@ -1,6 +1,6 @@
 # 2026-10-16: a terminal window's sidebar adds to the window (D77)
 
-**State:** built on the Mac (2026-10-16, evening). For the owner to try on the next build.
+**State:** built on the Mac (2026-10-16, evening); 0.4.464 tried by the owner, the reopen fixed after (below).
 
 ## What the owner asked
 
@@ -68,3 +68,27 @@ sidebar, so its frame is not the terminal's: the tests measure where SwiftUI lay
 - Database and editor windows keep today's behaviour; `GlassAdditiveSidebars` would serve them.
 - A right-hand sidebar: whether SwiftUI's `.inspector` is an AppKit inspector item is to be measured when the terminal
   has one.
+
+## On 0.4.464: closing fine, reopening snapped (fixed)
+
+The owner: "It hides correctly but pops back to the original size violently. lol"
+
+**Found with a standalone probe** (`~/Software/glass/tmp/sidebar-probe/main.swift`: an `NSHostingView` split view in a
+window, frames sampled every 4 ms through AppKit's animated toggle; animations don't run inside `swift test`):
+- a bare split view grows and shrinks smoothly both ways, the detail fixed on screen;
+- with the terminal window's `.frame(minWidth: 720, minHeight: 460)` on the whole split view, reopening never grew
+  the window: the sidebar squeezed the detail (1060 → 820) and snapped in at the end; with a 900-wide window,
+  closing also stopped at the 720 minimum and widened the detail;
+- AppKit grows the window by raising `NSWindow.minSize` step by step through the animation (sampled 1060 → 1275);
+  a minimum SwiftUI holds on the whole content put it back each step. The toolbar was not the cause.
+- With the minimum on the detail column instead, AppKit owns the window's minimum (detail + sidebar while open, the
+  detail alone while closed) and both directions animate.
+
+**Fix:** `MacWorkspaceView` gives the 720 × 460 minimum to the terminal's column (`MacWorkspaceTabContent`), not the
+whole window (from glas.sh, no reason recorded). With the sidebar open the window's smallest is now 720 plus the
+sidebar's width (was 720 whatever the sidebar).
+
+**Test:** `MacTerminalSidebarTests` "the terminal window itself" hosts the real `MacWorkspaceSceneRoot` (an empty
+tab) and toggles its sidebar: the window grows by the sidebar's width toward it and shrinks back. With the minimum
+back on the whole window it fails as he saw it: 1000 → 1000 opened, 760 closed.
+

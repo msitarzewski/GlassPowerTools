@@ -100,3 +100,5 @@
   — opening or closing the Mac terminal window's sidebar grows or shrinks the window; the terminal keeps its size
   and place (AppKit's collapse behaviour on SwiftUI's split items). Not for the sidebar a window opens with, the
   overview, full screen.
+  On 0.4.464 reopening snapped: the window's minimum fought AppKit's growing; now the terminal column's. Same evening,
+  D75 on iPad: ⌘+ grows a scaled window, sharp scaled text (simulator). 0.4.465.
