@@ -4,7 +4,7 @@
 //
 //  A SwiftUI split view's sidebar, on a Mac, opened and closed as its toolbar button does: additive,
 //  the window grows and shrinks by it and the content beside it keeps its size and place; not, the
-//  window keeps its size and the content gives way.
+//  window keeps its size and the content gives way. And the window's frame for it, as rules.
 //
 
 #if os(macOS)
@@ -13,7 +13,7 @@ import SwiftUI
 import Testing
 import GlassShell
 
-@Suite("Sidebars that add to a window")
+@Suite("Sidebars that add to a window", .serialized)
 @MainActor
 struct GlassAdditiveSidebarsTests {
     /// A window showing a sidebar and a detail, as a terminal window does, its sidebar closed.
@@ -45,6 +45,7 @@ struct GlassAdditiveSidebarsTests {
         }
 
         init() async {
+            GlassAdditiveSidebars.animationDuration = 0
             window.isReleasedWhenClosed = false
             window.contentView = NSHostingView(rootView: Content(measured: measured))
             // On screen, as a window the person sees, but not to be seen: AppKit keeps a window
@@ -87,6 +88,46 @@ struct GlassAdditiveSidebarsTests {
 
         func close() { window.close() }
     }
+
+    // MARK: The window's frame
+
+    private let screen = NSRect(x: 0, y: 0, width: 1800, height: 1100)
+
+    @Test("a sidebar opening grows the window to the left, closing shrinks it from the left")
+    func leadingFrame() throws {
+        let window = NSRect(x: 600, y: 200, width: 900, height: 500)
+        let opened = try #require(GlassAdditiveSidebars.windowFrame(window, sidebarWidth: 240, opening: true,
+                                                                    leading: true, visible: screen))
+        #expect(opened == NSRect(x: 360, y: 200, width: 1140, height: 500), "the right edge stays: \(opened)")
+        let closed = try #require(GlassAdditiveSidebars.windowFrame(opened, sidebarWidth: 240, opening: false,
+                                                                    leading: true, visible: screen))
+        #expect(closed == window)
+    }
+
+    @Test("an inspector grows the window to the right")
+    func trailingFrame() {
+        let window = NSRect(x: 100, y: 200, width: 900, height: 500)
+        #expect(GlassAdditiveSidebars.windowFrame(window, sidebarWidth: 300, opening: true, leading: false,
+                                                  visible: screen) == NSRect(x: 100, y: 200, width: 1200, height: 500))
+    }
+
+    @Test("opening keeps the window on screen, and gives way where it can't be that wide")
+    func onScreen() {
+        // Against the left edge: slid back in, the content moving with it.
+        let atEdge = NSRect(x: 100, y: 200, width: 900, height: 500)
+        #expect(GlassAdditiveSidebars.windowFrame(atEdge, sidebarWidth: 240, opening: true, leading: true,
+                                                  visible: screen) == NSRect(x: 0, y: 200, width: 1140, height: 500))
+        // Zoomed to the screen's width: nothing to grow into.
+        let zoomed = NSRect(x: 0, y: 0, width: 1800, height: 1100)
+        #expect(GlassAdditiveSidebars.windowFrame(zoomed, sidebarWidth: 240, opening: true, leading: true,
+                                                  visible: screen) == nil)
+        // Closing never moves a window someone left partly off screen.
+        let off = NSRect(x: 1500, y: 200, width: 900, height: 500)
+        #expect(GlassAdditiveSidebars.windowFrame(off, sidebarWidth: 240, opening: false, leading: true,
+                                                  visible: screen) == NSRect(x: 1740, y: 200, width: 660, height: 500))
+    }
+
+    // MARK: A window
 
     @Test("additive: the window grows by the sidebar, the detail keeps its size and place")
     func additive() async throws {

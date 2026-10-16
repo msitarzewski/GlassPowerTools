@@ -12,7 +12,7 @@ import GlassShell
 /// place. Not when the window puts back the sidebar it opens with, whose saved frame already holds
 /// it, nor for the overview, which hides the sidebar to give the terminals the whole window.
 @MainActor
-@Suite("A terminal window's sidebar adds to the window")
+@Suite("A terminal window's sidebar adds to the window", .serialized)
 struct MacTerminalSidebarTests {
     @MainActor
     @Observable
@@ -65,6 +65,7 @@ struct MacTerminalSidebarTests {
                               backing: .buffered, defer: false)
 
         init(opensSidebar: Bool) async {
+            GlassAdditiveSidebars.animationDuration = 0
             model = Model(opensSidebar: opensSidebar)
             window.isReleasedWhenClosed = false
             window.contentView = NSHostingView(rootView: Root(model: model))
@@ -128,6 +129,7 @@ struct MacTerminalSidebarTests {
     /// minimum width, SwiftUI put it back, and the sidebar squeezed the terminal.
     @Test("the terminal window itself: its sidebar grows and shrinks the window")
     func terminalWindow() async throws {
+        GlassAdditiveSidebars.animationDuration = 0
         let sidebarKey = UserDefaultsKeys.macWorkspaceSidebarVisibility + ".terminal"
         UserDefaults.standard.removeObject(forKey: sidebarKey)
         let request = MacWorkspaceLaunchRequest(startsEmpty: true)

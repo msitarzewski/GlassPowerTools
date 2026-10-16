@@ -120,12 +120,11 @@ struct MacTerminalWindowReader: NSViewRepresentable {
         /// **Sidebars add to the window** (the owner, 2026-10-16: "make the left (and eventually
         /// right) sidebars additive and not resize my terminal window to make room"). Opening one
         /// grows the window by it and closing one shrinks it; the terminal keeps its size and its
-        /// place, so its rows and columns stay (`GlassAdditiveSidebars`). Except where the window
-        /// is not the person's to grow:
+        /// place, so its rows and columns stay (`GlassAdditiveSidebars`, which moves the window as
+        /// the sidebar starts to move). Except where the window is not the person's to grow:
         /// - the sidebar the window opens with: the window's saved frame already holds it, and
-        ///   growing would widen the window at every launch. So this follows
-        ///   `configureInitialSidebar`, which puts it in with AppKit's default (the window's size
-        ///   kept), never before it;
+        ///   growing would widen the window at every launch. So this runs after
+        ///   `configureInitialSidebar`, which puts it in while nothing watches it yet;
         /// - while the overview shows, which hides the sidebar to give the terminals the whole
         ///   window, and until the sidebar it hid is back as the window shows it.
         /// The overview's start is set by the view itself before it hides the sidebar
@@ -152,7 +151,8 @@ struct MacTerminalWindowReader: NSViewRepresentable {
                sidebarShown.map({ sidebar.isCollapsed != $0 }) ?? true {
                 sidebarReturningFromOverview = false
             }
-            GlassAdditiveSidebars.set(additive: !overviewPresented && !sidebarReturningFromOverview, items: items)
+            GlassAdditiveSidebars.set(additive: !overviewPresented && !sidebarReturningFromOverview, items: items,
+                                      in: window)
         }
 
         func configureInitialSidebar(in window: NSWindow, enabled: Bool, overviewPresented: Bool = false) {

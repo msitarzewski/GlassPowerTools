@@ -50,6 +50,12 @@ struct MacWorkspaceView: View {
     @State private var overviewControlsVisible = true
     @State private var gridCardWidth: Double?
     @State private var sidebarBeforeOverview: NavigationSplitViewVisibility?
+    /// The terminal's column's width, and that width held while the window follows its sidebar
+    /// (`GlassAdditiveSidebars.willResizeWindow`), so the terminal isn't re-gridded for the points the
+    /// window's animation and the sidebar's differ by.
+    @State private var terminalColumnWidth: CGFloat = 0
+    @State private var heldTerminalWidth: CGFloat?
+    @State private var terminalWidthHolds = 0
     private let sidebarPreferenceKey: String
 
     @Environment(SessionManager.self) private var sessionManager
@@ -253,13 +259,17 @@ struct MacWorkspaceView: View {
                 onNewTab: addTab,
                 onCloseEmptyTab: { closeTab(selected.workspaceID) }
             )
-            // The window's smallest, given to the terminal's column, not to the whole window: AppKit
-            // grows a window for its sidebar by raising the window's minimum width as it goes, and
-            // a minimum SwiftUI holds on the whole window put it back each step — the sidebar then
-            // squeezed the terminal and snapped in (the owner, 2026-10-16: "pops back to the
-            // original size violently"). With the sidebar open the window's smallest is this and
-            // the sidebar's width.
-            .frame(minWidth: 720, minHeight: 460)
+            // Its width held while the window follows the sidebar (`holdTerminalWidth`).
+            .frame(width: heldTerminalWidth, alignment: .trailing)
+            // The window's smallest, given to the terminal's column, not the whole window: with the
+            // sidebar open the window's smallest is this and the sidebar's width, as the window
+            // grows by the sidebar (D77). Filling the column whatever is held in it, so a held width
+            // never raises the window's minimum (it did: the window, made to fit it, grew to the
+            // right).
+            .frame(minWidth: 720, maxWidth: .infinity, minHeight: 460, alignment: .trailing)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
+                if heldTerminalWidth == nil { terminalColumnWidth = width }
+            }
             .id(selected.workspaceID)
             // A tab dragged from another window can land anywhere on this one, sidebar open or
             // not; it joins at the end. Panes take only Finder's files, so they pass it on.
@@ -375,6 +385,10 @@ struct MacWorkspaceView: View {
                   preset.autoFocusOnActivity != enabled else { return }
             preset.autoFocusOnActivity = enabled
             settingsManager.upsertLayoutPreset(preset)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: GlassAdditiveSidebars.willResizeWindow)) { note in
+            guard let window = note.object as? NSWindow, window === terminalWindow, terminalColumnWidth > 0 else { return }
+            holdTerminalWidth()
         }
         .onChange(of: columnVisibility) { _, visibility in
             guard !showingOverview, sidebarBeforeOverview == nil,
@@ -546,6 +560,19 @@ struct MacWorkspaceView: View {
     private func showOverview(carousel: Bool) {
         overviewCarousel = carousel
         openOverview()
+    }
+
+    /// Holds the terminal's column at its width while the window follows its sidebar, then lets go.
+    private func holdTerminalWidth() {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { heldTerminalWidth = terminalColumnWidth }
+        terminalWidthHolds += 1
+        let hold = terminalWidthHolds
+        DispatchQueue.main.asyncAfter(deadline: .now() + GlassAdditiveSidebars.animationDuration + 0.15) {
+            guard hold == terminalWidthHolds else { return }
+            withTransaction(transaction) { heldTerminalWidth = nil }
+        }
     }
 
     private func openOverview() {
