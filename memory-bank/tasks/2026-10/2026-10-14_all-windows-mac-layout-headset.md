@@ -376,3 +376,10 @@ risk acceptance as we do now and the space can trigger that."
   closed as the pointer left the path's cell, before it reached the popover. Now kept while the pointer is on the path
   or inside the popover (12 pt margin), closed 0.4 s after it's off both (`watchPointer`, polled — inside the popover
   the terminal's window gets no pointer events). On the Mac and iPhone; the headset still unreachable.
+- **0.4.462 (e51e3ff):** "check the .output file type/mime types and allow edit, or preview where appropriate"; "Use
+  our file preview formats … a .swift file … was plain text, not formatted/highlighted". `GlassEditorQuickPreview`
+  decides from the bytes (`GlassEditorFileKind`): text → the editor's own `GlassEditorView`, read-only, highlighted,
+  theme following the appearance; Markdown/HTML/SVG/CSV → the editor's preview; pictures/PDF/video/audio → Quick Look
+  (a mislabelled picture drawn from its bytes); other binary → "No Preview" with its size. A bar over every preview: name,
+  Show in Finder/Files, Open in Editor (the path menu's actions). Tests: 5 decision tests, the text ones failing with the
+  old Quick Look route. On the Mac and iPhone; the headset unreachable.
