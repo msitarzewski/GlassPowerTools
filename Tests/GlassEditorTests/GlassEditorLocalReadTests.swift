@@ -42,10 +42,13 @@ struct GlassEditorLocalReadTests {
 
     /// Asks from the main actor, as the editor does, and gives up `seconds` after the read begins: a
     /// read that blocks fails the test rather than hanging the run. Timed from the start of the read,
-    /// not from the request, and nothing after the start waits for the main actor: the editor's suites
-    /// share it, and waiting behind them is not the read blocking (six more of them pushed these past
-    /// a deadline counted from the request).
-    private func read(_ path: String, within seconds: Double = 3) async -> Outcome? {
+    /// not from the request: the editor's suites share the main actor, and waiting behind them is not
+    /// the read blocking (six more of them pushed these past a deadline counted from the request).
+    /// And not three seconds: the read comes back by way of the main actor, which the editor's other
+    /// tests held for ten seconds at a time loading syntax grammars in a debug build (sampled
+    /// 2026-10-16, `GrammarRegistry.load` under `GlassEditorOutsideChangeTests`). A read that blocks
+    /// on a pipe blocks for good, so twenty seconds still tells the two apart.
+    private func read(_ path: String, within seconds: Double = 20) async -> Outcome? {
         let box = Box()
         Task { @MainActor in await Self.read(path, into: box) }
         // The main actor is given a generous while to reach the read at all.
