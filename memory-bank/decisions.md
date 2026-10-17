@@ -1536,3 +1536,15 @@ for the sidebar it opens with (its saved frame holds it), for the overview, in f
 that wide. The window's minimum belongs to the terminal's column. Only the Mac terminal window has a sidebar.
 Evidence: `GlassAdditiveSidebarsTests`, `MacTerminalSidebarTests`, the window-scene probe;
 `tasks/2026-10/2026-10-16_additive-sidebars.md`.
+
+## D78 — 3D models open everywhere files do — Implemented 2026-10-16
+**Owner:** "we need 3D model support!" (Apple's iMac `.usdz` as the example). Asked first; all four recommendations
+taken: everywhere files open; Apple's 3D Quick Look on Vision Pro; USDZ, USD and Reality; a model's link clicked in a
+terminal opens in 3D here.
+**Decision:** A file kind `model3D`, decided by the bytes (a zip whose first entry is a stored USD layer; `PXR-USDC`;
+`#usda`) and Reality files by name. Shown with RealityKit on the Mac, iPhone and iPad (`RealityView`, the camera
+aimed at the model, orbit controls; iPhone/iPad add AR Quick Look), and on Vision Pro in the window (`Model3D`) and
+Apple's Quick Look volume (`PreviewApplication`). The editor's viewer, the Files browser through it, and the Mac's
+hover preview. A model link, once confirmed, is downloaded (≤ 512 MB), checked by its bytes and shown. Evidence:
+`tasks/2026-10/2026-10-16_3d-models.md`.
+

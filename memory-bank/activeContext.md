@@ -32,21 +32,33 @@ use the disposable test VM only).
 
 ## 2026-10-16 (evening) — RESUME HERE
 
-**D77: a Mac terminal window's sidebar adds to the window — rebuilt twice.** The owner: "make the left (and eventually
-right) sidebars additive and not resize my terminal window to make room." 0.4.464 (AppKit's fixed-siblings collapse
-behaviour) and 0.4.465 (the window's minimum moved to the terminal column) both snapped on reopen for him ("pops back
-to the original size violently"; "still fails the same way"). Cause: AppKit doesn't move a SwiftUI `WindowGroup`
-window for a sidebar (it grows it rightward, never shrinks it) — tests had used a plain `NSWindow`. Now
-`GlassAdditiveSidebars` moves the window itself, following the sidebar's net state, and the terminal column holds its
-width meanwhile. Measured with a window-scene probe app (`~/Software/glass/tmp/sidebar-probe`). Note:
-`tasks/2026-10/2026-10-16_additive-sidebars.md`, "On 0.4.465". Committed; suites green unlocked. **His to try on
-0.4.466** (Mac): open and close the sidebar in a tab running tmux.
+**Since the afternoon, all committed:**
+- **D77 — a Mac terminal window's sidebar adds to the window.** Rebuilt twice for his snaps; the app moves the
+  window itself (AppKit doesn't for a SwiftUI window scene), following the sidebar's net state, reading its width as
+  it starts and settling to where it ends; the terminal column holds its width meanwhile. He confirmed on 0.4.466:
+  "Works now, smooth both ways." His follow-up: only the toolbar's "+" and title move (≈132 pt) — offered: keep them
+  fixed (a gap when open), centre the title, or leave as Finder/Mail do. **Unanswered.**
+  `tasks/2026-10/2026-10-16_additive-sidebars.md`.
+- **D78 — 3D models everywhere files open** (asked first; all four recommendations taken). RealityKit on Mac,
+  iPhone, iPad (AR Quick Look on touch); `Model3D` and Apple's Quick Look volume on Vision Pro; model links open in
+  3D. Seen on both simulators and a Mac probe; his devices to try (`--demo-open editor-model`).
+  `tasks/2026-10/2026-10-16_3d-models.md`.
+- **A dropped screenshot that "just disappears":** the file arrived and nothing was typed, silently. A pending paste
+  review no longer turns everything away; every drop step is logged. `tasks/2026-10/2026-10-16_drop-typing.md`.
+- **D75 on iPad:** ⌘+ grows a scaled window, sharp scaled text (simulator).
 
-**D75 on iPad** (his "Sure… let users let us know if that doesn't work"): ⌘+ grows a scaled iPad window, ⌘− can't
-shrink one, scaled text is sharp (Core Graphics for the pixels shown). Simulator-measured only; D75 note, "iPad".
+**Backlog candidate (measured, not changed):** the editor loads syntax grammars (`GrammarRegistry.load`) on the
+main actor — ten seconds at a time across the editor's tests in a debug build — so a person's first file in a new
+language stalls the interface. Its read tests' budget was raised to 20 s (they failed at the day's starting commit
+too).
 
-**Installs:** 0.4.466 on the Mac and iPhone. The headset (0.4.462) has been unreachable since the morning;
-`install-headset-when-awake.zsh 466` waits for it (an hour). `install-devices-when-awake.zsh <n>` does both devices.
+**Seen in full terminal runs, intermittent, not from today's changes:** W19's tmux naming test, the iCloud push
+cancellation test, `controllerOwnedLocalPTYSurvivesHostReconstructionUntilExplicitClose` (each once in several runs,
+the Mac busy). Locked screens fail the file-protection and window tests: check `~/Software/glass/tmp/locked`.
+
+**Installs:** 0.4.467 on the Mac, iPhone and Vision Pro (all three read it, 20:25; no new crash reports). His to
+try: models (a `.usdz` from the web, or `--demo-open editor-model`), the sidebar, a screenshot dragged into a terminal
+(if it vanishes again, the `terminal-drop` log says why).
 
 ## 2026-10-16 (afternoon)
 

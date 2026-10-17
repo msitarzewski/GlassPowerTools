@@ -102,3 +102,8 @@
   overview, full screen.
   On 0.4.464 reopening snapped: the window's minimum fought AppKit's growing; now the terminal column's. Same evening,
   D75 on iPad: ⌘+ grows a scaled window, sharp scaled text (simulator). 0.4.465.
+- 2026-10-16 (evening): [3D models (D78)](2026-10-16_3d-models.md) — USDZ/USD/Reality everywhere files open:
+  RealityKit on Mac/iPhone/iPad (AR Quick Look on touch), Quick Look volume on Vision Pro; model links open in 3D.
+- 2026-10-16 (evening): [A dropped screenshot that "just disappears"](2026-10-16_drop-typing.md) — the file
+  arrived, nothing was typed, silently; a waiting paste review no longer turns drops away; every step logged.
+
