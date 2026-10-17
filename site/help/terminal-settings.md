@@ -19,29 +19,33 @@ The terminal adds three pages to Settings: **Connections**, **Terminal** and **S
 - **Canvas**: a tint for the terminal background. **Opacity**, **Glass** and **Material** are shared with every window and set in Settings under **Appearance**. A window can keep its own of these and more; see [Give a terminal window its own settings](#give-a-terminal-window-its-own-settings).
 - **Font Family** (**SF Mono**, **Monaco**, **Menlo** or **Courier New**) and **Font Size** (10 to 24 points).
 - **Initial Terminal Size**: **Columns** and **Rows** for a new terminal before its window is measured.
+- **On Vision Pro, Mac and iPad**, **Resizing**: **When a window is resized**, choose **Change Rows and Columns** (the starting setting), where a smaller window holds fewer and the program redraws to fit, or **Scale the Text**, where the terminal keeps its rows and columns and its text grows and shrinks with the window. **Scale Text** in a window's bar switches that window alone. See [Scale the text with the window](terminal-sessions.md#scale-the-text-with-the-window).
 - **Cursor Style** (**Block**, **Underline** or **Bar**) and **Blinking cursor**.
+- **On Mac**, **Previews**: **Show previews**, **Never**, **Mouseover** (the starting setting) or **Mouseover + Space**, for the file a path in a terminal names. See [Preview a file over the terminal](terminal-sessions.md#preview-a-file-over-the-terminal).
 - **On Mac**, **tmux**: **Keep local terminals running with tmux** keeps local terminals running when you quit, update or force quit the app. **Running in the background** shows whether they are running and how many there are, and **End All Local Terminals…** ends them all. See [Local terminals on a Mac](terminal-tmux.md#local-terminals-on-a-mac). Each saved host has its own tmux setting, in its Terminal service; see [Turn it on](terminal-tmux.md#turn-it-on).
 
 ## Edit a theme
 
 1. Choose **Edit Theme**.
 2. Select a theme in **Themes**. **New** and **Duplicate** make an editable copy; **Delete** removes a custom theme; **Reset** restores a built-in one.
-3. Change its **Name**, **Canvas Material** (**Automatic**, **Light** or **Dark**), **Background**, **Foreground**, **Cursor**, **Selection**, font, and each normal and bright color under **ANSI Colors**. **Preview** shows the result.
+3. Change its **Name**, **Canvas Material** (**Automatic**, **Light** or **Dark**), **Background**, **Foreground**, **Cursor**, **Selection**, font, and each normal and bright color under **ANSI Colors**. **Use Apple Clear Dark Colors** takes the text, cursor, selection and ANSI colors of Terminal's Clear Dark profile and sets **Canvas Material** to **Dark**; the background, name and font stay as they are. **Preview** shows the result.
 4. Choose **Save**. The selected theme becomes the terminal's theme.
 
 **On Mac:** **Import** reads a Terminal profile **From .terminal File…**, or from **Apple Built-in Profiles**.
 
-**Sync terminal settings**, under **iCloud Sync**, keeps your themes the same on every device. It also syncs your Workgroups and your reconnect, closing, scrollback, bell, cursor, initial size and tint preferences. It never syncs passwords, keys, saved connections, host keys or snippets.
+**Sync terminal settings**, under **iCloud Sync** in the theme editor's list of themes, keeps your themes the same on every device. It also syncs your Workgroups and your reconnect, closing, scrollback, bell, cursor, initial size, resizing, previews and tint preferences. It never syncs passwords, keys, saved connections, host keys or snippets.
 
 ## Give a terminal window its own settings
 
-Anything about how a terminal window looks and behaves can be set for that window alone, so you can tell your windows apart at a glance, or keep a larger font in one. In any tab of the window, open the tools menu and choose **Settings**: it opens on **This Window**. **All Terminals**, beside it, changes every terminal window. **On Mac**, a local terminal's tools menu opens the same **Settings**; the app's own Settings are in the app menu, or press ⌘,.
+Anything about how a terminal window looks and behaves can be set for that window alone, so you can tell your windows apart at a glance, or keep a larger font in one. In any tab of the window, open the tools menu and choose **Settings**: it opens on **This Window**. **All Terminals**, beside it, changes every terminal window. iPhone has no **This Window**: its terminals all use **All Terminals**. **On Mac**, a local terminal's tools menu opens the same **Settings**; the app's own Settings are in the app menu, or press ⌘,.
 
 **This Window** has:
 
 - **Appearance**: **Opacity**, **Glass** and a **Glass Tint**. **On iPad**, also **Material**.
 - **Theme**: any theme from your theme library, its **Font Family** and its **Font Size**.
 - **Cursor**: **Cursor Style** and **Blinking cursor**.
+- **When resized** (**on Vision Pro, Mac and iPad**): **Change Rows and Columns** or **Scale the Text**. **Scale Text** in the window's bar changes this setting.
+- **Show previews** (**on Mac**): **Never**, **Mouseover** or **Mouseover + Space**.
 - **Bell and Scrollback**: **Bell enabled**, **Visual bell**, **Keep scrollback during session** and **Max scrollback lines**.
 - **Activity** (**on Vision Pro**): **Auto-focus on activity**. While a terminal in this window prints, **Grid** and **Carousel** bring it forward, and the window's orb pulses (see [Shrink a session window to an orb on Vision Pro](library-connect.md#shrink-a-session-window-to-an-orb-on-vision-pro)). Until you change it here, it follows the saved Workgroup the window was opened from, and is otherwise off.
 

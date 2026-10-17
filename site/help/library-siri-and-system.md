@@ -21,11 +21,13 @@ These phrases work with Siri, in Spotlight, in the Shortcuts app and with the iP
 | "What's open in Glass Power Tools", or "What's running in Glass Power Tools" | Answers without opening the app, for example "1 open and 4 running on 2 machines.", with a card of the machines that have something open or running. The button beside one opens the library with it selected. |
 | "New Glass Power Tools terminal" (**on Mac**) | Opens a terminal window on this Mac. |
 
-The Shortcuts app also has these actions, to use in shortcuts of your own:
+Each of these is also an action in the Shortcuts app, to use in shortcuts of your own: **Open Terminal**, **Open Desktop**, **Open Service**, **Open Workgroup**, **Open Saved Query**, **Show Machine**, **Show All Windows**, **Show Active Connections** and **What's Open**. The Shortcuts app also has these:
 
 - **Open in Editor**: opens files in the editor. A folder opens as a project.
 - **New Terminal Window** (**on Mac**): opens a terminal window on this Mac, in a folder when you choose one.
 - **Send Files to a Machine**: see below.
+
+The device's own host (**This Mac** and the others) isn't offered to Siri, Shortcuts or Spotlight; name another machine.
 
 ## Send files to a machine
 
@@ -41,7 +43,7 @@ Turn on **Settings** ▸ **Privacy** ▸ **Show Machines in Search** to find you
 
 Add these controls the way you add any control:
 
-- **Open Terminal**: a terminal on the machine you choose when you add the control. With no machine chosen, it opens the library.
+- **Open Terminal**: a terminal on the machine you choose when you add the control. With no machine chosen, it reads **Choose a Machine** and opens **Active** in the library.
 - **Active Connections**: opens **Active**.
 - **New Terminal Window** (**on Mac**): a terminal window on this Mac.
 
@@ -67,10 +69,10 @@ Glass Power Tools opens `ssh://` links on every device. A link to a machine in y
 
 ## The Finder and the Dock (Mac)
 
-Right-click a folder or a file in the Finder and choose, under **Services** or **Quick Actions**:
+Right-click a folder or a file in the Finder and choose, under **Services**:
 
 - **New Glass Power Tools Tab Here**: a terminal on this Mac in that folder, as a new tab of the terminal window in front, or in a new window when none is open. A file stands for the folder it is in.
-- **New Glass Power Tools Window Here**: the same, in a new terminal window. It is also in the Finder's preview pane under **Quick Actions**.
+- **New Glass Power Tools Window Here**: the same, in a new terminal window. It is also a Quick Action: under **Quick Actions** in the right-click menu and in the Finder's preview pane.
 - **Open in Glass Power Tools**: a file opens in the editor; a folder opens as an editor project.
 
 If you don't see them, turn them on in **System Settings** ▸ **Keyboard** ▸ **Keyboard Shortcuts** ▸ **Services**.

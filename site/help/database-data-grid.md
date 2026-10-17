@@ -17,7 +17,7 @@ A table tab has five views: **Data**, **Structure**, **DDL**, **Indexes** and **
 - Select a column header to sort by it ascending, again for descending, and a third time to remove the sort. Selecting other headers adds further sort keys, numbered in the header, for example `2↑`.
 - Open a header's context menu for **Sort Ascending**, **Sort Descending** and **Remove Sort**, and for **Freeze**, **Hide**, **Move Left** and **Move Right**.
 
-In a table, sorting asks the server for the rows in that order. Sorts, filters and page size are remembered for each table.
+In a table, sorting asks the server for the rows in that order. Sorts, filters that update the SQL query, grouping, page size and the columns' order, visibility, freezing and widths are remembered for each table. **Display Only** filters are not.
 
 ## Filter rows
 
@@ -30,7 +30,9 @@ A value that cannot fit the column's type is reported before the query runs. The
 
 ## Page through rows
 
-The bar under the grid shows the rows loaded, the total when known, and the time taken. Use the arrows to change page, and type a value from 1 through 10,000 in **Per page:**. A table you have not opened before starts at the service's **Rows per page**, set when you add or edit the database, or 100. Choose **Calculate Total…** to run an exact count, stopped after 30 seconds.
+The bar under the grid shows the rows loaded, the total when known, and the time taken. Use the arrows to change page, and type a value from 1 through 10,000 in **Per page:**. A table you have not opened before starts at the service's **Rows per page**, set when you add or edit the database, or 100. Choose **Calculate Total…** to run an exact count, after you confirm; it is stopped after 30 seconds, and you can choose **Cancel Count** while it runs. Until then the bar shows the server's estimate, marked `~`, or that the total is not calculated.
+
+**On iPhone**, and in a narrow iPad window, the bar has only the rows loaded, the page and the arrows.
 
 ## Choose, freeze and resize columns
 
@@ -41,7 +43,7 @@ Choose **Columns** to open **Manage Columns**. Turn **Visible** and **Frozen** o
 - Select a cell to select it; select a row number to select the whole row. **On Mac:** Shift-click a row number to extend the selection and Command-click to add or remove a row.
 - **More** (…) **▸ Extend Selection** extends a cell selection left, right, up or down.
 - **Copy** copies the selection as tab-separated text.
-- **More** (…) **▸ Compare Rows** lists the differences between exactly two selected rows.
+- **More** (…) **▸ Compare Rows** lists the differences between two rows: two selected rows on Mac, or a cell selection that spans exactly two rows, made with **Extend Selection**.
 
 ## Analyze
 
@@ -53,6 +55,6 @@ Open a row number's context menu, choose **Follow Reference**, then the relation
 
 ## Export
 
-Choose **Export** and then **CSV**, **JSON** or **SQL**, and pick where to save. The export contains the selected rows, or every row on the loaded page when nothing is selected. **SQL** writes one `INSERT` statement per row.
+Choose **Export** and then **CSV**, **JSON** or **SQL**, and pick where to save. The export contains the selected rows, or the cells of a cell selection, or, when nothing is selected, every row the loaded page shows. Hidden columns, and rows hidden by a **Display Only** filter, are left out. **SQL** writes one `INSERT` statement per row.
 
-**On iPhone:** the grid's bar keeps **Filter**; **Choose Columns**, **Copy Selected Rows** and **Count All Rows** are in the **More** menu, and **Export** is in the toolbar.
+**On iPhone**, and in a narrow iPad window, the grid's bar keeps **Format** and **Filter**; **Choose Columns**, **Copy Selected Rows**, **Delete Selected Rows…**, **Import TSV**, **Count All Rows** (a count added to **Analyze**) and **Clear Analysis** are in the **More** menu, and **Export** is in the toolbar.

@@ -39,7 +39,11 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
     </div>
     <div class="card">
       <h3>Links and paths</h3>
-      <p>Right-click an address or a path a terminal prints, or pinch and hold it on Vision Pro: open the link, open the file in the Editor, show it in the Finder or in Files, or watch a log file grow in a new tab.</p>
+      <p>Right-click an address or a path a terminal prints, or pinch and hold it on Vision Pro: open the link, open the file in the Editor, show it in the Finder or in Files, or watch a log file grow in a new tab. On the Mac, rest the pointer on a path to see its file over the terminal: code highlighted, Markdown rendered, pictures, PDFs and 3D models shown, from the Mac or the server. A link to a 3D model opens in 3D.</p>
+    </div>
+    <div class="card">
+      <h3>Resize or scale</h3>
+      <p>Make a window smaller and the terminal normally gets fewer rows and columns. Scale Text keeps them instead, and the text grows and shrinks with the window, so a 120 × 40 terminal stays 120 × 40 in a small window. On Vision Pro, the Mac and iPad.</p>
     </div>
     <div class="card">
       <h3>Files over SFTP</h3>
@@ -69,13 +73,13 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
 
 <section class="band">
   <h2>On each device</h2>
-  <p class="intro">Written from the app's code, and checked on each device on 2026-10-08. On 2026-10-15 the Mac, the iPhone and the Vision Pro all ran the same build, 0.4.453. Not every newer change has been tried on the headset yet.</p>
+  <p class="intro">Written from the app's code, and checked on each device on 2026-10-08. On 2026-10-17 the Mac, the iPhone and the Vision Pro all ran the same build, 0.4.471. Not every newer change has been tried on the headset yet, and Scale Text on iPad only in Apple's simulator.</p>
   <div class="two">
     <div>
       <h3>Vision Pro</h3>
-      <p>Each connection opens its own window, named after the machine. One button steps a window through tabs, grid and carousel. A window can shrink into a small glass orb with its terminal live inside, and its tabs as dots around it; pinch one to bring the window back on that tab. Pinch and hold to select text. Focus Mode dims the room around you.</p>
+      <p>Each connection opens its own window, named after the machine. One button steps a window through tabs, grid and carousel. A window can shrink into a small glass orb with its terminal live inside, and its tabs as dots around it; pinch one to bring the window back on that tab. Select text as Apple's own apps do, with pinches or a trackpad, even while tmux has the mouse. Focus Mode dims the room around you.</p>
       <h3>Mac</h3>
-      <p>A terminal window with tabs and split panes, keyboard shortcuts, a command palette that reaches every machine and service, and a local shell. The plus button lists the terminals already running on each machine, to open one as a tab. Programs such as Claude Code draw smoothly: the terminal answers the questions they ask before they draw, and takes each screen update as one frame.</p>
+      <p>A terminal window with tabs and split panes, keyboard shortcuts, a command palette that reaches every machine and service, and a local shell. The plus button lists the terminals already running on each machine, to open one as a tab. Opening the tab sidebar widens the window rather than taking room from the terminal, so its rows and columns stay as they are. Programs such as Claude Code draw smoothly: the terminal answers the questions they ask before they draw, and takes each screen update as one frame.</p>
     </div>
     <div>
       <h3>iPad and iPhone</h3>
@@ -93,6 +97,7 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
     <li>The SSH config importer reads explicit <code>Host</code> entries. <code>Match</code>, <code>Include</code> and wildcard entries are skipped and reported. It never reads key files.</li>
     <li>SFTP uploads and downloads files, not folders. Delete removes a folder only when it is empty.</li>
     <li>On the Mac, a workgroup that includes a legacy-algorithm connection does not open. Open that connection directly.</li>
+    <li>On the Mac, Scale Text works for terminals on other machines. A terminal on the Mac itself always changes its rows and columns with its window. iPhone has no Scale Text.</li>
   </ul>
 </section>
 
@@ -101,7 +106,7 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
   <div class="grid">
     <a class="card" href="help/terminal-connect.html"><h3>Connect over SSH</h3><p>Set up a service, passwords, jump hosts, old servers, dropped connections.</p></a>
     <a class="card" href="help/terminal-keys-and-trust.html"><h3>Keys and host trust</h3><p>Sign in with a key and decide whether to trust a machine.</p></a>
-    <a class="card" href="help/terminal-sessions.html"><h3>Work in a terminal</h3><p>Windows, tabs, splits, links and paths, search, paste review, snippets, recording.</p></a>
+    <a class="card" href="help/terminal-sessions.html"><h3>Work in a terminal</h3><p>Windows, tabs, splits, scaling, links and paths, file previews, search, paste review, snippets, recording.</p></a>
     <a class="card" href="help/terminal-tmux.html"><h3>Keep terminals running</h3><p>tmux sessions, Active, basic terminals, and the Mac's local terminals.</p></a>
     <a class="card" href="help/terminal-files.html"><h3>Files over SFTP</h3><p>Browse, transfer and edit files on a server.</p></a>
     <a class="card" href="help/terminal-port-forwarding.html"><h3>Port forwarding</h3><p>Local, remote and SOCKS5 forwards.</p></a>

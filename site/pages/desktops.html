@@ -6,12 +6,12 @@ description: RDP and VNC desktops that follow your window's size and adapt to th
 
 <section class="hero">
   <h1>Remote desktops</h1>
-  <p class="lede">RDP for Windows and Linux, tested against Windows 11, GNOME Remote Desktop and xrdp, and VNC, including a Mac's Screen Sharing, signed in with a Mac account and encrypted. Each desktop opens in its own window.</p>
+  <p class="lede">RDP for Windows and Linux, tested against Windows 11, GNOME Remote Desktop and xrdp, and VNC, including a Mac's Screen Sharing, signed in with a Mac account and encrypted. Each desktop opens in its own window, or on iPhone, its own screen.</p>
   <div class="cta">
     <a class="button primary" href="help/desktop-add-service.html">Add a remote desktop</a>
     <a class="button" href="index.html">Back to the overview</a>
   </div>
-  <p class="status-note">Not released yet. RDP has been tested against Windows 11 with Network Level Authentication (checked 2026-09-27) and against two Linux RDP servers, GNOME Remote Desktop and xrdp. Other Windows and Windows Server versions have not been tried, and that Windows 11 host did not offer resizing to the window.</p>
+  <p class="status-note">Not released yet. RDP has been tested against Windows 11 with Network Level Authentication (most recently 2026-10-13) and against two Linux RDP servers, GNOME Remote Desktop and xrdp. Other Windows and Windows Server versions have not been tried, and that Windows 11 host did not offer resizing to the window.</p>
 </section>
 
 <section class="band">
@@ -50,7 +50,7 @@ description: RDP and VNC desktops that follow your window's size and adapt to th
 
 <section class="band">
   <h2>On each device</h2>
-  <p class="intro">Written from the app's code. On 2026-10-15 the Mac, the iPhone and the Vision Pro all ran the same build, 0.4.453.</p>
+  <p class="intro">Written from the app's code. On 2026-10-17 the Mac, the iPhone and the Vision Pro all ran the same build, 0.4.471.</p>
   <div class="two">
     <div>
       <h3>Vision Pro</h3>
@@ -59,9 +59,9 @@ description: RDP and VNC desktops that follow your window's size and adapt to th
     </div>
     <div>
       <h3>Mac</h3>
-      <p>Mouse or trackpad, with left, right and middle buttons, back and forward, and scrolling. Opacity and glass let the desktop window show what is behind it, as on Vision Pro.</p>
+      <p>Mouse or trackpad, with left, right and middle buttons, back and forward, and scrolling. Type Text, in the Keys menu, sends text you type to the remote computer. Opacity and glass let the desktop window show what is behind it, as on Vision Pro. A VNC desktop can also open in the Mac's own Screen Sharing app.</p>
       <h3>iPad and iPhone</h3>
-      <p>Choose Trackpad or Direct Touch for the pointer. Pinch to zoom the image. A Keys menu and an arrow pad, also on a bar above the on-screen keyboard, send Escape, Tab, arrows, F1–F12, and Control, Option, Command or Shift with the next key. Control–Alt–Delete is in the Clipboard menu.</p>
+      <p>Choose Trackpad or Direct Touch for the pointer. Pinch to zoom the image. A Keys menu and an arrow pad, in the bar at the bottom or, while the on-screen keyboard is up, in the bar above it, send Escape, Tab, arrows, F1–F12, and Control, Option, Command or Shift with the next key. Control–Alt–Delete is in the Clipboard menu.</p>
     </div>
   </div>
 </section>
@@ -76,7 +76,7 @@ description: RDP and VNC desktops that follow your window's size and adapt to th
     <li>RemoteApp, single remote programs.</li>
     <li>Drive, printer, smart-card and USB redirection. Microphone and camera.</li>
     <li>More than one remote monitor over RDP. UDP transport; connections use TCP.</li>
-    <li>Files through the clipboard. Over VNC, only text: any text with a Mac signed in with a Mac account, Latin-1 characters with other servers.</li>
+    <li>Files through the clipboard. Over VNC, only text: any text with a Mac signed in with a Mac account, none with a Mac reached otherwise, Latin-1 characters with other servers.</li>
     <li>On Vision Pro and Mac, desktop windows are not restored when you reopen the app.</li>
   </ul>
   <p><strong>VNC is not encrypted after sign-in, except to a Mac signed in with a Mac account.</strong> Otherwise it protects your password, not the screen or your typing. Use VNC without a Mac account on a network you trust, or use RDP.</p>

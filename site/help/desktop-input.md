@@ -10,14 +10,14 @@ With the desktop focused, a hardware keyboard types directly into the remote com
 - Caps Lock on the remote computer follows your keyboard.
 - Press ⇧⌘Esc to take the keyboard back from the desktop, for example to use a shortcut in this app. Click, tap or pinch the desktop to give it the keyboard again.
 
-**On iPad and iPhone**, **Keyboard** in the bar at the bottom of the window shows the on-screen keyboard, and **Hide Keyboard** hides it.
+**On iPad and iPhone**, **Keyboard** (the keyboard symbol) in the bar at the bottom of the window shows the on-screen keyboard. While it is up, the bar above it takes the place of the bar at the bottom, and **Hide Keyboard**, first in that bar, puts it away.
 
 > [!NOTE]
 > Over VNC, characters that have no VNC equivalent are skipped when you type or send text.
 
 ## Keys that are hard to type
 
-For keys your keyboard lacks, or when you have no keyboard, the desktop window has a **Keys** menu and an arrow pad (**Arrows**). They are in the row of controls below the window on Apple Vision Pro, and in the bar at the bottom of the window on Mac, iPad and iPhone (on Mac, **Keys** only). On iPad and iPhone, the bar above the on-screen keyboard has them too, with **Tools**, which holds the window's **Settings** and **Clipboard**, and a button that hides the keyboard.
+For keys your keyboard lacks, or when you have no keyboard, the desktop window has a **Keys** menu and an arrow pad (**Arrows**). They are in the row of controls below the window on Apple Vision Pro, and in the bar at the bottom of the window on Mac, iPad and iPhone (on Mac, **Keys** only). On iPad and iPhone, while the on-screen keyboard is up, the bar above it has them instead, with **Tools**, which holds the window's **Settings** and **Clipboard**, and **Hide Keyboard**. **Keys** is a symbol in the bar above the keyboard, and in the bar at the bottom on iPhone and in a narrow iPad window.
 
 **Keys** has:
 
@@ -33,14 +33,14 @@ Drag on the arrow pad to send arrow keys: one for each short step, along the dir
 
 ## Point and click
 
-**On Apple Vision Pro:** look at a point and pinch to click there; pinch and drag to drag. A connected trackpad or mouse also works.
+**On Apple Vision Pro:** look at a point and pinch to click there; pinch and drag to drag. A connected trackpad or mouse also works, and is the way to right-click.
 
 **On Mac:** the mouse or trackpad moves the remote pointer. Left, right and middle buttons, the back and forward buttons, and vertical and horizontal scrolling are sent. Over VNC the forward button is not available.
 
 **On iPad and iPhone:** choose how touch works in **Desktop Settings** > **This Window** > **Touch** > **Pointer**:
 
 - **Trackpad** — the default on iPhone and in a narrow iPad window. Drag anywhere to move the pointer, tap to click where it sits, and tap with two fingers to right-click. Tap, then drag, to move something. If the remote computer does not draw a pointer, the app draws one so you can see where it is.
-- **Direct Touch** — the default in a full-width iPad window. Touching the screen presses the button at that point, which suits a large screen or Apple Pencil.
+- **Direct Touch** — the default in a full-width iPad window. Touching the screen presses the button at that point, which suits a large screen or Apple Pencil. A two-finger tap does not right-click here; use **Trackpad**, or a connected mouse or trackpad.
 
 In both modes, two fingers scroll the remote desktop, and a connected trackpad or mouse moves the pointer when you hover. The choice is this desktop window's, kept on this device. To choose for every desktop window, use **Pointer** in **All Desktops** (the same as **Settings** > **Desktops**), where **Automatic** chooses as described above. See [Give a desktop window its own settings](desktop-sessions.md#give-a-desktop-window-its-own-settings).
 
@@ -53,9 +53,9 @@ Turn on **Share clipboard** in the service's **Advanced** settings to share the 
 - **Copy Remote Clipboard** in the **Clipboard** menu puts the remote computer's latest copy on this device's clipboard again.
 - **Sync Automatically**, at the top of the **Clipboard** menu, is on unless you turn it off. Off, copies no longer cross by themselves, in either direction: **Send Clipboard** and **Copy Remote Clipboard** still move one when you choose them. It takes effect at once and is remembered for the desktop; the service's settings have it too, as **Sync clipboard automatically**.
 
-With **Share clipboard** off, the menu offers **Type Clipboard Text** instead, which types this device's clipboard text into the remote computer as keystrokes.
+With **Share clipboard** off, the menu says so — "Clipboard sharing is off for this desktop. Turn on Share clipboard in its service settings, then reconnect." — and offers **Type Clipboard Text** instead, which types this device's clipboard text into the remote computer as keystrokes.
 
-Files are not shared through the clipboard. Over VNC only text is shared. With a Mac signed in with a Mac user name, any text is shared, through the Mac's own pasteboard. With other VNC servers it is limited to Western European (Latin-1) characters; other characters are dropped.
+Files are not shared through the clipboard. Over VNC only text is shared. With a Mac signed in with a Mac user name, any text is shared, through the Mac's own pasteboard. A Mac reached with only a VNC password, or connected unencrypted in the standard protocol, shares no clipboard. With other VNC servers the clipboard is limited to Western European (Latin-1) characters; other characters are dropped.
 
 ## Hear the remote computer
 

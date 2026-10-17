@@ -4,15 +4,16 @@ The Editor is a text and code editor built into Glass Power Tools. This page cov
 
 ## Open the Editor
 
-On Apple Vision Pro, iPad and iPhone there is no File menu, so you reach the Editor from the library or from a server's files:
+On Apple Vision Pro, iPad and iPhone there is no File menu, so you reach the Editor these ways:
 
 - Choose **Projects** in the library, select a project, and choose **Open**. See [Work with projects](editor-projects.md).
 - In **Projects**, choose the plus button in the toolbar, then **New Document** for an editor window on a new, empty document, or **Open…** for files or a folder.
 - In a Terminal service's Files browser, choose **Edit** on a file, or **Open in Editor** on a folder. See [Projects on a server](editor-projects.md#open-a-folder-on-a-server).
+- With the **Open in Editor** action in the Shortcuts app (see [Siri, Shortcuts and the rest of the system](library-siri-and-system.md)), or by opening a text file with Glass Power Tools from another app, such as Files.
 
 Once an editor window is open, **Open…** (the folder button in its toolbar) asks for files or a folder. With a keyboard attached, press ⌘O.
 
-**On Apple Vision Pro:** the editor window's toolbar is the row of controls below the window: **Shrink to Orb** (see [Shrink a session window to an orb on Vision Pro](library-connect.md#shrink-a-session-window-to-an-orb-on-vision-pro)), **New Document**, **Open…**, **Show Preview** when the file has one, **Settings**, **Save**, **Find** and **Close Document**. The lightning bolt for **Active** is at the top of the window.
+**On Apple Vision Pro:** the editor window's toolbar is the row of controls below the window: **Shrink to Orb** (see [Shrink a session window to an orb on Vision Pro](library-connect.md#shrink-a-session-window-to-an-orb-on-vision-pro)), **New Document**, **Open…**, **Show Preview** when the file has one, **Settings**, **Save**, and, while a document is open, **Find** and **Close Document**. **Save as Project** joins them when the open project is no longer in **Projects**. The lightning bolt for **Active** is at the top of the window.
 
 **On Mac:** you can also use the File menu from any window:
 
@@ -20,7 +21,7 @@ Once an editor window is open, **Open…** (the folder button in its toolbar) as
 |---|---|---|
 | **New Editor Window** | ⇧⌘E | Opens a new editor window on a new, empty document, ready to type into. |
 | **Open…** | ⌘O | Asks for one or more files, or a folder, then opens them. |
-| **Open Recent** | — | Lists files and folders you opened recently on this Mac. **Clear Menu** empties the list. |
+| **Open Recent** | — | Lists up to 20 files and folders you opened recently on this Mac. **Clear Menu** empties the list. |
 
 What you choose decides what happens:
 
@@ -29,7 +30,7 @@ What you choose decides what happens:
 
 If you cancel, nothing opens.
 
-The Editor does not open by itself when the app starts, and empty editor windows are not brought back after the app restarts. The library is the first thing you see.
+The Editor does not open by itself when the app starts, and editor windows are not brought back after the app restarts, with or without documents in them: open a project again from **Projects**, or, on Mac, a file from **Open Recent**. The library is the first thing you see.
 
 ## What an editor window holds
 
@@ -51,12 +52,15 @@ Choose **New Document** (the plus button in the toolbar). Each new document is n
 
 On Apple Vision Pro and iPad, close the editor window as you close any window.
 
-**On iPhone:** the Editor fills the screen. The back chevron in the top corner returns to **Connections**, the library. Your open documents and project are kept, including unsaved changes. To return, choose the editor session in **Active** (the lightning bolt). Its row shows how many files are open and how many are unsaved. Swipe the row to end the session.
+**On iPhone:** the Editor fills the screen. The back chevron in the top corner returns to **Connections**, the library. Your open documents and project are kept, including unsaved changes. To return, choose the editor session in **Active** (the lightning bolt). Its row shows how many files are open and how many are unsaved. To end the session, swipe the row and choose **Close**.
 
 **On Mac:** ⌘W closes the document in front. When it is the last document and no project is open, the window closes with it. When a project is open, the window stays on the project, and ⌘W again closes the window. If the document has unsaved changes, you are asked first. See [Save your work](editor-saving.md#close-a-document).
 
 > [!NOTE]
 > There is no Close Project command. Closing the editor window closes its project. On iPhone, ending the session in **Active** closes it.
+
+> [!WARNING]
+> Only closing a document asks about unsaved changes. Closing an editor window, quitting the app on the Mac, or closing the editor session in **Active** discards them without asking. Save first.
 
 ## Open text files from the Finder
 

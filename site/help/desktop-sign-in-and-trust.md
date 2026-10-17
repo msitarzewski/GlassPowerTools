@@ -6,7 +6,7 @@ This page explains how a Desktop service signs in over RDP and VNC, how the app 
 
 An RDP service signs in with **Username**, **Password** and, optionally, **Domain**. Choose how strict the connection is under **Advanced** > **Authentication**:
 
-- **Network Level (NLA)** — the default. The server must offer Network Level Authentication, which checks your account before the remote desktop starts. If the server does not offer it, the connection fails.
+- **Network Level (NLA)** — the default. The server must offer Network Level Authentication, which checks your account before the remote desktop starts. If the server does not offer it, the connection fails with **Unable to Connect**, and **Technical Details** say the server did not negotiate Network Level Authentication. For such a server, choose **Allow TLS fallback**.
 - **Allow TLS fallback** — also connects to a server that offers TLS without Network Level Authentication. When the server offers Network Level Authentication, it is still used.
 
 Network Level Authentication uses NTLM. Kerberos is not supported, so a domain account signs in with its user name, domain and password.
@@ -18,14 +18,14 @@ Network Level Authentication uses NTLM. Kerberos is not supported, so a domain a
 
 A VNC service picks the sign-in method from what the server offers and what you entered:
 
-- With a **Mac user name** and password, it signs in with that Mac account when the server offers it. This is how Apple Screen Sharing expects to be reached. User names and passwords can be up to 63 bytes.
-- With only a password, it uses the VNC password. VNC passwords use at most their first eight characters; that is part of the protocol.
+- With a **Mac user name** and password, it signs in with that Mac account when the server offers it. This is how Apple Screen Sharing expects to be reached. User names and passwords can be up to 63 bytes. A server that doesn't offer account sign-in but does offer a VNC password gets the password alone, and the user name is not used.
+- With only a password, it uses the VNC password. VNC passwords use at most their first eight bytes, which is eight characters of English; that is part of the protocol.
 - If the server asks for nothing, the app still needs a password to connect, but does not send it.
 
 When the server wants something you did not enter, the connection fails with "This server needs a Mac user name and password (Apple Remote Desktop authentication)." or "This server needs a VNC password." If the server offers only methods the app does not support, the message asks you to enable VNC password or user-account access on the host.
 
 > [!WARNING]
-> With a **Mac user name** and password, a Mac is reached in Apple's own Screen Sharing revision, and the session is encrypted after sign-in. Other VNC — a password alone, or a server that isn't a Mac — protects the password at sign-in, not what follows: the screen and your typing cross the network readable. If a Mac can't be reached in its own revision, the message says so, and Reconnect connects unencrypted. Use VNC without a Mac account on a network you trust.
+> With a **Mac user name** and password, a Mac is reached in Apple's own Screen Sharing revision, and the session is encrypted after sign-in. Other VNC — a password alone, or a server that isn't a Mac — protects the password at sign-in, not what follows: the screen and your typing cross the network readable. If a Mac can't be reached in its own revision, the message says so, and Reconnect connects unencrypted, as does every connection to that Mac until the app is opened again. Use VNC without a Mac account on a network you trust.
 
 ## Verify an RDP server's certificate
 

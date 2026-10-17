@@ -8,14 +8,14 @@ Workgroups are in the library's sidebar, beside Collections, under **Workgroups*
 
 **On a Mac**, **Window** > **Workgroups** (or **Library** > **Workgroups…**) brings the Connections window forward with Workgroups selected. **On Vision Pro**, **Library** > **Workgroups…** does the same.
 
-Use **Search workgroups...** to filter the list. A Workgroup's menu (right-click, or touch and hold) offers **Open**, **Edit**, **Duplicate** and **Delete**.
+Use **Search workgroups...** to filter the list. A Workgroup's menu (right-click, or touch and hold) offers **Open**, **Edit**, **Duplicate**, **Add Favorite** (or **Remove Favorite**) and **Delete…**.
 
 > [!NOTE]
-> **Delete…** in that menu asks you to confirm. Deleting a Workgroup removes it from all your devices; the connections in it are not affected.
+> **Delete…** asks you to confirm. With **Sync terminal settings** on, deleting a Workgroup removes it from your other devices too, although the question speaks only of this device. The connections in it are not affected.
 
 ## Workgroups on all your devices
 
-With **Sync terminal settings** on (Settings ▸ **Terminal**, under **iCloud Sync**), a Workgroup you create, edit or delete on one device does the same on your others. If it changes on two devices, the most recent change wins. When you last opened a Workgroup, and the replacements a device remembers for its Mac terminals, stay on that device.
+With **Sync terminal settings** on (Settings ▸ **Terminal** ▸ **Edit Theme**, under **iCloud Sync**), a Workgroup you create, edit or delete on one device does the same on your others. If it changes on two devices, the most recent change wins. When you last opened a Workgroup, and the replacements a device remembers for its Mac terminals, stay on that device.
 
 ## Create a Workgroup
 
@@ -51,9 +51,9 @@ Each terminal runs its startup command once, after it connects and its host key 
 If the Workgroup is already open on this device, its window or terminals come forward instead of opening a second time.
 
 - **On Vision Pro:** the terminals open as tabs in one terminal window. If a connection needs a password, you are asked for it before anything opens.
-- **On Mac:** the Workgroup opens in a terminal window with its tabs and split layout, in the view you chose with **Open in**. A pane that cannot connect shows **Connection Failed** with **Enter Password…** (when a password is missing), **Retry** and **Close Pane**. The Workgroup's detail shows its running tabs under **Running terminals**.
+- **On Mac:** the Workgroup opens in a terminal window with its tabs and split layout, in the view you chose with **Open in**. A pane that cannot connect shows **Connection Failed** with **Enter Password…** (when a password is missing), **Reconnect**, **Connections** and **Close Pane**. The Workgroup's detail shows its running tabs under **Running terminals**.
 - **On iPad:** the terminals open together in place of the library, after asking for any missing password. The list's **Live Terminals** section shows open Workgroups; **Resume Terminal** returns to one.
-- **On iPhone:** after asking for any missing password, the Workgroup opens on its first terminal, and only that one connects. Choose another from the menu at the top to connect it: each is named by its tab's label, or **Terminal 2 · alpha** and so on, and a filled dot means it is connected. Terminals you have opened stay connected. After the app has been in the background, only the terminal on screen reconnects; the others reconnect when you choose them.
+- **On iPhone:** after asking for any missing password, the Workgroup opens on its first terminal, and only that one connects. Choose another from the menu at the top to connect it: each is named by its tab's label or the terminal's own name, or else by its place and its Terminal service's name, for example **Terminal 2 · Terminal on alpha**, and a filled dot means it is connected. Terminals you have opened stay connected. After the app has been in the background, only the terminal on screen reconnects; the others reconnect when you choose them.
 
 If some terminals cannot open, the others still do, and a message lists what failed and why.
 
@@ -70,7 +70,7 @@ When a terminal's machine keeps sessions running with tmux, the Workgroup rememb
 
 In **Edit Tab**, **tmux session** shows the session a tab opens on. **Start a New One** gives the tab a new session next time; the old one keeps running, and **Active** lists it.
 
-## Open a Mac Workgroup on Vision Pro or iPad
+## Open a Mac Workgroup on Vision Pro, iPad or iPhone
 
 Local terminals run only on a Mac. When a Workgroup has local tabs, **Use SSH Instead of Local** appears first.
 

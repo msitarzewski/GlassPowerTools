@@ -23,13 +23,13 @@ The small size shows three machines with one service each. The medium and large 
 
 ## Machine
 
-**Machine** shows one machine: its name, a button for each of its services, and what is open or running on it, for example **1 open · 2 running**. To choose the machine, edit the widget (touch and hold it, or right-click it on Mac) and pick one under **Machine**. Until you do, it shows your first favorite, or your most recent machine.
+**Machine** shows one machine: its name, a button for each of its services (up to three in the small size, four in the medium), and what is open or running on it, for example **1 open · 2 running**. To choose the machine, edit the widget (touch and hold it, or right-click it on Mac) and pick one under **Machine**. Until you do, it shows your first favorite, or your most recent machine.
 
 - Choose a service's button to connect to it, as **Connect** on that service in the library does.
 - Choose the machine's name to open the library with that machine selected.
 - **On Vision Pro**, it can stand in the room beside that machine's own windows.
 
-It comes in small and medium sizes, and on the Lock Screen on iPhone and iPad. If the machine you chose is removed from the library, the widget says so; edit it to choose another.
+It comes in small and medium sizes, and on the Lock Screen on iPhone and iPad, where it shows the machine's name and the symbols of up to four of its services, without buttons. If the machine you chose is removed from the library, the widget says so; edit it to choose another.
 
 ## Active
 

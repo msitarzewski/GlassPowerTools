@@ -46,7 +46,7 @@ tmux keeps its own history, so scrolling over a terminal in tmux scrolls tmux's 
 
 ## One session in several places
 
-A session can be open in more than one place at once: on your Mac and your Vision Pro, say. Both show the same screen, and typing in either goes to the same program. The window fits the device you used last. **Active**'s **Open** joins whoever is already there; **Take Over** disconnects them first.
+A session can be open in more than one place at once: on your Mac and your Vision Pro, say. Both show the same screen, and typing in either goes to the same program. The window fits the device you used last. Choosing the session in **Active** (or **Open Here** in its menu) joins whoever is already there; **Take Over** disconnects them first.
 
 ## Pick up a session from Active
 

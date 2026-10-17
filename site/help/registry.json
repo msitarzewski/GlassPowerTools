@@ -15,12 +15,12 @@
     {"name": "Terminal", "pages": [
       {"slug": "terminal-connect", "title": "Connect to a machine over SSH", "summary": "Set up a Terminal service, connect, enter passwords, route through jump hosts, allow legacy algorithms, and recover from dropped connections."},
       {"slug": "terminal-keys-and-trust", "title": "Sign in with keys and trust host keys", "summary": "Sign in with an SSH or Secure Enclave key, install your public key, and trust or refuse a machine's host key."},
-      {"slug": "terminal-sessions", "title": "Work in a terminal", "summary": "Terminal windows, tabs and splits, the layout toggle and the plus menu, moving tabs between windows, what comes back after a relaunch, the tools menu, text size, search, paste review, links and paths, selecting on Vision Pro, snippets, recording and the Mac's local shell."},
+      {"slug": "terminal-sessions", "title": "Work in a terminal", "summary": "Terminal windows, tabs and splits, the layout toggle and the plus menu, the Mac window's sidebar, moving tabs between windows, what comes back after a relaunch, the tools menu, text size, scaling the text with the window, search, paste review, links and paths, previewing a printed path's file, selecting on Vision Pro, dropping files, snippets, recording and the Mac's local shell."},
       {"slug": "terminal-tmux", "title": "Keep terminals running with tmux", "summary": "Keep each terminal in its own tmux session, reconnect to it, pick it up from Active on another device or add it to a window as a tab, end it, open a basic terminal outside tmux, and keep the Mac's local terminals running in the background."},
       {"slug": "terminal-files", "title": "Browse and transfer files over SFTP", "summary": "Open the file browser, upload and download, create, rename, move and delete items, and edit remote files in the Editor."},
       {"slug": "terminal-port-forwarding", "title": "Forward ports through an SSH session", "summary": "Add local, remote and SOCKS5 port forwards to a live SSH session, start and stop them, and fix common failures."},
       {"slug": "terminal-workgroups", "title": "Save and open terminal Workgroups", "summary": "Create Workgroups of terminal tabs with startup commands, open them on each platform, and swap in SSH for Mac-only local tabs."},
-      {"slug": "terminal-settings", "title": "Terminal settings, themes and snippets", "summary": "The Connections, Terminal and Snippets settings pages, theme editing, a terminal window's own settings, SSH config import and Tailscale."}
+      {"slug": "terminal-settings", "title": "Terminal settings, themes and snippets", "summary": "The Connections, Terminal and Snippets settings pages, resizing and previews, theme editing, a terminal window's own settings, SSH config import and Tailscale."}
     ]},
     {"name": "Databases", "pages": [
       {"slug": "database-add-service", "title": "Add a database service", "summary": "Add a MySQL, PostgreSQL or SQLite database to a host, fill in its fields, and make it read-only."},
@@ -29,7 +29,7 @@
       {"slug": "database-data-grid", "title": "Browse table data", "summary": "Switch table views, sort, filter and page rows, manage columns, analyze, follow foreign keys and export."},
       {"slug": "database-schema-diagram", "title": "See a database's diagram", "summary": "Every table, column and foreign key as a live diagram, in three dimensions on Vision Pro."},
       {"slug": "database-edit-rows", "title": "Edit rows and structure", "summary": "Edit, add, delete and paste rows with a review before every write, and change columns, indexes and foreign keys."},
-      {"slug": "database-sql-editor", "title": "Write and run SQL", "summary": "Run statements, use Explain Plan, cancel and format, save .sql files, and use query history with literal redaction."},
+      {"slug": "database-sql-editor", "title": "Write and run SQL", "summary": "Run statements, use Explain Plan, cancel and format, save .sql files, use query history with literal redaction, and keep saved queries."},
       {"slug": "database-on-device-assistant", "title": "The on-device assistant", "summary": "Generate SQL, get suggested fixes and automatic tab titles from the on-device model, and see exactly what it is given."}
     ]},
     {"name": "Remote desktops", "pages": [
@@ -39,7 +39,7 @@
       {"slug": "desktop-sessions", "title": "Connect to and leave a remote desktop", "summary": "Open a desktop, enter a password when asked, read status and failures, reconnect, give a desktop window its own settings, and close a session."},
       {"slug": "desktop-vision-pro", "title": "Remote desktops on Apple Vision Pro", "summary": "The desktop window's controls and shape, headset input, glass opacity and strength, and removing the remote background."},
       {"slug": "desktop-display-and-scaling", "title": "Resolution, scaling and zoom", "summary": "Match Window Size, Detail, fixed resolutions, several displays and a window for each, a Mac's displays and pointer, Screen Sharing quality, Retina displays at 1x, a smaller picture from a Mac and what the network carries, High Performance from a Mac, keeping a window in its display's shape, and zooming the image in the window."},
-      {"slug": "desktop-input", "title": "Keyboard, pointer, clipboard and audio", "summary": "Typing, the Keys menu and arrow pad, pointer modes and gestures, exchanging clipboard text, and remote audio."}
+      {"slug": "desktop-input", "title": "Keyboard, pointer, clipboard and audio", "summary": "Typing, the Keys menu and arrow pad, pointer modes and gestures, sharing the clipboard, and remote audio."}
     ]},
     {"name": "Editor", "pages": [
       {"slug": "editor-opening", "title": "Open the Editor", "summary": "Ways into the Editor on each platform, what an editor window holds, new documents, and how to leave or close it."},
@@ -47,7 +47,7 @@
       {"slug": "editor-files-and-tabs", "title": "Files, Folders and Tabs", "summary": "Browse a project's files, preview and keep tabs, create new files locally or on a server, and open files on their own."},
       {"slug": "editor-saving", "title": "Save Your Work", "summary": "Save with ⌘S or the toolbar, choose where a new document goes, handle files that changed, and close unsaved documents."},
       {"slug": "editor-languages", "title": "Languages, Find and the Status Bar", "summary": "The 15 highlighted languages and their extensions, changing a file's language, the status bar, Go to Line, and Find and Replace."},
-      {"slug": "editor-preview-and-viewers", "title": "Preview and Viewers", "summary": "Preview Markdown with Mermaid diagrams, HTML, SVG and CSV, and view images, PDFs, video and audio."},
+      {"slug": "editor-preview-and-viewers", "title": "Preview and Viewers", "summary": "Preview Markdown with Mermaid diagrams, HTML, SVG and CSV, view images, PDFs, video, audio and 3D models, and what happens with large files."},
       {"slug": "editor-settings", "title": "Editor Settings", "summary": "Text size, line numbers and wrapping at four levels: the Editor's defaults, a window, a project, and a single file; and a window's own glass."}
     ]}
   ]

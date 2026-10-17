@@ -12,8 +12,9 @@ When you are signed in to iCloud, the hosts you add on one device appear on your
 | SSH keys generated in the Secure Enclave | This device only |
 | Services that sign in with a Secure Enclave key | This device only |
 | The host for this device (**This Mac**, **This iPad**, **This iPhone** or **This Apple Vision Pro**) and its services | This device only |
-| Favorites | Your other devices: hosts, and the services, projects, workgroups and folders in **Favorites**. The device's own host (**This Mac** and the others) is the exception: a favorite there stays on the device. |
+| Favorites | Your other devices: hosts, and the services, projects, workgroups and folders in **Favorites**. The exception is the star on the device's own host (**This Mac** and the others), which stays on the device. |
 | Terminal Workgroups | Your other devices, while **Sync terminal settings** is on (see [Workgroups](terminal-workgroups.md)) |
+| Terminal themes and terminal preferences | Your other devices, while **Sync terminal settings** is on (see [Terminal settings](terminal-settings.md#edit-a-theme)) |
 | **Recent**, and which service **Connect opens** | This device only |
 | Window appearance (**Settings** ▸ **Appearance**) | This device only |
 
@@ -46,8 +47,11 @@ Settings shows the same status:
 
 - If you edit the same host on two devices, the most recent edit wins for the whole host.
 - A favorite follows the most recent change on any device: removing one on your iPhone removes it on your Mac too. When favorites first sync, each device's favorites are kept together.
-- If you delete a host on one device, it is deleted on the others, together with its services' saved settings and passwords. A deletion is final: an edit made on another device, even a later one, does not bring the host back.
-- If two devices each set up the same machine, with the same name and the same address, the two are combined into one host the next time the library syncs. Where both have a service of the same kind and name, one is kept.
+- If you delete a host on one device, the deletion is meant to reach your other devices and stay.
+
+  > [!WARNING]
+  > Known problem: today a host that has a service set up comes back after you delete it, at the next sync, while iCloud has a copy of it. A sync never lets a set-up service disappear, and it can't yet tell your deletion from a lost record. A fix is pending. Until then, a host without set-up services stays deleted.
+- Records with the same name (case and a trailing `.local` don't matter), a name they share under **Also known as**, or the same address are shown as one host. If they don't disagree about the address, they are combined into one record the next time the library loads: when the app opens, when you return to it, when you pull the host list down, or with **Sync Now**. Where both have a service of the same kind and name, one is kept.
 
 > [!TIP]
 > If a host shows several addresses under **Address**, its records disagree about where the machine is. Edit the host and save one address to combine them.

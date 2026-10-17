@@ -40,12 +40,12 @@ A collection is a label you give to hosts, such as `staging` or `client-a`. A ho
 
 To take a host out of a collection, choose the × on its chip, or press Delete in the empty field to remove the last chip.
 
-Each collection appears in the sidebar under **Collections**, with the number of hosts in it.
+Each collection appears under **Collections**.
 
 - **On Vision Pro:** choose the **Collections** tab, then choose a collection from the list. **Back** (‹) returns to the list of collections.
-- **On Mac, iPad and iPhone:** choose the collection in the sidebar's **Collections** section. The section appears once any host belongs to a collection.
+- **On Mac, iPad and iPhone:** choose the collection in the sidebar's **Collections** section, where each shows the number of hosts in it. The section appears once any host belongs to a collection.
 
-Collection names ignore case, so `Staging` and `staging` are one collection. A collection disappears when no host belongs to it. Collections are saved with the host, so they appear on all your devices.
+Collection names ignore case and accents, so `Staging` and `staging` are one collection, and so are `Café` and `cafe`. A collection disappears when no host belongs to it. Collections are saved with the host, so they appear on all your devices.
 
 ## Give a host other names
 

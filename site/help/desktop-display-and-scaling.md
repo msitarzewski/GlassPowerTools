@@ -6,14 +6,14 @@ A remote desktop has two sizes: the resolution the remote computer draws at, and
 
 **Match Window Size** is on when a session starts. While it is on, the app asks the remote computer to change its resolution whenever you resize the window, a quarter of a second after you stop.
 
-This works only when the server offers display control. Until it does, **Match Window Size** is unavailable and the section says "Source resizing becomes available when the server offers display control." The remote image is then scaled to fit the window, with bars at the sides or top if the shapes differ.
+This works only when the server offers display control, and only in the desktop's own window, not in a display's window of its own. Until it does, **Match Window Size** is unavailable and the section says "Source resizing becomes available when the server offers display control." The remote image is then scaled to fit the window, with bars at the sides or top if the shapes differ.
 
-- **RDP:** a session starts at the window's size. The server must support dynamic display resizing to follow later changes. Sizes are from 200 to 8192 pixels per side, within the limits the server announces.
+- **RDP:** a session starts at the window's size, at least 640 × 480. The server must support dynamic display resizing to follow later changes. Sizes are from 200 to 8192 pixels per side, within the limits the server announces.
 - **VNC:** the server chooses the starting size. If the server supports desktop resizing, it then follows the window.
 
 If the server changes its own size, for example after you sign in, the app asks for the window's size again, up to three times per connection.
 
-**Current Resolution** shows the size the remote computer is drawing now. The same size appears in the bar at the bottom of the window on Mac, iPad and iPhone.
+**Current Resolution** shows the size the remote computer is drawing now. The size of the picture this window is sent appears in the bar at the bottom of the window on Mac and iPad, but not on iPhone or in a narrow iPad window.
 
 ## Sharper text on high-resolution displays (RDP)
 
@@ -33,10 +33,10 @@ Open **Desktop Resolution** and choose **1280 × 800**, **1920 × 1080**, **2560
 A computer with several displays sends one image covering all of them. When it says where each display sits in that image, a **Displays** section appears in **This Window**:
 
 - **Show** chooses what this window shows: **All Displays**, **Main Display** or another display. A single display fills the window.
-- **Open … in a New Window**, one for each display (for example **Open Display 2 in a New Window**), opens that display in a window of its own, on Apple Vision Pro, Mac and iPad. Each window has its own display, zoom, tilt and settings, and the pointer and keys go to the display of the window you use. All of a desktop's windows share one connection.
+- **Open … in a New Window**, one for each display (for example **Open Display 2 in a New Window**), opens that display in a window of its own, on Apple Vision Pro, Mac and iPad. Each window has its own display, zoom and settings, and the pointer and keys go to the display of the window you use. All of a desktop's windows share one connection.
 - **Display Windows**: **A Window for Each Display** opens one window per display whenever the desktop connects; **One Window** keeps them together. It starts as **A Window for Each Display** on Apple Vision Pro and **One Window** elsewhere, and can be set in **Settings** > **Desktops**, or for one desktop in **Desktop Settings** > **Connection**.
 
-**Screen Sharing (VNC):** the computer is asked only for the displays that have a window on screen. A display whose window is closed or in the background costs nothing on the network, and its picture is fetched again when its window returns. Closing a display's window leaves the others connected; closing the last ends the session.
+**Screen Sharing (VNC):** the computer is asked only for the part of its picture that covers the displays with a window on screen; a Mac sending a smaller picture is asked for all of it. A display whose window is closed or in the background is usually left out and costs nothing on the network, and its picture is fetched again when its window returns. Closing a display's window leaves the others connected; closing the last ends the session.
 
 While a VNC computer has several displays, the app does not change its resolution: **Match Window Size** and **Desktop Resolution** are unavailable, because one desktop the size of a window would fold its displays into one.
 
@@ -60,9 +60,9 @@ If a Mac ends the session in a way that suggests the app misread its displays, t
 | **Data Saver** | Thousands of colors, stronger compression and JPEG, at most 15 updates a second. A Mac sends its picture at three quarters of its size. |
 | **Lowest** | The strongest compression and JPEG, at most 8 updates a second; 256 colors where the computer does not send JPEG. A Mac sends its picture at half its size. |
 
-A Mac's Screen Sharing has not been seen to send JPEG to apps other than Apple's own, so on a Mac the levels work through the size of the picture, colors, compression and how often the picture is asked for. They never go below thousands of colors there: older versions of macOS ended the session when asked for fewer. On a Mac, **Best** and **Balanced** send the same.
+A Mac's Screen Sharing has not been seen to send JPEG to apps other than Apple's own, so on a Mac the levels work through the size of the picture, colors and compression. A Mac sends its changes as they happen, so the limits on updates a second don't apply to it. They never go below thousands of colors there: older versions of macOS ended the session when asked for fewer. On a Mac, **Best** and **Balanced** send the same.
 
-**A smaller picture from a Mac.** At **Data Saver** and **Lowest** the Mac draws its picture smaller before sending it: at three quarters of its size each update carries a little over half the pixels, and at half its size a quarter of them. The window still fills with the picture, so text is softer; a Retina display at half its size is about as sharp as a standard display. Pointing, clicking and dragging land where you point, at any size. The size changes once the Mac has confirmed it, which takes a moment, and the picture is fetched again in full. If a Mac ends the session while it is being asked for a smaller picture, the message says so and **Reconnect** connects without asking: it sends its own size until the app is opened again.
+**A smaller picture from a Mac.** At **Data Saver** and **Lowest** the Mac draws its picture smaller before sending it: at three quarters of its size each update carries a little over half the pixels, and at half its size a quarter of them. The window still fills with the picture, so text is softer; a Retina display at half its size is about as sharp as a standard display. Pointing, clicking and dragging land where you point, at any size. The size changes once the Mac has confirmed it, which takes a moment, and the picture is fetched again in full. If a Mac ends the session while it is being asked for a smaller picture, it isn't asked again for ten minutes, and sends its own size meanwhile. When that happened before its picture arrived, the message says so.
 
 On the **Connection** page, under **Quality**, the figures show what the network is carrying now, updated every second: **Receiving** (for example `1.2 Mbit/s`), **Updates** per second, the **Level** in effect (with **Automatic**, the level it chose), **Color**, **Scale** (on a Mac: the size it is sending, `100%` at its own size), the **Encoding** the computer is using, **Round trip** (how long the network takes to answer, for example `42 ms`, and how much of that is data waiting in the network), and **Fetching** (the whole desktop, only the displays on screen, or nothing). On Mac, iPad and iPhone the bar at the bottom of the window shows the main figures in one line, for example `1.2 Mbit/s · 14 updates/s · 16-bit color · ZRLE · 75% size`, the last while a Mac sends a smaller picture.
 
@@ -79,14 +79,14 @@ A standard display is sent at its own pixels either way. Like **Quality**, this 
 
 A Mac draws its whole picture at one scale, and all of a desktop's windows share one connection, so a Retina display and a standard display cannot both arrive at 1x. While a Mac has both on screen, each arrives at its own pixels, as Apple's own Screen Sharing app shows them; **Send at 1x** applies while only Retina displays are on screen.
 
-Under **Windows**, the **Connection** page lists each window of the desktop and what it is being sent: its size in pixels and how many pixels for each of the Mac's points, for example `1512 × 982 at 1x (50%)`. On Mac, iPad and iPhone the same appears in the bar at the bottom of the window.
+Under **Windows**, the **Connection** page lists each window of the desktop and what it is being sent: its size in pixels and how many pixels for each of the Mac's points, for example `1512 × 982 at 1x (50%)`. On Mac and iPad the same appears in the bar at the bottom of the window.
 
 ## High Performance from a Mac (experimental)
 
 **Mac Screen Sharing**, in **Desktop Settings** > **Connection** under **Quality**, chooses how a Mac shares its screen:
 
 - **Standard**, the default: the Mac's own displays, as described above.
-- **High Performance (Experimental)**: the fast mode Apple's own Screen Sharing app offers. The Mac moves its windows to a virtual display the size of this window, at your screen's density, and sends it as video, with its sound. The Mac stops playing sound itself meanwhile. It adapts the video between 20 and 60 Mbit/s; **Data Saver** holds it to 8 and **Lowest** to 3.
+- **High Performance (Experimental)**: the fast mode Apple's own Screen Sharing app offers. The Mac moves its windows to a virtual display the size of this window, at your screen's density, and sends it as video, with its sound. The Mac stops playing sound itself meanwhile. It adapts the video between 20 and 60 Mbit/s; **Data Saver** holds it to 8 and **Lowest** to 3, as chosen when the desktop connects: **Quality** changed during a High Performance session waits for the next connection.
 
 High Performance needs macOS 14 or later on a Mac with Apple silicon, a **Mac user name** and password for the connection, not only a VNC password, and UDP between this device and the Mac on ports 5900 and 5901. It takes effect the next time the desktop connects. While it runs, **High Performance** under **Quality** says what it is doing: **Starting…**, **Streaming**, or **Restarting after a display change…**. When the Mac or the connection can't use it, the desktop connects in **Standard** and the same line says why. A device that can't decode the Mac's video connects in **Standard** too, and says so.
 
@@ -94,7 +94,7 @@ Like **Quality**, it belongs to the connection, and it can be set for every desk
 
 ## Keep a window in its display's shape
 
-**Keep Display Proportions**, in **Desktop Settings** > **This Window** under **Remote Desktop**, lets a desktop window be resized only in the shape of the display it shows, so the picture fills it with no bars at the sides or top. It is on unless you turn it off, on Apple Vision Pro and Mac. The window takes the display's shape as soon as the picture arrives, keeping its width, and again whenever you show another display or the computer's displays change.
+**Keep Display Proportions**, in **Desktop Settings** > **This Window** under **Remote Desktop**, lets a desktop window be resized only in the shape of the display it shows, so the picture fills it with no bars at the sides or top. It is on unless you turn it off, on Apple Vision Pro and Mac. The window takes the display's shape as soon as the picture arrives, keeping its width for a landscape display and its height for a portrait one, and again whenever you show another display or the computer's displays change.
 
 While **Match Window Size** is changing the remote computer's resolution to fit the window, the window can take any shape and the desktop follows it instead. A Mac never changes its resolution to fit a window, so a Mac's windows always keep their display's shape.
 

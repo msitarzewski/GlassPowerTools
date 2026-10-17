@@ -1,6 +1,6 @@
 # Work in a terminal
 
-This page covers terminal windows and tabs, moving tabs between windows, what comes back after a relaunch, Show All Windows, the session's tools menu, text size, search, pasting, links and paths, selecting on Vision Pro, dropping files, snippets, recording, and the Mac's local shell.
+This page covers terminal windows and tabs, the Mac window's sidebar, moving tabs between windows, what comes back after a relaunch, Show All Windows, the session's tools menu, text size, scaling the text with the window, search, pasting, links and paths, previewing a file over the terminal, selecting on Vision Pro, dropping files, snippets, recording, and the Mac's local shell.
 
 ## Windows and tabs
 
@@ -25,11 +25,13 @@ To move a terminal to another window, touch and hold its tab, or its card in **G
 | Close tab | | ⌘W |
 | Move the selected tabs to a new window | **Move Tab to New Window**, or right-click the tabs | |
 | Go to tab 1–9 | | ⌘1–⌘9 |
-| All tabs as a grid or carousel | **Terminal Grid**, **Terminal Carousel** | ⌥⌘G, ⌥⇧⌘G |
+| All tabs as a grid or carousel | **Terminal Grid**, **Terminal Carousel**, or **Terminal Overview** in the toolbar | ⌥⌘G, ⌥⇧⌘G |
 | Every window, and every terminal tab, at once | **Window ▸ Show All Windows** | ⇧⌘\ |
 | Find in the focused pane | **Edit ▸ Find ▸ Find…**, **Find Next**, **Find Previous** | ⌘F, ⌘G, ⇧⌘G |
 
 The plus button opens a new tab as ⌘T does. Its menu has **New Terminal**; **New Basic Terminal**, a shell on this Mac outside tmux (see [Open a terminal without tmux](terminal-tmux.md#open-a-terminal-without-tmux)); and **New Terminal on**, which lists every saved host with a Terminal service by its machine's name and opens a tab there, in tmux when that host keeps its terminals in tmux. A host with terminals running there in tmux is a submenu instead: **New Terminal**, then, under **Running**, each of its running terminals that no tab shows, with where it is and when it was last used. **Running on This Mac** lists this Mac's own tmux sessions that no tab shows. The running terminal you choose opens as a tab of this window, attached to its session. A Terminal service you gave a name of its own shows it after the machine's, for example **alpha — Admin shell**, and two that would still read the same show their user names, for example **alpha (root)** and **alpha (ann)**. **Connect Saved Host…** and the command palette name them the same way.
+
+The window's sidebar lists its tabs. Opening it, with the sidebar button at the top left of the window, makes the window wider by the sidebar's width, toward the left, and closing it makes the window narrower again. The terminal keeps its size, so its rows and columns don't change, and it stays where it is unless the window is at the edge of the screen. In full screen, or when the screen has no room for the wider window, the sidebar takes its room from the terminal instead. **Terminal Overview** hides the sidebar without changing the window's size.
 
 A new local tab, window or split opened while a local terminal is in front starts in the folder that terminal is in, as Terminal.app's Same Working Directory does; opened from anywhere else, or when that folder no longer exists, it starts in your home folder, or in the working directory set in Settings.
 
@@ -54,19 +56,47 @@ See every terminal window and its tabs, with every other window you have open, a
 
 ## The session's tools menu
 
-Each SSH terminal has a tools menu: the gear button in its toolbar on Mac, or in its bottom bar on Vision Pro. It holds **Search**, **Clear**, **Snippets**, **Start Recording…**, **Recordings**, **Duplicate Session**, on Vision Pro and iPad **Move Tab To** when there is somewhere to move it (see [Windows and tabs](#windows-and-tabs)), **Reconnect**, **Disconnect** (**Detach** for a terminal kept in tmux), and **Settings**: **This Window** for the window's own settings, **All Terminals** for the settings every terminal shares (see [Give a terminal window its own settings](terminal-settings.md#give-a-terminal-window-its-own-settings)), and the session's port forwards.
+Each SSH terminal has a tools menu: the gear button in its toolbar on Mac, or in its bottom bar on Vision Pro. It holds **Search**, **Clear**, **Open Folder in Editor** (once the shell's folder is known; it opens that folder as a project in the Editor), **Snippets**, **Start Recording…**, **Recordings**, **Duplicate Session**, on Vision Pro and iPad **Move Tab To** when there is somewhere to move it (see [Windows and tabs](#windows-and-tabs)), **Reconnect**, **Disconnect** (**Detach** for a terminal kept in tmux), and **Settings**: **This Window** for the window's own settings, **All Terminals** for the settings every terminal shares (see [Give a terminal window its own settings](terminal-settings.md#give-a-terminal-window-its-own-settings)), and the session's port forwards.
 
 **On iPhone and iPad:** the tools menu and the buttons below are in **Tools**, at the bottom of the terminal and on the bar above the on-screen keyboard. **On iPhone held sideways**, **Tools** is in the top bar beside **+** and ⚡, so the terminal gets the whole height.
 
 Beside the tools menu:
 
-- **Open Folder Here**, once the remote shell reports its current directory. It opens that folder in the file browser.
+- **Open Folder Here**, once the remote shell reports its current directory. It opens that folder in the file browser. **On Vision Pro and Mac**, pinch and hold it (right-click it on Mac) for **Open in Files** and **Open in Editor**, which opens the folder as a project in the Editor.
+- **Scale Text**, **on Vision Pro, Mac and iPad**: see [Scale the text with the window](#scale-the-text-with-the-window).
 - **Focus Mode**. **On Vision Pro** it surrounds you with a dimmed environment. **On Mac** it makes the window full screen.
 - **AI Assistant**, when Apple Intelligence is available. It suggests a command from a description; **Review & Run** shows the exact command and asks before sending it. When a command fails, it can explain the error and suggest a fix; a fix that is advice rather than a command is shown to read, with nothing to run. If the suggestions keep coming, for example while a test run prints "failed" on purpose, open the menu beside the suggestion's close button: **Pause in This Terminal** stops them in this terminal until it closes, and **Turn Off Error Suggestions** stops them everywhere, until you turn **Suggest fixes for errors** back on in **Settings** ▸ **Connections**.
 
 ## Text size
 
-Press ⌘+ to enlarge, ⌘- to shrink and ⌘0 to reset. This changes the current terminal only. **On Mac** these are in the **Terminal** menu.
+Make the text larger or smaller, or reset it, from the menus below; on Mac and Vision Pro with a keyboard, press ⌘+, ⌘- or ⌘0. This changes the current terminal only.
+
+- **On Mac:** **Terminal** ▸ **Increase Font Size**, **Decrease Font Size** and **Reset Font Size**.
+- **On Vision Pro:** **Terminal Font Size** (the text size button) in the window's bar.
+- **On iPad and iPhone:** **Tools** ▸ **Font Size** ▸ **Increase**, **Decrease** and **Reset**.
+
+In a window that scales its text, these size the window instead; see below.
+
+## Scale the text with the window
+
+Making a terminal window smaller normally gives the terminal fewer rows and columns, and the program in it redraws to fit. With **Scale Text**, the terminal keeps its rows and columns, and its text grows and shrinks with the window instead: a terminal of 120 columns and 40 rows stays 120 × 40 in a small window.
+
+**On Vision Pro, Mac and iPad**, choose **Scale Text** in the terminal window's bar: **on Vision Pro** in the bar below the window, **on Mac** in the toolbar, and **on iPad** in **Tools**. Choose it again to turn it off. It changes this window only. To have every window scale, set **When a window is resized** to **Scale the Text** in **Settings** ▸ **Terminal**; see [Terminal settings](terminal-settings.md#terminal). iPhone has no Scale Text: its terminal fills the screen.
+
+While a window scales:
+
+- The terminal keeps the rows and columns it had when you turned Scale on. A window that opens scaling keeps the ones it opens with; **on Mac**, that is the size a new terminal opens at: **Initial Terminal Size** in Settings, or the Terminal service's own **Columns** and **Rows**.
+- The program in the terminal isn't told the window changed size, so it doesn't redraw.
+- **On Vision Pro and Mac**, the window keeps the terminal's shape as you resize it. **On Mac**, a window split into panes doesn't: each pane scales into its own part. **On iPad**, a window can be any shape, and the text is centred in it.
+- The text size commands size the window instead. **On Vision Pro and Mac**, ⌘+ and ⌘- make the window a tenth larger or smaller, and ⌘0 sizes it so the text is at its font's own size; **on Mac** they do nothing in full screen. **On iPad**, **Increase** makes the window larger, and **Reset** does when the text is smaller than its font's own size; **Decrease** does nothing, because iPadOS doesn't let an app make a window smaller.
+- Changing the font size in Settings shows no change: the window sets the text's size.
+
+Turning Scale off gives the terminal the rows and columns that fit the window, and the program redraws.
+
+**On Mac**, Scale applies to terminals on other machines, over SSH. A terminal on this Mac always changes its rows and columns with its window.
+
+> [!NOTE]
+> On iPad, Scale has been tried only in Apple's iPad simulator so far.
 
 ## Search
 
@@ -76,7 +106,7 @@ In a terminal kept in tmux, tmux searches its own history, so text that has scro
 
 ## Paste
 
-Pasting a single short line sends it straight away. Text with more than one line, or longer than 4,096 bytes, opens **Review Terminal Paste** first. Edit it if needed, then choose **Paste**, or press ⌘↩ with a keyboard (Return adds a new line to the text). Clipboards larger than 262,144 bytes are refused.
+Pasting a single short line sends it straight away. Text with more than one line, or longer than 4,096 bytes, opens **Review Terminal Paste** first. Edit it if needed, then choose **Paste**, or press ⌘↩ with a keyboard (Return adds a new line to the text). Clipboards larger than 262,144 bytes are refused. If a review is still waiting when you paste or drop something else, the newer text takes its place.
 
 ## Right-click in a terminal (Mac)
 
@@ -87,6 +117,7 @@ Right-click, or Control-click, in a terminal for **Look Up**, **Copy**, **Paste*
 **On Mac**, right-click a web address or a path the terminal shows, and the menu starts with what can be done with it. **On Vision Pro**, pinch and hold on it and let go without moving for the same actions.
 
 - On a web address: **Open Link**, which asks before opening it in your browser, and **Copy Link**. **Open Link** is offered only for an `http` or `https` address with no user name or password in it.
+- On a web address of a 3D model, one ending in `.usdz`, `.usd`, `.usda`, `.usdc` or `.reality`, the question's button is **Open in 3D**. The model is downloaded, up to 512 MB, and shown here in 3D: **on Mac** in the Editor, **on iPhone and iPad** in AR Quick Look, and **on Vision Pro** in Quick Look, where you can walk around it. (Quick Look opens USDZ and Reality files; any other USD file is shown in the Editor instead.) **Downloading 3D model…** shows while it comes. A file that turns out not to be a model is not kept, and **Couldn't Open the Model** says why.
 - On a path: **Quick Look** on Mac (see [Preview a file over the terminal](#preview-a-file-over-the-terminal)); **Open in Editor**, which opens a file as a tab or a folder as a project, on the machine the path is on; **Show in Finder** for a path on this Mac, or **Show in Files** for a path on a server, which opens the file browser at its folder; **Watch Log File**; and **Copy Path**.
 
 A path is read on the machine that printed it: from the shell's current folder when it is relative, and `~` as that machine's home folder. A `:line:column` after it is left off. A path that isn't there beeps.
@@ -100,6 +131,7 @@ A path is read on the machine that printed it: from the shell's current folder w
 - Code and other text: in the editor's own view, highlighted as the editor highlights its language, with line numbers, and read-only.
 - Markdown (with its diagrams), HTML, SVG and CSV: as the editor previews them.
 - Pictures, PDFs, video, audio and documents: as Quick Look shows them.
+- 3D models (USDZ, USD and Reality files): in 3D, turned with the pointer.
 
 A bar across the top names the file and has **Open in Editor**, to change it, and **Show in Finder**, or **Show in Files** for a file on a server. A file on a server is copied to this Mac for the preview, up to 32 MB, and the copy is removed when the preview closes. A folder has no preview.
 
@@ -128,7 +160,7 @@ These work as selecting text does in Apple's own apps:
 
 Drag files onto a terminal to type their paths at the cursor, ready for the program that reads them, such as Claude Code. The paths are escaped for the shell and separated by spaces, with a space after the last. Nothing is run: press Return yourself.
 
-- **On Mac, in a local terminal:** each file types its own path. A screenshot dragged from its thumbnail, or an image dragged from a browser, is saved in the app's caches first and types that path.
+- **On Mac, in a local terminal:** each file types its own path. A screenshot dragged from its thumbnail, or an image dragged from a browser, is saved in the app's caches first and types that path. If the files arrive but their paths can't be typed, the Mac beeps.
 - **In an SSH terminal, on every platform:** the shell is on the host, so the files are uploaded there first, into `~/.cache/glass-power-tools/dropped/` in a folder for the day, and their paths on the host are typed. This works with files from Files or the Finder, photos from Photos, and files from other apps. A photo in HEIC is uploaded as a JPEG, which more tools can read; other files go as they are. If a name is taken, the file gets a number, for example `photo-2.jpg`. Nothing is ever uploaded into the shell's current folder.
 
 While files upload, the terminal's corner shows their progress; its × cancels, and a cancelled drop types nothing. A file that doesn't arrive types nothing either, and the corner says why and what to do. A terminal that isn't connected refuses the drop.

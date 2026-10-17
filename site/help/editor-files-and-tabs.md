@@ -6,9 +6,9 @@ This page covers the file list of an open project, how files open into tabs, and
 
 On Apple Vision Pro, iPad and Mac, the project's files are a list on the left of the editor window. **On Apple Vision Pro**, the list is titled **Files**; to hide or show it, choose the sidebar button beside the document's name at the top of the window (⌃⌘S with a keyboard). Folders come first, then files, each sorted by name. Choose the disclosure triangle beside a folder to open it. A folder on a server is read when you first open it, and shows a progress indicator while it is read. A folder that cannot be read shows a warning symbol; hold the pointer over it to see why. On iPhone the folder's screen says why instead.
 
-Type in **Filter** above the list to show only the entries whose names contain what you typed.
+Type in **Filter** above the list to show only the entries whose names contain what you typed. It looks only in folders already read, one level at a time, so a folder whose own name doesn't match is hidden with everything in it.
 
-Some folders are never listed because they hold tooling rather than work: `.git`, `.build`, `.DS_Store`, `node_modules`, `.swiftpm` and `DerivedData`.
+Some entries are never listed because they hold tooling rather than work: `.git`, `.build`, `.DS_Store`, `node_modules`, `.swiftpm` and `DerivedData`.
 
 **On iPhone:** a folder is its own screen. Tap a folder to go into it, and use the back button to go up. Each screen shows the folder's name and its path, and has its own **Filter** field.
 
@@ -24,7 +24,7 @@ Opening a file that is already open selects its tab instead of opening a second 
 
 ## Work with tabs
 
-When two or more documents are open, they appear as tabs above the text. Choose a tab to show it, or its close button to close it. **On iPhone, iPad and Vision Pro**, **Close Document** (×) in the toolbar closes the document in front, including when it is the only one, and **Find** (magnifying glass, or ⌘F with a keyboard) opens the find bar. **On Mac**, use **File** ▸ **Close** (⌘W) and **Edit** ▸ **Find** (⌘F). A tab whose document has unsaved changes shows a dot after its name. Hold the pointer over a tab to see its folder, and the machine it is on when that is not this device.
+When two or more documents are open, they appear as tabs above the text. Choose a tab to show it, or its close button to close it. **On iPhone, iPad and Vision Pro**, **Close Document** (×) in the toolbar closes the document in front, including when it is the only one, and **Find** (magnifying glass, or ⌘F with a keyboard) opens the find bar. **On Mac**, use **File** ▸ **Close** (⌘W) and **Text** ▸ **Find in Document…** (⌥⌘F). A tab whose document has unsaved changes shows a dot after its name. Hold the pointer over a tab to see its folder, and the machine it is on when that is not this device.
 
 **On Mac:** the window's subtitle shows the project name and its folder, or the folder of a file opened on its own. **On Apple Vision Pro**, the same is at the right-hand end of the status bar at the bottom of the window.
 
@@ -46,4 +46,4 @@ A file does not need a project. Open one with **Open…**, by dropping it on an 
 
 ## Files that are not text
 
-Images, PDFs, video, audio and other binary files open in a viewer rather than as text. See [Preview and viewers](editor-preview-and-viewers.md).
+Images, PDFs, video, audio, 3D models and other binary files open in a viewer rather than as text. See [Preview and viewers](editor-preview-and-viewers.md).

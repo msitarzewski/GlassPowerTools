@@ -1,13 +1,13 @@
 # Preview and Viewers
 
-Some text files have a picture: Markdown, HTML, SVG and tables. The Editor can show that picture beside the text or on its own. Files that are not text at all — images, PDFs, video and audio — open in a viewer instead of as text. This page covers both.
+Some text files have a picture: Markdown, HTML, SVG and tables. The Editor can show that picture beside the text or on its own. Files that are not text at all — images, PDFs, video, audio and 3D models — open in a viewer instead of as text. This page covers both.
 
 ## Preview a file
 
 Preview is available for:
 
 - **Markdown** — rendered as GitHub-flavored Markdown, including tables and task lists. Code blocks fenced as `mermaid` are drawn as Mermaid diagrams.
-- **HTML** — the page as written.
+- **HTML** — the page as written, for any file the Editor colors as HTML, such as `.html`, `.htm`, `.xhtml` or `.vue`.
 - **SVG** — the drawing as an image.
 - **CSV** and **TSV** (also `.tab`) — a table.
 
@@ -40,8 +40,8 @@ A preview is kept to the file and its surroundings:
 
 - Images and other files referenced with a relative path are read from the file's project, or from its folder when it has no project. For a file on a server, they are read over the same connection. Files outside that folder are not loaded.
 - Nothing is loaded from the internet.
-- Scripts in an HTML file do not run. The only script a preview runs is the Mermaid copy built into the app, and only for Markdown.
-- Choosing a web or email link opens it in your browser or mail app. Other links do nothing.
+- Scripts in an HTML file do not run, and script, HTML and WebAssembly files beside it are never loaded. The only script a preview runs is the Mermaid copy built into the app, and only for Markdown. HTML written inside a Markdown file is drawn, with its scripts blocked.
+- Choosing a web or email link opens it in your browser or mail app. Links with other kinds of address do nothing.
 
 ## Tables
 
@@ -53,7 +53,7 @@ A file whose contents are an image, a PDF, a video or audio opens in a viewer in
 
 On Apple Vision Pro, iPad and iPhone:
 
-- An image fits the tab. Pinch to zoom, and double-tap to switch between fitted and twice the size.
+- An image fits the tab. Pinch to zoom, up to eight times, and double-tap to switch between fitted and twice the size.
 - A PDF opens in a scrolling page view.
 - Video and audio open in a player.
 
@@ -61,10 +61,23 @@ On Apple Vision Pro, iPad and iPhone:
 
 A viewer is never edited or saved.
 
+## 3D models
+
+USDZ, USD and Reality files open in a 3D viewer in their tab. As with pictures, the Editor goes by what the file contains, so a USDZ saved under another name still opens as a model. A Reality file is known by its name.
+
+- **On Mac, iPad and iPhone:** the whole model is framed in the tab. Drag to turn it, and scroll or pinch to move closer.
+- **On iPad and iPhone:** **View in AR** opens the model in AR Quick Look, to stand it in the room around you.
+- **On Apple Vision Pro:** the model stands in the window, and as the file opens, Apple's Quick Look also opens it in a volume of its own that you can walk around. **View in 3D** opens the volume again.
+
+AR Quick Look and the Vision Pro volume take USDZ and Reality files only, so a USD file stays in its tab, without **View in AR** or **View in 3D**. A USD file written as text (it starts with `#usda`) also has **Open as Text**, to edit it in the Editor. If a model can't be shown, the tab says **Can't Show This Model** and why.
+
 ## Files that are not text
 
 Any other binary file shows **This File Isn't Text** with its size. Choose **Open as Text** to open it in the Editor anyway.
 
-## Large files on a server
+## Large files
 
-An image, PDF, video or audio file larger than 64 MB on a server is downloaded only after you confirm. **Download this file?** shows its size; choose **Download and View** or **Cancel**.
+The Editor reads a file whole, up to 64 MB.
+
+- **On this device:** a larger image, PDF, video, audio or 3D model still opens in its viewer, which reads it from the disk. A larger text or other file is not opened, and the message says so; open it in another app. Something that is not a file at all, such as a named pipe, is not opened either.
+- **On a server:** a file larger than 64 MB can't be opened in the Editor. For an image, PDF, video, audio or 3D model file, **Download this file?** shows its size first, with **Download and View** and **Cancel**, but the file still doesn't open.

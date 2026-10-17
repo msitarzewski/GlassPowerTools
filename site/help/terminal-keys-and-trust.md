@@ -31,7 +31,7 @@ A key made with **Generate in the Secure Enclave…** is an ECDSA P-256 key that
 The first time you connect to a machine, **Trust SSH Host Key?** shows the key's algorithm and SHA-256 fingerprint.
 
 1. Compare the fingerprint with the one the machine reports. On the machine, `ssh-keygen -lf` on its host key file prints it.
-2. Choose **Trust and Connect** if they match, or **Cancel** if they do not.
+2. Choose **Trust and Connect** if they match, or **Cancel** if they do not. When the question comes up in a terminal that is already open, for example as it reconnects, the button is **Trust & Reconnect**.
 
 The app remembers the key for that address and port. Anything else in the app that reaches the machine over SSH, such as a database tunnel, uses the same trust, so you are not asked again.
 
@@ -41,7 +41,7 @@ If the machine presents a different key from the one you trusted, **SSH Host Key
 
 A key changes legitimately when a server is rebuilt or reinstalled. It also changes when something is intercepting the connection.
 
-- If you know why the key changed and the new fingerprint is right, choose **Trust Changed Key**. The new key replaces the old one.
+- If you know why the key changed and the new fingerprint is right, choose **Trust Changed Key** (**Trust Changed Key & Reconnect** in a terminal that is already open). The new key replaces the old one.
 - Otherwise, choose **Cancel** and find out why before you connect.
 
 > [!WARNING]
@@ -58,4 +58,4 @@ In **Strict** mode, a new or changed key stops the connection and says why. No t
 
 ## See and forget trusted host keys
 
-Open **Settings** ▸ **Connections**. **Trusted Host Keys** lists every machine whose key you have accepted, with the key's type, its SHA-256 fingerprint and when it was last seen. Choose **Forget…** to forget a machine's key; the next connection asks you to check it again, or, in **Strict** mode, is refused until you do. Trusted keys sync through iCloud Keychain, so forgetting one forgets it on your other devices too.
+Open **Settings** ▸ **Connections**. **Trusted Host Keys** lists every machine whose key you have accepted, with the key's type, its SHA-256 fingerprint and when it was last seen. Choose **Forget…**, then **Forget**, to forget a machine's key; the next connection asks you to check it again, or, in **Strict** mode, is refused until you do. Trusted keys sync through iCloud Keychain, so forgetting one forgets it on your other devices too.

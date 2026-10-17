@@ -28,14 +28,14 @@ Open **Advanced** for everything optional. The RDP-only rows are hidden when you
 | **Port** | Leave it blank for the protocol's default: 3389 for RDP, 5900 for VNC. Changing **Protocol** clears this field, so choose the protocol first. |
 | **Domain** (RDP) | The Windows domain for the account, for example `EXAMPLE`. Optional. |
 | **Authentication** (RDP) | **Network Level (NLA)** requires Network Level Authentication. **Allow TLS fallback** also accepts servers that offer only TLS. See [Sign in and trust a remote computer](desktop-sign-in-and-trust.md). |
-| **Desktop size** | Width and height in pixels, 1920 × 1080 by default. Each side must be from 200 to 8192, and the width must be even. |
+| **Desktop size** | Width and height in pixels, 1920 × 1080 by default. Each side must be from 200 to 8192, the width must be even, and the whole may be at most 16,777,216 pixels (4096 × 4096, for example). |
 | **Share clipboard** | Shares the clipboard with the remote computer: text, formatting and images over RDP, text over VNC. Off by default. See [Keyboard, pointer, clipboard and audio](desktop-input.md). |
 | **Sync clipboard automatically** | With the clipboard shared, copies cross by themselves. On by default; also in the desktop's **Clipboard** menu, as **Sync Automatically**. Off, **Send Clipboard** and **Copy Remote Clipboard** move a copy when you choose them. |
 | **Remote audio** (RDP) | Plays the remote computer's sound on this device. Off by default. |
 | **Graphics** (RDP) | Which pictures the remote computer is asked to send. **Automatic**, the default, uses its best picture. If colours smear while things move, choose **H.264 (4:2:0)**, which leaves out H.264's 4:4:4 form; a computer that does not offer it sends its other pictures instead. If the picture breaks up or stays blank, choose **Without H.264**. Takes effect the next time you connect. |
 | **Credential storage** | **iCloud Keychain** (the default) syncs the password to your other devices through iCloud Keychain. **This device only** keeps it here. |
 
-With **Match Window Size** on, which is the default, an RDP session asks for the size of its window rather than **Desktop size**. On a Mac, **Desktop size** also sets how large a new session window opens. See [Resolution, scaling and zoom](desktop-display-and-scaling.md).
+With **Match Window Size** on, which is the default, an RDP session asks for the size of its window rather than **Desktop size**. On a Mac, **Desktop size** also sets how large a new session window opens. A VNC server chooses its own size, so for VNC that is all **Desktop size** does. See [Resolution, scaling and zoom](desktop-display-and-scaling.md).
 
 ## Edit a Desktop service
 
@@ -47,7 +47,7 @@ With **Match Window Size** on, which is the default, an RDP session asks for the
 - Changing **Port** or **Authentication** clears any certificate you trusted for this computer, so you are asked to verify it again on the next connection. Changing the host's address does the same.
 - Changing **Credential storage** moves the saved password to the storage you chose.
 
-To remove the service, open the context menu on its service row and choose **Remove Service**. This removes the saved desktop from the host.
+To remove the service, open the context menu on its service row and choose **Remove Service**. This removes the saved desktop from the host, with its saved password and the settings its windows kept.
 
 ## If a field is not accepted
 
@@ -56,4 +56,6 @@ When you try to save, the sheet shows a message under each field it cannot accep
 - "Enter the account to sign in with." — RDP needs a user name.
 - "Enter the password for this desktop." — a new service needs a password.
 - "Enter a port between 1 and 65535, or leave it blank for 3389." (or 5900 for VNC)
-- "Enter a size between 200 and 8192, with an even width."
+- "Enter a size between 200 and 8192, with an even width." It also appears for a size of more than 16,777,216 pixels.
+- "A Screen Sharing user name can be at most 63 characters." — counted in bytes, so fewer for letters outside English.
+- "This machine needs an address before a desktop can be added."

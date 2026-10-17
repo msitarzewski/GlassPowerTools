@@ -5,7 +5,7 @@ The file browser shows a machine's files over SFTP, using the host's Terminal se
 ## Open the file browser
 
 - In the library, select the host, then choose **Files** in its detail.
-- In a terminal, choose **Open Folder Here** to open the folder the shell is in.
+- In a terminal, choose **Open Folder Here** to open the folder the shell is in. To open that folder in the Editor instead, choose **Open Folder in Editor** in the terminal's tools menu (see [The session's tools menu](terminal-sessions.md#the-sessions-tools-menu)).
 - **On Mac:** in the command palette (⇧⌘P), choose **Open Files on** followed by the machine's name, for example **Open Files on alpha**.
 - **On Mac and Vision Pro:** on a path a terminal shows, choose **Show in Files** (right-click it on Mac; pinch and hold it on Vision Pro). The browser opens at the path's folder. See [Links and paths](terminal-sessions.md#links-and-paths).
 
@@ -76,6 +76,8 @@ Choose **Edit** in a file's menu, or its edit button. **On Vision Pro, iPad and 
 
 - **On Vision Pro, Mac and iPad**, the file opens in the Editor's window as a tab.
 - **On iPhone**, the file opens within the browser.
+
+A file that isn't text, such as a picture, a PDF, a video, audio or a 3D model, opens in the Editor's viewer instead; see [Preview and Viewers](editor-preview-and-viewers.md).
 
 When you save, the app writes the file back to the server and checks that nothing else changed it in the meantime. See the Editor's help for saving and conflicts.
 

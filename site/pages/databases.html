@@ -31,7 +31,7 @@ description: MySQL, PostgreSQL and SQLite: browse, filter and edit rows with a r
     </div>
     <div class="card">
       <h3>Write SQL</h3>
-      <p>Run a statement, a selection or a whole script. Explain Plan without running it. Cancel, format, and save <code>.sql</code> files.</p>
+      <p>Run a statement, a selection or a whole script. Explain Plan without running it. Cancel, format, and save <code>.sql</code> files. Saved queries open from Siri and Shortcuts too, never run.</p>
     </div>
     <div class="card">
       <h3>Read-only services</h3>
@@ -58,9 +58,9 @@ description: MySQL, PostgreSQL and SQLite: browse, filter and edit rows with a r
     </div>
     <div>
       <h3>Through the host's SSH</h3>
-      <p>Many database servers accept connections only from their own machine. The tunnel reaches them through the host's Terminal service, with the same sign-in and the same host-key trust.</p>
+      <p>Many database servers accept connections only from their own machine. The tunnel reaches them through the host's Terminal service, with the same sign-in and the same host-key trust. A database on a private network goes through the machine that can reach it, such as an app server, and needs no SSH of its own.</p>
       <h3>Query history</h3>
-      <p>Before a statement is stored in history, strings and numbers are replaced with <code>?</code>. The SQL sent to the database is not changed.</p>
+      <p>Unless you turn it off, strings and numbers are replaced with <code>?</code> before a statement is stored in history. The SQL sent to the database is not changed.</p>
     </div>
   </div>
 </section>
@@ -74,11 +74,11 @@ description: MySQL, PostgreSQL and SQLite: browse, filter and edit rows with a r
 
 <section class="band">
   <h2>On each device</h2>
-  <p class="intro">Written from the app's code. On 2026-10-15 the Mac, the iPhone and the Vision Pro all ran the same build, 0.4.453.</p>
+  <p class="intro">Written from the app's code. On 2026-10-17 the Mac, the iPhone and the Vision Pro all ran the same build, 0.4.471.</p>
   <ul class="list">
-    <li><strong>Vision Pro:</strong> the workspace is its own window, which you can place anywhere, or shrink into a small orb while it stays connected. Closing it ends the session.</li>
+    <li><strong>Vision Pro:</strong> the workspace is its own window, which you can place anywhere, or shrink into a small orb while it stays connected. Closing its last window ends the session.</li>
     <li><strong>Mac:</strong> a window per workspace, a Query menu, keyboard shortcuts and a command palette.</li>
-    <li><strong>iPad:</strong> a window per workspace. Closing the last window on a session ends it.</li>
+    <li><strong>iPad:</strong> a window per workspace. Closing the last window on a session ends it. A narrow window takes the iPhone's smaller bars.</li>
     <li><strong>iPhone:</strong> the workspace takes the screen, one level at a time: database, table, rows.</li>
   </ul>
 </section>

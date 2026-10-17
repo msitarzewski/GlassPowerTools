@@ -9,9 +9,11 @@ This page covers opening a remote desktop, entering a password when one is neede
 
 On Apple Vision Pro, Mac and iPad, the desktop opens in a window of its own. Choosing **Connect** again for a desktop that is already open brings its window forward.
 
+**On Mac**, a host with a Screen Sharing (VNC) desktop also lists **Screen Sharing** under **Services**: it opens the desktop in the Mac's own Screen Sharing app instead. That app signs in on its own; no user name or password is passed to it.
+
 **On iPhone:** the desktop covers the library. Choose the back chevron (**Connections**) to close it and return to the library.
 
-While the session starts, the window shows **Connecting…**, then **Waiting for desktop…** until the first image arrives, then **Connected**. On Mac, iPad and iPhone the bar at the bottom of the window shows the status and the remote resolution, for example `1920 × 1080`.
+While the session starts, the window shows **Connecting…**, then **Waiting for desktop…** until the first image arrives, then **Connected**. If it has signed in but no image comes, **Reconnect** appears under the spinner. On Mac and iPad the bar at the bottom of the window shows the status and the size of the picture this window is sent, for example `1920 × 1080`. On iPhone, and in a narrow iPad window, the bar is one line and leaves out the size.
 
 ## Enter a password when asked
 
@@ -24,11 +26,11 @@ If there is no saved password, or it cannot be used, a **Connect to** sheet open
 
 An RDP connection uses the **Domain** saved in the service. To change the domain, edit the service. See [Add a remote desktop](desktop-add-service.md).
 
-To enter a different account at any time the session is not connected, choose **Enter Credentials** in the middle of the window.
+To enter a different account at any time the session is not connected, choose **Enter Credentials** in the middle of the window. If you cancel the **Connect to** sheet, the window shows **Disconnected**, with **Reconnect** and **Enter Credentials**.
 
 ## When a connection fails
 
-If the desktop cannot be opened, the window shows **Unable to Connect**. If an open desktop drops, it shows **Connection Lost**. Both offer:
+If the desktop cannot be opened, the window shows **Unable to Connect**. If an open desktop fails, for example because the network stopped answering or the picture couldn't be read, it shows **Connection Lost**. Both offer:
 
 - **Reconnect** — tries again with the saved password.
 - **Close** — ends the session and closes the window.
@@ -58,17 +60,17 @@ A desktop's window keeps its own settings on this device. Desktop windows are no
 
 **This Window** also holds this session's own controls, which start over each time the desktop opens: **Match Window Size**, the display shown, **Desktop Resolution** and **Local Scale**. **Remove Wallpaper** and its image also last only for the session.
 
-Some settings are only ever the desktop's, or this device's. The account, password, domain, authentication, certificate, **Desktop size**, **Share clipboard** and **Remote audio** belong to the service: edit it in the library, and the change applies the next time the desktop connects. **Important Session Notices** is for every desktop on this device.
+Some settings are only ever the desktop's, or this device's. The account, password, domain, authentication, certificate, **Desktop size**, **Share clipboard** and **Remote audio** belong to the service: edit it in the library, and the change applies the next time the desktop connects. **Important Session Notices**, in **Settings** > **Desktops**, is for every desktop on this device. It is off unless you turn it on; on, a desktop that fails posts a notification, **Remote Desktop Interrupted**, which names no host, account or server details.
 
 ## Leave a session
 
 - **On Apple Vision Pro, Mac and iPad:** close the desktop's window. The session ends. If its displays are in windows of their own, it ends when the last of them closes; until then **Connect** brings the desktop's window back onto the same connection.
 - **On iPhone:** choose the back chevron.
-- When the remote computer ends the session cleanly after the desktop has appeared, for example because you signed out, the window closes by itself.
+- When the connection closes after the desktop has appeared, because you signed out or because the remote computer or the network closed it, the window closes by itself. Connect again from the library.
 
 You can also see and close every open desktop from the ⚡ **Active** list, where each desktop shows **RDP** or **VNC**, followed by its status when it is not connected. On iPhone, the ⚡ button is in the desktop's toolbar.
 
-When the app moves to the background, or the desktop window loses focus, keys and mouse buttons you were holding are released on the remote computer, so nothing stays pressed.
+When the app moves to the background, the desktop window loses focus, a sheet or **Settings** opens over it, or a Mac goes to sleep, keys and mouse buttons you were holding are released on the remote computer, so nothing stays pressed.
 
 > [!NOTE]
 > **On Apple Vision Pro and Mac:** desktop windows are not restored when you quit and reopen the app. Connect again from the library; each window has its own settings again when you do.

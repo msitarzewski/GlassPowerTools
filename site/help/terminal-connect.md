@@ -15,9 +15,10 @@ A Terminal service belongs to a host in the library. The host holds the machine'
    - **Port**: the SSH port. The default is 22.
    - **Allow Legacy SSH Algorithms**: see [Connect to an old server](#connect-to-an-old-server).
    - **Add Jump Host**: see [Connect through jump hosts](#connect-through-jump-hosts).
-   - **Use App Default Size**: turn it off to set **Columns** and **Rows** for this service's new terminals.
+   - **Keep Sessions Running with tmux**: see [Keep terminals running with tmux](terminal-tmux.md#turn-it-on).
+   - **Use App Default Size**: turn it off to set **Columns** and **Rows** for this service's new terminals. They are used only until the terminal's window is measured, which then sets the size.
    - **Color tag**.
-6. Save the sheet.
+6. Choose **Add**, or **Save** when you are editing the service.
 
 When you change the host's address later, its Terminal services follow it.
 
@@ -25,7 +26,7 @@ When you change the host's address later, its Terminal services follow it.
 
 Choose **Connect** on the host's Terminal service in the library.
 
-- **On Vision Pro:** the terminal opens in a window of its own, named after the machine.
+- **On Vision Pro:** the terminal opens in a window of its own.
 - **On Mac:** the terminal opens in a terminal window. See [Work in a terminal](terminal-sessions.md).
 - **On iPad and iPhone:** the terminal takes over the screen. **Connections** at the top leading edge goes back to the library; the session keeps running.
 
@@ -38,7 +39,7 @@ If the service has no saved password, the **Password Required** sheet appears. I
 1. Type the password.
 2. Choose **Save & Connect**.
 
-The app saves the password in Keychain first, then connects. If the password is wrong, the connection fails with **Connection Failed**. Edit the Terminal service and enter the correct **Password**.
+The password is saved in Keychain on trial, and the app connects with it. If it signs in, it stays saved. If it is wrong, the connection fails with **Connection Failed**, the password you typed is not kept, and whatever was saved before is put back; connect again to be asked again.
 
 ## Connect through jump hosts
 
@@ -46,9 +47,9 @@ A jump host is another saved Terminal connection that the app connects through f
 
 1. Edit the Terminal service and open **Advanced**.
 2. Under the route, choose **Add Jump Host** and pick a saved connection.
-3. Add more hops in the order the connection should take them. **Remove hop 1** (and so on) removes one.
+3. Add more hops in the order the connection should take them. Each is listed as **Hop 1**, **Hop 2** and so on; the minus button beside one removes it.
 
-With no hops, the route shows **Direct connection**. While connecting, the terminal prints each hop as it connects.
+With no hops, the route shows **Direct connection**.
 
 ## Connect to an old server
 
@@ -68,7 +69,7 @@ A Workgroup that includes such a connection does not open, on any device. Open t
 
 The app checks the connection every 60 seconds. After three checks go unanswered, the connection counts as lost.
 
-If **Auto-reconnect on disconnect** is on (it is by default), the terminal tries again up to five times, waiting longer before each try. The terminal shows **Reconnecting...** with the attempt number. To stop, choose the close button beside it, or **Cancel Reconnect** in the session's tools menu.
+If **Auto-reconnect on disconnect** is on (it is by default), the terminal tries again up to five times, waiting longer before each try. **On Vision Pro**, the window shows **Reconnecting...** with the attempt number, for example **(2/5)**, and a close button beside it that stops trying. **On Mac**, the window's subtitle says **Reconnecting…**. On every device, **Cancel Reconnect** in the session's tools menu stops trying.
 
 Auto-reconnect does not run when you disconnect yourself or when the remote shell exits normally, for example after `exit`. To try again by hand, choose **Reconnect** in the session's tools menu.
 
@@ -76,4 +77,4 @@ To change auto-reconnect, open Settings, then **Connections**, and use **Auto-re
 
 ## If a connection fails
 
-**Connection Failed** shows the reason. For an address on your local network, such as a `.local` name or a private address, it also says how to allow Local Network access: in System Settings, open **Privacy & Security** > **Local Network** and allow Glass Power Tools.
+**Connection Failed** shows the reason. When the failure could be Local Network access being turned off, for example a machine that can't be reached on your own network, it also says how to allow it: **on Mac**, in System Settings, open **Privacy & Security** > **Local Network** and allow Glass Power Tools; on other devices, the same is in the Settings app.

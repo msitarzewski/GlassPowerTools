@@ -21,7 +21,7 @@ The list, **Port Forwards**, shows this session's forwards. Each row shows the f
 A new forward starts turned off. Turn on its switch to start it, and turn it off to stop it. The trash button removes it.
 
 > [!NOTE]
-> Forwards belong to the live session. They are not saved, and they end when the session ends.
+> Forwards belong to the live session. They are not saved, and they end when the session ends. When the connection drops or reconnects, every forward is turned off: turn on the ones you want again.
 
 ### Local
 

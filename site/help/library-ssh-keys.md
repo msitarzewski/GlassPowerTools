@@ -14,10 +14,10 @@ Use **Search Keys** to filter the list by name.
 1. Choose **Add Key** (+), then **Import a Key…**. If you have no keys yet, you can also choose **Import a Key…** in the empty list.
 2. In **Add SSH Key**, enter a **Key name**.
 3. Choose **Choose File…** and pick the private key file, or paste the key's contents into the text area. **On Mac:** the file panel opens in your `.ssh` folder and shows hidden files.
-4. The sheet shows what it found, such as the key type and whether a passphrase is required. If it is, enter the **Passphrase**.
+4. The sheet shows what it found, such as the key type and whether a passphrase is required. If it is, the field reads **Passphrase (required for this key)**; enter it there.
 5. Choose **Save**.
 
-RSA and ED25519 private keys are supported. An ECDSA key imported from a file is marked **not supported for authentication**; the P-256 keys that sign in are the ones made in the Secure Enclave. When you choose a file and have not typed a name, the name is filled in from the key's comment or the file name.
+RSA and ED25519 private keys are supported. Any other kind, such as an ECDSA key, is marked **not supported for authentication**, and **Save** refuses it with a message saying so; the P-256 keys that sign in are the ones made in the Secure Enclave. When you choose a file and have not typed a name, the name is filled in from the key's comment or the file name.
 
 ## Generate a key in the Secure Enclave
 
@@ -45,9 +45,9 @@ Each row shows the key's storage and algorithm, such as **Imported ED25519**, an
 To put the key on a server, you need its public half.
 
 - Choose **Copy Public Key** to copy it to the clipboard.
-- Choose **Export…** to save it as a text file. The file name is the key's name ending in `.pub`.
+- Choose **Export…** to save it as a text file, named after the key and ending in `.pub`.
 
-**Copy Public Key** is also in the key's menu: right-click the key, or touch and hold it.
+**Copy Public Key** is also in the key's menu, with **Rename** and **Delete**: right-click the key, or touch and hold it (pinch and hold on Vision Pro).
 
 ## Rename or delete a key
 

@@ -20,7 +20,7 @@ Select the host. Under **Services**, choose **Connect** (play symbol) beside the
 - With a keyboard on any device, select a host and press Return.
 - Right-click a host, or touch and hold it (pinch and hold on Vision Pro), and choose **Connect**.
 
-Each of these opens one service: the one you connected to last on that host, or the first service if you have not chosen one yet. The host's details show which one under **Connect opens**.
+Each of these opens one service: the one you last chose on that host, from its details or the chevron menu, or the first service if you have not chosen one yet. It is remembered when you choose it, even if that attempt doesn't connect. The play half of the split button opens every service and changes nothing here. The host's details show which one under **Connect opens**.
 
 The host's **Last connected** time and its place in **Recent** change only when a session actually connects. A failed or cancelled attempt does not count.
 
@@ -32,10 +32,10 @@ Press ⇧⌘P (or ⌘K), or choose **Glass Power Tools** ▸ **Command Palette�
 - **Open Project:** each editor project, and **Open Folder:** each folder in **Favorites**, opened as **Favorites** opens them.
 - **Open Query:** each saved database query, opened in a new SQL tab. It is not run.
 - **Attach:** each tmux session running on your machines that no window here shows, opened as **Active** opens it.
-- The terminal's commands, whatever window is in front: **New Connection**, **Open Local Terminal**, **Open Basic Local Terminal**, **Workgroups**, **Tailscale Devices** (once Tailscale is set up), **Open Files on alpha** for each machine, **Connect to alpha without tmux** for each machine that keeps its terminals in tmux, and **Open** followed by each Workgroup's name.
+- The terminal's commands, whatever window is in front: **New Connection** (the terminal's own **Add Server** form, for a machine reached over SSH), **Open Local Terminal**, **Open Basic Local Terminal**, **Workgroups**, **Tailscale Devices** (once Tailscale is set up), **Open Files on alpha** for each machine, **Connect to alpha without tmux** for each machine that keeps its terminals in tmux, and **Open** followed by each Workgroup's name.
 - The commands of the window in front, and the menu bar's, with their shortcuts.
 
-A command that needs the library window opens it first when it isn't open.
+A command that needs the library window opens it first when it isn't open. Type `connect:` first to list only the **Connect** entries. Commands you ran recently come first.
 
 ## Connect from a widget
 
@@ -52,7 +52,7 @@ Siri, the Shortcuts app, Spotlight, Control Center, Handoff, `ssh://` links and,
 - **On Vision Pro:** choose the **Active** tab beside the library window.
 - **On Mac, iPad and iPhone:** choose **Active** in the sidebar's **Library** section. The number beside it is how many sessions **Active** lists: those open on this device, and the tmux sessions running on your machines when **Active** last checked.
 
-Sessions are grouped under the host they belong to, with a count for each host. A host whose Terminal service keeps sessions running with tmux also lists the tmux sessions running there, by the names their tabs have, and a host **Active** couldn't check says why; see [Keep terminals running with tmux](terminal-tmux.md). Sessions that belong to no host in the library are grouped under **Elsewhere**. Collapse a host's group with its disclosure arrow. When nothing is open, **Active** says **Nothing Is Open**.
+Sessions are grouped under the host they belong to, with a count for each host. A host whose Terminal service keeps sessions running with tmux also lists the tmux sessions running there, by the names their tabs have, and a host **Active** couldn't check says why; see [Keep terminals running with tmux](terminal-tmux.md). Sessions that belong to no host in the library are grouped under **Elsewhere**. Collapse a host's group with its disclosure arrow. When nothing is open, **Active** says **Nothing Is Open** and lists your machines under **Terminal**, **Database** and **Desktop**; choose one to connect to that service.
 
 ## Switch to a session
 
@@ -74,7 +74,7 @@ Every session has **Active Connections** (⚡) at the right end of its top toolb
 
 To open it:
 
-- **On Mac:** press ⇧⌘\, or choose **Window** ▸ **Show All Windows**, from any window, Connections included. **Show All Windows** is also in each window's toolbar, beside ⚡. On a terminal or remote desktop window, you can pinch in with two fingers; pinch out to close it again.
+- **On Mac:** press ⇧⌘\, or choose **Window** ▸ **Show All Windows**, from any window, Connections included. **Show All Windows** is also in each window's toolbar: beside ⚡ in a session's window, and after **Local Terminal** in Connections. On a terminal or remote desktop window, you can pinch in with two fingers; pinch out to close it again.
 - **On iPad and iPhone:** pull down from an empty part of the bar at the top of the screen (not on a button or a search field), or touch and hold ⚡. It slides down as a pane of glass over what you were doing.
 - **On Vision Pro:** pinch and hold ⚡. It opens as a window of its own, which you can make as large as the work needs; the pictures grow with it.
 - **With Siri or Shortcuts**, on any device: say "Show all windows in Glass Power Tools", or use the **Show All Windows** action.
@@ -98,7 +98,7 @@ A terminal that has not drawn anything yet says **Waiting for terminal preview�
 
 ### On iPhone, iPad and Vision Pro
 
-What is connected appears as cards, with editor windows while they are open, grouped under the machine each is on, and laid out the way the Mac lays them out: every card the same size, as large as fits. Each tab of a terminal window has a card of its own. A card shows its session's picture, taken again every second while the card is on screen, with its name and where it is across the bottom. A terminal's picture is live while the terminal is on screen somewhere (on Vision Pro, in any window); one that isn't, such as a terminal in another set on iPhone, shows the last picture it drew.
+What is connected appears as cards, with editor windows while they are open, grouped under the machine each is on, and laid out the way the Mac lays them out: every card the same size, as large as fits. Each tab of a terminal window has a card of its own. A card shows its session's picture, taken again every second while the card is on screen, with its name and where it is across the bottom. A terminal's picture is live while the terminal is on screen somewhere (on Vision Pro, in any window); one that isn't, such as a terminal in another set on iPhone, shows the last picture it drew. **On iPhone and iPad**, a terminal that waits to connect until you switch to it, such as one in a set that came back after a relaunch, has a card too, saying **Connects when opened**; choosing it goes to that terminal and connects it.
 
 - Choose a card to go to that session. **On iPhone and iPad** the screen you were on is left, and the session comes back; **on Vision Pro** its window comes to you, and **All Windows** closes.
 - The × in a card's corner closes that session, as **Close** in **Active** does. A terminal kept in tmux is detached instead and keeps running.

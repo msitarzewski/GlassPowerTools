@@ -7,7 +7,7 @@ This page covers connecting to a database, finding your way around the workspace
 1. Select the host, for example `alpha`, in the library.
 2. Choose **Connect** on the database's row in **Services**.
 
-The workspace opens in its own window. On Vision Pro it is a window you can place anywhere, and closing it ends the session. On Mac and iPad, closing the last window on a session ends it too.
+The workspace opens in its own window; on Vision Pro you can place it anywhere. Closing the last window on a session ends the session. **Open in New Window**, in the schema browser, gives a session another window.
 
 **On iPhone:** the workspace replaces the library on the same screen. Use **Connections** at the top left to go back to the host, and **Disconnect** in the ⋯ menu to end the session.
 
@@ -40,7 +40,7 @@ A database tab shows the same kind of summary for its tables, with **Set as Acti
 
 ## Commands in the schema browser
 
-Open the context menu on a database for **Open Database in Tab**, **Set as Active Database** (MySQL only), **Open SQL Editor**, **Open in New Window** and **Refresh**.
+Open the context menu on a database for **Open Database in Tab**, **Set as Active Database** (MySQL only), **Open SQL Editor**, **Open in New Window** and **Refresh**. **On iPhone**, and where a second window can't open, it has **Open Database Overview**, **Open Database in Tab**, **Open SQL Editor**, **Show Diagram** and **Refresh Tables**.
 
 Open the context menu on a table for:
 
@@ -54,20 +54,22 @@ Open the context menu on a table for:
 
 ## Review the Mutation Log
 
-Choose **Mutation Log** in the sidebar's toolbar (in the overflow menu where space is short). It lists the row and schema changes made from table tabs, and the destructive operations from the schema browser, with the outcome and the number of rows affected. Row values are never recorded, only which columns identified the row.
+Choose **Mutation Log** in the sidebar's toolbar (in the overflow menu where space is short; **on Vision Pro**, in the ⋯ menu at the top of the schema browser). It lists the row and schema changes made from table tabs, and the destructive operations from the schema browser, with the number of rows affected and the outcome: **Committed**, **Rolled back**, **Server state unknown** or **Not started**. Row values are never recorded, only which columns identified the row. Statements run in a SQL document are not listed. The log keeps the latest 1,000 entries.
 
 Turn on **All Connections** to include every service. **Clear Log…** removes every entry for every connection and changes nothing in any database.
 
 ## When the connection drops
 
-If the server closes the connection, the workspace shows **Disconnected** and keeps your tabs. Choose **Reconnect** to reconnect with the saved password, or **Show Connections** to go back to the host. If Local Network access is off, the message says to allow it in Settings.
+If the server closes the connection, the workspace shows **Disconnected** and keeps your tabs. Choose **Reconnect** to reconnect with the saved password, or **Show Connections** to go back to the host. While it tries, it shows **Reconnecting…**; if it can't, **Couldn't Reconnect**, with the reason, and you can try again. If the session has ended, the window shows **Connection Closed** with **Show Connections**.
+
+When a first connection to an address on your local network fails, the message may say that Glass Power Tools isn't allowed on the local network, and where to allow it. See [Encryption and the SSH tunnel](database-encryption-and-tunnel.md).
 
 ## Keyboard and menus on Mac
 
 - **File ▸ New SQL Document** (⌘N while a database workspace is in front) and **Open SQL Document…** (⇧⌘O).
 - **File ▸ Close Active Tab** (⇧⌘W). ⌘W also closes the active tab rather than the window.
 - **File ▸ New Connections Window** (⇧⌘N).
-- **Command Palette…** (⇧⌘P or ⌘K). Type `connect:` to connect a saved database, or a connected service's name and a period to step into its databases and tables.
+- **Command Palette…** (⇧⌘P or ⌘K). Type `connect:` to connect a saved database, or a connected service's name and a period to step into its databases and tables. In a database window it also lists the window's tabs, its databases and the tables already loaded, and **Open Query:** for each saved query.
 
 ## Database settings
 
@@ -76,7 +78,7 @@ Open **Settings** and choose **Databases**. The same page is **All Databases** i
 - **Result row limit** (1 to 100,000; default 1,000) and **Query history limit** (1 to 10,000; default 500) keep memory use bounded. The row limit caps what a single `SELECT` loads.
 - **Redact literals in query history** replaces quoted strings and numbers before a statement is kept in history. It never changes what is sent to the database.
 - **Notify when a query fails** shows a private notification with no SQL, schema names or server details.
-- **SQL editor text** and **Results grid text** set their text sizes, with line numbers and JSON formatting in the record editor.
+- **SQL editor text** and **Results grid text** set their text sizes, from 10 to 32 pt. **Show line numbers** and **Format JSON automatically while editing** are beside them.
 
 ## Give a database window its own settings
 

@@ -29,7 +29,7 @@ The name checked is always the host's address, for example `db.example.com`, eve
 The two modes that use your own certificate require one before you can save.
 
 1. Choose **Choose Certificate…** and pick the authority's certificate. PEM and DER files are accepted, and a PEM file may contain a chain.
-2. Check the summary shown under the file name. It lists each certificate's SHA-256 fingerprint in the same colon-separated form that `openssl x509 -fingerprint -sha256` prints, so you can compare them character for character, and it says if a certificate has expired.
+2. Check the summary shown under the file name. It says how many certificates the file holds and gives the first one's SHA-256 fingerprint, in the same colon-separated form that `openssl x509 -fingerprint -sha256` prints, so you can compare them character for character. It warns when a certificate is outside its validity window, expired or not yet valid, because the server will then not be accepted.
 3. Choose **Save**.
 
 A file that is not a certificate is rejected when you choose it. To replace a certificate, choose **Choose Different Certificate…**.
@@ -56,7 +56,7 @@ Most database servers accept connections only from their own machine. The tunnel
 
 The forward goes to `127.0.0.1` at that port, as the host's machine sees it.
 
-If the database is on another server that only this machine can reach — a production database behind an app server — enter that server's address in **Database address**, which appears under **Connect**, as this machine sees it (for example `192.0.2.12`). The machine's Terminal service connects on to it for you. Leave it blank for a database on the machine itself.
+If the database is on another server that only this machine can reach — a production database behind an app server — enter that server's address in **Database address**, which appears once the connection goes through this machine's Terminal, as this machine sees it (for example `192.0.2.12`). The machine's Terminal service connects on to it for you. Leave it blank, as its prompt **This machine** says, for a database on the machine itself.
 
 ## Reach a database through another machine
 
@@ -64,7 +64,7 @@ The database above was added to the machine that reaches it. If you'd rather kee
 
 1. Add the database server as its own host, with its private address (for example `192.0.2.12`).
 2. Add the database service to it, and open **Advanced**.
-3. In **Connect**, choose **Through** and the machine that can reach it — the app server. That machine needs a Terminal service.
+3. In **Connect**, choose **Through** and the machine that can reach it — the app server. That machine needs a Terminal service. The sheet then says where the connection goes, for example **Connects to bravo over SSH, then to 192.0.2.12:5432 from there.** If the database's host has no address yet, it asks for its private address under **Machine** first.
 4. Choose **Save**.
 
 When you connect, the app signs in to the app server with its Terminal service's credential and host-key trust, then opens a tunnel from there to the database's address and port. The database server needs no SSH of its own. If that machine, or its Terminal service, is later removed from the library, the database says so and asks you to choose again.
@@ -80,4 +80,4 @@ If the host has no Terminal service, the row says so. You can still save, but co
 While a tunnelled session is open, **Connection Details** shows a **Tunnel** row with the local port in use.
 
 > [!TIP]
-> If a direct connection fails because the server did not answer, the message suggests turning the tunnel on. If a tunnelled connection fails the same way, check that the database is running and listening on the port you entered. Through another machine, also check that the database accepts connections from that machine.
+> If a direct connection fails because the server did not answer, the message suggests turning the tunnel on. For a private network address or a `.local` name, it may instead say that Glass Power Tools may not be allowed on the local network: allow it in **Settings** (**System Settings** on Mac) ▸ **Privacy & Security** ▸ **Local Network**. A name that can't be found says so; check the host's address. If a tunnelled connection fails because the server did not answer, check that the database is running and listening on the port you entered. Through another machine, also check that the database accepts connections from that machine.

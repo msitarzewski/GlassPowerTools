@@ -6,7 +6,7 @@ This page covers the three places the database capability uses Apple's on-device
 
 The assistant needs a device that supports Apple Intelligence, with Apple Intelligence turned on and its model downloaded. When it is not ready, the assistant says why, for example **Enable Apple Intelligence in Settings to use the assistant.** or **The on-device model is still downloading or preparing. Try again later.** Choose **Check Again** after changing it.
 
-Where the model is unavailable, the database works exactly the same without it; only the assistant's buttons are missing.
+Where the model is unavailable, the database works exactly the same without it. **Suggest Fix** doesn't appear, and the sparkles button opens **Model Unavailable**, with the reason and **Check Again**.
 
 ## Ask for a query
 
@@ -14,8 +14,8 @@ Where the model is unavailable, the database works exactly the same without it; 
 2. Choose the sparkles button in the toolbar. The **AI SQL Assistant** opens.
 3. Type what you need in **Describe the query you need...**, for example "orders from the last seven days".
 4. **On Vision Pro, iPad and iPhone:** choose the arrow button beside the field. **On Mac:** choose **Generate SQL**, or press Return.
-5. Review the result under **Generated Query**, with the model's explanation and a badge such as **Read only**, **Changes data** or **Destructive**.
-6. Choose **Insert into Editor** to put it in the table's SQL editor, or **Copy**.
+5. Review the result under **Generated Query**, with the model's explanation and a badge: **Read only**, **Changes data**, **Destructive**, **Session control** or **Review required**.
+6. Choose **Insert into Editor** to put it in the table's SQL editor in place of what was there, or **Copy**.
 
 The badge comes from the app's own classifier, not from the model. Inserting a query never runs it. When you run it, anything other than a read asks for confirmation as usual.
 
@@ -26,7 +26,7 @@ The badge comes from the app's own classifier, not from the model. Inserting a q
 1. Run a query that fails.
 2. On the error card, choose **Suggest Fix**.
 3. Read **Potential Fix**: the problem, a corrected query and, under **Why this may work**, the model's reasoning.
-4. Choose **Use in Editor** or **Copy Suggested SQL**.
+4. Choose **Use in Editor**, which puts the corrected query in the editor in place of what was there, or **Copy Suggested SQL**.
 
 If the suggestion would change data, the card says it will still require confirmation.
 
@@ -41,4 +41,4 @@ When you pause typing in a SQL document, the model may give its tab a short titl
 
 ## Treatment of names and messages
 
-Table names, column names, queries and error messages are passed to the model as data inside marked regions, with an instruction never to follow commands found in them. This limits, but cannot rule out, a crafted name or message steering the answer. The app's safety classification and confirmations apply whatever the model says.
+Table names, column names, queries and error messages are passed to the model as data, inside marked regions for a query or a fix, with an instruction never to follow commands found in them. This limits, but cannot rule out, a crafted name or message steering the answer. The app's safety classification and confirmations apply whatever the model says.

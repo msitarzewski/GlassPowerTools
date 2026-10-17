@@ -23,7 +23,7 @@ If a field is missing or invalid, a red message appears under it and the sheet s
 
 1. Select the host.
 2. Under **Services**, choose **Add a service…**.
-3. The sheet is titled, for example, **Add Database to alpha**. Choose a different tab if you want another kind.
+3. The sheet opens on the first kind of service it can add, and is titled after it, for example **Add Terminal to alpha**. Choose a different tab if you want another kind.
 4. Fill in the fields and choose **Add**.
 
 If the host has no address yet, the sheet asks for one. The address is saved on the host and shared by all its services.
@@ -46,7 +46,7 @@ Services are not changed from this sheet. Use the buttons beside each service in
 
 1. Select the host.
 2. Right-click the service, or touch and hold it (pinch and hold on Vision Pro).
-3. Choose **Remove Service**.
+3. Choose **Remove Service**. It takes effect at once, without asking first.
 
 The service's saved settings and saved password are deleted. Built-in services on this device cannot be removed.
 
@@ -56,6 +56,6 @@ The service's saved settings and saved password are deleted. Built-in services o
 2. Confirm with **Delete**.
 
 > [!WARNING]
-> Deleting a host also deletes the saved settings and saved passwords of all its services, on every device that shares your library. It cannot be undone. Keys in **SSH Keys** are not deleted.
+> Deleting a host also deletes the saved settings and saved passwords of all its services, on every device that shares your library. It cannot be undone. Keys in **SSH Keys** are not deleted. A device that still has the host when the deletion reaches it can bring the host back; see [When two devices disagree](library-sync.md#when-two-devices-disagree).
 
 The host for this device cannot be deleted.

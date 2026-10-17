@@ -8,7 +8,7 @@ Choose **SQL Editor** in the workspace's toolbar or in the overview. Each SQL do
 
 **On Mac:** **File ▸ New SQL Document** is ⌘N while a database workspace is in front.
 
-As you type, the editor suggests keywords, functions and the names of tables and columns in the active database. Press Tab to accept the dimmed suggestion.
+As you type, a row of suggestions under the editor offers keywords, functions and the names of tables and columns in the active database; choose one to insert it. **On Mac:** a dimmed completion is also shown at the cursor; press Tab to accept it.
 
 Unsaved SQL is kept as a draft and comes back the next time you open a workspace on the same service.
 
@@ -29,6 +29,8 @@ The run button runs the statement at the cursor, or the selection when there is 
 A statement that changes data, is destructive or cannot be classified opens **Review SQL Before Executing**, which names the kind of SQL in the script. Choose **Execute** to run it or **Cancel**. When several statements run, the first error stops the rest.
 
 A single `SELECT` returns up to 1,000 rows. To change that, set **Result row limit** (1 to 100,000) in Settings ▸ **Databases**, or, on Mac, iPad and Vision Pro, for one window under **Settings** (gear) ▸ **This Window** in its toolbar; see [Database settings](database-workspace.md#database-settings). When there are more rows than the limit, the bar under the results says so, for example **more available — loaded result limited to 1000**. Other statements are sent as written.
+
+**Clear** empties the editor and its results. **New Query Tab** and **Close Query Tab** open and close SQL documents. **On Mac, iPad and Vision Pro:** after a query succeeds, **Detach Results** opens its result in a window of its own, with **Copy All** (⌘C) and **Export**.
 
 ## Explain a query
 
@@ -54,14 +56,18 @@ The first failure also offers **Enable Notifications**. Query-failure notificati
 
 Choose **Queries ▸ Query History**. The list shows this service's statements, newest first, with the time, database, duration, row counts and a **Failed** mark. Search by SQL, database or error. The **Filter** menu picks **All**, **Succeeded** or **Failed**, and **Clear This Connection** removes this service's history. Swipe a row to **Delete** it. Selecting an entry puts its SQL in the editor.
 
-History keeps the latest 500 statements and survives relaunch.
+History keeps the latest 500 statements, from all your database services together, and survives relaunch. To keep more or fewer, set **Query history limit** in Settings ▸ **Databases**.
 
 > [!NOTE]
-> Before a statement is stored in history, quoted strings are replaced with `'?'` and numbers with `?`. `WHERE email = 'ann@example.com'` is stored as `WHERE email = '?'`. The SQL sent to the database is never changed. The error text a server returned is stored as it was received.
+> With **Redact literals in query history** on, as it is unless you turn it off in Settings ▸ **Databases**, quoted strings are replaced with `'?'` and numbers with `?` before a statement is stored in history. `WHERE email = 'ann@example.com'` is stored as `WHERE email = '?'`. The SQL sent to the database is never changed. The error text a server returned is stored as it was received.
 
 ## Saved queries
 
 1. Choose **Queries ▸ Save Current Query**.
 2. Enter a **Name** and choose **Save**.
 
-Choose **Queries ▸ Saved Queries** to find one by name or SQL and put it in the editor. Saved queries remain available after the app restarts. Swipe to **Delete** one.
+The name starts as the query's first line. A saved query belongs to the database service it was saved on.
+
+Choose **Queries ▸ Saved Queries** to find one by name or SQL and put it in the editor. The list shows this service's saved queries, most recently used first, with how many times each was used. Saved queries remain available after the app restarts. Swipe to **Delete** one.
+
+A saved query also opens from Siri and Shortcuts, and on Mac from the Command Palette as **Open Query:** followed by its name. It opens in a new SQL tab, connecting first if needed, and is never run. See [Siri, Shortcuts and the rest of the system](library-siri-and-system.md).

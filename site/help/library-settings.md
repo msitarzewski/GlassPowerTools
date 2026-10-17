@@ -4,7 +4,7 @@ Settings for the whole app are in one place. This page covers opening Settings, 
 
 ## Open Settings
 
-- **On Vision Pro:** choose **Settings** (gear) in the bar below the library window. Settings opens in its own window, with its pages as tabs beside it.
+- **On Vision Pro:** choose **Settings** (gear) in the bar below the library window. Settings opens in its own window, with its pages as tabs beside it, on the page you last used.
 - **On Mac:** choose **Glass Power Tools** ▸ **Settings…** (⌘,). The pages are icons across the top of the window, and Settings reopens on the page you last used.
 - **On iPad:** choose **Settings** (gear) in the library's toolbar. Choose a page from the control at the top, and choose **Done** when you finish.
 - **On iPhone:** choose **Settings** (gear) in the library's toolbar, then choose a page from the list. Every page has **Done**.
@@ -45,7 +45,7 @@ Each follows **Appearance** until you change it there, and only that window chan
 
 ## General
 
-Under **Library**, **Show service availability** (off by default) puts a dot beside each service in the library: green when it answers, orange when it answers slowly, red when it does not. While the library is on screen, this device opens a connection to each service's port about once a minute and closes it at once; it never signs in. A Screen Sharing (VNC) service is checked every ten minutes instead, because each connection makes a Mac start its screen sharing for a while. A service you're connected to isn't checked: it always shows a green dot, with this setting on or off, and is checked again on its usual schedule after you disconnect. A database reached through its machine's SSH connection, and this Mac's own terminal, have no dot.
+Under **Library**, **Show service availability** (off by default) puts a dot beside each service in a host's details, and on each kind of service in the host's row, for the least responsive service of that kind: green when it answers, orange when it answers slowly, red when it does not. While the library is on screen, this device opens a connection to each service's port about once a minute and closes it at once; it never signs in. A Screen Sharing (VNC) service is checked every ten minutes instead, because each connection makes a Mac start its screen sharing for a while. A service you're connected to isn't checked: it always shows a green dot, with this setting on or off, and is checked again on its usual schedule after you disconnect. A SQLite file, a database reached through its machine's SSH connection, and this Mac's own terminal have no dot.
 
 **On Vision Pro:** **Shrink Connections when idle** sets how long the library window waits, with no tap, scroll or typing in it, before it shrinks into a small orb while other windows are open: **Never**, **1 Minute**, **2 Minutes** (the starting setting), **5 Minutes** or **10 Minutes**. Tap the orb to bring the window back. See [Bring the library back on Vision Pro](library-connect.md#bring-the-library-back-on-vision-pro).
 
@@ -62,5 +62,7 @@ Under **Library**, **Show service availability** (off by default) puts a dot bes
 ## About
 
 **About** shows the app's version, a **Sponsor** link and **Acknowledgements**.
+
+**On Mac**, a build that updates itself also has **Check for updates automatically**, **Check Now** and when it last checked, and the app menu has **Check for Updates…**. Any other build says **This build does not update itself.**
 
 Choose **Acknowledgements** to see every third-party component in the app, grouped by what it is used for. Search by name or licence, and choose a component to read its licence text and see where its source is published. Choose **Done** to close the list.

@@ -6,11 +6,11 @@ The library is the window that lists every machine you use, called a host, and t
 
 **On Vision Pro:** A tab bar beside the library window holds **All**, **Favorites**, **Recent** and **Collections**, followed by a tab for each panel, such as **Active** and **SSH Keys**. The window shows the list of hosts on the left and the selected host's details on the right. **Search connections** above the list filters it, and the sidebar button at the top left of the details hides and shows the list (⌃⌘S with a keyboard). **Add Host**, **Settings** and **Active Connections** (⚡) sit in a bar below the window. Left alone while other windows are open, the library shrinks into a small orb; tap the orb to bring it back. See [Bring the library back on Vision Pro](library-connect.md#bring-the-library-back-on-vision-pro).
 
-**On Mac:** The library window is titled **Connections**. Its sidebar has a **Library** section with **All Connections**, **Favorites**, **Recent** and **Active**, each with a count. Below it are **Collections** (once any host belongs to one), **Keys** with **SSH Keys**, and sections such as **Workgroups**. The middle column lists hosts and the right column shows the selected host. **Add Host** (+) is in the toolbar above the host list, and ⚡ is at the top right.
+**On Mac:** The library window is titled **Connections**. Its sidebar has a **Library** section with **All Connections**, **Favorites**, **Recent** and **Active**, each with a count. Below it are **Collections** (once any host belongs to one), **Keys** with **SSH Keys**, and sections such as **Workgroups**. The middle column lists hosts and the right column shows the selected host. **Add Host** (+) is in the toolbar above the host list. The toolbar also has ⚡, **Local Terminal**, **Show All Windows**, **Import RDP File…** and, once Tailscale is set up, **Tailscale**. **File** ▸ **New Connections Window** (⇧⌘N) opens another library window.
 
-**On iPad:** At full width the library has the same three columns as on Mac. The toolbar holds ⚡, **Add Host** (+) and **Settings** (gear). In a narrow window it works as it does on iPhone.
+**On iPad:** At full width the library has the same three columns as on Mac. The toolbar holds ⚡, **Add Host** (+), **Settings** (gear), **Import RDP File…** and, once Tailscale is set up, **Tailscale**. In a narrow window it works as it does on iPhone.
 
-**On iPhone:** The library opens on the list of categories. Tap a category to see its hosts, then tap a host to see its details. ⚡, **Add Host** and **Settings** are in the toolbar.
+**On iPhone:** The library opens on the list of categories. Tap a category to see its hosts, then tap a host to see its details. ⚡, **Add Host** and **Settings** are in the toolbar, with **Import RDP File…** and, once Tailscale is set up, **Tailscale**.
 
 ## Search the library
 
@@ -23,17 +23,17 @@ The list shows hosts whose name, other names (**Also known as**), collection nam
 
 Select a host to see two sections.
 
-**Services** lists each service on the host with its kind: **Terminal**, **Database** or **Desktop**. Each row has a **Connect** button (play symbol) and an **Edit** button (pencil). When the row is too narrow, extra actions move into a **More** menu. Rows for tools that a service provides appear under the services with an **Open** button: **Files** for a Terminal service, and **Basic Terminal**, a shell outside tmux, for one that keeps its terminals in tmux (see [Open a terminal without tmux](terminal-tmux.md#open-a-terminal-without-tmux)). **Add a service…** is at the end of the section.
+**Services** lists each service on the host with its kind: **Terminal**, **Database** or **Desktop**. Each row has a **Connect** button (play symbol) and an **Edit** button (pencil). Rows for tools that a service provides appear under the services with an **Open** button: **Files** for a Terminal service, and **Basic Terminal**, a shell outside tmux, for one that keeps its terminals in tmux (see [Open a terminal without tmux](terminal-tmux.md#open-a-terminal-without-tmux)). **Add a service…** is at the end of the section.
 
 > [!NOTE]
 > A service marked **Not set up** in orange has no saved settings behind it. Connecting cannot work. Right-click it, or touch and hold it, choose **Remove Service**, then add it again.
 
 **Host** shows:
 
-- **Address**: the hostname or IP address. If the records that make up the host disagree, every address is listed and you are asked to edit the host to settle it.
+- **Address**: the hostname or IP address, or **Not set** for a host that has none yet. If the records that make up the host disagree, every address is listed and you are asked to edit the host to settle it.
 - **Also known as** and **Collections**, when set.
 - **Last connected**: how long ago a session on this host last connected, or **Never**.
-- **Connect opens**: the service that opens when you connect the host without choosing one.
+- **Connect opens**: the service that opens when you connect the host without choosing one. It appears once you have chosen one of the host's services to connect to.
 - **Add Favorite** or **Remove Favorite**.
 
 **Edit** at the bottom of the details opens the host's settings.
@@ -51,7 +51,7 @@ The first host in the list is the device you are using: **This Mac**, **This iPa
 
 ## The library at a glance
 
-With no host selected, the library's detail shows an overview: how many machines, services, favorites and collections you have, the services of each kind, the connections this device made in the last 30 days, and the machines it used most. Choose one of those machines to select it.
+With no host selected, the library's detail shows an overview, **Your Library**: how many machines, services, favorites and collections you have, the services of each kind, the connections this device made in the last 30 days, and the machines it used most. Choose one of those machines to select it.
 
 The connection history is kept on this device only. It records when you connected and to which kind of service on which machine, and nothing else. It never syncs, and it keeps 90 days.
 
