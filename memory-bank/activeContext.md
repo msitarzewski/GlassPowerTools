@@ -52,8 +52,13 @@ Evidence and the scene probe: `tasks/2026-10/2026-10-16_additive-sidebars.md` (2
   AppKit shows it again), still draggable. The database and desktop windows keep theirs — not asked; offer.
 
 **Suites:** connection UI 51, terminal 874, shell 307; tmux unchanged; screen unlocked.
-**Installs:** 0.4.470 (the hold reverted) on the Mac (read 0.4.470; no new crash reports) and iPhone; the headset
-asleep (4016) since this morning, `install-devices-when-awake.zsh 470` waits for it — check its version.
+- **Open: a 6 pt see-through strip** between sidebar and terminal as the sidebar opens — "it's what causes the shift"
+  (his screenshot). Likely the column ends ~6 pt wider than the terminal held in it; the probe can't reproduce it.
+  0.4.471 logs each move (`com.glasspowertools`/`sidebar`): read his toggles before changing anything. Task note,
+  last section.
+
+**Installs:** 0.4.471 on the Mac (read 0.4.471; no new crash reports) and iPhone; the headset asleep (4016) since
+this morning, `install-devices-when-awake.zsh 471` waits for it — check its version.
 **His to try:** the sidebar's edge without a line; everything listed below for 0.4.467.
 **Open offer:** the same no-line edge for the database and desktop windows.
 

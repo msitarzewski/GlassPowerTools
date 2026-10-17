@@ -207,3 +207,19 @@ sidebar, as on 0.4.467): "It moves anyway... let's close the space. Is this an A
 at this point?" Reverted 46cf403 (1534ece: `MacWorkspaceToolbarHold`, the view's hold, `toolbarStays`). Answered:
 the toolbar is AppKit's arrangement again; the window growing by the sidebar (D77) and the edge without a line are
 ours. Terminal suite 873. 0.4.470.
+
+## 2026-10-17: a see-through strip at the sidebar's edge as it opens ("it's what causes the shift")
+
+On 0.4.470, a screenshot with an arrow: "This line at the sidebar's edge? What's that from? It happens when I click the
+sidebar toggle... it's what causes the shift." Measured on it: a 6 pt (12 px) band from the sidebar's edge to where
+the terminal's background begins, showing whatever is behind the window (dark mid-window, the wallpaper's brightness
+near the bottom), below the toolbar only. Not the divider just removed (½ pt).
+
+Reading: the view holds the terminal at its width, right-aligned, while the window follows the sidebar
+(`holdTerminalWidth`, 0.4 s); a column wider than the held terminal shows the window behind at its leading edge, and
+when the hold lets go the terminal widens into it and reflows — the shift. So in his window the column ends up ~6 pt
+wider with the sidebar open than the terminal was. The scene probe, given the same hold and the real follower, kept
+the gap at 0 through open, close and reopen at 240 and at 269 pt: the 6 pt comes from something in his window.
+Logged now (9500e21, `com.glasspowertools` / `sidebar`): `sidebar-follow`, `sidebar-not-followed`, `sidebar-settled`,
+`terminal-width-released` (held vs column). 0.4.471; his toggles to read:
+`/usr/bin/log show --last 15m --predicate 'subsystem == "com.glasspowertools" AND category == "sidebar"'`.
