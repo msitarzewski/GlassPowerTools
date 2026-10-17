@@ -12,6 +12,23 @@ public final class GlassTitlebarMaterialView: NSVisualEffectView {
     private var resizeObservation: NSObjectProtocol?
     /// Changes to the sidebar under way, announced and not yet made.
     private var sidebarChanges = 0
+    private weak var splitView: NSSplitView?
+    /// The hairline down the sidebar's edge (`installSidebarSeparator`).
+    weak var separator: NSView? {
+        didSet { separator?.isHidden = !showsSidebarEdge }
+    }
+
+    /// Whether a line marks the sidebar's edge: AppKit's split-view divider, and the hairline this
+    /// window's chrome adds. Off, the sidebar meets the content with no line between (the owner,
+    /// 2026-10-17, of the terminal window's: "What is that gray line … That's what we need to
+    /// eliminate").
+    public var showsSidebarEdge = true {
+        didSet {
+            guard oldValue != showsSidebarEdge else { return }
+            separator?.isHidden = !showsSidebarEdge
+            updateSidebarEdge(restoring: showsSidebarEdge)
+        }
+    }
 
     isolated deinit {
         if let resizeObservation { NotificationCenter.default.removeObserver(resizeObservation) }
@@ -40,6 +57,7 @@ public final class GlassTitlebarMaterialView: NSVisualEffectView {
             if let resizeObservation { NotificationCenter.default.removeObserver(resizeObservation) }
             resizeObservation = nil
             sidebarItem = discoveredSidebar
+            splitView = discoveredSplit
             // Opening, AppKit lays the sidebar out at its full width, and the window is drawn,
             // before it moves the sidebar out of sight to slide it in and says it has opened. Read
             // then, the edge stood at the sidebar's full width over nothing, and the window showed
@@ -66,6 +84,23 @@ public final class GlassTitlebarMaterialView: NSVisualEffectView {
             }
         }
         updateLeadingBoundary()
+        updateSidebarEdge()
+    }
+
+    /// AppKit's divider, made transparent: a view the split view adds beside its panes, no wider
+    /// than its divider (`NSSplitDividerView`, macOS 27.2), which draws the line. Not hidden: AppKit
+    /// shows a hidden one again as the sidebar reopens, and leaves its transparency alone
+    /// (measured in a window scene). Dragging the edge still sizes the sidebar: the split view
+    /// itself takes that drag. Again with each new split view (`followSidebarBoundary`).
+    private func updateSidebarEdge(restoring: Bool = false) {
+        guard !showsSidebarEdge || restoring, let splitView else { return }
+        let panes = splitView.arrangedSubviews
+        for view in splitView.subviews where !panes.contains(view) {
+            let across = splitView.isVertical ? view.frame.width : view.frame.height
+            guard across <= splitView.dividerThickness + 0.5 else { continue }
+            let alpha: CGFloat = showsSidebarEdge ? 1 : 0
+            if view.alphaValue != alpha { view.alphaValue = alpha }
+        }
     }
 
     private func updateLeadingBoundary() {
@@ -135,7 +170,7 @@ public enum GlassWindowChrome {
     /// AppKit's own split divider paints nothing and the desktop shows through the seam
     /// (observed on a connected session, 2026-09-11). This line is opaque and full height, and it
     /// follows the same boundary the titlebar material does.
-    private static func installSidebarSeparator(in frame: NSView, alignedTo material: NSView) {
+    private static func installSidebarSeparator(in frame: NSView, alignedTo material: GlassTitlebarMaterialView) {
         let existing = frame.subviews.first { $0.identifier == sidebarSeparatorIdentifier }
         existing?.removeFromSuperview()
         let separator = NSView(frame: .zero)
@@ -145,6 +180,7 @@ public enum GlassWindowChrome {
         separator.translatesAutoresizingMaskIntoConstraints = false
         separator.setAccessibilityElement(false)
         frame.addSubview(separator, positioned: .above, relativeTo: material)
+        material.separator = separator
         NSLayoutConstraint.activate([
             separator.leadingAnchor.constraint(equalTo: material.leadingAnchor),
             separator.widthAnchor.constraint(equalToConstant: 1),

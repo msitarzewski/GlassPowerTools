@@ -342,6 +342,9 @@ enum MacTerminalWindowPolicy {
         // did the same swap, which is why it is "again". Rule 50: chrome that says where you are
         // does not become see-through because a mode changed.
         GlassWindowLayerPolicy.apply(window, state: layers)
+        // The sidebar meets the terminal with no line between (the owner, 2026-10-17: "What is
+        // that gray line … That's what we need to eliminate").
+        GlassWindowLayerPolicy.titlebarMaterial(in: window)?.showsSidebarEdge = false
         // Leave toolbar layout and dragging to SwiftUI/AppKit.
         // The added titlebar material is passive.
         // SwiftUI's navigation sidebar owns terminal tabs inside this

@@ -93,6 +93,58 @@ struct WindowChromeTests {
         #expect(material.leadingInset == 0, "closed again: \(material.leadingInset)")
     }
 
+    /// A window that draws no line at its sidebar's edge (the terminal window's; the owner,
+    /// 2026-10-17: "What is that gray line … That's what we need to eliminate"): AppKit's divider
+    /// draws nothing and the chrome's hairline is hidden, after the sidebar reopens too. The edge
+    /// still takes a drag, where the split view takes it.
+    @Test func sidebarEdgeDrawsNoLine() throws {
+        _ = NSApplication.shared
+        let sidebar = NSSplitViewItem(sidebarWithViewController: Self.controller(width: 240))
+        let split = NSSplitViewController()
+        split.addSplitViewItem(sidebar)
+        split.addSplitViewItem(NSSplitViewItem(viewController: Self.controller(width: 700)))
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 940, height: 500),
+            styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentViewController = split
+        window.setContentSize(NSSize(width: 940, height: 500))
+        window.alphaValue = 0
+        window.orderFrontRegardless()
+        defer { window.close() }
+        GlassWindowChrome.installTitlebarMaterial(in: window)
+        let root = try #require(window.contentView?.superview)
+        let material = try #require(root.subviews.compactMap { $0 as? GlassTitlebarMaterialView }.first)
+        let hairline = try #require(material.separator)
+        let splitView = split.splitView
+        /// What the split view adds beside its panes, no wider than its divider: the divider.
+        func dividers() -> [NSView] {
+            splitView.subviews.filter {
+                !splitView.arrangedSubviews.contains($0) && $0.frame.width <= splitView.dividerThickness + 0.5
+            }
+        }
+        root.layoutSubtreeIfNeeded()
+        #expect(!dividers().isEmpty, "AppKit's divider is there to hide")
+        #expect(!hairline.isHidden && dividers().allSatisfy { $0.alphaValue == 1 }, "drawn by default, as other windows keep it")
+
+        material.showsSidebarEdge = false
+        #expect(hairline.isHidden)
+        #expect(dividers().allSatisfy { $0.alphaValue == 0 }, "\(dividers().map(\.alphaValue))")
+
+        for collapsed in [true, false] {
+            NSAnimationContext.runAnimationGroup({ $0.duration = 0; sidebar.isCollapsed = collapsed }, completionHandler: nil)
+            root.layoutSubtreeIfNeeded()
+        }
+        #expect(!sidebar.isCollapsed)
+        #expect(!dividers().isEmpty)
+        #expect(dividers().allSatisfy { $0.alphaValue == 0 }, "still nothing after it reopens: \(dividers().map(\.alphaValue))")
+        #expect(hairline.isHidden)
+        let edge = sidebar.viewController.view.convert(sidebar.viewController.view.bounds, to: root).maxX
+        #expect(root.hitTest(NSPoint(x: edge - 0.25, y: root.bounds.midY)) === splitView, "the divider still takes a drag")
+
+        material.showsSidebarEdge = true
+        #expect(!hairline.isHidden && dividers().allSatisfy { $0.alphaValue == 1 }, "and back")
+    }
+
     /// The material's edge at each layout of the split view while the sidebar opens, until it is
     /// said to have opened.
     @MainActor
