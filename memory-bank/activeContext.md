@@ -57,8 +57,7 @@ Evidence and the scene probe: `tasks/2026-10/2026-10-16_additive-sidebars.md` (2
   0.4.471 logs each move (`com.glasspowertools`/`sidebar`): read his toggles before changing anything. Task note,
   last section.
 
-**Installs:** 0.4.471 on the Mac (read 0.4.471; no new crash reports) and iPhone; the headset asleep (4016) since
-this morning, `install-devices-when-awake.zsh 471` waits for it — check its version.
+**Installs:** 0.4.471 on all three (Mac read 0.4.471, no new crash reports; iPhone; headset at 12:01 once awake).
 **His to try:** the sidebar's edge without a line; everything listed below for 0.4.467.
 **Open offer:** the same no-line edge for the database and desktop windows.
 
