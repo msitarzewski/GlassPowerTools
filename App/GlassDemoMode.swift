@@ -68,6 +68,10 @@ enum GlassDemoMode {
         switch surface {
         case "editor", "preview":
             await openEditor(editor, preview: surface == "preview")
+        case "editor-model":
+            // A 3D model in the editor's viewer (D78): RealityKit on the Mac, iPhone and iPad, and
+            // Apple's Quick Look volume as it opens on Vision Pro. Written here, as the project is.
+            await openEditor(editor, preview: false, model: true)
         case "editor-window", "editor-settings":
             // A window with settings of its own (W23), and This Window open over it.
             await openEditor(editor, preview: false, windowSettings: GlassEditorRuntime.demoWindowSettings,
@@ -267,7 +271,7 @@ enum GlassDemoMode {
     /// Settings ▸ This Window opens over it.
     private static func openEditor(_ editor: GlassEditorRuntime, preview: Bool,
                                    windowSettings: GlassWindowOverrides = GlassWindowOverrides(),
-                                   opensSettings: Bool = false) async {
+                                   opensSettings: Bool = false, model: Bool = false) async {
         let root = URL.documentsDirectory.appending(path: "shop", directoryHint: .isDirectory)
         do {
             for (path, text) in projectFiles {
@@ -286,9 +290,77 @@ enum GlassDemoMode {
             : ["compose.yaml", "README.md", "Sources/Checkout/ShippingAddress.swift"]
         var last: GlassEditorDocument?
         for path in order { last = await workspace.open(root.appending(path: path)) }
+        if model {
+            let scene = root.appending(path: "Scene.usda")
+            try? Data(demoModel.utf8).write(to: scene)
+            _ = await workspace.open(scene)
+            // A USDZ put beside the project by hand (`simctl get_app_container`) opens too, last.
+            let others = (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
+            for file in others where file.pathExtension.lowercased() == "usdz" { _ = await workspace.open(file) }
+        }
         if preview, let last { workspace.previewModes[last.id] = .beside }
         editor.present(window)
     }
+
+    /// A blue box and an orange ball, in USD's text form, for `editor-model`.
+    private static let demoModel = """
+    #usda 1.0
+    (
+        defaultPrim = "Scene"
+        metersPerUnit = 1
+        upAxis = "Y"
+    )
+
+    def Xform "Scene"
+    {
+        def Cube "Box" (
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double size = 0.2
+            double3 xformOp:translate = (-0.15, 0.1, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+            rel material:binding = </Scene/Materials/Blue>
+        }
+
+        def Sphere "Ball" (
+            prepend apiSchemas = ["MaterialBindingAPI"]
+        )
+        {
+            double radius = 0.1
+            double3 xformOp:translate = (0.15, 0.1, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+            rel material:binding = </Scene/Materials/Orange>
+        }
+
+        def Scope "Materials"
+        {
+            def Material "Blue"
+            {
+                token outputs:surface.connect = </Scene/Materials/Blue/Surface.outputs:surface>
+                def Shader "Surface"
+                {
+                    uniform token info:id = "UsdPreviewSurface"
+                    color3f inputs:diffuseColor = (0.15, 0.4, 0.95)
+                    float inputs:roughness = 0.35
+                    token outputs:surface
+                }
+            }
+
+            def Material "Orange"
+            {
+                token outputs:surface.connect = </Scene/Materials/Orange/Surface.outputs:surface>
+                def Shader "Surface"
+                {
+                    uniform token info:id = "UsdPreviewSurface"
+                    color3f inputs:diffuseColor = (0.95, 0.5, 0.1)
+                    float inputs:roughness = 0.25
+                    token outputs:surface
+                }
+            }
+        }
+    }
+    """
 
     private static let projectFiles: [(String, String)] = [
         ("README.md", """

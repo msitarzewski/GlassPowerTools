@@ -20,11 +20,13 @@ enum TerminalDroppedPaths {
     /// terminal window"); so is an image dragged as bare data. The path is typed into the shell and
     /// read later — by an agent, often — so the file stays. Each drop has a folder of its own, and
     /// folders older than a week are cleared the next time something is dropped.
-    static func inbox(caches: URL? = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first,
+    /// `name`: another folder kept the same way — a 3D model a link downloaded (D78).
+    static func inbox(named name: String = inboxName,
+                      caches: URL? = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first,
                       now: Date = Date(), fileManager: FileManager = .default) throws -> URL {
         guard let caches else { throw CocoaError(.fileNoSuchFile) }
         let inbox = caches.appendingPathComponent("com.glasspowertools", isDirectory: true)
-            .appendingPathComponent(inboxName, isDirectory: true)
+            .appendingPathComponent(name, isDirectory: true)
         try fileManager.createDirectory(at: inbox, withIntermediateDirectories: true)
         let cutoff = now.addingTimeInterval(-7 * 24 * 60 * 60)
         let folders = (try? fileManager.contentsOfDirectory(at: inbox, includingPropertiesForKeys: [.creationDateKey])) ?? []

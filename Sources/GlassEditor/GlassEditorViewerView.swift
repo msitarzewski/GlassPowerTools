@@ -5,8 +5,9 @@
 //  What a viewer document shows. The Mac uses Quick Look's embeddable preview, which covers
 //  images, PDF, video and audio with the system's own zoom, paging and transport in one control.
 //  iPhone, iPad and Vision Pro offer Quick Look only as a full-screen presenter, which does not
-//  sit in a tab, so they get a native viewer per kind. Anything else is "not text", with its size
-//  and a way to open it as text anyway.
+//  sit in a tab, so they get a native viewer per kind. A 3D model is RealityKit's on every one
+//  (`GlassModelView`, D78). Anything else is "not text", with its size and a way to open it as
+//  text anyway.
 //
 
 import SwiftUI
@@ -27,6 +28,9 @@ struct GlassEditorViewerView: View {
             switch viewer.kind {
             case .binary, .text:
                 notText
+            case .model3D:
+                GlassModelView(url: viewer.fileURL, openAsText: openAsText, opensQuickLook: true)
+                    .id(viewer.fileURL)
             case .image, .pdf, .video, .audio:
                 #if os(macOS)
                 GlassQuickLookView(url: viewer.fileURL)
@@ -72,6 +76,7 @@ extension GlassEditorFileKind {
         case .pdf: "doc.richtext"
         case .video: "film"
         case .audio: "waveform"
+        case .model3D: "cube"
         case .binary: "doc.questionmark"
         case .text: "doc.text"
         }

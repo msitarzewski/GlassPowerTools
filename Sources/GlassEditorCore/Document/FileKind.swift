@@ -9,12 +9,18 @@
 //  showing the picture (*"when I click a png I get the image, not the binary?"*). This answers the
 //  question first: by the name, then by the bytes, and the bytes win.
 //
+//  3D models (D78, the owner, 2026-10-16: "we need 3D model support!") are what Apple's frameworks
+//  open: USDZ, USD in its binary and text forms, and Reality files. A USDZ is a zip whose first
+//  entry is stored, not compressed, and is a USD layer (Pixar's USDZ specification), which tells
+//  it from any other zip; a binary USD layer opens with `PXR-USDC`; a text one with `#usda`. A
+//  Reality file has no published signature, so its name decides.
+//
 
 import Foundation
 import UniformTypeIdentifiers
 
 public enum GlassEditorFileKind: String, Sendable, Equatable, CaseIterable {
-    case text, image, pdf, video, audio, binary
+    case text, image, pdf, video, audio, model3D, binary
 
     /// Whether the editor's text engine is the right surface.
     public var isText: Bool { self == .text }
@@ -68,7 +74,21 @@ public enum GlassEditorFileKind: String, Sendable, Equatable, CaseIterable {
             }
         }
         if starts([0x1A, 0x45, 0xDF, 0xA3]) { return .video }                                 // Matroska/WebM
+        if starts(Array("PXR-USDC".utf8)) || starts(Array("#usda ".utf8)) { return .model3D }  // USD
+        if isUSDZ(data) { return .model3D }
         return nil
+    }
+
+    /// A zip's first entry, stored and named as a USD layer: a USDZ. Its local header gives the
+    /// method at 8 and the name's length at 26, and the name follows at 30.
+    static func isUSDZ(_ data: Data) -> Bool {
+        let b = [UInt8](data.prefix(30 + 1024))
+        guard b.count >= 30, b[0] == 0x50, b[1] == 0x4B, b[2] == 0x03, b[3] == 0x04,
+              b[8] == 0, b[9] == 0 else { return false }
+        let nameLength = Int(b[26]) | Int(b[27]) << 8
+        guard nameLength > 0, b.count >= 30 + nameLength else { return false }
+        let name = String(decoding: b[30..<30 + nameLength], as: UTF8.self).lowercased()
+        return name.hasSuffix(".usdc") || name.hasSuffix(".usda") || name.hasSuffix(".usd")
     }
 
     /// The kind a file extension names, when it names a visual one.
@@ -79,6 +99,7 @@ public enum GlassEditorFileKind: String, Sendable, Equatable, CaseIterable {
         if type.conforms(to: .image) { return .image }
         if type.conforms(to: .movie) || type.conforms(to: .video) { return .video }
         if type.conforms(to: .audio) { return .audio }
+        if type.conforms(to: .usdz) || type.conforms(to: .usd) || type.conforms(to: .realityFile) { return .model3D }
         if type.conforms(to: .text) || type.conforms(to: .sourceCode) { return .text }
         return nil
     }

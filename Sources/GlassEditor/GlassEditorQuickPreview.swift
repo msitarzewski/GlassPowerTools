@@ -15,6 +15,7 @@
 //    as the editor highlights its language (the owner, 2026-10-16: "I just previewed a .swift file
 //    and it was plain text, not formatted/highlighted"); plain only where the editor won't open it.
 //  - Pictures, PDFs, video and audio: Quick Look, in the one view the editor keeps safe.
+//  - A 3D model: RealityKit, turned with the pointer (`GlassModelView`, D78).
 //  - Anything else: what it is, and its size; Open in Editor is beside it.
 //
 
@@ -46,6 +47,7 @@ public struct GlassEditorQuickPreview: View {
         /// A picture whose name doesn't say so: Quick Look would go by the name.
         case image(NSImage)
         case quickLook
+        case model
         case nothing(GlassEditorFileKind, size: UInt64)
     }
 
@@ -69,6 +71,8 @@ public struct GlassEditorQuickPreview: View {
             case .quickLook:
                 // One view for one file, as everywhere Quick Look is shown (`GlassQuickLookView`).
                 GlassQuickLookView(url: url).id(url)
+            case .model:
+                GlassModelView(url: url).id(url)
             case .nothing(let kind, let size):
                 ContentUnavailableView {
                     Label("No Preview", systemImage: "doc")
@@ -142,6 +146,8 @@ public struct GlassEditorQuickPreview: View {
             return .quickLook
         case .pdf, .video, .audio:
             return .quickLook
+        case .model3D:
+            return .model
         case .binary:
             return .nothing(.binary, size: head.size)
         }

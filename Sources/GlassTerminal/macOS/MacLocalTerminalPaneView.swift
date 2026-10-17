@@ -3,6 +3,7 @@
 import AppKit
 import GlassTerminalEmulator
 import SwiftUI
+import GlassEditorCore
 import GlassLayers
 import GlassShell
 
@@ -39,6 +40,8 @@ struct MacLocalTerminalPaneView: View {
     @State private var aiAssistant = AIAssistant()
     @State private var localSessionID = UUID()
     @State private var find = TerminalFindController()
+    /// A link to a 3D model, opened in 3D here (D78).
+    @State private var modelLinks = TerminalModelLinkOpener()
     @State private var showingAIAssistant = false
     @State private var aiAssistantDirectory: String?
     /// Why Open Folder Here did not open a folder, while that is shown.
@@ -308,10 +311,14 @@ struct MacLocalTerminalPaneView: View {
             "Open External Link?",
             isPresented: externalLinkConfirmationBinding,
             presenting: hostModel.pendingExternalLink
-        ) { _ in
-            Button("Open") {
+        ) { request in
+            Button(GlassModelFile.isModelLink(request.url) ? "Open in 3D" : "Open") {
                 if let url = hostModel.resolvePendingExternalLink(approved: true) {
-                    NSWorkspace.shared.open(url)
+                    if GlassModelFile.isModelLink(url) {
+                        modelLinks.open(url)
+                    } else {
+                        NSWorkspace.shared.open(url)
+                    }
                 }
             }
             Button("Cancel", role: .cancel) {
@@ -322,6 +329,7 @@ struct MacLocalTerminalPaneView: View {
                 ?? request.normalizedHost
             Text("A local terminal link wants to open this address.\n\nHost: \(authority)\n\nExact URL:\n\(request.exactURL)")
         }
+        .modifier(TerminalModelLinkPresentation(opener: modelLinks))
     }
 
     private var localProcessStatusText: String? {

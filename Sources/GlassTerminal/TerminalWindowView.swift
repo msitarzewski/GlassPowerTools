@@ -9,6 +9,7 @@ import SwiftUI
 import GlassLayers
 import GlassConnectionUI
 import GlassShell
+import GlassEditorCore
 #if canImport(UIKit)
 import UIKit
 #elseif canImport(AppKit)
@@ -121,6 +122,8 @@ struct TerminalWindowView: View {
     @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiateWithoutColor
 
     @State private var find = TerminalFindController()
+    /// A link to a 3D model, opened in 3D here (D78).
+    @State private var modelLinks = TerminalModelLinkOpener()
     @State private var showingTerminalSettings = false
     #if os(iOS)
     @State private var softwareKeyboardVisible = false
@@ -497,17 +500,16 @@ struct TerminalWindowView: View {
             isPresented: externalLinkConfirmationBinding,
             presenting: terminalHostModel.pendingExternalLink
         ) { request in
-            Button("Open") {
+            Button(GlassModelFile.isModelLink(request.url) ? "Open in 3D" : "Open") {
+                guard let url = terminalHostModel.resolvePendingExternalLink(approved: true) else { return }
+                if GlassModelFile.isModelLink(url) {
+                    modelLinks.open(url)
+                    return
+                }
                 #if canImport(UIKit)
-                if let url = terminalHostModel.resolvePendingExternalLink(approved: true) {
-                    UIApplication.shared.open(url)
-                }
+                UIApplication.shared.open(url)
                 #elseif canImport(AppKit)
-                if let url = terminalHostModel.resolvePendingExternalLink(approved: true) {
-                    NSWorkspace.shared.open(url)
-                }
-                #else
-                _ = terminalHostModel.resolvePendingExternalLink(approved: false)
+                NSWorkspace.shared.open(url)
                 #endif
             }
             Button("Cancel", role: .cancel) {
@@ -518,6 +520,7 @@ struct TerminalWindowView: View {
                 ?? request.normalizedHost
             Text("A remote terminal link wants to open this address.\n\nHost: \(authority)\n\nExact URL:\n\(request.exactURL)")
         }
+        .modifier(TerminalModelLinkPresentation(opener: modelLinks))
     }
 
     private func handleTerminalAppear() {

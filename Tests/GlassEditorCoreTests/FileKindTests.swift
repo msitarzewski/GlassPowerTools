@@ -49,4 +49,40 @@ struct FileKindTests {
                 "no signature this build knows, but binary bytes and a video name")
         #expect(GlassEditorFileKind.classify(name: "empty.png", prefix: Data()) == .image, "an empty file takes its name")
     }
+
+    // MARK: 3D models (D78)
+
+    /// A zip's local file header for its first entry, `method` 0 (stored) or 8 (deflated).
+    private func zip(firstEntry name: String, method: UInt8 = 0) -> Data {
+        let nameBytes = Array(name.utf8)
+        var header: [UInt8] = [0x50, 0x4B, 0x03, 0x04, 0x0A, 0x00, 0x00, 0x00, method, 0x00]
+        header += Array(repeating: 0, count: 16)                     // time, date, CRC, sizes
+        header += [UInt8(nameBytes.count & 0xFF), UInt8(nameBytes.count >> 8), 0x0E, 0x00]
+        return Data(header + nameBytes + Array(repeating: 0, count: 14 + 64))
+    }
+
+    @Test("A USDZ is a zip whose first entry is a stored USD layer, whatever it is called")
+    func usdz() {
+        // The opening of Apple's iMac model (apple.com), byte for byte.
+        let apple = zip(firstEntry: "WapJpOLwhRiCiqd.usdc")
+        #expect(GlassEditorFileKind.classify(name: "imac-with-accessories-blue.usdz", prefix: apple) == .model3D)
+        #expect(GlassEditorFileKind.classify(name: "download", prefix: apple) == .model3D, "the bytes win over no name")
+        #expect(GlassEditorFileKind.classify(name: "scene.zip", prefix: zip(firstEntry: "Scene.USDA")) == .model3D)
+        // Other zips stay what they were.
+        #expect(GlassEditorFileKind.classify(name: "photos.zip", prefix: zip(firstEntry: "readme.txt")) == .binary)
+        #expect(GlassEditorFileKind.classify(name: "a.zip", prefix: zip(firstEntry: "model.usdc", method: 8)) == .binary,
+                "a USDZ's layers are stored, never compressed")
+    }
+
+    @Test("USD's binary and text layers, and Reality files by their name")
+    func usdLayersAndReality() {
+        #expect(GlassEditorFileKind.classify(name: "a", prefix: Data("PXR-USDC".utf8) + Data([0, 0, 0, 0])) == .model3D)
+        #expect(GlassEditorFileKind.classify(name: "cube.usda", prefix: Data("#usda 1.0\n(\n)\n".utf8)) == .model3D,
+                "text, but a model first")
+        #expect(GlassEditorFileKind.classify(name: "scene.reality", prefix: Data([0x01, 0x00, 0x00, 0x00, 0x52])) == .model3D)
+        #expect(GlassEditorFileKind.classify(name: "empty.usdz", prefix: Data()) == .model3D, "an empty file takes its name")
+        #expect(GlassEditorFileKind.classify(name: "notes.usdz", prefix: Data("just text\n".utf8)) == .text,
+                "text bytes behind a model's name")
+        #expect(!GlassEditorFileKind.model3D.isText)
+    }
 }
