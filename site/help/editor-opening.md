@@ -59,8 +59,7 @@ On Apple Vision Pro and iPad, close the editor window as you close any window.
 > [!NOTE]
 > There is no Close Project command. Closing the editor window closes its project. On iPhone, ending the session in **Active** closes it.
 
-> [!WARNING]
-> Only closing a document asks about unsaved changes. Closing an editor window, quitting the app on the Mac, or closing the editor session in **Active** discards them without asking. Save first.
+Closing a window, quitting, or ending the session in **Active** with unsaved changes asks first; see [Close a window with unsaved changes](editor-saving.md#close-a-window-with-unsaved-changes).
 
 ## Open text files from the Finder
 

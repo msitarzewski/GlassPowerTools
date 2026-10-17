@@ -108,17 +108,22 @@ struct GlassAllWindowsArrangement: View {
     let machines: [GlassActiveMachine]
     let size: CGSize
     let open: @MainActor (_ chosen: @escaping @MainActor () -> Void) -> Void
+    /// A session whose ending would lose something, waiting on the question.
+    @State private var asking: GlassOpenSession?
 
     var body: some View {
         let layout = GlassAllWindowsLayout(tileCounts: machines.map(\.sessions.count), in: size)
-        if layout.scrolls {
-            ScrollView {
+        Group {
+            if layout.scrolls {
+                ScrollView {
+                    canvas(layout)
+                        .frame(width: layout.contentSize.width, height: layout.contentSize.height)
+                }
+            } else {
                 canvas(layout)
-                    .frame(width: layout.contentSize.width, height: layout.contentSize.height)
             }
-        } else {
-            canvas(layout)
         }
+        .glassAskingBeforeClosing($asking)
     }
 
     private func canvas(_ layout: GlassAllWindowsLayout) -> some View {
@@ -150,7 +155,8 @@ struct GlassAllWindowsArrangement: View {
                 .offset(x: frames.titleFrame.minX - origin.x, y: frames.titleFrame.minY - origin.y)
                 .accessibilityAddTraits(.isHeader)
             ForEach(Array(zip(machine.sessions, frames.tileFrames)), id: \.0.id) { session, frame in
-                GlassAllWindowsCard(session: session, activate: { open(session.activate) }, close: { session.close() },
+                GlassAllWindowsCard(session: session, activate: { open(session.activate) },
+                                    close: { session.requestClose { asking = $0 } },
                                     alwaysOnScreen: allOnScreen)
                     .frame(width: tileSize.width, height: tileSize.height)
                     .position(x: frame.midX - origin.x, y: frame.midY - origin.y)

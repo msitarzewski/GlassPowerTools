@@ -100,6 +100,12 @@ public final class MacTerminalAppDelegate: NSObject, NSApplicationDelegate {
         GlassRemoteChangeReceiver.registrationFailed(error)
     }
 
+    /// The editor's documents with unsaved changes, and the way to the first of them — asked
+    /// before a quit (2026-10-17: quitting threw them away without a word). Set by the composition
+    /// root, which knows the editor; this delegate is the terminal's.
+    public static var unsavedDocumentNames: (@MainActor () -> [String])?
+    public static var showUnsavedDocuments: (@MainActor () -> Void)?
+
     public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard !terminationInProgress else { return .terminateLater }
         let windows = MacTerminalWindowReader.Coordinator.active.allObjects
@@ -107,12 +113,22 @@ public final class MacTerminalAppDelegate: NSObject, NSApplicationDelegate {
         let windowMessage = windows.lazy.compactMap(\.quitConfirmationMessage).first
         let needsConfirmation = windowMessage != nil
             || (settingsManager?.confirmBeforeClosing == true && sessions.contains(where: \.closeStopsWork))
-        if needsConfirmation {
-            let alert = NSAlert()
-            alert.messageText = "Quit \(GlassProduct.displayName)?"
-            alert.informativeText = windowMessage ?? (sessions.contains(where: \.survivesClose)
+        let terminalMessage = needsConfirmation
+            ? windowMessage ?? (sessions.contains(where: \.survivesClose)
                 ? "Terminals that aren't kept in tmux will be disconnected. Those in tmux keep running, and Active lists them."
                 : "Running terminal sessions will be disconnected.")
+            : nil
+        let unsaved = Self.unsavedDocumentNames?() ?? []
+        if let question = Self.unsavedChangesQuestion(names: unsaved, terminalMessage: terminalMessage) {
+            // Cancel takes the person to the changes, to save them.
+            guard question.runModal() == .alertSecondButtonReturn else {
+                Self.showUnsavedDocuments?()
+                return .terminateCancel
+            }
+        } else if let terminalMessage {
+            let alert = NSAlert()
+            alert.messageText = "Quit \(GlassProduct.displayName)?"
+            alert.informativeText = terminalMessage
             alert.alertStyle = .warning
             alert.addButton(withTitle: "Quit")
             alert.addButton(withTitle: "Cancel")
@@ -133,6 +149,24 @@ public final class MacTerminalAppDelegate: NSObject, NSApplicationDelegate {
             sender.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater
+    }
+
+    /// The question before quitting with unsaved editor documents, or nil when there are none: Cancel
+    /// first (Return), Quit Without Saving second. What the terminals lose is said with it, so one
+    /// question covers both.
+    static func unsavedChangesQuestion(names: [String], terminalMessage: String?) -> NSAlert? {
+        guard !names.isEmpty else { return nil }
+        let alert = NSAlert()
+        alert.messageText = "Quit without saving?"
+        let documents = names.count == 1
+            ? "\(names[0]) has changes that haven't been saved."
+            : "\(names.count) documents have changes that haven't been saved: \(ListFormatter.localizedString(byJoining: names))."
+        alert.informativeText = [documents, terminalMessage].compactMap { $0 }.joined(separator: " ")
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Cancel")
+        let quit = alert.addButton(withTitle: "Quit Without Saving")
+        quit.hasDestructiveAction = true
+        return alert
     }
 }
 #endif

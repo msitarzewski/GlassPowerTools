@@ -506,6 +506,8 @@ struct MacTerminalOverview: View {
     @State private var hoveredID: MacOverviewItemID?
     @State private var workgroupOnly = false
     @State private var activitySelection = MacTerminalActivitySelection()
+    /// A session open elsewhere whose ending would lose something, waiting on the question.
+    @State private var askingToClose: GlassOpenSession?
     @FocusState private var navigationFocused: Bool
 
     private var tabs: [MacWorkspaceController] {
@@ -655,6 +657,7 @@ struct MacTerminalOverview: View {
                 if let id = activitySelection.candidate(in: activitySamples) { select(.tab(id)) }
             }
         }
+        .glassAskingBeforeClosing($askingToClose)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("terminal-overview")
     }
@@ -729,7 +732,7 @@ struct MacTerminalOverview: View {
         let id = MacOverviewItemID.session(session.id)
         return GlassSessionCard(session: session,
                                 activate: { session.activate(); dismiss() },
-                                close: { session.close() })
+                                close: { session.requestClose { askingToClose = $0 } })
             .opacity(controlsVisible || selectedID == id || hoveredID == id ? 1 : 0.7)
             .overlay {
                 RoundedRectangle(cornerRadius: 14)

@@ -196,7 +196,14 @@ public struct GlassEditorWorkspaceView: View {
             documentCount: workspace.documents.count,
             hasProjects: !workspace.projects.isEmpty,
             closeCancellations: closeCancellations,
-            closeDocument: { if let document = workspace.selectedDocument { requestClose(document) } }))
+            closeDocument: { if let document = workspace.selectedDocument { requestClose(document) } },
+            unsavedCount: workspace.documents.filter(\.isDirty).count,
+            firstUnsaved: { workspace.documents.first(where: \.isDirty) },
+            isAsking: { closeCandidate != nil || firstSave != nil },
+            askToClose: { document in
+                workspace.selection = document.id
+                requestClose(document)
+            }))
         #endif
         // **The window's own settings, for everything in it** (W23): outermost, so the window's
         // glass (`GlassLayeredWindow`), its panels and its sheets all draw with them.
@@ -1268,9 +1275,13 @@ private struct GlassEditorWindowLifecycle: ViewModifier {
             // library" — and it emptied the project out of a workspace the user was coming back
             // to, so the session switcher listed a window with nothing in it. The other half of
             // the same mistake as `forget` (D31, rule 54); the workspace is kept there and the
-            // project with it, and `closeWorkspace` releases both on purpose.
+            // project with it, and `closeWorkspace` releases both on purpose. So is a workspace
+            // with unsaved changes, kept for them (`forget`): a document from a project on a
+            // server is saved through the project's connection.
             .onDisappear {
-                if runtime?.closesWorkspaceWithItsWindow ?? true { workspace.closeAllProjects() }
+                if runtime?.closesWorkspaceWithItsWindow ?? true, !workspace.hasUnsavedChanges {
+                    workspace.closeAllProjects()
+                }
             }
             // A file opened on its own collapses the tree, because a project column with no project
             // in it is a stripe of empty space beside the text.
@@ -1315,11 +1326,59 @@ private struct MacEditorWindowBehaviour: ViewModifier {
     let hasProjects: Bool
     let closeCancellations: Int
     let closeDocument: () -> Void
+    /// Documents with unsaved changes, and the first of them, read as they are asked about.
+    let unsavedCount: Int
+    let firstUnsaved: () -> GlassEditorDocument?
+    /// Whether a question about closing a document, or the save it led to, is on screen.
+    let isAsking: () -> Bool
+    /// Asks about one document as closing it does: Save, Discard Changes or Cancel.
+    let askToClose: (GlassEditorDocument) -> Void
 
     @State private var windowHolder = GlassEditorWindowHolder()
     /// Set when ⌘W is closing the window's last document, so the window goes with it once the
     /// document has actually gone — after the unsaved-changes question, if there was one.
     @State private var closesWindowWhenEmptied = false
+    /// Set while the window is closing with unsaved changes: each document with changes is asked
+    /// about in turn, and the window closes once none is left (2026-10-17: closing the window
+    /// discarded them without a word, though closing one document asked).
+    @State private var closingWithUnsavedChanges = false
+
+    /// The window's close button, File ▸ Close Window and ⌘W in an empty window, asked before the
+    /// window goes: with unsaved changes it stays, and the documents are asked about.
+    private func windowShouldClose() -> Bool {
+        guard firstUnsaved() != nil else { return true }
+        closingWithUnsavedChanges = true
+        askAboutTheNextDocument()
+        return false
+    }
+
+    /// The next document with changes, once the last question has left the window; the window
+    /// itself when there is none.
+    private func askAboutTheNextDocument() {
+        afterSheetsHaveGone {
+            guard closingWithUnsavedChanges, !isAsking() else { return }
+            if let document = firstUnsaved() {
+                askToClose(document)
+            } else {
+                closingWithUnsavedChanges = false
+                windowHolder.window?.performClose(nil)
+            }
+        }
+    }
+
+    /// `body` once no sheet is attached to the window: a question that was just answered is still
+    /// leaving, and a window with a sheet attached neither closes nor shows another.
+    private func afterSheetsHaveGone(_ body: @escaping @MainActor () -> Void) {
+        guard let window = windowHolder.window, window.attachedSheet != nil else { body(); return }
+        Task { @MainActor in
+            var turns = 0
+            while window.attachedSheet != nil, turns < 50 {
+                try? await Task.sleep(for: .milliseconds(20))
+                turns += 1
+            }
+            body()
+        }
+    }
 
     func body(content: Content) -> some View {
         content
@@ -1367,7 +1426,15 @@ private struct MacEditorWindowBehaviour: ViewModifier {
             }
             // Cancel — in the question, or in the Save panel it led to — leaves the window. Save
             // and Discard do not: the document goes, and the window with it.
-            .onChange(of: closeCancellations) { _, _ in closesWindowWhenEmptied = false }
+            .onChange(of: closeCancellations) { _, _ in
+                closesWindowWhenEmptied = false
+                closingWithUnsavedChanges = false
+            }
+            // A document asked about was saved or discarded: on to the next, or the window.
+            .onChange(of: unsavedCount) { _, _ in
+                if closingWithUnsavedChanges { askAboutTheNextDocument() }
+            }
+            .background { GlassWindowCloseGate(shouldClose: windowShouldClose) }
             .focusedSceneValue(\.glassEditorActions, actions)
             .focusedSceneValue(\.glassSaveItem, saveItem)
             .frame(minWidth: 820, minHeight: 520)

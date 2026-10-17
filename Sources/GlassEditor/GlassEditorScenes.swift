@@ -166,8 +166,38 @@ public final class GlassEditorRuntime {
         liveWindows.remove(id)
         if frontmostWorkspaceID == id { frontmostWorkspaceID = nil }
         // Kept on a phone: the switcher is how it is reached again, and `closeWorkspace` is how
-        // it is ended on purpose.
-        if closesWorkspaceWithItsWindow { workspaces[id] = nil }
+        // it is ended on purpose. **Kept anywhere while it has unsaved changes** (2026-10-17): an
+        // iPad's or Vision Pro's window can be dismissed with no way to ask first, and its edits
+        // went with it. Active lists it, "1 unsaved", and choosing it brings the window back. A
+        // Mac asks before its window closes (`GlassWindowCloseGate`), so only a quit gets here
+        // with changes, and the app goes too.
+        if closesWorkspaceWithItsWindow, workspaces[id]?.hasUnsavedChanges != true { workspaces[id] = nil }
+    }
+
+    /// What closing this workspace would lose, as a sentence; nil when nothing is unsaved.
+    static func unsavedChanges(in workspace: GlassEditorWorkspace) -> String? {
+        let names = workspace.documents.filter(\.isDirty).map(\.displayName)
+        switch names.count {
+        case 0: return nil
+        case 1: return "\(names[0]) has changes that haven't been saved."
+        default:
+            let list = ListFormatter.localizedString(byJoining: names)
+            return "\(names.count) documents have changes that haven't been saved: \(list)."
+        }
+    }
+
+    /// Every document with unsaved changes, in every editor window: what a quit would lose.
+    public var unsavedDocumentNames: [String] {
+        workspaces.sorted { $0.key.uuidString < $1.key.uuidString }
+            .flatMap { $0.value.documents.filter(\.isDirty).map(\.displayName) }
+    }
+
+    /// Brings forward the first window with unsaved changes — where a quit that was called off
+    /// takes the person, to save them.
+    public func presentFirstUnsaved() {
+        guard let id = workspaces.keys.sorted(by: { $0.uuidString < $1.uuidString })
+            .first(where: { workspaces[$0]?.hasUnsavedChanges == true }) else { return }
+        present(id)
     }
 
     /// Ends a workspace deliberately: the switcher's swipe, and the only way to close one on a
@@ -206,7 +236,8 @@ public final class GlassEditorRuntime {
                     // or loose file here.
                     hostID: workspace.projects.first?.hostID ?? GlassLocalHost.id,
                     activate: { [weak self] in self?.present(id) },
-                    close: { [weak self] in self?.closeWorkspace(id) }
+                    close: { [weak self] in self?.closeWorkspace(id) },
+                    unsavedChanges: { [weak workspace] in workspace.flatMap(Self.unsavedChanges(in:)) }
                 )
             }
     }

@@ -64,15 +64,20 @@ no download or TestFlight build yet. What is verified, and how, is in
 - The Mac app runs outside App Sandbox (a terminal cannot work inside it), so it will be distributed
   directly, signed and notarized, not through the Mac App Store. See [SECURITY.md](SECURITY.md).
 - VNC without a Mac account is not encrypted after sign-in.
-- A host with a set-up service that you delete comes back at the next sync while iCloud holds a copy;
-  a fix is pending.
-- Closing an editor window, quitting the Mac app, or closing an editor session in Active discards
-  unsaved changes without asking; only closing a document asks. Save first. A file on a server
-  larger than 64 MB can't be opened.
+- A file on a server larger than 64 MB can't be opened in the Editor.
 - What has not been verified on a device or against a real server is listed under "Not verified" and
   "Known and open" in [progress.md](memory-bank/progress.md).
 
 ## Recent builds
+
+### 0.4.472 (17 October 2026)
+- **A machine you delete, or a service you remove, stays that way on your other devices.** Before,
+  deleting a machine whose service was set up never reached your other devices, and a device that
+  did hear of it sent the machine back; a removed service came back the same way.
+- **Unsaved changes in the Editor are never lost without asking.** On the Mac, closing a window asks
+  about each changed document, and quitting asks first and can take you to them. On iPad and
+  Vision Pro, a window closed with changes keeps them in Active. Closing an editor session from
+  Active or Show All Windows asks first, everywhere.
 
 ### 0.4.455 – 0.4.471 (15 – 17 October 2026)
 - **Terminals scale as well as resize** (Vision Pro, iPad, and SSH terminals on the Mac; not the Mac's

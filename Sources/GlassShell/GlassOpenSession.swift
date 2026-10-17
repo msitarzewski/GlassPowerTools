@@ -75,6 +75,11 @@ public struct GlassOpenSession: Identifiable {
     /// Windows shows it, and choosing it connects it (the owner, 2026-10-15: "in the expose it show
     /// one card for all tabs").
     public let waitsToBeShown: Bool
+    /// What ending it would lose, said as a sentence — an editor's documents with changes not yet
+    /// saved — asked as it is ended; nil when nothing is lost. Ending such a session from outside
+    /// it asks first (`requestClose`, `glassAskingBeforeClosing`), as closing a document does
+    /// (2026-10-17: Active and All Windows threw unsaved editor changes away without a word).
+    public let unsavedChanges: (@MainActor () -> String?)?
 
     public init(id: String, title: String, subtitle: String? = nil, symbolName: String,
                 endpointIDs: [EndpointID] = [], hostID: HostID? = nil,
@@ -83,7 +88,8 @@ public struct GlassOpenSession: Identifiable {
                 closeTitle: String = "Close", closeSymbolName: String = "xmark",
                 isConnected: Bool = true, connectedEndpointIDs: [EndpointID]? = nil,
                 snapshot: (@MainActor () -> Image?)? = nil, mark: (@MainActor () -> Image?)? = nil,
-                tabs: [GlassOpenSession] = [], waitsToBeShown: Bool = false) {
+                tabs: [GlassOpenSession] = [], waitsToBeShown: Bool = false,
+                unsavedChanges: (@MainActor () -> String?)? = nil) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
@@ -99,6 +105,34 @@ public struct GlassOpenSession: Identifiable {
         self.mark = mark
         self.tabs = tabs
         self.waitsToBeShown = waitsToBeShown
+        self.unsavedChanges = unsavedChanges
+    }
+
+    /// Ends it, or hands it to `ask` when ending it would lose something (`unsavedChanges`).
+    @MainActor
+    public func requestClose(asking ask: (GlassOpenSession) -> Void) {
+        if unsavedChanges?() != nil { ask(self) } else { close() }
+    }
+}
+
+extension View {
+    /// The question before ending a session that would lose something: the one closing a document
+    /// in the editor asks, in the same words. `asking` is the session waiting on an answer
+    /// (`GlassOpenSession.requestClose`); `didClose` runs once it has been ended.
+    public func glassAskingBeforeClosing(_ asking: Binding<GlassOpenSession?>,
+                                         didClose: @escaping @MainActor () -> Void = {}) -> some View {
+        confirmationDialog("Close without saving?", isPresented: Binding(
+            get: { asking.wrappedValue != nil }, set: { if !$0 { asking.wrappedValue = nil } }),
+            titleVisibility: .visible, presenting: asking.wrappedValue) { session in
+            Button("Discard Changes", role: .destructive) {
+                asking.wrappedValue = nil
+                session.close()
+                didClose()
+            }
+            Button("Cancel", role: .cancel) { asking.wrappedValue = nil }
+        } message: { session in
+            Text(session.unsavedChanges?() ?? "")
+        }
     }
 }
 

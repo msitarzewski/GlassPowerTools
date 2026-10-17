@@ -159,4 +159,41 @@ struct GlassEditorSessionLifetimeTests {
 
         #expect(runtime.openSessions().isEmpty)
     }
+
+    // MARK: - Unsaved changes are never dropped silently (2026-10-17)
+    //
+    // Closing an editor window, quitting, or closing it in Active discarded unsaved changes
+    // without a word; only closing a document asked. An iPad's or Vision Pro's window can be
+    // dismissed with no chance to ask, so its workspace is kept for the changes.
+
+    @Test func aWindowClosedWithUnsavedChangesKeepsThemInActive() async throws {
+        let runtime = runtime(phone: false)
+        let id = UUID()
+        let workspace = runtime.workspace(for: id)
+        let document = try #require(await workspace.open(try file("draft.txt")))
+        try document.model.replaceAllContent(with: "not yet saved\n")
+
+        runtime.forget(id)
+
+        #expect(runtime.workspace(for: id) === workspace, "the window's unsaved changes went with it")
+        let session = try #require(runtime.openSessions().first)
+        #expect(session.subtitle == "1 file · 1 unsaved")
+        #expect(session.unsavedChanges?() == "draft.txt has changes that haven't been saved.")
+    }
+
+    @Test func whatClosingWouldLoseIsSaid() async throws {
+        let runtime = runtime(phone: false)
+        let workspace = runtime.workspace(for: UUID())
+        let first = try #require(await workspace.open(try file("a.txt")))
+        let second = try #require(await workspace.open(try file("b.md")))
+        #expect(runtime.openSessions().first?.unsavedChanges?() == nil, "nothing is unsaved yet")
+        #expect(runtime.unsavedDocumentNames.isEmpty)
+
+        try first.model.replaceAllContent(with: "one\n")
+        try second.model.replaceAllContent(with: "two\n")
+
+        #expect(runtime.openSessions().first?.unsavedChanges?()
+                == "2 documents have changes that haven't been saved: a.txt and b.md.")
+        #expect(Set(runtime.unsavedDocumentNames) == ["a.txt", "b.md"])
+    }
 }

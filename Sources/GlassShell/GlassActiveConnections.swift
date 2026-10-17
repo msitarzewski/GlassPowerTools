@@ -844,10 +844,13 @@ struct GlassRunningSessionRow: View {
 struct GlassActiveSessionRow: View {
     let session: GlassOpenSession
     var didClose: @MainActor () async -> Void = {}
+    /// A session whose ending would lose something, waiting on the question.
+    @State private var asking: GlassOpenSession?
 
     private func close() {
-        session.close()
-        Task { await didClose() }
+        var asked = false
+        session.requestClose { asking = $0; asked = true }
+        if !asked { Task { await didClose() } }
     }
 
     var body: some View {
@@ -880,6 +883,7 @@ struct GlassActiveSessionRow: View {
             Button("Switch To", systemImage: "arrow.right.circle") { session.activate() }
             Button(session.closeTitle, systemImage: session.closeSymbolName, role: .destructive) { close() }
         }
+        .glassAskingBeforeClosing($asking) { Task { await didClose() } }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(session.title), \(session.subtitle ?? "")")
         .accessibilityHint("Switches to this session")

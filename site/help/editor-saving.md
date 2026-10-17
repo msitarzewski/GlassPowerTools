@@ -57,5 +57,11 @@ Close a document with its tab's close button, with **Close Document** (×) in th
 
 **On Mac:** when ⌘W closes the last document in a window with no project, the window closes too. **Cancel**, in the message or in the save panel, keeps both open.
 
-> [!WARNING]
-> Closing the editor window itself, quitting the app on the Mac, or closing the editor session in **Active** does not ask: unsaved changes are lost. See [Leave the Editor](editor-opening.md#leave-the-editor).
+## Close a window with unsaved changes
+
+Unsaved changes are never thrown away without asking:
+
+- **On Mac**, closing an editor window that has unsaved changes asks about each of those documents in turn, with the same **Save**, **Discard Changes** and **Cancel**. The window closes once none is left; **Cancel** keeps it open.
+- **On Mac**, quitting with unsaved changes asks **Quit without saving?** and names the documents. **Cancel** brings their window forward so you can save; **Quit Without Saving** quits.
+- **On iPad and Vision Pro**, a window can be closed without the app being asked. A window closed with unsaved changes keeps them: **Active** lists it with how many are unsaved, and choosing it brings the window back.
+- Closing an editor session from **Active** or **Show All Windows**, on any device, asks **Close without saving?** first. **Discard Changes** closes it; **Cancel** keeps it.

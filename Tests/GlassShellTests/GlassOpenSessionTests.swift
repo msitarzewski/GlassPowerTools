@@ -126,4 +126,24 @@ struct GlassOpenSessionTests {
         #expect(activated)
         #expect(closed)
     }
+
+    /// Ending a session that would lose something asks first (2026-10-17): Active, All Windows and
+    /// the Mac's overview threw an editor's unsaved changes away without a word.
+    @Test func endingASessionThatWouldLoseSomethingAsksFirst() {
+        var closed = 0
+        var unsaved: String? = "notes.txt has changes that haven't been saved."
+        let session = GlassOpenSession(id: "editor:1", title: "notes.txt", symbolName: "doc.text",
+                                       activate: {}, close: { closed += 1 },
+                                       unsavedChanges: { unsaved })
+        var asked: GlassOpenSession?
+        session.requestClose { asked = $0 }
+        #expect(asked?.id == "editor:1", "it was ended without asking")
+        #expect(closed == 0)
+
+        unsaved = nil
+        asked = nil
+        session.requestClose { asked = $0 }
+        #expect(asked == nil, "asked though nothing would be lost")
+        #expect(closed == 1)
+    }
 }
