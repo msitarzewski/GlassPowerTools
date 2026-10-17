@@ -40,17 +40,17 @@ struct GlassPathHeaderTests {
     @Test func anAbbreviatedHomePathKeepsItsAbbreviation() {
         // The editor spells a local path with `~` before handing it over; the header must not
         // undo that by insisting on a leading separator.
-        let location = GlassPathLocation(path: "~/Software/glass/GlassPowerTools")
-        #expect(location.name == "GlassPowerTools")
-        #expect(location.parent == "~/Software/glass")
+        let location = GlassPathLocation(path: "~/Projects/alpha/shop")
+        #expect(location.name == "shop")
+        #expect(location.parent == "~/Projects/alpha")
     }
 
     @Test func homeBecomesATildeAndKeepsTheSeparatorAfterIt() {
         // The editor's own copy kept the last character of home instead of the separator, so a
         // simulator's container path read `~F/Documents`. Photographed before it was moved here.
         let home = "/Users/ann"
-        #expect(GlassPathLocation.abbreviatingHome("\(home)/Software/glass", home: home)
-                == "~/Software/glass")
+        #expect(GlassPathLocation.abbreviatingHome("\(home)/Projects/alpha", home: home)
+                == "~/Projects/alpha")
         #expect(GlassPathLocation.abbreviatingHome(home, home: home) == "~")
     }
 
@@ -67,8 +67,8 @@ struct GlassPathHeaderTests {
     }
 
     @Test func aRelativeOrAbbreviatedPathKeepsItsOwnSpelling() {
-        let ancestors = GlassPathLocation(path: "~/Software/glass").ancestors
-        #expect(ancestors.map(\.path) == ["~/Software", "~"], "no root invented in front of `~`")
+        let ancestors = GlassPathLocation(path: "~/Projects/alpha").ancestors
+        #expect(ancestors.map(\.path) == ["~/Projects", "~"], "no root invented in front of `~`")
         #expect(GlassPathLocation(path: "sensor").ancestors.isEmpty)
     }
 

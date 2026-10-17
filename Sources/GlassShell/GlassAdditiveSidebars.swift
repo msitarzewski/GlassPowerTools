@@ -13,7 +13,7 @@
 //  size and position on screen, potentially growing or shrinking the window", macOS 27.2 SDK,
 //  `NSSplitViewItem.h`), and does it for a SwiftUI split view in a window of one's own. In a SwiftUI
 //  `WindowGroup` window — the terminal's — it doesn't (measured, macOS 27.2, a window-scene probe in
-//  `~/Software/glass/tmp/sidebar-probe`): AppKit grows such a window by raising its minimum width, so
+//  the working files' `sidebar-probe`): AppKit grows such a window by raising its minimum width, so
 //  it grew to the right only and never shrank (SwiftUI's window controller holds the window's size),
 //  and a minimum SwiftUI held on the whole content stopped even that — the owner's "pops back to the
 //  original size violently". So AppKit is told to keep the window's size
