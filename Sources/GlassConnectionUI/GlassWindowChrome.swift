@@ -10,6 +10,8 @@ public final class GlassTitlebarMaterialView: NSVisualEffectView {
     private weak var sidebarItem: NSSplitViewItem?
     private var sidebarObservation: NSKeyValueObservation?
     private var resizeObservation: NSObjectProtocol?
+    /// Changes to the sidebar under way, announced and not yet made.
+    private var sidebarChanges = 0
 
     isolated deinit {
         if let resizeObservation { NotificationCenter.default.removeObserver(resizeObservation) }
@@ -38,8 +40,21 @@ public final class GlassTitlebarMaterialView: NSVisualEffectView {
             if let resizeObservation { NotificationCenter.default.removeObserver(resizeObservation) }
             resizeObservation = nil
             sidebarItem = discoveredSidebar
-            sidebarObservation = discoveredSidebar?.observe(\.isCollapsed, options: [.new]) { [weak self] _, _ in
-                MainActor.assumeIsolated { self?.updateLeadingBoundary() }
+            // Opening, AppKit lays the sidebar out at its full width, and the window is drawn,
+            // before it moves the sidebar out of sight to slide it in and says it has opened. Read
+            // then, the edge stood at the sidebar's full width over nothing, and the window showed
+            // through the toolbar for a frame (the owner's recording, 2026-10-17). The edge holds
+            // from the change's first notice (`.prior`) to its last.
+            sidebarObservation = discoveredSidebar?.observe(\.isCollapsed, options: [.prior]) { [weak self] _, change in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    if change.isPrior {
+                        self.sidebarChanges += 1
+                    } else {
+                        self.sidebarChanges = max(0, self.sidebarChanges - 1)
+                        self.updateLeadingBoundary()
+                    }
+                }
             }
             if let discoveredSplit {
                 resizeObservation = NotificationCenter.default.addObserver(
@@ -54,7 +69,7 @@ public final class GlassTitlebarMaterialView: NSVisualEffectView {
     }
 
     private func updateLeadingBoundary() {
-        guard let frame = superview else { return }
+        guard sidebarChanges == 0, let frame = superview else { return }
         var offset: CGFloat = 0
         if let sidebarItem, !sidebarItem.isCollapsed {
             let sidebar = sidebarItem.viewController.view
@@ -72,6 +87,9 @@ public final class GlassTitlebarMaterialView: NSVisualEffectView {
             leadingConstraint?.isActive = true
         }
     }
+
+    /// Where the material begins, from the window's leading edge.
+    var leadingInset: CGFloat { leadingConstraint?.constant ?? 0 }
 
     public override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
