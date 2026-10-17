@@ -44,8 +44,9 @@ use the disposable test VM only).
   **Device names:** iPhone/iPad/Vision Pro report only "iPhone"/"Apple Vision Pro" without Apple's
   user-assigned-device-name entitlement; requesting it is his step (the App ID's capabilities); until then he names
   each device in Settings. **0.4.474 on all three** (Mac read 0.4.474 and runs; no new crash reports).
-- **Demo oddity, not the feature:** in `--demo-open library-history` the seeded "build" machine's connections are
-  missing (alpha and bravo sum exactly); likely the seed not finished when the demo records. Not chased.
+- **The "build" demo machine, fixed at his word (e980fcb):** `load()`'s second caller went on with a half-seeded
+  UI-test catalog and set `isLoaded`; the seeding is now a task every load awaits (DEBUG only; release builds
+  unchanged, so no device install). Two simulator launches: build 44, "189 connections on 3 devices".
 
 ## 2026-10-17 (afternoon)
 
