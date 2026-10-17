@@ -18,25 +18,33 @@ in the room. The Mac, iPad and iPhone apps are the same app, adapted to each.
 ## What it does
 
 - **Terminal:** SSH with host-key pinning, password and key sign-in (including keys held in the
-  Secure Enclave), tabs, themes, workgroups, port forwarding, and an SFTP file browser. A local
-  shell on the Mac.
+  Secure Enclave), tabs, splits, themes, workgroups, port forwarding, and an SFTP file browser. A
+  local shell on the Mac. Terminals kept in tmux, on servers and on the Mac, outlive the app and can
+  be picked up on another device. Windows scale as well as resize, and on the Mac a file whose path
+  a terminal prints previews over it.
 - **Databases:** MySQL, PostgreSQL and SQLite — browse, filter and edit rows, follow foreign keys,
   see a live diagram of every table and key (in three dimensions on Vision Pro), write and explain
-  queries, reach a database directly with TLS or through the machine's own SSH connection, or mark
-  it read-only.
-- **Remote desktops:** RDP and VNC, with the remote resolution following the window, image quality
-  that adapts to the link, audio, a shared clipboard with formatting and images, and see-through
-  glass on Mac and Vision Pro.
+  queries (or ask the on-device assistant for one), reach a database directly with TLS, through its
+  machine's SSH connection or through another machine, or mark it read-only.
+- **Remote desktops:** RDP and VNC, including Apple's own Screen Sharing protocol (encrypted after
+  you sign in with a Mac account), with the remote resolution following the window, a window per
+  remote display, image quality that adapts to the link, audio, a shared clipboard with formatting
+  and images, and see-through glass on Mac and Vision Pro.
 - **Editor:** files on this device or on a server, projects with a file tree, syntax highlighting
-  for fifteen languages, and previews for Markdown (with Mermaid diagrams), HTML, SVG and CSV. On the
-  Mac it can be your default text editor.
-- **Everywhere you are:** the library syncs through iCloud, and credentials through iCloud
-  Keychain. Keys made in the Secure Enclave stay on their device.
+  for fifteen languages, and previews for Markdown (with Mermaid diagrams), HTML, SVG and CSV;
+  images, PDFs, video, audio and 3D models open as themselves. On the Mac it can be your default
+  text editor.
+- **Everywhere you are:** the library, favorites, workgroups and projects sync through iCloud, and
+  credentials through iCloud Keychain; keys made in the Secure Enclave stay on their device. Active
+  and Show All Windows show what is open and running on every device; widgets, Siri and Shortcuts,
+  Spotlight, Controls and Handoff reach your machines, and on the Mac so do the Finder's Services,
+  toolbar button and Quick Action.
 
 ## Status
 
 Not released yet. It is in use daily and in release preparation; there is no download or TestFlight
-build today. What is verified, and how, is recorded in
+build today. What the first release holds, and what changed in the builds leading up to it, is in
+[RELEASE-NOTES.md](RELEASE-NOTES.md); what is verified, and how, is recorded in
 [memory-bank/progress.md](memory-bank/progress.md).
 
 When it ships, the Mac app will be distributed directly (signed and notarized, with automatic
@@ -52,8 +60,8 @@ Apple Developer team.
 ## Security and privacy
 
 The app talks to the servers you add and to iCloud, and to nothing else unless you connect a
-Tailscale account for device discovery; the released Mac app will also check its update feed. There
-are no analytics. Secrets live in the Keychain. See
+Tailscale account for device discovery, or open a link to a 3D model that a terminal printed; the
+released Mac app will also check its update feed. There are no analytics. Secrets live in the Keychain. See
 [SECURITY.md](SECURITY.md) for how credentials and connections are protected — and what is not
 protected — and how to report a vulnerability.
 

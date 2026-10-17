@@ -12,7 +12,8 @@
 ## The project
 
 `GlassPowerTools.xcodeproj` is the project of record: one multiplatform app target (Mac, iPad,
-iPhone, Vision Pro), a widget extension and a UI-test target. Almost all code lives in the Swift
+iPhone, Vision Pro), a widget extension, the Mac's Finder, Quick Action, Share and File Provider
+extensions, and a UI-test target. Almost all code lives in the Swift
 package at the repository root (`Package.swift`), whose modules the app target links:
 
 | Folder | What it is |
@@ -22,6 +23,8 @@ package at the repository root (`Package.swift`), whose modules the app target l
 | `Packages/` | Third-party code carried in the repository, each with its licence and a record of local changes (`PATCHES.md`, `GLASSDT-PATCHES.md`) |
 | `Tests/`, `UITests/` | Package tests (Swift Testing and XCTest) and XCUITest suites |
 | `Widgets/` | The widget extension, for every platform; what it shares with the app is the `GlassWidgetData` module |
+| `FinderSync/`, `QuickActions/`, `Share/` | The Mac's Finder toolbar button, its Quick Action and Share ▸ Send to a Machine: each leaves its request in the App Group and opens the app |
+| `FileProvider/` | A File Provider extension for machines in the Finder's sidebar: a spike, embedded in Mac builds but inert (it registers no domain) |
 | `Config/Identity.xcconfig` | Signing team, bundle identifier, iCloud container, App Group and keychain group |
 | `Tools/` | Build and maintenance scripts |
 | `memory-bank/` | The project's working notes: decisions, rules, progress and task records |
@@ -46,7 +49,7 @@ else needs to change. Your team needs the iCloud container and App Group registe
 and the App Group for the widget extension's (`$(GPT_BUNDLE_ID).widgets`) too. On a Mac the widgets
 use a group of their own instead, `GPT_WIDGET_GROUP`, made from your team and bundle identifier: Xcode
 signs the Mac extension with the team's wildcard profile, which cannot grant a `group.` App Group, and
-a team-prefixed group needs no profile. Nothing to set.
+a team-prefixed group needs no profile. The Mac's other extensions use the same group. Nothing to set.
 
 ## Building
 
@@ -70,7 +73,7 @@ takes a new version only when every package inside it carries a licence already 
 the build continues with the copy it has.
 
 The macOS app is not sandboxed: a terminal needs to start local shells and reach the user's files and
-tools. Its widget extension is, as a Mac app extension must be. Release builds use the hardened runtime.
+tools. Its extensions are, as a Mac app extension must be. Release builds use the hardened runtime.
 
 **If a build stops at "Downloading binary artifact … Sparkle":** SwiftPM looks for GitHub credentials
 in the Keychain before downloading Sparkle's prebuilt framework, and with more than one saved entry it

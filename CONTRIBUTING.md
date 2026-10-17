@@ -35,6 +35,8 @@ anyone — person or coding agent — making changes. The parts that matter most
 ## Pull requests
 
 - Keep a pull request to one change, with tests where the behaviour can be tested.
+- A change people will notice updates the help (`site/help/`) and `RELEASE-NOTES.md` in the same pull
+  request.
 - `swift test` must pass (unlock the Mac first; see the building guide), and the app must build for
   macOS, iOS and visionOS.
 - Adding a dependency means adding its entry to `Tools/Licenses/components.json` and running

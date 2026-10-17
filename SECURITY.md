@@ -26,7 +26,9 @@ this repository's `PATCHES.md` files record what is changed locally.
   credentials and host-key pins sync through iCloud Keychain. Keys created in the **Secure
   Enclave** never leave the device they were made on and are never offered to another device.
 - **Nothing is sent anywhere else.** The app connects to the servers you add, to iCloud for sync,
-  and, only if you connect a Tailscale account for device discovery, to Tailscale's API. The Mac app,
+  and, only if you connect a Tailscale account for device discovery, to Tailscale's API. A link a
+  terminal prints is opened only after you confirm it; a link to a 3D model is then downloaded from
+  that address (http or https, at most 512 MB) and kept only if its bytes are a model's. The Mac app,
   once released, also checks an update feed — Sparkle asks on its second launch whether to do so
   automatically, and installs only updates signed with the project's key. It has no analytics or
   telemetry. The editor's Markdown preview runs with a content security policy that
@@ -58,7 +60,10 @@ does not allow. The Mac app therefore runs outside the sandbox, with the hardene
 runtime exceptions. It is to be distributed outside the Mac App Store, signed with a Developer ID
 and notarized by Apple. Its widget extension runs sandboxed: it reads only the summary the app writes
 for the widgets (machine names, service kinds, times and counts) from an App Group of its own. The
-iPhone, iPad and Vision Pro apps run in their platforms' sandboxes.
+Finder's toolbar button, its Quick Action and Share ▸ Send to a Machine are sandboxed extensions
+too: they hold no credentials and make no connections, but leave the request (and any shared files)
+in that App Group and open the app, which does the work. The iPhone, iPad and Vision Pro apps run in
+their platforms' sandboxes.
 
 ## Third-party code
 
