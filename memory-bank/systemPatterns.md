@@ -270,3 +270,19 @@ test fails without the push.
 - **A drop or paste is never turned away in silence (2026-10-16).** The newest paste or drop takes a pending
   review's place, `insertDroppedText` reports what became of the text, and the Mac pane logs each step
   (`sh.glas` / `terminal-drop`) and beeps when nothing was typed (`Tests/GlassTerminalTests/TerminalDropTypingTests.swift`).
+
+## What a person removes, and what closing loses (D79, D80, 2026-10-17)
+
+- **The sync's merge revives only what a merge lost.** `GlassCatalogMerge.reconcile`'s second pass
+  (`Sources/GlassShell/GlassCatalogSync.swift`) skips a service any tombstone names (`deleteHost` leaves its services
+  on the tombstone; a fold moves them out first) and revives only from a record whose final copy is a tombstone (Remove
+  Service leaves the record live). A new way of removing something must leave the same trace, or the merge will bring
+  it back.
+- **A session says what ending it would lose.** `GlassOpenSession.unsavedChanges` (`Sources/GlassShell/GlassOpenSession.swift`)
+  and `requestClose(asking:)`; every place that ends a session asks through `glassAskingBeforeClosing` (Active's row,
+  All Windows' cards, the Mac's overview). The editor answers it; a capability with nothing to lose leaves it nil.
+- **A SwiftUI window that must ask before it closes** uses `GlassWindowCloseGate`
+  (`Sources/GlassConnectionUI/GlassWindowCloseGate.swift`): it takes the window's delegate and forwards everything
+  else to SwiftUI's. The editor's Mac window walks its unsaved documents through the document's own question, then
+  closes itself; a quit asks through `MacTerminalAppDelegate.unsavedDocumentNames`, set by the composition root.
+  Where a window can't ask (iPad, Vision Pro), the editor keeps a workspace with changes (`GlassEditorRuntime.forget`).

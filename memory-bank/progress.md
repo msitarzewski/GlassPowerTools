@@ -79,6 +79,8 @@ All four capabilities and the shell are built and in daily use on the owner's Ma
 | 2026-10-17 (0.4.469): no gray line at a terminal window's sidebar edge (AppKit's divider transparent, our hairline hidden; other windows unchanged) | built | `WindowChromeTests.sidebarEdgeDrawsNoLine` (fails without); probe pictures: no line at rest or in any animation frame, nothing see-through, the edge still drags; his to try |
 | 2026-10-16: a file dropped on a terminal has its path typed, or the drop says why not; a waiting paste review no longer turns drops away; every drop step logged (`terminal-drop`) (389e1f9) | built | unit (fails without its change); the owner's own check of his running app not yet made |
 | 2026-10-17 (0.4.471): every sidebar move of a terminal window, and the terminal width held meanwhile, written to the log (`com.glasspowertools`/`sidebar`) for the open 6 pt strip | built | log lines read back on the Mac; the strip itself is open (Known and open) |
+| 2026-10-17 (0.4.472): a deleted machine and a removed service stay that way across devices — found documenting sync: the merge's second pass revived every set-up service no live record held, so a deletion was never sent (the deleting device adopted the account's older copy) and a device that heard of one sent the machine back; Remove Service the same. Now a service a tombstone names went with its machine (`deleteHost` keeps them on it; a fold moves them out), and a copy is revived only from a record that ended deleted (d61271a) | built | `GlassCatalogMergeTests` +5, `D19SyncPublishTests` +2 through the model and catalog (each fails on the old merge); shell 314; the 2026-09-21/28 fold cases unchanged; not yet seen across two devices |
+| 2026-10-17 (0.4.472): unsaved editor changes never lost without asking — a Mac window asks about each changed document before it closes (`GlassWindowCloseGate`, the terminal's delegate-forwarding technique, in GlassConnectionUI); a Mac quit asks "Quit without saving?" and Cancel goes to them; iPad and Vision Pro keep a dismissed window's workspace with its changes, listed in Active; Active, All Windows and the Mac's overview ask before ending a session with unsaved changes (`GlassOpenSession.unsavedChanges`) | built | `GlassWindowCloseGateTests` 2 (a real window, SwiftUI's delegate forwarded), `GlassEditorSessionLifetimeTests` +2, `GlassOpenSessionTests` +1, `MacQuitWithUnsavedChangesTests` 3; each behaviour fails with its fix undone; the Mac's walk through several documents is his to try |
 | Database Local Network and tunnel limits closed: tunnels keep their own connections (D69) | decided | sshd_config(5); OpenSSH reports of multiplexing lag |
 
 Suites run 2026-10-17 with the screen unlocked: connection UI 51, terminal 873, shell 307, all passing; on
@@ -147,21 +149,6 @@ profile, notarization, deploying the site), the behaviour findings listed in `ac
 - VNC is encrypted after sign-in only to a Mac signed in with a Mac account (its own revision, e7463ce);
   a password alone or a non-Mac server is not (no VeNCrypt, no tunnel). The setup form says which (262ba7a).
 - tree-sitter 0.27 and swift-crypto 5 wait on upstream releases (`techContext.md`).
-- **A deleted host with a set-up service comes back (found 2026-10-17, documentation pass; proven at the merge):**
-  `GlassCatalogMerge.reconcile`'s second pass (`Sources/GlassShell/GlassCatalogSync.swift:176-211`, "no set-up
-  service disappears through a merge", 2026-09-28) revives any live copy holding a set-up service. A throwaway test
-  (removed again) reconciled a local tombstone of a set-up host against the account's older live copy: the device
-  that deleted it applies the live copy back and sends nothing (`apply=[live]`, `publish=[]`); a device still holding
-  it live sends it back alive. Every deletion test in `GlassCatalogMergeTests` uses hosts with no set-up service. A
-  likely fix: revive only an endpoint that some other record also names (the fold the rule was written for), not one
-  only the deleted record holds — the owner's decision, with a two-device check. The help says so
-  (`site/help/library-sync.md`).
-- **Unsaved editor work is discarded without asking (found 2026-10-17, read from the code):** only closing a
-  document asks. Closing an editor window (`GlassEditorScenes.swift:165-171`, `forget` drops the workspace where
-  windows open), quitting the Mac app (`applicationShouldTerminate`, `glas_shApp.swift:103`, asks about terminals
-  only) or closing the session in Active (`GlassActiveConnections.swift:848-851`) discards edits;
-  `GlassEditorWorkspace.hasUnsavedChanges` (`:274`) has no caller. The help warns (`editor-opening.md`,
-  `editor-saving.md`); remove the warnings with the fix.
 - **A server file over 64 MB can't be opened (found 2026-10-17):** the SFTP reader stops at 64 MiB and throws
   `GlassPortForwardError.unavailable` (`GlassTerminalCapability.swift:1242,1345`), so Download and View never
   succeeds and the message blames a missing Terminal service (`GlassCapability.swift:194`).

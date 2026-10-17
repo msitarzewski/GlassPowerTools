@@ -1560,3 +1560,38 @@ Apple's Quick Look volume (`PreviewApplication`). The editor's viewer, the Files
 hover preview. A model link, once confirmed, is downloaded (≤ 512 MB), checked by its bytes and shown. Evidence:
 `tasks/2026-10/2026-10-16_3d-models.md`.
 
+
+## D79 — What a person removes stays removed through the sync's merge — Implemented 2026-10-17
+**Found** documenting sync (the owner: "make sure that the memory bank … and the site/help are current"); **fixed at
+his word** ("yes, fix both"). The merge's second pass (2026-09-28, `GlassCatalogMerge.reconcile`: "no set-up service
+disappears through a merge", written for a stale device's fold) revived every set-up service that no live record held
+— including the ones a person removed. Deleting a set-up machine: the deleting device adopted the account's older live
+copy instead of sending its tombstone (its store kept the tombstone, so the machine vanished there and nowhere else),
+and a device that did receive a deletion sent the machine back alive. Remove Service: undone the same way.
+**Decision:** what a person removes says so in the records, and a fold never does. `deleteHost` tombstones a record
+with its services still on it, while a fold moves each service out first (`HostCatalogStore.move`) — so a service
+any tombstone names went with its machine and is not revived. Remove Service leaves the record live (`unpair`) — so a
+copy is revived only from a record that ended deleted, never past that record's own live, newer statement. The folds
+of 2026-09-21 and 2026-09-28 revive as before (their tombstones name nothing).
+**Cost accepted:** a service set up on another device *after* the machine was deleted still brings the machine back,
+so that setup isn't lost (D34's trade: an edit is a deliberate act too). Old tombstones written by the catalog's
+`remove(endpointID:)` (the database's outbox, unused since the merge) name nothing and read as folds.
+**Evidence:** `GlassCatalogMergeTests` +5 and `D19SyncPublishTests` +2, each failing on the old merge (d61271a). Not
+yet seen across two devices.
+
+## D80 — Unsaved changes are asked about before anything ends them — Implemented 2026-10-17
+**Found** documenting the editor; **fixed at the owner's word.** Only closing a document asked; closing an editor
+window, quitting the Mac app, or ending the session in Active, All Windows or the Mac's overview discarded the
+changes silently (`GlassEditorWorkspace.hasUnsavedChanges` had no caller).
+**Decision:** on the Mac a window asks before it closes, document by document with the document's own question (Save,
+Discard Changes, Cancel), then closes; a quit asks "Quit without saving?" with the terminals' loss in the same
+question, and Cancel brings the changes forward. Where a window can be dismissed without asking (iPad, Vision Pro) its
+workspace and project are kept while they hold changes, listed in Active, and reopened from there. A session says
+what ending it would lose (`GlassOpenSession.unsavedChanges`), and every place that ends one asks first
+(`glassAskingBeforeClosing`).
+**Pattern:** `GlassWindowCloseGate` (GlassConnectionUI) stands in for SwiftUI's window delegate and forwards everything
+else to it, as the terminal's window reader has since glas.sh; recorded against rule 62. The terminal's reader could
+adopt it.
+**Evidence:** `GlassWindowCloseGateTests`, `GlassEditorSessionLifetimeTests` +2, `GlassOpenSessionTests` +1,
+`MacQuitWithUnsavedChangesTests`; each behaviour fails with its fix undone (eaa59a6). The Mac's walk through several
+documents is the owner's to try.

@@ -497,6 +497,9 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     transparent (`GlassTitlebarMaterialView.showsSidebarEdge`), because SwiftUI offers none of it and
     AppKit does not move a SwiftUI window scene's frame for its sidebar. It sets no autosave name and
     no toolbar visibility, and the split view stays SwiftUI's.
+    *Exception, D80 (2026-10-17):* a window that must ask before it closes takes SwiftUI's window
+    delegate behind `GlassWindowCloseGate`, which forwards every other delegate method to SwiftUI's
+    (as the terminal's window reader always has), because SwiftUI has no way to keep a window open.
 63. **A test's tmux never reaches the default server, and never inherits the test's descriptors.**
     When `TMUX_TMPDIR` names a folder that does not exist, tmux silently uses the default server,
     which holds the owner's live sessions. Create a short folder (`/tmp/gpt-<hex>`) first, and name

@@ -43,16 +43,25 @@ coordinator; every changed claim re-read in the code. The site builds (7 pages, 
   Core Graphics, not Metal; drifted citations fixed), toc and the October index, progress.
 - **Rule 61:** home paths removed from notes, a source comment and a test fixture (`GlassPathHeaderTests`, 12 pass).
 
-**For the owner to decide (in `progress.md`, Known and open):**
-1. **A deleted host with a set-up service comes back at the next sync** — proven at the merge with a throwaway test;
-   the 2026-09-28 "no set-up service disappears" pass revives it. Proposed fix: revive only an endpoint another
-   record also names. iCloud data, so not changed without him.
-2. **Unsaved editor work is discarded** by closing an editor window, quitting the Mac app or closing it in Active
-   (read from the code; nothing calls `hasUnsavedChanges`). Proposed: ask, as closing a document does.
+**Then, at his word ("yes, fix both"), both fixed and committed:**
+1. **D79 (d61271a):** a deleted set-up machine and a removed service stay that way across devices. The fix differs
+   from the one first proposed: a fold's tombstone names no services and `deleteHost`'s keeps them, so a service a
+   tombstone names isn't revived, and nothing is revived past a record's own live, newer copy (which also fixed
+   Remove Service, undone the same way). Merge +5 and model +2 tests fail on the old merge; shell 314.
+2. **D80 (eaa59a6):** unsaved editor changes are asked about before a Mac window closes (document by document),
+   before a quit, and before Active, All Windows or the Mac overview end the session; iPad and Vision Pro keep a
+   dismissed window's changes in Active. `GlassWindowCloseGate` is new (rule 62 exception). Connection UI 53,
+   terminal 876, shell 315, editor 171; tmux unchanged. **His to try:** close a Mac editor window with two edited
+   documents; quit with one.
+
+**Still for the owner (in `progress.md`, Known and open):**
 3. The release script checks only the widget extension; the inert File Provider extension ships in Mac builds.
 4. Smaller: Mac local terminals don't scale; server files over 64 MB can't open; wording defects listed there.
 5. Two rules proposed by the audit (measure window behaviour in a SwiftUI window scene, not a plain `NSWindow`; test
    on the newest simulator runtime) — his to adopt.
+
+**Installs:** 0.4.472 on all three (Mac read 0.4.472 and is running, no new crash reports since 2026-10-13; iPhone and
+Vision Pro installed 15:31).
 
 **Still open from the morning:** the 6 pt strip (read his toggles' log first); the no-line edge for the database and
 desktop windows (offered).
