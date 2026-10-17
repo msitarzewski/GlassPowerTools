@@ -286,3 +286,10 @@ test fails without the push.
   else to SwiftUI's. The editor's Mac window walks its unsaved documents through the document's own question, then
   closes itself; a quit asks through `MacTerminalAppDelegate.unsavedDocumentNames`, set by the composition root.
   Where a window can't ask (iPad, Vision Pro), the editor keeps a workspace with changes (`GlassEditorRuntime.forget`).
+- **Each device's own counts, merged per device (D81).** `GlassUsagePayload` (`Sources/GlassShell/GlassShellUsageSync.swift`)
+  is one key-value-store payload with an entry per device keyed by its writer id; a device pushes only its own entry
+  and `converged` keeps the newest per device. The overview reads `GlassShellModel.usageByDevice` (this device from its
+  history, the others mapped to this library's host ids). The same shape suits anything per-device that every device
+  should see.
+- **A card drawn as its window paints (2026-10-17).** `GlassOpenSession.backdrop` carries what a session's window paints
+  behind it where the window has an opaque page (iPhone, iPad); All Windows draws it and takes its light or dark.

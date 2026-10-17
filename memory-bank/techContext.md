@@ -516,3 +516,10 @@ Not yet seen: the Mac viewer in the running app, AR Quick Look on a phone, the h
 **Logs to read after the owner tries something:** `com.glasspowertools` / `sidebar` (each sidebar move and the
 width held); `sh.glas` / `terminal-drop`, `terminal-selection`, `terminal-paste`, `terminal-model-link`. Use
 `/usr/bin/log show --predicate 'subsystem == "…" AND category == "…"'` — zsh's builtin `log` shadows it.
+
+## Device names (D81, 2026-10-17)
+
+- `UIDevice.name` on iOS and iPadOS 16 and later, and on visionOS, answers with the kind of device ("iPhone", "Apple Vision
+  Pro") unless the app has Apple's `com.apple.developer.device-information.user-assigned-device-name` entitlement,
+  which Apple grants on request. Adding the key before the App ID has it breaks signing. On the Mac,
+  `SCDynamicStoreCopyComputerName` gives the computer name with no entitlement (`GlassDeviceName.system`).

@@ -30,7 +30,24 @@ use the disposable test VM only).
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
-## 2026-10-17 (afternoon) — RESUME HERE
+## 2026-10-17 (evening) — RESUME HERE
+
+**Since the afternoon, all committed:**
+- **All Windows in light mode on iPhone** (his screenshot; chosen: "Cards in the terminal's colors"): a terminal's
+  card is drawn on its theme's canvas, as the iPhone window's opaque page is, with name, × and mark in the theme's
+  light or dark (cdb160b, `GlassOpenSession.backdrop`). Simulator captures in the working files' `captures/
+  all-windows-light/`. 0.4.473 on all three.
+- **D81 — Your Library counts connections on all devices** ("totals, then a way to choose which device"; "use the
+  device name, not the product. I might have two vision pros"; "When the Active connections refreshes on iCloud
+  maybe?"). Daily counts per device through iCloud KVS, All Devices then a menu by name, Settings ▸ General ▸ This
+  Device (93d857a). What travels wasn't chosen by him; the smaller (counts, no times) was taken — say so.
+  **Device names:** iPhone/iPad/Vision Pro report only "iPhone"/"Apple Vision Pro" without Apple's
+  user-assigned-device-name entitlement; requesting it is his step (the App ID's capabilities); until then he names
+  each device in Settings. **0.4.474 on all three** (Mac read 0.4.474 and runs; no new crash reports).
+- **Demo oddity, not the feature:** in `--demo-open library-history` the seeded "build" machine's connections are
+  missing (alpha and bravo sum exactly); likely the seed not finished when the demo records. Not chased.
+
+## 2026-10-17 (afternoon)
 
 **The owner asked:** "make sure that the memory bank, release notes, README, and the site/help are current. If you
 need to, scan the codebase and compare it to the existing docs!" Done, checked against the code by three agents

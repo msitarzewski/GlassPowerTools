@@ -131,3 +131,6 @@
   help and the site, checked against the code. Found on the way and fixed at the owner's word ("yes, fix both"): a
   deleted set-up machine or a removed service undone by the sync's merge (D79, d61271a), and unsaved editor changes
   thrown away by closing a window, quitting or ending the session elsewhere (D80, eaa59a6). 0.4.472.
+- 2026-10-17 (evening): All Windows in light mode on iPhone — a terminal's card in its theme's colours (cdb160b,
+  chosen from three ways), 0.4.473; and Your Library counting connections on all devices, All Devices then each by
+  name (D81, 93d857a), 0.4.474.

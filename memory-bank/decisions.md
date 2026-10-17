@@ -1595,3 +1595,22 @@ adopt it.
 **Evidence:** `GlassWindowCloseGateTests`, `GlassEditorSessionLifetimeTests` +2, `GlassOpenSessionTests` +1,
 `MacQuitWithUnsavedChangesTests`; each behaviour fails with its fix undone (eaa59a6). The Mac's walk through several
 documents is the owner's to try.
+
+## D81 — Your Library counts connections on all your devices — Implemented 2026-10-17
+**Owner:** "I'd also like to display the cross device use in the All Connections (no connection selected) pane.
+Right now it's per device. So maybe totals, then a way to choose which device?" Asked what may travel and how to show
+it: "When the Active connections refreshes on iCloud maybe?" (with the iCloud sync the app already does); the layout
+"All devices, then pick one", "but use the device name, not the product. I might have two vision pros". What travels
+was not chosen; the smaller of the two offered was taken.
+**Decision (amends D41):** each device's history stays on it; what travels is the device's name and its connections
+counted per day, per machine and per kind of service, for the overview's 30 days — no times of day
+(`GlassUsagePayload`, `Sources/GlassShell/GlassShellUsageSync.swift`). One key in iCloud's key-value store, an entry
+per device keyed by its writer id, each device writing only its own (pushed at start, after each connection and
+when renamed; merged newest-per-device). The overview adds every device up, and a menu (All Devices, then each
+device by name) narrows the chart and Most used to one.
+**Device names:** a Mac's computer name; on iPhone, iPad and Vision Pro the system gives an app only the kind of
+device ("iPhone") without Apple's user-assigned-device-name entitlement (`UIDevice.name`, iOS 16 and later), so
+Settings ▸ General ▸ This Device names the device here. Requesting the entitlement would make the starting names
+right; it must be granted before it can be added, or signing breaks.
+**Evidence:** `GlassUsageSyncTests` 6 (counting, merging, validation, an unknown kind, the sums, two devices over a
+shared store; the sums and the two-device test fail with their change undone). iPad simulator capture.
