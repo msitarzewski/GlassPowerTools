@@ -1536,7 +1536,7 @@ for the sidebar it opens with (its saved frame holds it), for the overview, in f
 that wide. The window's minimum belongs to the terminal's column. Only the Mac terminal window has a sidebar.
 Evidence: `GlassAdditiveSidebarsTests`, `MacTerminalSidebarTests`, the window-scene probe;
 `tasks/2026-10/2026-10-16_additive-sidebars.md`.
-**2026-10-17, Implemented — the toolbar holds still too.** Offered three ways (keep fixed, centre the title, leave
+**2026-10-17, Implemented, then Superseded the same day — the toolbar holds still too.** Offered three ways (keep fixed, centre the title, leave
 as Finder does); the owner: "keep the + and title fixed". An empty toolbar item before "+" holds the room the
 window's and the sidebar's buttons take with the sidebar closed, as wide as the sidebar shows; with it open there is
 that gap after the sidebar's button. A toolbar item is never under 36 pt, so "+" dips up to ~30 pt for two frames at
@@ -1545,6 +1545,9 @@ the frame AppKit draws mid-opening.
 **2026-10-17, Implemented — no line at the sidebar's edge.** The owner: "What is that gray line … That's what we need
 to eliminate." AppKit's split divider and the chrome's hairline: in the terminal window both are gone
 (`GlassTitlebarMaterialView.showsSidebarEdge` off); the database and desktop windows keep theirs, unasked.
+**2026-10-17, Superseded — the held space closed.** Seen open on 0.4.469 ("there's a little new space … before the
++"), asked keep or close: "It moves anyway... let's close the space." Reverted (1534ece): "+" leads the content after
+the sidebar again (D24's arrangement) and slides with it. The no-see-through fix and the edge stay.
 
 ## D78 — 3D models open everywhere files do — Implemented 2026-10-16
 **Owner:** "we need 3D model support!" (Apple's iMac `.usdz` as the example). Asked first; all four recommendations

@@ -34,6 +34,8 @@ use the disposable test VM only).
 
 **From his screen recording of 0.4.467** (his typed answer to the open toolbar question: "keep the + and title
 fixed"), all committed (55a80b9, 46cf403, ba19154):
+- **Reverted at noon (1534ece, 0.4.470):** "+" and the title held still — he saw the space it leaves and said "It
+  moves anyway... let's close the space." "+" slides with the sidebar again. What it was:
 - **"+" and the title stay put** as a terminal window's sidebar opens and closes: an empty toolbar item before "+"
   holds the room the window's and sidebar's buttons take with it closed, as wide as the sidebar shows (room read
   from the toolbar, 132 pt on macOS 27.2). Open, there is that gap after the sidebar's button. Left: a ≤30 pt dip for
@@ -50,9 +52,10 @@ Evidence and the scene probe: `tasks/2026-10/2026-10-16_additive-sidebars.md` (2
   AppKit shows it again), still draggable. The database and desktop windows keep theirs — not asked; offer.
 
 **Suites:** connection UI 51, terminal 874, shell 307; tmux unchanged; screen unlocked.
-**Installs:** 0.4.469 on the Mac (read 0.4.469; no new crash reports) and iPhone; the headset was asleep (4016),
-`install-devices-when-awake.zsh 469` waits for it — check its version.
-**His to try:** the sidebar's button with an eye on "+", the title and the edge; everything listed below for 0.4.467.
+**Installs:** 0.4.470 (the hold reverted) on the Mac (read 0.4.470; no new crash reports) and iPhone; the headset
+asleep (4016) since this morning, `install-devices-when-awake.zsh 470` waits for it — check its version.
+**His to try:** the sidebar's edge without a line; everything listed below for 0.4.467.
+**Open offer:** the same no-line edge for the database and desktop windows.
 
 ## 2026-10-16 (evening)
 

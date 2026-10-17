@@ -113,3 +113,5 @@
 - 2026-10-17 (late morning): [the D77 note, continued](2026-10-16_additive-sidebars.md) — the gray line at the
   sidebar's edge ("That's what we need to eliminate"): AppKit's split divider and our hairline, gone from the terminal
   window (the divider made transparent, still draggable). 0.4.469.
+- 2026-10-17 (noon): [the same note](2026-10-16_additive-sidebars.md) — the space held before "+" closed again at his
+  word ("It moves anyway... let's close the space"); "+" slides with the sidebar, as AppKit arranges it. 0.4.470.

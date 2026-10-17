@@ -198,3 +198,12 @@ than its divider), again for each new split view. `MacTerminalWindowPolicy.apply
 **Tests:** `WindowChromeTests.sidebarEdgeDrawsNoLine` — divider transparent and hairline hidden, after the sidebar
 closes and reopens too, the edge still hit-testing to the split view, and back on; fails with the divider left alone.
 Probe: no line at rest open, reopened, or in any frame of the animations; no see-through pixels.
+
+## 2026-10-17: the held space closed again
+
+On 0.4.469, with a screenshot: "LOVE this... there's a little new space next to the side panel in the toolbar (before
+the +)" — 140 pt measured on it, the hold exactly. Asked, keep it (nothing moves) or close it ("+" slides with the
+sidebar, as on 0.4.467): "It moves anyway... let's close the space. Is this an Apple defined pattern or is it custom
+at this point?" Reverted 46cf403 (1534ece: `MacWorkspaceToolbarHold`, the view's hold, `toolbarStays`). Answered:
+the toolbar is AppKit's arrangement again; the window growing by the sidebar (D77) and the edge without a line are
+ours. Terminal suite 873. 0.4.470.
