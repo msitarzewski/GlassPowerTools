@@ -412,6 +412,12 @@ struct GlassPowerToolsApp: App {
                     with: GlassSettingsSyncService(favoriteItemsStore: GlassUbiquitousSettingsStore())
                 )
             }
+            // Each device's connections, counted per day, for Your Library's overview (D81).
+            Task { @MainActor in
+                await model.startSynchronizingUsage(
+                    with: GlassSettingsSyncService(usageStore: GlassUbiquitousSettingsStore())
+                )
+            }
         }
         _layers = State(initialValue: layers)
         _model = State(initialValue: model)

@@ -15,7 +15,8 @@ When you are signed in to iCloud, the hosts you add on one device appear on your
 | Favorites | Your other devices: hosts, and the services, projects, workgroups and folders in **Favorites**. The exception is the star on the device's own host (**This Mac** and the others), which stays on the device. |
 | Terminal Workgroups | Your other devices, while **Sync terminal settings** is on (see [Workgroups](terminal-workgroups.md)) |
 | Terminal themes and terminal preferences | Your other devices, while **Sync terminal settings** is on (see [Terminal settings](terminal-settings.md#edit-a-theme)) |
-| **Recent**, and which service **Connect opens** | This device only |
+| How many connections the device made each day of the last 30, per machine and kind of service, and the device's name (for **Your Library**'s overview) | Your other devices, through iCloud |
+| The connection history itself (times of day), **Recent**, and which service **Connect opens** | This device only |
 | Window appearance (**Settings** ▸ **Appearance**) | This device only |
 
 > [!NOTE]

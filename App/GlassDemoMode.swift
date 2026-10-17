@@ -118,6 +118,10 @@ enum GlassDemoMode {
                 if day % 5 == 0 { connections.append(("build", day, .ssh)) }
             }
             shell.demoRecordConnections(connections)
+            // Two more devices, as iCloud would bring them (D81): the overview's All Devices and
+            // its device choice. Invented names, as the rest of the demo's.
+            shell.demoOtherDevices([("Studio Mac", [("alpha", .ssh, 3), ("build", .ssh, 2)]),
+                                    ("Vision Pro (Lab)", [("bravo", .rdp, 2), ("alpha", .database, 1)])])
         case "terminal-ring":
             // 2026-10-15: ten terminals in one window, for its orb's ring (`--demo-session-orb`, and
             // `--demo-orb-names` to see where every name sits).

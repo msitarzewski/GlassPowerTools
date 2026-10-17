@@ -3,9 +3,10 @@
 //  Glass Power Tools — GlassShell
 //
 //  What the library's detail shows when no host is selected (D41, 2026-09-30): how many machines,
-//  services, favourites and collections there are, and how this device has been used — connections
-//  per day for the last 30 days and the machines used most. The history is this device's own
-//  (`GlassShellPreferences.connectionHistory`) and is never synced.
+//  services, favourites and collections there are, and how they have been used — connections per
+//  day for the last 30 days and the machines used most. On every device, added up, or on one chosen
+//  (D81, 2026-10-17): each device's history stays on it, and its counts per day travel
+//  (`GlassUsagePayload`).
 //
 
 import SwiftUI
@@ -44,15 +45,25 @@ public struct GlassLibraryStatistics: Equatable, Sendable {
                             history: [GlassShellPreferences.ConnectionEvent],
                             now: Date = Date(), days: Int = 30,
                             calendar: Calendar = .current) -> GlassLibraryStatistics {
+        make(hosts: hosts, isFavorite: isFavorite,
+             counts: history.map { GlassUsageCount(date: $0.date, hostID: $0.hostID, kind: $0.kind, count: 1) },
+             now: now, days: days, calendar: calendar)
+    }
+
+    /// The same from counts — this device's connections and other devices' days (D81).
+    public static func make(hosts: [GlassShellHost], isFavorite: (HostID) -> Bool,
+                            counts: [GlassUsageCount],
+                            now: Date = Date(), days: Int = 30,
+                            calendar: Calendar = .current) -> GlassLibraryStatistics {
         var byKind: [HostServiceKind: Int] = [:]
         for service in hosts.flatMap(\.services) { byKind[service.kind, default: 0] += 1 }
         let today = calendar.startOfDay(for: now)
         let start = calendar.date(byAdding: .day, value: -(days - 1), to: today) ?? today
-        let window = history.filter { $0.date >= start && $0.date <= now }
+        let window = counts.filter { $0.date >= start && $0.date <= now }
 
         var buckets: [Date: [HostServiceKind: Int]] = [:]
         for event in window {
-            buckets[calendar.startOfDay(for: event.date), default: [:]][event.kind, default: 0] += 1
+            buckets[calendar.startOfDay(for: event.date), default: [:]][event.kind, default: 0] += event.count
         }
         let perDay = buckets.keys.sorted().flatMap { date in
             HostServiceKind.allCases.compactMap { kind in
@@ -62,7 +73,7 @@ public struct GlassLibraryStatistics: Equatable, Sendable {
 
         let names = Dictionary(hosts.map { ($0.id, $0.displayName) }, uniquingKeysWith: { first, _ in first })
         var perHost: [HostID: Int] = [:]
-        for event in window where names[event.hostID] != nil { perHost[event.hostID, default: 0] += 1 }
+        for event in window where names[event.hostID] != nil { perHost[event.hostID, default: 0] += event.count }
         let mostUsed = perHost
             .map { Usage(hostID: $0.key, name: names[$0.key] ?? "", count: $0.value) }
             .sorted { ($0.count, $1.name) > ($1.count, $0.name) }
@@ -76,21 +87,42 @@ public struct GlassLibraryStatistics: Equatable, Sendable {
             collections: Set(hosts.flatMap(\.tags)).count,
             perDay: perDay,
             mostUsed: Array(mostUsed),
-            connectionsInWindow: window.count)
+            connectionsInWindow: window.reduce(0) { $0 + $1.count })
     }
 }
 
 struct GlassLibraryOverview: View {
-    let statistics: GlassLibraryStatistics
+    let hosts: [GlassShellHost]
+    let isFavorite: (HostID) -> Bool
+    /// Every device's connections, this one first (`GlassShellModel.usageByDevice`).
+    let devices: [GlassDeviceUsage]
     let onSelectHost: (HostID) -> Void
+    /// The device whose connections are shown; nil for all of them, added up.
+    @State private var chosenDevice: String?
+
+    /// The devices to choose from: this one, and each other with connections in the last 30 days.
+    private var listed: [GlassDeviceUsage] {
+        let start = Calendar.current.date(byAdding: .day, value: -29, to: Calendar.current.startOfDay(for: Date())) ?? .distantPast
+        return devices.filter { $0.isThisDevice || $0.counts.contains { $0.date >= start } }
+    }
+
+    /// The chosen device while it is listed; nil, every device, otherwise.
+    private var shownDevice: GlassDeviceUsage? {
+        chosenDevice.flatMap { id in listed.first { $0.id == id } }
+    }
+
+    private var statistics: GlassLibraryStatistics {
+        .make(hosts: hosts, isFavorite: isFavorite, counts: (shownDevice.map { [$0] } ?? listed).flatMap(\.counts))
+    }
 
     var body: some View {
+        let statistics = statistics
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 #if !os(visionOS)
                 Text("Your Library").font(.largeTitle.bold())
                 #endif
-                metrics
+                metrics(statistics)
                 if !statistics.servicesByKind.isEmpty {
                     HStack(spacing: 20) {
                         ForEach(HostServiceKind.allCases, id: \.self) { kind in
@@ -105,8 +137,8 @@ struct GlassLibraryOverview: View {
                         }
                     }
                 }
-                connectionsSection
-                if !statistics.mostUsed.isEmpty { mostUsedSection }
+                connectionsSection(statistics)
+                if !statistics.mostUsed.isEmpty { mostUsedSection(statistics) }
             }
             .glassDetailPageInsets()
             .frame(maxWidth: 760, alignment: .leading)
@@ -123,8 +155,12 @@ struct GlassLibraryOverview: View {
     /// The four figures, in one even row, or two even rows of two where the column is narrow:
     /// every tile the same width, so their edges line up with the chart and the list below. An
     /// adaptive grid left three on one row and one under it, short of the right-hand edge.
-    private var metrics: some View {
-        ViewThatFits(in: .horizontal) {
+    private func metrics(_ statistics: GlassLibraryStatistics) -> some View {
+        let machines = metric("Machines", statistics.machines, "server.rack")
+        let services = metric("Services", statistics.services, "square.stack.3d.up")
+        let favorites = metric("Favorites", statistics.favorites, "star")
+        let collections = metric("Collections", statistics.collections, "folder")
+        return ViewThatFits(in: .horizontal) {
             GlassEqualWidthRow(spacing: 12) {
                 machines; services; favorites; collections
             }
@@ -134,11 +170,6 @@ struct GlassLibraryOverview: View {
             }
         }
     }
-
-    private var machines: some View { metric("Machines", statistics.machines, "server.rack") }
-    private var services: some View { metric("Services", statistics.services, "square.stack.3d.up") }
-    private var favorites: some View { metric("Favorites", statistics.favorites, "star") }
-    private var collections: some View { metric("Collections", statistics.collections, "folder") }
 
     private func metric(_ title: String, _ value: Int, _ symbol: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -158,11 +189,30 @@ struct GlassLibraryOverview: View {
         .accessibilityElement(children: .combine)
     }
 
-    private var connectionsSection: some View {
+    private func connectionsSection(_ statistics: GlassLibraryStatistics) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Connections, last 30 days").font(.headline)
+            HStack(alignment: .firstTextBaseline) {
+                Text("Connections, last 30 days").font(.headline)
+                Spacer(minLength: 8)
+                // All of them first, then each device by the name it was given (the owner: "use the
+                // device name, not the product. I might have two vision pros").
+                if listed.count > 1 {
+                    Picker("Device", selection: $chosenDevice) {
+                        Text("All Devices").tag(String?.none)
+                        ForEach(listed) { device in
+                            Text(device.name).tag(String?.some(device.id))
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .fixedSize()
+                    .accessibilityLabel("Device")
+                    .accessibilityIdentifier("library-overview-device")
+                }
+            }
             if statistics.perDay.isEmpty {
-                Text("Connections you make on this device appear here. They are kept on this device only.")
+                Text(shownDevice.map { "No connections on \($0.name) in the last 30 days." }
+                     ?? "Connections you make on any of your devices appear here, counted per day.")
                     .foregroundStyle(.secondary)
             } else {
                 Chart(statistics.perDay) { day in
@@ -171,13 +221,24 @@ struct GlassLibraryOverview: View {
                 }
                 .frame(height: 180)
                 .accessibilityLabel("Connections per day, last 30 days")
-                Text("\(statistics.connectionsInWindow) connection\(statistics.connectionsInWindow == 1 ? "" : "s"), kept on this device only.")
+                Text(caption(statistics))
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
     }
 
-    private var mostUsedSection: some View {
+    /// "142 connections on 3 devices", or on the one chosen.
+    private func caption(_ statistics: GlassLibraryStatistics) -> String {
+        let total = statistics.connectionsInWindow
+        let connections = "\(total) connection\(total == 1 ? "" : "s")"
+        if let shownDevice { return "\(connections) on \(shownDevice.name)." }
+        let start = Calendar.current.date(byAdding: .day, value: -29, to: Calendar.current.startOfDay(for: Date())) ?? .distantPast
+        let used = listed.filter { $0.counts.contains { $0.date >= start } }
+        if used.count == 1, let only = used.first { return "\(connections) on \(only.name)." }
+        return "\(connections) on \(used.count) devices."
+    }
+
+    private func mostUsedSection(_ statistics: GlassLibraryStatistics) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Most used").font(.headline)
             ForEach(statistics.mostUsed) { usage in

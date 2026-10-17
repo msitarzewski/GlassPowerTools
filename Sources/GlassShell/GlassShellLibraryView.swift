@@ -55,9 +55,10 @@ public struct GlassShellLibraryView: View {
                         // A header on the headset all the same: it carries the sidebar's toggle.
                         emptyDetail.glassSpatialColumn("Your Library")
                     } else {
-                        // D41: the library at a glance, and how this device has used it.
-                        GlassLibraryOverview(statistics: .make(hosts: model.hosts, isFavorite: { model.isFavorite($0) },
-                                                               history: model.connectionHistory)) { selection = $0 }
+                        // D41: the library at a glance, and how it has been used — on every device,
+                        // or one chosen (D81).
+                        GlassLibraryOverview(hosts: model.hosts, isFavorite: { model.isFavorite($0) },
+                                             devices: model.usageByDevice) { selection = $0 }
                     }
                 }
                 // Fills the column so the layered surface behind it does too. **No opaque

@@ -42,6 +42,9 @@ public struct GlassShellPreferences: Codable, Equatable, Sendable {
     /// Favourites that are not machines (2026-10-13), each with its sync clock, keyed by
     /// `GlassFavorite.key`. An unfavourite is kept, dated, so it travels. Optional for older files.
     public var favoriteItems: [String: GlassFavoriteItemsPayload.Mark]?
+    /// What this device is called in every device's overview (D81), when the person named it;
+    /// nil for what the system calls it (`GlassDeviceName.system`). Optional for older files.
+    public var deviceName: String?
 
     /// Adds a connection, dropping what falls outside the window or over the limit.
     public mutating func recordConnection(_ event: ConnectionEvent) {

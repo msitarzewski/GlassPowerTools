@@ -70,6 +70,13 @@ no download or TestFlight build yet. What is verified, and how, is in
 
 ## Recent builds
 
+### 0.4.474 (17 October 2026)
+- **Your Library counts connections on all your devices.** The overview's chart and Most used add up
+  every device's connections, with a menu to show one device by its name. Each device shares how
+  many connections it made each day, per machine and kind of service, through iCloud; its history
+  stays on it. Name a device in Settings ▸ General ▸ This Device (iPhone, iPad and Vision Pro
+  otherwise go by their kind).
+
 ### 0.4.473 (17 October 2026)
 - **All Windows in light mode on iPhone and iPad:** a terminal's card is drawn on its theme's own
   canvas, as its window is, with its name and close button in the theme's light or dark — a dark

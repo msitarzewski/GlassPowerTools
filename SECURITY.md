@@ -23,7 +23,9 @@ this repository's `PATCHES.md` files record what is changed locally.
   database credentials and host-key pins. Configuration (hosts, services, settings) is stored
   separately from secrets.
 - **Syncing is iCloud's.** The host library syncs through CloudKit in your private database;
-  credentials and host-key pins sync through iCloud Keychain. Keys created in the **Secure
+  credentials and host-key pins sync through iCloud Keychain. Favorites, workgroups, projects,
+  terminal settings, and each device's name with how many connections it made per day to each
+  machine (no times of day), sync through iCloud's key-value store. Keys created in the **Secure
   Enclave** never leave the device they were made on and are never offered to another device.
 - **Nothing is sent anywhere else.** The app connects to the servers you add, to iCloud for sync,
   and, only if you connect a Tailscale account for device discovery, to Tailscale's API. A link a

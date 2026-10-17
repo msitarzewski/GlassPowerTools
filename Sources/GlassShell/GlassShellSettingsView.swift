@@ -218,8 +218,23 @@ public struct GlassShellSettingsView: View {
     }
     #endif
 
+    /// This device's name as typed, before it is kept (on Return, or on leaving the page).
+    @State private var deviceNameDraft = ""
+
     private var general: some View {
         Group {
+        Section {
+            TextField(GlassDeviceName.system, text: $deviceNameDraft)
+                .onAppear { deviceNameDraft = model.customDeviceName ?? "" }
+                .onSubmit { model.setDeviceName(deviceNameDraft) }
+                .onDisappear { model.setDeviceName(deviceNameDraft) }
+                .accessibilityLabel("This device's name")
+                .accessibilityIdentifier("settings-device-name")
+        } header: {
+            Text("This Device")
+        } footer: {
+            Text("What Your Library calls this device when it counts connections on all your devices. Left empty, it is what the system calls it.")
+        }
         Section {
             Toggle("Show service availability", isOn: $showsAvailability)
                 .accessibilityIdentifier("settings-show-availability")

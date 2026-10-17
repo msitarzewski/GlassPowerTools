@@ -1396,6 +1396,75 @@ public final class GlassShellModel: GlassServiceStore {
         Task { try? await favoritesSync.push(payload) }
     }
 
+    // MARK: Use on every device (D81, 2026-10-17)
+
+    private var usageSync: GlassSettingsSyncService<GlassUsagePayload>?
+    /// Every other device's counts, as iCloud last brought them, keyed by the device's id.
+    public private(set) var otherDevicesUsage: [String: GlassUsagePayload.Device] = [:]
+
+    /// Attaches this device's counts to iCloud, and reads every other device's. Without it the
+    /// overview shows this device alone, as it did before.
+    public func startSynchronizingUsage(with service: GlassSettingsSyncService<GlassUsagePayload>) async {
+        usageSync = service
+        await service.start(onMerge: { [weak self] incoming in self?.applyUsage(incoming) })
+        pushUsage()
+    }
+
+    /// This device in the counts: its writer id, which no other device has.
+    var thisDeviceKey: String { preferences.writerID.rawValue.uuidString }
+
+    /// The name this device was given here, if any.
+    public var customDeviceName: String? { preferences.deviceName }
+
+    /// What this device is called in every device's overview: the name given here, else the system's.
+    public var deviceName: String { preferences.deviceName ?? GlassDeviceName.system }
+
+    /// Names this device; empty goes back to the system's name. Told to the other devices.
+    public func setDeviceName(_ name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let named = trimmed.isEmpty ? nil : String(trimmed.prefix(GlassUsagePayload.maximumNameLength))
+        guard named != preferences.deviceName else { return }
+        preferences.deviceName = named
+        do { try persistPreferences() } catch { errorMessage = GlassShellError.message(for: error) }
+        pushUsage()
+    }
+
+    /// Takes every other device's counts; this device's own come from its history.
+    public func applyUsage(_ incoming: GlassUsagePayload) {
+        otherDevicesUsage = incoming.devices.filter { $0.key != thisDeviceKey }
+    }
+
+    /// A connection made on this device: into its history, and its counts to the other devices.
+    public func recordConnection(hostID: HostID, kind: HostServiceKind, at date: Date = Date()) {
+        preferences.recordConnection(.init(date: date, hostID: hostID, kind: kind))
+        do { try persistPreferences() } catch { errorMessage = GlassShellError.message(for: error) }
+        pushUsage()
+    }
+
+    private func pushUsage() {
+        guard let usageSync else { return }
+        let mine = GlassUsagePayload.Device(name: deviceName, history: preferences.connectionHistory ?? [])
+        let payload = GlassUsagePayload(devices: [thisDeviceKey: mine])
+        Task { try? await usageSync.push(payload) }
+    }
+
+    /// Every device's connections for the overview: this device first, from its own history, then
+    /// the others by name — each machine under the id this library knows it by.
+    public var usageByDevice: [GlassDeviceUsage] {
+        let mine = GlassDeviceUsage(
+            id: thisDeviceKey, name: deviceName, isThisDevice: true,
+            counts: connectionHistory.map { GlassUsageCount(date: $0.date, hostID: $0.hostID, kind: $0.kind, count: 1) })
+        let others = otherDevicesUsage.map { key, device in
+            GlassDeviceUsage(id: key, name: device.name, isThisDevice: false, counts: device.counts().map {
+                var count = $0
+                count.hostID = canonicalID(for: count.hostID)
+                return count
+            })
+        }
+        .sorted { ($0.name, $0.id) < ($1.name, $1.id) }
+        return [mine] + others
+    }
+
     // MARK: Favourites beyond machines (2026-10-13)
 
     /// How long an unfavourite is kept so it can travel to devices that have not heard of it.
@@ -1637,8 +1706,7 @@ public final class GlassShellModel: GlassServiceStore {
             guard let self, case .connected = outcome else { return }
             let now = Date()
             self.preferences[host: hostID].lastConnected = now
-            self.preferences.recordConnection(.init(date: now, hostID: hostID, kind: service.kind))
-            do { try self.persistPreferences() } catch { self.errorMessage = GlassShellError.message(for: error) }
+            self.recordConnection(hostID: hostID, kind: service.kind, at: now)
         }
     }
 
@@ -1762,6 +1830,26 @@ extension GlassShellModel {
             preferences.recordConnection(.init(date: date, hostID: host.id, kind: connection.kind))
         }
         try? persistPreferences()
+    }
+
+    /// Screenshots only: other devices' counts, as iCloud would bring them (D81) — each a name and,
+    /// per machine and kind, how many connections it made on each of the last 30 days but every third.
+    public func demoOtherDevices(_ devices: [(name: String, use: [(host: String, kind: HostServiceKind, perDay: Int)])]) {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        var payload = GlassUsagePayload()
+        for device in devices {
+            var history: [GlassShellPreferences.ConnectionEvent] = []
+            for day in 0..<GlassUsagePayload.days where day % 3 != 2 {
+                let date = calendar.date(byAdding: .hour, value: 12, to: calendar.date(byAdding: .day, value: -day, to: today) ?? today) ?? today
+                for use in device.use {
+                    guard let host = hosts.first(where: { $0.displayName == use.host }) else { continue }
+                    history += Array(repeating: .init(date: date, hostID: host.id, kind: use.kind), count: use.perDay)
+                }
+            }
+            payload.devices[UUID().uuidString] = GlassUsagePayload.Device(name: device.name, history: history)
+        }
+        applyUsage(payload)
     }
 }
 #endif

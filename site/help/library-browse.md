@@ -51,9 +51,11 @@ The first host in the list is the device you are using: **This Mac**, **This iPa
 
 ## The library at a glance
 
-With no host selected, the library's detail shows an overview, **Your Library**: how many machines, services, favorites and collections you have, the services of each kind, the connections this device made in the last 30 days, and the machines it used most. Choose one of those machines to select it.
+With no host selected, the library's detail shows an overview, **Your Library**: how many machines, services, favorites and collections you have, the services of each kind, the connections made in the last 30 days, and the machines used most. Choose one of those machines to select it.
 
-The connection history is kept on this device only. It records when you connected and to which kind of service on which machine, and nothing else. It never syncs, and it keeps 90 days.
+The connections are those of all your devices, added up. When more than one device has connected in the last 30 days, a menu beside **Connections, last 30 days** chooses **All Devices** or one device, by its name; the chart and **Most used** follow it. A device's name is set in **Settings** ▸ **General** ▸ **This Device**.
+
+Each device keeps its own connection history: when you connected, and to which kind of service on which machine, for 90 days. What reaches your other devices, through iCloud, is how many connections it made each day of the last 30, to each machine through each kind of service, and its name — not the times of day.
 
 A green dot on a service's icon means it's **connected** right now: a terminal, database or desktop session through it is open and connected, on this device. The dot appears on the host's row and beside the service in the host's detail, and goes when you disconnect. A session still connecting or reconnecting has no dot yet.
 
