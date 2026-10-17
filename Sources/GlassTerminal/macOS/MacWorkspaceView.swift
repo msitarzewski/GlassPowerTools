@@ -1084,7 +1084,14 @@ private struct MacWorkspaceTabContent: View {
     /// An SSH pane's shell is on the host, where this Mac's paths mean nothing: its files are
     /// uploaded to the host's drop folder and the host's paths are typed instead (W14).
     private func receiveDrop(_ providers: [NSItemProvider], on paneID: UUID) -> Bool {
-        guard let drop = SFTPIncomingDrop(providers: providers) else { return false }
+        // Every step said in the log (2026-10-16: a dropped screenshot reached the drop folder and
+        // was never typed, with nothing in the log to say why).
+        let types = providers.flatMap(\.registeredTypeIdentifiers).joined(separator: ",")
+        guard let drop = SFTPIncomingDrop(providers: providers) else {
+            Self.dropLogger.notice("event=drop-refused types=\(types, privacy: .public)")
+            return false
+        }
+        Self.dropLogger.notice("event=drop types=\(types, privacy: .public)")
         let route = TerminalDropRoute.resolve(
             localModel: controller.localRuntimesByPaneID[paneID]?.model,
             session: controller.session(for: paneID)
@@ -1099,6 +1106,7 @@ private struct MacWorkspaceTabContent: View {
             do {
                 let staging = try SFTPDropStaging(keepingFilesIn: TerminalDroppedPaths.inbox())
                 let received = try await drop.materialize(into: staging)
+                Self.dropLogger.notice("event=drop-received files=\(received.urls.count, privacy: .public)")
                 _ = dropFiles(received.urls, on: paneID)
             } catch {
                 Self.dropLogger.error("A drop on a terminal could not be read: \(error.localizedDescription, privacy: .public)")
@@ -1111,12 +1119,28 @@ private struct MacWorkspaceTabContent: View {
 
     /// Types the dropped files' paths into the pane's terminal, and makes it the focused pane.
     private func dropFiles(_ urls: [URL], on paneID: UUID) -> Bool {
-        guard let text = TerminalDroppedPaths.text(for: urls) else { return false }
+        guard let text = TerminalDroppedPaths.text(for: urls) else {
+            Self.dropLogger.error("event=drop-untyped reason=no-file-paths files=\(urls.count, privacy: .public)")
+            NSSound.beep()
+            return false
+        }
         let model = controller.localRuntimesByPaneID[paneID]?.model ?? controller.session(for: paneID)?.terminalHostModel
-        guard let model else { return false }
+        guard let model else {
+            Self.dropLogger.error("event=drop-untyped reason=no-terminal-for-pane")
+            NSSound.beep()
+            return false
+        }
         controller.focus(paneID)
-        model.insertDroppedText(text)
-        return true
+        let outcome = model.insertDroppedText(text)
+        switch outcome {
+        case .typed, .awaitingReview:
+            Self.dropLogger.notice("event=drop-typed outcome=\(String(describing: outcome), privacy: .public)")
+            return true
+        case .noTerminal, .refused:
+            Self.dropLogger.error("event=drop-untyped reason=\(String(describing: outcome), privacy: .public)")
+            NSSound.beep()
+            return false
+        }
     }
 
     /// A local pane is done: its shell ended, or it was closed — in tmux, detached (D47).

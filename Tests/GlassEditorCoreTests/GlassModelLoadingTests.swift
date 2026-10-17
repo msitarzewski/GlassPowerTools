@@ -5,6 +5,8 @@ import GlassEditorCore
 
 /// A 3D model RealityKit opens (D78): a text USD layer saved without its extension is given the one
 /// its bytes call for, and RealityKit opens it — the viewer's path on the Mac, iPhone and iPad.
+///
+/// Beside `GlassModelFile`'s other tests, in the module that has it.
 @Suite("A 3D model RealityKit opens")
 @MainActor
 struct GlassModelLoadingTests {

@@ -781,12 +781,27 @@ public final class SwiftTermHostModel: ObservableObject {
         terminalEngine?.commitPaste(approvedText, bracketed: request.bracketedPasteMode)
     }
 
+    private static let pasteLogger = os.Logger(subsystem: "sh.glas", category: "terminal-paste")
+
+    /// What became of text dropped on a terminal.
+    public enum DroppedTextOutcome: Equatable, Sendable {
+        /// Sent to the terminal.
+        case typed
+        /// Waiting for the person to review it (long, or more than one line).
+        case awaitingReview
+        /// No terminal to type it into: the pane's terminal isn't drawn yet, or has closed.
+        case noTerminal
+        /// Too large to paste at all, or empty.
+        case refused
+    }
+
     /// Text dropped on the terminal — files from Finder, as their paths — typed in the way a paste
     /// is: bracketed when the program asked for it, and reviewed first when it is long or spans
-    /// lines, by the same rules as ⌘V (2026-10-07).
-    public func insertDroppedText(_ text: String) {
-        guard let engine = terminalEngine else { return }
-        requestPaste(text, bracketed: engine.isBracketedPasteMode)
+    /// lines, by the same rules as ⌘V (2026-10-07). Says what became of it, for the drop to report.
+    @discardableResult
+    public func insertDroppedText(_ text: String) -> DroppedTextOutcome {
+        guard let engine = terminalEngine else { return .noTerminal }
+        return requestPaste(text, bracketed: engine.isBracketedPasteMode)
     }
 
     public func resolvePendingExternalLink(approved: Bool) -> URL? {
@@ -795,13 +810,29 @@ public final class SwiftTermHostModel: ObservableObject {
         return approved ? request.url : nil
     }
 
-    fileprivate func requestPaste(_ text: String, bracketed: Bool) {
-        guard pendingPasteReview == nil, !text.isEmpty else { return }
+    /// A paste or drop, typed or held for review.
+    ///
+    /// **The newest wins.** A review still waiting when another paste or drop comes was never
+    /// answered — on screen, its sheet takes the keys and the window under it takes no drops — and
+    /// left there it turned away every paste and drop after it without a word (the owner,
+    /// 2026-10-16: a screenshot dragged into a terminal "just disappears"; the file had arrived,
+    /// and nothing was typed). It gives way to the newer one, and says so in the log.
+    @discardableResult
+    fileprivate func requestPaste(_ text: String, bracketed: Bool) -> DroppedTextOutcome {
+        guard !text.isEmpty else { return .refused }
+        if let stale = pendingPasteReview {
+            Self.pasteLogger.notice("event=paste-review-replaced waiting-bytes=\(stale.byteCount, privacy: .public)")
+            pendingPasteReview = nil
+        }
         if let review = SwiftTermPastePolicy.reviewRequest(for: text, bracketed: bracketed) {
             pendingPasteReview = review
+            return .awaitingReview
         } else if SwiftTermPastePolicy.isAllowed(text) {
-            terminalEngine?.commitPaste(text, bracketed: bracketed)
+            guard let engine = terminalEngine else { return .noTerminal }
+            engine.commitPaste(text, bracketed: bracketed)
+            return .typed
         }
+        return .refused
     }
 
     func requestExternalLink(_ link: String) {
