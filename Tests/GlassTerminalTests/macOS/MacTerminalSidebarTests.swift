@@ -111,10 +111,20 @@ struct MacTerminalSidebarTests {
             await settle()
         }
 
+        /// Until the window and the terminal have stopped moving (200 ms still, 3 s at most): the
+        /// window follows its sidebar over several turns of the main queue, and under load a fixed
+        /// wait wasn't always enough.
         func settle() async {
-            for _ in 0..<5 { await Task.yield() }
-            try? await Task.sleep(for: .milliseconds(400))
-            window.contentView?.layoutSubtreeIfNeeded()
+            try? await Task.sleep(for: .milliseconds(150))
+            var last = (window.frame, model.detail), still = 0
+            let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+            while ContinuousClock.now < deadline, still < 4 {
+                for _ in 0..<5 { await Task.yield() }
+                try? await Task.sleep(for: .milliseconds(50))
+                window.contentView?.layoutSubtreeIfNeeded()
+                let now = (window.frame, model.detail)
+                if now == last { still += 1 } else { still = 0; last = now }
+            }
         }
 
         func close() { window.close() }
@@ -156,10 +166,17 @@ struct MacTerminalSidebarTests {
         window.setFrame(NSRect(x: 400, y: 300, width: 1000, height: 600), display: true)
         window.alphaValue = 0
         window.orderFrontRegardless()
+        // Until the window has stopped moving, as `Hosted.settle`.
         func settle() async {
-            for _ in 0..<5 { await Task.yield() }
-            try? await Task.sleep(for: .milliseconds(400))
-            window.contentView?.layoutSubtreeIfNeeded()
+            try? await Task.sleep(for: .milliseconds(150))
+            var last = window.frame, still = 0
+            let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+            while ContinuousClock.now < deadline, still < 4 {
+                for _ in 0..<5 { await Task.yield() }
+                try? await Task.sleep(for: .milliseconds(50))
+                window.contentView?.layoutSubtreeIfNeeded()
+                if window.frame == last { still += 1 } else { still = 0; last = window.frame }
+            }
         }
         await settle()
         let sidebar = try #require(GlassAdditiveSidebars.items(in: window).first { $0.behavior == .sidebar })

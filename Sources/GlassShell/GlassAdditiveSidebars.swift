@@ -117,6 +117,10 @@ public enum GlassAdditiveSidebars {
         private let watched = NSHashTable<NSSplitViewItem>.weakObjects()
         /// Each item's state as last followed (or let be, the window not additive then).
         private var followed: [ObjectIdentifier: Bool] = [:]
+        /// Each item's width as it started to move, read then: a moment later it is moving.
+        private var startingWidths: [ObjectIdentifier: CGFloat] = [:]
+        /// The width the window was given for each open item, to set right once it has settled.
+        private var allowedWidths: [ObjectIdentifier: CGFloat] = [:]
         /// Where the window is going, while it gets there.
         private var heading: NSRect?
         private var headingGeneration = 0
@@ -160,6 +164,7 @@ public enum GlassAdditiveSidebars {
                 followed[id] = item.isCollapsed
                 return
             }
+            startingWidths[id] = item.viewController.view.frame.width
             // Now, before the sidebar's first frame: what is beside it holds its width meanwhile.
             if !lookScheduled {
                 NotificationCenter.default.post(name: GlassAdditiveSidebars.willResizeWindow, object: window)
@@ -188,11 +193,14 @@ public enum GlassAdditiveSidebars {
                 let collapsed = item.isCollapsed
                 guard followed[id] != collapsed else { continue }
                 followed[id] = collapsed
+                let width = collapsed ? (allowedWidths[id] ?? startingWidths[id] ?? item.viewController.view.frame.width)
+                    : (startingWidths[id] ?? item.viewController.view.frame.width)
                 guard additive, window.isVisible, !window.styleMask.contains(.fullScreen),
                       let next = GlassAdditiveSidebars.windowFrame(
-                        target, sidebarWidth: item.viewController.view.frame.width, opening: !collapsed,
+                        target, sidebarWidth: width, opening: !collapsed,
                         leading: item.behavior == .sidebar, visible: window.screen?.visibleFrame) else { continue }
                 target = next
+                allowedWidths[id] = collapsed ? nil : width
                 moved = true
             }
             guard moved, target != window.frame else { return }
@@ -203,6 +211,7 @@ public enum GlassAdditiveSidebars {
             guard duration > 0 else {
                 window.setFrame(target, display: true)
                 heading = nil
+                DispatchQueue.main.async { [weak self] in self?.settle() }
                 return
             }
             NSAnimationContext.runAnimationGroup { context in
@@ -211,9 +220,30 @@ public enum GlassAdditiveSidebars {
                 window.animator().setFrame(target, display: true)
             } completionHandler: { [weak self] in
                 MainActor.assumeIsolated {
-                    if self?.headingGeneration == generation { self?.heading = nil }
+                    guard let self, self.headingGeneration == generation else { return }
+                    self.heading = nil
+                    self.settle()
                 }
             }
+        }
+
+        /// The sidebar settled at another width than it started opening at (measured, now and then:
+        /// 25 points narrower): the window takes up the difference, at the sidebar's side, so what is
+        /// beside it is the width it was. Before the view lets go of the width it held meanwhile.
+        private func settle() {
+            guard additive, heading == nil, let window, !window.styleMask.contains(.fullScreen) else { return }
+            var frame = window.frame
+            for item in watched.allObjects where !item.isCollapsed {
+                let id = ObjectIdentifier(item)
+                guard let allowed = allowedWidths[id] else { continue }
+                let actual = item.viewController.view.frame.width
+                let difference = actual - allowed
+                guard abs(difference) >= 0.5 else { continue }
+                frame.size.width += difference
+                if item.behavior == .sidebar { frame.origin.x -= difference }
+                allowedWidths[id] = actual
+            }
+            if frame != window.frame { window.setFrame(frame, display: true) }
         }
     }
 }

@@ -80,10 +80,18 @@ struct GlassAdditiveSidebarsTests {
             await settle()
         }
 
+        /// Until the window and the detail have stopped moving (200 ms still, 3 s at most).
         func settle() async {
-            for _ in 0..<5 { await Task.yield() }
-            try? await Task.sleep(for: .milliseconds(300))
-            window.contentView?.layoutSubtreeIfNeeded()
+            try? await Task.sleep(for: .milliseconds(150))
+            var last = (window.frame, measured.frame), still = 0
+            let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+            while ContinuousClock.now < deadline, still < 4 {
+                for _ in 0..<5 { await Task.yield() }
+                try? await Task.sleep(for: .milliseconds(50))
+                window.contentView?.layoutSubtreeIfNeeded()
+                let now = (window.frame, measured.frame)
+                if now == last { still += 1 } else { still = 0; last = now }
+            }
         }
 
         func close() { window.close() }
