@@ -70,6 +70,11 @@ no download or TestFlight build yet. What is verified, and how, is in
 
 ## Recent builds
 
+### 0.4.473 (17 October 2026)
+- **All Windows in light mode on iPhone and iPad:** a terminal's card is drawn on its theme's own
+  canvas, as its window is, with its name and close button in the theme's light or dark — a dark
+  theme's picture was green text on the white sheet.
+
 ### 0.4.472 (17 October 2026)
 - **A machine you delete, or a service you remove, stays that way on your other devices.** Before,
   deleting a machine whose service was set up never reached your other devices, and a device that

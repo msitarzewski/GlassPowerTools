@@ -183,11 +183,24 @@ struct GlassAllWindowsCard: View {
     var alwaysOnScreen = false
     @AppStorage(GlassShowAllWindows.blursPreviewsKey) private var blursPreviews = false
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.colorScheme) private var colorScheme
     @State private var scrolledOnScreen = false
 
+    /// What the session's window paints behind it, where a window has an opaque page: iPhone and
+    /// iPad. A Vision Pro window is glass, and its card stays as clear as the window is.
+    private var backdrop: GlassSessionBackdrop? {
+        #if os(iOS)
+        session.backdrop?()
+        #else
+        nil
+        #endif
+    }
+
     var body: some View {
+        let backdrop = backdrop
         Button(action: activate) {
             ZStack {
+                if let backdrop { backdrop.color }
                 TimelineView(.animation(minimumInterval: 1, paused: !refreshes)) { _ in
                     if let snapshot = session.snapshot?() {
                         // The card's width filled, its newest part kept: a phone's terminal is
@@ -238,6 +251,9 @@ struct GlassAllWindowsCard: View {
             .accessibilityLabel("\(session.closeTitle) \(session.title)")
         }
         .onScrollVisibilityChange(threshold: 0.01) { scrolledOnScreen = $0 }
+        // Its name, its close button and its mark in the backdrop's own light or dark, as the
+        // terminal's controls are over its theme (ce2dbf6), whatever the sheet around it is.
+        .environment(\.colorScheme, backdrop?.colorScheme ?? colorScheme)
     }
 
     /// Whether the picture is being taken again each second: on screen, in a window in front.

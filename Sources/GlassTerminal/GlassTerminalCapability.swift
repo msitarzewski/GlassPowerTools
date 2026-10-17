@@ -659,9 +659,18 @@ public final class GlassTerminalCapability: GlassCapability {
                 closeSymbolName: Self.closeSymbolName(for: [session]),
                 isConnected: session.state == .connected,
                 snapshot: { Self.preview(of: session) },
-                mark: { Self.agent(of: session)?.markImage }
+                mark: { Self.agent(of: session)?.markImage },
+                backdrop: { [runtime] in Self.backdrop(window: GlassWindowOverrides(), runtime: runtime) }
             )
         }
+    }
+
+    /// What a terminal's window paints behind it on iPhone and iPad — its theme's canvas, an opaque
+    /// page — and the theme's light or dark, so its All Windows card looks as the window does.
+    static func backdrop(window: GlassWindowOverrides, runtime: GlassTerminalRuntime) -> GlassSessionBackdrop {
+        let theme = TerminalWindowProfile.resolved(window, settings: runtime.settingsManager).theme
+        return GlassSessionBackdrop(color: theme.canvasBackgroundColor.color,
+                                    colorScheme: theme.resolvedAppearance.colorScheme)
     }
 
     /// A terminal in no workgroup is called what the tab showing it is called (W19): on the Mac,
@@ -721,7 +730,11 @@ public final class GlassTerminalCapability: GlassCapability {
                     let shown = workgroup.selectedSessionID.flatMap { manager.session(for: $0) } ?? live[0]
                     return Self.agent(of: shown)?.markImage
                 },
-                tabs: live.map { tab(of: $0, in: workgroup.id, manager: manager) }
+                tabs: live.map { tab(of: $0, in: workgroup.id, manager: manager) },
+                backdrop: { [runtime] in
+                    Self.backdrop(window: manager.workgroup(for: workgroup.id)?.windowSettings ?? GlassWindowOverrides(),
+                                  runtime: runtime)
+                }
             )
         }
     }
@@ -750,7 +763,11 @@ public final class GlassTerminalCapability: GlassCapability {
             isConnected: session.state == .connected,
             snapshot: { Self.preview(of: session) },
             mark: { Self.agent(of: session)?.markImage },
-            waitsToBeShown: waits
+            waitsToBeShown: waits,
+            backdrop: { [runtime] in
+                Self.backdrop(window: manager.workgroup(for: workgroupID)?.windowSettings ?? GlassWindowOverrides(),
+                              runtime: runtime)
+            }
         )
     }
 

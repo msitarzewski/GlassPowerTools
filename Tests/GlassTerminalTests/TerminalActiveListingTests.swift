@@ -3,6 +3,7 @@ import Testing
 import GlassLayers
 import GlassConnectionKit
 import GlassShell
+import SwiftUI
 @testable import GlassTerminal
 
 /// A live terminal in no workgroup — every terminal Connect opens on a Mac — is a row in Active,
@@ -34,6 +35,34 @@ struct TerminalActiveListingTests {
         let grouped = capability.openSessions()
         #expect(grouped.map(\.id) == [GlassTerminalCapability.sessionID(workgroupID: group)], "once, as the workgroup")
         manager.closeWorkgroup(group)
+    }
+
+    /// All Windows on iPhone and iPad draws a terminal's card on what its window paints behind it —
+    /// the theme's canvas, an opaque page — in the theme's light or dark, whatever the system's (the
+    /// owner, 2026-10-17, light mode: a dark theme's picture was green text on the white sheet).
+    @Test("A terminal's cards carry its theme's canvas and its light or dark")
+    func cardsCarryTheThemesBackdrop() throws {
+        let runtime = GlassTerminalRuntime(layers: GlassLayerStore())
+        let capability = GlassTerminalCapability(runtime: runtime)
+        let manager = runtime.sessionManager
+        let group = manager.createWorkgroup(name: "alpha", colorTag: .blue)
+        defer { manager.closeWorkgroup(group) }
+        let terminal = session(named: "alpha")
+        manager.registerSession(terminal)
+        terminal.state = .connected
+        _ = manager.appendSession(terminal, toWorkgroup: group)
+
+        runtime.settingsManager.currentTheme.background = CodableColor(sRGBRed: 0.05, green: 0.05, blue: 0.08, alpha: 0.2)
+        let window = try #require(capability.openSessions().first)
+        let card = try #require(window.tabs.first)
+        let dark = GlassSessionBackdrop(color: CodableColor(sRGBRed: 0.05, green: 0.05, blue: 0.08, alpha: 1).color,
+                                        colorScheme: .dark)
+        #expect(window.backdrop?() == dark, "the window's card")
+        #expect(card.backdrop?() == dark, "a tab's card: opaque, as the window's page is, whatever the theme's alpha")
+
+        runtime.settingsManager.currentTheme.background = CodableColor(sRGBRed: 0.98, green: 0.97, blue: 0.94, alpha: 1)
+        runtime.settingsManager.currentTheme.preferredAppearance = .light
+        #expect(card.backdrop?()?.colorScheme == .light, "a light theme's card is drawn light")
     }
 
     @Test("A workgroup Connect made for one terminal is named as its window names it; a named workgroup keeps its name")

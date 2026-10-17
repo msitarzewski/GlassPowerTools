@@ -80,6 +80,11 @@ public struct GlassOpenSession: Identifiable {
     /// it asks first (`requestClose`, `glassAskingBeforeClosing`), as closing a document does
     /// (2026-10-17: Active and All Windows threw unsaved editor changes away without a word).
     public let unsavedChanges: (@MainActor () -> String?)?
+    /// What the session's own window paints behind its picture where that window has an opaque page
+    /// — a terminal's theme on iPhone and iPad — so its card is the same, nil where the picture
+    /// stands on its own (2026-10-17, the owner, on All Windows in light mode: a dark theme's
+    /// see-through picture was green text on the white sheet).
+    public let backdrop: (@MainActor () -> GlassSessionBackdrop?)?
 
     public init(id: String, title: String, subtitle: String? = nil, symbolName: String,
                 endpointIDs: [EndpointID] = [], hostID: HostID? = nil,
@@ -89,7 +94,8 @@ public struct GlassOpenSession: Identifiable {
                 isConnected: Bool = true, connectedEndpointIDs: [EndpointID]? = nil,
                 snapshot: (@MainActor () -> Image?)? = nil, mark: (@MainActor () -> Image?)? = nil,
                 tabs: [GlassOpenSession] = [], waitsToBeShown: Bool = false,
-                unsavedChanges: (@MainActor () -> String?)? = nil) {
+                unsavedChanges: (@MainActor () -> String?)? = nil,
+                backdrop: (@MainActor () -> GlassSessionBackdrop?)? = nil) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
@@ -106,12 +112,26 @@ public struct GlassOpenSession: Identifiable {
         self.tabs = tabs
         self.waitsToBeShown = waitsToBeShown
         self.unsavedChanges = unsavedChanges
+        self.backdrop = backdrop
     }
 
     /// Ends it, or hands it to `ask` when ending it would lose something (`unsavedChanges`).
     @MainActor
     public func requestClose(asking ask: (GlassOpenSession) -> Void) {
         if unsavedChanges?() != nil { ask(self) } else { close() }
+    }
+}
+
+/// The colour a session's window paints behind it, and its light or dark — what is drawn over it
+/// (a card's name, its close button) takes that, as the terminal's own controls do. Nil for a
+/// colour scheme that follows the system.
+public struct GlassSessionBackdrop: Equatable, Sendable {
+    public let color: Color
+    public let colorScheme: ColorScheme?
+
+    public init(color: Color, colorScheme: ColorScheme?) {
+        self.color = color
+        self.colorScheme = colorScheme
     }
 }
 
