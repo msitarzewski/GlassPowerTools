@@ -179,9 +179,23 @@ public enum GlassCatalogMerge {
         // copy of its own and the old copy was then deleted, leaving the machine nowhere; the
         // record that held the setup is revived instead. iCloud's copy is preferred, so every
         // device revives the same record and they converge.
+        //
+        // **Only what a merge lost, never what a person removed** (2026-10-17). Until then this
+        // undid every deletion of a set-up machine at the next sync — on the device that deleted
+        // it, from the account's older copy — and every Remove Service the same way. What a person
+        // removes says so in the records, and a fold never does:
+        // - `deleteHost` tombstones a record with its services still on it; a fold moves each
+        //   service out first (`HostCatalogStore.move`), so its tombstones name none. A service a
+        //   tombstone names went with its machine.
+        // - Remove Service leaves the record live without the service (`unpair`). A copy holding
+        //   it is revived only from a record that ended deleted, never past its own live, newer
+        //   statement.
+        let all = Array(remoteByID.values) + Array(localByID.values)
+        let deletedWithTheirMachine = Set(all.filter { $0.deletedAt != nil }.flatMap { $0.services.map(\.endpointID) })
         var holders: [EndpointID: [HostProfile]] = [:]
-        for host in Array(remoteByID.values) + Array(localByID.values) where host.deletedAt == nil {
-            for service in host.services where service.configuration != nil {
+        for host in all where host.deletedAt == nil && final[host.id]?.deletedAt != nil {
+            for service in host.services
+            where service.configuration != nil && !deletedWithTheirMachine.contains(service.endpointID) {
                 holders[service.endpointID, default: []].append(host)
             }
         }

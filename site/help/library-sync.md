@@ -47,10 +47,8 @@ Settings shows the same status:
 
 - If you edit the same host on two devices, the most recent edit wins for the whole host.
 - A favorite follows the most recent change on any device: removing one on your iPhone removes it on your Mac too. When favorites first sync, each device's favorites are kept together.
-- If you delete a host on one device, the deletion is meant to reach your other devices and stay.
-
-  > [!WARNING]
-  > Known problem: today a host that has a service set up comes back after you delete it, at the next sync, while iCloud has a copy of it. A sync never lets a set-up service disappear, and it can't yet tell your deletion from a lost record. A fix is pending. Until then, a host without set-up services stays deleted.
+- If you delete a host on one device, it is deleted on the others, together with its services' saved settings and passwords. Editing it on another device doesn't bring it back; setting up a new service on it there does, so that service isn't lost.
+- A service you remove from a host is removed on your other devices too.
 - Records with the same name (case and a trailing `.local` don't matter), a name they share under **Also known as**, or the same address are shown as one host. If they don't disagree about the address, they are combined into one record the next time the library loads: when the app opens, when you return to it, when you pull the host list down, or with **Sync Now**. Where both have a service of the same kind and name, one is kept.
 
 > [!TIP]

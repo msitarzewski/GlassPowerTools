@@ -294,4 +294,71 @@ struct GlassCatalogMergeTests {
         #expect(applied[d]?.deletedAt != nil, "the old copy stays deleted")
         #expect(!outcome.toPublish.contains { $0.id == m }, "nothing to send for the adopted copy")
     }
+
+    // MARK: - What a person removed stays removed (2026-10-17)
+    //
+    // The pass above revived every set-up service no live record held, so a machine deleted on
+    // purpose came back at the next sync — on the device that deleted it, from the account's
+    // older copy — and so did every service removed with Remove Service. `deleteHost` leaves the
+    // services on the tombstone and Remove Service leaves the record live, which a fold never does.
+
+    @Test("A set-up machine deleted here stays deleted, and the deletion is sent")
+    func deletedSetUpMachineStaysDeleted() throws {
+        let id = HostID(), endpoint = EndpointID()
+        let tombstone = configured(try host("doomed", id: id, updated: 20, deleted: 20), endpoint: endpoint)
+        let accountCopy = configured(try host("doomed", id: id, updated: 10), endpoint: endpoint)
+        let outcome = GlassCatalogMerge.reconcile(local: [tombstone], remote: [accountCopy])
+        #expect(outcome.toApplyLocally.isEmpty, "the account's older copy came back: \(outcome.toApplyLocally)")
+        #expect(outcome.toPublish.map(\.deletedAt) == [tombstone.deletedAt])
+    }
+
+    @Test("A set-up machine deleted on another device is deleted here too")
+    func deletionOfASetUpMachineArrives() throws {
+        let id = HostID(), endpoint = EndpointID()
+        let mine = configured(try host("doomed", id: id, updated: 10), endpoint: endpoint)
+        let tombstone = configured(try host("doomed", id: id, updated: 20, deleted: 20), endpoint: endpoint)
+        let outcome = GlassCatalogMerge.reconcile(local: [mine], remote: [tombstone])
+        #expect(outcome.toApplyLocally.map(\.deletedAt) == [tombstone.deletedAt])
+        #expect(outcome.toPublish.isEmpty, "sent back alive: \(outcome.toPublish)")
+    }
+
+    @Test("A long-deleted set-up machine a stale device restamped stays deleted")
+    func restampedSetUpMachineStaysDeleted() throws {
+        // 2026-09-28's headset, with the machines' services set up: its upgrade restamped copies
+        // the account had held deleted for months.
+        let id = HostID(), endpoint = EndpointID()
+        let restamped = configured(try host("gone", id: id, updated: 99), endpoint: endpoint)
+        let tombstone = configured(try host("gone", id: id, updated: 10, deleted: 10), endpoint: endpoint)
+        let outcome = GlassCatalogMerge.reconcile(local: [restamped], remote: [tombstone])
+        #expect(outcome.toApplyLocally.allSatisfy { $0.deletedAt != nil })
+        #expect(outcome.toPublish.allSatisfy { $0.deletedAt != nil })
+    }
+
+    @Test("A service removed here stays removed, and the record is sent without it")
+    func removedServiceStaysRemoved() throws {
+        let id = HostID(), removed = EndpointID(), kept = EndpointID()
+        let accountCopy = withService(configured(try host("alpha", id: id, updated: 10), endpoint: kept), removed)
+        let mine = configured(try host("alpha", id: id, updated: 20), endpoint: kept)
+        let outcome = GlassCatalogMerge.reconcile(local: [mine], remote: [accountCopy])
+        #expect(outcome.toApplyLocally.isEmpty, "the removed service came back: \(outcome.toApplyLocally)")
+        #expect(outcome.toPublish.map { $0.services.map(\.endpointID) } == [[kept]])
+    }
+
+    @Test("A service removed on another device is removed here too")
+    func removalOfAServiceArrives() throws {
+        let id = HostID(), removed = EndpointID(), kept = EndpointID()
+        let mine = withService(configured(try host("alpha", id: id, updated: 10), endpoint: kept), removed)
+        let theirs = configured(try host("alpha", id: id, updated: 20), endpoint: kept)
+        let outcome = GlassCatalogMerge.reconcile(local: [mine], remote: [theirs])
+        #expect(outcome.toApplyLocally.map { $0.services.map(\.endpointID) } == [[kept]])
+        #expect(outcome.toPublish.isEmpty, "sent back with the removed service: \(outcome.toPublish)")
+    }
+
+    /// `host` with a second set-up service.
+    private func withService(_ host: HostProfile, _ endpoint: EndpointID) -> HostProfile {
+        var host = host
+        host.services.append(HostServiceLink(endpointID: endpoint, kind: .database, displayName: "Database",
+                                             configuration: Data(#"{"port":5432}"#.utf8)))
+        return host
+    }
 }

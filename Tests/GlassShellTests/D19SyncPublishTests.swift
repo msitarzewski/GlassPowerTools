@@ -116,4 +116,60 @@ struct D19SyncPublishTests {
         #expect(!model.hosts.contains { $0.displayName.hasPrefix("retired") },
                 "a machine deleted here came back from the account")
     }
+
+    /// The same with the service set up, as every real machine's is (2026-10-17). The merge's
+    /// second pass revived any set-up service no live record held: it adopted the account's older
+    /// copy instead of sending the deletion, so the machine stayed on every other device (this
+    /// device's store refused the older copy). The test above passed only because its service had
+    /// no setup.
+    @Test func aSetUpMachineDeletedHereStaysDeletedAndTheDeletionIsSent() async throws {
+        let (model, backend, root) = try makeShell()
+        defer { try? FileManager.default.removeItem(at: root) }
+        await model.load()
+
+        let endpoint = try await model.adoptService(kind: .ssh, hostName: "retired",
+                                                    address: "retired.example", serviceName: "Terminal")
+        let retired = try #require(model.catalogHosts.first { $0.displayName == "retired" })
+        var accountCopy = try #require(model.records.first { $0.id == retired.id })
+        let index = try #require(accountCopy.services.firstIndex { $0.endpointID == endpoint })
+        accountCopy.services[index].configuration = Data(#"{"port":22}"#.utf8)
+        // The account holds the machine, set up, when it is deleted here; deleting syncs.
+        backend.remote = [accountCopy]
+        backend.saved.removeAll()
+        try await model.deleteHost(retired.id)
+        await model.synchronizeCatalog()
+
+        #expect(!model.hosts.contains { $0.displayName == "retired" }, "a set-up machine deleted here came back")
+        #expect(backend.saved.contains { $0.id == retired.id && $0.deletedAt != nil }, "the deletion was never sent")
+    }
+
+    /// Remove Service, the same way: the account's older copy still holds the service.
+    @Test func aServiceRemovedHereStaysRemoved() async throws {
+        let (model, backend, root) = try makeShell()
+        defer { try? FileManager.default.removeItem(at: root) }
+        await model.load()
+
+        let terminal = try await model.adoptService(kind: .ssh, hostName: "alpha",
+                                                    address: "192.0.2.10", serviceName: "Terminal")
+        let database = try await model.adoptService(kind: .database, hostName: "alpha",
+                                                    address: "192.0.2.10", serviceName: "MySQL on alpha")
+        let alpha = try #require(model.catalogHosts.first { $0.displayName == "alpha" })
+        var accountCopy = try #require(model.records.first { record in
+            record.services.contains { $0.endpointID == database }
+        })
+        for index in accountCopy.services.indices {
+            accountCopy.services[index].configuration = Data(#"{"port":3306}"#.utf8)
+        }
+        backend.remote = [accountCopy]
+        backend.saved.removeAll()
+        try await model.removeService(database, from: alpha.id)
+        await model.synchronizeCatalog()
+
+        let services = model.records.flatMap(\.services).map(\.endpointID)
+        #expect(services.contains(terminal))
+        #expect(!services.contains(database), "a service removed here came back")
+        let sent = backend.saved.filter { $0.id == accountCopy.id }
+        #expect(!sent.isEmpty && sent.allSatisfy { !$0.services.contains { $0.endpointID == database } },
+                "the removal was never sent: \(sent.map { $0.services.map(\.displayName) })")
+    }
 }
