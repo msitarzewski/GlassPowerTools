@@ -24,6 +24,11 @@ struct MacWorkspaceSceneRoot: View {
     }
 }
 
+/// A width kept for the log as it changes, without redrawing the view.
+final class MacWorkspaceColumnWidth {
+    var width: CGFloat = 0
+}
+
 struct MacWorkspaceView: View {
     @State private var windowController: MacWorkspaceWindowController
     @State private var columnVisibility: NavigationSplitViewVisibility
@@ -56,6 +61,8 @@ struct MacWorkspaceView: View {
     @State private var terminalColumnWidth: CGFloat = 0
     @State private var heldTerminalWidth: CGFloat?
     @State private var terminalWidthHolds = 0
+    /// The column's width as laid out, held or not, for the log (a box: no redraw for it).
+    @State private var columnWidthNow = MacWorkspaceColumnWidth()
     private let sidebarPreferenceKey: String
 
     @Environment(SessionManager.self) private var sessionManager
@@ -268,6 +275,7 @@ struct MacWorkspaceView: View {
             // right).
             .frame(minWidth: 720, maxWidth: .infinity, minHeight: 460, alignment: .trailing)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
+                columnWidthNow.width = width
                 if heldTerminalWidth == nil { terminalColumnWidth = width }
             }
             .id(selected.workspaceID)
@@ -569,8 +577,15 @@ struct MacWorkspaceView: View {
         withTransaction(transaction) { heldTerminalWidth = terminalColumnWidth }
         terminalWidthHolds += 1
         let hold = terminalWidthHolds
+        let held = terminalColumnWidth
         DispatchQueue.main.asyncAfter(deadline: .now() + GlassAdditiveSidebars.animationDuration + 0.15) {
             guard hold == terminalWidthHolds else { return }
+            // A column wider than the terminal held in it shows the window behind at its leading
+            // edge until now; then the terminal takes the column's width and reflows.
+            GlassAdditiveSidebars.logger.notice("""
+                event=terminal-width-released held=\(held, privacy: .public) \
+                column=\(columnWidthNow.width, privacy: .public) window=\(terminalWindow.map { NSStringFromRect($0.frame) } ?? "none", privacy: .public)
+                """)
             withTransaction(transaction) { heldTerminalWidth = nil }
         }
     }

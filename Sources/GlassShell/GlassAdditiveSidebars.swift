@@ -31,6 +31,7 @@
 #if os(macOS)
 import AppKit
 import ObjectiveC
+import OSLog
 
 @MainActor
 public enum GlassAdditiveSidebars {
@@ -106,6 +107,9 @@ public enum GlassAdditiveSidebars {
         if target.maxX > visible.maxX { target.origin.x = visible.maxX - target.width }
         return target
     }
+
+    /// Each move, in numbers: what the window was given, and where the sidebar ended.
+    public nonisolated static let logger = Logger(subsystem: "com.glasspowertools", category: "sidebar")
 
     /// Watches a window's sidebars and moves the window as one starts to open or close.
     @MainActor
@@ -198,7 +202,20 @@ public enum GlassAdditiveSidebars {
                 guard additive, window.isVisible, !window.styleMask.contains(.fullScreen),
                       let next = GlassAdditiveSidebars.windowFrame(
                         target, sidebarWidth: width, opening: !collapsed,
-                        leading: item.behavior == .sidebar, visible: window.screen?.visibleFrame) else { continue }
+                        leading: item.behavior == .sidebar, visible: window.screen?.visibleFrame) else {
+                    GlassAdditiveSidebars.logger.notice("""
+                        event=sidebar-not-followed \(collapsed ? "closing" : "opening", privacy: .public) \
+                        width=\(width, privacy: .public) window=\(NSStringFromRect(target), privacy: .public) \
+                        screen=\(window.screen.map { NSStringFromRect($0.visibleFrame) } ?? "none", privacy: .public)
+                        """)
+                    continue
+                }
+                GlassAdditiveSidebars.logger.notice("""
+                    event=sidebar-follow \(collapsed ? "closing" : "opening", privacy: .public) \
+                    width=\(width, privacy: .public) started=\(self.startingWidths[id] ?? -1, privacy: .public) \
+                    allowed=\(self.allowedWidths[id] ?? -1, privacy: .public) \
+                    window=\(NSStringFromRect(target), privacy: .public) to=\(NSStringFromRect(next), privacy: .public)
+                    """)
                 target = next
                 allowedWidths[id] = collapsed ? nil : width
                 moved = true
@@ -238,6 +255,10 @@ public enum GlassAdditiveSidebars {
                 guard let allowed = allowedWidths[id] else { continue }
                 let actual = item.viewController.view.frame.width
                 let difference = actual - allowed
+                GlassAdditiveSidebars.logger.notice("""
+                    event=sidebar-settled allowed=\(allowed, privacy: .public) actual=\(actual, privacy: .public) \
+                    window=\(NSStringFromRect(window.frame), privacy: .public)
+                    """)
                 guard abs(difference) >= 0.5 else { continue }
                 frame.size.width += difference
                 if item.behavior == .sidebar { frame.origin.x -= difference }
