@@ -13,7 +13,7 @@ itself exists yet.
 - **Scope and authorization:** the plan is authorized and written. **Creating project files is
   not yet authorized**; it begins on the user's word. Three pre-steps below need the user's
   explicit instruction because they touch sibling repositories.
-- **Owner and affected files:** `~/Software/glass/GlassPowerTools` only. Siblings are read, not
+- **Owner and affected files:** this repository only. Siblings are read, not
   edited, with the pre-steps as the sole exceptions and only when instructed.
 - **Acceptance:** the exit criteria at the end, each with evidence.
 

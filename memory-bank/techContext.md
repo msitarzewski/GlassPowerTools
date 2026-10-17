@@ -1,14 +1,16 @@
 # Technical context
 
-Everything here was measured or read on 2026-09-10 from the working checkouts. No build of Glass
-Power Tools exists. The sizes, entitlement groups and deployment targets below were re-measured on
-2026-09-10 after the project moved to `~/Software/glass/GlassPowerTools`, and all of them still hold.
+The sections from here to "Security posture to carry forward" were measured or read on 2026-09-10
+from the working checkouts, before any build of Glass Power Tools existed, and are kept as that
+survey; each later section is dated. For where things stand, start at "Current dependency state" and
+read down. The sizes, entitlement groups and deployment targets below were re-measured on 2026-09-10
+after the project moved to its present directory, and all of them still held.
 
 ## Workspace layout
 
-The project is `~/Software/glass/GlassPowerTools`. Every source application and shared package is a
-**sibling directory** under `~/Software/glass/`, so the `../name` paths used throughout this memory
-bank and `AGENTS.md` resolve correctly from the project root. Verified 2026-09-10.
+Every source application and shared package is a **sibling directory** of the project, so the
+`../name` paths used throughout this memory bank and `AGENTS.md` resolve correctly from the project
+root. Verified 2026-09-10.
 
 | Path | What it is | Role |
 |---|---|---|
@@ -35,7 +37,7 @@ confirmed present.
   `../glassdb`, and Stage 3 migrates from there. Do not unpack the archive to consult it.
 - `../docs` — two **security and maturity audit reports** of glas.sh and glassdb dated 2026-07-16/17,
   with `file:line` citations and severity tiers. Not user documentation and not a journal. They cite
-  GlasSecretStore at `~/Developer/GlasSecretStore/`, an old path, confirming they
+  GlasSecretStore at an older location outside this layout, confirming they
   predate the current layout. Not an input to the merge, but not merely historical either: see the
   carried-forward findings below before Stage 2.
 
@@ -76,7 +78,9 @@ path is built and no stage blocks on proving it.
 
 ## Deployment target and architecture
 
-**Decided: 26.0 on macOS, iOS and visionOS, `arm64` only, no Intel slice.**
+**Decided: 26.0 on macOS, iOS and visionOS, `arm64` only, no Intel slice.** Still so on 2026-10-17:
+`Package.swift` declares `.macOS(.v26)`, `.iOS(.v26)`, `.visionOS(.v26)`, and every configuration in
+`GlassPowerTools.xcodeproj` sets 26.0 and `ARCHS = arm64` (the app, its UI tests and five extensions).
 
 Observed in the sources: glas.sh 26.0 across the board; glassdb macOS 27.0 with iOS and visionOS at
 26.0; glassDT 26.0 across the board. Only glassdb's macOS target moves, downward, so anything in it
@@ -185,10 +189,12 @@ current look carries over.
 
 | Purpose | Host | User | Auth | Verified |
 |---|---|---|---|---|
-| SSH / SFTP / tunnel integration tests | `192.0.2.6` (Parallels scratch VM, Linux 7.0.0-29-generic) | `michael` | ED25519 key at `~/.ssh/<test VM key>` | `echo ok` over BatchMode SSH; `Subsystem sftp /usr/lib/openssh/sftp-server`; no `AllowTcpForwarding` restriction |
+| SSH / SFTP / tunnel integration tests | `192.0.2.6` (Parallels scratch VM, Linux 7.0.0-29-generic) | `<test account>` | ED25519 key at `~/.ssh/<test VM key>` | `echo ok` over BatchMode SSH; `Subsystem sftp /usr/lib/openssh/sftp-server`; no `AllowTcpForwarding` restriction |
 
-Environment for the gated tests: `GPT_SSH_TEST_HOST=192.0.2.6 GPT_SSH_TEST_USER=michael
-GPT_SSH_TEST_KEY_PATH=$HOME/.ssh/<test VM key>`. Never record key material or passwords here.
+Environment for the gated tests: `GPT_SSH_TEST_HOST=192.0.2.6 GPT_SSH_TEST_USER=<test account>
+GPT_SSH_TEST_KEY_PATH=$HOME/.ssh/<test VM key>`. Never record key material, passwords or the real
+account and address here (rule 61); they are kept outside the repository. Since 2026-10-12 the
+runner reaches the VM through a loopback tunnel (below, "Widgets, App Groups and the test runner").
 
 ## macOS accessibility crash under XCUITest (root-caused 2026-09-10)
 
@@ -197,8 +203,10 @@ SwiftUI `AccessibilityNode.resolvedRole`, no app frames, are triggered determini
 presenting `AddSSHKeyView` as a sheet from the server-form sheet (`ServerFormViews.swift:427`),
 whenever the accessibility tree is then resolved (the runner's snapshot ~45 s after the click).
 The view is byte-identical to glas.sh; the form alone is fine. Rule 12 in project rules; fix owned
-by W3. The engine reached the test VM from the iOS simulator through key exchange to the host-trust
-prompt, so the simulator is not subject to the Mac's Local Network gate.
+by W3. *Superseded 2026-09-11 (rule 12): W4 bisected the crash to the SSH Key row's accessibility
+label, not to the nested sheet; nested sheets are allowed. The sheet is presented at
+`ServerFormViews.swift:621` today.* The engine reached the test VM from the iOS simulator through
+key exchange to the host-trust prompt, so the simulator is not subject to the Mac's Local Network gate.
 
 ## Security posture to carry forward
 
@@ -292,6 +300,15 @@ in the runner, which on macOS inherits the shell's. Every live UI test is theref
 in practice**, and the database and desktop have no phone-side coverage at all until a
 configuration can be seeded the way `--ui-testing-seed-project` seeds one for the editor.
 
+**Read again on 2026-10-17:** Xcode 27.2 (27B5019j) is still the toolchain, its compiler Swift 6.4;
+the Mac runs macOS 27.2 (26B5112a). `Package.swift` is tools version 6.2 with the Swift 6 language
+mode, and `GlassTerminal` and its tests default to main-actor isolation
+(`.defaultIsolation(MainActor.self)`). The app target sets `SWIFT_VERSION = 6.0`,
+`SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`, `SWIFT_STRICT_CONCURRENCY = complete` and approachable
+concurrency. Simulator testing is on iOS and visionOS 27.2 runtimes since 2026-10-14: the ⚡ hold
+passed on an older simulator and did nothing on the owner's iOS 27.2 phone, where the library's
+SwiftUI-drawn ⚡ carries no accessibility identifier
+(`tasks/2026-10/2026-10-14_all-windows-agents-clipboard.md`).
 
 ## macOS 27.2 beta (26B5091g) — observed 2026-09-21
 
@@ -317,7 +334,12 @@ be measured headless with an `ImageRenderer` probe — `Tools/ChartProbe` is the
   harness: `GPT_GRID_TIMING=1 GPT_GRID_PAGE=1000 GPT_GRID_STEPS=1500 swift test -c release --filter
   GridScrollTimingTests` (real view, real SQLite in the managed folder; needs the Mac to itself).
   `NSTableView` remains the proposed next step if numbers require it.
-- **Terminal renderer:** SwiftTerm's Metal renderer on the Mac and iPhone; CoreGraphics on Vision Pro.
+- **Terminal renderer** (*corrected 2026-10-17*; this line said Metal on the Mac): Metal on iPhone and
+  iPad, Core Graphics on Vision Pro (`SwiftTermRendererPreference.platformDefault`,
+  `Sources/GlassTerminalEmulator/SwiftTermHostView.swift:27`, applied only in the UIKit host), and an
+  iPad under Scale draws with Core Graphics too (D75). The Mac draws with SwiftTerm's Core Graphics: its
+  `TerminalView` starts with Metal off and nothing in the Mac host turns it on (`setUseMetal` is called
+  only in the UIKit section, `SwiftTermHostView.swift:3087`/`:3104`).
 
 ## Release and hosting, 2026-09-25 (D38, D39)
 
@@ -338,19 +360,22 @@ Procedure: `Documentation/BUILDING.md`, "Releasing the Mac app" and "The website
 ## Dependencies, 2026-09-27
 
 Every dependency is pinned to a revision in `Package.resolved`; Xcode's copy must match it
-(`Tools/Packages/sync-xcode-pins.py`, `PackagePinAgreementTests`). Notable versions: swift-nio
-2.103.0, swift-nio-ssl 2.37.5, swift-crypto 4.5.2, BigInt 6.0.1, SwiftTerm **1.20.0** (exact, D48;
-its build-tool plugin needs `-skipPackagePluginValidation` for `xcodebuild`),
-swift-markdown 0.9.0 (exact), tree-sitter 0.25.10, postgres-nio 1.33.1, mysql-nio at the fork's
-recorded revision. Vendored: Citadel `ae8562f`, swift-nio-ssh 0.3.7 (`6acaa1a`), RDPKit 0.3.1.
+(`Tools/Packages/sync-xcode-pins.py`, `PackagePinAgreementTests`; the two files agreed when read on
+2026-10-17). Notable versions (re-read 2026-10-17): swift-nio **2.104.0** and swift-log **1.16.1**
+(taken 2026-10-12, 7116d9b), swift-nio-ssl 2.37.5, swift-crypto 4.5.2, BigInt 6.0.1, SwiftTerm
+**1.20.0** (exact, D48; its build-tool plugin needs `-skipPackagePluginValidation` for `xcodebuild`),
+swift-markdown 0.9.0 (exact), Sparkle 2.10.0 (exact, macOS only, D38), SwiftTreeSitter 0.25.0,
+tree-sitter 0.25.10, postgres-nio 1.33.1, mysql-nio at the fork's recorded revision. Vendored: Citadel
+`ae8562f`, swift-nio-ssh 0.3.7 (`6acaa1a`) with local patches including upstream's fix for
+CVE-2026-43798 (`Packages/swift-nio-ssh/PATCHES.md`, N8, 2026-10-12), RDPKit 0.3.1 (`2032fdb`).
 
 **Watching for newer releases (D48, 2026-10-07):** `Tools/Packages/check-updates.py` reports what is
 newer, with release notes, commits and anything to review (new plugins, binary targets, unsafe flags,
 dependencies, licence changes, major versions); `--test NAME` tests the app against a release in a
 temporary worktree. A LaunchAgent (`Tools/Packages/install-weekly-check.sh`) runs it Mondays at
 08:00 with `--test newer`; reports in `~/Library/Logs/GlassPowerTools/`. It never changes a pin.
-First survey: 8 of 30 pins behind (swift-log 1.16.1 and swift-nio 2.104.0 allowed as declared; the
-rest indirect, including tree-sitter 0.27 and swift-crypto 5 below).
+First survey: 8 of 30 pins behind (swift-log 1.16.1 and swift-nio 2.104.0 allowed as declared, and
+since taken; the rest indirect, including tree-sitter 0.27 and swift-crypto 5 below).
 
 Held back, with the reason:
 
@@ -417,11 +442,77 @@ Simulator,name=iPhone 17' -clonedSourcePackagesDirPath <resolved SourcePackages>
 - **New macOS extension targets** in the hand-written project: `GlassPowerToolsFinder` (Finder Sync) and
   `GlassPowerToolsQuickActions` (an action extension, `com.apple.services`,
   `NSExtensionServiceAllowsFinderPreviewItem`). Both are sandboxed, use the team App Group (`GPT_WIDGET_GROUP`), and
-  are embedded on the Mac only. The release script must sign them (B-R2).
+  are embedded on the Mac only. The release script must sign them (B-R2). Two more followed the same evening, also
+  Mac-only, sandboxed and on the team group: `GlassPowerToolsShare` (`Share/`, Share ▸ Send to a Machine, a37a981;
+  it holds no credential and connects to nothing — the app sends the files) and `GlassPowerToolsFiles`
+  (`FileProvider/`, the D72 phase 5 spike, 12f7e63: links `GlassSSHTransport`, 31 MB, also signed with the Keychain
+  group; embedded but inert, no domain registered — `tasks/2026-10/2026-10-13_file-provider-spike.md`).
 - **App Intents:** every intent in `GlassWidgetData` goes into the app's and the widget extension's metadata.
-  Check `Metadata.appintents/extract.actionsdata` after a build. App Shortcuts live in the app target, eight of
-  the ten allowed.
+  Check `Metadata.appintents/extract.actionsdata` after a build. App Shortcuts live in the app target: all ten
+  allowed are used (`App/GlassPowerToolsShortcuts.swift`, counted 2026-10-17), so a new one replaces another.
 - **Controls:** a control template has no branches (`ControlWidgetTemplateBuilder`), so one intent per control.
   Controls exist on macOS 26 and iOS 18, not visionOS.
 - **`swift build` compiles only the Mac:** code under `#if os(iOS) || os(visionOS)` is checked only by the
   `xcodebuild` builds for those platforms.
+
+## Platform facts measured 2026-10-14 to 2026-10-17 (D74–D78)
+
+**AppKit and SwiftUI windows on the Mac** (D77; `tasks/2026-10/2026-10-16_additive-sidebars.md`, measured on macOS
+27.2 with probe apps, because animations don't run inside `swift test`):
+- `NSSplitViewItem.collapseBehavior = .preferResizingSplitViewWithFixedSiblings` does what its header promises for
+  a SwiftUI split view in a plain `NSWindow`, and **not in a SwiftUI `WindowGroup` window** (`AppKitWindow`, content
+  an `AppKitWindowHostingController`): AppKit grows such a window by raising its minimum width, so it grew to the
+  right only and never shrank. Setting the window's frame does work there, so the app moves it. A test or probe
+  that uses a plain window does not cover a window scene.
+- A minimum size SwiftUI holds on a window's whole content stops AppKit growing the window for a sidebar; on the
+  detail column it does not.
+- One toolbar click flips `isCollapsed` three times; resizing the window inside the KVO change left the sidebar
+  laid out at no width (move on the next main-queue turn). A collapsed sidebar's view still reports the width it
+  opens to.
+- Opening, AppKit lays the sidebar out at full width and draws the window inside the call, before it slides the
+  sidebar in and sends KVO; `.prior` arrives first.
+- The split divider is an `NSSplitDividerView` (0.5 pt) beside the panes. Hidden, AppKit shows it again when the
+  sidebar reopens; made transparent, it stays so. The split view itself takes the drag.
+- A toolbar item is never narrower than 36 pt.
+- A shell process cannot capture the screen; a probe app can photograph its own window with
+  `CGWindowListCreateImage` reached through `dlsym`.
+
+**Terminal scale** (D75; `tasks/2026-10/2026-10-16_terminal-resize-and-scale.md`, SwiftTerm 1.20.0):
+- Setting SwiftTerm's font calls `resetFont()` → `resize(cols:rows:)` → `softReset()`, and cell height is whole
+  points, so a font that fits the window would re-grid and soft-reset at every step: scaling the drawing is the way.
+- AppKit gives a view under scaled bounds the scale it is shown at (`contentsScale` 2 × 0.504 = 1.008), so Mac text
+  stays sharp. `wantsDynamicContentScaling` exists on visionOS only.
+- SwiftTerm's iOS Metal renderer draws at the screen's scale whatever the view's, so a scaled iPad terminal was soft;
+  Core Graphics with `contentScaleFactor` = screen × shown scale (to 1/16) is sharp.
+- iPadOS 27.2 (simulator, Windowed Apps): no request sizes a window. Raising `sizeRestrictions.minimumSize` grows
+  one, when it changes; a smaller maximum never shrank one. `windowIdealSize`, `windowIdealPlacement` and
+  `defaultWindowPlacement` are unavailable on iOS, and no iOS API holds a scene's shape
+  (`UIWindowSceneGeometryPreferencesIOS.h` has only orientations). Not tried on an iPad device.
+- Vision Pro: `requestGeometryUpdate(.Vision(size:resizingRestrictions: .uniform))` holds a window to its shape;
+  SwiftUI has no aspect lock for a window.
+
+**Vision Pro** (D74 and the headset terminal; `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`):
+- An app is never told where a person looks. Every look effect is a system hover effect; effects in one
+  `HoverEffectGroup` show together, and a member left at the default `.activatesGroup` starts the group.
+- A pinch is touch type `direct`, a trackpad `indirectPointer`. SwiftTerm's iOS edit menu (`UIMenuController`)
+  never shows on visionOS.
+- tmux 3.8 turns `mouse` on with no configuration (a private server started with `-f /dev/null` reports it), so a
+  drag goes to tmux unless the app stands in the way.
+- The visionOS simulator cannot drive looks, the trackpad or a held SwiftUI menu (the runner turns a hold into a
+  tap); those are checked on the headset.
+
+**iPhone and iPad, iOS 27.2** (`tasks/2026-10/2026-10-14_all-windows-agents-clipboard.md`): a toolbar's plain
+button is drawn natively, so SwiftUI gestures on it never fire, and the library's SwiftUI-drawn ⚡ carries no
+accessibility identifier; Metal drawing is invisible to `layer.render` and visible to `drawHierarchy`.
+
+**3D** (D78; `tasks/2026-10/2026-10-16_3d-models.md`, SDK 27.2): `Model3D` and `PreviewApplication` are visionOS
+only; `RealityView` with camera controls is macOS 15 / iOS 18 / visionOS; `quickLookPreview` is everywhere.
+RealityKit picks the loader by file extension. Its camera starts inside the model until `cameraTarget` is set,
+and the orbit camera frames its target by height (about 45% of the view), so the viewer aims at an unseen sphere
+around the model. Vision Pro's Quick Look opens USDZ and Reality, not a bare USD layer. `Model3D` with
+`scaledToFit3D()` drew nothing visible in a window. The Mac's Quick Look has USD extensions, none for `.reality`.
+Not yet seen: the Mac viewer in the running app, AR Quick Look on a phone, the headset.
+
+**Logs to read after the owner tries something:** `com.glasspowertools` / `sidebar` (each sidebar move and the
+width held); `sh.glas` / `terminal-drop`, `terminal-selection`, `terminal-paste`, `terminal-model-link`. Use
+`/usr/bin/log show --predicate 'subsystem == "…" AND category == "…"'` — zsh's builtin `log` shadows it.

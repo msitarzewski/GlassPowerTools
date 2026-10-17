@@ -1,10 +1,10 @@
 # glassdb — Complete User-Facing Feature Inventory
 
-Read-only survey of `~/Software/glass/glassdb` performed 2026-09-11 for the GlassPowerTools merge.
+Read-only survey of `../glassdb` performed 2026-09-11 for the GlassPowerTools merge.
 Purpose: porting checklist. Every feature below must have a destination in the merged product or be
 an explicit, recorded decision to drop.
 
-All citations are `file:line` relative to `~/Software/glass/glassdb`.
+All citations are `file:line` relative to `../glassdb`.
 
 ---
 

@@ -17,11 +17,26 @@ local modules:
 | Database capability | Connections, browsing, query surfaces. Moved from glassdb |
 | Desktop capability | RDP and VNC sessions, Metal presentation, input. Moved from glassDT |
 | Protocol engines | RDPKit, VNCKit, SSH and database drivers, kept as separate modules |
-
 | Editing capability | GlassEditorKit. Library in from the start, interface built last |
 
 The shell depends on no capability. Each capability depends on the shell and on its own engines.
 Capabilities do not depend on each other.
+
+**As built** (read from `Package.swift`, 2026-10-17): nineteen library products, beside the vendored
+grammar targets. Shell side —
+`GlassShell` (library, settings, capability registry, Active, All Windows, orbs, window sizing and
+shape, additive sidebars; Sparkle on macOS only), `GlassLayers`, `GlassConnectionKit`,
+`GlassConnectionUI` (shared library UI and window chrome), `GlassHostCatalog`, `GlasSecretStore`,
+`GlassWidgetData` (the widget snapshot, intents and requests, shared with the extensions).
+Capabilities — `GlassTerminal`, `GlassDatabase`, `GlassDesktop`, `GlassEditor`. Engines —
+`GlassTerminalEmulator` (SwiftTerm's host), `GlassSSHTransport` (Citadel), `GlassDBKit` (MySQLNIO,
+PostgresNIO), `GlassRDPTransport` (RDPKit, vendored in `Packages/`), `VNCKit`, `GlassVNCTransport`,
+and the editor's `GlassEditorCore` and `GlassEditorUI`, which the terminal and the database import as
+libraries (the editing row above became these three targets when GlassEditorKit was absorbed,
+2026-09-14). No capability imports another: where one needs another's view, the composition root
+hands it over as a closure (below, 2026-10-14 onward). The Xcode project adds the app, its UI tests
+and five extensions: widgets (all three platforms) and, on the Mac only, Finder Sync, Quick Actions,
+Share and an inert File Provider.
 
 **Layers are not a later polish pass.** Every surface gets its material from one system: windows,
 title bars, panels, detail views and session canvases. A capability never invents its own background
@@ -65,34 +80,36 @@ should have produced before any of that was written. Rule 57.
 
 | Behaviour | Owner today | Reachable from | Notes |
 |---|---|---|---|
-| **Terminal still image** | `SwiftTermHostModel.previewImage(maxPixelWidth:)`, `Sources/GlassTerminalEmulator/SwiftTermHostView.swift:575` (NSImage) and `:601` (UIImage) | Anywhere — `GlassTerminalEmulator` is a base module | Cross-platform already. This is D4's snapshot |
-| **Gallery layout solver** | `GlassGalleryLayout`, `Sources/GlassShell/GlassSessionGallery.swift` | Anywhere | **Moved here 2026-09-21** from `MacTerminalOverviewGrid`. `MacTerminalOverview` uses it through a typealias; its tests moved to `GlassShellTests` and now run on every platform |
+| **Terminal still image** | `SwiftTermHostModel.previewImage(maxPixelWidth:)`, `Sources/GlassTerminalEmulator/SwiftTermHostView.swift:684` (NSImage) and `:716` (UIImage) | Anywhere — `GlassTerminalEmulator` is a base module | Cross-platform already. This is D4's snapshot. Off the Mac it is drawn with `drawHierarchy`, because `layer.render` cannot see Metal drawing (7837885), and a terminal left keeps its last picture (f824c8c) |
+| **Gallery layout solver** | `GlassGalleryLayout`, `Sources/GlassShell/GlassSessionGallery.swift:24` | Anywhere | **Moved here 2026-09-21** from `MacTerminalOverviewGrid`. `MacTerminalOverview` uses it through a typealias; its tests moved to `GlassShellTests` and now run on every platform |
+| **All Windows layout solver** (groups of equal tiles, as large as the space allows) | `GlassAllWindowsLayout`, `Sources/GlassShell/GlassAllWindowsLayout.swift:20` | Anywhere | **Moved here 2026-10-14** (321a625) unchanged from `MacTerminalExposeLayout`, now a typealias (`Sources/GlassTerminal/macOS/MacTerminalExpose.swift:193`); the off-Mac overview uses it |
 | **Grid ⇄ carousel overview, card-width slider, arrow-key navigation** | `MacTerminalOverview`, `Sources/GlassTerminal/macOS/MacTerminalOverview.swift` | macOS only | **Since 2026-09-21 shows every open session** — its own tabs live, everything else as `GlassSessionCard` — browsed as one row (`MacOverviewItem`) |
-| **Spatial grid and carousel** (3D rotation, ±1 card rendered) | `VisionTerminalWorkgroupView.spatialOverview`, `:414` | visionOS only | Same scope: one workgroup |
-| **"Only fresh output may steal selection"** | `MacTerminalActivitySelection`, `MacTerminalOverview.swift:178` | macOS only, but pure and portable | A live gallery wants this; the session gallery does not use it yet |
+| **Spatial grid and carousel** (3D rotation, ±1 card rendered) | `VisionTerminalWorkgroupView.spatialOverview`, `:730` | visionOS only | Same scope: one workgroup |
+| **"Only fresh output may steal selection"** | `MacTerminalActivitySelection`, `MacTerminalOverview.swift:471` | macOS only, but pure and portable | A live gallery wants this; the session gallery does not use it yet |
 | **Idle-hiding policy for overview chrome** | `MacOverviewIdlePolicy`, same file | macOS only, pure | |
-| **Running-workgroup card grid** | `TerminalWorkgroupsView.swift:379` | macOS only | A *third* card treatment (see drift below) |
-| **Cross-capability session list and gallery** | `GlassOpenSession`, `GlassSessionSwitcher`, `GlassSessionGallery`, `Sources/GlassShell/` | Everywhere | The gap all of the above left: they switch within one capability |
-| **Desktop still image** | None. `DesktopSessionModel` holds a framebuffer and builds `CGImage` for the cursor (`updateCursorImage`) but exposes no frame snapshot | — | Desktops do contribute sessions to Active (`GlassDesktopCapability.openSessions`, `Sources/GlassDesktop/GlassDesktopCapability.swift:139`), with no `snapshot`, so their cards show a name and a symbol. *Corrected 2026-10-12: this row said the desktop contributed none (D31).* |
-| **Database / editor still image** | None, and none wanted | — | A card with a name and a symbol is the right answer for both |
+| **Running-workgroup card grid** | `TerminalWorkgroupsView.swift:414` | macOS only | A *third* card treatment (see drift below) |
+| **Cross-capability session list and gallery** | `GlassOpenSession`, `GlassActiveConnections` (Active, D33; it replaced `GlassSessionSwitcher` on 2026-09-21), `GlassSessionGallery`, `Sources/GlassShell/` | Everywhere | The gap all of the above left: they switch within one capability |
+| **Desktop still image** | `GlassDesktopCapability.openSessions`, `Sources/GlassDesktop/GlassDesktopCapability.swift:139`: `snapshot` is the remote screen as it last arrived (`:153`, 8b2fb4d, 2026-10-13) | Anywhere a `GlassOpenSession` goes | *Corrected 2026-10-17: this row said desktops gave no snapshot.* Show All Windows uses it; the desktop's orb draws the same picture (`GlassDesktopCapability.picture(of:)`, `Sources/GlassDesktop/DesktopSessionView.swift:193`) |
+| **Database / editor still image** | None from the capability, and none wanted for Active | — | On Vision Pro an orb whose face has no picture draws its window as it shrinks (`GlassWindowSizer.picture`, `Sources/GlassShell/GlassWindowSizer.swift:80`, 30d6ca6) |
 
-**Known drift to settle when the gallery is next touched:** there are now four card treatments —
+**Known drift to settle when the gallery is next touched:** there are now six card treatments —
 `MacTerminalOverview`'s, `VisionTerminalWorkgroupView.overviewCard`'s, the workgroups detail
-grid's, and `GlassSessionCard`. They differ in corner radius, border and how selection is shown.
-`GlassSessionCard` is the candidate to absorb the others, and the two terminal ones should adopt
-it rather than a fifth being added.
+grid's, `GlassSessionCard`, the Mac's Show All Windows tiles (`MacTerminalExposeView.swift`) and the
+off-Mac overview's `GlassAllWindowsCard` (`Sources/GlassShell/GlassShowAllWindowsOverview.swift:172`).
+They differ in corner radius, border and how selection is shown. One shell card should absorb the
+others rather than a seventh being added.
 
-## Contextual File items and Mac key owners (2026-09-25; keys rechecked 2026-10-12)
+## Contextual File items and Mac key owners (2026-09-25; keys rechecked 2026-10-12 and 2026-10-17)
 
 One menu item per key, aimed by the focused window: the window publishes a focused scene value with
 the item's title and action, or nothing (the item is then disabled, never borrowed from another
 window). `MenuBarPlacementTests` holds a single-owner guard for ⌘N, ⌘S, ⌘W, ⌘O (and ⌥⌘O's absence),
-⇧⌘E, ⌘F, ⌘G, ⇧⌘G, ⌥⌘G, ⌥⇧⌘G, ⌘T and ⇧⌘\; ⇧⌘O, ⌥⌘E and ⌃⌘T have none yet.
+⇧⌘E, ⌘F, ⌘G, ⇧⌘G, ⌥⌘G, ⌥⇧⌘G, ⌘T, ⇧⌘\, ⇧⌘P and ⌘K; ⇧⌘O, ⌥⌘E and ⌃⌘T have none yet.
 
 | Key | Owner | What the window says |
 |---|---|---|
 | ⌘N | shell (`\.glassNewItem`) | New Host · New Terminal Window · New SQL Document · New Document |
-| ⌘S | shell (`\.glassSaveItem`, D37) | Save… / Save (editor) · Save SQL Document… (database) |
+| ⌘S | shell (`\.glassSaveItem`, D37) | Save… / Save (editor) · Save SQL Document… (database). Off the Mac the editor's toolbar Save takes ⌘S, inside `#if !os(macOS)` (e3ee5d7); the guard checks it stays off the Mac |
 | ⌘W | `GlassCloseCommandRouter` (registered, never declared) | editor: the document, and the window with its last document unless a project is open |
 | ⌘O | editor's Open… — files and folders; a folder opens as a project in its own window | runs its own panel from any window. ⌥⌘O (Open Project…) was removed 2026-10-08 (`50f6cae`) and is guarded as undeclared |
 | ⇧⌘O | database's Open SQL Document… | |
@@ -102,7 +119,9 @@ window). `MenuBarPlacementTests` holds a single-owner guard for ⌘N, ⌘S, ⌘W
 | ⌥⌘G / ⌥⇧⌘G | terminal's Terminal Grid / Terminal Carousel (`MacWorkspaceCommands`, moved from ⌘G 2026-10-08) | |
 | ⌘T | terminal (Mac workspace; visionOS platform commands) | |
 | ⌃⌘T | terminal's New Basic Terminal Tab — a local shell outside tmux (`MacWorkspaceCommands`, 2026-10-12) | |
-| ⇧⌘\ | terminal's Window ▸ Show All Terminals (`GlassTerminalLibraryEntries`, 2026-10-08) | works from any window |
+| ⇧⌘\ | terminal's Window ▸ Show All Windows (`GlassTerminalLibraryEntries`, 2026-10-08; Show All Terminals until 2026-10-13) | works from any window |
+| ⇧⌘P / ⌘K | shell's Command Palette… (`GlassShellPaletteCommands`, 2026-10-13) | capabilities add entries through `GlassCommandPaletteSources` |
+| ⌘+ / ⌘− / ⌘0 | per scene: the terminal's (`MacWorkspaceCommands`) and the editor's Text menu (`GlassEditorScenes`) | under Scale (D75) the terminal's size the window, not the font |
 
 ## Synced preferences beside the catalog (2026-10-08)
 
@@ -174,3 +193,80 @@ test fails without the push.
   database's saved queries (with their database's name, never their SQL). Something that must reach a window not
   yet open waits on its owner, briefly: a saved query waits in `DatabaseSessionManager.pendingQueries` for its
   connection's workspace, and expires after two minutes so a failed connect cannot surface it later.
+
+## Favorites by kind, the overview everywhere, orbs, scale, previews, sidebars, models (D73–D78, 2026-10-13 to 17)
+
+- **Favorites beyond machines (D73).** Machines keep their mark on the host (`GlassFavoritesPayload`, D49), which
+  older builds read. Everything else is a `GlassFavorite` (`Sources/GlassShell/GlassShellFavoritesSync.swift:79`:
+  a service, a project, a workgroup, or a folder = a Terminal service plus an absolute path) in a payload of its
+  own under `shell-favorite-items-envelope-v1` (`:184`), which older builds neither read nor write. D49's merge
+  (`GlassFavoriteItemsPayload.replaces`: newest change wins, a tie keeps the star); an unstar is dropped after 90
+  days (`GlassShellModel.favoriteTombstoneLifetime`, `Sources/GlassShell/GlassShellModel.swift:1402`). The shell
+  names and connects services; what a project, workgroup or folder is comes from the composition root
+  (`GlassShellModel.describeFavorite`, `GlassShellModel.swift:90`, set at `App/GlassPowerToolsApp.swift:322`), and
+  the sections reach the library through `GlassLibraryExtraSections` (GlassConnectionUI). A favourite whose thing is
+  missing or not yet synced is hidden, its star kept.
+- **Show All Windows is the shell's off the Mac (2026-10-14).** The overview (`GlassShowAllWindowsOverview`) is
+  built from `GlassOpenSession`s: a card per tab (`GlassOpenSession.tabs`, `Sources/GlassShell/GlassOpenSession.swift:72`;
+  a tab not yet connected `waitsToBeShown`), grouped by machine (`GlassShellModel.allWindowsMachines()`,
+  `Sources/GlassShell/GlassActiveConnections.swift:79`), laid out by `GlassAllWindowsLayout`, pictures from
+  `snapshot` retaken each second while shown, an AI agent's `mark` (`TerminalAgent`). iPhone and iPad show it as a
+  pane over the window (`GlassAllWindowsPane`); Vision Pro as a `Window` scene of its own
+  (`GlassAllWindowsWindow`, id `all-windows`) declared inside every capability's bootstrap, so a chosen card works
+  with no Connections window open. The Mac's overlay stays the terminal's (`GlassShowAllWindows.toggle`).
+- **Sessions into an existing window (2026-10-15):** a capability lists its windows with room
+  (`GlassCapability.tabGroups()`, `GlassTabGroup`) and opens running sessions into one
+  (`openRunningSessions(_:inTabGroup:)`, `Sources/GlassShell/GlassCapability.swift:400`); Active's Open as Tab In
+  and Open N as Tabs In use it. Both are requirements in the protocol body with defaults, per rule 53.
+- **Vision Pro session orbs (D74).** One modifier on a session window's whole content,
+  `glassSessionOrb(_:)` (`Sources/GlassShell/GlassSessionOrb.swift:119`), with a `GlassSessionOrbFace` the capability
+  fills (title, symbol, picture, tabs as `GlassSessionOrbTab`, pulse, whether the bar shows the button), and
+  `GlassSessionOrbButton` first in the bottom bar. The window itself becomes the orb, as Connections does (W39): its
+  content stays laid out out of sight, and its size is asked of visionOS through `GlassWindowSizer` (moved out of
+  the Connections probe). `GlassSessionOrbControl.isWindow` tells whatever holds a window's shape (the desktop's
+  W38 lock) to wait until the window is back. Look effects are system hover effects only, in shared
+  `HoverEffectGroup`s, pictures and names `.followsGroup` (`GlassSessionOrb.swift:241`): the app is never told
+  where a person looks. Tabs on a ring, at most 12 (`GlassOrbRingLayout`); `glassHiddenWhileOrb()` takes the
+  terminal's tab ornament away meanwhile.
+- **Scale draws, it never changes the font (D75).** The engine's view sits in a scaling container — the Mac's
+  `MacTerminalScaleView` (bounds scaled) and, on iOS and visionOS, `TerminalHardwareKeyContainerView`'s
+  always-present scaler (a transform), in `Sources/GlassTerminalEmulator/SwiftTermScale.swift` and
+  `SwiftTermHostView.swift` — and the host hears only the kept grid (`SwiftTermScaledGrid`). The choice is
+  `TerminalWindowSettings.whenResized` (synced, This Window override); `TerminalScaling` and `TerminalScaleToggle`
+  live in `Sources/GlassTerminal/TerminalResizeBehavior.swift`. The desktop's shape lock moved to the shell for
+  both: `GlassWindowAspectLock` and its tested math `GlassWindowAspect`
+  (`Sources/GlassShell/GlassWindowAspectLock.swift:42`); `DesktopWindowAspect` keeps only the desktop's chrome and
+  minimum.
+- **A capability that shows another's view gets it from the composition root (D76).** The terminal does not import
+  GlassEditor: its hover preview is `GlassTerminalRuntime.filePreview`
+  (`Sources/GlassTerminal/GlassTerminalCapability.swift:146`), set to `GlassEditorQuickPreview` at
+  `App/GlassPowerToolsApp.swift:371`. What a file is comes from GlassEditorCore, which both import:
+  `GlassEditorFileKind`, decided from the bytes (`Sources/GlassEditorCore/Document/FileKind.swift:23`). The pointer
+  is watched by `MacTerminalPathPreviewer` (GlassTerminalEmulator) through a local `NSEvent` monitor, because
+  SwiftTerm's `mouseMoved` and `keyDown` are `public`, not `open`; a remote file comes over the pane's own SSH
+  connection (`TerminalRemotePreview`, ≤ 32 MB, removed on close); links and paths are found once for the menu
+  and the previewer (`TerminalLinkLookup`, `TerminalLinkTarget`).
+- **One 3D viewer (D78):** `GlassModelView` (`Sources/GlassEditor/GlassModelView.swift:33`), used by the editor's
+  viewer, Files through it, and the Mac hover preview. A model is `.model3D` by its bytes; `GlassModelFile`
+  (`Sources/GlassEditorCore/Document/ModelFile.swift:13`) handles links, a misnamed model's extension and text
+  layers. A terminal's model link is the terminal's (`Sources/GlassTerminal/TerminalModelLinks.swift`: after the
+  link confirmation, ≤ 512 MB, kept only if its bytes are a model's, in Caches, cleared after a week).
+- **The app moves a window for its sidebar (D77, Mac).** `GlassAdditiveSidebars`
+  (`Sources/GlassShell/GlassAdditiveSidebars.swift:37`) finds SwiftUI's split items in the window's views, sets
+  each to `.preferResizingSiblingsWithFixedSplitView` so AppKit leaves the window alone, observes `isCollapsed`,
+  and animates the window's frame by the sidebar's width toward its side (`windowFrame`), following the net state;
+  it posts `willResizeWindow` so the column beside it holds its width meanwhile (`MacWorkspaceView.holdTerminalWidth`).
+  The terminal's reader decides when it is off — the sidebar a window opens with, the overview, full screen
+  (`MacTerminalWindowReader.Coordinator.keepSidebarsAdditive`, `Sources/GlassTerminal/macOS/MacTerminalWindowPolicy.swift:132`).
+  The window's minimum sits on the terminal's column, not the whole content (a whole-content minimum fought the
+  growing). Each move is logged (`com.glasspowertools` / `sidebar`). Shared, for other windows if wanted; only the
+  Mac terminal window uses it. An exception to rule 62, recorded there.
+- **The titlebar material and the sidebar's edge.** `GlassTitlebarMaterialView`
+  (`Sources/GlassConnectionUI/GlassWindowChrome.swift:7`) follows the sidebar's edge but holds it from KVO's
+  `.prior` notice to the last (`:66`), because AppKit draws the window with the sidebar laid out at full width
+  before it slides it in. `showsSidebarEdge` (`:25`) off hides the chrome's hairline and makes AppKit's divider
+  transparent, still draggable; the terminal window turns it off (`MacTerminalWindowPolicy.swift:347`); the
+  database and desktop windows keep the line.
+- **A drop or paste is never turned away in silence (2026-10-16).** The newest paste or drop takes a pending
+  review's place, `insertDroppedText` reports what became of the text, and the Mac pane logs each step
+  (`sh.glas` / `terminal-drop`) and beeps when nothing was typed (`Tests/GlassTerminalTests/TerminalDropTypingTests.swift`).

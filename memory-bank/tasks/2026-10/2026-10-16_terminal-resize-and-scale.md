@@ -1,4 +1,4 @@
-# 2026-10-16: a terminal window that resizes, and one that scales — NEXT PRIORITY (D75, proposed)
+# 2026-10-16: a terminal window that resizes, and one that scales (D75, implemented)
 
 **State:** built (2026-10-16): engine, setting and bar button 394fb47; window shape and ⌘+/⌘− 3feb28a; the visionOS
 UI test 2914f3f. 0.4.463 for the devices — for the owner to try. Details under "Built" at the end.
@@ -152,8 +152,8 @@ Windowed Apps (no iPad device):
   about 2× fell 3989 → 3202 pixels; Metal had also drawn that scaled terminal a row off.
 - **Tests:** `GlassTerminalScaleIPadUITests` — `testIncreaseGrowsTheScaledWindow` (skips outside Windowed Apps) and
   `testScaledTextIsDrawnForThePixelsShown` (a DEBUG, `--ui-testing`-only marker of the renderer and pixels per point);
-  each failed with its change reverted. Run with `~/Software/glass/tmp/ipad-test.zsh` on the simulator "Scale iPad
-  27.2" (Windowed Apps on); captures in `~/Software/glass/tmp/ipad-scale/`.
+  each failed with its change reverted. Run with the working files' `ipad-test.zsh` on the simulator "Scale iPad
+  27.2" (Windowed Apps on); captures in the working files' `ipad-scale/`.
 - **Unverified:** whether a hardware keyboard's ⌘+ reaches the font actions inside the iPad bar's Tools menu (the UI
   test runner's typed shortcuts didn't, in Resize or Scale; the menu items do). Seen in passing: an item with a folder
   icon and no title in the iPad Tools menu.

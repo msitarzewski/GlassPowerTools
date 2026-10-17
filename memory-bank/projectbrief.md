@@ -52,6 +52,14 @@ separate applications cannot compose that way.
   and the server form) must offer a file picker in addition to the pasted-text box, reading the
   chosen file through the same import path; the file's path and contents are never persisted
   outside the credential store. Owner: Stage 2 W3.
+- **2026-10-13 to 2026-10-17 — the owner's asks while testing**, each a decision in `decisions.md`, implemented and
+  recorded there with its evidence: Favorites hold services, projects, workgroups and folders as well as machines,
+  in sections by kind (D73); on Vision Pro a session window shrinks into an orb (D74); a terminal window can scale
+  its text instead of changing its rows and columns, on the Mac, iPad and Vision Pro (D75); a printed path's file
+  previews over a Mac terminal (D76); a Mac terminal window's sidebar adds to the window instead of taking from the
+  terminal (D77; the owner wants the same "eventually" for a right-hand sidebar, which no window has yet); 3D models
+  open wherever files do (D78). The same days built D72's system ways in (phases 1–4; the File Provider spike waits
+  for the owner) and Show All Windows on iPhone, iPad and Vision Pro.
 
 ## Non-goals
 
@@ -61,13 +69,16 @@ separate applications cannot compose that way.
   merging carries no product-identity cost. *Superseded 2026-09-25 by D38 (`decisions.md`): the Mac
   ships outside the App Store (Developer ID, notarized, updated by Sparkle), because the App Store
   requires a sandbox a local shell cannot live in; iPhone, iPad and Vision Pro go to TestFlight, then
-  the App Store. Neither has happened yet (2026-10-12).*
+  the App Store. Neither has happened yet (still so on 2026-10-17: no release tag, and the release steps
+  are the owner's, `activeContext.md`).*
 
 ## Constraints carried in
 
 - Follow protocol specifications precisely and advertise only implemented capabilities.
 - Validate untrusted protocol data before use.
-- Keep credential storage in GlasSecretStore, with its existing eligibility and mobility rules.
+- Keep credential storage in GlasSecretStore, with its existing eligibility and mobility rules
+  (absorbed 2026-09-13; D18, D21 and D23 since changed them: credentials and host-key pins sync through
+  iCloud Keychain, Secure Enclave material never does).
 - Preserve the familiar library navigation. Users must not relearn the app.
 - Never present a stub, a compile, or a dependency declaration as a working feature.
 

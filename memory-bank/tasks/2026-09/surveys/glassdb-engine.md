@@ -1,8 +1,8 @@
 # glassdb Engine and Data Layer Survey
 
-Read-only survey of `~/Software/glass/glassdb` for the Glass Power Tools merge.
+Read-only survey of `../glassdb` for the Glass Power Tools merge.
 Scope: engine and data layer, not UI. Date: 2026-09-11.
-All paths below are relative to `~/Software/glass/glassdb/` unless stated absolute.
+All paths below are relative to `../glassdb/` unless stated absolute.
 
 Evidence basis: current checkout on branch `main`, plus two commands I actually ran in this
 session, both recorded under section 2.4. Everything else is source inspection.

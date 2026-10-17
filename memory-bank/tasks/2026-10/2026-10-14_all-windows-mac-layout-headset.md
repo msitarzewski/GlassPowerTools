@@ -272,7 +272,7 @@ The owner, on the headset in a tmux terminal on this Mac: "I just can't select t
 - With the terminal focused as a real session's is (`--demo-keyboard`), a double-pinched word in the tmux demo stays
   highlighted (captured), so the simulator never showed his failure: the mouse was the difference.
 - The headset log couldn't be copied: the Mac (no Wi-Fi joined, a new address) and the headset can't see each other.
-- Working files moved to `~/Software/glass/tmp` after a /tmp cleanup wiped the scratchpad.
+- Working files moved out of `/tmp`, to a folder beside the repository, after a /tmp cleanup wiped the scratchpad.
 - **Confirmed by the owner:** with this Mac's tmux mouse turned off (`tmux set -g mouse off`, run at his word; sessions
   unchanged), "Can confirm, selection works on mac as expected!" on 0.4.454: the cause was tmux 3.8's mouse. 0.4.455
   makes the headset independent of it (not yet installed: devices unreachable).
@@ -347,7 +347,7 @@ user chooses otherwise. The mouse interactions (trackpad) should work the same w
   their change; all 8 selection tests pass (visionOS 27.2 sim). Selection reads its length in UI tests
   (`terminal-selection-active-<n>`). The trackpad can't be driven in the simulator.
 - 0.4.459 on the Mac and iPhone (both read it); the headset was unreachable (three tries) — install with
-  `~/Software/glass/tmp/install-devices.zsh 459` when it's awake. No new crash reports.
+  the working files' `install-devices.zsh 459` when it's awake. No new crash reports.
 - His question on Finder-style toolbar controls (icon ⌃⌄ = pop-up `Picker(.menu)`; icon ⌄ = pull-down `Menu`): answered;
   both exist on every platform, but only the Mac's toolbar draws the chevrons for certain.
 

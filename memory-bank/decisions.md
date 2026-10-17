@@ -32,7 +32,7 @@ foundation. That was the right answer for keeping three products, and is unneces
 
 **Status: Approved by the user, acted on only to the extent of creating this memory bank.**
 
-`~/Software/glass/GlassPowerTools`, rather than renaming one of the three repositories. Building on
+A new `GlassPowerTools` directory beside the three source repositories, rather than renaming one of them. Building on
 glas.sh would have kept two thirds of the shell in place but made the other two capabilities
 permanent guests in its structure, and the shell-to-capability boundary is the thing this product
 depends on. The three public repositories will be deprecated with redirects later, on the user's

@@ -101,7 +101,7 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     synthesized events, which go to the **frontmost** application, so two runs interfere by
     construction and surface as `Failed to synthesize event: Timed out while synthesizing event` —
     an event-synthesis timeout, not an assertion failure (the hazard is already noted at
-    `UITests/GlassShellLibraryUITests.swift:42`). Three runs were discarded in one session for this,
+    `UITests/GlassShellLibraryUITests.swift:43`). Three runs were discarded in one session for this,
     two of them the coordinator's. **Checking at launch is not enough:** a run is attributable only
     if the machine was quiet for its *whole duration*, and a suite that starts clean is still
     contaminated by an instance appearing halfway through. Announce a UI run before starting it. When
@@ -415,7 +415,8 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     decision on it: `forget` discarded the workspace, so dismissing the full-screen cover threw the
     open documents away — unsaved edits included — with nothing said and no way back. Two verbs,
     not one: leaving the screen gives up frontmost, and **closing** is a separate, deliberate act
-    (`closeWorkspace`, reachable from the session switcher). The policy is a settable property
+    (`closeWorkspace`, reachable from Active, which replaced the session switcher under D33). The
+    policy is a settable property
     rather than a call to `GlassWindowPresentation` inside the method, because the suite's own
     machine always answers "Mac" and the phone's behaviour would never be tested.
 
@@ -490,6 +491,12 @@ These sit on top of the four core rules in [AGENTS.md](../AGENTS.md) and apply t
     views. AppKit then restored layouts SwiftUI had not asked for, such as a collapsed sidebar
     SwiftUI thought was shown. A window whose toolbar SwiftUI swapped in the middle of a layout
     crashed the app four times in four minutes (2026-10-08, `fde5940`). One owner, every time.
+    *Exception, D77 (2026-10-16/17, the owner's additive sidebars):* in the Mac terminal window the app
+    sets each SwiftUI split item's `collapseBehavior` to `.preferResizingSiblingsWithFixedSplitView`,
+    moves the window's frame itself (`GlassAdditiveSidebars`), and makes AppKit's split divider
+    transparent (`GlassTitlebarMaterialView.showsSidebarEdge`), because SwiftUI offers none of it and
+    AppKit does not move a SwiftUI window scene's frame for its sidebar. It sets no autosave name and
+    no toolbar visibility, and the split view stays SwiftUI's.
 63. **A test's tmux never reaches the default server, and never inherits the test's descriptors.**
     When `TMUX_TMPDIR` names a folder that does not exist, tmux silently uses the default server,
     which holds the owner's live sessions. Create a short folder (`/tmp/gpt-<hex>`) first, and name

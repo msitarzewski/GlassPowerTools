@@ -13,7 +13,7 @@ All four capabilities and the shell are built and in daily use on the owner's Ma
 
 | Area | State | Strongest evidence |
 |---|---|---|
-| Shell: library, hosts, services, one setup sheet, favorites, collections, tags, search, Active and the session switcher, settings, layers | built | unit, UI on Mac and iPhone simulator, device (Mac, iPhone) |
+| Shell: library, hosts, services, one setup sheet, favorites, collections, tags, search, Active (the ⚡; the session switcher it replaced is gone, D33), settings, layers | built | unit, UI on Mac and iPhone simulator, device (Mac, iPhone) |
 | Host library sync through CloudKit; credentials and host-key pins through iCloud Keychain (D18, D19, D21, D23) | built | unit; device (CloudKit delivering between Mac and iPhone). The two-device acceptance run of D26 has not been done |
 | Terminal: SSH, host trust, keys (file and Secure Enclave), tabs, themes, workgroups, local shell on Mac, SFTP browser, port forwarding | built | unit, UI, server (OpenSSH 10.2: shell, SFTP, RSA and Ed25519 sign-in), device |
 | Databases: MySQL, PostgreSQL, SQLite; TLS modes; host tunnel; browser, grid, record editor, query editor, Explain, history, read-only services | built | unit, server (MySQL 8, PostgreSQL: 21 live integration tests plus the engine's own), device |
@@ -37,7 +37,7 @@ All four capabilities and the shell are built and in daily use on the owner's Ma
 | Library rows one height in every list; Workgroups on the shared row | built | unit (`GlassLibraryRowConsistencyTests`), device (Mac) |
 | Favourites (D49) and workgroups (D51) sync across devices | built | unit (two devices over a shared in-memory store; each fails without its push); not yet seen across real devices |
 | Vision Pro: Connections window as a value-keyed window group (no launch lockout) | built | device (launched cleanly after the lockout) |
-| Terminal plan of 2026-10-08/09 (W1–W10, W12, W13): find in tmux (⌘G next, ⌥⌘G grid), folder button opens Finder at the shell's folder, "+" offers a choice again, Connect always makes a new tmux session (atomic name claim), workgroups keep tmux names, one editor window per project and one Open…, tab drags move rather than copy, no Workgroups window (D52), Show All Terminals (Exposé), windows reopened by the app with their places (D54), multi-select in Active | built | unit (each fix shown failing without it), device (Mac: Exposé, restored windows and the drag confirmed by the owner; Vision Pro: no layout crash since rule 64). Detail: `tasks/2026-10/2026-10-08_find-tabs-tmux-workgroups-editor-plan.md` |
+| Terminal plan of 2026-10-08/09 (W1–W10, W12, W13): find in tmux (⌘G next, ⌥⌘G grid), folder button opens Finder at the shell's folder, "+" offers a choice again, Connect always makes a new tmux session (atomic name claim), workgroups keep tmux names, one editor window per project and one Open…, tab drags move rather than copy, no Workgroups window (D52), Show All Terminals (Exposé; Show All Windows since 2026-10-13), windows reopened by the app with their places (D54), multi-select in Active | built | unit (each fix shown failing without it), device (Mac: Exposé, restored windows and the drag confirmed by the owner; Vision Pro: no layout crash since rule 64). Detail: `tasks/2026-10/2026-10-08_find-tabs-tmux-workgroups-editor-plan.md` |
 | Repository and branch in terminal names; names and rename from the tmux session on iPhone, iPad and Vision Pro (W11, 2026-10-09) | built | unit (26 new tests, each failing without its fix; live repo reads and private `-S` tmux); iOS/visionOS compile-only until seen on the devices |
 | Files and photos dropped on a remote terminal upload to the host and type its paths; Mac SSH panes the same; Insert Path in a terminal's Files browser (W14, 2026-10-09) | built | unit (9 tests over the real `SFTPClient` with an in-memory host, each failing without its fix; HEIC→JPEG on this Mac); device (iPhone: a photo dropped from Photos reached the host) |
 | Editor on Vision Pro: toolbar as the system ornament (Preview with Mermaid, Save, Open…, New, Find), Projects + ▸ New Document / Open…, rule 64 deferrals (W17, 2026-10-09) | built | unit + visionOS simulator UI tests (each failing without its fix); device (owner: "the editor toolbar works on the headset") |
@@ -75,12 +75,14 @@ All four capabilities and the shell are built and in daily use on the owner's Ma
 | 2026-10-16: 3D models (D78) — USDZ/USD/Reality decided by their bytes; RealityKit viewer on Mac/iPhone/iPad (AR Quick Look on touch), Model3D and Apple's Quick Look volume on Vision Pro; editor viewer, Files, Mac hover preview; model links downloaded and shown in 3D | built | `FileKindTests` +2, `ModelFileTests` 3, `TerminalModelLinkTests` 4, `GlassModelLoadingTests` 1 (each fails without its change); iPhone and visionOS simulators and a Mac probe seen; 0.4.467 on all three, his to try |
 | 2026-10-16: iPad under Scale — ⌘+ grows the window (the scene's minimum raised for a moment; ⌘− can't shrink one), scaled text drawn with Core Graphics for the pixels shown (fa7b8b6, 6fd8fc2) | built | `GlassTerminalScaleIPadUITests` 2 on an iPadOS 27.2 simulator in Windowed Apps (each fails without its change); no iPad device; hardware ⌘+ through the Tools menu unverified |
 | 2026-10-16 (0.4.466): a Mac terminal window's sidebar adds to the window (D77) — opened or closed, the window grows or shrinks and the terminal keeps its size and place; the app moves the window (AppKit doesn't for a SwiftUI window scene); not for the sidebar it opens with, the overview, full screen | built | `GlassAdditiveSidebarsTests` 2, `MacTerminalSidebarTests` 3 (each fails without its change); `GlassAdditiveSidebarsTests` 5, `MacTerminalSidebarTests` 4 incl. the real window; a window-scene probe app measured ≤1 pt drift; snapped for him on 0.4.464 and 0.4.465, his to try on 0.4.466 |
-| 2026-10-17 (0.4.468): with the sidebar opening and closing, "+" and the window title stay where they are (D77, his "keep the + and title fixed"), and no frame shows the window behind the toolbar | the see-through fix built; the held space reverted in 0.4.470 at his word ("let's close the space") | `MacTerminalSidebarTests.toolbarStays`, `WindowChromeTests.materialWaitsForTheSidebarToOpen` (each fails without its change); a scene probe measured "+" within 1 pt but for a ≤30 pt two-frame dip, and filmed 0 see-through frames in 5 runs (the original 3 of 3); his to try |
+| 2026-10-17 (0.4.468): with the sidebar opening and closing, "+" and the window title stay where they are (D77, his "keep the + and title fixed"), and no frame shows the window behind the toolbar | the see-through fix built; the held space reverted in 0.4.470 at his word ("let's close the space") | `WindowChromeTests.materialWaitsForTheSidebarToOpen` (fails without its change); a scene probe filmed 0 see-through frames in 5 runs (the original 3 of 3); `MacTerminalSidebarTests.toolbarStays` went with the reverted hold; his to try |
 | 2026-10-17 (0.4.469): no gray line at a terminal window's sidebar edge (AppKit's divider transparent, our hairline hidden; other windows unchanged) | built | `WindowChromeTests.sidebarEdgeDrawsNoLine` (fails without); probe pictures: no line at rest or in any animation frame, nothing see-through, the edge still drags; his to try |
+| 2026-10-16: a file dropped on a terminal has its path typed, or the drop says why not; a waiting paste review no longer turns drops away; every drop step logged (`terminal-drop`) (389e1f9) | built | unit (fails without its change); the owner's own check of his running app not yet made |
+| 2026-10-17 (0.4.471): every sidebar move of a terminal window, and the terminal width held meanwhile, written to the log (`com.glasspowertools`/`sidebar`) for the open 6 pt strip | built | log lines read back on the Mac; the strip itself is open (Known and open) |
 | Database Local Network and tunnel limits closed: tunnels keep their own connections (D69) | decided | sshd_config(5); OpenSSH reports of multiplexing lag |
 
-Suites run 2026-10-13 with the screen unlocked: terminal 781, shell 280, database 321, DBKit 28, all passing
-(the whole package not re-counted that day). Earlier: about **1,790 tests**. The last full run with the screen unlocked passed (1,777, early
+Suites run 2026-10-17 with the screen unlocked: connection UI 51, terminal 873, shell 307, all passing; on
+2026-10-16 editor 169 and desktop 222. On 2026-10-13: database 321, DBKit 28 (the whole package not re-counted since). Earlier: about **1,790 tests**. The last full run with the screen unlocked passed (1,777, early
 2026-09-27); the night's later runs were under a locked screen, where file-protected stores cannot be
 read — they fail the same 137 tests before and after the night's changes, and every new test passes.
 Vendored suites: swift-nio-ssh 363, Citadel 58, RDPKit 1,015. Release builds succeed for macOS, iOS
@@ -97,7 +99,8 @@ history redacted by default, MySQL metadata lookups bound rather than escaped (a
 project list, RDP trust evaluated over the whole certificate chain, and VNC's lack of session
 encryption stated in the setup form. Details in `tasks/2026-09/`.
 
-Also done: README, SECURITY, CONTRIBUTING and a building guide; 35 help pages audited from the code,
+Also done: README, SECURITY, CONTRIBUTING and a building guide; 35 help pages audited from the code (39 by
+2026-10-17, when all of them, the README and the memory bank were checked against the code again and RELEASE-NOTES.md added),
 the site and its generator (not deployed); Sparkle for the Mac with a release script (never run); and
 the defects the help audit found (`tasks/2026-09/2026-09-27_help-site-and-updates.md`).
 
@@ -116,7 +119,7 @@ profile, notarization, deploying the site), the behaviour findings listed in `ac
   tests' reach.
 - **The unfolded Duo tour** (the 12-pt content margin, host detail, Active, Settings, Workgroups) waits on the
   simulator being unfolded.
-- **Vision Pro:** runs the same build as the Mac and the iPhone (0.4.400 on 2026-10-13); the owner has used
+- **Vision Pro:** runs the same build as the Mac and the iPhone (0.4.471 on 2026-10-17); the owner has used
   desktops, trackpad scrolling and the editor's toolbar on it. Not every change since has been gone through on it
   (the inventory's B-V1 lists what is owed).
 - **Database scroll edge on the Mac** (hard top edge so content does not print through the
@@ -144,6 +147,46 @@ profile, notarization, deploying the site), the behaviour findings listed in `ac
 - VNC is encrypted after sign-in only to a Mac signed in with a Mac account (its own revision, e7463ce);
   a password alone or a non-Mac server is not (no VeNCrypt, no tunnel). The setup form says which (262ba7a).
 - tree-sitter 0.27 and swift-crypto 5 wait on upstream releases (`techContext.md`).
+- **A deleted host with a set-up service comes back (found 2026-10-17, documentation pass; proven at the merge):**
+  `GlassCatalogMerge.reconcile`'s second pass (`Sources/GlassShell/GlassCatalogSync.swift:176-211`, "no set-up
+  service disappears through a merge", 2026-09-28) revives any live copy holding a set-up service. A throwaway test
+  (removed again) reconciled a local tombstone of a set-up host against the account's older live copy: the device
+  that deleted it applies the live copy back and sends nothing (`apply=[live]`, `publish=[]`); a device still holding
+  it live sends it back alive. Every deletion test in `GlassCatalogMergeTests` uses hosts with no set-up service. A
+  likely fix: revive only an endpoint that some other record also names (the fold the rule was written for), not one
+  only the deleted record holds — the owner's decision, with a two-device check. The help says so
+  (`site/help/library-sync.md`).
+- **Unsaved editor work is discarded without asking (found 2026-10-17, read from the code):** only closing a
+  document asks. Closing an editor window (`GlassEditorScenes.swift:165-171`, `forget` drops the workspace where
+  windows open), quitting the Mac app (`applicationShouldTerminate`, `glas_shApp.swift:103`, asks about terminals
+  only) or closing the session in Active (`GlassActiveConnections.swift:848-851`) discards edits;
+  `GlassEditorWorkspace.hasUnsavedChanges` (`:274`) has no caller. The help warns (`editor-opening.md`,
+  `editor-saving.md`); remove the warnings with the fix.
+- **A server file over 64 MB can't be opened (found 2026-10-17):** the SFTP reader stops at 64 MiB and throws
+  `GlassPortForwardError.unavailable` (`GlassTerminalCapability.swift:1242,1345`), so Download and View never
+  succeeds and the message blames a missing Terminal service (`GlassCapability.swift:194`).
+- **Smaller editor, database and desktop defects found for the help (2026-10-17):** bare dotfiles (`.bashrc`,
+  `.zshrc`, `.profile`) get no Shell colour (no path extension, `GlassEditorModel.swift:194`); a timed-out regex
+  shows "Invalid pattern" (`GlassEditorWorkspaceView.swift:976`); the 64 MB limit prints as "67.1 MB"
+  (`GlassEditorViewer.swift:91`); the database Tunnel row says "this machine's Terminal service" for another
+  machine's tunnel (`DatabaseDetailView.swift:229`) and reconnect failures skip the plain-words rewrite
+  (`DatabaseSessionManager.swift:435`); the desktop size message leaves out the pixel total
+  (`DesktopServiceDraft.swift:165-169`). Reported by audit agents, not re-read: a missing file reported as "is a
+  folder" (`GlassEditorWorkspace.swift:353-360`); F2 and F4 absent from `MacKeyboardMapping.swift:240-249`.
+- **A Mac local terminal doesn't scale (D75 gap):** `TerminalScaling` is applied only in `TerminalWindowView`
+  (`TerminalWindowView.swift:278`), which the Mac's SSH panes use; `MacLocalTerminalPaneView` never scales.
+- **Found reading the code for the help (2026-10-17), small:** jump-host progress and reconnect attempts go to
+  `session.output`, which no view reads (`SSHConnection.swift:371-376`); the service row's More menu is always empty
+  (`GlassShellLibraryView.swift:540-556`); the Add sheet's title follows the first kind, not the chosen tab; Delete
+  Workgroup says "this device" though the deletion syncs (`TerminalWorkgroupsView.swift:113-124`); Settings ▸ General
+  says "reset them in Settings" but nothing calls `resetPreferences()` (`GlassShellPreferences.swift:88`); Vision
+  Pro's empty Collections says "in its details" where collections are set in Edit
+  (`GlassConnectionLibrary.swift:489-490`).
+- **Release script and the Mac's newer extensions (found 2026-10-17, documentation pass):**
+  `Tools/Release/release-mac.sh` checks the widget extension's signature, hardened runtime, sandbox and App Group
+  (lines 100–119) but not the Finder, Quick Action, Share or File Provider extensions added on 2026-10-13. The File
+  Provider spike's `GlassPowerToolsFiles.appex` is embedded in every Mac build, inert, with network and keychain-group
+  entitlements: keep it inert, or remove it, before the first release (`2026-10-13_file-provider-spike.md`).
 - **B-X27 (2026-10-13):** files written with complete protection fail while the Mac is locked (recordings, SFTP
   downloads, desktop captures; ~23 terminal tests). The protection class is the owner's decision.
 - The database's own sidebar chrome removes UIKit's toggle off the Mac (`databaseSidebarChrome()`), as the library
@@ -178,9 +221,13 @@ profile, notarization, deploying the site), the behaviour findings listed in `ac
   hold itself, so it is the headset's to show. The Files shelf's corners are clipped but the demo can't show the
   shelf. The held + and the toggle's held menu are for the owner to try (the simulator's runner turns a held menu
   into a tap).
-- **Vision Pro terminal selection (2026-10-15, 0.4.454):** the owner reported it "still broken wholly … with tmux"
-  after 0.4.449's fix passed the simulator. Two defects found and fixed (a drifting hold became tmux's drag when tmux
-  has the mouse; a pinch never cleared a selection then), but this Mac's tmux has the mouse off, so his failure may
-  have another cause. Each hold, pinch and selection change is now written to the app's diagnostics file
-  (`terminal-selection` lines in `screen-sharing.log`): copy it off the headset after he tries (see the
-  headset-diagnostics memory) before changing anything else.
+- **Vision Pro terminal selection (2026-10-15):** the owner's "still broken wholly … with tmux" was tmux 3.8 turning
+  its mouse on by default; with it off he confirmed selection works. 0.4.455 on (2975ace, f2fde40) makes the headset
+  independent of it: a pinch-drag scrolls when tmux has the mouse, and selection works as Apple's text does. Not yet
+  tried by him on the headset; each hold, pinch and selection change is written to the app's diagnostics file
+  (`terminal-selection` lines in `screen-sharing.log`) — copy it off the headset after he tries.
+- **A 6 pt see-through strip between a terminal window's sidebar and its terminal as the sidebar opens**
+  (2026-10-17, the owner: "it's what causes the shift"): not reproduced by the scene probe; 0.4.471 logs each move.
+  Read his toggles' log before changing anything (`tasks/2026-10/2026-10-16_additive-sidebars.md`, last section).
+- **The sidebar edge without a line** is the terminal window's only; the database and desktop windows keep theirs
+  (offered to the owner, unanswered).

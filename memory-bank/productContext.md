@@ -19,9 +19,14 @@ across three applications.
 
 ## The library row and the Connect control
 
-A host row shows an icon per service it actually has. Connect opens the service last used on that
-host. When a host has more than one service, the rest are reachable from the same control: a chevron
-menu beside Connect on every platform (the press-and-hold plan gave way to a visible control). A host with one service behaves exactly as it does today.
+A host row shows an icon per service it actually has. When a host has more than one service, the
+control has two halves on every platform (the press-and-hold plan gave way to a visible control): the
+play glyph connects **every** service on the host, and the chevron beside it picks one (the brief's
+2026-09-11 refinement; `GlassShellModel.connectAll`, `Sources/GlassShell/GlassShellModel.swift:1613`).
+This Mac offers only the chevron, since connecting "all of it" means nothing for the device itself
+(D8). The row's own menu has Connect, which opens the service last used on that host (the details call
+it "Connect opens"). A host with one service has a single play button. *Corrected 2026-10-17: this
+paragraph said Connect opened the last-used service.*
 
 ## Design order
 
@@ -78,3 +83,50 @@ This is the reason to merge that no amount of shared packaging would have delive
 - **Database errors say what happened in plain words:** the server's own refusal ("password authentication failed
   for user …"), "No machine named … could be found", and, for a machine on the local network that cannot be reached,
   where to allow Local Network access.
+
+## Favorites, the overview everywhere, and the owner's October asks (2026-10-13 to 2026-10-17)
+
+Each is built; where only a simulator or a test has seen it, the owner's devices are the check
+(`progress.md`).
+
+- **Favorites hold anything you return to** (D73): sections by kind — Machines, Services, Projects, Workgroups,
+  Folders — synced between devices. Star a machine on its row, a service from its menu in the machine's details, a
+  project or saved workgroup from its menu, and a folder from Files' toolbar (Add This Folder to Favorites). A
+  favourite opens on one click or tap, as a Finder sidebar favourite does; a folder opens Files there, or, from its
+  menu, as a project.
+- **Show All Windows on every device** (2026-10-14): on iPhone and iPad hold the ⚡ or pull down from the empty part
+  of a top bar (a glass pane; push or toss it up to close); on Vision Pro hold the ⚡ or ask Siri ("Show all
+  windows") for a window of its own. Cards by machine, one per tab, pictures refreshed each second (on an iPhone a
+  terminal has a picture only once it has been on screen, and keeps its last), an AI agent's mark on a terminal
+  that runs one, Blur previews honoured. The Mac keeps ⇧⌘\, its button and the pinch.
+- **Sessions into a window you already have** (2026-10-15): Active's Open as Tab In ▸ for a running session, and
+  for several chosen at once; a terminal window's "+" (held, off the Mac) lists every saved server ▸ New Terminal and
+  its running terminals, and the Mac's "+" menu lists running terminals too.
+- **Vision Pro: a session window shrinks into an orb** (D74): Shrink to Orb first in the bottom bar (in a terminal
+  window with several terminals, Orb in the view menu beside Tabs, Grid and Carousel). A glass sphere showing the
+  session; its tabs as dots on a ring; look at a dot for its picture and name; a pinch grows the window back, on
+  that tab. It pulses with activity when the window's Auto-focus on activity is on.
+- **Vision Pro terminal text, as Apple's text works** (2026-10-15/16): double pinch selects a word, pinch and hold
+  selects the word held, drag either end to change it, and a trackpad click-drag selects as on a Mac; a pinch-drag
+  scrolls even when tmux has the mouse. A held link or path offers its actions.
+- **A terminal that scales instead of re-gridding** (D75; Mac, iPad, Vision Pro): When Resized — Change Rows and
+  Columns (as before) or Scale the Text — in Settings ▸ Terminal, This Window, and Scale Text in the window's bar.
+  Under Scale the rows and columns stay, the window keeps their shape, and ⌘+ / ⌘− / ⌘0 size the window (on iPad
+  only ⌘+ can, by growing it).
+- **Links and paths in a Mac terminal** (2026-10-14/16): right-click a path for Quick Look, Open in Editor, Show in
+  Finder, Watch Log File (a `tail -F` tab in the same window) and Copy Path; a link for Open Link and Copy Link.
+  Show previews (D76) — Never, Mouseover (the default) or Mouseover + Space — shows a printed path's file over the
+  terminal as the editor shows it, local or on the server, with Open in Editor; web addresses never preview on
+  hover, and Space on one asks before opening it, as ⌘-click does.
+- **A Mac terminal window's sidebar adds to the window** (D77): opening or closing it grows or shrinks the window,
+  and the terminal keeps its size, place, rows and columns. "+" slides with the sidebar, as AppKit arranges it (a
+  version that held it still was tried and closed at the owner's word). No line at the sidebar's edge in a terminal
+  window; database and desktop windows keep theirs.
+- **3D models wherever files open** (D78): USDZ, USD and Reality files in the editor's viewer, Files and the Mac's
+  hover preview — turn and zoom on Mac, iPhone and iPad (View in AR on the phone and iPad), Apple's Quick Look volume
+  on Vision Pro. A model's link in a terminal asks, then opens in 3D here (Open in 3D).
+- **Smaller asks from the same days:** a file dropped on a terminal has its path typed, or the drop says why not;
+  ⌘S off the Mac saves, asking where for a new document, and a new file saves into a project on a server; the
+  desktop's Clipboard menu has Sync Automatically (per desktop, on by default); Settings ▸ a Desktop service ▸
+  Graphics (Automatic, H.264 (4:2:0), Without H.264); Share ▸ Send to a Machine on the Mac (D72); Siri and Shortcuts
+  open machines, services, workgroups and saved queries (a saved query opens in a new SQL tab, never run).

@@ -7,7 +7,7 @@ Owner `/root`. Created 2026-09-10. **Status: planned, nothing built.**
 - **Objective:** one application, `com.glasspowertools`, containing the terminal, database and remote
   desktop capabilities, over a shared shell, with the host as the organising object.
 - **Authorization so far:** create this plan and the memory bank. Building starts on the user's word.
-- **Owner and affected files:** `~/Software/glass/GlassPowerTools` only. The three source
+- **Owner and affected files:** this repository only. The three source
   applications are read-only inputs and must keep building.
 - **Acceptance:** each capability reaches parity here, proven by its own tests and native workflows,
   before the next begins. Existing user data is found in place, proven on a test build.

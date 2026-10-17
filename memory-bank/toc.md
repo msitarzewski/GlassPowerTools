@@ -10,8 +10,8 @@ source applications are obsolete and no longer compile.
 |---|---|
 | [Project brief](projectbrief.md) | Scope, the decision to merge, and what the product is |
 | [Product context](productContext.md) | The host-centric model and the interface it implies |
-| [System patterns](systemPatterns.md) | Intended module boundaries and what they replace |
-| [Technical context](techContext.md) | Measured sizes, dependencies, targets and identities |
+| [System patterns](systemPatterns.md) | Module boundaries as intended and as built, the reuse inventory, who owns each key, and the patterns through D78 |
+| [Technical context](techContext.md) | Measured sizes, dependencies, targets and identities, the toolchain, and platform facts through D78 |
 | [Active context](activeContext.md) | Current state, authorization, the release checklist and open questions |
 | [Progress](progress.md) | What is built, how each part is verified, what is not verified, and what is open |
 | [Project rules](projectRules.md) | Rules specific to this merge |
@@ -81,13 +81,21 @@ source applications are obsolete and no longer compile.
 | [Apple Screen Sharing](tasks/2026-10/2026-10-11_apple-screen-sharing-protocol.md) | RFB 003.889 and its record layer, Quality, High Performance (D65), the hotspot findings |
 | [tmux under launchd, Basic terminals (D66, D67)](tasks/2026-10/2026-10-12_tmux-under-launchd.md) | The coalition a Force Quit ends, the app as tmux host, the test leak onto the owner's server, terminals outside tmux |
 | [Widgets: Machines and Active (D68)](tasks/2026-10/2026-10-12_widgets-machines-and-active.md) | A snapshot the app writes, App Intents for taps, the Mac's App Group |
-| [October tasks](tasks/2026-10/README.md) | Monthly index: tmux (D44), database through another machine (D45), RDP bandwidth, iPhone landscape, Vision Pro input (D46 proposed), the owner's testing day of 2026-10-13 (D69, D70) |
+| [October tasks](tasks/2026-10/README.md) | Monthly index: tmux (D44), database through another machine (D45), RDP bandwidth, iPhone landscape, Vision Pro input (D46 proposed), terminal windows, settings and glass (D54–D60, D62, D63), remote displays and Apple's Screen Sharing (D61, D64, D65), tmux under launchd (D66, D67), widgets (D68), the owner's testing days (D69–D71), system integration and favorites (D72, D73), All Windows and orbs (D74), scaling, previews, sidebars and 3D models (D75–D78) |
 | [Backlog inventory, 2026-10-12](tasks/2026-10/2026-10-12_backlog-inventory.md) | Every open decision, release step, defect, feature, owed check and limit, including what the original apps and absorbed packages never carried forward; IDs to pick by |
 | [Backlog tier 2, 2026-10-12](tasks/2026-10/2026-10-12_backlog-tier-2.md) | The CVE fix, wake liveness, iPhone Duo, licensing research and lawyer questions, the two-device checklist |
 | [The owner testing, 2026-10-13](tasks/2026-10/2026-10-13_owner-testing-day.md) | Duo, headset input, desktops on phones, Show All Windows, one Command Palette, the Quick Look crash, SSH panes in terminal windows (D70), database errors measured, tunnels kept apart (D69) |
-| [Plan: system integration, 2026-10-13](tasks/2026-10/2026-10-13_system-integration-plan.md) | The Finder (Services, Quick Actions, Finder Sync), App Intents and entities, Share, drag-out windows, Handoff, Controls, search, snippets, File Provider — by platform, Vision Pro included; proposed |
+| [Plan: system integration, 2026-10-13](tasks/2026-10/2026-10-13_system-integration-plan.md) | The Finder (Services, Quick Actions, Finder Sync), App Intents and entities, Share, drag-out windows, Handoff, Controls, search, snippets, File Provider — by platform, Vision Pro included (D72) |
+| [Spike: machines in the Finder and Files](tasks/2026-10/2026-10-13_file-provider-spike.md) | D72 phase 5: a File Provider extension can reach the SSH stack and the Keychain; the inert `GlassPowerToolsFiles` target; registering a domain waits for the owner |
+| [Tier 3, the evening of 2026-10-13](tasks/2026-10/2026-10-13_tier-3-evening.md) | B-X2 (the editor looks again when its window comes forward), B-X22 (this Mac's projects from the disk), B-F32 (a Graphics choice per Desktop service) |
+| [All Windows everywhere, agents, clipboard](tasks/2026-10/2026-10-14_all-windows-agents-clipboard.md) | All Windows on iPhone, iPad and Vision Pro; AI agents marked; the desktop clipboard both ways; the Command Palette's services and lists; the terminal's link and path menu |
+| [All Windows as the Mac lays it out; the headset](tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md) | A card per tab grouped by machine; orbs (D74); headset selection and tmux 3.8's mouse; Open as Tab In; file previews over a Mac terminal (D76); iPhone tabs and desktop bars — 2026-10-14 to 16 |
+| [A terminal that resizes, and one that scales (D75)](tasks/2026-10/2026-10-16_terminal-resize-and-scale.md) | When Resized, Scale Text, the grid kept and the drawing scaled, the window held to its shape, ⌘+/⌘−/⌘0 |
+| [A terminal window's sidebar adds to the window (D77)](tasks/2026-10/2026-10-16_additive-sidebars.md) | The app moves the window for its sidebar; the titlebar material's opening frame; no line at the edge; the toolbar hold built and reverted; the open 6 pt strip and its log |
+| [3D models (D78)](tasks/2026-10/2026-10-16_3d-models.md) | USDZ, USD and Reality files wherever files open: RealityKit, AR Quick Look, `Model3D` and Quick Look's volume on Vision Pro |
+| [A dropped screenshot that disappeared](tasks/2026-10/2026-10-16_drop-typing.md) | A waiting paste review turned drops away silently; every drop step logged |
 
-This project is `~/Software/glass/GlassPowerTools`. `../GlassEditorKit` was **absorbed on 2026-09-14**
+The sibling directories named below sit beside this repository. `../GlassEditorKit` was **absorbed on 2026-09-14**
 — it was already in production behind the SQL, record and SFTP editors, so it was never a future
 capability. `../GlassConnectionKit` was **absorbed on
 2026-09-14** and is now a historical record like the rest. `../glas.sh`, `../glassdb`, `../glassDT` and `../GlasSecretStore` are

@@ -11,7 +11,7 @@
 - 2026-09-10T17:32:27Z: Session handoff written for compaction. Stage 0 complete, Stage 1 unblocked, no code yet.
 
 - 2026-09-10: Memory bank reconciled with the workspace at the start of a fresh session. The project
-  path was corrected from `~/Software/glasspowertools` to `~/Software/glass/GlassPowerTools` in the
+  path was corrected (to the `GlassPowerTools` directory beside the source apps) in the
   active context, decisions and merge plan. A workspace layout section was added to
   [technical context](../../techContext.md): the six sibling inputs, the two siblings that are not
   inputs (`glassdb-connection-library`, a stale glassdb snapshot, and `docs`, July evaluation

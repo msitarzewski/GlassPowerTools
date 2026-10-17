@@ -1,7 +1,10 @@
 # 2026-10-16: a terminal window's sidebar adds to the window (D77)
 
 **State:** built on the Mac (2026-10-16, evening). Tried by the owner on 0.4.464 and 0.4.465 — both snapped on reopen;
-rebuilt a second time (below, "On 0.4.465"), for 0.4.466.
+rebuilt a second time (below, "On 0.4.465"), for 0.4.466, which he confirmed ("smooth both ways"). Since (2026-10-17,
+to 0.4.471): the opening's see-through frame fixed, no line at the edge, the toolbar hold built and reverted at his
+word. **Open:** a 6 pt see-through strip between sidebar and terminal as it opens; 0.4.471 logs each move (last
+section).
 
 ## What the owner asked
 
@@ -74,7 +77,7 @@ sidebar, so its frame is not the terminal's: the tests measure where SwiftUI lay
 
 The owner: "It hides correctly but pops back to the original size violently. lol"
 
-**Found with a standalone probe** (`~/Software/glass/tmp/sidebar-probe/main.swift`: an `NSHostingView` split view in a
+**Found with a standalone probe** (the working files' `sidebar-probe/main.swift`: an `NSHostingView` split view in a
 window, frames sampled every 4 ms through AppKit's animated toggle; animations don't run inside `swift test`):
 - a bare split view grows and shrinks smoothly both ways, the detail fixed on screen;
 - with the terminal window's `.frame(minWidth: 720, minHeight: 460)` on the whole split view, reopening never grew
@@ -98,7 +101,7 @@ back on the whole window it fails as he saw it: 1000 → 1000 opened, 760 closed
 The owner, with tmux sessions in several tabs: "hmm. still fails the same way." The tests and the first probe put the
 split view in a plain `NSWindow`; his windows are a `WindowGroup`'s (`AppKitWindow`, content an
 `AppKitWindowHostingController`). A probe built as an app with a window scene (`SceneProbe.app`, `LSUIElement`, run with
-`open -g`, in `~/Software/glass/tmp/sidebar-probe/scene.swift`; variants through `options.txt`) showed:
+`open -g`, in the working files' `sidebar-probe/scene.swift`; variants through `options.txt`) showed:
 - with `.preferResizingSplitViewWithFixedSiblings`, closing never shrank the window (the detail widened) and opening
   grew it to the right only — no minimum, the column's minimum, the whole window's minimum and a full toolbar alike.
   AppKit grows such a window by raising its minimum width; nothing shrinks it, and SwiftUI's window controller holds

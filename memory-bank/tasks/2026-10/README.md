@@ -23,6 +23,14 @@
   only tmux's visible screen), "+" opens an empty chooser tab, a twin window controller behind the
   drag "copy", `-A` joining a session by name, workgroups without tmux names, `modifiedAt` never
   saved (D51 defect), editor projects piling into the front window. Five workstreams; awaiting go.
+- 2026-10-09 → 11: the plan's workstreams and the owner's testing, recorded day by day in `activeContext.md` and
+  decisions D54–D65 (no task note of their own): terminal windows reopened by the app on every platform (D54, D55);
+  synchronized settings under one theme identifier (D56); a window owns its look and any setting can be overridden
+  per window (D57, D58); Apple's glass on Vision Pro windows and Opacity kept everywhere (D59, D60, D62; D63 proposed);
+  a remote display per window and Quality (D61), Retina at 1x and windows held to their display's shape (D64).
+- 2026-10-11: [Apple's Screen Sharing protocol](2026-10-11_apple-screen-sharing-protocol.md) — RFB 003.889 and its
+  record layer (encrypted after sign-in, where 3.8 was not), Automatic that watches lateness and High Performance
+  behind a switch (D65), the hotspot findings.
 - 2026-10-12: [This Mac's tmux server under launchd (D66)](2026-10-12_tmux-under-launchd.md) — a Force Quit of an app
   run from a pane ended every local terminal; the resource coalition, reproduced with a probe; launchd's server survives
   the same Force Quit. Installed 0.4.373 (Mac).
@@ -98,7 +106,7 @@
   394fb47, 3feb28a, 2914f3f; 0.4.463. For the owner to try.
 - 2026-10-16 (evening): [A terminal window's sidebar adds to the window (D77)](2026-10-16_additive-sidebars.md)
   — opening or closing the Mac terminal window's sidebar grows or shrinks the window; the terminal keeps its size
-  and place (AppKit's collapse behaviour on SwiftUI's split items). Not for the sidebar a window opens with, the
+  and place (first through AppKit's collapse behaviour on SwiftUI's split items; the same night the app moves the window itself, a9050d2, since AppKit doesn't for a SwiftUI window scene). Not for the sidebar a window opens with, the
   overview, full screen.
   On 0.4.464 reopening snapped: the window's minimum fought AppKit's growing; now the terminal column's. Same evening,
   D75 on iPad: ⌘+ grows a scaled window, sharp scaled text (simulator). 0.4.465.
@@ -115,3 +123,9 @@
   window (the divider made transparent, still draggable). 0.4.469.
 - 2026-10-17 (noon): [the same note](2026-10-16_additive-sidebars.md) — the space held before "+" closed again at his
   word ("It moves anyway... let's close the space"); "+" slides with the sidebar, as AppKit arranges it. 0.4.470.
+- 2026-10-17 (afternoon): [the same note](2026-10-16_additive-sidebars.md) — a 6 pt see-through strip between the
+  sidebar and the terminal as it opens ("it's what causes the shift"); not reproduced by the probe, so every sidebar
+  move and the terminal width held meanwhile are logged (`com.glasspowertools`/`sidebar`) for his next toggles.
+  0.4.471 on all three.
+- 2026-10-17 (afternoon): documentation brought current — the memory bank's index, the README, release notes, the
+  help and the site, checked against the code.

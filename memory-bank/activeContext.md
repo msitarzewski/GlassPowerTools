@@ -3,7 +3,7 @@
 Where the work is now. Rewritten 2026-09-27; the session-by-session log it replaces is in git
 history, and each piece of work's evidence is in its task note under `tasks/2026-09/`.
 
-## State: release preparation, no new features
+## State: release preparation; features only at the owner's ask while he tests
 
 The owner decided on 2026-09-26 to stop adding features and prepare the first public release.
 All four capabilities (terminal, databases, remote desktops, editor) and the shell are built; see
@@ -22,15 +22,42 @@ use the disposable test VM only).
 | # | Item | State |
 |---|---|---|
 | 1 | Licences and acknowledgements | done (`2026-09-26_licensing-and-acknowledgements.md`) |
-| 2 | Dependency refresh | done within reach: point releases, SwiftTerm 1.18; tree-sitter 0.27 and swift-crypto 5 blocked upstream (`techContext.md`) |
+| 2 | Dependency refresh | done within reach: point releases, SwiftTerm 1.20 (D48), swift-nio 2.104.0, swift-log 1.16.1; tree-sitter 0.27 and swift-crypto 5 blocked upstream (`techContext.md`) |
 | 3 | Public-release audit fixes | done (`2026-09-27_release-audit-fixes.md`) |
 | 4 | Memory bank curated | done; quotes paraphrased; `.brain/` untracked |
-| 5 | README, SECURITY, CONTRIBUTING, building guide | done |
+| 5 | README, SECURITY, CONTRIBUTING, building guide, release notes | done; brought current with the code 2026-10-17, and `RELEASE-NOTES.md` added |
 | 6 | Upstream contributions (swift-nio-ssh, Citadel) | drafted locally for the owner's review; nothing sent |
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
-## 2026-10-17 (morning) — RESUME HERE
+## 2026-10-17 (afternoon) — RESUME HERE
+
+**The owner asked:** "make sure that the memory bank, release notes, README, and the site/help are current. If you
+need to, scan the codebase and compare it to the existing docs!" Done, checked against the code by three agents
+(help: terminal and library; help: databases, desktops and editor; the memory bank's core files) and the
+coordinator; every changed claim re-read in the code. The site builds (7 pages, 39 help pages, links checked).
+- **New:** `RELEASE-NOTES.md` (there were none): what the first release holds, recent builds by date, known limits.
+- **Brought current:** README (since 2026-09-30), SECURITY (model links, the Mac's sandboxed extensions), BUILDING
+  (the extensions), CONTRIBUTING (help and release notes with a visible change), all 39 help pages and 6 site pages
+  (build 0.4.471), systemPatterns/techContext/productContext/projectbrief through D78 (the Mac terminal draws with
+  Core Graphics, not Metal; drifted citations fixed), toc and the October index, progress.
+- **Rule 61:** home paths removed from notes, a source comment and a test fixture (`GlassPathHeaderTests`, 12 pass).
+
+**For the owner to decide (in `progress.md`, Known and open):**
+1. **A deleted host with a set-up service comes back at the next sync** — proven at the merge with a throwaway test;
+   the 2026-09-28 "no set-up service disappears" pass revives it. Proposed fix: revive only an endpoint another
+   record also names. iCloud data, so not changed without him.
+2. **Unsaved editor work is discarded** by closing an editor window, quitting the Mac app or closing it in Active
+   (read from the code; nothing calls `hasUnsavedChanges`). Proposed: ask, as closing a document does.
+3. The release script checks only the widget extension; the inert File Provider extension ships in Mac builds.
+4. Smaller: Mac local terminals don't scale; server files over 64 MB can't open; wording defects listed there.
+5. Two rules proposed by the audit (measure window behaviour in a SwiftUI window scene, not a plain `NSWindow`; test
+   on the newest simulator runtime) — his to adopt.
+
+**Still open from the morning:** the 6 pt strip (read his toggles' log first); the no-line edge for the database and
+desktop windows (offered).
+
+## 2026-10-17 (morning)
 
 **From his screen recording of 0.4.467** (his typed answer to the open toolbar question: "keep the + and title
 fixed"), all committed (55a80b9, 46cf403, ba19154):
@@ -85,7 +112,7 @@ too).
 
 **Seen in full terminal runs, intermittent, not from today's changes:** W19's tmux naming test, the iCloud push
 cancellation test, `controllerOwnedLocalPTYSurvivesHostReconstructionUntilExplicitClose` (each once in several runs,
-the Mac busy). Locked screens fail the file-protection and window tests: check `~/Software/glass/tmp/locked`.
+the Mac busy). Locked screens fail the file-protection and window tests: check the working files' `locked`.
 
 **Installs:** 0.4.467 on the Mac, iPhone and Vision Pro (all three read it, 20:25; no new crash reports). His to
 try: models (a `.usdz` from the web, or `--demo-open editor-model`), the sidebar, a screenshot dragged into a terminal
@@ -129,7 +156,7 @@ then **restate it and ask** which platforms first and how the choice is made, be
   / Mouseover + Space; local and server files, recognised from their bytes, code highlighted in the editor's view, a
   bar with Open in Editor. Hover keeps it open while the pointer is in it.
 - **Installs:** the Mac install script had waited on the app's `--tmux-host` process; fixed. Working files live in
-  `~/Software/glass/tmp` (`README.md` there): `build-install.zsh <patch>`, `install-devices.zsh`,
+  the working files (`README.md` there): `build-install.zsh <patch>`, `install-devices.zsh`,
   `install-headset-when-awake.zsh`, `vision-test.zsh`, `ios-test.zsh`, `capture-on.zsh`. Next build: `build-install.zsh 463`.
 
 **Open:** the orb's pulse not yet seen on a device; a desktop orb's shape hold after a round trip shows only on the
@@ -160,7 +187,7 @@ Evidence: `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`, section 
   up, and fits one line on a phone. 0.4.457 on the Vision Pro and iPhone; the Mac reads 0.4.453. The desktop's
   light-mode title now reads (d1198cb). **0.4.458 on the Mac, Vision Pro and iPhone.** The Mac installs had all failed
   since 14:36: the install script's running check matched the app's `--tmux-host` process; fixed in
-  `~/Software/glass/tmp/install-mac2.zsh` (see the working-with-michael-on-builds memory).
+  the working files' `install-mac2.zsh` (see the agent's private notes on builds).
 - **Evening — iPhone tabs** (ce2dbf6, 3e101b8, 0.4.456): the title's tab switcher was invisible in light mode (black
   on the terminal's black) and now reads; All Windows shows every tab of a window, those waiting to connect too.
   0.4.456 on the Vision Pro and iPhone; the Mac is still 0.4.453 (its quit question unanswered twice).
@@ -190,7 +217,7 @@ Evidence: `tasks/2026-10/2026-10-14_all-windows-mac-layout-headset.md`, section 
 orb; a desktop's orb, then resize it after it grows back (should keep the display's shape); the pulse; the held +
 and the toggle's held menu; a hold on a path.
 
-**How we work** is unchanged (see below). **Working files now live in `~/Software/glass/tmp`** (the owner's choice,
+**How we work** is unchanged (see below). **Working files now live in a folder beside the repository, outside `/tmp`** (the owner's choice,
 after a /tmp cleanup took the scratchpad): `build-install.zsh 455` builds and installs the next version;
 `vision-test.zsh <log> <Class/test…>` runs visionOS UI tests; `capture-on.zsh "<log text>" <png>`; its `README.md`
 lists them. Derived data and package checkouts are there too.

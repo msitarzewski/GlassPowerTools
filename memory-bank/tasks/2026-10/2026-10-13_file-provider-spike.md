@@ -1,7 +1,7 @@
 # Spike: machines as locations in the Finder and Files (D72 phase 5)
 
 **Owner's go:** "Go ahead with 5" (2026-10-13, 19:35, while away; he tests when back).
-**Status:** in progress. A spike: measure, then recommend. Nothing ships as working until the owner has seen it.
+**Status:** paused where it needs the owner (registering a domain; "State left" at the end). A spike: measure, then recommend. Nothing ships as working until the owner has seen it.
 **Owner:** the agent.
 
 ## The question
