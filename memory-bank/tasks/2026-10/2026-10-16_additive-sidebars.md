@@ -133,3 +133,45 @@ iPhone for the owner to try.
 
 **Known:** collapsing the sidebar by dragging its divider shrinks the window by the sidebar's width at that moment.
 
+
+## 2026-10-17: "+" and the title held; the opening's see-through frame
+
+The owner's screen recording of 0.4.467 (in the working files, `shift-video`), typed answer to yesterday's offer:
+"keep the + and title fixed". Frame by frame:
+- **The shift.** Opening, "+" and the title rode the window's leading edge as it grew, then stopped at the sidebar's
+  edge: 132 pt left in all (closing, the reverse). With the sidebar closed the window's buttons and the sidebar's
+  button come first, over the terminal; open, they move over the sidebar.
+- **A see-through frame on every opening** (both openings in the recording, no closing): the toolbar from the
+  window's edge to the title showed the window behind.
+
+**Measured in a scene probe** (the working files' `toolbar-probe`: a `WindowGroup` app with the real
+`GlassAdditiveSidebars.swift` and `GlassWindowChrome.swift` compiled in; positions sampled every 4 ms; and, because the
+shell can't capture the screen, the probe photographing its own window through `CGWindowListCreateImage` reached by
+`dlsym`, see-through pixels counted in the toolbar band):
+- the toolbar puts "+" at max(the room the buttons take, the sidebar's edge + 8): the title sat at the window's edge
+  + 223 until 132 pt of sidebar showed, then at the sidebar's edge + 91;
+- an empty item before "+" as wide as the sidebar shows, up to that room, keeps them within 1 pt — but a toolbar item
+  is never narrower than 36 pt, so it appears at 36: "+" dips up to ~30 pt for two frames as the sidebar starts to open
+  and as it finishes closing. Leading padding inside the "+" item did nothing;
+- the room is where the sidebar's button ends, from the window's edge, with the sidebar closed (796 + 36 − 700 = 132).
+- **The flash:** opening, AppKit lays the sidebar out at its full width *inside* the call that opens it — `isCollapsed`
+  already reads false, the KVO not yet sent — and the window is drawn then; only after does it move the sidebar out of
+  sight to slide it in and announce the change. The titlebar material, following `!isCollapsed`, stood at 240 over
+  nothing. Reading where the sidebar actually is fixed closing but not this; following the sidebar exactly while it
+  closes opened see-through slivers (the material is drawn a step behind the panel), so the material keeps covering
+  the band from the window's edge once collapsed, as before. Filmed: the original flashed 3 runs of 3; holding the
+  edge from KVO's `.prior` notice to its last, 0 of 5.
+
+**Now:**
+- `GlassTitlebarMaterialView` (GlassConnectionUI) observes `isCollapsed` with `.prior` and holds its edge while a
+  change is under way (a count, in case AppKit nests them); otherwise as before.
+- `MacWorkspaceToolbarHold` + `MacWorkspaceView`: the terminal column's leading edge in the window
+  (`sidebarShowing`), the room read from the toolbar while it is laid out for a closed sidebar (at rest and the first
+  frames of every opening; 132 until read), and a `ToolbarItem("new-terminal-tab-hold")` before "+" of
+  min(showing, room) once that reaches 36, no shared background, hidden from accessibility, kept visible when compact.
+
+**Tests:** `WindowChromeTests.materialWaitsForTheSidebarToOpen` — the material's edge at each split-view layout while
+the toggle opens the sidebar, before it's announced, stays 0 (the original read 240), and follows the sidebar after;
+`MacTerminalSidebarTests.toolbarStays` — the real terminal window in a hosting controller: "+" and the title on screen
+within 1 pt closed, open, closed (without the hold: open moved). Not covered by tests: the two-frame dip, which the
+probe measures.

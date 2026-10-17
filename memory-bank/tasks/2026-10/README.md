@@ -106,4 +106,7 @@
   RealityKit on Mac/iPhone/iPad (AR Quick Look on touch), Quick Look volume on Vision Pro; model links open in 3D.
 - 2026-10-16 (evening): [A dropped screenshot that "just disappears"](2026-10-16_drop-typing.md) — the file
   arrived, nothing was typed, silently; a waiting paste review no longer turns drops away; every step logged.
-
+- 2026-10-17 (morning): [the D77 note, continued](2026-10-16_additive-sidebars.md) — from the owner's recording:
+  "+" and the title stay put as the sidebar opens and closes ("keep the + and title fixed"; a held room before "+"),
+  and the frame on every opening where the toolbar showed the window behind is gone (the titlebar material waits out
+  AppKit's mid-opening layout). W19's SSH naming test waits for the note it counts. 0.4.468.

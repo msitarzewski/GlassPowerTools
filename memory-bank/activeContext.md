@@ -30,7 +30,27 @@ use the disposable test VM only).
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
-## 2026-10-16 (evening) — RESUME HERE
+## 2026-10-17 (morning) — RESUME HERE
+
+**From his screen recording of 0.4.467** (his typed answer to the open toolbar question: "keep the + and title
+fixed"), all committed (55a80b9, 46cf403, ba19154):
+- **"+" and the title stay put** as a terminal window's sidebar opens and closes: an empty toolbar item before "+"
+  holds the room the window's and sidebar's buttons take with it closed, as wide as the sidebar shows (room read
+  from the toolbar, 132 pt on macOS 27.2). Open, there is that gap after the sidebar's button. Left: a ≤30 pt dip for
+  two frames at the start of opening and end of closing (a toolbar item is never under 36 pt).
+- **The see-through frame on every opening is gone:** AppKit draws the window mid-opening with the sidebar laid out
+  at full width but not yet slid in; the titlebar material now holds its edge until the change is announced (KVO
+  `.prior`).
+- W19's SSH naming test waited for nothing; it now waits for the repository note it counts (failed twice in full
+  runs, passed alone).
+Evidence and the scene probe: `tasks/2026-10/2026-10-16_additive-sidebars.md` (2026-10-17 section).
+
+**Suites:** connection UI 50, terminal 874 (twice), shell 307; tmux unchanged; screen unlocked.
+**Installs:** 0.4.468 on the Mac (read 0.4.468; no new crash reports) and iPhone; the headset was asleep (4016),
+`install-devices-when-awake.zsh 468` waits for it — check its version.
+**His to try:** the sidebar's button with an eye on "+" and the title; everything listed below for 0.4.467.
+
+## 2026-10-16 (evening)
 
 **Since the afternoon, all committed:**
 - **D77 — a Mac terminal window's sidebar adds to the window.** Rebuilt twice for his snaps; the app moves the

@@ -1536,6 +1536,12 @@ for the sidebar it opens with (its saved frame holds it), for the overview, in f
 that wide. The window's minimum belongs to the terminal's column. Only the Mac terminal window has a sidebar.
 Evidence: `GlassAdditiveSidebarsTests`, `MacTerminalSidebarTests`, the window-scene probe;
 `tasks/2026-10/2026-10-16_additive-sidebars.md`.
+**2026-10-17, Implemented — the toolbar holds still too.** Offered three ways (keep fixed, centre the title, leave
+as Finder does); the owner: "keep the + and title fixed". An empty toolbar item before "+" holds the room the
+window's and the sidebar's buttons take with the sidebar closed, as wide as the sidebar shows; with it open there is
+that gap after the sidebar's button. A toolbar item is never under 36 pt, so "+" dips up to ~30 pt for two frames at
+the start of opening and the end of closing. And the titlebar material no longer leaves the toolbar see-through for
+the frame AppKit draws mid-opening.
 
 ## D78 — 3D models open everywhere files do — Implemented 2026-10-16
 **Owner:** "we need 3D model support!" (Apple's iMac `.usdz` as the example). Asked first; all four recommendations
