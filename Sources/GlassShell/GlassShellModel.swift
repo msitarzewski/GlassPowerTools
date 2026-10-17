@@ -1716,7 +1716,8 @@ public final class GlassShellModel: GlassServiceStore {
     }
 
     #if DEBUG
-    private var didSeedHostsForUITesting = false
+    /// The seeding under way or done, which every caller of `load()` waits for.
+    private var hostSeedingForUITesting: Task<Void, any Error>?
     private var didSeedLocalServicesForUITesting = false
 
     /// UI tests seed the isolated catalog through a launch argument, because the runner cannot
@@ -1728,16 +1729,29 @@ public final class GlassShellModel: GlassServiceStore {
     /// `--ui-testing`, only into a catalog that is not under a real Group Container, and only when
     /// that catalog is empty.
     private func seedForUITestingIfRequested() async throws {
+        // **Every caller waits for the one seeding.** `load()` has two callers — the library's
+        // `.task` and its scene-phase observer — which interleave. The seeding is claimed before
+        // the first await, or both would seed the same hosts twice; and the other caller waits
+        // for it, or it went on with a half-seeded library and called it loaded — the screenshot
+        // demo, waiting for `isLoaded`, then found "build", the fourth of five machines, missing
+        // (2026-10-17).
+        if let hostSeedingForUITesting {
+            try await hostSeedingForUITesting.value
+            return
+        }
         let arguments = ProcessInfo.processInfo.arguments
         guard arguments.contains("--ui-testing"),
               let index = arguments.firstIndex(of: "--ui-testing-seed-hosts"), arguments.indices.contains(index + 1),
-              !catalogFileURL.path.contains("Group Containers"), !didSeedHostsForUITesting else { return }
-        // Claimed before the first await. `load()` has two callers — the library's `.task` and
-        // its scene-phase observer — which can interleave, and an emptiness check made *after*
-        // an await is passed by both of them, seeding the same hosts twice.
-        didSeedHostsForUITesting = true
+              !catalogFileURL.path.contains("Group Containers") else { return }
+        let seeding = Task { try await self.seedHostsForUITesting(arguments[index + 1]) }
+        hostSeedingForUITesting = seeding
+        try await seeding.value
+    }
+
+    /// One record per `|` entry of `--ui-testing-seed-hosts`, into an empty catalog.
+    private func seedHostsForUITesting(_ specification: String) async throws {
         guard try await catalog.snapshot().isEmpty else { return }
-        for (offset, entry) in arguments[index + 1].split(separator: "|").enumerated() {
+        for (offset, entry) in specification.split(separator: "|").enumerated() {
             let parts = entry.split(separator: ":", maxSplits: 1)
             guard let head = parts.first.map(String.init), !head.isEmpty else { continue }
             let headParts = head.split(separator: "#", maxSplits: 1).map(String.init)
