@@ -56,11 +56,6 @@ struct MacWorkspaceView: View {
     @State private var terminalColumnWidth: CGFloat = 0
     @State private var heldTerminalWidth: CGFloat?
     @State private var terminalWidthHolds = 0
-    /// How much of the sidebar shows — where the terminal's column begins in the window — and the
-    /// room the window's buttons and the sidebar's take before "+" with it closed: "+" and the title
-    /// stay put as it opens and closes (`MacWorkspaceToolbarHold`).
-    @State private var sidebarShowing: CGFloat = 0
-    @State private var toolbarRoom = MacWorkspaceToolbarHold.usualRoom
     private let sidebarPreferenceKey: String
 
     @Environment(SessionManager.self) private var sessionManager
@@ -275,15 +270,6 @@ struct MacWorkspaceView: View {
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width in
                 if heldTerminalWidth == nil { terminalColumnWidth = width }
             }
-            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minX } action: { edge in
-                // Read while the toolbar is still laid out for a closed sidebar: at rest, and
-                // through the first frames of every opening, so a window's room is its own.
-                if edge < MacWorkspaceToolbarHold.smallestItem, let terminalWindow,
-                   let room = MacWorkspaceToolbarHold.room(in: terminalWindow) {
-                    toolbarRoom = room
-                }
-                sidebarShowing = max(0, edge)
-            }
             .id(selected.workspaceID)
             // A tab dragged from another window can land anywhere on this one, sidebar open or
             // not; it joins at the end. Panes take only Finder's files, so they pass it on.
@@ -312,17 +298,6 @@ struct MacWorkspaceView: View {
             // New Tab leads the content region, immediately after the sidebar — the placement
             // glassdb gives Add Connection (`ConnectionManagerView.swift:327-330`).
             .toolbar {
-                // Room held before it while the sidebar shows, so it and the title stay where
-                // they were with the sidebar closed (`MacWorkspaceToolbarHold`).
-                if let hold = MacWorkspaceToolbarHold.width(sidebarShowing: sidebarShowing, room: toolbarRoom) {
-                    ToolbarItem(id: "new-terminal-tab-hold", placement: .navigation) {
-                        Color.clear
-                            .frame(width: hold, height: 1)
-                            .accessibilityHidden(true)
-                    }
-                    .sharedBackgroundVisibility(.hidden)
-                    .glassKeepVisibleWhenCompact()
-                }
                 ToolbarItem(id: "new-terminal-tab", placement: .navigation) {
                     // Click: a tab as ⌘T makes it. The menu, in the owner's words (2026-10-12): "new
                     // terminal, new basic terminal, new terminal on..." — the last a cascading menu
