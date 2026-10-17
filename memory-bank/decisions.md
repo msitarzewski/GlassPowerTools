@@ -1542,6 +1542,9 @@ window's and the sidebar's buttons take with the sidebar closed, as wide as the 
 that gap after the sidebar's button. A toolbar item is never under 36 pt, so "+" dips up to ~30 pt for two frames at
 the start of opening and the end of closing. And the titlebar material no longer leaves the toolbar see-through for
 the frame AppKit draws mid-opening.
+**2026-10-17, Implemented — no line at the sidebar's edge.** The owner: "What is that gray line … That's what we need
+to eliminate." AppKit's split divider and the chrome's hairline: in the terminal window both are gone
+(`GlassTitlebarMaterialView.showsSidebarEdge` off); the database and desktop windows keep theirs, unasked.
 
 ## D78 — 3D models open everywhere files do — Implemented 2026-10-16
 **Owner:** "we need 3D model support!" (Apple's iMac `.usdz` as the example). Asked first; all four recommendations

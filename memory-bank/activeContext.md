@@ -45,10 +45,14 @@ fixed"), all committed (55a80b9, 46cf403, ba19154):
   runs, passed alone).
 Evidence and the scene probe: `tasks/2026-10/2026-10-16_additive-sidebars.md` (2026-10-17 section).
 
-**Suites:** connection UI 50, terminal 874 (twice), shell 307; tmux unchanged; screen unlocked.
-**Installs:** 0.4.468 on the Mac (read 0.4.468; no new crash reports) and iPhone; the headset was asleep (4016),
-`install-devices-when-awake.zsh 468` waits for it — check its version.
-**His to try:** the sidebar's button with an eye on "+" and the title; everything listed below for 0.4.467.
+- **Then the gray line at the sidebar's edge** ("That's what we need to eliminate"): AppKit's split divider (a
+  half-point line) and our hairline. In the terminal window both are gone (a100d04): the divider transparent (hidden,
+  AppKit shows it again), still draggable. The database and desktop windows keep theirs — not asked; offer.
+
+**Suites:** connection UI 51, terminal 874, shell 307; tmux unchanged; screen unlocked.
+**Installs:** 0.4.469 on the Mac (read 0.4.469; no new crash reports) and iPhone; the headset was asleep (4016),
+`install-devices-when-awake.zsh 469` waits for it — check its version.
+**His to try:** the sidebar's button with an eye on "+", the title and the edge; everything listed below for 0.4.467.
 
 ## 2026-10-16 (evening)
 

@@ -175,3 +175,26 @@ the toggle opens the sidebar, before it's announced, stays 0 (the original read 
 `MacTerminalSidebarTests.toolbarStays` — the real terminal window in a hosting controller: "+" and the title on screen
 within 1 pt closed, open, closed (without the hold: open moved). Not covered by tests: the two-frame dip, which the
 probe measures.
+
+## 2026-10-17: no line at the sidebar's edge in the terminal window
+
+The owner, after 0.4.468: "What is that gray line that shows on the left side of the terminal window? That's what we
+need to eliminate" (a screenshot, an arrow at the sidebar's edge; then "Looks like a left scroll bar?!"). Three
+things stand on that edge (the scene probe listed the views there):
+- AppKit's split-view divider, `NSSplitDividerView`, 0.5 pt, painting `_showBordersAwareDividerColor` — the bright
+  line (+27 over its surroundings in the probe's pictures);
+- `_NSSplitViewShadowView`, 12 pt over the content beside the sidebar — drew nothing measurable;
+- the chrome's own hairline (`glass.sidebar.separator`, added 2026-09-11 when the divider painted nothing and the
+  desktop showed through) — 4 pt inside the sidebar, barely visible.
+Hiding the hairline left the line; hiding the divider view too removed it with nothing showing through (alpha 255 up
+to the terminal). A hidden divider is shown again by AppKit as the sidebar reopens; a transparent one stays so (two
+probe runs). Swapping the split view's class to clear `dividerColor` broke it (KVO had subclassed it). Dragging the
+edge still sizes the sidebar: hit-tests there land on the split view itself, divider or not.
+
+**Now:** `GlassTitlebarMaterialView.showsSidebarEdge` (default on, as the database and desktop windows keep it): off,
+the hairline is hidden and AppKit's divider made transparent (a subview of the split view beside its panes, no wider
+than its divider), again for each new split view. `MacTerminalWindowPolicy.apply` turns it off.
+
+**Tests:** `WindowChromeTests.sidebarEdgeDrawsNoLine` — divider transparent and hairline hidden, after the sidebar
+closes and reopens too, the edge still hit-testing to the split view, and back on; fails with the divider left alone.
+Probe: no line at rest open, reopened, or in any frame of the animations; no see-through pixels.

@@ -110,3 +110,6 @@
   "+" and the title stay put as the sidebar opens and closes ("keep the + and title fixed"; a held room before "+"),
   and the frame on every opening where the toolbar showed the window behind is gone (the titlebar material waits out
   AppKit's mid-opening layout). W19's SSH naming test waits for the note it counts. 0.4.468.
+- 2026-10-17 (late morning): [the D77 note, continued](2026-10-16_additive-sidebars.md) — the gray line at the
+  sidebar's edge ("That's what we need to eliminate"): AppKit's split divider and our hairline, gone from the terminal
+  window (the divider made transparent, still draggable). 0.4.469.
