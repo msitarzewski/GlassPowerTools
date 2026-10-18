@@ -35,6 +35,16 @@ NOTES="${3:-}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
+# A released Xcode only. App Store Connect refuses an upload built by a beta ("Unsupported SDK or Xcode
+# version", 2026-10-18), and what reaches people should be built by an Xcode Apple has released. Daily
+# builds may use a beta; point this at a released one with DEVELOPER_DIR. A beta's build number ends in a
+# letter (27B5019j); a release's does not (27A9275).
+XCODE_BUILD="$(xcodebuild -version | awk '/Build version/ {print $3}')"
+case "$XCODE_BUILD" in
+  *[a-z]) echo "Xcode $XCODE_BUILD is a beta. Use a released Xcode, for example:"
+          echo "  DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer $0 ${DRY_RUN:+--dry-run }$*"; exit 1 ;;
+esac
+
 NOTARY_PROFILE="${GPT_NOTARY_PROFILE:-glasspowertools-notary}"
 
 setting() { xcodebuild -project GlassPowerTools.xcodeproj -scheme GlassPowerTools -configuration Release \
