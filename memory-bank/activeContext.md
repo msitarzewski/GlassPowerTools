@@ -30,7 +30,24 @@ use the disposable test VM only).
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
-## 2026-10-17 (evening) — RESUME HERE
+## 2026-10-17 (night) — RESUME HERE
+
+**His ask:** "remove the gray line in database and desktop windows too - take a look at the AudioPaper site, and glass
+project, and autopaper and update this site to that aesthetic. screenshots and all using the new sandbox". (AutoPaper is
+`~/Clean/autopaper`; "the new sandbox" is Glass Project's headless macOS VM.) Done, committed:
+- **The gray line (929a183, 0.4.475):** the database window's sidebar edge as the terminal's; the desktop window's
+  hairline (down its leading edge, as it has no sidebar) hidden. Tests fail without; the VM pictures show only the
+  system glass sidebar's own rim, as in a terminal window (`techContext.md`, "The macOS screenshot VM").
+  **Installs:** Mac read 0.4.475 and runs, no new crash reports; iPhone and headset unreachable twice (CoreDevice
+  4016, asleep or locked) — install 0.4.475 when they're awake (`build-install.zsh`'s two devicectl lines).
+- **The site in the family's look**, with the real app in pictures (Mac windows from the VM in dark and light; Vision
+  Pro, iPad and iPhone from the simulators). The VM tooling is in `Tools/Screenshots/macvm/`, documented in
+  BUILDING. Kept from ours: ⌘K help search, the appearance button, the help's sidebar. Not deployed (his step).
+- **Left as they are, his to judge:** the library's sidebar footer says "Not synced on this build" in the Mac
+  pictures (true of the VM build); the hero buttons are How to use it / Why one app / Security, with no download (not
+  released).
+
+## 2026-10-17 (evening)
 
 **Since the afternoon, all committed:**
 - **All Windows in light mode on iPhone** (his screenshot; chosen: "Cards in the terminal's colors"): a terminal's

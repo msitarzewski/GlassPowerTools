@@ -523,3 +523,33 @@ width held); `sh.glas` / `terminal-drop`, `terminal-selection`, `terminal-paste`
   Pro") unless the app has Apple's `com.apple.developer.device-information.user-assigned-device-name` entitlement,
   which Apple grants on request. Adding the key before the App ID has it breaks signing. On the Mac,
   `SCDynamicStoreCopyComputerName` gives the computer name with no entitlement (`GlassDeviceName.system`).
+
+## The macOS screenshot VM (2026-10-17)
+
+The website's Mac pictures are taken in a headless macOS 26 VM, never on the owner's screen (his ask: "screenshots and
+all using the new sandbox"). The driver is Glass Project's, itself AutoPaper's: `Tools/Screenshots/macvm/macvm.sh`
+(tart; Cirrus Labs' `macos-tahoe-base` image; VMs `glasspowertools-mac26`, `-clean` never booted, `-run` throwaway),
+`vmtool.swift` compiled inside the VM, `wallpaper.py`, and `Tools/Screenshots/site_shots.sh`. Its key, Debug build and
+raw captures are in the git-ignored `.scratch/`. Observed:
+- **The app runs in the VM ad-hoc signed, without entitlements** (`macvm.sh build-app`: Debug, `CODE_SIGN_IDENTITY=-`,
+  no `CODE_SIGN_ENTITLEMENTS`, no hardened runtime). A `--ui-testing <uuid>` run uses none of them: its catalog and
+  storage are a folder of its own and it never attaches CloudKit. The sidebar says "Not synced on this build".
+- **The screen starts at 1024 × 768 points**, whatever `tart set --display` says; `vmtool display set 1920x1200` gives
+  1920 × 1200 at 2x (`site_shots.sh` sets it each run).
+- **A capture from SSH raises "com.apple.sshd-session is requesting to bypass the system private window picker"**,
+  although setup quiets the notice for `sshd-keygen-wrapper`; pressing its Allow (`vmtool press UserNotificationCenter
+  Allow`) clears it, and `site_shots.sh` presses it around every capture.
+- **A window-only capture (`screencapture -l`) draws the glass flat**, as over nothing (an opaque gray sidebar). The
+  site's pictures are the screen in the window's frame (`-R`), cut out by the window-only capture's outline, over a
+  desktop picture in the site's colours, so the glass shows a wash of it and nothing of Apple's wallpaper.
+- **Window titles the shots find:** the library "All Connections"; `terminal` "alpha"; `database` "orders" (the open
+  table); `diagram` "main"; `desktop` "bravo"; `editor` "ShippingAddress.swift".
+- **The demo desktop says "The remote session is not ready."** on a Mac: as its window becomes key it sends the Caps
+  Lock state, which its never-connected session refuses (as a real one should). `site_shots.sh` presses the banner's
+  Dismiss.
+- **The glass sidebar's own rim stays**: a 2-pixel highlight at its edge, brighter than both sides in dark and light
+  alike, in terminal and database windows. AppKit's divider and our hairline (`separatorColor`, darker in light mode)
+  are gone from both (D77 follow-ups, a100d04 and 929a183); a desktop window's left edge shows only the window
+  border, the same as its right.
+- The device pictures come from the simulators (`Tools/Screenshots/device_shots.sh`).
+

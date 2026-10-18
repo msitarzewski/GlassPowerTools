@@ -134,3 +134,7 @@
 - 2026-10-17 (evening): All Windows in light mode on iPhone — a terminal's card in its theme's colours (cdb160b,
   chosen from three ways), 0.4.473; and Your Library counting connections on all devices, All Devices then each by
   name (D81, 93d857a), 0.4.474.
+- 2026-10-17 (night): no gray line in database and desktop windows (929a183, 0.4.475 on the Mac; iPhone and headset
+  unreachable); the site in AudioPaper's family look with the real app in pictures, Mac windows from a headless macOS
+  VM (`Tools/Screenshots/macvm`, `site_shots.sh`) and devices from the simulators (`device_shots.sh`). Evidence and
+  the VM's quirks: `techContext.md`, "The macOS screenshot VM"; `progress.md`.

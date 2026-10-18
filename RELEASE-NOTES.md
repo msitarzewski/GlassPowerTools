@@ -70,6 +70,11 @@ no download or TestFlight build yet. What is verified, and how, is in
 
 ## Recent builds
 
+### 0.4.475 (17 October 2026)
+- **No gray line in database and desktop windows**, as in terminal windows since 0.4.469: a database
+  window's sidebar meets its workspace with no line between, and a desktop window has no line down its
+  left edge.
+
 ### 0.4.474 (17 October 2026)
 - **Your Library counts connections on all your devices.** The overview's chart and Most used add up
   every device's connections, with a menu to show one device by its name. Each device shares how
