@@ -108,7 +108,8 @@ The two BoringSSL texts, and where they came from, are in `Documentation/ThirdPa
 
 ## Authored for this application
 
-MIT, under this repository's own copyright.
+The GNU GPL, version 3, under this repository's own copyright. The parts that came from the same
+author's earlier packages and apps were published there under MIT; those published copies stay MIT.
 
 | Component | Note |
 |---|---|
@@ -118,7 +119,7 @@ MIT, under this repository's own copyright.
 | `Sources/GlassEditorCore`, `GlassEditorUI` | Text editing and syntax analysis. Absorbed from the standalone GlassEditorKit package, 2026-09-14. |
 | `Sources/GlassConnectionKit`, `GlassConnectionUI`, `GlassHostCatalog` | Host identities, library projection and the catalog. Absorbed, 2026-09-14. |
 | `Sources/GlassDBKit` | Database engines moved from glassdb, its tunnel manager left behind (D7). |
-| `Sources/GlassSSHTransport`, `Sources/GlassTerminal`, `Sources/GlassDatabase`, `Sources/GlassShell`, `Sources/GlassLayers` | Moved from glas.sh and glassdb, both MIT under the same author. |
+| `Sources/GlassSSHTransport`, `Sources/GlassTerminal`, `Sources/GlassDatabase`, `Sources/GlassShell`, `Sources/GlassLayers` | Moved from glas.sh and glassdb, the same author's apps (published under MIT). |
 
 ## Derived from third-party sources, with attribution
 

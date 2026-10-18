@@ -378,7 +378,7 @@ struct GlassShellAboutView: View {
             GlassShellUpdateSettings()
                 .padding(.top, 4)
             #endif
-            Text("MIT · © 2026 Michael Sitarzewski")
+            Text("GPLv3 · © 2026 Michael Sitarzewski")
                 .font(.caption2).foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity)

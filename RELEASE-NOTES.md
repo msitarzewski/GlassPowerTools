@@ -70,6 +70,10 @@ no download or TestFlight build yet. What is verified, and how, is in
 
 ## Recent builds
 
+### 0.4.478 (18 October 2026)
+- **Glass Power Tools is licensed under the GNU GPL, version 3**, chosen before its first publication.
+  Settings ▸ About says so. Contributions come with a contributor agreement (`CLA.md`).
+
 ### 0.4.477 (18 October 2026)
 - **The library of machines moved to iCloud's production database**, the one released copies use.
   Until now builds from Xcode used CloudKit's development database, which a released copy never sees.
