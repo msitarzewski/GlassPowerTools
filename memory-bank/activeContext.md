@@ -38,11 +38,11 @@ visionOS and macOS. Don't forget session tranfer with tmux and workgroups that r
 claim vision pro first and feature a mac interface instead above the fold", and "run btop or something for the
 terminal examples". Asked which "78% transparency" meant, with a side-by-side: **Opacity 78%** (Glass 50%, Medium).
 - **The pictures:** Vision Pro (simulator) terminal, database, desktop, editor with Connections closed, plus Active
-  (tmux sessions to pick up) and a workgroup; the Mac (VM) the same services, Active, the library, and all four at
-  once; the iPhone's terminal; every terminal running a btop-style screen drawn for its window's size. All DEBUG-only
+  (tmux sessions to pick up) and a workgroup; the Mac (VM) the same services, Active and the library (all four at once
+  was taken, then dropped: it repeated the four service pictures); the iPhone's terminal; every terminal running a btop-style screen drawn for its window's size. All DEBUG-only
   demo code (`App/GlassDemoMode.swift`, `App/GlassDemoBtop.swift`); nothing shipped changed, so no new build.
 - **The site:** the Vision Pro terminal above the fold; Vision Pro first with its other three services; "Pick up where
-  you left off" (Active, workgroups); the Mac's four windows and its gallery; the library under Why one app; iPad and
+  you left off" (Active, workgroups); the Mac's four services; the library under Why one app; iPad and
   iPhone. Service pages each gain their Vision Pro picture; the terminal page, Active on the Mac. Not deployed.
 - **Tried and dropped:** four windows at once in the visionOS simulator (techContext, "The macOS screenshot VM").
 - **A crash found on the way, fixed in 0.4.476** (5c567dd): the database window's policy re-set unchanged window

@@ -148,9 +148,10 @@ dock() {  # hide | show
 }
 
 names=("$@")
-# `workgroups` is there to name, not in the default set: the Mac's detail cuts its table off at this size, so
-# the site shows the Vision Pro one.
-(( $# )) || names=(library terminal database diagram desktop editor active workspace)
+# `workgroups` and `workspace` are there to name, not in the default set: the Mac's workgroup detail cuts its
+# table off at this size, so the site shows the Vision Pro one; and the four windows at once repeated the home
+# page's four service pictures, so the owner kept those (2026-10-18).
+(( $# )) || names=(library terminal database diagram desktop editor active)
 prepare
 [[ -n ${(M)names:#database} || -n ${(M)names:#diagram} || -n ${(M)names:#workspace} ]] && shop
 for name in $names; do
