@@ -186,4 +186,14 @@ spctl --assess --type open --context context:primary-signature --verbose=2 "$DMG
 echo
 echo "==> done: $DMG and $ZIP; site/static/appcast.xml updated"
 cat "$OUT/GlassPowerTools-$VERSION.sha256"
-echo "Next: publish the GitHub release v$VERSION with both files, then rebuild and publish the site (the feed)."
+# The feed (Tools/Release/appcast.py) sends Sparkle to releases/download/v<version>/<the zip's name> on
+# GitHub, so the tag and the file names must be exactly these: a release published by hand with another
+# tag or name leaves every update failing to download.
+echo
+echo "Next, in this order:"
+echo "  1. Push the commit it was built from, so the tag marks that source:  git push"
+echo "  2. Publish the GitHub release with both files:"
+echo "     gh release create v$VERSION \"$DMG\" \"$ZIP\" \"$OUT/GlassPowerTools-$VERSION.sha256\" \\"
+echo "       --target $(git rev-parse HEAD) --title \"Glass Power Tools $VERSION\" --notes-file <notes>"
+echo "  3. Rebuild and publish the site, which carries the feed: python3 Tools/Site/build_site.py, then deploy."
+echo "     Publishing the feed before the release would point Sparkle at a file that isn't there yet."
