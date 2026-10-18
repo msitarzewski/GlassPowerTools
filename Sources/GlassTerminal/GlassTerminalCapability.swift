@@ -110,6 +110,9 @@ public final class GlassTerminalRuntime {
         /// `windowSettings` for its window (W22), and This Window opened over it when asked; `tick`,
         /// when given, arrives again and again after it, as a program's redraws do.
         case demoReplay(name: String, output: Data, windowSettings: GlassWindowOverrides, opensSettings: Bool, tick: Data?)
+        /// Screenshots: a terminal running a stand-in for a full-screen program, which draws its
+        /// whole screen for the rows and columns the window gives it, and again when they change.
+        case demoScreen(name: String, draw: @MainActor (_ rows: Int, _ columns: Int) -> Data)
         /// Screenshots: one window holding a demo terminal on each of `names`, the first in front;
         /// on Vision Pro, shown in the grid when `grid` (W31: one bottom bar in tabs and in grid).
         case demoTabs(names: [String], output: Data, grid: Bool)
@@ -514,6 +517,11 @@ public final class GlassTerminalRuntime {
         enqueue(.demoReplay(name: name, output: output, windowSettings: windowSettings, opensSettings: opensSettings,
                             tick: tick))
     }
+    /// Screenshots only: a terminal window on `name` running a stand-in for a full-screen program
+    /// (`draw`), which is given the window's rows and columns each time they change, as a program is.
+    public func requestDemoScreen(name: String, draw: @escaping @MainActor (_ rows: Int, _ columns: Int) -> Data) {
+        enqueue(.demoScreen(name: name, draw: draw))
+    }
     /// Screenshots only: one window with a demo terminal on each of `names` as its tabs, each
     /// showing `output`; on Vision Pro in the grid when `grid`.
     public func requestDemoTabs(names: [String], output: Data, grid: Bool = false) {
@@ -531,6 +539,27 @@ public final class GlassTerminalRuntime {
     }
     /// Screenshots only: the Files window on `name` at `path`, with no connection behind it.
     public func requestDemoFiles(name: String, path: String) { enqueue(.demoFiles(name: name, path: path)) }
+    /// Screenshots only (`--demo-open workgroups`): a saved workgroup of `terminals` — each a
+    /// Terminal service on a machine at an address, its label, its startup command and the tmux
+    /// session it keeps — selected in the library's Workgroups. A seeded machine has no terminal
+    /// record (user, port) behind its service, so each is given one here, held in memory only.
+    public func demoShowWorkgroup(name: String,
+                                  terminals: [(endpointID: EndpointID, machine: String, address: String,
+                                               label: String, command: String?, tmux: String)]) {
+        let servers = sessionManager.serverManager
+        for terminal in terminals where servers.server(for: terminal.endpointID.rawValue) == nil {
+            servers.servers.append(ServerConfiguration(id: terminal.endpointID.rawValue, name: terminal.machine,
+                                                       host: terminal.address, username: "ann"))
+        }
+        var preset = LayoutPreset(name: name, colorTag: .orange, sessionIntents: terminals.map {
+            LayoutPreset.SessionIntent(serverID: $0.endpointID.rawValue, label: $0.label, startupCommand: $0.command,
+                                       tmuxSession: $0.tmux)
+        })
+        preset.openingView = .grid
+        settingsManager.upsertLayoutPreset(preset)
+        showWorkgroupsPanel()
+        workgroupsModel.selection = .preset(preset.id)
+    }
     #endif
     public func requestShowTailscale() { enqueue(.showTailscale) }
 

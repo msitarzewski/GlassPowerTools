@@ -334,6 +334,19 @@ struct TerminalConnectFlow: ViewModifier {
                     }
                 }
             }
+        case .demoScreen(let name, let draw):
+            // The same connectionless session, its "program" told the size as a PTY's would be.
+            let server = ServerConfiguration(name: name, host: "192.0.2.10", username: "ann")
+            let program = DemoWheelAnswer()
+            let session = TerminalSession(server: server,
+                                          terminalWriteSink: { _ in },
+                                          terminalResizeSink: { rows, columns in
+                                              program.session?.feedTerminalData(draw(rows, columns))
+                                          })
+            program.session = session
+            sessionManager.registerSession(session)
+            session.state = .connected
+            presentTerminalWindow(for: session, windowSettings: GlassWindowOverrides())
         case .demoTabs(let names, let output, let grid):
             // The same connectionless sessions, as the tabs of one window.
             let sessions = names.map { name in
@@ -1224,6 +1237,7 @@ struct TerminalConnectFlow: ViewModifier {
 /// reports a program with the mouse is sent, shown on the status line as tmux shows its scroll.
 @MainActor
 final class DemoWheelAnswer {
+    /// The demo terminal it answers for; `demoScreen` holds its session here too, to draw into.
     weak var session: TerminalSession?
 
     nonisolated static func reply(to data: Data) -> Data? {

@@ -100,6 +100,11 @@ public final class GlassShellModel: GlassServiceStore {
     public internal(set) var isCheckingRunningSessions = false
     /// When the machines last answered what runs on them; nil before the first answer.
     var runningSessionsCheckedAt: ContinuousClock.Instant?
+    #if DEBUG
+    /// Screenshots only (`demoRunningSessions`): Active keeps the made-up sessions it was given,
+    /// rather than asking machines at made-up addresses, which never answer.
+    @ObservationIgnored var demoHoldsRunningSessions = false
+    #endif
     /// Connections handed to a capability that has not reported back yet, and when each began
     /// (W29). Removed on the capability's one report, whatever it says.
     private(set) var connectAttempts: [UUID: ContinuousClock.Instant] = [:]
@@ -1844,6 +1849,15 @@ extension GlassShellModel {
             preferences.recordConnection(.init(date: date, hostID: host.id, kind: connection.kind))
         }
         try? persistPreferences()
+    }
+
+    /// Screenshots only (`--demo-open active`): tmux sessions running on the machines, as Active
+    /// lists them when the machines answer, kept there for the picture.
+    public func demoRunningSessions(_ sessions: [GlassRunningSession]) {
+        demoHoldsRunningSessions = true
+        runningSessions = sessions
+        uncheckedMachines = []
+        runningSessionsCheckedAt = .now
     }
 
     /// Screenshots only: other devices' counts, as iCloud would bring them (D81) — each a name and,

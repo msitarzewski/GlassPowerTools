@@ -23,9 +23,32 @@ import GlassDesktop
 import GlassShell
 import GlassConnectionKit
 
+/// Runs the demo from the library's window; with `--demo-close-connections`, closes that window
+/// once the surface has opened, so the picture shows the surface alone, with the room or the
+/// desktop behind its glass (the owner, 2026-10-18: "close the connections window so users can see
+/// why this was built").
+struct GlassDemoModeTask: ViewModifier {
+    @Environment(\.dismissWindow) private var dismissWindow
+    let run: @MainActor () async -> Void
+
+    func body(content: Content) -> some View {
+        content.task {
+            await run()
+            guard GlassDemoMode.closesConnections else { return }
+            try? await Task.sleep(for: .seconds(5))
+            dismissWindow()
+        }
+    }
+}
+
 @MainActor
 enum GlassDemoMode {
     private static var didRun = false
+
+    /// `--demo-close-connections`, in a demo run.
+    static var closesConnections: Bool {
+        requestedSurface != nil && ProcessInfo.processInfo.arguments.contains("--demo-close-connections")
+    }
 
     /// The surface asked for, when this is a demo run.
     static var requestedSurface: String? {
@@ -45,18 +68,31 @@ enum GlassDemoMode {
         // The theme colour behind content, so a window reads against the simulator's bright room.
         // A setting anyone can choose (Settings ▸ Appearance); the default paints none.
         layers.state.opacity = 0.9
-        // `--demo-glass <opacity>,<frost>`: Appearance's two sliders, for checking a window's glass
-        // at a given setting (a Vision Pro terminal at Blur 0 is completely clear).
+        // `--demo-glass <opacity>,<frost>[,<material>]`: Appearance's two sliders, and its
+        // material by name (`thin` is Medium), for checking a window's glass at a given setting (a
+        // Vision Pro terminal at Blur 0 is completely clear). The site's pictures use
+        // `0.78,0.5,thin`: Opacity 78%, Glass 50%, Medium (the owner, 2026-10-18).
         let arguments = ProcessInfo.processInfo.arguments
         var demoGlass: (opacity: Double, frost: Double)?
         if let index = arguments.firstIndex(of: "--demo-glass"), arguments.indices.contains(index + 1) {
-            let values = arguments[index + 1].split(separator: ",").compactMap { Double($0) }
+            let parts = arguments[index + 1].split(separator: ",").map(String.init)
+            let values = parts.prefix(2).compactMap { Double($0) }
             if values.count == 2 {
                 layers.state.opacity = values[0]
                 layers.state.frost = values[1]
                 demoGlass = (values[0], values[1])
             }
+            if parts.count == 3, let material = GlassLayerMaterial(rawValue: parts[2]) {
+                layers.state.material = material
+            }
         }
+        // A desktop has no theme to paint, so its Opacity fades the remote screen instead (W28).
+        // The glass given applies to its window; the screen fades too only with `--demo-fade-desktop`.
+        let desktopSettings: GlassWindowOverrides = demoGlass.map {
+            GlassDesktopRuntime.demoWindowSettings(
+                frost: $0.frost,
+                opacity: arguments.contains("--demo-fade-desktop") && $0.opacity > 0 ? $0.opacity : nil)
+        } ?? GlassWindowOverrides()
         #if os(iOS)
         // `--demo-landscape`: the iPhone turned on its side, for checking the landscape layout
         // without driving the Simulator app's rotate menu.
@@ -78,6 +114,65 @@ enum GlassDemoMode {
                              opensSettings: surface == "editor-settings")
         case "terminal":
             terminal.requestDemoReplay(name: "alpha", output: Data(terminalTranscript.utf8))
+        case "btop":
+            // The website's terminal (the owner, 2026-10-18: "run btop or something for the
+            // terminal examples"): a btop-style monitor of the made-up shop (GlassDemoBtop.swift).
+            terminal.requestDemoScreen(name: "alpha", draw: GlassDemoBtop.screen(rows:columns:))
+        case "workspace":
+            // Why the app was built (the owner, 2026-10-18: "close the connections window so users
+            // can see why this was built"): a terminal, a database, a remote desktop and the editor,
+            // open at once, each in its own window, one at a time so they stack in the same order
+            // every run: the editor in front.
+            terminal.requestDemoScreen(name: "alpha", draw: GlassDemoBtop.screen(rows:columns:))
+            try? await Task.sleep(for: .seconds(3))
+            database.requestDemoDatabase(file: URL.documentsDirectory.appending(path: "demo-shop.sqlite"), name: "shop",
+                                         showsDiagram: false)
+            try? await Task.sleep(for: .seconds(3))
+            let renderer = ImageRenderer(content: DemoRemoteScreen())
+            renderer.scale = 1
+            if let picture = renderer.cgImage {
+                await desktop.requestDemoDesktop(name: "bravo", host: "192.0.2.20", picture: picture,
+                                                 windowSettings: desktopSettings, opensSettings: false)
+            }
+            try? await Task.sleep(for: .seconds(3))
+            await openEditor(editor, preview: false)
+        case "active":
+            // Session transfer with tmux (the owner, 2026-10-18: "Don't forget session tranfer with
+            // tmux"): Active listing what runs on the machines — open on another device, or
+            // detached — to pick up here. Made-up sessions; nothing is behind them.
+            while !shell.isLoaded { try? await Task.sleep(for: .milliseconds(100)) }
+            var sessions: [GlassRunningSession] = []
+            if let alpha = terminalService("alpha", in: shell)?.endpointID {
+                sessions += GlassTerminalCapability.demoRunningSessions(on: alpha, [
+                    ("glass-1", nil, "shop", "shop", "main", 1, 1),
+                    ("glass-2", "jobs", "shop", "shop", "main", 0, 35),
+                ])
+            }
+            if let build = terminalService("build", in: shell)?.endpointID {
+                sessions += GlassTerminalCapability.demoRunningSessions(on: build, [
+                    ("glass-1", "release", "shop", "shop", "release/2.15", 1, 3),
+                ])
+            }
+            if let nas = terminalService("nas", in: shell)?.endpointID {
+                sessions += GlassTerminalCapability.demoRunningSessions(on: nas, [
+                    ("glass-1", nil, "backups", nil, nil, 0, 190),
+                ])
+            }
+            shell.demoRunningSessions(sessions)
+            shell.showActiveConnections()
+        case "workgroups":
+            // Workgroups that come back after a quit (the owner, 2026-10-18): a saved set of
+            // terminals on three machines, each keeping its own tmux session.
+            while !shell.isLoaded { try? await Task.sleep(for: .milliseconds(100)) }
+            try? await Task.sleep(for: .seconds(1))
+            guard let alpha = terminalService("alpha", in: shell), let build = terminalService("build", in: shell),
+                  let nas = terminalService("nas", in: shell) else { return }
+            terminal.demoShowWorkgroup(name: "Shop", terminals: [
+                (alpha.endpointID, "alpha", alpha.address, "web", "cd ~/shop && docker compose logs -f web", "glass-3"),
+                (alpha.endpointID, "alpha", alpha.address, "jobs", "cd ~/shop && docker compose logs -f jobs", "glass-4"),
+                (build.endpointID, "build", build.address, "release", "cd ~/shop && make release", "glass-2"),
+                (nas.endpointID, "nas", nas.address, "backups", "tail -f /var/log/backup.log", "glass-2"),
+            ])
         case "terminal-links", "terminal-paths":
             // 2026-10-15: one long address, or one long log path, on the rows around the screen's
             // middle — the visionOS simulator's test runner holds an element at its middle,
@@ -195,13 +290,9 @@ enum GlassDemoMode {
             // `desktop-window`: a window with settings of its own (W25); `desktop-settings`: and
             // Desktop Settings ▸ This Window open over it. `desktop` with `--demo-glass`: the
             // window's glass is the frost given (a desktop's glass is its own Background Frost,
-            // not Appearance's), and an opacity above 0 fades the remote screen — a desktop has no
-            // theme to paint, so 0 leaves the screen as it is (W28).
-            var windowSettings = surface == "desktop" ? GlassWindowOverrides() : GlassDesktopRuntime.demoWindowSettings
-            if surface == "desktop", let demoGlass {
-                windowSettings = GlassDesktopRuntime.demoWindowSettings(
-                    frost: demoGlass.frost, opacity: demoGlass.opacity > 0 ? demoGlass.opacity : nil)
-            }
+            // not Appearance's), and with `--demo-fade-desktop` an opacity above 0 fades the remote
+            // screen (`desktopSettings`, above).
+            let windowSettings = surface == "desktop" ? desktopSettings : GlassDesktopRuntime.demoWindowSettings
             await desktop.requestDemoDesktop(
                 name: "bravo", host: "192.0.2.20", picture: picture,
                 windowSettings: windowSettings,
@@ -237,6 +328,13 @@ enum GlassDemoMode {
         default:
             break
         }
+    }
+
+    /// The made-up machine `name`'s Terminal service, and its address.
+    private static func terminalService(_ name: String, in shell: GlassShellModel) -> (endpointID: EndpointID, address: String)? {
+        guard let host = shell.hosts.first(where: { $0.displayName == name }),
+              let ssh = host.services.first(where: { $0.kind == .ssh }) else { return nil }
+        return (ssh.endpointID, host.address ?? "192.0.2.1")
     }
 
     /// A believable few minutes in a shell on `alpha`: invented repository, invented containers.

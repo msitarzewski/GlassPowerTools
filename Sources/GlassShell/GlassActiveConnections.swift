@@ -117,6 +117,9 @@ public extension GlassShellModel {
     /// answer stood until a manual refresh. The library asks once it has loaded.
     func refreshRunningSessions() async {
         guard isLoaded, !isCheckingRunningSessions else { return }
+        #if DEBUG
+        if demoHoldsRunningSessions { return }
+        #endif
         isCheckingRunningSessions = true
         defer { isCheckingRunningSessions = false }
         let report = await registry.runningReport()

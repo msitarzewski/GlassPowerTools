@@ -287,3 +287,31 @@ extension GlassTerminalCapability {
         return try await body(probe)
     }
 }
+
+#if DEBUG
+extension GlassTerminalCapability {
+    /// Screenshots only (`--demo-open active`): tmux sessions on the machine whose Terminal service
+    /// is `endpointID`, as Active lists them — named and described as a real listing is — with
+    /// nothing behind them: opening, taking over or ending one does nothing.
+    public static func demoRunningSessions(
+        on endpointID: EndpointID,
+        _ sessions: [(name: String, given: String?, folder: String, repository: String?, branch: String?,
+                      attached: Int, minutesAgo: Int)]
+    ) -> [GlassRunningSession] {
+        sessions.map { demo in
+            let home = "/home/ann"
+            let tmux = TerminalTmux.Session(
+                name: demo.name, attachedClients: demo.attached, windows: 1,
+                lastActivity: Date().addingTimeInterval(-Double(demo.minutesAgo) * 60),
+                givenName: demo.given, directory: home + "/" + demo.folder, home: home,
+                repository: demo.repository.map { TerminalRepository(name: $0, branch: demo.branch, root: home + "/" + $0) })
+            return GlassRunningSession(
+                id: "terminal-tmux:\(endpointID.rawValue.uuidString):\(demo.name)",
+                title: tmux.displayName, subtitle: runningDetails(tmux), symbolName: "terminal",
+                endpointID: endpointID, isAttachedElsewhere: demo.attached > 0,
+                open: {}, takeOver: {}, end: {},
+                attachment: attachment(serverID: endpointID.rawValue, name: demo.name))
+        }
+    }
+}
+#endif

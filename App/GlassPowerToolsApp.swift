@@ -641,7 +641,7 @@ struct GlassPowerToolsApp: App {
         #if DEBUG
         // Screenshots: `--demo-open <surface>` in a `--ui-testing` run (GlassDemoMode.swift).
         // After the bootstraps mount, so each surface's request is drained where it always is.
-        .task { await GlassDemoMode.run(editor: editor, terminal: terminal, database: database, desktop: desktop, layers: layers, shell: model) }
+        .modifier(GlassDemoModeTask { await GlassDemoMode.run(editor: editor, terminal: terminal, database: database, desktop: desktop, layers: layers, shell: model) })
         #endif
     }
 

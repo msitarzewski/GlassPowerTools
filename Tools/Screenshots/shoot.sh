@@ -5,6 +5,8 @@
 # front of the one being captured.
 # Surfaces: library, library-history, editor, editor-window, editor-settings, editor-project, preview,
 # terminal, terminal-window, terminal-settings, terminal-move, terminal-tabs, terminal-grid, files, database,
+# btop (the terminal running a btop-style monitor), workspace (it, a database, a desktop and the editor at
+# once), active, workgroups,
 # database-window, database-settings, database-server, database-main, diagram,
 # desktop, desktop-window, desktop-settings, desktop-displays, desktop-quality, connections-host, orb,
 # orb-looked-at, orb-later, orb-later-desktop
@@ -18,7 +20,7 @@ if [ -n "${APP:-}" ]; then
   xcrun simctl install "$SIM" "$APP"
 fi
 # The database surface opens a made-up shop, built fresh and placed in the app's Documents.
-if [ "${SURFACE%%-*}" = "database" ] || [ "$SURFACE" = "diagram" ]; then
+if [ "${SURFACE%%-*}" = "database" ] || [ "$SURFACE" = "diagram" ] || [ "$SURFACE" = "workspace" ]; then
   DATA="$(xcrun simctl get_app_container "$SIM" com.glasspowertools data)"
   mkdir -p "$DATA/Documents"
   python3 "$(dirname "$0")/make-demo-db.py" "$DATA/Documents/demo-shop.sqlite" >/dev/null
