@@ -28,7 +28,7 @@ use the disposable test VM only).
 | 5 | README, SECURITY, CONTRIBUTING, building guide, release notes | done; brought current with the code 2026-10-17, and `RELEASE-NOTES.md` added |
 | 6 | Upstream contributions (swift-nio-ssh, Citadel) | drafted locally for the owner's review; nothing sent |
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the Sparkle key made and the site live (2026-10-18); the Developer ID profiles and CloudKit's production schema done, and the dry run passed; remaining: the first release run, after the repository is public |
-| 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Choice pending: push the history as is, or start public history fresh |
+| 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then a checked rewrite of a copy (history kept, private values replaced, cited commit ids translated, every check passed; the procedure is in `.private/`); awaiting his word to push |
 
 ## 2026-10-18 — RESUME HERE
 
