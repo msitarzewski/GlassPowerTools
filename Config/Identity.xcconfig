@@ -40,7 +40,7 @@ GPT_APS_ENVIRONMENT = development
 // and the private half stays in the maintainer's login Keychain. Empty, the build does not update
 // itself — the right state for a fork, and for this project until the key exists.
 GPT_SPARKLE_FEED_URL = https:/$()/glasspowertools.com/appcast.xml
-GPT_SPARKLE_PUBLIC_KEY =
+GPT_SPARKLE_PUBLIC_KEY = 9We4jdfKY7j6hBL7Va2dAJJIR9Mip8/ZfTs95UtJXgU=
 
 DEVELOPMENT_TEAM = $(GPT_DEVELOPMENT_TEAM)
 
