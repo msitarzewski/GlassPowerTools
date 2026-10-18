@@ -32,10 +32,14 @@ public enum GlassShellSettingsSelection: Hashable, Sendable {
     case shell(GlassShellSettingsPage)
     case capability(String)
 
-    /// The shell's pages first, then every registered capability's, in kind order.
+    /// The shell's pages first, then every registered capability's, in kind order, then About,
+    /// last, where a Mac's Settings ends (the owner, 2026-10-18: it sat between Privacy and the
+    /// capabilities).
     public static func options(shell: [GlassShellSettingsPage] = GlassShellSettingsPage.allCases,
                                capabilityPages: [GlassCapabilitySettingsPage]) -> [GlassShellSettingsSelection] {
-        shell.map(GlassShellSettingsSelection.shell) + capabilityPages.map { .capability($0.id) }
+        shell.filter { $0 != .about }.map(GlassShellSettingsSelection.shell)
+            + capabilityPages.map { .capability($0.id) }
+            + shell.filter { $0 == .about }.map(GlassShellSettingsSelection.shell)
     }
 }
 

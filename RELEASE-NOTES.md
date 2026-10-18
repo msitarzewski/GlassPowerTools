@@ -70,6 +70,10 @@ no download or TestFlight build yet. What is verified, and how, is in
 
 ## Recent builds
 
+### 0.4.479 (18 October 2026)
+- **About is the last page of Settings**, after Editor, on every device. It sat between Privacy and
+  the services' pages.
+
 ### 0.4.478 (18 October 2026)
 - **Glass Power Tools is licensed under the GNU GPL, version 3**, chosen before its first publication.
   Settings ▸ About says so. Contributions come with a contributor agreement (`CLA.md`).

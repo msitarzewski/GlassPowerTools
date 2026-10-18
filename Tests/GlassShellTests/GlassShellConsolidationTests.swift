@@ -309,14 +309,15 @@ private final class ContributingCapability: GlassCapability {
 @Suite("GlassShell capability hooks")
 @MainActor
 struct GlassShellCapabilityHookTests {
-    @Test("A registered capability's settings page joins the selection after the shell's pages")
+    @Test("A registered capability's settings page joins the selection after the shell's pages, and About ends it")
     func settingsPageAppears() {
         let registry = GlassCapabilityRegistry()
         registry.register(ContributingCapability(kind: .rdp))
         registry.register(ContributingCapability(kind: .ssh))
         let options = GlassShellSettingsSelection.options(capabilityPages: registry.settingsPages)
-        #expect(Array(options.prefix(4)) == GlassShellSettingsPage.allCases.map(GlassShellSettingsSelection.shell))
-        #expect(Array(options.dropFirst(4)) == [.capability("rdp-page"), .capability("ssh-page")], "kind order, after the shell's")
+        #expect(options == [.shell(.general), .shell(.appearance), .shell(.privacy),
+                            .capability("rdp-page"), .capability("ssh-page"), .shell(.about)],
+                "the shell's pages, the capabilities' in kind order, then About last (the owner, 2026-10-18)")
         #expect(registry.settingsPages.map(\.title) == ["Rdp Settings", "Ssh Settings"])
     }
 
