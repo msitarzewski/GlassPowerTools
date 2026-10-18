@@ -112,6 +112,10 @@ Tools/Screenshots/site_shots.sh               # site/static/shots/mac-*-dark.web
 The Vision Pro, iPad and iPhone pictures come from the simulators:
 `IOS_APP=… VISION_APP=… Tools/Screenshots/device_shots.sh`, given Debug simulator builds.
 
+Both scripts show every window at Opacity 78%, Glass 50%, Medium (`--demo-glass 0.78,0.5,thin`) and close the
+Connections window for the service pictures (`--demo-close-connections`); the terminals run a btop-style monitor
+drawn for the window's size (`--demo-open btop`). The other surfaces are listed in `Tools/Screenshots/shoot.sh`.
+
 ## Tests
 
 The package tests are fast and need no network:

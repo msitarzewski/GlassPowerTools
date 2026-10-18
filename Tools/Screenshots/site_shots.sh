@@ -9,9 +9,12 @@
 #
 # Each shot launches the app fresh on made-up machines (App/GlassDemoMode.swift, as Tools/Screenshots/shoot.sh
 # does on the simulators), opens one surface, and gives its window the same frame every time, alone on a desktop
-# picture in the site's colours (macvm/wallpaper.py). The picture is that part of the screen, cut out by the
-# window's own outline: the glass shows what is behind it, as it does on a Mac, and the rounded corners are
-# transparent. Look at every picture before publishing it: nothing personal belongs in them.
+# picture in the site's colours (macvm/wallpaper.py). Every window is at Opacity 78%, Glass 50%, Medium (the
+# owner's choice, 2026-10-18), and the service shots close the Connections window. The picture is that part of
+# the screen, cut out by the windows' own outlines: the glass shows what is behind it, as it does on a Mac, and
+# the rounded corners are transparent. `workspace` is four windows at once: a terminal running a btop-style
+# monitor, a database, a desktop and the editor. Look at every picture before publishing it: nothing personal
+# belongs in them.
 set -euo pipefail
 ROOT=${0:A:h:h:h}
 cd "$ROOT"
@@ -20,16 +23,24 @@ APP="Glass Power Tools"
 RAW="$ROOT/.scratch/shots/macvm"
 OUT="$ROOT/site/static/shots"
 HOSTS="alpha@192.0.2.10:ssh+database|bravo@192.0.2.20:ssh+rdp|nas@192.0.2.30:ssh|build@192.0.2.40:ssh|win@192.0.2.50:rdp"
+GLASS="--demo-glass 0.78,0.5,thin"
 mkdir -p "$RAW" "$OUT"
 
 gui() { timeout 90 $VM gui "$1"; }
 events() { gui "osascript -e 'tell application \"System Events\" to $1'" >/dev/null 2>&1 || true; }
-# The screen-recording notice macOS shows a capture from SSH, pressed away if it's up.
-notice() { timeout 60 $VM tool press UserNotificationCenter Allow >/dev/null 2>&1 || true; }
+# The screen-recording notice macOS shows a capture from SSH, pressed away if it's up; and any other banner (macOS
+# posts "See what's new in macOS Tahoe"), closed, so none stands over a picture.
+notice() {
+  timeout 60 $VM tool press UserNotificationCenter Allow >/dev/null 2>&1 || true
+  gui "osascript '/Volumes/My Shared Files/macvm/close-banners.applescript'" >/dev/null 2>&1 || true
+}
 
-# The screen at 1920 × 1200 points (2x), and the two desktop pictures in the VM.
+# The screen at 1920 × 1200 points (2x), and the two desktop pictures in the VM. No desktop widgets (glass shows
+# them), and no crash report left from an earlier run (it showed through the glass once, 2026-10-18).
 prepare() {
   timeout 90 $VM tool display set 1920x1200 >/dev/null
+  gui "defaults write com.apple.WindowManager StandardHideWidgets -bool true; killall NotificationCenter" >/dev/null 2>&1 || true
+  timeout 60 $VM tool press "Problem Reporter" OK >/dev/null 2>&1 || true
   python3 -I Tools/Screenshots/macvm/wallpaper.py "$RAW" >/dev/null
   for look in dark light; do timeout 60 $VM copy-in "$RAW/wallpaper-$look.png" /Users/admin/Pictures >/dev/null; done
 }
@@ -45,9 +56,10 @@ shop() {
 }
 # The app on the made-up machines with one surface open. Each run is a new --ui-testing folder, so nothing carries
 # from one shot to the next.
-launch() {  # surface
+launch() {  # surface [more arguments]
+  local surface=$1; shift
   timeout 60 $VM quit-app >/dev/null 2>&1 || true
-  gui "open -n -a '/Applications/$APP.app' --args --ui-testing $(uuidgen) --ui-testing-seed-hosts '$HOSTS' --demo-open $1"
+  gui "open -n -a '/Applications/$APP.app' --args --ui-testing $(uuidgen) --ui-testing-seed-hosts '$HOSTS' --demo-open $surface $GLASS $*"
   sleep ${SETTLE:-14}
 }
 # id and frame ("x,y WxH", points) of the app's normal window titled $1, the newest if several are.
@@ -55,8 +67,11 @@ window() { timeout 90 $VM tool windows "$APP" | awk -F'\t' -v t="$1" '$4 == "lay
 alone() {  # title: that window in front, the app's others out of the way
   local title=$1
   [[ $title == "All Connections" ]] || events "tell process \"$APP\" to set value of attribute \"AXMinimized\" of window \"All Connections\" to true"
+  raise "$title"
+}
+raise() {  # title: that window in front
   events "tell process \"$APP\" to set frontmost to true"
-  events "tell process \"$APP\" to perform action \"AXRaise\" of window \"$title\""
+  events "tell process \"$APP\" to perform action \"AXRaise\" of window \"$1\""
   sleep 1
 }
 place() {  # w h: the front window's size, centred on the screen below the menu bar
@@ -64,45 +79,102 @@ place() {  # w h: the front window's size, centred on the screen below the menu 
   timeout 90 $VM tool place "$APP" $(( (1920 - w) / 2 )) $(( 40 + (1150 - h) / 2 )) $w $h >/dev/null
   sleep 2
 }
-capture() {  # name title
-  local name=$1 found id frame
-  found="$(window "$2")"
-  [[ -n $found ]] || { echo "site_shots: no window titled \"$2\" for $name"; timeout 90 $VM tool windows "$APP"; exit 1; }
-  id=${found%%$'\t'*}; frame=${found#*$'\t'}
+capture() {  # name title…: the screen around those windows, cut out by their outlines
+  local name=$1 found id frame x y w h left=100000 top=100000 right=0 bottom=0 i
+  shift
+  local -a ids frames masks
+  for title in "$@"; do
+    found="$(window "$title")"
+    [[ -n $found ]] || { echo "site_shots: no window titled \"$title\" for $name"; timeout 90 $VM tool windows "$APP"; exit 1; }
+    id=${found%%$'\t'*}; frame=${found#*$'\t'}
+    x=${frame%%,*}; y=${${frame#*,}%% *}; w=${${frame##* }%x*}; h=${frame##*x}
+    (( x < left )) && left=$x; (( y < top )) && top=$y
+    (( x + w > right )) && right=$(( x + w )); (( y + h > bottom )) && bottom=$(( y + h ))
+    ids+=($id); frames+=("$x $y")
+  done
+  local commands=""
+  for i in {1..${#ids}}; do commands+="screencapture -x -o -t png -l ${ids[$i]} /tmp/shot-mask-$i.png; "; done
   notice
-  gui "screencapture -x -o -t png -l $id /tmp/shot-mask.png; screencapture -x -t png -R ${${frame%% *}},${${frame##* }/x/,} /tmp/shot-region.png"
+  gui "$commands screencapture -x -t png -R $left,$top,$(( right - left )),$(( bottom - top )) /tmp/shot-region.png"
   sleep 1; notice
-  timeout 60 $VM ssh "cat /tmp/shot-mask.png" > "$RAW/$name-mask.png"
-  timeout 60 $VM ssh "cat /tmp/shot-region.png && rm -f /tmp/shot-mask.png /tmp/shot-region.png" > "$RAW/$name.png"
-  # The window's outline from its own capture (opaque inside, its corners' edges smooth), laid over the screen.
-  python3 -I - "$RAW/$name.png" "$RAW/$name-mask.png" "$OUT/mac-$name.webp" <<'PY'
+  for i in {1..${#ids}}; do
+    timeout 60 $VM ssh "cat /tmp/shot-mask-$i.png" > "$RAW/$name-mask-$i.png"
+    masks+=("$RAW/$name-mask-$i.png" "${frames[$i]}")
+  done
+  timeout 60 $VM ssh "cat /tmp/shot-region.png && rm -f /tmp/shot-mask-*.png /tmp/shot-region.png" > "$RAW/$name.png"
+  # Each window's outline from its own capture (opaque inside, its corners' edges smooth), placed where the window
+  # stands, over the screen.
+  python3 -I - "$RAW/$name.png" "$OUT/mac-$name.webp" $(( right - left )) "$left $top" "${masks[@]}" <<'EOF'
 import sys
-from PIL import Image
-region, window = Image.open(sys.argv[1]).convert("RGBA"), Image.open(sys.argv[2]).convert("RGBA")
-region = region.resize(window.size)
-region.putalpha(window.getchannel("A").point(lambda a: min(255, a * 3)))
-region.save(sys.argv[3], "WEBP", quality=88, method=6)
-print(f"{sys.argv[3]}: {region.size[0]}x{region.size[1]}")
-PY
+from PIL import Image, ImageChops
+region = Image.open(sys.argv[1]).convert("RGBA")
+scale = region.size[0] / int(sys.argv[3])
+left, top = (int(v) for v in sys.argv[4].split())
+alpha = Image.new("L", region.size, 0)
+for mask_path, origin in zip(sys.argv[5::2], sys.argv[6::2]):
+    x, y = (int(v) for v in origin.split())
+    mask = Image.open(mask_path).convert("RGBA").getchannel("A").point(lambda a: min(255, a * 3))
+    layer = Image.new("L", region.size, 0)
+    layer.paste(mask, (round((x - left) * scale), round((y - top) * scale)))
+    alpha = ImageChops.lighter(alpha, layer)
+region.putalpha(alpha)
+if region.size[0] > 2880:
+    region = region.resize((2880, round(region.size[1] * 2880 / region.size[0])), Image.LANCZOS)
+region.save(sys.argv[2], "WEBP", quality=88, method=6)
+print(f"{sys.argv[2]}: {region.size[0]}x{region.size[1]}")
+EOF
 }
 
-# shot → surface, its window's title, its size in points, and anything to do before the picture.
+# shot → surface, its window's title, its size in points, and anything to do before the picture. The service
+# shots close the Connections window (`--demo-close-connections`); the library, Active and Workgroups are in it.
 typeset -A SURFACE TITLE SIZE BEFORE
-SURFACE=(library library-history  terminal terminal  database database  diagram diagram  desktop desktop  editor editor)
-TITLE=(library "All Connections"  terminal "alpha"  database "orders"  diagram "main"  desktop "bravo"  editor "ShippingAddress.swift")
-SIZE=(library "1440 900"  terminal "1240 780"  database "1240 780"  diagram "1240 780"  desktop "1240 780"  editor "1240 780")
+SURFACE=(library library-history  terminal btop  database database  diagram diagram  desktop desktop  editor editor
+         active active  workgroups workgroups)
+TITLE=(library "All Connections"  terminal "alpha"  database "orders"  diagram "main"  desktop "bravo"
+       editor "ShippingAddress.swift"  active "Active"  workgroups "Workgroups")
+SIZE=(library "1440 900"  terminal "1240 780"  database "1240 780"  diagram "1240 780"  desktop "1240 780"
+      editor "1240 780"  active "1440 900"  workgroups "1440 900")
 # The demo's desktop has no remote machine behind it, so the Caps Lock state it sends as its window becomes key is
 # refused, and the window says the session isn't ready (as it should for a real one): dismissed before the picture.
 BEFORE=(terminal "show-sidebar"  desktop "dismiss")
+# `workspace`: its four windows by title, and each one's frame (x y w h, points): tiles on the 1920 × 1200 screen,
+# with the Dock hidden meanwhile (it draws over windows). 570 points high: the editor's least. The desktop keeps
+# its remote screen's shape, so it is narrower, to stay that high.
+WORKSPACE_TITLES=("alpha" "orders" "bravo" "ShippingAddress.swift")
+WORKSPACE_FRAMES=("24 38 924 570" "972 38 924 570" "56 620 860 570" "972 620 924 570")
+dock() {  # hide | show
+  timeout 60 $VM ssh "defaults write com.apple.dock autohide -bool $([[ $1 == hide ]] && echo true || echo false); killall Dock" >/dev/null 2>&1 || true
+  sleep 3
+}
 
-names=(${@:-library terminal database diagram desktop editor})
+names=("$@")
+# `workgroups` is there to name, not in the default set: the Mac's detail cuts its table off at this size, so
+# the site shows the Vision Pro one.
+(( $# )) || names=(library terminal database diagram desktop editor active workspace)
 prepare
-[[ -n ${(M)names:#database} || -n ${(M)names:#diagram} ]] && shop
+[[ -n ${(M)names:#database} || -n ${(M)names:#diagram} || -n ${(M)names:#workspace} ]] && shop
 for name in $names; do
-  [[ -n ${SURFACE[$name]:-} ]] || { echo "unknown shot: $name"; exit 2; }
+  [[ -n ${SURFACE[$name]:-} || $name == workspace ]] || { echo "unknown shot: $name"; exit 2; }
   for look in dark light; do
     appearance $look
-    launch ${SURFACE[$name]}
+    if [[ $name == workspace ]]; then
+      dock hide
+      SETTLE=26 launch workspace --demo-close-connections
+      raise "${WORKSPACE_TITLES[1]}"
+      for i in {1..${#WORKSPACE_TITLES}}; do
+        timeout 90 $VM tool place "$APP" ${=WORKSPACE_FRAMES[$i]} "${WORKSPACE_TITLES[$i]}" >/dev/null
+        sleep 1
+      done
+      timeout 60 $VM tool press "$APP" "Dismiss" >/dev/null 2>&1 || true
+      sleep 2
+      capture "$name-$look" "${WORKSPACE_TITLES[@]}"
+      dock show
+      continue
+    fi
+    case $name in
+      library|active|workgroups) launch ${SURFACE[$name]} ;;
+      *) launch ${SURFACE[$name]} --demo-close-connections ;;
+    esac
     alone "${TITLE[$name]}"
     place ${=SIZE[$name]}
     if [[ ${BEFORE[$name]:-} == show-sidebar ]]; then

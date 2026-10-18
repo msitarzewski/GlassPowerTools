@@ -10,7 +10,7 @@
 //   vmtool wallpaper set <file>       set it on every screen (setDesktopImageURL), then read it back
 //   vmtool press <bundle-id|name|pid> <title>  press the first button, menu item, radio button or checkbox
 //                                     with that title or description: in the windows, then the menu bar
-//   vmtool place <app> x y w h        move and size the app's front window (points)
+//   vmtool place <app> x y w h [title]  move and size the app's front window, or its window with that title (points)
 //   vmtool display [set WIDTHxHEIGHT]  list the main display's modes, or pick one by size in points (HiDPI if any)
 //   vmtool ax <bundle-id|name|pid> [depth]
 //                                     accessibility tree of the app's windows (role, title, description = the
@@ -194,12 +194,19 @@ func press(_ query: String, _ name: String) {
 
 // `place <app> x y width height` moves and sizes the app's front window (points, top-left origin), so screenshots
 // are framed the same way every time.
-func place(_ query: String, _ frame: [Double]) {
+func place(_ query: String, _ frame: [Double], title: String? = nil) {
     guard AXIsProcessTrusted() else { fail("not trusted for Accessibility", 3) }
     guard let app = findApp(query) else { fail("\(query) isn't running", 4) }
     let element = AXUIElementCreateApplication(app.processIdentifier)
-    guard let windows = attribute(element, kAXWindowsAttribute) as? [AXUIElement], let window = windows.first else {
-        fail("\(query) has no window", 4)
+    let windows = attribute(element, kAXWindowsAttribute) as? [AXUIElement] ?? []
+    // The front window, or the one titled so: raising a window by title doesn't always make it the front one. A
+    // window's accessibility title can carry its subtitle after the one the window list shows ("alpha – ann@…").
+    func titled(_ window: AXUIElement, _ title: String) -> Bool {
+        guard let text = attribute(window, kAXTitleAttribute) as? String else { return false }
+        return text == title || text.hasPrefix(title + " ")
+    }
+    guard let window = title.map({ title in windows.first { titled($0, title) } }) ?? windows.first else {
+        fail("\(query) has no window\(title.map { " titled \($0)" } ?? "")", 4)
     }
     var origin = CGPoint(x: frame[0], y: frame[1]), size = CGSize(width: frame[2], height: frame[3])
     AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, AXValueCreate(.cgPoint, &origin)!)
@@ -245,9 +252,10 @@ case ("wallpaper", "set") where args.count == 3: wallpaperSet(args[2])
 case ("ax", let query?): audit(query, maxDepth: args.count > 2 ? Int(args[2]) ?? 6 : 6)
 case ("press", let query?) where args.count == 3: press(query, args[2])
 case ("place", let query?) where args.count == 6: place(query, args.dropFirst(2).compactMap(Double.init))
+case ("place", let query?) where args.count == 7: place(query, args[2...5].compactMap(Double.init), title: args[6])
 case ("display", nil): displayModes(set: nil)
 case ("display", "set") where args.count == 3: displayModes(set: args[2])
 default:
     fail("usage: vmtool windows [owner] | wallpaper get | wallpaper set <file> | ax <bundle-id|name|pid> [depth] | "
-        + "press <bundle-id|name|pid> <button title> | place <app> x y w h | display [set WIDTHxHEIGHT]", 2)
+        + "press <bundle-id|name|pid> <button title> | place <app> x y w h [title] | display [set WIDTHxHEIGHT]", 2)
 }

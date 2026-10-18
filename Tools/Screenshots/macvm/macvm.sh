@@ -17,7 +17,8 @@
 #   macvm.sh gui '<command>'                      run a bash command as admin in the logged-in GUI (Aqua) session
 #   macvm.sh tool <args…>                         vmtool in the GUI session: windows [owner] | wallpaper get |
 #                                                 wallpaper set <file-in-vm> | ax <bundle-id|name|pid> [depth] |
-#                                                 press <bundle-id|name|pid> <button title>
+#                                                 press <bundle-id|name|pid> <button title> |
+#                                                 place <app> x y w h [title] | display [set WxH]
 #   macvm.sh shot <name>                          whole VM screen → .scratch/shots/macvm/<name>.png
 #   macvm.sh winshot <owner> <name>               one window of <owner> ("Glass Power Tools") → …/<name>.png
 #   macvm.sh install-app [App.app]                copy the app (default: build-app's) to /Applications
