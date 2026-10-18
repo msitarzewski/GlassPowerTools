@@ -27,7 +27,7 @@ use the disposable test VM only).
 | 4 | Memory bank curated | done; quotes paraphrased; `.brain/` untracked |
 | 5 | README, SECURITY, CONTRIBUTING, building guide, release notes | done; brought current with the code 2026-10-17, and `RELEASE-NOTES.md` added |
 | 6 | Upstream contributions (swift-nio-ssh, Citadel) | drafted locally for the owner's review; nothing sent |
-| 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
+| 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the Sparkle key made and the site live (2026-10-18); remaining: the Developer ID profile, CloudKit's production schema, the first release run |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
 ## 2026-10-18 — RESUME HERE
@@ -43,7 +43,8 @@ terminal examples". Asked which "78% transparency" meant, with a side-by-side: *
   demo code (`App/GlassDemoMode.swift`, `App/GlassDemoBtop.swift`); nothing shipped changed, so no new build.
 - **The site:** the Vision Pro terminal above the fold; Vision Pro first with its other three services; "Pick up where
   you left off" (Active, workgroups); the Mac's four services; the library under Why one app; iPad and
-  iPhone. Service pages each gain their Vision Pro picture; the terminal page, Active on the Mac. Not deployed.
+  iPhone. Service pages each gain their Vision Pro picture; the terminal page, Active on the Mac. Live at glasspowertools.com since 2026-10-18; security reports go to the owner's
+  email until the repository is public (his choice).
 - **Tried and dropped:** four windows at once in the visionOS simulator (techContext, "The macOS screenshot VM").
 - **A crash found on the way, fixed in 0.4.476** (5c567dd): the database window's policy re-set unchanged window
   properties on every update, and one notice crashed a hosting view mid-teardown (the VM's diagram picture).

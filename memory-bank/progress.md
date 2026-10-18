@@ -109,11 +109,11 @@ encryption stated in the setup form. Details in `tasks/2026-09/`.
 
 Also done: README, SECURITY, CONTRIBUTING and a building guide; 35 help pages audited from the code (39 by
 2026-10-17, when all of them, the README and the memory bank were checked against the code again and RELEASE-NOTES.md added),
-the site and its generator (not deployed); Sparkle for the Mac with a release script (never run); and
+the site and its generator (live since 2026-10-18); Sparkle for the Mac with a release script (never run); and
 the defects the help audit found (`tasks/2026-09/2026-09-27_help-site-and-updates.md`).
 
-Remaining before a first public release: the owner's release steps (Sparkle key, Developer ID
-profile, notarization, deploying the site), the behaviour findings listed in `activeContext.md`, and
+Remaining before a first public release: the owner's release steps (the Developer ID
+profile, CloudKit's production schema, the first release run; the Sparkle key and the site are done), the behaviour findings listed in `activeContext.md`, and
 — only on the owner's word — the history rewrite and the first push.
 
 ## Not verified
