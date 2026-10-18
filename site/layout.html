@@ -13,7 +13,9 @@
 <meta property="og:url" content="{{canonical}}">
 <meta property="og:image" content="{{base_url}}static/icon-512.png">
 <meta name="twitter:card" content="summary">
-<meta name="color-scheme" content="light dark">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0c0a0a" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f8f6f5" media="(prefers-color-scheme: light)">
 <link rel="icon" type="image/png" href="{{root}}static/icon-64.png">
 <link rel="apple-touch-icon" href="{{root}}static/apple-touch-icon.png">
 <link rel="alternate" type="text/plain" href="{{base_url}}llms.txt" title="llms.txt">
@@ -24,7 +26,7 @@
 <a class="skip" href="#content">Skip to content</a>
 <header class="top">
   <div class="top-inner">
-    <a class="brand" href="{{root}}index.html"><img src="{{root}}static/icon-64.png" alt="" width="26" height="26"><span>Glass Power Tools</span></a>
+    <a class="brand" href="{{root}}index.html"><img src="{{root}}static/icon-64.png" alt="" width="28" height="28"><span>Glass Power Tools</span></a>
     <nav class="nav" aria-label="Site">
 {{nav}}
     </nav>
@@ -37,8 +39,8 @@
 {{body}}
 <footer class="footer">
   <div class="footer-inner">
-    <span>Glass Power Tools · MIT licence</span>
 {{footer}}
+    <p class="fine">© 2026 Michael Sitarzewski · MIT licence · Apple Vision Pro, Mac, iPad and iPhone are Apple’s trademarks; Glass Power Tools isn’t affiliated with Apple · This site sets no cookies, runs no analytics and loads nothing from anywhere else. The appearance you choose here is kept in this browser only.</p>
   </div>
 </footer>
 <div class="palette" role="dialog" aria-modal="true" aria-label="Search the help">

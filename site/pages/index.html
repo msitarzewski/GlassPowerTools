@@ -4,16 +4,49 @@ description: Terminals, databases, remote desktops and an editor for Apple Visio
 -->
 <main class="page" id="content">
 
-<section class="hero">
-  <img class="mark" src="static/icon-512.png" alt="">
-  <h1>The machines you work on, in one list.</h1>
-  <p class="lede">Terminals, databases, remote desktops and an editor, for Apple Vision Pro, Mac, iPad and iPhone. You keep one list of your machines. Each machine lists its services, and Connect opens the one you want.</p>
-  <p class="lede">The source is MIT licensed. The app talks to your servers, to your iCloud, and to Tailscale only if you connect it. It is yours to run.</p>
+<header class="hero">
+  <img class="mark" src="static/icon-288.png" alt="The Glass Power Tools icon: a silver display whose red screen shows a terminal prompt, on a stack of database disks." width="144" height="144">
+  <h1>Glass Power Tools</h1>
+  <p class="tagline">The machines you work on, in one list.</p>
+  <p class="lede">Terminals, databases, remote desktops and an editor, for Apple Vision Pro, Mac, iPad and iPhone. You add a machine once. Each machine lists its services, and Connect opens the one you want.</p>
   <div class="cta">
-    <a class="button primary" href="help/index.html">Read how it works</a>
+    <a class="button primary" href="help/index.html">How to use it</a>
     <a class="button" href="why.html">Why one app</a>
+    <a class="button" href="security.html">Security</a>
   </div>
-  <p class="status-note">Not released yet. There is no download or TestFlight build today.</p>
+  <p class="facts">Not released yet · Vision Pro, Mac, iPad and iPhone · MIT licence · nothing to sign up for · no analytics, no telemetry</p>
+</header>
+
+<figure class="window-shot">
+  <img class="only-dark" src="static/shots/mac-library-dark.webp" width="2880" height="1800" alt="The library on a Mac, in Dark Mode. All Connections lists six machines (This Mac, alpha, bravo, build, nas and win) with an icon for each service. Beside it, Your Library counts 6 machines and 8 services, a bar chart shows 181 connections over the last 30 days on 3 devices, and Most used lists alpha, bravo and build.">
+  <img class="only-light" src="static/shots/mac-library-light.webp" width="2880" height="1800" alt="The same window in the light appearance.">
+  <figcaption>The library on a Mac, with a month of connections from three devices. Every machine in these pictures is made up.</figcaption>
+</figure>
+
+<section class="band">
+  <h2>What it looks like</h2>
+  <div class="gallery">
+    <figure>
+      <img class="window only-dark" src="static/shots/mac-terminal-dark.webp" width="2480" height="1560" loading="lazy" alt="A terminal window on a Mac with its sidebar open, listing the terminal on alpha. It shows a git log graph, the shop's containers under Docker Compose with one restarting, and that container's log with a refused mail connection.">
+      <img class="window only-light" src="static/shots/mac-terminal-light.webp" width="2480" height="1560" loading="lazy" alt="The same window in the light appearance.">
+      <figcaption><strong>Terminal.</strong> SSH with host keys you confirm, tabs in a sidebar, tmux sessions you pick up on any device, and the server’s files a click away.</figcaption>
+    </figure>
+    <figure>
+      <img class="window only-dark" src="static/shots/mac-database-dark.webp" width="2480" height="1560" loading="lazy" alt="A database window on a Mac: the shop database's twelve tables in the sidebar with orders selected, its SELECT statement, and a grid of orders with their customer, date, status and total.">
+      <img class="window only-light" src="static/shots/mac-database-light.webp" width="2480" height="1560" loading="lazy" alt="The same window in the light appearance.">
+      <figcaption><strong>Databases.</strong> MySQL, PostgreSQL and SQLite: browse, filter and edit rows, follow foreign keys, write and explain queries.</figcaption>
+    </figure>
+    <figure>
+      <img class="window only-dark" src="static/shots/mac-desktop-dark.webp" width="2416" height="1552" loading="lazy" alt="A remote desktop window on a Mac, connected to bravo at 1920 × 1080: a made-up remote screen with a monitoring window charting CPU over the last hour and a window listing the files in ~/shop.">
+      <img class="window only-light" src="static/shots/mac-desktop-light.webp" width="2416" height="1552" loading="lazy" alt="The same window in the light appearance.">
+      <figcaption><strong>Remote desktops.</strong> RDP and VNC, with the remote resolution following your window.</figcaption>
+    </figure>
+    <figure>
+      <img class="window only-dark" src="static/shots/mac-editor-dark.webp" width="2480" height="1560" loading="lazy" alt="The editor on a Mac: the shop project's files in the sidebar, three tabs (compose.yaml, README.md and ShippingAddress.swift), and ShippingAddress.swift open with its Swift highlighted.">
+      <img class="window only-light" src="static/shots/mac-editor-light.webp" width="2480" height="1560" loading="lazy" alt="The same window in the light appearance.">
+      <figcaption><strong>Editor.</strong> Files on this device or on a server, with highlighting, previews, and viewers for pictures, PDFs and 3D models.</figcaption>
+    </figure>
+  </div>
 </section>
 
 <section class="band">
@@ -62,9 +95,23 @@ description: Terminals, databases, remote desktops and an editor for Apple Visio
       <p>The Mac, iPad and iPhone apps are the same app, adapted to each device. The Mac adds a local shell and menus. The iPhone gives each session the whole screen.</p>
     </div>
     <div>
-      <p>An honest note on testing. The current build is used every day on a Mac and an iPhone, and the headset runs it too: on 2026-10-17 all three had 0.4.471. Not every newer change has been checked on the headset yet.</p>
+      <p>An honest note on testing. The current build is used every day on a Mac and an iPhone, and the headset runs it too: on 2026-10-17 all three had 0.4.475. Not every newer change has been checked on the headset yet.</p>
       <p><a href="help/desktop-vision-pro.html">Remote desktops on Apple Vision Pro</a></p>
     </div>
+  </div>
+  <div class="devices">
+    <figure>
+      <img src="static/shots/vision-terminal.webp" width="2400" height="1350" loading="lazy" alt="Apple Vision Pro, in the simulator's living room: a terminal on alpha with the shop's git log and containers, floating in front of the library's window.">
+      <figcaption><strong>Vision Pro.</strong> A session is a window you place in the room.</figcaption>
+    </figure>
+    <figure class="tablet">
+      <img src="static/shots/ipad-library.webp" width="1200" height="1600" loading="lazy" alt="An iPad in Dark Mode showing the library: the machines on the left; on the right, Your Library's counts, a month of connections as a bar chart (189 on 3 devices) and the machines used most.">
+      <figcaption><strong>iPad.</strong> The same library, the same machines.</figcaption>
+    </figure>
+    <figure class="phone">
+      <img src="static/shots/iphone-terminal.webp" width="780" height="1695" loading="lazy" alt="An iPhone showing the terminal on alpha across the whole screen, with the same shop's git log and containers.">
+      <figcaption><strong>iPhone.</strong> A session gets the whole screen.</figcaption>
+    </figure>
   </div>
 </section>
 
@@ -128,8 +175,8 @@ description: Terminals, databases, remote desktops and an editor for Apple Visio
   </ul>
 </section>
 
-<section class="band">
-  <p>That is what it is, what it is not yet, and how to check. Whether one library of machines suits the way you work is yours to decide.</p>
+<section class="band narrow">
+  <p class="handback">That is what it is, what it is not yet, and how to check. Whether one library of machines suits the way you work is yours to decide.</p>
 </section>
 
 </main>
