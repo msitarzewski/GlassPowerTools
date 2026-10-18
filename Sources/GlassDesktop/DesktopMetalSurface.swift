@@ -217,7 +217,7 @@ final class DesktopMTKView: MTKView {
         renderer?.settings = shown.presentation
         renderer?.setWallpaper(session.wallpaperURL)
         #if os(macOS)
-        if let window { GlassWindowChrome.installTitlebarMaterial(in: window) }
+        if let window { Self.installChrome(in: window) }
         needsDisplay = true
         #else
         setNeedsDisplay()
@@ -302,8 +302,14 @@ final class DesktopMTKView: MTKView {
         window?.isOpaque = false
         window?.backgroundColor = .clear
         window?.titlebarAppearsTransparent = true
-        if let window { GlassWindowChrome.installTitlebarMaterial(in: window) }
+        if let window { Self.installChrome(in: window) }
         if window == nil { releaseFocusState() }
+    }
+    /// The titlebar's material, with no line down the window's leading edge: a desktop window has
+    /// no sidebar, so the chrome's hairline stood at its very edge (the owner, 2026-10-17: "remove
+    /// the gray line in database and desktop windows too").
+    static func installChrome(in window: NSWindow) {
+        GlassWindowChrome.installTitlebarMaterial(in: window)?.showsSidebarEdge = false
     }
     @objc private func windowLostFocus(_ notification: Notification) { releaseFocusState() }
     override func becomeFirstResponder() -> Bool {

@@ -21,7 +21,8 @@ public final class GlassTitlebarMaterialView: NSVisualEffectView {
     /// Whether a line marks the sidebar's edge: AppKit's split-view divider, and the hairline this
     /// window's chrome adds. Off, the sidebar meets the content with no line between (the owner,
     /// 2026-10-17, of the terminal window's: "What is that gray line … That's what we need to
-    /// eliminate").
+    /// eliminate"; then "remove the gray line in database and desktop windows too"). A window with
+    /// no sidebar, as a desktop's, has the hairline down its leading edge, and off it has none.
     public var showsSidebarEdge = true {
         didSet {
             guard oldValue != showsSidebarEdge else { return }
@@ -131,16 +132,19 @@ public final class GlassTitlebarMaterialView: NSVisualEffectView {
 
 @MainActor
 public enum GlassWindowChrome {
-    public static func installTitlebarMaterial(in window: NSWindow, materialStyle: NSVisualEffectView.Material = .sidebar) {
+    /// The window's titlebar material, installed once and reused after; nil before the window has
+    /// content to measure against.
+    @discardableResult
+    public static func installTitlebarMaterial(in window: NSWindow, materialStyle: NSVisualEffectView.Material = .sidebar) -> GlassTitlebarMaterialView? {
         guard let content = window.contentView,
               let frame = content.superview,
-              let guide = window.contentLayoutGuide as? NSLayoutGuide else { return }
+              let guide = window.contentLayoutGuide as? NSLayoutGuide else { return nil }
         if let existing = frame.subviews.compactMap({ $0 as? GlassTitlebarMaterialView }).first {
             if existing.contentBoundary === content {
                 existing.material = materialStyle
                 existing.isHidden = false
                 existing.followSidebarBoundary()
-                return
+                return existing
             }
             existing.removeFromSuperview()
         }
@@ -164,6 +168,7 @@ public enum GlassWindowChrome {
             material.bottomAnchor.constraint(equalTo: guide.topAnchor),
         ])
         installSidebarSeparator(in: frame, alignedTo: material)
+        return material
     }
 
     /// A hairline down the sidebar's trailing edge. The layered window has a clear backing, so

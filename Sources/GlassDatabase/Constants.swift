@@ -439,7 +439,9 @@ enum MacDatabaseWorkspaceWindowPolicy {
         window.autorecalculatesKeyViewLoop = true
         // As in glas.sh, let the system choose toolbar style and control size.
         // The passive material must not impose compact window chrome.
-        GlassWindowChrome.installTitlebarMaterial(in: window)
+        // The sidebar meets the workspace with no line between, as in a terminal window (the
+        // owner, 2026-10-17: "remove the gray line in database and desktop windows too").
+        GlassWindowChrome.installTitlebarMaterial(in: window)?.showsSidebarEdge = false
     }
 
 
