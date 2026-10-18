@@ -349,7 +349,7 @@ not been deployed (`activeContext.md`, 2026-10-12). Mac releases: Developer ID +
 `Tools/Release/release-mac.sh` (the feed entry by `Tools/Release/appcast.py`, into
 `site/static/appcast.xml`). The entitlements read `$(GPT_APS_ENVIRONMENT)`, `development` in
 `Config/Identity.xcconfig`; the script archives with `production` and refuses a build without it, an
-empty `GPT_SPARKLE_PUBLIC_KEY`, a missing Developer ID certificate, or a widget not signed into the
+empty `GPT_SPARKLE_PUBLIC_KEY`, a missing Developer ID certificate or notarytool Keychain profile, or a widget not signed into the
 app's App Group. Still the owner's: the Sparkle key (account `GlassPowerTools`), a Developer ID profile carrying the
 CloudKit container, App Group and Keychain group, the CloudKit schema deployed to production, the first run,
 and deploying the site (inventory B-R1–B-R4). The Developer ID certificate is in the Keychain (seen 2026-10-18; D38).

@@ -1077,6 +1077,9 @@ automatic signing with `-allowProvisioningUpdates` may make one; unproven). **A 
 a Developer ID build uses CloudKit's production environment, so the schema must be deployed to
 production in CloudKit Console first, and the production database starts empty. Builds installed
 from Xcode use development, so the two kinds of build do not see each other's data.
+Notarization now uses a notarytool profile saved in the Keychain (`glasspowertools-notary`, or
+`GPT_NOTARY_PROFILE`), as the owner's other projects do, checked before the archive; the team comes from
+`Config/Identity.xcconfig`. It no longer takes an Apple ID and password from the environment.
 
 ## D39 — Documentation and glasspowertools.com — Approved 2026-09-25
 

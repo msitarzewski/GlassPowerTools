@@ -7,10 +7,11 @@
 # (made once with Sparkle's `generate_keys --account GlassPowerTools`; its public half goes in
 # GPT_SPARKLE_PUBLIC_KEY in Config/Identity.xcconfig — a build without it does not update itself).
 #
-# Needs, in the environment:
-#   APPLE_ID, APPLE_PASSWORD (an app-specific password), APPLE_TEAM_ID   — for notarytool
+# Notarizes with a notarytool profile saved in the login Keychain, as the maintainer's other projects do:
+# `glasspowertools-notary` unless GPT_NOTARY_PROFILE names another. Any profile for the team serves. To
+# save one: xcrun notarytool store-credentials glasspowertools-notary --apple-id <Apple ID> --team-id <team>
+# (it asks for an app-specific password). The team is the one in Config/Identity.xcconfig.
 #
-#   set -a; source <your signing environment file>; set +a
 #   Tools/Release/release-mac.sh 1.0.0 100 [notes.html]
 #
 # Flow: archive (Release, push environment production) → export with Developer ID (app and widget,
@@ -27,17 +28,19 @@ NOTES="${3:-}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
-: "${APPLE_ID:?set APPLE_ID (see the header of this script)}"
-: "${APPLE_PASSWORD:?set APPLE_PASSWORD (an app-specific password)}"
-: "${APPLE_TEAM_ID:?set APPLE_TEAM_ID}"
+NOTARY_PROFILE="${GPT_NOTARY_PROFILE:-glasspowertools-notary}"
 
 setting() { xcodebuild -project GlassPowerTools.xcodeproj -scheme GlassPowerTools -configuration Release \
   -destination 'generic/platform=macOS' -skipPackagePluginValidation -showBuildSettings 2>/dev/null | awk -v k="$1" '$1 == k { $1=""; $2=""; sub(/^  /, ""); print; exit }'; }
 TEAM="$(setting DEVELOPMENT_TEAM)"
-[ "$TEAM" = "$APPLE_TEAM_ID" ] || { echo "Config/Identity.xcconfig team ($TEAM) doesn't match APPLE_TEAM_ID"; exit 1; }
+[ -n "$TEAM" ] || { echo "No DEVELOPMENT_TEAM in Config/Identity.xcconfig"; exit 1; }
 [ -n "$(setting GPT_SPARKLE_PUBLIC_KEY)" ] || { echo "GPT_SPARKLE_PUBLIC_KEY is empty: this build would not update itself"; exit 1; }
 IDENTITY="$(security find-identity -v -p codesigning | grep "Developer ID Application" | grep "($TEAM)" | head -1 | awk '{print $2}')"
 [ -n "$IDENTITY" ] || { echo "No Developer ID Application certificate for team $TEAM in the Keychain"; exit 1; }
+# Before the archive, not after it: a missing profile would otherwise surface only at the first submission.
+xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1 || {
+  echo "No notarytool profile '$NOTARY_PROFILE' in the Keychain. Save one (see the header of this script),"
+  echo "or name the one you have: GPT_NOTARY_PROFILE=<name> $0 $*"; exit 1; }
 
 OUT="$ROOT/build/release"
 PACKAGES="$ROOT/build/SourcePackages"
@@ -52,11 +55,11 @@ trap 'rm -rf "$WORK"' EXIT
 rm -rf "$OUT" && mkdir -p "$OUT"
 
 notarize() {
-  xcrun notarytool submit "$1" --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID" \
+  xcrun notarytool submit "$1" --keychain-profile "$NOTARY_PROFILE" \
     --wait --output-format json | tee "$WORK/notary.json" | grep -q '"status" *: *"Accepted"' || {
       echo "Notarization failed:"; cat "$WORK/notary.json"
       id="$(sed -nE 's/.*"id" *: *"([^"]+)".*/\1/p' "$WORK/notary.json" | head -1)"
-      [ -n "$id" ] && xcrun notarytool log "$id" --apple-id "$APPLE_ID" --password "$APPLE_PASSWORD" --team-id "$APPLE_TEAM_ID"
+      [ -n "$id" ] && xcrun notarytool log "$id" --keychain-profile "$NOTARY_PROFILE"
       exit 1
     }
 }
