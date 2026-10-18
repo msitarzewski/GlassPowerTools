@@ -28,8 +28,8 @@ struct GlassUsageSyncTests {
         let history = [event(alpha, .ssh, daysAgo: 0, hour: 9), event(alpha, .ssh, daysAgo: 0, hour: 11),
                        event(alpha, .database, daysAgo: 0), event(bravo, .ssh, daysAgo: 1),
                        event(bravo, .ssh, daysAgo: 40)]
-        let device = GlassUsagePayload.Device(name: "juliet", history: history, now: now, calendar: calendar)
-        #expect(device.name == "juliet")
+        let device = GlassUsagePayload.Device(name: "Ann's Mac", history: history, now: now, calendar: calendar)
+        #expect(device.name == "Ann's Mac")
         #expect(device.days.count == 2, "40 days ago is outside the overview's window")
         let counts = device.counts(calendar: calendar)
         let today = calendar.startOfDay(for: now)
@@ -46,8 +46,8 @@ struct GlassUsageSyncTests {
     func merging() throws {
         let mac = UUID().uuidString, phone = UUID().uuidString
         let early = Date(timeIntervalSince1970: 1_000), late = Date(timeIntervalSince1970: 2_000)
-        let older = GlassUsagePayload(devices: [mac: .init(name: "juliet", updatedAt: early)])
-        let newer = GlassUsagePayload(devices: [mac: .init(name: "juliet", updatedAt: late, hosts: [UUID().uuidString],
+        let older = GlassUsagePayload(devices: [mac: .init(name: "Ann's Mac", updatedAt: early)])
+        let newer = GlassUsagePayload(devices: [mac: .init(name: "Ann's Mac", updatedAt: late, hosts: [UUID().uuidString],
                                                             days: ["2026-10-17": [.init(host: 0, kind: "ssh", count: 3)]])])
         let other = GlassUsagePayload(devices: [phone: .init(name: "Work iPhone", updatedAt: early)])
         #expect(older.converged(with: newer) == newer && newer.converged(with: older) == newer)
@@ -105,7 +105,7 @@ struct GlassUsageSyncTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let mac = makeModel(root, "mac"), phone = makeModel(root, "phone")
         await mac.load(); await phone.load()
-        mac.setDeviceName("juliet")
+        mac.setDeviceName("Ann's Mac")
         phone.setDeviceName("Work iPhone")
         _ = try await mac.adoptService(kind: .ssh, hostName: "alpha", address: "alpha.example", serviceName: "Terminal")
         let alpha = try #require(mac.catalogHosts.first { $0.displayName == "alpha" }).id
@@ -116,14 +116,14 @@ struct GlassUsageSyncTests {
 
         mac.recordConnection(hostID: alpha, kind: .ssh)
         mac.recordConnection(hostID: alpha, kind: .ssh)
-        for _ in 0..<50 where !(phone.usageByDevice.contains { $0.name == "juliet" && !$0.counts.isEmpty }) {
+        for _ in 0..<50 where !(phone.usageByDevice.contains { $0.name == "Ann's Mac" && !$0.counts.isEmpty }) {
             try await Task.sleep(for: .milliseconds(20))
         }
 
         let devices = phone.usageByDevice
         #expect(devices.first?.isThisDevice == true, "this device first")
         #expect(devices.first?.name == "Work iPhone")
-        let fromMac = try #require(devices.first { $0.name == "juliet" }, "the Mac's counts never arrived: \(devices.map(\.name))")
+        let fromMac = try #require(devices.first { $0.name == "Ann's Mac" }, "the Mac's counts never arrived: \(devices.map(\.name))")
         #expect(!fromMac.isThisDevice)
         #expect(fromMac.counts.map(\.hostID) == [alpha])
         #expect(fromMac.counts.reduce(0) { $0 + $1.count } == 2)
