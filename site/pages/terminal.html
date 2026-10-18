@@ -15,9 +15,14 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
 </section>
 
 <figure class="window-shot">
-  <img class="only-dark" src="static/shots/mac-terminal-dark.webp" width="2480" height="1560" alt="A terminal window on a Mac with its sidebar open, listing the terminal on alpha. It shows a git log graph, the shop's containers under Docker Compose with one restarting, and that container's log with a refused mail connection.">
+  <img class="only-dark" src="static/shots/mac-terminal-dark.webp" width="2480" height="1560" alt="A terminal window on a Mac with its sidebar open, listing the terminal on alpha, which is running btop: the CPU's graph and cores, memory, the network and the shop's processes.">
   <img class="only-light" src="static/shots/mac-terminal-light.webp" width="2480" height="1560" alt="The same window in the light appearance.">
-  <figcaption>A terminal on a Mac, with its tabs in the sidebar.</figcaption>
+  <figcaption>A terminal on a Mac running btop, with its tabs in the sidebar.</figcaption>
+</figure>
+
+<figure class="window-shot">
+  <img class="room" src="static/shots/vision-terminal.webp" width="2400" height="1350" loading="lazy" alt="Apple Vision Pro, in the simulator's living room: a terminal on alpha running btop, with the room showing through the window's glass.">
+  <figcaption>The same terminal on Apple Vision Pro.</figcaption>
 </figure>
 
 <section class="band">
@@ -64,6 +69,17 @@ description: SSH with host-key pinning, key and Secure Enclave sign-in, tabs, wo
       <p>Jump hosts, in the order you set. Auto-reconnect after a dropped connection, up to five tries. Import hosts from an OpenSSH config file, or from your Tailscale tailnet.</p>
     </div>
   </div>
+</section>
+
+<section class="band">
+  <h2>Pick up where you left off</h2>
+  <p class="intro">With a machine's terminals kept in tmux, Active lists what runs there on every device: open on another device, detached, or open here. Choose one to join it, or take it over. A workgroup keeps each of its terminals' sessions, so after a quit, a crash or an update its windows come back on them with everything still running.</p>
+  <figure class="window-shot">
+    <img class="only-dark" src="static/shots/mac-active-dark.webp" width="2880" height="1800" loading="lazy" alt="Active in the Connections window on a Mac: tmux sessions running on alpha (shop, open elsewhere; jobs, detached), on build (release, open elsewhere) and on nas (backups, detached), each with its repository and branch or folder, and when it was last used.">
+    <img class="only-light" src="static/shots/mac-active-light.webp" width="2880" height="1800" loading="lazy" alt="The same window in the light appearance.">
+    <figcaption>Active on a Mac: sessions running on three machines, to open here.</figcaption>
+  </figure>
+  <p><a href="help/terminal-tmux.html">Keep terminals running with tmux</a> · <a href="help/terminal-workgroups.html">Workgroups</a></p>
 </section>
 
 <section class="band">

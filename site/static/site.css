@@ -244,15 +244,15 @@ strong { color: var(--text); font-weight: 600; }
 
 .page { display: block; }
 .hero {
-  padding: 56px var(--pad-x) 40px;
+  padding: 40px var(--pad-x) 28px;
   text-align: center;
   background: radial-gradient(ellipse 760px 420px at 50% 0%, var(--brand-soft), transparent 70%);
 }
 .hero img.mark {
-  width: 144px;
-  height: 144px;
+  width: 120px;
+  height: 120px;
   display: block;
-  margin: 0 auto 20px;
+  margin: 0 auto 16px;
   filter: drop-shadow(0 18px 40px rgba(0, 0, 0, 0.45));
 }
 .hero h1 {
@@ -391,6 +391,14 @@ a.card:hover { text-decoration: none; border-color: var(--border-strong); backgr
   margin-top: 12px;
 }
 .window-shot figcaption { text-align: center; margin-top: 16px; }
+/* Vision Pro captures are the simulator's whole room, so they get a rounded frame, not a shadow. */
+.window-shot img.room, .gallery img.room {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 18px;
+  border: 1px solid var(--border-strong);
+}
 .gallery figcaption strong, .devices figcaption strong { color: var(--text-muted); }
 .gallery {
   display: grid;
@@ -399,6 +407,8 @@ a.card:hover { text-decoration: none; border-color: var(--border-strong); backgr
   margin: 22px 0 0;
 }
 .gallery figure, .devices figure { margin: 0; }
+/* An odd one out at the end takes the whole row, so three pictures read as two and one large. */
+.gallery figure:last-child:nth-child(odd) { grid-column: 1 / -1; }
 /* Columns in proportion to the pictures (16:9, 3:4, 9:19.5), so the three stand the same height. */
 .devices {
   display: grid;
@@ -416,9 +426,13 @@ a.card:hover { text-decoration: none; border-color: var(--border-strong); backgr
 }
 .devices .tablet img { border-radius: 18px; }
 .devices .phone img { border-radius: 24px; }
+/* The iPad and the iPhone on their own, the same height. */
+.devices.pair { grid-template-columns: 0.75fr 0.46fr; max-width: 760px; margin-left: auto; margin-right: auto; }
 @media (max-width: 760px) {
   .devices { grid-template-columns: 1fr 1fr; }
   .devices figure:first-child { grid-column: 1 / -1; }
+  .devices.pair { grid-template-columns: 0.75fr 0.46fr; }
+  .devices.pair figure:first-child { grid-column: auto; }
 }
 .caption { text-align: center; max-width: 640px; margin: 10px auto 0; }
 

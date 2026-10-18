@@ -5,7 +5,7 @@ description: Terminals, databases, remote desktops and an editor for Apple Visio
 <main class="page" id="content">
 
 <header class="hero">
-  <img class="mark" src="static/icon-288.png" alt="The Glass Power Tools icon: a silver display whose red screen shows a terminal prompt, on a stack of database disks." width="144" height="144">
+  <img class="mark" src="static/icon-288.png" alt="The Glass Power Tools icon: a silver display whose red screen shows a terminal prompt, on a stack of database disks." width="120" height="120">
   <h1>Glass Power Tools</h1>
   <p class="tagline">The machines you work on, in one list.</p>
   <p class="lede">Terminals, databases, remote desktops and an editor, for Apple Vision Pro, Mac, iPad and iPhone. You add a machine once. Each machine lists its services, and Connect opens the one you want.</p>
@@ -18,16 +18,65 @@ description: Terminals, databases, remote desktops and an editor for Apple Visio
 </header>
 
 <figure class="window-shot">
-  <img class="only-dark" src="static/shots/mac-library-dark.webp" width="2880" height="1800" alt="The library on a Mac, in Dark Mode. All Connections lists six machines (This Mac, alpha, bravo, build, nas and win) with an icon for each service. Beside it, Your Library counts 6 machines and 8 services, a bar chart shows 181 connections over the last 30 days on 3 devices, and Most used lists alpha, bravo and build.">
-  <img class="only-light" src="static/shots/mac-library-light.webp" width="2880" height="1800" alt="The same window in the light appearance.">
-  <figcaption>The library on a Mac, with a month of connections from three devices. Every machine in these pictures is made up.</figcaption>
+  <img class="room" src="static/shots/vision-terminal.webp" width="2400" height="1350" alt="Apple Vision Pro, in the simulator's living room: a terminal on alpha running btop. Its CPU graph rises at the right beside sixteen cores; below are memory, the network and the shop's processes, with shop-web selected. The room shows through the window's glass.">
+  <figcaption>A terminal on Apple Vision Pro, running btop, with the room behind its glass. Every machine in these pictures is made up.</figcaption>
 </figure>
 
 <section class="band">
-  <h2>What it looks like</h2>
+  <h2>Vision Pro first</h2>
+  <div class="two">
+    <div>
+      <p>It started as an SSH client for Apple Vision Pro, and the headset still leads the design. Each session is a normal window you place around you. A server's terminal, its database and its desktop can sit side by side in the room. A window you aren't using can shrink into a small glass orb, with its session live inside it, until you pinch it back.</p>
+      <p>Every window is glass. Opacity sets how much of the theme's colour is painted, Glass how much the room is frosted behind it; the pictures here use 78% and 50%.</p>
+    </div>
+    <div>
+      <p>The Mac, iPad and iPhone apps are the same app, adapted to each device. The Mac adds a local shell and menus. The iPhone gives each session the whole screen.</p>
+      <p>An honest note on testing. The current build is used every day on a Mac and an iPhone, and the headset runs it too: on 2026-10-18 all three had 0.4.476. Not every newer change has been checked on the headset yet.</p>
+    </div>
+  </div>
   <div class="gallery">
     <figure>
-      <img class="window only-dark" src="static/shots/mac-terminal-dark.webp" width="2480" height="1560" loading="lazy" alt="A terminal window on a Mac with its sidebar open, listing the terminal on alpha. It shows a git log graph, the shop's containers under Docker Compose with one restarting, and that container's log with a refused mail connection.">
+      <img class="room" src="static/shots/vision-database.webp" width="2400" height="1350" loading="lazy" alt="A database window on Vision Pro: the shop database's tables in the sidebar, and the orders table open with its SELECT statement and a grid of orders, the room showing through.">
+      <figcaption><strong>Databases.</strong> The shop's orders: the query above, the rows below.</figcaption>
+    </figure>
+    <figure>
+      <img class="room" src="static/shots/vision-desktop.webp" width="2400" height="1350" loading="lazy" alt="A remote desktop window on Vision Pro, connected to bravo: a made-up remote screen with a monitoring window charting CPU and a window listing the files in ~/shop.">
+      <figcaption><strong>Remote desktops.</strong> A machine's own screen, as large as you make the window.</figcaption>
+    </figure>
+    <figure>
+      <img class="room" src="static/shots/vision-editor.webp" width="2400" height="1350" loading="lazy" alt="The editor on Vision Pro: the shop project's files on the left, and ShippingAddress.swift open in a tab beside compose.yaml and README.md.">
+      <figcaption><strong>Editor.</strong> A project's files, and the one you're changing.</figcaption>
+    </figure>
+  </div>
+  <p><a href="help/desktop-vision-pro.html">Remote desktops on Apple Vision Pro</a></p>
+</section>
+
+<section class="band">
+  <h2>Pick up where you left off</h2>
+  <p class="intro">Turn on <strong>Keep Sessions Running with tmux</strong> for a machine, and each terminal you open there runs in its own tmux session on the machine. A dropped connection, a closed window or a quit app leaves the work running. The machine needs tmux.</p>
+  <div class="gallery">
+    <figure>
+      <img class="room" src="static/shots/vision-active.webp" width="2400" height="1350" loading="lazy" alt="Active on Vision Pro: tmux sessions running on alpha (shop, open elsewhere; jobs, detached), on build (release, open elsewhere) and on nas (backups, detached), each with its repository and branch or folder, and when it was last used.">
+      <figcaption><strong>Move a session between devices.</strong> Active lists what runs in tmux on each machine, open on another device or detached. Choose one to join it here, or take it over. Start a build on the Mac and watch it from the headset.</figcaption>
+    </figure>
+    <figure>
+      <img class="room" src="static/shots/vision-workgroups.webp" width="2400" height="1350" loading="lazy" alt="Workgroups on Vision Pro: the Shop workgroup's startup plan, four terminals on three machines: web and jobs on alpha, release on build and backups on nas, each with its address and startup command.">
+      <figcaption><strong>Workgroups that come back.</strong> A saved set of terminals, each keeping its own tmux session. After a quit, a crash or an update, the windows come back on the same sessions with everything still running, and a startup command never runs into a session that is still going.</figcaption>
+    </figure>
+  </div>
+  <p><a href="help/terminal-tmux.html">Keep terminals running with tmux</a> · <a href="help/terminal-workgroups.html">Workgroups</a></p>
+</section>
+
+<section class="band">
+  <h2>On the Mac</h2>
+  <figure class="window-shot">
+    <img class="only-dark" src="static/shots/mac-workspace-dark.webp" width="2880" height="1786" loading="lazy" alt="Four windows on a Mac, in Dark Mode: a terminal on alpha running btop, the shop database's orders, a remote desktop on bravo, and the editor with ShippingAddress.swift open.">
+    <img class="only-light" src="static/shots/mac-workspace-light.webp" width="2880" height="1786" loading="lazy" alt="The same four windows in the light appearance.">
+    <figcaption>One machine's terminal, its database, a remote desktop and the editor, open together on a Mac.</figcaption>
+  </figure>
+  <div class="gallery">
+    <figure>
+      <img class="window only-dark" src="static/shots/mac-terminal-dark.webp" width="2480" height="1560" loading="lazy" alt="A terminal window on a Mac with its sidebar open, listing the terminal on alpha, which is running btop: the CPU's graph and cores, memory, the network and the shop's processes.">
       <img class="window only-light" src="static/shots/mac-terminal-light.webp" width="2480" height="1560" loading="lazy" alt="The same window in the light appearance.">
       <figcaption><strong>Terminal.</strong> SSH with host keys you confirm, tabs in a sidebar, tmux sessions you pick up on any device, and the server’s files a click away.</figcaption>
     </figure>
@@ -37,8 +86,8 @@ description: Terminals, databases, remote desktops and an editor for Apple Visio
       <figcaption><strong>Databases.</strong> MySQL, PostgreSQL and SQLite: browse, filter and edit rows, follow foreign keys, write and explain queries.</figcaption>
     </figure>
     <figure>
-      <img class="window only-dark" src="static/shots/mac-desktop-dark.webp" width="2416" height="1552" loading="lazy" alt="A remote desktop window on a Mac, connected to bravo at 1920 × 1080: a made-up remote screen with a monitoring window charting CPU over the last hour and a window listing the files in ~/shop.">
-      <img class="window only-light" src="static/shots/mac-desktop-light.webp" width="2416" height="1552" loading="lazy" alt="The same window in the light appearance.">
+      <img class="window only-dark" src="static/shots/mac-desktop-dark.webp" width="2412" height="1548" loading="lazy" alt="A remote desktop window on a Mac, connected to bravo at 1920 × 1080: a made-up remote screen with a monitoring window charting CPU over the last hour and a window listing the files in ~/shop.">
+      <img class="window only-light" src="static/shots/mac-desktop-light.webp" width="2412" height="1548" loading="lazy" alt="The same window in the light appearance.">
       <figcaption><strong>Remote desktops.</strong> RDP and VNC, with the remote resolution following your window.</figcaption>
     </figure>
     <figure>
@@ -84,33 +133,25 @@ description: Terminals, databases, remote desktops and an editor for Apple Visio
 <section class="band">
   <h2>Why one app</h2>
   <p>A machine usually offers several ways in. The common setup is one app per protocol. Each app keeps its own list of the same machines and its own settings. Glass Power Tools keeps one list instead. Whether that fits how you work is for you to judge.</p>
+  <figure class="window-shot">
+    <img class="only-dark" src="static/shots/mac-library-dark.webp" width="2880" height="1800" loading="lazy" alt="The library on a Mac, in Dark Mode. All Connections lists six machines (This Mac, alpha, bravo, build, nas and win) with an icon for each service. Beside it, Your Library counts 6 machines and 8 services, a bar chart shows 181 connections over the last 30 days on 3 devices, and Most used lists alpha, bravo and build.">
+    <img class="only-light" src="static/shots/mac-library-light.webp" width="2880" height="1800" loading="lazy" alt="The same window in the light appearance.">
+    <figcaption>The one list, on a Mac, with a month of connections from three devices.</figcaption>
+  </figure>
   <p><a href="why.html">The reasoning, and what the app is not →</a></p>
 </section>
 
 <section class="band">
-  <h2>Vision Pro first</h2>
-  <div class="two">
-    <div>
-      <p>It started as an SSH client for Apple Vision Pro, and the headset still leads the design. Each session is a normal window you place around you. A server's terminal, its database and its desktop can sit side by side in the room. A window you aren't using can shrink into a small glass orb, with its session live inside it, until you pinch it back.</p>
-      <p>The Mac, iPad and iPhone apps are the same app, adapted to each device. The Mac adds a local shell and menus. The iPhone gives each session the whole screen.</p>
-    </div>
-    <div>
-      <p>An honest note on testing. The current build is used every day on a Mac and an iPhone, and the headset runs it too: on 2026-10-17 all three had 0.4.475. Not every newer change has been checked on the headset yet.</p>
-      <p><a href="help/desktop-vision-pro.html">Remote desktops on Apple Vision Pro</a></p>
-    </div>
-  </div>
-  <div class="devices">
-    <figure>
-      <img src="static/shots/vision-terminal.webp" width="2400" height="1350" loading="lazy" alt="Apple Vision Pro, in the simulator's living room: a terminal on alpha with the shop's git log and containers, floating in front of the library's window.">
-      <figcaption><strong>Vision Pro.</strong> A session is a window you place in the room.</figcaption>
-    </figure>
+  <h2>iPad and iPhone</h2>
+  <p class="intro">The same library and the same machines. The iPhone gives each session the whole screen.</p>
+  <div class="devices pair">
     <figure class="tablet">
       <img src="static/shots/ipad-library.webp" width="1200" height="1600" loading="lazy" alt="An iPad in Dark Mode showing the library: the machines on the left; on the right, Your Library's counts, a month of connections as a bar chart (189 on 3 devices) and the machines used most.">
-      <figcaption><strong>iPad.</strong> The same library, the same machines.</figcaption>
+      <figcaption><strong>iPad.</strong> The library, with a month of connections.</figcaption>
     </figure>
     <figure class="phone">
-      <img src="static/shots/iphone-terminal.webp" width="780" height="1695" loading="lazy" alt="An iPhone showing the terminal on alpha across the whole screen, with the same shop's git log and containers.">
-      <figcaption><strong>iPhone.</strong> A session gets the whole screen.</figcaption>
+      <img src="static/shots/iphone-terminal.webp" width="780" height="1695" loading="lazy" alt="An iPhone showing the terminal on alpha across the whole screen, running btop: the CPU's graph and cores, memory and the shop's processes.">
+      <figcaption><strong>iPhone.</strong> btop on alpha, across the whole screen.</figcaption>
     </figure>
   </div>
 </section>
