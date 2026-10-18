@@ -1,5 +1,6 @@
 #!/bin/bash
-# Every screenshot for the website, from the real app on made-up data (App/GlassDemoMode.swift).
+# Screenshots of every surface on the simulators, from the real app on made-up data (App/GlassDemoMode.swift).
+# The website's own pictures come from site_shots.sh (the Mac, in the VM) and device_shots.sh.
 #   Tools/Screenshots/capture.sh [visionos] [ipad] [iphone]      (default: all three, in that order)
 # Builds the Debug app once per platform (the demo code is DEBUG-only), then shoots each surface
 # on that platform's simulator into site/static/shots/<platform>-<surface>.png.

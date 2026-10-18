@@ -98,6 +98,20 @@ the private half in the login Keychain, and put the public half in `GPT_SPARKLE_
 does not resolve or a page carries an address outside the documentation ranges. Preview it with
 `python3 -m http.server -d _site 8090`.
 
+Its pictures are the real app on made-up machines (the demo mode in `App/GlassDemoMode.swift`, Debug
+builds only). The Mac's are taken in a headless macOS 26 virtual machine, so nothing opens on your
+screen: [tart](https://tart.run) runs it, and `Tools/Screenshots/macvm/macvm.sh` drives it.
+
+```sh
+Tools/Screenshots/macvm/macvm.sh setup        # once: the VM, from Cirrus Labs' macOS 26 image
+Tools/Screenshots/macvm/macvm.sh build-app    # Debug, ad-hoc signed, for the VM only
+Tools/Screenshots/macvm/macvm.sh start && Tools/Screenshots/macvm/macvm.sh install-app
+Tools/Screenshots/site_shots.sh               # site/static/shots/mac-*-dark.webp and -light.webp
+```
+
+The Vision Pro, iPad and iPhone pictures come from the simulators:
+`IOS_APP=… VISION_APP=… Tools/Screenshots/device_shots.sh`, given Debug simulator builds.
+
 ## Tests
 
 The package tests are fast and need no network:

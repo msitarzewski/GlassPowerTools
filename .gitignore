@@ -24,3 +24,6 @@ _site/
 Tests/LiveDesktop/*.txt
 Tests/LiveDesktop/*.bin
 *.logarchive
+
+# The macOS screenshot VM's key, build and raw captures (Tools/Screenshots/macvm).
+.scratch/
