@@ -420,10 +420,14 @@ struct MacDatabaseWorkspaceWindowReader: NSViewRepresentable {
 
 @MainActor
 enum MacDatabaseWorkspaceWindowPolicy {
+    /// Runs again on every update of the workspace, so it sets only what differs: setting a window
+    /// property to the value it has still tells its observers, SwiftUI's hosting view among them,
+    /// and one being taken down crashed in AttributeGraph on that notice (the screenshot VM,
+    /// 2026-10-18; `DatabaseWindowEdgeTests.applyingAgainTellsNoOne`).
     static func apply(_ window: NSWindow?) {
         guard let window else { return }
-        window.isOpaque = false
-        window.backgroundColor = .clear
+        if window.isOpaque { window.isOpaque = false }
+        if window.backgroundColor != .clear { window.backgroundColor = .clear }
         // Match glas.sh's `MacTerminalWindowPolicy` and Apple's full-height
         // sidebar windows: content extends under the toolbar, and SwiftUI's
         // NavigationSplitView places its per-column titlebar backgrounds in
@@ -432,11 +436,11 @@ enum MacDatabaseWorkspaceWindowPolicy {
         // of the workspace tab strip instead.
         // The window itself is clear, so AppKit draws no titlebar material of
         // its own; `installTitlebarMaterial` supplies it behind the band.
-        window.titlebarAppearsTransparent = true
-        window.styleMask.insert(.fullSizeContentView)
-        window.ignoresMouseEvents = false
-        window.isMovableByWindowBackground = false
-        window.autorecalculatesKeyViewLoop = true
+        if !window.titlebarAppearsTransparent { window.titlebarAppearsTransparent = true }
+        if !window.styleMask.contains(.fullSizeContentView) { window.styleMask.insert(.fullSizeContentView) }
+        if window.ignoresMouseEvents { window.ignoresMouseEvents = false }
+        if window.isMovableByWindowBackground { window.isMovableByWindowBackground = false }
+        if !window.autorecalculatesKeyViewLoop { window.autorecalculatesKeyViewLoop = true }
         // As in glas.sh, let the system choose toolbar style and control size.
         // The passive material must not impose compact window chrome.
         // The sidebar meets the workspace with no line between, as in a terminal window (the

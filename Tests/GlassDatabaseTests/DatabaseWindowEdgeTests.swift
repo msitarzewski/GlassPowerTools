@@ -51,6 +51,39 @@ struct DatabaseWindowEdgeTests {
         #expect(dividers().allSatisfy { $0.alphaValue == 0 }, "still nothing after it reopens: \(dividers().map(\.alphaValue))")
     }
 
+    /// The policy runs again on every update of the workspace. Setting a window property to the value
+    /// it already has still tells everything observing it, SwiftUI's hosting view among them: in the
+    /// screenshot VM (2026-10-18) that notice reached a hosting view being taken down, and the app
+    /// crashed in AttributeGraph under `LazyPreventsWindowDragFeature`. Applied again, it changes
+    /// nothing, so it tells no one.
+    @Test func applyingAgainTellsNoOne() throws {
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 500),
+            styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentViewController = Self.controller(width: 700)
+        window.alphaValue = 0
+        window.orderFrontRegardless()
+        defer { window.close() }
+        MacDatabaseWorkspaceWindowPolicy.apply(window)
+
+        let observer = ChangeRecorder()
+        let keys = ["opaque", "backgroundColor", "titlebarAppearsTransparent", "styleMask", "ignoresMouseEvents",
+                    "movableByWindowBackground", "autorecalculatesKeyViewLoop"]
+        for key in keys { window.addObserver(observer, forKeyPath: key, options: [], context: nil) }
+        defer { for key in keys { window.removeObserver(observer, forKeyPath: key) } }
+        MacDatabaseWorkspaceWindowPolicy.apply(window)
+        #expect(observer.changes.isEmpty, "told of \(observer.changes)")
+    }
+
+    private final class ChangeRecorder: NSObject {
+        var changes: [String] = []
+        override func observeValue(forKeyPath keyPath: String?, of object: Any?,
+                                   change: [NSKeyValueChangeKey: Any]?, context: UnsafeMutableRawPointer?) {
+            changes.append(keyPath ?? "?")
+        }
+    }
+
     private static func controller(width: CGFloat) -> NSViewController {
         let controller = NSViewController()
         controller.view = NSView(frame: NSRect(x: 0, y: 0, width: width, height: 500))
