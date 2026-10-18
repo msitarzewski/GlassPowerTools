@@ -70,6 +70,14 @@ no download or TestFlight build yet. What is verified, and how, is in
 
 ## Recent builds
 
+### 0.4.477 (18 October 2026)
+- **The library of machines moved to iCloud's production database**, the one released copies use.
+  Until now builds from Xcode used CloudKit's development database, which a released copy never sees.
+  The first device on this build uploads its library, and the others take it from there. Favorites,
+  workgroups, projects, settings and passwords were never in that database, so they are unchanged.
+- The Mac build carries its update key (Sparkle), so Check for Updates… appears. The update feed is
+  empty until the first release.
+
 ### 0.4.476 (18 October 2026)
 - **A crash in database windows on the Mac, fixed.** A database or diagram window re-applied its
   window settings on every update, and that could reach the window's content while it was being

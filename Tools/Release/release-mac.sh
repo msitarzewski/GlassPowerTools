@@ -100,6 +100,8 @@ grep -q "Authority=Developer ID Application" <<<"$info" || { echo "app: not Deve
 grep -q "flags=.*runtime" <<<"$info" || { echo "app: hardened runtime missing"; exit 1; }
 entitlements="$(codesign -d --entitlements - --xml "$APP" 2>/dev/null)"
 grep -q "production" <<<"$entitlements" || { echo "app: push environment is not production"; exit 1; }
+grep -A1 "icloud-container-environment" <<<"$entitlements" | grep -q "<string>Production</string>" \
+  || { echo "app: iCloud environment is not Production: released copies would not see the account's library"; exit 1; }
 # Not sandboxed on purpose (SECURITY.md): a terminal must start the user's shell. Its widget extension is.
 # The widget extension (D68) is nested code the checks above do not name; `--deep` proves only that its
 # signature is valid. Check it as the app is checked, here rather than by notarization's refusal, and

@@ -35,6 +35,15 @@ GPT_WIDGET_GROUP[sdk=macosx*] = $(GPT_DEVELOPMENT_TEAM).$(GPT_BUNDLE_ID).widgets
 // `Tools/Release/release-mac.sh` passes on its command line (D38).
 GPT_APS_ENVIRONMENT = development
 
+// Which of the container's two databases every build uses, Xcode's builds included. Production, the
+// one released copies use: there are no users yet, so the owner's own library moved there before the
+// first release (2026-10-18) rather than his devices and a released copy each seeing a different one.
+// Development profiles allow either. A record type has to be deployed to production in CloudKit
+// Console before a build can save it; `HostProfile` travels as one encoded field
+// (`GlassCloudKitCatalogBackend`), so its changes need no deploy. A fork with its own container starts
+// on Development, until its schema is deployed.
+GPT_ICLOUD_ENVIRONMENT = Production
+
 // Mac updates (D38, Sparkle). The feed lists releases; each update must be signed with the EdDSA
 // private key whose public half is below. The key pair is made once with Sparkle's `generate_keys`
 // and the private half stays in the maintainer's login Keychain. Empty, the build does not update
