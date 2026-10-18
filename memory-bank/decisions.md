@@ -1068,6 +1068,15 @@ feed-checked, never run: they need the Developer ID certificate and notarization
 **Still the owner's:** generate the EdDSA key and set its public half; the Developer ID provisioning
 profile with the CloudKit container, App Group and Keychain group; sync verified on a Developer ID
 build; the feed served uncached.
+**Observed 2026-10-18:** the installed 0.4.476 carries Sparkle.framework and `SUFeedURL` but no
+`SUPublicEDKey`, so the updater never starts and its menu item and settings are hidden. A Developer ID
+Application certificate for the team is now in the login Keychain. There is no Sparkle key under the
+account the release script signs with (`GlassPowerTools`); the only one is under Sparkle's default
+account, made 2026-06-06 for another app. No Developer ID provisioning profile is on disk (the script's
+automatic signing with `-allowProvisioningUpdates` may make one; unproven). **A step this list lacked:**
+a Developer ID build uses CloudKit's production environment, so the schema must be deployed to
+production in CloudKit Console first, and the production database starts empty. Builds installed
+from Xcode use development, so the two kinds of build do not see each other's data.
 
 ## D39 — Documentation and glasspowertools.com — Approved 2026-09-25
 
