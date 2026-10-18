@@ -27,7 +27,7 @@ use the disposable test VM only).
 | 4 | Memory bank curated | done; quotes paraphrased; `.brain/` untracked |
 | 5 | README, SECURITY, CONTRIBUTING, building guide, release notes | done; brought current with the code 2026-10-17, and `RELEASE-NOTES.md` added |
 | 6 | Upstream contributions (swift-nio-ssh, Citadel) | drafted locally for the owner's review; nothing sent |
-| 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the Sparkle key made and the site live (2026-10-18); remaining: the Developer ID profile, CloudKit's production schema, the first release run |
+| 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the Sparkle key made and the site live (2026-10-18); the Developer ID profiles and CloudKit's production schema done, and the dry run passed; remaining: the first release run, after the repository is public |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
 ## 2026-10-18 — RESUME HERE

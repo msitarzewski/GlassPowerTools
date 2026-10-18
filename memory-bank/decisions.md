@@ -1094,6 +1094,14 @@ encoded `HostProfile`, and `updatedAt`), which must be deployed to production in
 first. Key-value storage and iCloud Keychain have no environments, so settings, favorites and
 credentials are unaffected. The update downloads go on GitHub Releases (the owner, 2026-10-18), which
 needs the repository to exist and be public; on 2026-10-18 it did not exist.
+**Dry run, 2026-10-18** (`release-mac.sh --dry-run 0.4.479 479`, after the owner signed in to Xcode):
+archived arm64 only, exported with Developer ID, every check passed. Xcode made the Developer ID
+profiles ("Mac Team Direct Provisioning Profile", until 2044) for the app and the Files extension, the
+two bundles that need one. The app's profile grants every entitlement it claims: Production iCloud,
+production push, the container, key-value store, `group.sh.glas.shared` and the Keychain group. The
+Files extension claims only a team-prefixed App Group, which needs no grant on a Mac. Still to do: a
+notarized copy actually launching. The export was not run, because it would have shared the owner's data
+with his running copy.
 
 ## D39 — Documentation and glasspowertools.com — Approved 2026-09-25
 

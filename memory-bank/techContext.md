@@ -350,9 +350,9 @@ https://glasspowertools.com (every file checked against the build; hosting is in
 `site/static/appcast.xml`). The entitlements read `$(GPT_APS_ENVIRONMENT)`, `development` in
 `Config/Identity.xcconfig`; the script archives with `production` and refuses a build without it, an
 empty `GPT_SPARKLE_PUBLIC_KEY`, a missing Developer ID certificate or notarytool Keychain profile, or a widget not signed into the
-app's App Group. Still the owner's: the Sparkle key (account `GlassPowerTools`), a Developer ID profile carrying the
-CloudKit container, App Group and Keychain group, the CloudKit schema deployed to production, and the first run
-(inventory B-R1–B-R4). The Sparkle key exists since 2026-10-18 (account `GlassPowerTools`, public half in
+app's App Group. Done on 2026-10-18: the Sparkle key (account `GlassPowerTools`), the CloudKit schema in production, and the
+Developer ID profiles (made by the first `--dry-run`, D38). Remaining: the first run, which waits for a public
+GitHub repository (inventory B-R1–B-R4). The Sparkle key exists since 2026-10-18 (account `GlassPowerTools`, public half in
 `Config/Identity.xcconfig`). The Developer ID certificate is in the Keychain (seen 2026-10-18; D38).
 iOS, iPadOS, visionOS: TestFlight, then the App Store (D38; no tooling yet). The site is static:
 `Tools/Site/build_site.py` builds `site/` into the ignored `_site/` and fails on a broken link or
