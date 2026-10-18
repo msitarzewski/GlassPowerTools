@@ -553,3 +553,37 @@ raw captures are in the git-ignored `.scratch/`. Observed:
   border, the same as its right.
 - The device pictures come from the simulators (`Tools/Screenshots/device_shots.sh`).
 
+Added 2026-10-18, at the owner's ask ("78% transparency with about 50% medium glass. close the connections window so
+users can see why this was built … all 4 services for each visionOS and macOS … session transfer with tmux and
+workgroups"; then "run btop or something for the terminal examples"):
+- **Every picture's glass is Opacity 78%, Glass 50%, Medium** (`--demo-glass 0.78,0.5,thin`; the third value is a
+  `GlassLayerMaterial` raw value, `thin` being Medium). Shown both, he chose Opacity 78% over 22%: at 22% a terminal's
+  text was faint over the simulator's bright room. A desktop's Opacity would fade its remote screen (W28), so the
+  demo applies only its glass unless `--demo-fade-desktop`.
+- **`--demo-close-connections`** closes the Connections window 5 s after the surface opens (`GlassDemoModeTask`,
+  `dismissWindow()` from the library's own environment), so the glass shows the room or the desktop picture.
+- **The terminal pictures run a btop-style screen** (`--demo-open btop`, `App/GlassDemoBtop.swift`): the demo
+  session's resize sink hands the window's rows and columns to the drawing (`.demoScreen`), so it fits a Mac window,
+  the headset and the iPhone, as a real full-screen program redraws. btop's default theme, its boxes lifted to read on
+  glass; its "block" graphs, as braille read as faint dots at these sizes.
+- **Active and Workgroups** (`active`, `workgroups`): made-up tmux sessions named and described by the real
+  `runningDetails`, held against Active's refresh (`demoHoldsRunningSessions`); a saved workgroup whose machines are
+  given in-memory terminal records, because a seeded host has only its catalogue entry (without them every row reads
+  "Missing SSH connection"). The Mac's workgroup detail cuts its table off at 1440 × 900, so the site uses the Vision
+  Pro picture.
+- **Four windows at once works on the Mac, not in the visionOS simulator.** `workspace` opens a terminal, a
+  database, a desktop and the editor one at a time; `site_shots.sh` tiles them on the VM's screen and cuts the picture
+  out by all four outlines. On the headset the default opens each window in front of the last, and
+  `defaultWindowPlacement` with `.leading`/`.trailing` turns the side windows toward the viewer and brings them close,
+  so they ran off both edges of the simulator's fixed view; the placement's size was not honoured either. Tried and
+  removed; the Vision Pro pictures are one service each.
+- `macvm.sh start` once said "no VM named glasspowertools-mac26" while the simulators were busy; `tart list --quiet`
+  listed it a moment later and a retry started it.
+- **Glass shows whatever is behind it, so the VM's screen is cleared first** (`site_shots.sh`): desktop widgets hidden
+  (`com.apple.WindowManager StandardHideWidgets`), a leftover "quit unexpectedly" report pressed OK, and notification
+  banners closed before every capture (`macvm/close-banners.applescript`, each banner's Close action; macOS 26 posts
+  "See what's new in macOS Tahoe" and it came back after Notification Center restarted). All three had shown through
+  or over pictures. The Dock is hidden only for `workspace`, whose tiles reach the screen's bottom.
+- **The crash behind that report** was the app's, in the database window's policy (0.4.476, 5c567dd): a re-apply
+  set window properties to their own values, which still notifies SwiftUI's hosting view.
+

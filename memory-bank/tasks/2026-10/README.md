@@ -138,3 +138,7 @@
   unreachable); the site in AudioPaper's family look with the real app in pictures, Mac windows from a headless macOS
   VM (`Tools/Screenshots/macvm`, `site_shots.sh`) and devices from the simulators (`device_shots.sh`). Evidence and
   the VM's quirks: `techContext.md`, "The macOS screenshot VM"; `progress.md`.
+- 2026-10-18: the site's pictures at his word — Opacity 78%, Glass 50%, Medium, Connections closed; all four services
+  on Vision Pro and the Mac, the Mac's four at once, Active's tmux sessions and a workgroup, btop in every terminal; the
+  Vision Pro terminal above the fold. How, and what didn't work: `techContext.md`, "The macOS screenshot VM";
+  `progress.md`. A crash in database windows found in the VM, fixed in 0.4.476 (5c567dd), on all three devices.

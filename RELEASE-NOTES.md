@@ -70,6 +70,12 @@ no download or TestFlight build yet. What is verified, and how, is in
 
 ## Recent builds
 
+### 0.4.476 (18 October 2026)
+- **A crash in database windows on the Mac, fixed.** A database or diagram window re-applied its
+  window settings on every update, and that could reach the window's content while it was being
+  taken down, which crashed the app. It now changes only what differs. Found while taking the
+  website's pictures.
+
 ### 0.4.475 (17 October 2026)
 - **No gray line in database and desktop windows**, as in terminal windows since 0.4.469: a database
   window's sidebar meets its workspace with no line between, and a desktop window has no line down its

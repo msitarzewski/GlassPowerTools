@@ -30,7 +30,26 @@ use the disposable test VM only).
 | 7 | Help, site and the Mac release path (D38, D39) | built (`2026-09-27_help-site-and-updates.md`); the owner's steps remain: the Sparkle key, the Developer ID profile, deploying the site |
 | 8 | History rewrite, then the first push | only on the owner's word |
 
-## 2026-10-17 (night) — RESUME HERE
+## 2026-10-18 — RESUME HERE
+
+**His ask:** "I'd like the vision pro screen shots to have 78% transparency with about 50% medium glass. close the
+connections window so users can see why this was built. Do the same for Mac and let's get all 4 services for each
+visionOS and macOS. Don't forget session tranfer with tmux and workgroups that restore after a quit!" Then: "we can't
+claim vision pro first and feature a mac interface instead above the fold", and "run btop or something for the
+terminal examples". Asked which "78% transparency" meant, with a side-by-side: **Opacity 78%** (Glass 50%, Medium).
+- **The pictures:** Vision Pro (simulator) terminal, database, desktop, editor with Connections closed, plus Active
+  (tmux sessions to pick up) and a workgroup; the Mac (VM) the same services, Active, the library, and all four at
+  once; the iPhone's terminal; every terminal running a btop-style screen drawn for its window's size. All DEBUG-only
+  demo code (`App/GlassDemoMode.swift`, `App/GlassDemoBtop.swift`); nothing shipped changed, so no new build.
+- **The site:** the Vision Pro terminal above the fold; Vision Pro first with its other three services; "Pick up where
+  you left off" (Active, workgroups); the Mac's four windows and its gallery; the library under Why one app; iPad and
+  iPhone. Service pages each gain their Vision Pro picture; the terminal page, Active on the Mac. Not deployed.
+- **Tried and dropped:** four windows at once in the visionOS simulator (techContext, "The macOS screenshot VM").
+- **A crash found on the way, fixed in 0.4.476** (5c567dd): the database window's policy re-set unchanged window
+  properties on every update, and one notice crashed a hosting view mid-teardown (the VM's diagram picture).
+  0.4.476 is on the Mac, the iPhone and the headset (each reads it; no new Mac crash reports).
+
+## 2026-10-17 (night)
 
 **His ask:** "remove the gray line in database and desktop windows too - take a look at the AudioPaper site, and glass
 project, and autopaper and update this site to that aesthetic. screenshots and all using the new sandbox". (AutoPaper is
