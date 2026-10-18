@@ -20,6 +20,9 @@ Config/Identity.local.xcconfig
 # The built website (Tools/Site/build_site.py).
 _site/
 
+# Release archives, exports and their packages (Tools/Release/release-mac.sh).
+/build/
+
 # Live desktop probe output and device log archives: real machines' details, never tracked (rule 61).
 Tests/LiveDesktop/*.txt
 Tests/LiveDesktop/*.bin

@@ -13,6 +13,11 @@
 # (it asks for an app-specific password). The team is the one in Config/Identity.xcconfig.
 #
 #   Tools/Release/release-mac.sh 1.0.0 100 [notes.html]
+#   Tools/Release/release-mac.sh --dry-run 1.0.0 100
+#
+# --dry-run archives, exports with Developer ID and runs every check below, then stops: nothing goes to
+# Apple's notary service, nothing is signed for Sparkle, no feed entry or disk image is made. Xcode may
+# still create Developer ID provisioning profiles in the team's account; that is what it checks.
 #
 # Flow: archive (Release, push environment production) → export with Developer ID (app and widget,
 # Sparkle's helpers, hardened runtime) → verify signatures, hardened runtime and entitlements (the app's
@@ -22,8 +27,10 @@
 # (the feed points at the zip on the release).
 set -euo pipefail
 
-VERSION="${1:?usage: release-mac.sh <version> <build number> [notes.html]}"
-BUILD="${2:?usage: release-mac.sh <version> <build number> [notes.html]}"
+DRY_RUN=""
+[ "${1:-}" = "--dry-run" ] && { DRY_RUN=1; shift; }
+VERSION="${1:?usage: release-mac.sh [--dry-run] <version> <build number> [notes.html]}"
+BUILD="${2:?usage: release-mac.sh [--dry-run] <version> <build number> [notes.html]}"
 NOTES="${3:-}"
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
@@ -38,7 +45,7 @@ TEAM="$(setting DEVELOPMENT_TEAM)"
 IDENTITY="$(security find-identity -v -p codesigning | grep "Developer ID Application" | grep "($TEAM)" | head -1 | awk '{print $2}')"
 [ -n "$IDENTITY" ] || { echo "No Developer ID Application certificate for team $TEAM in the Keychain"; exit 1; }
 # Before the archive, not after it: a missing profile would otherwise surface only at the first submission.
-xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1 || {
+[ -n "$DRY_RUN" ] || xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1 || {
   echo "No notarytool profile '$NOTARY_PROFILE' in the Keychain. Save one (see the header of this script),"
   echo "or name the one you have: GPT_NOTARY_PROFILE=<name> $0 $*"; exit 1; }
 
@@ -68,8 +75,8 @@ echo "==> Glass Power Tools $VERSION ($BUILD), team $TEAM"
 echo "==> archive (Release; push environment production for released copies, D38)"
 xcodebuild -project GlassPowerTools.xcodeproj -scheme GlassPowerTools -configuration Release \
   -destination "generic/platform=macOS" -archivePath "$ARCHIVE" -clonedSourcePackagesDirPath "$PACKAGES" \
-  -packageAuthorizationProvider netrc -skipPackagePluginValidation -allowProvisioningUpdates -quiet \
-  MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" GPT_APS_ENVIRONMENT=production archive
+  -packageAuthorizationProvider netrc -skipPackagePluginValidation -onlyUsePackageVersionsFromResolvedFile \
+  -allowProvisioningUpdates -quiet MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" GPT_APS_ENVIRONMENT=production archive
 
 echo "==> export with Developer ID"
 cat > "$WORK/ExportOptions.plist" <<PLIST
@@ -128,6 +135,28 @@ grep -qF "<string>$WIDGET_GROUP</string>" "$WORK/widget-entitlements.plist" \
   || { echo "version mismatch"; exit 1; }
 [ -n "$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$APP/Contents/Info.plist" 2>/dev/null)" ] \
   || { echo "SUPublicEDKey missing from the build"; exit 1; }
+# iCloud, push and Keychain groups are honoured at launch only with a provisioning profile that grants
+# them. Notarization does not check this, so a build without one is notarized and then refuses to open.
+# The app and every extension claiming one must carry a Developer ID profile (one for all devices).
+echo "==> provisioning profiles"
+for bundle in "$APP" "$APP"/Contents/PlugIns/*.appex; do
+  [ -d "$bundle" ] || continue
+  name="$(basename "$bundle")"
+  claims="$(codesign -d --entitlements - --xml "$bundle" 2>/dev/null)"
+  grep -q -e "com\.apple\.developer\." -e "keychain-access-groups" <<<"$claims" || { echo "   $name: none needed"; continue; }
+  [ -f "$bundle/Contents/embedded.provisionprofile" ] || { echo "$name: claims iCloud, push or Keychain groups but carries no profile"; exit 1; }
+  security cms -D -i "$bundle/Contents/embedded.provisionprofile" > "$WORK/profile.plist" 2>/dev/null \
+    || { echo "$name: its profile could not be read"; exit 1; }
+  [ "$(/usr/libexec/PlistBuddy -c 'Print :ProvisionsAllDevices' "$WORK/profile.plist" 2>/dev/null)" = true ] \
+    || { echo "$name: its profile is not a Developer ID profile"; exit 1; }
+  echo "   $name: $(/usr/libexec/PlistBuddy -c 'Print :Name' "$WORK/profile.plist"), until $(/usr/libexec/PlistBuddy -c 'Print :ExpirationDate' "$WORK/profile.plist")"
+done
+if [ -n "$DRY_RUN" ]; then
+  echo
+  echo "==> dry run: exported with Developer ID and checked; stopped before notarization"
+  echo "    $APP"
+  exit 0
+fi
 
 echo "==> notarize the app (waits for Apple)"
 ditto -c -k --keepParent "$APP" "$WORK/GlassPowerTools.zip"
