@@ -5,7 +5,7 @@
 
 ## Project Context
 
-Glass Power Tools is an MIT-licensed, native Apple application that merges the previously separate
+Glass Power Tools is a GPLv3-licensed, native Apple application that merges the previously separate
 glas.sh (SSH/terminal), glassdb (databases) and glassDT (RDP/VNC remote desktop) apps into one
 product, with the editor (GlassEditorKit) as a fourth capability. Bundle identifier
 `com.glasspowertools`. The merge was decided on 2026-09-10. All four capabilities and the shell are
@@ -370,7 +370,7 @@ For the main library, share common presentation and behavior where feasible: fav
 
 ### Linting & Code Quality
 
-Use established Swift/platform conventions, explicit ownership and concurrency boundaries, and clear errors. Follow actual configured lint/build checks; do not invent missing tools or enforce arbitrary nesting limits as a substitute for readable code. The authored project is MIT; third-party licenses remain intact.
+Use established Swift/platform conventions, explicit ownership and concurrency boundaries, and clear errors. Follow actual configured lint/build checks; do not invent missing tools or enforce arbitrary nesting limits as a substitute for readable code. The authored project is GPLv3 (since 2026-10-18; it was MIT before its first publication), and outside contributions come with `CLA.md`; third-party licenses remain intact.
 
 ### Testing Requirements
 

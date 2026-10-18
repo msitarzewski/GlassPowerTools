@@ -1,7 +1,7 @@
 # Third-party notices
 
-Glass Power Tools is MIT licensed (see `LICENSE`). The components below keep their own licences;
-this application's licence does not relicense them.
+Glass Power Tools is licensed under the GNU GPL, version 3 (see `LICENSE`). The components below
+keep their own licences; this application's licence does not relicense them.
 
 **Where the licence texts are.** Every component's full licence and NOTICE text is in
 `Documentation/ThirdPartyLicenses/` (or beside the vendored code, under `Packages/`), and the app

@@ -72,5 +72,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). The project's decisions, rules and worki
 
 ## Licence
 
-MIT — see [LICENSE](LICENSE). Third-party components keep their own licences; see
+Copyright © 2026 Michael Sitarzewski. Glass Power Tools is free software: you can redistribute it
+and/or modify it under the terms of the GNU General Public License, version 3, as published by the
+Free Software Foundation ([LICENSE](LICENSE)). It comes with no warranty. Contributions come with the
+permissions in [CLA.md](CLA.md). Third-party components keep their own licences; see
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), and Settings ▸ About ▸ Acknowledgements in the app.

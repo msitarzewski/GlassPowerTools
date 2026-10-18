@@ -48,5 +48,8 @@ anyone — person or coding agent — making changes. The parts that matter most
 
 ## Licence
 
-Contributions are accepted under the project's [MIT licence](LICENSE). Third-party code keeps its
+The project is under the GNU General Public License, version 3 ([LICENSE](LICENSE)). Before your
+first contribution is merged, agree to the [Contributor License Agreement](CLA.md): put its sentence
+in your pull request. It lets the maintainer also ship the app where the GPL does not reach, such as
+the App Store; you keep the copyright in your work. Third-party code keeps its
 own licence; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

@@ -4,7 +4,7 @@
 
 Glass Power Tools is one native Apple application for every machine a user owns and every service on
 it: terminal and file transfer over SSH, databases, and remote desktops over RDP and VNC, with text
-editing available as a further capability. Bundle identifier `com.glasspowertools`. MIT licensed.
+editing available as a further capability. Bundle identifier `com.glasspowertools`. GPLv3 licensed (MIT until 2026-10-18, D82).
 
 It replaces three separate applications that were converging on the same shell: glas.sh, glassdb and
 glassDT.

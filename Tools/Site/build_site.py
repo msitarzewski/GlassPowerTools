@@ -242,7 +242,7 @@ def main():
         if output == "index.html":
             jsonld = {"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Glass Power Tools",
                       "operatingSystem": "macOS, iOS, iPadOS, visionOS", "applicationCategory": "DeveloperApplication",
-                      "description": meta.get("description", ""), "url": BASE_URL, "license": "https://opensource.org/license/mit"}
+                      "description": meta.get("description", ""), "url": BASE_URL, "license": "https://www.gnu.org/licenses/gpl-3.0.html"}
         render(layout, output, title=title, description=meta.get("description", ""), body=body, jsonld=jsonld)
         outputs.append((output, title, meta.get("description", "")))
     for source, (output, title, description) in MARKDOWN.items():
@@ -267,7 +267,7 @@ def main():
                                      + "".join(f"  <url><loc>{u}</loc><lastmod>{today}</lastmod></url>\n" for u in urls) + "</urlset>\n")
     (OUT / "robots.txt").write_text(f"User-agent: *\nAllow: /\nSitemap: {BASE_URL}sitemap.xml\n")
     llms = ["# Glass Power Tools", "",
-            "> One app for the machines you work on — SSH terminal, databases (MySQL, PostgreSQL, SQLite), remote desktops (RDP, VNC) and a code editor — built natively for Apple Vision Pro, Mac, iPad and iPhone. MIT licensed.",
+            "> One app for the machines you work on — SSH terminal, databases (MySQL, PostgreSQL, SQLite), remote desktops (RDP, VNC) and a code editor — built natively for Apple Vision Pro, Mac, iPad and iPhone. Free software under the GPLv3.",
             "", "## Pages", ""]
     llms += [f"- [{t}]({BASE_URL}{'' if o == 'index.html' else o}): {d}" for o, t, d in outputs]
     group = None
