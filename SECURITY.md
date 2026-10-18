@@ -6,9 +6,9 @@ problem.
 
 ## Reporting a vulnerability
 
-Please report security problems privately, by email to <msitarzewski@gmail.com>, not in a public
-issue. Once this repository is public, GitHub's private vulnerability reporting (**Security ▸ Report
-a vulnerability**) works too. Include what you found, how to reproduce it, and the version
+Please report security problems privately, not in a public issue: through GitHub's private
+vulnerability reporting on this repository (**Security ▸ Report a vulnerability**), or by email to
+<msitarzewski@gmail.com>. Include what you found, how to reproduce it, and the version
 (Settings ▸ About). You will get an answer, and a fix or a plan, as quickly as the problem warrants.
 Please give a reasonable time to fix a problem before disclosing it.
 
