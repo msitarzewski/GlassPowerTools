@@ -69,7 +69,7 @@ When a first connection to an address on your local network fails, the message m
 - **File ▸ New SQL Document** (⌘N while a database workspace is in front) and **Open SQL Document…** (⇧⌘O).
 - **File ▸ Close Active Tab** (⇧⌘W). ⌘W also closes the active tab rather than the window.
 - **File ▸ New Connections Window** (⇧⌘N).
-- **Command Palette…** (⇧⌘P or ⌘K). Type `connect:` to connect a saved database, or a connected service's name and a period to step into its databases and tables. In a database window it also lists the window's tabs, its databases and the tables already loaded, and **Open Query:** for each saved query.
+- **Command Palette…** (⇧⌘P). Type `connect:` to connect a saved database, or a connected service's name and a period to step into its databases and tables. In a database window it also lists the window's tabs, its databases and the tables already loaded, and **Open Query:** for each saved query.
 
 ## Database settings
 

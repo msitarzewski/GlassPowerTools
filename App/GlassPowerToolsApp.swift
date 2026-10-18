@@ -579,7 +579,7 @@ struct GlassPowerToolsApp: App {
                 GlassShellFileCommands()
                 // Edit ▸ Find, the same way: the shell owns ⌘F, ⌘G and ⇧⌘G, the focused window aims them.
                 GlassShellFindCommands()
-                // Command Palette… (⇧⌘P, ⌘K), once: every capability's entries and the focused window's.
+                // Command Palette… (⇧⌘P), once: every capability's entries and the focused window's.
                 GlassShellPaletteCommands()
                 // D38: Check for Updates…, for the build distributed outside the App Store.
                 GlassShellUpdateCommands()

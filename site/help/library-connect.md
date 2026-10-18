@@ -26,7 +26,7 @@ The host's **Last connected** time and its place in **Recent** change only when 
 
 ## Connect from the Command Palette (Mac)
 
-Press ⇧⌘P (or ⌘K), or choose **Glass Power Tools** ▸ **Command Palette…**, from any window, and type to narrow the list. Return opens what is selected. The palette lists:
+Press ⇧⌘P, or choose **Glass Power Tools** ▸ **Command Palette…**, from any window, and type to narrow the list. Return opens what is selected. The palette lists:
 
 - **Connect:** every service of every machine, for example **Connect: Terminal on alpha**, **Connect: Desktop on alpha** or **Connect: MySQL on alpha**. It connects as the library's **Connect** does.
 - **Open Project:** each editor project, and **Open Folder:** each folder in **Favorites**, opened as **Favorites** opens them.

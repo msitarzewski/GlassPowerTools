@@ -310,10 +310,18 @@ struct MenuBarPlacementTests {
 
     /// Command Palette… is the shell's, once (2026-10-13). The terminal and the database each
     /// declared it on ⇧⌘P and ⌘K, and the app menu listed it twice; which palette the key opened
-    /// was SwiftUI's choice.
-    @Test func commandPaletteKeysHaveOneOwner() throws {
+    /// was SwiftUI's choice. One palette then kept both keys, and a SwiftUI menu item holds one,
+    /// so the app menu still listed it twice ("Why are there two command palettes?", the owner,
+    /// 2026-10-18). He chose ⇧⌘P alone; ⌘K is left to no one, as Terminal's and iTerm's clear.
+    @Test func commandPaletteIsOneItemOnOneKey() throws {
         #expect(try owners(of: "p", modifiers: ["command", "shift"]) == ["GlassShellPaletteCommands.swift"])
-        #expect(try owners(of: "k", modifiers: ["command"]) == ["GlassShellPaletteCommands.swift"])
+        #expect(try owners(of: "k", modifiers: ["command"]) == [])
+        var items = 0
+        for file in try swiftSources() {
+            let text = try String(contentsOf: file, encoding: .utf8)
+            items += text.components(separatedBy: #"Button("Command Palette"#).count - 1
+        }
+        #expect(items == 1, "the app menu lists Command Palette \(items) times")
     }
 
     // MARK: Reading the sources

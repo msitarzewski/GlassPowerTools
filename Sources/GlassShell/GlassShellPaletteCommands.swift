@@ -8,6 +8,11 @@
 //  "This menu needs attention"). Each capability's entries come from `GlassCommandPaletteSources`;
 //  the focused window adds its own commands through `macCommandCenterEntries`.
 //
+//  **One item, on ⇧⌘P** (2026-10-18). The one palette kept both keys, and a SwiftUI menu item holds
+//  one, so the app menu still listed it twice, the second as "(Alternate)" — "Why are there two
+//  command palettes?" The owner chose ⇧⌘P, as Xcode and VS Code have it. ⌘K is left to no one:
+//  Terminal and iTerm clear the screen with it, and a terminal's user expects that.
+//
 
 #if os(macOS)
 import SwiftUI
@@ -23,8 +28,6 @@ public struct GlassShellPaletteCommands: Commands {
         CommandGroup(after: .appInfo) {
             Button("Command Palette…") { present() }
                 .keyboardShortcut("p", modifiers: [.command, .shift])
-            Button("Command Palette (Alternate)…") { present() }
-                .keyboardShortcut("k", modifiers: .command)
         }
     }
 
