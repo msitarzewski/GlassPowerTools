@@ -354,7 +354,7 @@ app's App Group. Done on 2026-10-18: the Sparkle key (account `GlassPowerTools`)
 Developer ID profiles (made by the first `--dry-run`, D38). Remaining: the first run, which waits for a public
 GitHub repository (inventory B-R1–B-R4). The Sparkle key exists since 2026-10-18 (account `GlassPowerTools`, public half in
 `Config/Identity.xcconfig`). The Developer ID certificate is in the Keychain (seen 2026-10-18; D38).
-iOS, iPadOS, visionOS: TestFlight, then the App Store (D38; no tooling yet). The site is static:
+iOS, iPadOS, visionOS: TestFlight, then the App Store (D38): `Tools/Release/release-testflight.sh [--dry-run] <version> <build>` archives iOS and visionOS with production push, exports for App Store Connect (or uploads, with Xcode's signed-in account) and checks each bundle's signing, push, iCloud and store profile. The first dry run passed on 2026-10-18 (0.4.479); the owner created the App Store Connect record that day. The site is static:
 `Tools/Site/build_site.py` builds `site/` into the ignored `_site/` and fails on a broken link or
 anchor; where and how it is hosted is kept out of this repository (private infrastructure notes).
 Procedure: `Documentation/BUILDING.md`, "Releasing the Mac app" and "The website".
