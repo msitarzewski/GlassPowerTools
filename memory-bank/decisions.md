@@ -1080,6 +1080,20 @@ from Xcode use development, so the two kinds of build do not see each other's da
 Notarization now uses a notarytool profile saved in the Keychain (`glasspowertools-notary`, or
 `GPT_NOTARY_PROFILE`), as the owner's other projects do, checked before the archive; the team comes from
 `Config/Identity.xcconfig`. It no longer takes an Apple ID and password from the environment.
+**Findings, 2026-10-18.** Every entitlement the Mac app uses is available to Developer ID: App Groups,
+iCloud CloudKit and key-value storage, Keychain sharing and push (Apple, "Supported capabilities
+(macOS)", https://developer.apple.com/help/account/reference/supported-capabilities-macos). Nothing can
+be reused from the source apps: a profile belongs to one bundle identifier, glassDT shipped no embedded
+profile, and AudioPaper uses no iCloud. Xcode's automatic signing makes the Developer ID profiles at
+export. **The owner's library can move to production, and he wants it to:** the Mac and iOS team
+profiles allow `com.apple.developer.icloud-container-environment` Production as well as Development.
+Each sync reads the whole zone, and `GlassCatalogMerge.reconcile` uploads a host the account lacks, so
+the first device to sync against the empty production zone uploads its library, tombstones included,
+and the others converge by record ID. The zone holds one record type, `Host` (fields `profile`, an
+encoded `HostProfile`, and `updatedAt`), which must be deployed to production in CloudKit Console
+first. Key-value storage and iCloud Keychain have no environments, so settings, favorites and
+credentials are unaffected. The update downloads go on GitHub Releases (the owner, 2026-10-18), which
+needs the repository to exist and be public; on 2026-10-18 it did not exist.
 
 ## D39 — Documentation and glasspowertools.com — Approved 2026-09-25
 
