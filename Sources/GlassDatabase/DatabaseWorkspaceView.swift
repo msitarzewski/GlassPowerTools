@@ -218,7 +218,10 @@ struct DatabaseWorkspaceView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     #if os(iOS)
-    @Environment(DatabaseIOSRouter.self) private var iOSRouter
+    /// Optional: only the library's window supplies it, for a phone's workspace shown in place. An
+    /// iPad opens the workspace in a window of its own, which has none and needs none; reading it
+    /// as required stopped the app there (2026-10-18, `DatabaseOnIPadUITests`).
+    @Environment(DatabaseIOSRouter.self) private var iOSRouter: DatabaseIOSRouter?
     #endif
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var appliedInitialSidebarVisibility = false
@@ -678,7 +681,7 @@ struct DatabaseWorkspaceView: View {
         let route = DatabaseWorkspaceConnectionsRoute.resolve(
             isPhone: UIDevice.current.userInterfaceIdiom == .phone
         )
-        if route == .inAppRouter {
+        if route == .inAppRouter, let iOSRouter {
             iOSRouter.showConnections()
             return
         }

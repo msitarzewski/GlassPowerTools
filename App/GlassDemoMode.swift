@@ -22,6 +22,7 @@ import GlassDatabase
 import GlassDesktop
 import GlassShell
 import GlassConnectionKit
+import SQLite3
 
 /// Runs the demo from the library's window; with `--demo-close-connections`, closes that window
 /// once the surface has opened, so the picture shows the surface alone, with the room or the
@@ -44,6 +45,21 @@ struct GlassDemoModeTask: ViewModifier {
 @MainActor
 enum GlassDemoMode {
     private static var didRun = false
+
+    /// The made-up shop's database in the app's Documents. `Tools/Screenshots/shoot.sh` puts the full
+    /// one there (`make-demo-db.py`). A UI test cannot reach the app's container, so when the file is
+    /// missing a one-table stand-in is made in its place.
+    static var shopDatabase: URL {
+        let url = URL.documentsDirectory.appending(path: "demo-shop.sqlite")
+        guard !FileManager.default.fileExists(atPath: url.path) else { return url }
+        var handle: OpaquePointer?
+        if sqlite3_open_v2(url.path, &handle, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nil) == SQLITE_OK {
+            sqlite3_exec(handle, "CREATE TABLE orders (id INTEGER PRIMARY KEY, customer TEXT, total REAL);"
+                         + "INSERT INTO orders (customer, total) VALUES ('Ann', 42.5), ('Ben', 17.0);", nil, nil, nil)
+        }
+        sqlite3_close(handle)
+        return url
+    }
 
     /// `--demo-close-connections`, in a demo run.
     static var closesConnections: Bool {
@@ -125,7 +141,7 @@ enum GlassDemoMode {
             // every run: the editor in front.
             terminal.requestDemoScreen(name: "alpha", draw: GlassDemoBtop.screen(rows:columns:))
             try? await Task.sleep(for: .seconds(3))
-            database.requestDemoDatabase(file: URL.documentsDirectory.appending(path: "demo-shop.sqlite"), name: "shop",
+            database.requestDemoDatabase(file: GlassDemoMode.shopDatabase, name: "shop",
                                          showsDiagram: false)
             try? await Task.sleep(for: .seconds(3))
             let renderer = ImageRenderer(content: DemoRemoteScreen())
@@ -262,11 +278,11 @@ enum GlassDemoMode {
             terminal.requestDemoFiles(name: "alpha", path: "/home/ann/shop")
         case "database", "diagram":
             // Put there by Tools/Screenshots/shoot.sh, from make-demo-db.py.
-            database.requestDemoDatabase(file: URL.documentsDirectory.appending(path: "demo-shop.sqlite"), name: "shop",
+            database.requestDemoDatabase(file: GlassDemoMode.shopDatabase, name: "shop",
                                          showsDiagram: surface == "diagram")
         case "database-server", "database-main":
             // W32: the server's overview, or the `main` database's, for their titles and tiles.
-            database.requestDemoDatabase(file: URL.documentsDirectory.appending(path: "demo-shop.sqlite"), name: "shop",
+            database.requestDemoDatabase(file: GlassDemoMode.shopDatabase, name: "shop",
                                          start: surface == "database-server" ? .server : .database)
         case "editor-project":
             // W32: the shop's repository open with no file in front, for its overview page.
@@ -280,7 +296,7 @@ enum GlassDemoMode {
             if let window = editor.openProject(root) { editor.present(window) }
         case "database-window", "database-settings":
             // A database window with settings of its own (W24), and This Window open over it.
-            database.requestDemoDatabase(file: URL.documentsDirectory.appending(path: "demo-shop.sqlite"), name: "shop",
+            database.requestDemoDatabase(file: GlassDemoMode.shopDatabase, name: "shop",
                                          windowSettings: GlassDatabaseRuntime.demoWindowSettings,
                                          opensSettings: surface == "database-settings")
         case "desktop", "desktop-window", "desktop-settings":

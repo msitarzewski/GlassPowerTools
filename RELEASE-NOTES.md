@@ -2,8 +2,9 @@
 
 Glass Power Tools has not had a public release yet. These notes say what the first release holds and
 what changed in the builds leading up to it, and are kept current as the work lands. Builds before
-the release are numbered 0.4.*n* and run on the maintainer's own Mac, iPhone and Vision Pro; there is
-no download or TestFlight build yet. What is verified, and how, is in
+the release are numbered 0.4.*n* and run on the maintainer's own Mac, iPhone and Vision Pro; from
+0.4.479 they also go to TestFlight for internal testing. There is no public download yet; the first
+App Store release will be 1.0. What is verified, and how, is in
 [memory-bank/progress.md](memory-bank/progress.md).
 
 ## The first release (not yet released)
@@ -69,6 +70,14 @@ no download or TestFlight build yet. What is verified, and how, is in
   "Known and open" in [progress.md](memory-bank/progress.md).
 
 ## Recent builds
+
+### 0.4.480 (18 October 2026)
+- **On iPad, opening a database no longer stops the app.** The database's window, which an iPad
+  opens on its own, required something only the library's window has. Found while making the App
+  Store's pictures. iPhone, Mac and Vision Pro were not affected.
+- **The app has a privacy manifest**, which Apple requires: it collects nothing and tracks no one, and
+  it gives Apple's reason for each API it uses from Apple's list (settings, file dates, free space,
+  and the time since the device started).
 
 ### 0.4.479 (18 October 2026)
 - **About is the last page of Settings**, after Editor, on every device. It sat between Privacy and
