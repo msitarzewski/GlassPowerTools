@@ -1,0 +1,43 @@
+Terminals, databases, remote desktops and an editor for every machine you work on, in one app built for Apple Vision Pro, iPad and iPhone.
+
+Add a machine once. Its address lives on the host, and each way in is a service: a terminal over SSH, a database, a remote desktop. Connect opens the one you choose, or all of them. Change the address, and every service follows.
+
+VISION PRO FIRST
+Each session is a window you place around you, so a server's terminal, its database and its desktop can sit side by side in your room. Every window is glass: Opacity sets how much colour is painted, and Glass how much the room is frosted behind it. A window you aren't using can shrink into a small glass orb, with its session live inside, until you pinch it back. A database's tables and keys can stand in the room as a diagram in three dimensions.
+
+TERMINAL
+• SSH with host keys you confirm, and a stop if a key ever changes
+• Password and key sign-in, including keys made in the Secure Enclave
+• Tabs, a grid or a carousel of terminals, themes and workgroups
+• Port forwarding and an SFTP file browser
+• Keep Sessions Running with tmux: a dropped connection, a closed window or a quit app leaves the work running, and Active picks the session up on another device
+
+DATABASES
+• MySQL, PostgreSQL and SQLite
+• Browse, filter and edit rows, follow foreign keys, write and explain queries
+• A live diagram of every table and key
+• Connect directly with TLS, through the machine's SSH connection, or through another machine
+• Mark a database read-only
+• Ask the on-device assistant for a query, on devices with Apple Intelligence
+
+REMOTE DESKTOPS
+• RDP and VNC, including the Mac's own Screen Sharing, encrypted once you sign in with a Mac account
+• The remote resolution follows your window
+• Image quality that adapts to the connection, audio, and a shared clipboard
+
+EDITOR
+• Files on this device or on a server, and projects with a file tree
+• Syntax highlighting for fifteen languages
+• Previews for Markdown (with Mermaid diagrams), HTML, SVG and CSV
+• Pictures, PDFs, video, audio and 3D models open as themselves
+
+EVERYWHERE YOU ARE
+• Your library, favorites, workgroups and projects sync through iCloud, and passwords and keys through iCloud Keychain. Keys made in the Secure Enclave never leave their device.
+• Active lists every open session on every device
+• Widgets, Siri and Shortcuts, Spotlight and Handoff, and Controls on iPhone and iPad
+
+PRIVATE BY DESIGN
+No account, no analytics, no tracking. The app connects to the machines you add and to iCloud, and to Tailscale only if you connect a Tailscale account to find your devices. No server of ours sits between you and your machines.
+
+FREE AND OPEN SOURCE
+Glass Power Tools is free, and its source is public under the GPLv3 at github.com/msitarzewski/GlassPowerTools. Made by Michael Sitarzewski.

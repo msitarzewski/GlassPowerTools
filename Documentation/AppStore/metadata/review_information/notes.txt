@@ -1,0 +1,16 @@
+Thank you for reviewing Glass Power Tools.
+
+The app needs no account and has no sign-in. It connects to machines the user adds: SSH servers, MySQL and PostgreSQL databases, and RDP and VNC remote desktops. Two parts work with no server at all:
+
+1. The editor: in the library, open Projects, choose the plus button, then New Document, and type. Open… opens files from the Files app.
+2. SQLite: choose Add Host (+), give it any name, add a Database service, choose SQLite as the Engine, then Choose SQLite File and pick a .sqlite file.
+
+To try the terminal, a database server or a remote desktop, add a host with the address of an SSH, MySQL, PostgreSQL, RDP or VNC server you can reach, and choose Connect. The first SSH connection asks you to confirm the server's host key.
+
+On Apple Vision Pro, each session opens in its own window. Settings ▸ Appearance sets how see-through the windows are (Opacity and Glass).
+
+Encryption: SSH, TLS (BoringSSL, through SwiftNIO SSL) and the session encryption of Apple's Screen Sharing protocol. All are standard published algorithms; there is no proprietary encryption.
+
+Privacy: the app collects no data and has no analytics or tracking. The library syncs through the user's private iCloud database, and passwords and keys through iCloud Keychain.
+
+The source is public under the GPLv3: https://github.com/msitarzewski/GlassPowerTools

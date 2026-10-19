@@ -14,7 +14,8 @@ Sources, all in site/:
                  release script).
 - layout.html    the one page shell.
 
-SECURITY.md is rendered from the repository root, so the site cannot disagree with it.
+SECURITY.md, PRIVACY.md and SUPPORT.md are rendered from the repository root, so the site cannot disagree
+with them. The App Store listing links to the privacy and support pages.
 
 The build fails, and writes nothing, if a registry entry has no page or a page no entry, if an internal
 link or anchor does not resolve, or if an IPv4 address outside the ranges reserved for documentation
@@ -40,9 +41,11 @@ REPO = "https://github.com/msitarzewski/GlassPowerTools"
 NAV = [("index.html", "Overview"), ("why.html", "Why"), ("help/index.html", "Help"),
        ("security.html", "Security")]
 FOOTER = [("terminal.html", "Terminal"), ("databases.html", "Databases"), ("desktops.html", "Remote desktops"),
-          ("editor.html", "Editor"), ("security.html", "Security"), ("help/index.html", "Help"),
-          (REPO, "Source")]
-MARKDOWN = {"SECURITY.md": ("security.html", "Security", "How Glass Power Tools protects credentials and connections, what it does not protect, and how to report a problem.")}
+          ("editor.html", "Editor"), ("security.html", "Security"), ("privacy.html", "Privacy"),
+          ("support.html", "Support"), ("help/index.html", "Help"), (REPO, "Source")]
+MARKDOWN = {"SECURITY.md": ("security.html", "Security", "How Glass Power Tools protects credentials and connections, what it does not protect, and how to report a problem."),
+            "PRIVACY.md": ("privacy.html", "Privacy", "Glass Power Tools collects nothing: what the app keeps and where, and everything it sends and to whom."),
+            "SUPPORT.md": ("support.html", "Support", "Where to find answers about Glass Power Tools, and how to ask a question or report a problem.")}
 DOCUMENTATION_RANGES = ("192.0.2.", "198.51.100.", "203.0.113.", "127.0.0.1", "0.0.0.0", "255.255.255.")
 
 errors = []
@@ -247,7 +250,10 @@ def main():
         outputs.append((output, title, meta.get("description", "")))
     for source, (output, title, description) in MARKDOWN.items():
         body = pandoc((ROOT / source).read_text())
-        body = re.sub(r'href="(?!https?:|#|mailto:)([^"]+)"', lambda m: f'href="{REPO}/blob/main/{m.group(1)}"', body)
+        # A link to another rendered file stays on the site; any other goes to the file in the repository.
+        body = re.sub(r'href="(?!https?:|#|mailto:)([^"]+)"',
+                      lambda m: f'href="{MARKDOWN[m.group(1)][0] if m.group(1) in MARKDOWN else f"{REPO}/blob/main/{m.group(1)}"}"',
+                      body)
         render(layout, output, title=f"{title} · Glass Power Tools", description=description,
                body=f'<main class="page doc prose" id="content" style="max-width:760px">{body}</main>')
         outputs.append((output, title, description))

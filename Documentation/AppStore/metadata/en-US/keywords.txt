@@ -1,0 +1,1 @@
+terminal,sftp,rdp,vnc,mysql,postgresql,sqlite,tmux,server,sysadmin,devops,linux,shell,editor,client

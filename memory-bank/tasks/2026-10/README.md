@@ -142,3 +142,5 @@
   on Vision Pro and the Mac, the Mac's four at once, Active's tmux sessions and a workgroup, btop in every terminal; the
   Vision Pro terminal above the fold. How, and what didn't work: `techContext.md`, "The macOS screenshot VM";
   `progress.md`. A crash in database windows found in the VM, fixed in 0.4.476 (5c567dd), on all three devices.
+- 2026-10-18 (evening): the App Store listing begun — text, answers, privacy and support pages, the app's privacy
+  manifest, store screenshots ([`2026-10-18_app-store-listing.md`](2026-10-18_app-store-listing.md)).
