@@ -1,13 +1,13 @@
 # Release notes
 
-The Mac app's first release was 0.4.491, and the latest is 0.4.493 (both 20 October 2026): a download from
+The Mac app's first release was 0.4.491, and the latest is 0.4.494 (both 20 October 2026): a download from
 [glasspowertools.com](https://glasspowertools.com), signed with a Developer ID, notarized by Apple, and
 updated through Sparkle. iPhone, iPad and Vision Pro builds go to TestFlight for internal testing; their
 first App Store release will be 1.0, and the Mac will be 1.0 then too. Builds are numbered 0.4.*n* until
 then. These notes say what the app holds and what changed in each build, and are kept current as the
 work lands. What is verified, and how, is in [memory-bank/progress.md](memory-bank/progress.md).
 
-## What it holds (0.4.493)
+## What it holds (0.4.494)
 
 ### One library of machines
 - Every machine you work on, once, with its services — Terminal, Database, Desktop — and Connect
@@ -86,16 +86,17 @@ work lands. What is verified, and how, is in [memory-bank/progress.md](memory-ba
 
 ## Recent builds
 
-### 0.4.492 – 0.4.493 (20 October 2026)
-- **0.4.493 is the Mac's second release**, through Sparkle, and TestFlight build 493.
+### 0.4.492 – 0.4.494 (20 October 2026)
+- **0.4.494 is the Mac's second release**, through Sparkle, and TestFlight build 494.
 - **Scale Text on the Mac's own terminals**, tmux tabs included. A local tab ignored Scale Text: the
   view that draws it never had the part that keeps the rows and columns. Now the bar's Scale Text and
   ⌘+, ⌘− and ⌘0 work there as on a terminal on another machine.
-- **A terminal's folder button has a menu on the Mac**, an arrow beside it as **+** has: **Open in
-  Finder** (or **Open in Files** on another machine) and **Open in Editor**. Open in Editor opens the
-  project on that machine whose folder is the shell's, or holds it; otherwise the folder, in a new
-  Editor window on this Mac or as a project on another machine. The pinch-and-hold menu Vision Pro has
-  was meant as a right-click on the Mac, which a Mac toolbar never shows.
+- **Open Folder in Editor** in a Mac terminal's tools menu, the Mac's own terminals included (before,
+  only on other machines'). It opens the project on that machine whose folder is the shell's, or holds
+  it; otherwise the folder, in a new Editor window on this Mac or as a project on another machine.
+  Vision Pro's pinch and hold on the folder button does the same.
+- **A local terminal's tools menu no longer repeats the toolbar**: Connections, AI Assistant, Open
+  Folder Here, Focus Mode and Scale Text are the buttons beside it.
 - **Not signed in to iCloud says so.** A Mac without an Apple Account showed "iCloud sync failed" and
   CloudKit's own words; the library now says iCloud is unavailable and to sign in.
 

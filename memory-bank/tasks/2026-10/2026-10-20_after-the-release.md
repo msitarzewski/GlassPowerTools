@@ -38,6 +38,21 @@ this?"), and the signed-out iCloud wording seen running the release in the VM.
     tests are deleted. iPad and Vision Pro keep `.contextMenu` (pinch and hold).
   - **In the VM:** the folder is its own capsule with an arrow, as **+** is; the arrow's menu and Open in Editor
     worked.
+  - **His question:** "would this method show inline with the other toolbar options vs break them all apart?" No:
+    - **In a bare probe window** a hidden-arrow menu sits inline.
+    - **In our window's toolbar** any SwiftUI menu on the folder gets its own capsule, arrow or not. Probes ruled out
+      the toggle, the gear menu, the priorities, the menu's modifiers, a child view, the item id, default placement,
+      the title and `sharedBackgroundVisibility`.
+  - **0.4.494, his choice** ("Inline button + gear menu", and "remove the duplicate items in the menu that exist in the
+    toolbar too … leave the toolbar icons … verify cross platform"):
+    - **Folder:** a plain button again, inline.
+    - **Open Folder in Editor:** in the gear menu, local (new) and SSH (it was there, now with the project rule).
+    - **The local gear menu** drops Connections, AI Assistant, Open Folder Here, Focus Mode and Scale Text.
+    - **Other platforms:**
+      - The SSH Session menu repeats nothing in its bar on any platform.
+      - On iPhone the bar is one Tools menu.
+      - Vision Pro and iPad keep pinch and hold on the folder.
+    - **VM:** one capsule; the gear menu has no repeats; Open Folder in Editor opened the editor.
 - **iCloud:** `GlassCatalogSyncStatus.after(_:)` turns CloudKit's errors into a status:
   - `.notAuthenticated`, `.accountTemporarilyUnavailable` and `.managedAccountRestricted` become `.unavailable`,
     in words that say what to do;

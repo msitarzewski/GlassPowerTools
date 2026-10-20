@@ -42,8 +42,9 @@ use the disposable test VM only).
 - **0.4.492, built at his word** ("fix that, and also allow a right on the folder icon…";
   `2026-10-20_after-the-release.md`):
   - Scale Text on local tabs.
-  - The folder button's Open in Editor (the machine's project that holds the folder, else a new editor). On the Mac
-    it's a split button with an arrow, as **+** is (his choice, 0.4.493). A Mac toolbar never shows `.contextMenu`.
+  - Open Folder in Editor (the machine's project that holds the folder, else a new editor). On the Mac it's in the gear
+    menu, beside a plain folder button that stays inline; any menu on the button splits the bar. The local gear menu
+    no longer repeats the toolbar (0.4.494, his choice).
   - iCloud's signed-out words.
   - Uncommitted. Releasing it and deploying its docs wait for his word.
 

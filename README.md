@@ -21,7 +21,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/licence-GPLv3-c8102e" alt="Licence: GPLv3"></a>
   <img src="https://img.shields.io/badge/runs%20on-Vision%20Pro%20%7C%20Mac%20%7C%20iPad%20%7C%20iPhone-555" alt="Runs on Vision Pro, Mac, iPad and iPhone">
-  <a href="https://github.com/msitarzewski/GlassPowerTools/releases"><img src="https://img.shields.io/badge/Mac-0.4.493-2e7d32" alt="Mac: 0.4.493"></a>
+  <a href="https://github.com/msitarzewski/GlassPowerTools/releases"><img src="https://img.shields.io/badge/Mac-0.4.494-2e7d32" alt="Mac: 0.4.494"></a>
   <a href="https://github.com/sponsors/msitarzewski"><img src="https://img.shields.io/badge/sponsor-GitHub%20Sponsors-ea4aaa?logo=githubsponsors&logoColor=white" alt="Sponsor on GitHub"></a>
 </p>
 
@@ -242,7 +242,7 @@ claims on the website were checked against the code and its test records.
 
 ## Status
 
-The Mac app is at 0.4.493 (its first release was 0.4.491): download it from
+The Mac app is at 0.4.494 (its first release was 0.4.491): download it from
 [glasspowertools.com](https://glasspowertools.com) or this repository's
 [releases](https://github.com/msitarzewski/GlassPowerTools/releases). It is signed with a Developer ID,
 notarized by Apple, and updates itself through Sparkle. It cannot be in the Mac App Store, because a

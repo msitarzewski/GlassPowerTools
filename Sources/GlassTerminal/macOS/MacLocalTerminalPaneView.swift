@@ -200,13 +200,10 @@ struct MacLocalTerminalPaneView: View {
                         .help("AI Assistant")
                     }
 
-                    // Click: Finder. The arrow beside it: Finder or the Editor (2026-10-20, the owner:
-                    // "a regular drop down like … new terminal"), as + has New Terminal's others.
-                    Menu {
-                        workingFolderActions
-                    } label: {
-                        Label("Open Folder Here", systemImage: "folder")
-                    } primaryAction: {
+                    // A button, not a menu: a menu here gets a capsule of its own and splits the bar
+                    // (2026-10-20, seen in the VM, arrow or not). Open Folder in Editor is in the
+                    // tools menu (the owner: "inline button + gear menu").
+                    Button("Open Folder Here", systemImage: "folder") {
                         openFolderHere()
                     }
                     .labelStyle(.iconOnly)
@@ -406,36 +403,20 @@ struct MacLocalTerminalPaneView: View {
     }
 
     private var localToolsMenu: some View {
+        // What the toolbar doesn't already have (2026-10-20, the owner: "remove the duplicate items
+        // in the menu that exist in the toolbar too"): Connections, AI Assistant, Open Folder Here,
+        // Focus Mode and Scale Text are buttons beside it. In an SSH terminal's menu's order.
         Menu {
-            Button("Connections", systemImage: "server.rack") {
-                openWindow(id: "main")
-            }
-            if aiAssistant.isAvailable {
-                Button("AI Assistant", systemImage: "sparkles") {
-                    presentAIAssistant()
-                }
-                .disabled(!processState.isRunning)
-            }
-            Button("Open Folder Here", systemImage: "folder") {
-                openFolderHere()
-            }
-            .disabled(!canOpenFolder)
-            Button(
-                isLocalFullScreen ? "Exit Focus Mode" : "Focus Mode",
-                systemImage: isLocalFullScreen ? "moon.fill" : "moon"
-            ) {
-                processState.toggleFullScreen()
-            }
-            if let scalesBinding {
-                TerminalScaleToggle(scales: scalesBinding, inMenu: true)
-            }
-
-            Divider()
-
             Button("Search", systemImage: "magnifyingglass") { presentSearch() }
             Button("Clear", systemImage: "trash") {
                 processState.clearDisplay()
                 restoreTerminalFocus()
+            }
+            if openFolderInEditor != nil {
+                Button("Open Folder in Editor", systemImage: "chevron.left.forwardslash.chevron.right") {
+                    openShellFolderInEditor()
+                }
+                .disabled(!canOpenFolder)
             }
             #if DEBUG
             Button("HTML Preview", systemImage: "safari") {
@@ -665,20 +646,15 @@ struct MacLocalTerminalPaneView: View {
         return { open(nil, $0) }
     }
 
-    /// The folder button's menu.
-    @ViewBuilder
-    private var workingFolderActions: some View {
-        Button("Open in Finder", systemImage: "folder") { openFolderHere() }
-        if let openFolderInEditor {
-            Button("Open in Editor", systemImage: "chevron.left.forwardslash.chevron.right") {
-                Task {
-                    // The folder as Open Folder Here finds it, and its problems said the same way.
-                    let folder = await resolveShellFolder()
-                    folderProblem = MacLocalShellFolder.open(folder) { url in
-                        openFolderInEditor(url.path(percentEncoded: false))
-                        return true
-                    }
-                }
+    /// The shell's folder in the editor, found as Open Folder Here finds it, its problems said the
+    /// same way.
+    private func openShellFolderInEditor() {
+        guard let openFolderInEditor else { return }
+        Task {
+            let folder = await resolveShellFolder()
+            folderProblem = MacLocalShellFolder.open(folder) { url in
+                openFolderInEditor(url.path(percentEncoded: false))
+                return true
             }
         }
     }

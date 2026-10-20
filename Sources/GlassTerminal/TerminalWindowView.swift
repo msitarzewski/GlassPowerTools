@@ -601,7 +601,7 @@ struct TerminalWindowView: View {
     }
 
     /// What a pinch and hold on the folder button offers (owner, 2026-10-09: "an Open in Editor
-    /// option on pinch and hold on the folder icon"), and on a Mac its menu.
+    /// option on pinch and hold on the folder icon").
     @ViewBuilder
     private var workingFolderActions: some View {
         Button("Open in Files", systemImage: "folder") { withWorkingFolder(openFolderHere) }
@@ -1635,28 +1635,17 @@ struct TerminalWindowView: View {
             // In tmux the reported directory is stale, so the button is always there and the
             // directory is asked of tmux when it is pressed.
             if canOpenWorkingFolder {
-                Group {
-                #if os(macOS)
-                    // Click: Files. The arrow beside it: Files or the Editor, as + has its others
-                    // (2026-10-20). A Mac toolbar never shows a `.contextMenu`: the right-click this had
-                    // since 2026-10-09 got the toolbar's own Icon and Text menu.
-                    Menu {
-                        workingFolderActions
-                    } label: {
-                        Image(systemName: "folder")
-                    } primaryAction: {
-                        withWorkingFolder(openFolderHere)
-                    }
-                #else
-                    Button {
-                        withWorkingFolder(openFolderHere)
-                    } label: {
-                        Image(systemName: "folder")
-                    }
-                    // Pinch and hold: the same folder in the editor instead.
-                    .contextMenu { workingFolderActions }
-                #endif
+                Button {
+                    withWorkingFolder(openFolderHere)
+                } label: {
+                    Image(systemName: "folder")
                 }
+                #if !os(macOS)
+                // Pinch and hold: the same folder in the editor instead. Not on a Mac, whose
+                // toolbar never shows a `.contextMenu` (2026-10-20): there it is the Session
+                // menu's Open Folder in Editor.
+                .contextMenu { workingFolderActions }
+                #endif
                 .accessibilityLabel("Open Folder Here")
                 .accessibilityIdentifier("terminal-open-folder-here")
                 .help(session.survivesClose ? "Open this shell's folder over SFTP" : "Open \(reportedFolder ?? "") over SFTP")
