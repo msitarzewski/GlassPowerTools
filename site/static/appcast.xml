@@ -6,6 +6,22 @@
     <description>Glass Power Tools for Mac updates</description>
     <language>en</language>
     <item>
+      <title>Glass Power Tools 0.4.494</title>
+      <pubDate>Tue, 20 Oct 2026 16:07:46 GMT</pubDate>
+      <sparkle:version>494</sparkle:version>
+      <sparkle:shortVersionString>0.4.494</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:fullReleaseNotesLink>https://github.com/msitarzewski/GlassPowerTools/releases/tag/v0.4.494</sparkle:fullReleaseNotesLink>
+      <description><![CDATA[<h2>0.4.494</h2>
+<ul>
+  <li>Scale Text works on this Mac's own terminals, tmux tabs included.</li>
+  <li>Open Folder in Editor, in a terminal's gear menu: the project that holds the shell's folder, or a new editor window.</li>
+  <li>A local terminal's gear menu no longer repeats the toolbar's buttons.</li>
+  <li>A Mac signed out of iCloud says so, and how to sign in, instead of "iCloud sync failed".</li>
+</ul>]]></description>
+      <enclosure url="https://github.com/msitarzewski/GlassPowerTools/releases/download/v0.4.494/GlassPowerTools-0.4.494.zip" length="27362168" type="application/octet-stream" sparkle:edSignature="nnOyxq9k+DQvfN8VFNXZLk76f/6FuNLTBECxve2HsEnMFL7jXGYbY4Is6sbgZpEDOj07XOa4z28iS1n45ZgwBw=="/>
+    </item>
+    <item>
       <title>Glass Power Tools 0.4.491</title>
       <pubDate>Tue, 20 Oct 2026 14:24:29 GMT</pubDate>
       <sparkle:version>491</sparkle:version>
