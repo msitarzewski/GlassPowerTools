@@ -18,6 +18,10 @@
 //  copied; a path is copied or watched — Watch Log File, a tab of its own following the file,
 //  where the host can make one (`SwiftTermHostModel.onWatchFile`).
 //
+//  On SQL (2026-10-20, `TerminalSQLDetector`), it starts with Open in SQL Editor: the statement
+//  under the pointer, selected so its extent shows, into a new query tab on the terminal's
+//  machine's database — a menu of them where it has several, as the owner asked.
+//
 
 #if !canImport(UIKit) && canImport(AppKit)
 import AppKit
@@ -27,11 +31,18 @@ import SwiftTerm
 enum MacTerminalContextMenu {
     /// The menu for a right-click or Control-click at `event`.
     static func menu(for view: TerminalView, event: NSEvent) -> NSMenu {
-        selectWordIfOutsideSelection(in: view, at: event.locationInWindow)
+        let model = (view as? MacTerminalModelHolding)?.hostModel
+        // SQL under the pointer is taken whole and shown selected, rather than the word there.
+        let sql = sqlStatement(in: view, at: event.locationInWindow, model: model)
+        if sql == nil { selectWordIfOutsideSelection(in: view, at: event.locationInWindow) }
         let selected = selectedText(of: view)
         let menu = NSMenu(title: "Terminal")
         // Each item's state is set here; SwiftTerm's own validation knows only its selectors.
         menu.autoenablesItems = false
+        if let sql, let model {
+            addSQLItems(sql, model: model, to: menu)
+            menu.addItem(.separator())
+        }
         if let target = link(in: view, at: event.locationInWindow) {
             // Quick Look first on a path, as Finder's menu has it (2026-10-16): the file, over the
             // terminal, whatever the window's Show previews says.
@@ -85,6 +96,53 @@ enum MacTerminalContextMenu {
         for action in TerminalLinkLookup.actions(for: target, model: model, copy: { copy($0, to: copyPasteboard) }) {
             menu.addItem(item(action.title, symbol: action.symbol) { action.perform() })
         }
+    }
+
+    // MARK: SQL (2026-10-20)
+
+    /// The SQL a right-click at `windowPoint` is on: the selection, when it was clicked inside and
+    /// is SQL; else the statement on the clicked row, which is then selected to show what will be
+    /// taken. Nil where the terminal can't open SQL anywhere, or what is there isn't SQL.
+    static func sqlStatement(in view: TerminalView, at windowPoint: NSPoint, model: SwiftTermHostModel?) -> String? {
+        guard model?.sqlDestinations != nil, let position = position(in: view, at: windowPoint) else { return nil }
+        let selection = view.selection!
+        if selection.active, contains(start: selection.start, end: selection.end, position) {
+            return selectedText(of: view).flatMap(TerminalSQLDetector.selection)
+        }
+        let terminal = view.getTerminal()
+        guard let statement = TerminalSQLDetector.statement(around: position.row, in: terminal) else { return nil }
+        selection.setSelection(start: Position(col: 0, row: statement.firstRow),
+                               end: Position(col: max(0, terminal.cols - 1), row: statement.lastRow))
+        return statement.text
+    }
+
+    /// Open in SQL Editor: on the one database the terminal's machine has, or a menu of them; dimmed,
+    /// saying why, where it has none.
+    static func addSQLItems(_ sql: String, model: SwiftTermHostModel, to menu: NSMenu) {
+        let title = "Open in SQL Editor"
+        let destinations = model.sqlDestinations?() ?? []
+        guard let only = destinations.first else {
+            let none = item(title, symbol: "tablecells", enabled: false) {}
+            none.subtitle = "No database on this machine"
+            menu.addItem(none)
+            return
+        }
+        let open = model.onOpenSQL
+        guard destinations.count > 1 else {
+            let single = item(title, symbol: "tablecells") { open?(sql, only.id) }
+            single.subtitle = only.title
+            menu.addItem(single)
+            return
+        }
+        let parent = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        parent.image = NSImage(systemSymbolName: "tablecells", accessibilityDescription: nil)
+        let submenu = NSMenu(title: title)
+        submenu.autoenablesItems = false
+        for destination in destinations {
+            submenu.addItem(item(destination.title) { open?(sql, destination.id) })
+        }
+        parent.submenu = submenu
+        menu.addItem(parent)
     }
 
     // MARK: Select All over tmux's history

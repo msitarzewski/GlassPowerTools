@@ -138,6 +138,9 @@ struct TerminalOverridesSettingsView: View {
                 }
             }
 
+            // What the window shows behind its text, and the text's palette and glow (D84).
+            TerminalLooksSettingsView(settings: $settings)
+
             Section("Cursor") {
                 GlassWindowSettingRow(TerminalWindowSettings.cursorStyle, overrides: $settings,
                                       global: global.cursorStyle, inheritsFrom: Source.allTerminals) { value in

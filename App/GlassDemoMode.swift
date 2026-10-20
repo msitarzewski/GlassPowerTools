@@ -117,6 +117,19 @@ enum GlassDemoMode {
             scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight)) { _ in }
         }
         #endif
+        // `--demo-look <look>` and `--demo-picture <file>` (D84): the terminal window's look — one of
+        // This Window's Start From looks (`digitalRain`, `synthwave`, `amberPhosphor`,
+        // `greenPhosphor`) — and a picture behind its text; `--demo-look-settings` opens This
+        // Window over a `terminal`.
+        let demoLook: GlassWindowOverrides = {
+            let look = arguments.firstIndex(of: "--demo-look").flatMap {
+                arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil
+            }
+            let picture = arguments.firstIndex(of: "--demo-picture").flatMap {
+                arguments.indices.contains($0 + 1) ? URL(fileURLWithPath: arguments[$0 + 1]) : nil
+            }
+            return GlassTerminalRuntime.demoLookSettings(look: look, picture: picture)
+        }()
         switch surface {
         case "editor", "preview", "preview-only":
             // `preview-only`: the README's preview alone, without the text beside it.
@@ -130,11 +143,12 @@ enum GlassDemoMode {
             await openEditor(editor, preview: false, windowSettings: GlassEditorRuntime.demoWindowSettings,
                              opensSettings: surface == "editor-settings")
         case "terminal":
-            terminal.requestDemoReplay(name: "alpha", output: Data(terminalTranscript.utf8))
+            terminal.requestDemoReplay(name: "alpha", output: Data(terminalTranscript.utf8), windowSettings: demoLook,
+                                       opensSettings: arguments.contains("--demo-look-settings"))
         case "btop":
             // The website's terminal (the owner, 2026-10-18: "run btop or something for the
             // terminal examples"): a btop-style monitor of the made-up shop (GlassDemoBtop.swift).
-            terminal.requestDemoScreen(name: "alpha", draw: GlassDemoBtop.screen(rows:columns:))
+            terminal.requestDemoScreen(name: "alpha", draw: GlassDemoBtop.screen(rows:columns:), windowSettings: demoLook)
         case "workspace":
             // Why the app was built (the owner, 2026-10-18: "close the connections window so users
             // can see why this was built"): a terminal, a database, a remote desktop and the editor,
@@ -245,7 +259,7 @@ enum GlassDemoMode {
             // Folder Here is in the bar as it is on a real shell.
             terminal.requestDemoTabs(names: ["alpha", "bravo"],
                                      output: Data(("\u{1B}]7;/home/ann/shop\u{07}" + terminalTranscript).utf8),
-                                     grid: surface == "terminal-grid")
+                                     grid: surface == "terminal-grid", windowSettings: demoLook)
         case "connections-host":
             // The Connections window at its first size with a machine's details showing (W29).
             while !shell.isLoaded { try? await Task.sleep(for: .milliseconds(100)) }
@@ -318,7 +332,7 @@ enum GlassDemoMode {
             // All Windows (2026-10-14): a window of three terminals as tabs, a desktop and an
             // editor, then All Windows over them, laid out as the Mac's, a card per tab.
             terminal.requestDemoTabs(names: ["alpha", "bravo", "charlie"],
-                                     output: Data(terminalTranscript.utf8), grid: false)
+                                     output: Data(terminalTranscript.utf8), grid: false, windowSettings: demoLook)
             let renderer = ImageRenderer(content: DemoRemoteScreen())
             renderer.scale = 1
             if let picture = renderer.cgImage {

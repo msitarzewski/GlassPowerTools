@@ -31,7 +31,24 @@ use the disposable test VM only).
 | 8 | History rewrite, then the first push | only on the owner's word. Scanned 2026-10-18: today's tree is clean (one test fixed, de0610d); old file versions, the session log once committed and about 20 commit messages hold private details (the specifics are in `.private/`, never committed). Then, at his word, main became the checked rewrite (history kept, private values replaced, cited commit ids translated; 799 commits). The original history is archived outside the repository, a pre-push hook refuses anything descending from it, and `origin` pushes main only (details in `.private/`). **Pushed 2026-10-18:** github.com/msitarzewski/GlassPowerTools is public, main only; README, description, website and private vulnerability reporting set; the site says the source is public. Further pushes still on his word |
 | 9 | App Store listing (iPhone, iPad, Vision Pro) | started 2026-10-18 at his word ("free, start now"): the listing's text and App Store Connect answers in `Documentation/AppStore/`, `PRIVACY.md` and `SUPPORT.md` rendered by the site build, the app's privacy manifest (`App/PrivacyInfo.xcprivacy`, missing until now), and screenshots from `Tools/Screenshots/store_shots.sh`. Committed at his word; 0.4.480 to TestFlight (the iPad database fix and the manifest); the site staged. 1.0 when it ships, TestFlight stays 0.4.n. Accessibility audit approved and done (2026-10-18, five naming fixes; labels not yet declarable). The iPhone Duo checked on every page and six problems fixed; the largest text sizes fixed at his word (2026-10-19), then the terminal's 28-point maximum, text following the system size, and the iPad editor's wider file list (same day); a wrapped paste joined again (`2026-10-19_wrapped-paste.md`). All of these, the page tour, the framed-screenshot tools and D83 (tmux tabs as control-mode clients, `2026-10-19_tmux-scrollback.md`) committed at his word on 2026-10-19; 0.4.483 holds them. TestFlight next, on his word. Open for him: a demo server for App Review, the France encryption declaration, an App Store Connect API key (lets the listing, builds and TestFlight groups be set from here). Proposed, not started: translations (the app is English-only). Task note `tasks/2026-10/2026-10-18_app-store-listing.md` |
 
-## 2026-10-19 — RESUME HERE
+## 2026-10-20 — RESUME HERE
+
+**Committed at his word** ("update the memory bank, then commit what we have, And yes, build it"); not pushed. 0.4.487
+is on the Mac and iPhone; the Vision Pro has been unreachable since 0.4.481.
+- **Terminal looks (D84)**, an experiment he loved: backgrounds, phosphor palettes, glow, readability guard;
+  installed (`2026-10-20_terminal-looks.md`).
+- **SQL from a terminal (D85)**, Mac right-click into the query editor (`2026-10-20_sql-detector.md`).
+- **Tab tooltips:** each Mac tab row names its tmux session.
+- **Closing stays as it is:** closing a tmux tab detaches (his word: "Leave it exactly as it is today").
+- **Now building:** D86, This Mac recognising its own library record (`2026-10-20_this-mac-link.md`).
+- **Open:**
+  - the SQL round trip against a real database;
+  - the looks on iPhone, iPad and Vision Pro;
+  - iOS and visionOS terminal pictures without the look;
+  - the paste UI test;
+  - TestFlight for these builds, on his word.
+
+## 2026-10-19
 
 **Committed at his word** ("update the memory bank and commit"); not pushed. 0.4.483 is on the Mac and iPhone; the
 Vision Pro was unreachable and still has 0.4.481. Next, his: "I have a fun exploration next."
@@ -72,7 +89,7 @@ terminal examples". Asked which "78% transparency" meant, with a side-by-side: *
 
 **His ask:** "remove the gray line in database and desktop windows too - take a look at the AudioPaper site, and glass
 project, and autopaper and update this site to that aesthetic. screenshots and all using the new sandbox". (AutoPaper is
-`~/Clean/autopaper`; "the new sandbox" is Glass Project's headless macOS VM.) Done, committed:
+the owner's own site project; "the new sandbox" is Glass Project's headless macOS VM.) Done, committed:
 - **The gray line (929a183, 0.4.475):** the database window's sidebar edge as the terminal's; the desktop window's
   hairline (down its leading edge, as it has no sidebar) hidden. Tests fail without; the VM pictures show only the
   system glass sidebar's own rim, as in a terminal window (`techContext.md`, "The macOS screenshot VM").

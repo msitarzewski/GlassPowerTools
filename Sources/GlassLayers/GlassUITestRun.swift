@@ -18,12 +18,17 @@ public enum GlassUITestRun {
     /// only), else nil. Every caller gets the same suite for the same run, named after the App
     /// Group so it is recognisably this app's: `<group>.uitests.<uuid>`.
     public nonisolated static var defaults: UserDefaults? {
+        identifier.flatMap { UserDefaults(suiteName: suiteName(for: $0)) }
+    }
+
+    /// The run's identifier while a UI test drives the app (`--ui-testing <uuid>`, Debug only),
+    /// for a store that keeps files rather than settings to keep them apart too.
+    public nonisolated static var identifier: UUID? {
         #if DEBUG || GLASS_STRESS_HARNESS
         let arguments = ProcessInfo.processInfo.arguments
         guard let index = arguments.firstIndex(of: "--ui-testing"),
-              arguments.indices.contains(index + 1),
-              let identifier = UUID(uuidString: arguments[index + 1]) else { return nil }
-        return UserDefaults(suiteName: suiteName(for: identifier))
+              arguments.indices.contains(index + 1) else { return nil }
+        return UUID(uuidString: arguments[index + 1])
         #else
         return nil
         #endif

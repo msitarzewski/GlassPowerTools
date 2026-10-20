@@ -396,13 +396,16 @@ public final class SwiftTermHostModel: ObservableObject {
     /// (2026-10-07). Not published: the listener keeps its own state.
     public var onOutputActivity: (@MainActor () -> Void)?
     private var lastOutputActivity: ContinuousClock.Instant?
+    /// Whether output is arriving, for what draws behind the terminal (D84): observed on its own,
+    /// so only those views follow it, never the whole window as this model's published changes do.
+    public let outputActivity = SwiftTermOutputActivity()
 
     fileprivate func noteOutputActivity() {
-        guard let onOutputActivity else { return }
         let now = ContinuousClock.now
         if let last = lastOutputActivity, now - last < .milliseconds(250) { return }
         lastOutputActivity = now
-        onOutputActivity()
+        outputActivity.note(at: now)
+        onOutputActivity?()
     }
 
     /// The title the remote shell or program set (OSC 0/2): "user@host: ~/src" from Ubuntu's
@@ -441,6 +444,11 @@ public final class SwiftTermHostModel: ObservableObject {
     public var previewFile: (@MainActor (String) async -> TerminalPreviewFile?)?
     /// What a file looks like in that preview: the editor's preview, from the composition root.
     public var previewContent: (@MainActor (URL) -> AnyView)?
+    /// The databases SQL this terminal shows can open in (2026-10-20): its machine's, by the window
+    /// that knows the machine; nil where the menu can't offer it, which leaves Open in SQL Editor out.
+    public var sqlDestinations: (@MainActor () -> [SwiftTermSQLDestination])?
+    /// Open in SQL Editor: the statement, and the database chosen from `sqlDestinations`.
+    public var onOpenSQL: (@MainActor (_ sql: String, _ destination: UUID) -> Void)?
     @Published public private(set) var scrollPosition: Double = 1
     @Published public private(set) var pendingPasteReview: SwiftTermPasteReview?
     /// A paste rewritten before it is weighed, or nil to leave it: the terminal's settings join the
@@ -696,6 +704,13 @@ public final class SwiftTermHostModel: ObservableObject {
     }
 
     #if os(macOS)
+    /// The size, in points, of what `previewImage` pictures: the terminal as it is on screen, so a
+    /// preview can draw what surrounds it (D84's backdrop and glow) at the picture's scale.
+    public var previewSourceSize: CGSize? {
+        guard let view = terminalEngine?.hostView, view.bounds.width > 0, view.bounds.height > 0 else { return nil }
+        return view.bounds.size
+    }
+
     /// An in-memory, bounded rendering of the existing viewport. Never reparents
     /// the terminal, changes its grid, starts a process, or acquires input focus.
     public func previewImage(maxPixelWidth: Int = 640) -> NSImage? {
@@ -1299,6 +1314,47 @@ public enum SwiftTermPastePolicy {
             data.append(bracketedPasteEnd)
         }
         return data
+    }
+}
+
+/// Whether a terminal's output is arriving (D84): true from a chunk until it has been quiet
+/// for `quiet`. Told at most four times a second (`noteOutputActivity`); changes only when it
+/// starts or stops, so a view observing it redraws twice per burst, not per chunk.
+@MainActor
+@Observable
+public final class SwiftTermOutputActivity {
+    public private(set) var isActive = false
+    @ObservationIgnored public var quiet: Duration = .milliseconds(1_200)
+    @ObservationIgnored private var lastOutput: ContinuousClock.Instant?
+    @ObservationIgnored private var watch: Task<Void, Never>?
+
+    public init() {}
+
+    public func note(at now: ContinuousClock.Instant = .now) {
+        lastOutput = now
+        if !isActive { isActive = true }
+        guard watch == nil else { return }
+        watch = Task { [weak self] in
+            while let self {
+                try? await Task.sleep(for: .milliseconds(300))
+                guard let last = self.lastOutput, ContinuousClock.now - last < self.quiet else {
+                    self.isActive = false
+                    self.watch = nil
+                    return
+                }
+            }
+        }
+    }
+}
+
+/// A database SQL in a terminal can open in: a saved database, by its name.
+public struct SwiftTermSQLDestination: Identifiable, Equatable, Sendable {
+    public let id: UUID
+    public let title: String
+
+    public init(id: UUID, title: String) {
+        self.id = id
+        self.title = title
     }
 }
 

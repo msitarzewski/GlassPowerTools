@@ -481,7 +481,33 @@ struct DatabaseWorkspaceView: View {
                                             selectedRange: NSRange(location: (pending.sql as NSString).length, length: 0))
             document.applyGeneratedTitle(pending.name, for: pending.sql)
             openQueryDocument(document)
+            if pending.findsTable {
+                Task { await openTable(namedIn: pending.sql, beside: document.id) }
+            }
         }
+    }
+
+    /// SQL from a terminal (2026-10-20): the table it names, where the server has it, opened with its
+    /// database made the active one — `USE` on MySQL, as opening a database does — and the SQL's own
+    /// tab back in front. Nothing happens when no table is found: the SQL is open, and that is all.
+    private func openTable(namedIn sql: String, beside queryID: UUID) async {
+        guard let session, let connection = session.connection else { return }
+        let references = SQLTableReferences.tables(in: sql)
+        guard !references.isEmpty,
+              let found = await SQLTableReferences.locate(references, current: session.currentDatabase,
+                                                          databases: { try await connection.databases() },
+                                                          tables: { try await connection.tables(in: $0) })
+        else { return }
+        if found.database != session.currentDatabase, session.connectionConfig.engine != .sqlite {
+            if connection.dialect == .mysql {
+                _ = try? await sessionManager.executeQuery("USE \(connection.quotedIdentifier(found.database))",
+                                                           sessionID: sessionID)
+            } else {
+                session.currentDatabase = found.database
+            }
+        }
+        openWorkspace(.table(database: found.database, table: found.table))
+        openWorkspace(.query(id: queryID))
     }
 
     // MARK: - Durable Drafts

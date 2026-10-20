@@ -51,6 +51,17 @@ public struct GlassTerminalWorkgroup: Sendable, Equatable, Identifiable {
     public let terminals: Int
 }
 
+/// A saved database SQL in a terminal can open in (2026-10-20), as the composition root names it.
+public struct GlassTerminalSQLDestination: Sendable, Equatable {
+    public let id: UUID
+    public let title: String
+
+    public init(id: UUID, title: String) {
+        self.id = id
+        self.title = title
+    }
+}
+
 /// Owns glas.sh's managers for the process. One per app, created in the composition root.
 @MainActor @Observable
 public final class GlassTerminalRuntime {
@@ -112,10 +123,10 @@ public final class GlassTerminalRuntime {
         case demoReplay(name: String, output: Data, windowSettings: GlassWindowOverrides, opensSettings: Bool, tick: Data?)
         /// Screenshots: a terminal running a stand-in for a full-screen program, which draws its
         /// whole screen for the rows and columns the window gives it, and again when they change.
-        case demoScreen(name: String, draw: @MainActor (_ rows: Int, _ columns: Int) -> Data)
+        case demoScreen(name: String, draw: @MainActor (_ rows: Int, _ columns: Int) -> Data, windowSettings: GlassWindowOverrides)
         /// Screenshots: one window holding a demo terminal on each of `names`, the first in front;
         /// on Vision Pro, shown in the grid when `grid` (W31: one bottom bar in tabs and in grid).
-        case demoTabs(names: [String], output: Data, grid: Bool)
+        case demoTabs(names: [String], output: Data, grid: Bool, windowSettings: GlassWindowOverrides)
         /// Screenshots: the Files window over a session that connects to nothing, opened at
         /// `path`. It shows the window's frame and header, and the browser's own "not connected"
         /// state where a listing would be.
@@ -147,6 +158,12 @@ public final class GlassTerminalRuntime {
     /// A file on this device as its preview over a terminal shows it (2026-10-16): the editor's
     /// preview, Quick Look's for most. Set by the composition root; the Mac's terminals use it.
     public var filePreview: (@MainActor (URL) -> AnyView)?
+    /// The saved databases SQL in a terminal on a server (its catalog endpoint) can open in
+    /// (2026-10-20): its machine's Database services and those reached through it, from the
+    /// composition root, which holds the catalog and the database capability. Nil offers none.
+    public var sqlDestinations: (@MainActor (UUID) -> [GlassTerminalSQLDestination])?
+    /// Open in SQL Editor: the SQL, unrun, in a new query tab on that database.
+    public var openSQL: (@MainActor (_ sql: String, _ database: UUID) -> Void)?
     /// The app's one runtime, for a terminal's tab to reach the editor and Files from a path's
     /// menu. Set as it is made.
     public nonisolated(unsafe) static weak var current: GlassTerminalRuntime?
@@ -519,13 +536,49 @@ public final class GlassTerminalRuntime {
     }
     /// Screenshots only: a terminal window on `name` running a stand-in for a full-screen program
     /// (`draw`), which is given the window's rows and columns each time they change, as a program is.
-    public func requestDemoScreen(name: String, draw: @escaping @MainActor (_ rows: Int, _ columns: Int) -> Data) {
-        enqueue(.demoScreen(name: name, draw: draw))
+    public func requestDemoScreen(name: String, draw: @escaping @MainActor (_ rows: Int, _ columns: Int) -> Data,
+                                  windowSettings: GlassWindowOverrides = GlassWindowOverrides()) {
+        enqueue(.demoScreen(name: name, draw: draw, windowSettings: windowSettings))
+    }
+    /// Screenshots only (`--demo-look <look>[,<setting>=<value>…]`, `--demo-picture <file>`): a
+    /// window's look (D84) — one of This Window's Start From looks by its raw value, or `none` — then
+    /// any of its fractions (`intensity`, `blur`, `pixelate`, `tone`, `readability`, `glow`) and
+    /// choices (`backdrop`, `phosphor`, `glowColor`) by raw value, with a picture behind the text
+    /// when given.
+    public static func demoLookSettings(look: String?, picture: URL?) -> GlassWindowOverrides {
+        let parts = (look ?? "").split(separator: ",").map(String.init)
+        var window = parts.first.flatMap(TerminalLookPreset.init(rawValue:))?.applied(to: GlassWindowOverrides())
+            ?? GlassWindowOverrides()
+        if let picture, let data = try? Data(contentsOf: picture),
+           let name = try? TerminalBackgroundPictures.importPicture(data) {
+            window[TerminalWindowSettings.backdrop] = .picture
+            window[TerminalWindowSettings.backdropPicture] = name
+        }
+        let fractions: [String: GlassWindowSetting<Double>] = [
+            "intensity": TerminalWindowSettings.backdropIntensity, "blur": TerminalWindowSettings.backdropBlur,
+            "pixelate": TerminalWindowSettings.backdropPixelate, "tone": TerminalWindowSettings.backdropTone,
+            "readability": TerminalWindowSettings.readability, "glow": TerminalWindowSettings.glow,
+        ]
+        for part in parts.dropFirst() {
+            let pair = part.split(separator: "=", maxSplits: 1).map(String.init)
+            guard pair.count == 2 else { continue }
+            if let setting = fractions[pair[0]], let value = Double(pair[1]) {
+                window[setting] = value
+            } else if pair[0] == "backdrop" {
+                window[TerminalWindowSettings.backdrop] = TerminalBackdropStyle(rawValue: pair[1])
+            } else if pair[0] == "phosphor" {
+                window[TerminalWindowSettings.phosphor] = TerminalPhosphor(rawValue: pair[1])
+            } else if pair[0] == "glowColor" {
+                window[TerminalWindowSettings.glowColor] = TerminalGlowColor(rawValue: pair[1])
+            }
+        }
+        return window
     }
     /// Screenshots only: one window with a demo terminal on each of `names` as its tabs, each
     /// showing `output`; on Vision Pro in the grid when `grid`.
-    public func requestDemoTabs(names: [String], output: Data, grid: Bool = false) {
-        enqueue(.demoTabs(names: names, output: output, grid: grid))
+    public func requestDemoTabs(names: [String], output: Data, grid: Bool = false,
+                                windowSettings: GlassWindowOverrides = GlassWindowOverrides()) {
+        enqueue(.demoTabs(names: names, output: output, grid: grid, windowSettings: windowSettings))
     }
     /// Screenshots only: a terminal window's own settings (W22) — lighter glass with a tint, a
     /// larger font and a bar cursor — over the demo's Appearance.

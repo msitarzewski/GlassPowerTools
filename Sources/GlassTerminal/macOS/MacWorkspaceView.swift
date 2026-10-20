@@ -193,6 +193,9 @@ struct MacWorkspaceView: View {
                     .foregroundStyle(windowTint ?? controller.workgroupColor?.color ?? .secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            // Its tmux session, machine, program and folder, as the tmux status line showed them
+            // (the owner, 2026-10-20: "let's add an Apple way to see the session info").
+            .help(controller.sessionHelp(servers: sessionManager.serverManager.servers) ?? "")
             // While a terminal in the tab is printing, a wave moves under the row.
             .background {
                 if controller.isProducingOutput {

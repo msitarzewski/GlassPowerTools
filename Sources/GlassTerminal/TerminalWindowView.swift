@@ -748,6 +748,9 @@ struct TerminalWindowView: View {
                     .allowsHitTesting(false)
             }
             #endif
+            // What the window shows behind its text (D84), over the canvas and under the text.
+            TerminalBackdropView(style: profile.lookStyle, theme: windowTheme,
+                                 activity: terminalHostModel.outputActivity)
             SwiftTermHostView(
                 model: terminalHostModel,
                 theme: swiftTermTheme,
@@ -793,6 +796,7 @@ struct TerminalWindowView: View {
             )
             .onGeometryChange(for: CGSize.self) { $0.size } action: { terminalCanvasSize = $0 }
             .background(Color.clear)
+            .terminalTextLook(profile.lookStyle, theme: windowTheme)
             .overlay(Color.white.opacity(showVisualBell ? 0.3 : 0).allowsHitTesting(false))
             .padding(.horizontal, terminalCanvasHorizontalPadding)
             .padding(.vertical, terminalCanvasPadding)

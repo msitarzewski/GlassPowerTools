@@ -6,6 +6,7 @@ import Observation
 import GlassLayers
 import GlassTerminalEmulator
 import os
+import GlassConnectionKit
 
 extension Logger {
     /// Saving and restoring terminal windows and tabs (W7b).
@@ -334,6 +335,21 @@ final class MacWorkspaceController {
         // Quick Look over the terminal (2026-10-16): the file here, or a copy from the host.
         model.previewFile = { [weak self] path in await self?.previewFile(path, from: paneID) }
         model.previewContent = GlassTerminalRuntime.current?.filePreview
+        // Open in SQL Editor (2026-10-20): the databases of the machine the pane is on.
+        if let runtime = GlassTerminalRuntime.current, runtime.sqlDestinations != nil {
+            model.sqlDestinations = { [weak self] in self?.sqlDestinations(for: paneID) ?? [] }
+            model.onOpenSQL = { sql, database in GlassTerminalRuntime.current?.openSQL?(sql, database) }
+        }
+    }
+
+    /// The databases SQL in a pane can open in: those of the machine it runs on — this Mac for a
+    /// local pane, the server's machine for an SSH one.
+    func sqlDestinations(for paneID: UUID) -> [SwiftTermSQLDestination] {
+        guard let pane = state.root?.pane(id: paneID), let destinations = GlassTerminalRuntime.current?.sqlDestinations
+        else { return [] }
+        let endpoint = pane.intent.kind == .local
+            ? GlassTerminalCapability.localShellEndpointID.rawValue : pane.intent.serverID
+        return (endpoint.map(destinations) ?? []).map { SwiftTermSQLDestination(id: $0.id, title: $0.title) }
     }
 
     /// The file a pane printed the path of, on this Mac for its preview: the file itself here, or a
@@ -505,6 +521,29 @@ final class MacWorkspaceController {
                 )
             )
         }
+    }
+
+    /// What a tab's row says when the pointer rests on it (the owner, 2026-10-20: "Since we got rid
+    /// of the bottom status for tmux, let's add an Apple way to see the session info"): for each of
+    /// its terminals, the tmux session it is kept in and where, what runs in it and in which folder.
+    func sessionHelp(servers: [ServerConfiguration], home: String? = NSHomeDirectory()) -> String? {
+        guard let panes = state.root?.panes, !panes.isEmpty else { return nil }
+        let described = panes.map { pane -> MacWorkspaceSessionHelp.Pane in
+            let context = paneContextByPaneID[pane.id]
+            let program = agent(for: pane.id)?.displayName ?? context?.program
+            switch pane.intent.kind {
+            case .local:
+                return .init(tmuxSession: pane.intent.localTmuxSession, machine: nil, connection: nil,
+                             program: program, directory: context?.directory)
+            case .ssh:
+                let session = session(for: pane.id)
+                let server = session?.server ?? servers.first { $0.id == pane.intent.serverID }
+                return .init(tmuxSession: session?.tmuxSessionName, machine: server?.name,
+                             connection: server.map { "\($0.username)@\($0.host)" },
+                             program: program, directory: context?.directory)
+            }
+        }
+        return MacWorkspaceSessionHelp.text(described, home: home)
     }
 
     func focusedSessionState() -> SessionState? {
@@ -1541,6 +1580,46 @@ final class MacWorkspaceController {
               let state = try? JSONDecoder().decode(MacWorkspaceRestorationState.self, from: data)
                 .validated(for: workspaceID) else { return nil }
         return state.root?.panes ?? []
+    }
+}
+
+/// A tab's terminals in words, for its row's tooltip (2026-10-20).
+nonisolated enum MacWorkspaceSessionHelp {
+    struct Pane: Equatable {
+        /// The tmux session it is kept in, if it is.
+        var tmuxSession: String?
+        /// The machine an SSH terminal is on; nil for this Mac.
+        var machine: String?
+        var connection: String?
+        /// What runs in it: an agent by name, else the program.
+        var program: String?
+        var directory: String?
+    }
+
+    /// One paragraph per terminal: "tmux session glass-24 on this Mac", then "Codex in
+    /// ~/src/shop". Nil when there is nothing to say.
+    static func text(_ panes: [Pane], home: String?) -> String? {
+        let paragraphs = panes.map { pane -> String in
+            let place = pane.machine ?? "this Mac"
+            var lines = [pane.tmuxSession.map { "tmux session \($0) on \(place)" }
+                ?? (pane.machine == nil ? "On this Mac, not in tmux" : "On \(place), not in tmux")]
+            if let connection = pane.connection { lines.append(connection) }
+            let folder = pane.directory.map { abbreviated($0, home: home) }
+            switch (pane.program, folder) {
+            case let (program?, folder?): lines.append("\(program) in \(folder)")
+            case let (program?, nil): lines.append(program)
+            case let (nil, folder?): lines.append(folder)
+            case (nil, nil): break
+            }
+            return lines.joined(separator: "\n")
+        }
+        let text = paragraphs.joined(separator: "\n\n")
+        return text.isEmpty ? nil : text
+    }
+
+    static func abbreviated(_ directory: String, home: String?) -> String {
+        guard let home, !home.isEmpty, directory == home || directory.hasPrefix(home + "/") else { return directory }
+        return "~" + directory.dropFirst(home.count)
     }
 }
 

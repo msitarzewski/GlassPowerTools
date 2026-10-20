@@ -343,5 +343,78 @@ struct MacTerminalContextMenuTests {
         let menu = try #require(view.menu(for: try rightClick(view)))
         #expect(titles(menu).first == "Open Link")
     }
+
+    // MARK: Open in SQL Editor (2026-10-20)
+
+    @Test("a right-click on a line of SQL takes the statement, shows it selected, and opens it on the machine's database")
+    func openInSQLEditor() async throws {
+        let host = await HostedTerminal()
+        defer { host.close() }
+        await host.feed("Here is the query:\r\nSELECT id, email\r\n  FROM customers\r\n  WHERE id = 4;\r\n")
+        let view = try terminalView(host)
+        let database = UUID()
+        var opened: (sql: String, database: UUID)?
+        host.model.sqlDestinations = { [SwiftTermSQLDestination(id: database, title: "shop — MySQL · orders")] }
+        host.model.onOpenSQL = { opened = ($0, $1) }
+
+        let menu = try #require(view.menu(for: try rightClick(view, x: 40, row: 2)))
+        #expect(titles(menu).prefix(2) == ["Open in SQL Editor", "—"])
+        let open = try item(menu, "Open in SQL Editor")
+        #expect(open.isEnabled)
+        #expect(open.subtitle == "shop — MySQL · orders", "the database it opens on")
+        #expect(view.selection.active, "the statement shown selected")
+        #expect(view.selection.start.row == 1 && view.selection.end.row == 3)
+        menu.performActionForItem(at: try #require(menu.items.firstIndex(of: open)))
+        #expect(opened?.sql == "SELECT id, email\nFROM customers\nWHERE id = 4;")
+        #expect(opened?.database == database)
+    }
+
+    @Test("several databases on the machine: a menu of them")
+    func severalDatabases() async throws {
+        let host = await HostedTerminal()
+        defer { host.close() }
+        await host.feed("UPDATE orders SET status = 'paid' WHERE id = 9;\r\n")
+        let view = try terminalView(host)
+        let analytics = UUID()
+        var opened: UUID?
+        host.model.sqlDestinations = {
+            [SwiftTermSQLDestination(id: UUID(), title: "shop — MySQL"), SwiftTermSQLDestination(id: analytics, title: "analytics — PostgreSQL")]
+        }
+        host.model.onOpenSQL = { _, database in opened = database }
+
+        let menu = try #require(view.menu(for: try rightClick(view, x: 20, row: 0)))
+        let submenu = try #require(try item(menu, "Open in SQL Editor").submenu)
+        #expect(submenu.items.map(\.title) == ["shop — MySQL", "analytics — PostgreSQL"])
+        submenu.performActionForItem(at: 1)
+        #expect(opened == analytics)
+    }
+
+    @Test("no database on the machine: the item is there, dimmed, saying why; not SQL: no item, the word as before")
+    func noDatabaseAndNotSQL() async throws {
+        let host = await HostedTerminal()
+        defer { host.close() }
+        await host.feed("SELECT * FROM orders;\r\nhello world\r\n")
+        let view = try terminalView(host)
+        host.model.sqlDestinations = { [] }
+
+        let sql = try #require(view.menu(for: try rightClick(view, x: 20, row: 0)))
+        let dimmed = try item(sql, "Open in SQL Editor")
+        #expect(!dimmed.isEnabled)
+        #expect(dimmed.subtitle == "No database on this machine")
+
+        let prose = try #require(view.menu(for: try rightClick(view, x: 2, row: 1)))
+        #expect(!titles(prose).contains("Open in SQL Editor"))
+        #expect(view.selection.getSelectedText() == "hello", "the word, as before")
+    }
+
+    @Test("a terminal no window wired for SQL never offers it")
+    func notWired() async throws {
+        let host = await HostedTerminal()
+        defer { host.close() }
+        await host.feed("SELECT * FROM orders;\r\n")
+        let view = try terminalView(host)
+        let menu = try #require(view.menu(for: try rightClick(view, x: 20, row: 0)))
+        #expect(!titles(menu).contains("Open in SQL Editor"))
+    }
 }
 #endif

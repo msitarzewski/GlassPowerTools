@@ -1691,3 +1691,64 @@ over.
 **Status:** Implemented and committed 2026-10-19 (task note); installed in 0.4.482 and, with the slow-reattach fix,
 0.4.483 on the Mac and iPhone (the Vision Pro was unreachable). Route A's code was removed. Remote tabs use `-CC` on the SSH PTY; local panes use `-C` on pipes, because SwiftTerm's
 PTY reader left tmux's last bytes waiting under load (measured; the task note has the runs).
+
+## D84 — Terminal looks: backgrounds behind the text, glow later — Approved for an experiment 2026-10-20
+**Owner:** "We look at these terminals all day long, so I was hoping for some inspired ideas to keep them
+interesting": backgrounds that distort (pixelation, Matrix animation, blurs, images), an image dropped into a window
+as the background of every terminal in it, and glowing text (vaporwave, green, amber, Matrix). Then: "document the
+direction in the memory bank, then build an experiment yes … live in general after you test in the VM".
+
+**Direction:**
+- **Effects behind or around the text, never over it.**
+  - Terminals are transparent, so a view behind them is ordinary SwiftUI on every platform: shaders, animation, blur,
+    images.
+  - Effects on the text's own pixels (true glow, scanlines, curvature) need a pixel pass in the renderer and come
+    later.
+- **Text first:** a readability guard keeps contrast.
+- **Motion:**
+  - It means something: it follows the terminal's activity.
+  - It stops under Reduce Motion, Low Power Mode and in hidden windows.
+- **The window keeps its glass.**
+- **Our own code and assets only:** nothing third-party the App Store build can't carry (D82).
+
+**Status:** Implemented as the experiment and installed in 0.4.484 (Exposé pictures and the brightness ceiling in
+0.4.485); the owner: "Holy shit on a stick. This is AMAZING." Committed 2026-10-20 at his word. The task note is
+`2026-10-20_terminal-looks.md`.
+
+## D85 — SQL in a terminal opens in the query editor — Approved and implemented 2026-10-20
+**Owner:** "we need a data detector for SQL that when engaged checks the server for a defined DB and will take the
+SQL into a new editor with the proper database and table selected (if possible)". Then, on the proposal: "1.
+right-click only 2. present a menu? 3. nah".
+
+**Decision:**
+- **Trigger:** right-click only, on the Mac. The statement under the pointer is taken whole and shown selected.
+- **Destinations:** the terminal's machine's databases, plus those reached through its server (D45). One database
+  is an item, several are a menu, none is a dimmed item saying so.
+- **The editor:** the SQL opens unrun in a new query tab. The table it names is found on the server, its database
+  made active and the table opened beside it.
+- **Not done:** no reading of `psql` or `mysql` prompts; no hover detection.
+
+**Status:** installed in 0.4.486. Not yet driven end to end against a real database. Task note
+`2026-10-20_sql-detector.md`.
+
+## D86 — This Mac knows its own library record — Approved 2026-10-20
+**Owner:** "we don't recognize in the app that 'This Mac' and [his Mac's library record] are one in the same. How
+can we set that?" Then, on the proposal: "yes, build it".
+
+**Why:** D8 kept the device's own host apart from any record of the same machine reached over SSH, and D50 (2026-10-08)
+already wanted the Mac to recognise its synced record as itself.
+
+**Decision:** a device-local link from This Mac to a library machine.
+- **Recognition:**
+  - automatic when the machine's pinned SSH host key is this Mac's own;
+  - offered once when its address is one of this Mac's;
+  - set or cleared by hand in the machine's editor.
+- **What the link does on this Mac:**
+  - one row in the library;
+  - its Terminal opens a local shell in tmux;
+  - its databases count as This Mac's, including for SQL from a local terminal.
+- **Next:** hide Screen Sharing to itself, and list Active's sessions once.
+- **Other devices** keep it a remote machine; nothing about the link syncs.
+
+**Status:** Approved; building. Task note `2026-10-20_this-mac-link.md`.
+

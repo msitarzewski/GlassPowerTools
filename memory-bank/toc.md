@@ -100,6 +100,9 @@ source applications are obsolete and no longer compile.
 | [The largest text sizes](tasks/2026-10/2026-10-19_large-text.md) | Rows that stack, bars with the Large Content Viewer; the terminal's 28 pt, text following the system size |
 | [A wrapped paste joined again](tasks/2026-10/2026-10-19_wrapped-paste.md) | Detecting text a terminal program wrapped, "Join Wrapped Lines", when the review is skipped |
 | [tmux tabs keep their own history (D83)](tasks/2026-10/2026-10-19_tmux-scrollback.md) | Route A and why it lost lines, tmux's control mode as iTerm2 does it, the pipes for local panes, the O(n²) reattach |
+| [Terminal looks (D84)](tasks/2026-10/2026-10-20_terminal-looks.md) | Backgrounds behind the text, glowing palettes, motion that follows activity, the ground rules |
+| [SQL from a terminal (D85)](tasks/2026-10/2026-10-20_sql-detector.md) | Right-click on SQL, the machine's databases, the table found on the server |
+| [This Mac knows its library record (D86)](tasks/2026-10/2026-10-20_this-mac-link.md) | Recognising the device's own machine in the synced library, and what the link changes |
 
 The sibling directories named below sit beside this repository. `../GlassEditorKit` was **absorbed on 2026-09-14**
 — it was already in production behind the SQL, record and SFTP editors, so it was never a future

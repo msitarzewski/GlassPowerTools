@@ -42,10 +42,14 @@ class DatabaseSessionManager {
         let name: String
         let sql: String
         let queuedAt: Date
+        /// SQL from a terminal (2026-10-20): the workspace also finds the table it names on the
+        /// server, makes its database the active one and opens it beside the SQL.
+        var findsTable = false
     }
 
-    func queueQuery(name: String, sql: String, for connectionID: UUID, at now: Date = Date()) {
-        pendingQueries[connectionID, default: []].append(PendingQuery(name: name, sql: sql, queuedAt: now))
+    func queueQuery(name: String, sql: String, for connectionID: UUID, findsTable: Bool = false, at now: Date = Date()) {
+        pendingQueries[connectionID, default: []].append(PendingQuery(name: name, sql: sql, queuedAt: now,
+                                                                      findsTable: findsTable))
     }
 
     /// The queries waiting for `connectionID` that are still fresh; all of them are taken.

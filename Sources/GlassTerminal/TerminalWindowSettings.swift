@@ -156,6 +156,9 @@ struct TerminalWindowProfile: Equatable {
     let pathPreviews: TerminalPathPreviews
     /// Under `.scale` the terminal keeps its rows and columns and its text follows the window (D75).
     let whenResized: TerminalResizeBehavior
+    /// What the window shows behind its text, its glow and its palette (D84). The palette is
+    /// already in `theme`.
+    let lookStyle: TerminalLookStyle
 
     var runtimeSettings: SwiftTermRuntimeSettings {
         SwiftTermRuntimeSettings(cursorStyle: cursorStyle, blinkingCursor: blinkingCursor,
@@ -178,6 +181,7 @@ struct TerminalWindowProfile: Equatable {
                                                                         over: pathPreviews.rawValue)) ?? pathPreviews
         self.whenResized = TerminalResizeBehavior(rawValue: window.value(of: TerminalWindowSettings.whenResized,
                                                                          over: whenResized.rawValue)) ?? whenResized
+        self.lookStyle = TerminalLookStyle.resolved(window)
     }
 
     /// A terminal in a window with `window`'s settings. Read in a view's body, it follows both:
@@ -202,6 +206,8 @@ struct TerminalWindowProfile: Equatable {
         }
         if let family = window[TerminalWindowSettings.fontFamily] { theme.fontName = family }
         if let size = window[TerminalWindowSettings.fontSize] { theme.fontSize = CGFloat(size) }
+        // The window's text palette over the theme's colours (D84).
+        if let phosphor = window[TerminalWindowSettings.phosphor] { theme = phosphor.applied(to: theme) }
         return theme
     }
 

@@ -336,14 +336,26 @@ struct MacTerminalPreview: View {
 
     var body: some View {
         let resolved = TerminalWindowProfile.resolved(windowSettings, settings: settings)
+        // The picture is drawn smaller than the terminal: its look (D84) — backdrop, phosphor and
+        // glow, which surround the terminal rather than being part of what it draws — at that scale.
+        let source = model?.previewSourceSize
         ZStack {
             TerminalCanvasBackground(color: resolved.theme.background,
                                      tint: resolved.look.tintColor,
                                      opacity: resolved.look.opacity,
                                      blur: resolved.look.blur,
                                      appearance: resolved.theme.resolvedAppearance)
+            GeometryReader { geometry in
+                TerminalBackdropView(style: resolved.lookStyle, theme: resolved.theme,
+                                     scale: Self.scale(of: source, in: geometry.size), still: true)
+            }
             if let image {
-                Image(nsImage: image).resizable().scaledToFit()
+                GeometryReader { geometry in
+                    Image(nsImage: image).resizable().scaledToFit()
+                        .terminalTextLook(resolved.lookStyle, theme: resolved.theme,
+                                          scale: Self.scale(of: source, in: geometry.size))
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                }
             } else {
                 VStack(spacing: 6) {
                     Image(systemName: "apple.terminal")
@@ -374,6 +386,12 @@ struct MacTerminalPreview: View {
         let model: ObjectIdentifier?
         let visible: Bool
         let active: Bool
+    }
+
+    /// How much smaller the picture is drawn than the terminal it shows, fitted as the image is.
+    static func scale(of source: CGSize?, in shown: CGSize) -> CGFloat {
+        guard let source, source.width > 0, source.height > 0 else { return 1 }
+        return min(1, min(shown.width / source.width, shown.height / source.height))
     }
 }
 

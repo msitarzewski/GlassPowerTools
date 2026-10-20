@@ -292,6 +292,24 @@ struct GlassPowerToolsApp: App {
         terminal.openSessions = { [registry = model.registry] in registry.openSessions() }
         // "New Terminal on ▸ alpha", not "Terminal on alpha": the machine's name, from the catalog.
         terminal.hostName = { [weak model] serverID in model?.host(owningEndpoint: EndpointID(rawValue: serverID))?.displayName }
+        // Open in SQL Editor (2026-10-20): the Database services of a terminal's machine, from the
+        // catalog, and the databases reached through its server, which the database knows (D45).
+        terminal.sqlDestinations = { [weak model] endpoint in
+            let machine = model?.host(owningEndpoint: EndpointID(rawValue: endpoint))
+            let databases = machine?.services.filter { $0.kind == .database }.map(\.endpointID.rawValue) ?? []
+            return database.sqlDestinations(machineDatabases: databases, reachedThrough: endpoint)
+                .map { GlassTerminalSQLDestination(id: $0.id, title: $0.title) }
+        }
+        // The SQL, unrun, in a new query tab; connected first as the library's Connect does, from a
+        // Connections window, where the database asks for a password and says what failed.
+        terminal.openSQL = { [weak model] sql, connection in
+            #if os(macOS)
+            if !GlassLibraryWindows.isOpen { GlassWindowOpener.shared.perform { $0.openConnections() } }
+            #endif
+            guard let model, let toConnect = database.openSQL(sql, connectionID: connection) else { return }
+            let endpoint = EndpointID(rawValue: toConnect)
+            if let host = model.host(owningEndpoint: endpoint) { model.connect(hostID: host.id, endpointID: endpoint) }
+        }
         // The + menu's running terminals (2026-10-15): Active's list, and its refresh when old.
         terminal.runningSessions = { [weak model] in model?.runningSessions ?? [] }
         terminal.refreshRunningSessionsIfDue = { [weak model] in await model?.refreshRunningSessionsIfDue() }

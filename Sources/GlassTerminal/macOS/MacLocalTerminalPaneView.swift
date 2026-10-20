@@ -99,6 +99,7 @@ struct MacLocalTerminalPaneView: View {
                     }
                 }
             )
+            .terminalTextLook(profile.lookStyle, theme: profile.theme)
             .overlay(Color.white.opacity(showVisualBell ? 0.3 : 0).allowsHitTesting(false))
             .overlay(alignment: .bottom) { if isDetachedFromTmux { detachedBanner } }
             .padding(.horizontal, 8)
@@ -106,13 +107,18 @@ struct MacLocalTerminalPaneView: View {
             .background {
                 // The window's settings over the terminal settings, as its SSH panes draw (W20, W22).
                 let resolved = profile
-                TerminalCanvasBackground(
-                    color: resolved.theme.background,
-                    tint: resolved.look.tintColor,
-                    opacity: resolved.look.opacity,
-                    blur: resolved.look.blur,
-                    appearance: resolved.theme.resolvedAppearance
-                )
+                ZStack {
+                    TerminalCanvasBackground(
+                        color: resolved.theme.background,
+                        tint: resolved.look.tintColor,
+                        opacity: resolved.look.opacity,
+                        blur: resolved.look.blur,
+                        appearance: resolved.theme.resolvedAppearance
+                    )
+                    // What the window shows behind its text (D84).
+                    TerminalBackdropView(style: resolved.lookStyle, theme: resolved.theme,
+                                         activity: hostModel.outputActivity)
+                }
             }
             // A framed canvas: the background is clipped to the session canvas's corner radius
             // and floats inside a margin of window glass (top stays flush under the toolbar).

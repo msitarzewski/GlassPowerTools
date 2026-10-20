@@ -207,6 +207,49 @@ public final class GlassDatabaseRuntime {
     }
 }
 
+// MARK: - SQL from a terminal (2026-10-20)
+
+/// A saved database SQL from a terminal can open in.
+public struct GlassDatabaseSQLDestination: Sendable, Equatable {
+    public let id: UUID
+    public let title: String
+}
+
+extension GlassDatabaseRuntime {
+    /// The saved databases SQL in a terminal opens in: `machineDatabases` — the Database services of
+    /// the terminal's machine, which the shell's catalog knows — then those reached through the
+    /// terminal's server (D45), which only the database's own records say. Each once, by name, with
+    /// its engine and the database it opens in.
+    public func sqlDestinations(machineDatabases: [UUID], reachedThrough terminalEndpoint: UUID) -> [GlassDatabaseSQLDestination] {
+        var ids = machineDatabases.filter { hasConnection(id: $0) }
+        for config in connectionManager.connections where config.tunnelServiceID == terminalEndpoint && !ids.contains(config.id) {
+            ids.append(config.id)
+        }
+        return ids.compactMap { id in
+            connectionManager.connection(for: id).map { config in
+                let detail = [config.engine.displayName, config.defaultDatabase].compactMap { $0 }.filter { !$0.isEmpty }
+                return GlassDatabaseSQLDestination(id: id, title: "\(config.name) — \(detail.joined(separator: " · "))")
+            }
+        }
+    }
+
+    /// Open in SQL Editor: `sql` in a new query tab on that database, never run; the table it names,
+    /// where the server has it, opened beside it with its database the active one. Returns the
+    /// connection the shell should connect, as `openSavedQuery` does, when none is live.
+    public func openSQL(_ sql: String, connectionID: UUID) -> UUID? {
+        guard hasConnection(id: connectionID) else {
+            enqueue(.showFailure("That database is no longer in your library. Add it again from its machine's Services."))
+            return nil
+        }
+        sessionManager.queueQuery(name: QueryDocumentTitle.fallback(for: sql), sql: sql, for: connectionID, findsTable: true)
+        if let sessionID = liveSessionID(for: connectionID) {
+            enqueue(.openQueryEditor(sessionID: sessionID))
+            return nil
+        }
+        return connectionID
+    }
+}
+
 /// A saved query as the system sees it: its name and the database it belongs to.
 public struct GlassDatabaseSavedQueryEntry: Sendable, Equatable {
     public let id: UUID

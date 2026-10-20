@@ -334,7 +334,7 @@ struct TerminalConnectFlow: ViewModifier {
                     }
                 }
             }
-        case .demoScreen(let name, let draw):
+        case .demoScreen(let name, let draw, let windowSettings):
             // The same connectionless session, its "program" told the size as a PTY's would be.
             let server = ServerConfiguration(name: name, host: "192.0.2.10", username: "ann")
             let program = DemoWheelAnswer()
@@ -346,8 +346,8 @@ struct TerminalConnectFlow: ViewModifier {
             program.session = session
             sessionManager.registerSession(session)
             session.state = .connected
-            presentTerminalWindow(for: session, windowSettings: GlassWindowOverrides())
-        case .demoTabs(let names, let output, let grid):
+            presentTerminalWindow(for: session, windowSettings: windowSettings)
+        case .demoTabs(let names, let output, let grid, let windowSettings):
             // The same connectionless sessions, as the tabs of one window.
             let sessions = names.map { name in
                 let session = TerminalSession(server: ServerConfiguration(name: name, host: "192.0.2.10", username: "ann"),
@@ -361,7 +361,7 @@ struct TerminalConnectFlow: ViewModifier {
             guard let first = sessions.first else { return }
             #if os(visionOS)
             let workgroupID = sessionManager.createWorkgroup(name: first.server.name, colorTag: first.server.colorTag,
-                                                             windowSettings: GlassWindowOverrides())
+                                                             windowSettings: windowSettings)
             for session in sessions { _ = sessionManager.appendSession(session, toWorkgroup: workgroupID) }
             sessionManager.selectSession(first.id, inWorkgroup: workgroupID)
             if grid { VisionTerminalWorkgroupView.demoOpensGrid.insert(workgroupID) }
@@ -372,7 +372,7 @@ struct TerminalConnectFlow: ViewModifier {
             // left out (the owner: "in the expose it show one card for all tabs").
             _ = grid
             let workgroupID = sessionManager.createWorkgroup(name: first.server.name, colorTag: first.server.colorTag,
-                                                             windowSettings: GlassWindowOverrides())
+                                                             windowSettings: windowSettings)
             for session in sessions { _ = sessionManager.appendSession(session, toWorkgroup: workgroupID) }
             if ProcessInfo.processInfo.arguments.contains("--demo-slots") {
                 for session in sessions.dropFirst() {
@@ -385,7 +385,7 @@ struct TerminalConnectFlow: ViewModifier {
             iOSRouter.showTerminal(workgroupID: workgroupID)
             #else
             _ = grid
-            presentTerminalWindow(for: first)
+            presentTerminalWindow(for: first, windowSettings: windowSettings)
             #endif
         case .demoFiles(let name, let path):
             // The same connectionless session: the browser cannot open SFTP over it and says so,

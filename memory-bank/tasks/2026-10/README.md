@@ -172,3 +172,16 @@
 - 2026-10-19: Metal against Core Graphics for the Mac's terminals, at his word: measured with a Release benchmark
   outside the repo; Core Graphics kept (`techContext.md`, Terminal renderer). macOS 27's own performance work is in
   the system, nothing for the app to adopt.
+- 2026-10-20: terminal looks (D84), at his word: backgrounds behind the text (images, Matrix rain, vaporwave, blur,
+  pixelation), glowing palettes, motion that follows activity; an experiment to test in the VM, then install
+  ([`2026-10-20_terminal-looks.md`](2026-10-20_terminal-looks.md)).
+- 2026-10-20: SQL in a terminal opened in the query editor, with its database and table: researched and proposed,
+  not built ([`2026-10-20_sql-detector.md`](2026-10-20_sql-detector.md)).
+- 2026-10-20: SQL from a terminal built on the Mac, at his answers ("right-click only", a menu of databases, no
+  psql/mysql reading); 0.4.486 ([`2026-10-20_sql-detector.md`](2026-10-20_sql-detector.md)).
+- 2026-10-20: "Not in a window" showed an older Codex session in tmux, in the same folder as a current one. Closing a tab in tmux detaches, and the launch offer forgets closes across relaunches.
+  - Asked whether closing should end the session: "Leave it exactly as it is today" (D47 stands).
+  - Instead, tab rows on the Mac now have a tooltip with each terminal's tmux session, its machine, and what runs
+    in which folder, since control mode removed tmux's status line (`MacWorkspaceSessionHelp`, 3 tests); 0.4.487.
+  - The window's title is AppKit's and has no tooltip seam; not touched.
+
