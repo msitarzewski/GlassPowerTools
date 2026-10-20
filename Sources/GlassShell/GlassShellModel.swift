@@ -1525,7 +1525,23 @@ public final class GlassShellModel: GlassServiceStore {
 
     private func pushUsage() {
         guard let usageSync else { return }
-        let mine = GlassUsagePayload.Device(name: deviceName, history: preferences.connectionHistory ?? [])
+        // Each machine by the id the library shows it under, which other devices know: This Mac's
+        // own id is never synced, and once linked its use is its machine's (D86).
+        let history = (preferences.connectionHistory ?? []).map { event in
+            var event = event
+            event.hostID = canonicalID(for: event.hostID)
+            return event
+        }
+        let minutes = (preferences.usageMinutes ?? [:]).mapValues { byKey in
+            var mapped: [String: Int] = [:]
+            for (key, value) in byKey {
+                let parts = key.split(separator: "|", maxSplits: 1)
+                guard parts.count == 2, let uuid = UUID(uuidString: String(parts[0])) else { continue }
+                mapped["\(canonicalID(for: HostID(rawValue: uuid)).rawValue.uuidString)|\(parts[1])", default: 0] += value
+            }
+            return mapped
+        }
+        let mine = GlassUsagePayload.Device(name: deviceName, history: history, minutes: minutes)
         let payload = GlassUsagePayload(devices: [thisDeviceKey: mine])
         Task { try? await usageSync.push(payload) }
     }
@@ -1533,9 +1549,22 @@ public final class GlassShellModel: GlassServiceStore {
     /// Every device's connections for the overview: this device first, from its own history, then
     /// the others by name — each machine under the id this library knows it by.
     public var usageByDevice: [GlassDeviceUsage] {
+        let calendar = Calendar.current
+        // Minutes in use, as their own rows: a day, a machine, a kind, no connections.
+        let minutes = (preferences.usageMinutes ?? [:]).flatMap { day, byKey -> [GlassUsageCount] in
+            guard let date = GlassUsagePayload.day(day, calendar: calendar) else { return [] }
+            return byKey.compactMap { key, value in
+                let parts = key.split(separator: "|", maxSplits: 1)
+                guard parts.count == 2, value > 0, let uuid = UUID(uuidString: String(parts[0])),
+                      let kind = HostServiceKind(rawValue: String(parts[1])) else { return nil }
+                return GlassUsageCount(date: date, hostID: canonicalID(for: HostID(rawValue: uuid)), kind: kind,
+                                       count: 0, minutes: value)
+            }
+        }
         let mine = GlassDeviceUsage(
             id: thisDeviceKey, name: deviceName, isThisDevice: true,
-            counts: connectionHistory.map { GlassUsageCount(date: $0.date, hostID: $0.hostID, kind: $0.kind, count: 1) })
+            counts: connectionHistory.map { GlassUsageCount(date: $0.date, hostID: $0.hostID, kind: $0.kind, count: 1) }
+                + minutes)
         let others = otherDevicesUsage.map { key, device in
             GlassDeviceUsage(id: key, name: device.name, isThisDevice: false, counts: device.counts().map {
                 var count = $0
@@ -1545,6 +1574,80 @@ public final class GlassShellModel: GlassServiceStore {
         }
         .sorted { ($0.name, $0.id) < ($1.name, $1.id) }
         return [mine] + others
+    }
+
+    // MARK: Time in use (2026-10-20)
+
+    /// The once-a-minute count of what is in use; started with the library, for the app's life.
+    private var usageClock: Task<Void, Never>?
+    /// When the last minute was counted: activity after it counts for the next.
+    private var lastUsageSample: Date?
+    /// Minutes counted since the last save, so the file and iCloud are written every few minutes,
+    /// not every minute.
+    private var unsavedUsageMinutes = 0
+    static let usageSaveEvery = 5
+
+    /// Starts counting minutes in use: each minute, every open session that was active in it counts
+    /// for its machine and the kind of service it is through.
+    public func startUsageClock() {
+        guard usageClock == nil else { return }
+        lastUsageSample = Date()
+        usageClock = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(60))
+                guard let self else { return }
+                self.countMinuteInUse()
+            }
+        }
+    }
+
+    /// Writes minutes not yet saved, on the way to the background or out.
+    public func saveUsage() {
+        guard unsavedUsageMinutes > 0 else { return }
+        unsavedUsageMinutes = 0
+        try? persistPreferences()
+        pushUsage()
+    }
+
+    /// One minute: the machines and kinds whose sessions had activity since the last count, once
+    /// each. After a sleep, activity before it is one minute, not the hours between.
+    func countMinuteInUse(now: Date = Date(), sessions: [GlassOpenSession]? = nil,
+                          activity: [GlassUsageActivity]? = nil, calendar: Calendar = .current) {
+        let since = min(lastUsageSample ?? now.addingTimeInterval(-60), now.addingTimeInterval(-1))
+        lastUsageSample = now
+        var inUse: [HostID: Set<HostServiceKind>] = [:]
+        func credit(_ endpoints: [EndpointID], lastActivity: Date?) {
+            guard let lastActivity, lastActivity > since, lastActivity <= now.addingTimeInterval(5) else { return }
+            for endpoint in endpoints {
+                guard let host = host(owningEndpoint: endpoint), let kind = kind(of: endpoint, on: host) else { continue }
+                inUse[host.id, default: []].insert(kind)
+            }
+        }
+        func count(_ session: GlassOpenSession) {
+            let endpoints = session.connectedEndpointIDs.isEmpty ? session.endpointIDs : session.connectedEndpointIDs
+            credit(endpoints, lastActivity: session.lastActivity?())
+        }
+        for session in sessions ?? registry.openSessions() {
+            if session.tabs.isEmpty { count(session) } else { session.tabs.forEach(count) }
+        }
+        for other in activity ?? registry.usageActivity() {
+            credit([other.endpointID], lastActivity: other.lastActivity)
+        }
+        guard !inUse.isEmpty else { return }
+        let day = GlassUsagePayload.dayKey(now, calendar: calendar)
+        let oldest = GlassUsagePayload.dayKey(
+            calendar.date(byAdding: .day, value: -(GlassShellPreferences.historyDays - 1), to: now) ?? now, calendar: calendar)
+        for (hostID, kinds) in inUse {
+            for kind in kinds { preferences.addUsageMinute(day: day, hostID: hostID, kind: kind, oldestDay: oldest) }
+        }
+        unsavedUsageMinutes += 1
+        if unsavedUsageMinutes >= Self.usageSaveEvery { saveUsage() }
+    }
+
+    /// The kind of service an endpoint is on a machine: its own, or a built-in's (This Mac's shell).
+    private func kind(of endpoint: EndpointID, on host: GlassShellHost) -> HostServiceKind? {
+        host.services.first { $0.endpointID == endpoint }?.kind
+            ?? registry.builtInLocalServices.first { $0.endpointID == endpoint }?.kind
     }
 
     // MARK: Favourites beyond machines (2026-10-13)

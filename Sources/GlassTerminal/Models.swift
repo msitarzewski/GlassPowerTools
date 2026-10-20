@@ -1341,6 +1341,8 @@ class TerminalSession: Identifiable, Hashable {
     /// What the terminal, a snippet or the startup command types: through tmux's client while there
     /// is one, else straight to the shell.
     private func writeInput(_ data: Data, presentsFailure: Bool) {
+        // Input from the keyboard bar and other controls as well as the terminal's own (time in use).
+        terminalHostModel.noteInputActivity()
         if let actions = tmuxControl?.input(data) {
             applyTmuxControl(actions)
         } else {

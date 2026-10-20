@@ -150,7 +150,8 @@ public final class GlassDesktopCapability: GlassCapability {
                 close: { _ = session.close() },
                 isConnected: session.isConnected,
                 // The remote screen as it last arrived: Show All Windows' tile (2026-10-13).
-                snapshot: { session.frame.flatMap(Self.picture(of:)) }
+                snapshot: { session.frame.flatMap(Self.picture(of:)) },
+                lastActivity: { session.lastActivityAt }
             )
         }
     }

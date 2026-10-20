@@ -745,7 +745,8 @@ public final class GlassTerminalCapability: GlassCapability {
                 isConnected: session.state == .connected,
                 snapshot: { Self.preview(of: session) },
                 mark: { Self.agent(of: session)?.markImage },
-                backdrop: { [runtime] in Self.backdrop(window: GlassWindowOverrides(), runtime: runtime) }
+                backdrop: { [runtime] in Self.backdrop(window: GlassWindowOverrides(), runtime: runtime) },
+                lastActivity: { session.terminalHostModel.lastActivityAt }
             )
         }
     }
@@ -781,6 +782,20 @@ public final class GlassTerminalCapability: GlassCapability {
         if MacWorkspacePreviewRegistry.shared.close(sessionID: session.id, sessionManager: manager) { return }
         #endif
         manager.closeSession(session)
+    }
+
+    /// A Mac terminal tab's local shells, which are not open sessions (Active lists their tmux
+    /// sessions as This Mac's), for the library's time in use (2026-10-20).
+    public func usageActivity() -> [GlassUsageActivity] {
+        #if os(macOS)
+        MacWorkspacePreviewRegistry.shared.shownControllers.flatMap(\.tabs).flatMap { tab in
+            tab.localRuntimesByPaneID.values.map {
+                GlassUsageActivity(endpointID: Self.localShellEndpointID, lastActivity: $0.model.lastActivityAt)
+            }
+        }
+        #else
+        []
+        #endif
     }
 
     /// The id this capability gives a session that is in no workgroup.
@@ -819,7 +834,8 @@ public final class GlassTerminalCapability: GlassCapability {
                 backdrop: { [runtime] in
                     Self.backdrop(window: manager.workgroup(for: workgroup.id)?.windowSettings ?? GlassWindowOverrides(),
                                   runtime: runtime)
-                }
+                },
+                lastActivity: { live.compactMap(\.terminalHostModel.lastActivityAt).max() }
             )
         }
     }
@@ -852,7 +868,8 @@ public final class GlassTerminalCapability: GlassCapability {
             backdrop: { [runtime] in
                 Self.backdrop(window: manager.workgroup(for: workgroupID)?.windowSettings ?? GlassWindowOverrides(),
                               runtime: runtime)
-            }
+            },
+            lastActivity: { session.terminalHostModel.lastActivityAt }
         )
     }
 

@@ -385,6 +385,11 @@ public protocol GlassCapability: AnyObject {
     /// requirement for the same reason as `openSessions()`.
     func runningSessions() async -> [GlassRunningSession]
 
+    /// When the things this capability has open that aren't open sessions last had activity, for
+    /// the library's time in use (2026-10-20). Default: none. A requirement for the same reason as
+    /// `openSessions()`.
+    func usageActivity() -> [GlassUsageActivity]
+
     /// The running sessions and the machines that could not be asked, with why (W6). Default:
     /// `runningSessions()` and none unasked. A requirement for the same reason.
     func runningReport() async -> GlassRunningReport

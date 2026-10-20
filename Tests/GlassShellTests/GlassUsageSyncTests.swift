@@ -42,6 +42,37 @@ struct GlassUsageSyncTests {
         #expect(!encoded.contains(":00"), "\(encoded)")
     }
 
+    @Test("minutes in use travel with the counts, under the same machines; a minute-only day is kept")
+    func minutesTravel() throws {
+        let alpha = HostID(), bravo = HostID()
+        let today = GlassUsagePayload.dayKey(now, calendar: calendar)
+        let old = GlassUsagePayload.dayKey(calendar.date(byAdding: .day, value: -40, to: now)!, calendar: calendar)
+        let usage = [today: ["\(alpha.rawValue.uuidString)|ssh": 600, "\(bravo.rawValue.uuidString)|database": 5_000],
+                     old: ["\(alpha.rawValue.uuidString)|ssh": 30]]
+        let device = GlassUsagePayload.Device(name: "Ann's Mac", history: [event(alpha, .ssh, daysAgo: 0)],
+                                              minutes: usage, now: now, calendar: calendar)
+        #expect(device.hosts.count == 2, "alpha once, for its connection and its minutes")
+        let decoded = try JSONDecoder().decode(GlassUsagePayload.Device.self, from: JSONEncoder().encode(device))
+        let counts = decoded.counts(calendar: calendar)
+        #expect(counts.first { $0.hostID == alpha }.map { [$0.count, $0.minutes] } == [1, 600])
+        #expect(counts.first { $0.hostID == bravo }.map { [$0.count, $0.minutes] } == [0, 24 * 60],
+                "a day holds at most 1,440 minutes")
+        #expect(counts.count == 2, "40 days ago is outside the window")
+        try GlassUsagePayload(devices: [UUID().uuidString: decoded]).validate()
+    }
+
+    @Test("a payload from before minutes still reads; one with more minutes than a day is refused")
+    func minutesCompatibility() throws {
+        let alpha = UUID()
+        let older = Data(#"{"name":"headset","updatedAt":0,"hosts":["\#(alpha.uuidString)"],"days":{"2026-10-17":[{"host":0,"kind":"ssh","count":2}]}}"#.utf8)
+        let device = try JSONDecoder().decode(GlassUsagePayload.Device.self, from: older)
+        #expect(device.counts(calendar: calendar).map { [$0.count, $0.minutes] } == [[2, 0]])
+        let tooMany = GlassUsagePayload(devices: [UUID().uuidString: .init(
+            name: "x", updatedAt: now, hosts: [alpha.uuidString],
+            days: ["2026-10-17": [.init(host: 0, kind: "ssh", count: 0, minutes: 24 * 60 + 1)]])])
+        #expect(throws: GlassSettingsSyncError.self) { try tooMany.validate() }
+    }
+
     @Test("each device's newest entry wins, and the other devices' are kept; every order agrees")
     func merging() throws {
         let mac = UUID().uuidString, phone = UUID().uuidString

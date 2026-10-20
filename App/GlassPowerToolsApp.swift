@@ -464,6 +464,17 @@ struct GlassPowerToolsApp: App {
                     with: GlassSettingsSyncService(usageStore: GlassUbiquitousSettingsStore())
                 )
             }
+            // And its time in use (2026-10-20): counted each minute the app runs, saved every few
+            // minutes and on the way to the background or out.
+            model.startUsageClock()
+            #if os(macOS)
+            let leaving = NSApplication.willTerminateNotification
+            #else
+            let leaving = UIApplication.didEnterBackgroundNotification
+            #endif
+            NotificationCenter.default.addObserver(forName: leaving, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { model.saveUsage() }
+            }
         }
         _layers = State(initialValue: layers)
         _model = State(initialValue: model)

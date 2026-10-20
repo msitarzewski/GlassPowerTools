@@ -33,6 +33,8 @@ public struct GlassShellPreferences: Codable, Equatable, Sendable {
     /// Bounds on the history: the overview looks back 90 days.
     public static let historyLimit = 2_000
     public static let historyWindow: TimeInterval = 90 * 24 * 60 * 60
+    /// The same window in days, for minutes in use.
+    public static let historyDays = 90
 
     public var version = Self.currentVersion
     public var writerID = WriterID()
@@ -51,6 +53,19 @@ public struct GlassShellPreferences: Codable, Equatable, Sendable {
     public var thisMacHostID: HostID?
     /// Machines whose offer to be this Mac was turned down, so it isn't made again.
     public var declinedThisMacHostIDs: [HostID]?
+    /// Minutes each machine was in use through each kind of service, by day (2026-10-20, the owner:
+    /// "I've had tmux sessions running for days in a row now and that's not reflected"): day
+    /// ("2026-10-20", this device's calendar) → "host|kind" → minutes. A minute counts when a session
+    /// there had input or output in it. Optional for older files.
+    public var usageMinutes: [String: [String: Int]]?
+
+    /// One more minute in use for `hostID` through `kind` on `day`; days past the history window go.
+    public mutating func addUsageMinute(day: String, hostID: HostID, kind: HostServiceKind, oldestDay: String) {
+        var minutes = usageMinutes ?? [:]
+        minutes[day, default: [:]]["\(hostID.rawValue.uuidString)|\(kind.rawValue)", default: 0] += 1
+        minutes = minutes.filter { $0.key >= oldestDay }
+        usageMinutes = minutes
+    }
 
     /// Adds a connection, dropping what falls outside the window or over the limit.
     public mutating func recordConnection(_ event: ConnectionEvent) {

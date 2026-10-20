@@ -187,3 +187,12 @@
 - 2026-10-20: This Mac knows its own library machine (D86), at his word: linked by SSH host key (his Mac did so by
   itself), offered by address, or set in the editor; one row, a local Terminal, its databases, Active once, no Screen
   Sharing to itself; 0.4.488–489 ([`2026-10-20_this-mac-link.md`](2026-10-20_this-mac-link.md)). Committed.
+- 2026-10-20: Your Library counts time in use (D87), at his report ("half truths… tmux sessions running for days")
+  and his answers (Activity; Time in use first): a minute per machine and kind with input or output, a Mac tab's
+  local shells included, synced per day; the chart opens on hours with Connections beside it; 0.4.490
+  ([`2026-10-20_time-in-use.md`](2026-10-20_time-in-use.md)). Not committed.
+- 2026-10-20: a new local tmux tab opened with the cursor a row above its prompt (his screenshot): the restore placed
+  the cursor from the top in a terminal taller than the pane; a resize during the start and font size changes never
+  reached tmux. All three fixed and tested; 0.4.491 ([`2026-10-19_tmux-scrollback.md`](2026-10-19_tmux-scrollback.md)).
+  Not committed.
+

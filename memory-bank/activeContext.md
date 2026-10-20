@@ -33,6 +33,14 @@ use the disposable test VM only).
 
 ## 2026-10-20 — RESUME HERE
 
+**Committed at his word** ("commit."); not pushed. 0.4.491 is on the Mac and iPhone; the Vision Pro unreachable.
+- **Time in use (D87):** the overview counted only library Connects, not his days of tmux. Each minute with input or
+  output now counts for its machine and kind, a Mac tab's local shells included, synced per day. The chart opens on
+  hours. Built and tested; 0.4.490 (`2026-10-20_time-in-use.md`). Counting connects from every path is deferred.
+- **A new tmux tab's cursor a row above its prompt** (his screenshot): the restore counted the cursor from the top
+  in a terminal taller than the pane; a resize during the start and font size changes never reached tmux. Fixed and
+  tested; 0.4.491 (`2026-10-19_tmux-scrollback.md`).
+
 **Committed at his word** ("update the memory bank, then commit what we have, And yes, build it"); not pushed. 0.4.487
 is on the Mac and iPhone; the Vision Pro has been unreachable since 0.4.481.
 - **Terminal looks (D84)**, an experiment he loved: backgrounds, phosphor palettes, glow, readability guard;

@@ -1757,3 +1757,18 @@ already wanted the Mac to recognise its synced record as itself.
 
 Task note `2026-10-20_this-mac-link.md`.
 
+## D87 — Your Library counts time in use — Approved 2026-10-20
+**Owner:** "this show half truths! The number of connections is true... but I've had tmux sessions running for days
+in a row now and that's not reflected in the data here." Asked what counts and what the chart opens on, he chose
+**Activity** (a minute with input or output) and **Time in use**.
+
+**Decision:**
+- Each minute, every machine and kind of service whose open sessions had input or output counts one minute.
+  - On the Mac, a terminal tab's local shells count too.
+  - The minutes are kept on the device for 90 days, and sync per day alongside D81's counts.
+- The overview opens on hours in use per day, with Most Used by time; Connections is a choice beside it.
+- Connections are still counted only for a library Connect. Counting every path (restores, reconnects, the terminal's
+  own) is deferred.
+
+**Status:** Implemented 2026-10-20 (0.4.490); not committed. Task note `2026-10-20_time-in-use.md`.
+

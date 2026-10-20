@@ -85,6 +85,10 @@ public struct GlassOpenSession: Identifiable {
     /// stands on its own (2026-10-17, the owner, on All Windows in light mode: a dark theme's
     /// see-through picture was green text on the white sheet).
     public let backdrop: (@MainActor () -> GlassSessionBackdrop?)?
+    /// When it was last in use (2026-10-20): a terminal's last input or output, a database's last
+    /// query or browse, a desktop's last input or moment in front. The library counts a minute in use
+    /// for its machine when this falls inside the minute. Nil for a session that doesn't say.
+    public let lastActivity: (@MainActor () -> Date?)?
 
     public init(id: String, title: String, subtitle: String? = nil, symbolName: String,
                 endpointIDs: [EndpointID] = [], hostID: HostID? = nil,
@@ -95,7 +99,8 @@ public struct GlassOpenSession: Identifiable {
                 snapshot: (@MainActor () -> Image?)? = nil, mark: (@MainActor () -> Image?)? = nil,
                 tabs: [GlassOpenSession] = [], waitsToBeShown: Bool = false,
                 unsavedChanges: (@MainActor () -> String?)? = nil,
-                backdrop: (@MainActor () -> GlassSessionBackdrop?)? = nil) {
+                backdrop: (@MainActor () -> GlassSessionBackdrop?)? = nil,
+                lastActivity: (@MainActor () -> Date?)? = nil) {
         self.id = id
         self.title = title
         self.subtitle = subtitle
@@ -113,6 +118,7 @@ public struct GlassOpenSession: Identifiable {
         self.waitsToBeShown = waitsToBeShown
         self.unsavedChanges = unsavedChanges
         self.backdrop = backdrop
+        self.lastActivity = lastActivity
     }
 
     /// Ends it, or hands it to `ask` when ending it would lose something (`unsavedChanges`).
@@ -251,6 +257,20 @@ public struct GlassRunningReport {
     }
 }
 
+/// Something open that isn't an open session, and when it last had input or output, for the
+/// library's time in use (2026-10-20): a Mac terminal tab's local shells, which Active lists as This
+/// Mac's running tmux sessions rather than as open sessions.
+public struct GlassUsageActivity: Sendable, Equatable {
+    /// The service it is through.
+    public var endpointID: EndpointID
+    public var lastActivity: Date?
+
+    public init(endpointID: EndpointID, lastActivity: Date?) {
+        self.endpointID = endpointID
+        self.lastActivity = lastActivity
+    }
+}
+
 public extension GlassCapability {
     /// Sessions this capability has open, newest first. Default: none.
     ///
@@ -263,6 +283,9 @@ public extension GlassCapability {
     /// Sessions running on hosts that this device is not showing (D44). Default: none. Asked when
     /// Active appears or is refreshed — it may reach out to hosts, so never from a view body.
     func runningSessions() async -> [GlassRunningSession] { [] }
+
+    /// Activity outside open sessions. Default: none.
+    func usageActivity() -> [GlassUsageActivity] { [] }
 
     /// The same, with the machines that could not be asked and why (W6). Default: the running
     /// sessions, and no machine left unasked.
@@ -285,6 +308,11 @@ public extension GlassCapabilityRegistry {
     /// Call this **inside a view body**. See `openSessions()` above for why.
     func openSessions() -> [GlassOpenSession] {
         registered.flatMap { $0.openSessions() } + standaloneSessions()
+    }
+
+    /// Every capability's activity outside its open sessions (2026-10-20).
+    func usageActivity() -> [GlassUsageActivity] {
+        registered.flatMap { $0.usageActivity() }
     }
 
     /// Every capability's running sessions (D44). Each capability asks its own hosts together.

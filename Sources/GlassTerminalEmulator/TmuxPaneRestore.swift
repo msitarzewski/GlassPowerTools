@@ -97,23 +97,39 @@ enum TmuxPaneRestore {
         }
         add("\u{1B}[0m")
 
+        // A row of the primary screen, counted up from its last line, where the drawing ended, not
+        // down from the top: where the screen lands depends on this terminal's rows and the history
+        // above it. A terminal taller than the pane put the cursor on the history line above the
+        // prompt (2026-10-20, a new tab: "New terminals open with the input on the wrong line").
+        func onPrimary(row: Int?, column: Int?) {
+            let up = primaryScreen.count - 1 - (row ?? 0)
+            if up > 0 { add("\u{1B}[\(up)A") } else if up < 0 { add("\u{1B}[\(-up)B") }   // never ESC[0A, which moves one
+            add("\u{1B}[\((column ?? 0) + 1)G")
+        }
+
+        let height = state["pane_height"] ?? rows
+        var region: String?
+        if let upper = state["scroll_region_upper"], let lower = state["scroll_region_lower"],
+           upper != 0 || lower != height - 1 {
+            region = "\u{1B}[\(upper + 1);\(lower + 1)r"
+        }
         if alternate {
             // Where the program's switch saved the primary's cursor, then the switch, then its screen.
-            add("\u{1B}[\((state["alternate_saved_y"] ?? 0) + 1);\((state["alternate_saved_x"] ?? 0) + 1)H")
+            onPrimary(row: state["alternate_saved_y"], column: state["alternate_saved_x"])
             add("\u{1B}[?1049h")
             for (row, line) in screen.enumerated() {
                 add("\u{1B}[\(row + 1);1H")
                 out += line
                 add("\u{1B}[0m")
             }
+            // The alternate screen is drawn from its top, so its own cursor is where tmux says.
+            if let region { add(region) }
+            add("\u{1B}[\((state["cursor_y"] ?? 0) + 1);\((state["cursor_x"] ?? 0) + 1)H")
+        } else {
+            onPrimary(row: state["cursor_y"], column: state["cursor_x"])
+            // Setting a region moves the cursor home: it is kept around it.
+            if let region { add("\u{1B}7" + region + "\u{1B}8") }
         }
-
-        let height = state["pane_height"] ?? rows
-        if let upper = state["scroll_region_upper"], let lower = state["scroll_region_lower"],
-           upper != 0 || lower != height - 1 {
-            add("\u{1B}[\(upper + 1);\(lower + 1)r")
-        }
-        add("\u{1B}[\((state["cursor_y"] ?? 0) + 1);\((state["cursor_x"] ?? 0) + 1)H")
         if state["cursor_flag"] == 0 { add("\u{1B}[?25l") }
         if flag("insert_flag") { add("\u{1B}[4h") }
         if flag("keypad_cursor_flag") { add("\u{1B}[?1h") }

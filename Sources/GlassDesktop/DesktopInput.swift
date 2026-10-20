@@ -17,6 +17,8 @@ final class DesktopInput {
     private let dispatch: @Sendable (Event) async throws -> Void
     private let onError: @MainActor (String) -> Void
     private var accepting = true
+    /// Told of each key, click, move, scroll or text sent: the library's time in use (2026-10-20).
+    var onActivity: (@MainActor () -> Void)?
 
     convenience init(session: any GlassDesktopTransport, onError: @escaping @MainActor (String) -> Void) {
         self.init(dispatch: { event in
@@ -45,6 +47,10 @@ final class DesktopInput {
 
     func send(_ event: Event) {
         guard accepting else { return }
+        switch event {
+        case .move, .button, .key, .text, .scroll: onActivity?()
+        case .synchronize, .release: break
+        }
         if case .release = event {
             // An in-flight event finishes before this release; unsent input is discarded on focus loss.
             pending.removeAll(keepingCapacity: true)

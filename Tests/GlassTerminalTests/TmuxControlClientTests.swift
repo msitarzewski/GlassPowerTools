@@ -93,7 +93,8 @@ struct TmuxControlClientTests {
         exchange.receive(reply(8, ["0,0,0,4,1,0,23,1,0,0,0,1,0,0,0,0,0,1,80,24,2"]) + reply(9))
         let drawn = exchange.takeDrawn()
         #expect(drawn.contains("one\r\ntwo\r\n$ ls"), "the history, then the screen")
-        #expect(drawn.contains("\u{1B}[2;5H"), "the cursor where tmux has it")
+        // Counted from the screen's last line drawn ("$ ls"), not the top: tmux has it on row 2, column 5.
+        #expect(drawn.contains("\u{1B}[1B\u{1B}[5G"), "the cursor where tmux has it")
         #expect(drawn.contains("\u{1B}[?2004h"), "bracketed paste, as the program asked")
         #expect(!drawn.contains("old"))
         #expect(exchange.live == 1 && exchange.client.phase == .live)
@@ -227,6 +228,16 @@ struct TmuxControlClientTests {
         #expect(live.takeSent() == ["refresh-client -C 100,30"])
     }
 
+    @Test("a size that changes while the pane is being asked for still reaches tmux")
+    func resizeWhileStarting() {
+        var exchange = Exchange()
+        exchange.receive("\u{1B}P1000p%begin 1 1 0\r\n%end 1 1 0\r\n%session-changed $1 alpha\r\n")
+        #expect(exchange.takeSent().first == "refresh-client -C 80,24")
+        // The tab's real frame, after the placeholder tmux was started at.
+        exchange.apply(exchange.client.resize(columns: 120, rows: 40))
+        #expect(exchange.takeSent() == ["refresh-client -C 120,40"])
+    }
+
     @Test("tmux 3.2 and later, as tmux -V says it")
     func versions() {
         #expect(TmuxControlClient.supports(version: "tmux 3.6\n"))
@@ -263,4 +274,35 @@ struct TmuxControlClientTests {
         let primary = (0..<terminal.rows).compactMap { terminal.getLine(row: $0)?.translateToString(trimRight: true) }
         #expect(primary.first == "$ vim", "the shell behind it")
     }
+
+    /// A pane's restore fed to a terminal of `rows`, and the prompt's row: where the cursor should be.
+    private func restored(paneRows: Int, history: Int, into rows: Int) throws -> (cursor: (row: Int, column: Int), prompt: (row: Int, column: Int)) {
+        let prompt = Array("alpha@host src % ".utf8)
+        var draft = TmuxPaneRestore.Draft()
+        draft.record(.history, lines: Array(repeating: [UInt8](), count: max(1, history)))
+        let screen = [prompt] + Array(repeating: [UInt8](), count: paneRows - 1)
+        draft.record(.screen, lines: screen)
+        draft.record(.screenExact, lines: screen)
+        draft.record(.primaryBehind, lines: [])
+        draft.record(.state, lines: [Array("0,0,0,\(prompt.count),0,0,\(paneRows - 1),1,0,0,0,1,0,0,0,0,0,1,80,\(paneRows),\(history)".utf8)])
+        draft.record(.pending, lines: [])
+        final class Delegate: TerminalDelegate { func send(source: Terminal, data: ArraySlice<UInt8>) {} }
+        let delegate = Delegate()   // held: the terminal's is weak
+        let terminal = Terminal(delegate: delegate, options: TerminalOptions(cols: 80, rows: rows, scrollback: 100))
+        terminal.feed(byteArray: Array(TmuxPaneRestore.bytes(for: draft, columns: 80, rows: rows)))
+        let row = try #require((0..<terminal.rows).first {
+            terminal.getLine(row: $0)?.translateToString(trimRight: true).hasPrefix("alpha@host") == true
+        })
+        return withExtendedLifetime(delegate) { ((terminal.buffer.y, terminal.buffer.x), (row, prompt.count)) }
+    }
+
+    @Test("a new shell's pane drawn into a terminal taller than it: the cursor on the prompt, not the line above")
+    func restoreIntoTallerTerminal() throws {
+        // A new zsh pane has one blank line of history (seen with tmux 3.8).
+        for (pane, rows, history) in [(25, 40, 1), (24, 25, 1), (25, 25, 1), (24, 24, 0)] {
+            let (cursor, prompt) = try restored(paneRows: pane, history: history, into: rows)
+            #expect(cursor == prompt, "pane \(pane) rows, terminal \(rows): cursor \(cursor), prompt \(prompt)")
+        }
+    }
 }
+

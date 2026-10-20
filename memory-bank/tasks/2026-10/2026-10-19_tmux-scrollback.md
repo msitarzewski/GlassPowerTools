@@ -227,3 +227,38 @@ program already running is restored only on tmux 3.7+; tmux older than 3.2 keeps
     been at 100% for about 15 s, then 20–30%.
   - A `sample` shows the main thread mostly waiting; the whole-buffer reads are gone.
   - No crash reports. All 26 tabs are control-mode clients. Not committed.
+
+## A new tab's cursor a row above its prompt (2026-10-20, 0.4.491)
+
+**His report, with a screenshot:** "New terminals open with the input on the wrong line :D". It was a local tab in
+tmux: row 0 blank with the cursor at the prompt's end column, and the prompt on row 1.
+
+**Cause** (traced by an agent and reproduced in SwiftTerm 1.20):
+- **The restore's cursor was placed from the top:** `TmuxPaneRestore.bytes` drew history and screen, then moved
+  to `cursor_y` with an absolute move.
+  - That is right only when the terminal has as many rows as the pane. In a taller terminal nothing scrolls, so the
+    screen lands below the history, and the cursor was that many rows too high.
+  - A new zsh pane has one blank history line (tmux 3.8), which gives exactly his screenshot.
+- **Why the pane was shorter than the tab:**
+  - **A resize while the pane was asked for was dropped.** `TmuxControlClient.resize` sent only once live or
+    restoring. A new tab starts tmux at the 800×480 placeholder, and SwiftUI's real frame follows.
+  - **A font size change never reached tmux.** It changes the grid without a frame, and only `setFrameSize`
+    told tmux.
+
+**Fix:**
+- **Cursor:** the restore counts the cursor up from the screen's last line drawn (`onPrimary`), for the shell's
+  cursor and for a program's saved one. A scroll region is set around it (DECSC/DECRC), since setting one moves the
+  cursor home.
+- **Resize:** sent while starting, once the start has sent its size.
+- **Font size:** `MacLocalProcessDelegateProxy.sizeChanged` tells tmux, after Scale's kept-grid check.
+
+**Tests:** each failed without its fix.
+- `TmuxControlClientTests.restoreIntoTallerTerminal`: four sizes, two of them taller.
+- `.resizeWhileStarting`.
+- `LiveTmuxControlResizeTests` (live, a private server): a doubled font makes tmux's window narrower.
+- `restore`'s byte expectation now names the relative move.
+- All 956 terminal tests pass, and the live tests passed three runs in a row.
+
+**Not checked:** whether a tab that was already open stays wrong. It doesn't redraw until tmux is told a size, and a
+window resize does that.
+

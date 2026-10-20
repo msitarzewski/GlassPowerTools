@@ -400,12 +400,22 @@ public final class SwiftTermHostModel: ObservableObject {
     /// so only those views follow it, never the whole window as this model's published changes do.
     public let outputActivity = SwiftTermOutputActivity()
 
+    /// When this terminal last had input or output, for the library's time in use (2026-10-20):
+    /// a minute counts when its sessions had either. Not published, as above.
+    public private(set) var lastActivityAt: Date?
+
     fileprivate func noteOutputActivity() {
         let now = ContinuousClock.now
         if let last = lastOutputActivity, now - last < .milliseconds(250) { return }
         lastOutputActivity = now
+        lastActivityAt = Date()
         outputActivity.note(at: now)
         onOutputActivity?()
+    }
+
+    /// Typing, a paste, or the mouse sent to the program.
+    public func noteInputActivity() {
+        lastActivityAt = Date()
     }
 
     /// The title the remote shell or program set (OSC 0/2): "user@host: ~/src" from Ubuntu's
@@ -3099,6 +3109,7 @@ private final class SwiftTermEngine: TerminalEngine {
 
     func recordInput(byteCount: Int) {
         performanceDiagnostics.recordInput(byteCount: byteCount)
+        terminalView.hostModel()?.noteInputActivity()
     }
 
     func refreshAccessibilityViewport() {
@@ -3994,6 +4005,7 @@ private final class MacSwiftTermEngine: TerminalEngine {
 
     func recordInput(byteCount: Int) {
         performanceDiagnostics.recordInput(byteCount: byteCount)
+        terminalView.hostModel?.noteInputActivity()
     }
 
     func focusIfActive() -> Bool {
@@ -4717,6 +4729,11 @@ private final class MacLocalProcessDelegateProxy:
         // Preserve LocalProcessTerminalView's ioctl-backed resize behavior after
         // replacing its delegate with this policy proxy.
         terminalView?.sizeChanged(source: source, newCols: newCols, newRows: newRows)
+        // tmux on pipes (D83) is told here too: a new font size changes the grid without a new
+        // frame, and only a new frame reached tmux (2026-10-20).
+        if let view = terminalView, let actions = view.tmuxControl?.resize(columns: newCols, rows: newRows) {
+            for case .transport(let bytes) in actions { view.writeToTmux(bytes) }
+        }
     }
 
     func setTerminalTitle(source: TerminalView, title: String) {
@@ -5094,6 +5111,7 @@ private final class MacLocalProcessEngine: TerminalEngine, SwiftTermLocalProcess
 
     func recordInput(byteCount: Int) {
         performanceDiagnostics.recordInput(byteCount: byteCount)
+        delegateProxy.hostModel?.noteInputActivity()
     }
 
     func sendUserInput(_ bytes: ArraySlice<UInt8>) {

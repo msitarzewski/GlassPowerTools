@@ -39,17 +39,21 @@ public struct GlassUsagePayload: Codable, Equatable, Sendable {
         }
     }
 
-    /// Connections to one machine through one kind of service on one day. The kind is its raw
-    /// value, so a kind a newer build adds is skipped here rather than failing the whole payload.
+    /// Connections to one machine through one kind of service on one day, and the minutes it was
+    /// in use (2026-10-20). The kind is its raw value, so a kind a newer build adds is skipped here
+    /// rather than failing the whole payload; `minutes` is optional, so a build from before it
+    /// reads the counts and a payload from before it has none.
     public struct Count: Codable, Equatable, Sendable {
         public var host: Int
         public var kind: String
         public var count: Int
+        public var minutes: Int?
 
-        public init(host: Int, kind: String, count: Int) {
+        public init(host: Int, kind: String, count: Int, minutes: Int? = nil) {
             self.host = host
             self.kind = kind
             self.count = count
+            self.minutes = minutes
         }
     }
 
@@ -78,8 +82,10 @@ public struct GlassUsagePayload: Codable, Equatable, Sendable {
 }
 
 extension GlassUsagePayload.Device {
-    /// This device's entry, counted from its own history: the last `GlassUsagePayload.days` days.
-    public init(name: String, history: [GlassShellPreferences.ConnectionEvent], now: Date = Date(),
+    /// This device's entry, counted from its own history, with the minutes each machine was in use
+    /// (`usageMinutes`: day → "host|kind" → minutes): the last `GlassUsagePayload.days` days.
+    public init(name: String, history: [GlassShellPreferences.ConnectionEvent],
+                minutes usage: [String: [String: Int]] = [:], now: Date = Date(),
                 calendar: Calendar = .current) {
         let today = calendar.startOfDay(for: now)
         let start = calendar.date(byAdding: .day, value: -(GlassUsagePayload.days - 1), to: today) ?? today
@@ -97,12 +103,34 @@ extension GlassUsagePayload.Device {
             }
             counts[GlassUsagePayload.dayKey(event.date, calendar: calendar), default: [:]]["\(slot)|\(event.kind.rawValue)", default: 0] += 1
         }
-        var days: [String: [GlassUsagePayload.Count]] = [:]
-        for (day, byKey) in counts {
-            days[day] = byKey.keys.sorted().compactMap { key in
+        // Minutes in use, in the window, under the same machine slots.
+        let firstDay = GlassUsagePayload.dayKey(start, calendar: calendar)
+        let lastDay = GlassUsagePayload.dayKey(now, calendar: calendar)
+        var minutes: [String: [String: Int]] = [:]
+        for (day, byKey) in usage where day >= firstDay && day <= lastDay {
+            for (key, value) in byKey where value > 0 {
                 let parts = key.split(separator: "|", maxSplits: 1)
-                guard parts.count == 2, let host = Int(parts[0]), let count = byKey[key] else { return nil }
-                return GlassUsagePayload.Count(host: host, kind: String(parts[1]), count: count)
+                guard parts.count == 2, let uuid = UUID(uuidString: String(parts[0])) else { continue }
+                let hostID = HostID(rawValue: uuid)
+                let slot: Int
+                if let known = index[hostID] {
+                    slot = known
+                } else {
+                    hosts.append(uuid.uuidString)
+                    slot = hosts.count - 1
+                    index[hostID] = slot
+                }
+                minutes[day, default: [:]]["\(slot)|\(parts[1])", default: 0] += value
+            }
+        }
+        var days: [String: [GlassUsagePayload.Count]] = [:]
+        for day in Set(counts.keys).union(minutes.keys) {
+            let byKey = counts[day] ?? [:], used = minutes[day] ?? [:]
+            days[day] = Set(byKey.keys).union(used.keys).sorted().compactMap { key in
+                let parts = key.split(separator: "|", maxSplits: 1)
+                guard parts.count == 2, let host = Int(parts[0]) else { return nil }
+                return GlassUsagePayload.Count(host: host, kind: String(parts[1]), count: byKey[key] ?? 0,
+                                               minutes: used[key].map { min($0, 24 * 60) })
             }
         }
         self.init(name: name, updatedAt: now, hosts: hosts, days: days)
@@ -114,9 +142,11 @@ extension GlassUsagePayload.Device {
         days.flatMap { key, counts -> [GlassUsageCount] in
             guard let date = GlassUsagePayload.day(key, calendar: calendar) else { return [] }
             return counts.compactMap { count in
+                let minutes = max(0, count.minutes ?? 0)
                 guard hosts.indices.contains(count.host), let uuid = UUID(uuidString: hosts[count.host]),
-                      let kind = HostServiceKind(rawValue: count.kind), count.count > 0 else { return nil }
-                return GlassUsageCount(date: date, hostID: HostID(rawValue: uuid), kind: kind, count: count.count)
+                      let kind = HostServiceKind(rawValue: count.kind), count.count > 0 || minutes > 0 else { return nil }
+                return GlassUsageCount(date: date, hostID: HostID(rawValue: uuid), kind: kind, count: count.count,
+                                       minutes: minutes)
             }
         }
     }
@@ -137,7 +167,8 @@ extension GlassUsagePayload: GlassSettingsSyncPayload {
                 throw GlassSettingsSyncError.invalidPayload("a device's counts are too large")
             }
             for counts in device.days.values {
-                guard counts.allSatisfy({ device.hosts.indices.contains($0.host) && $0.count >= 0 }) else {
+                guard counts.allSatisfy({ device.hosts.indices.contains($0.host) && $0.count >= 0
+                    && (0...(24 * 60)).contains($0.minutes ?? 0) }) else {
                     throw GlassSettingsSyncError.invalidPayload("a count names no machine")
                 }
             }
@@ -165,12 +196,15 @@ public struct GlassUsageCount: Equatable, Sendable {
     public var hostID: HostID
     public var kind: HostServiceKind
     public var count: Int
+    /// Minutes in use that day (2026-10-20): each minute a session there had input or output.
+    public var minutes: Int
 
-    public init(date: Date, hostID: HostID, kind: HostServiceKind, count: Int) {
+    public init(date: Date, hostID: HostID, kind: HostServiceKind, count: Int, minutes: Int = 0) {
         self.date = date
         self.hostID = hostID
         self.kind = kind
         self.count = count
+        self.minutes = minutes
     }
 }
 

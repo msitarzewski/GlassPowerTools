@@ -1015,8 +1015,14 @@ public final class DesktopSessionModel {
         Task { await target.releaseInputs() }
     }
 
+    /// When input was last sent to this desktop, for the library's time in use (2026-10-20).
+    @ObservationIgnored public private(set) var lastActivityAt: Date?
+
+    func noteActivity() { lastActivityAt = Date() }
+
     private func sendInput(_ operation: @escaping @Sendable (any GlassDesktopTransport) async throws -> Void) {
         guard isConnected else { return }
+        noteActivity()
         let attempt = attemptID, target = transport
         Task { [weak self] in
             guard let self, attempt == attemptID, isConnected else { return }
@@ -1120,6 +1126,7 @@ public final class DesktopSessionModel {
         if accessoryInput == nil || accessoryTransport !== transport {
             accessoryInput?.stop()
             accessoryInput = DesktopInput(session: transport) { [weak self] in self?.errorMessage = $0 }
+            accessoryInput?.onActivity = { [weak self] in self?.noteActivity() }
             accessoryTransport = transport
         }
         return accessoryInput

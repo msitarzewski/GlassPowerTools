@@ -303,7 +303,10 @@ public struct TmuxControlClient: Sendable {
         guard columns != self.columns || rows != self.rows else { return [] }
         self.columns = columns
         self.rows = rows
-        guard phase == .live || phase == .restoring else { return [] }
+        // Once the start has sent a size, every change goes too: one made while the pane was being
+        // asked for was kept here and never reached tmux, and the pane stayed the placeholder's
+        // size under a taller terminal (2026-10-20).
+        guard phase == .live || phase == .restoring || (phase == .starting && askedAtStart) else { return [] }
         return send("refresh-client -C \(columns),\(rows)", as: .ignored)
     }
 

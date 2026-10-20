@@ -148,6 +148,7 @@ final class DesktopMTKView: MTKView {
         inputTransport = session.transport
         setupPresentation()
         input = DesktopInput(session: session.transport) { [weak session] in session?.errorMessage = $0 }
+        input?.onActivity = { [weak session] in session?.noteActivity() }
         guard let device else { session.rendererError = RendererError.unavailable.localizedDescription; return }
         do {
             renderer = try DesktopMetalRenderer(device: device, pixelFormat: colorPixelFormat) { [weak session] in session?.rendererError = $0 }
@@ -198,6 +199,7 @@ final class DesktopMTKView: MTKView {
         if inputTransport !== target || session.isConnected != wasConnected {
             input?.stop()
             input = DesktopInput(session: target) { [weak session] in session?.errorMessage = $0 }
+            input?.onActivity = { [weak session] in session?.noteActivity() }
             inputTransport = target
             releaseFocusState()
             wasConnected = session.isConnected

@@ -522,6 +522,7 @@ class DatabaseSessionManager {
               let connection = session.connection else {
             throw SessionError.connectionLost
         }
+        session.noteActivity()
         guard await refreshConnectionState(sessionID: sessionID) else {
             throw SessionError.connectionLost
         }
@@ -1087,7 +1088,13 @@ class DatabaseSession {
     /// (2026-09-22: Active should say which table the open workspace is on). Nil on the
     /// connection overview. The workspace publishes it on every change of its displayed tab;
     /// with two windows on one session the later change wins.
-    var workspaceFocus: String?
+    var workspaceFocus: String? {
+        didSet { if workspaceFocus != oldValue { noteActivity() } }
+    }
+    /// When a query last ran or the workspace moved to another table or tab, for the library's
+    /// time in use (2026-10-20). Not observed: nothing draws it.
+    @ObservationIgnored private(set) var lastActivityAt: Date?
+    func noteActivity() { lastActivityAt = Date() }
     var connection: (any DatabaseConnection)?
     var engine: (any DatabaseEngine)?
     /// The live forward this session's transport rides, when `usesHostTunnel`. Owned here so

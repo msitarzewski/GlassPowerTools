@@ -28,6 +28,22 @@ struct ActiveRowFocusTests {
                 == "MySQL · Disconnected", "a focus means nothing on a session that is not connected")
     }
 
+    @Test("Moving to another table or tab marks the session active, for the library's time in use (2026-10-20)")
+    func focusIsActivity() throws {
+        let runtime = GlassDatabaseRuntime(layers: GlassLayerStore())
+        let capability = GlassDatabaseCapability(runtime: runtime)
+        let session = DatabaseSession(connectionConfig: DatabaseConnectionConfig(name: "MySQL on alpha"))
+        runtime.sessionManager.sessions[UUID()] = session
+        let row = try #require(capability.openSessions().first)
+        #expect(row.lastActivity?() == nil)
+        let before = Date()
+        session.workspaceFocus = "shop › articles"
+        let first = try #require(row.lastActivity?())
+        #expect(first >= before)
+        session.workspaceFocus = "shop › articles"
+        #expect(row.lastActivity?() == first, "the same place again isn't activity")
+    }
+
     @Test("The row Active gets carries the session's focus")
     func rowCarriesFocus() {
         let runtime = GlassDatabaseRuntime(layers: GlassLayerStore())
