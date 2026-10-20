@@ -81,3 +81,18 @@ this?"), and the signed-out iCloud wording seen running the release in the VM.
 - The terminal page's limit is removed.
 - `RELEASE-NOTES.md` has a 0.4.492 section, "not yet released".
 - The live site still describes 0.4.491 until the next release.
+
+## Released (0.4.494, his "commit, push, and ship 0.4.493", then 0.4.494 by his choice)
+
+- **Commits:**
+  - `ff46dcd3`: the code.
+  - `17d50e3e`: the first release's site, help, README and pictures.
+  - `410268ca`: the plain button and the gear menu.
+  - `e37ce0c3`: the feed.
+  - All pushed.
+- **TestFlight:** 493, unused, and 494, for iPhone/iPad and Vision Pro.
+- **Mac:** GitHub v0.4.494, built from `410268ca`, with the app and dmg notarized; the downloads match their checksums.
+- **The site and feed** are live, with all 90 files checked; the feed lists 0.4.494 over 0.4.491, `no-cache`.
+- **Installed:** Mac and iPhone 0.4.494. The Vision Pro is unreachable.
+- **Install script:** `install-mac2.zsh` now skips a build already in place, so an early hand install isn't quit twice.
+

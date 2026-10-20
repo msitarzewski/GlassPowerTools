@@ -46,7 +46,13 @@ use the disposable test VM only).
     menu, beside a plain folder button that stays inline; any menu on the button splits the bar. The local gear menu
     no longer repeats the toolbar (0.4.494, his choice).
   - iCloud's signed-out words.
-  - Uncommitted. Releasing it and deploying its docs wait for his word.
+  - **Released at his word** ("commit, push, and ship"):
+    - 0.4.494 on GitHub (v0.4.494, notarized; downloads match their checksums).
+    - TestFlight 494 for iPhone/iPad and Vision Pro.
+    - The feed offers 494 over 491.
+    - The site is live (90 files checked).
+    - 0.4.493 went to TestFlight only.
+  - On the Mac and iPhone (494). The Vision Pro is unreachable (still 0.4.481).
 
 **Committed at his word** ("commit."); pushed with the ship. 0.4.491 is on the Mac and iPhone; the Vision Pro unreachable.
 - **Time in use (D87):** the overview counted only library Connects, not his days of tmux. Each minute with input or
